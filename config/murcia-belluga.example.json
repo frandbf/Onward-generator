@@ -1,0 +1,40 @@
+{
+  "$schema": "./generator.schema.json",
+  "project": {
+    "name": "Murcia Belluga",
+    "version": "0.1.0",
+    "target": "onward_quest"
+  },
+  "source": {
+    "provider": "openstreetmap",
+    "attribution_required": true
+  },
+  "area": {
+    "center": {
+      "latitude": 37.98407,
+      "longitude": -1.12863
+    },
+    "boundary_file": "murcia_belluga_aoi.geojson",
+    "margin_m": 30
+  },
+  "generation": {
+    "buildings": true,
+    "roads": true,
+    "sidewalks": true,
+    "facades": true,
+    "interiors": false
+  },
+  "quality": {
+    "detail_level": "low",
+    "deterministic_seed": 48152
+  },
+  "optimization": {
+    "target": "quest_standalone",
+    "generate_collisions": true,
+    "generate_lods": true
+  },
+  "export": {
+    "adapter": "onward",
+    "enabled": false
+  }
+}

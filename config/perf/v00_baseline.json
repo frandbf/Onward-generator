@@ -1,0 +1,9 @@
+{
+  "variant": "v00_baseline",
+  "description": "Phase 04 output as is, with only what the Onward SDK requires: one baked directional light and a baked lightmap. No static batching, no occlusion culling, no LOD.",
+  "static_batching": false,
+  "occlusion_culling": false,
+  "lightmap_texels_per_m": 2.0,
+  "lightmap_max_size": 2048,
+  "lightmap_directional": true
+}

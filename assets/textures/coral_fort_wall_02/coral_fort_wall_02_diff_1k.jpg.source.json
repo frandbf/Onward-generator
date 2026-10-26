@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "coral_fort_wall_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/coral_fort_wall_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coral_fort_wall_02/coral_fort_wall_02_diff_1k.jpg",
+  "md5": "faa203913ca4749e79ee05c5af5832dd",
+  "sha256": "4411870cd45ccf88ca26dda42e33b4aff4430c6f51be322c1a62788ab1fc3c5f",
+  "size_bytes": 1065570,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/coral_fort_wall_02/coral_fort_wall_02_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T12:22:50+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

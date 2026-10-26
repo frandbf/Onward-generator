@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "grass_path_2",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/grass_path_2",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg",
+  "md5": "48cebe95af233211c9469a9bfe2f42f2",
+  "sha256": "7f30b163739435c11f500f3818c7bb4922bab5f2734cc9ba6dd36817f0c9a8ab",
+  "size_bytes": 716010,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/grass_path_2/grass_path_2_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:37+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

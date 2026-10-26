@@ -1,0 +1,19 @@
+{
+  "$schema": "./onward.schema.json",
+  "version": "0.1.0",
+  "adapter": { "name": "onward_unity", "version": "0.1.0" },
+  "target": { "unity": "2021.3.23f1", "sdk": "1.15", "platform": "quest" },
+  "map": {
+    "id": "murcia_belluga",
+    "title": "Apocalipsis Murciana",
+    "description": "Apocalipsis Murciana: generated map of the Murcia cathedral area. Generic facades; not a faithful reconstruction."
+  },
+  "build": {
+    "combine_cell_m": 100.0,
+    "static_batching": false,
+    "occlusion_culling": false,
+    "lightmap_texels_per_m": 10.0,
+    "lightmap_max_size": 2048,
+    "lightmap_directional": false
+  }
+}

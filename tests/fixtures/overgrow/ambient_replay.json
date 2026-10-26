@@ -1,0 +1,30 @@
+{
+  "plan_version": "0.1.0",
+  "mood": "A fenced gap, a covered wall, and a watched point.",
+  "actions": [
+    {
+      "op": "span",
+      "asset_id": "large_iron_gate",
+      "from_id": "corner:osm-way-left:0:1",
+      "to_id": "corner:osm-way-right:0:0",
+      "passage_m": 1.2
+    },
+    {
+      "op": "cover",
+      "asset_id": "modular_fire_escape",
+      "edge_id": "facade:osm-way-left:0:0"
+    },
+    {
+      "op": "watch",
+      "asset_id": "security_camera_02",
+      "poi_id": "poi:osm-node-place",
+      "count": 2
+    },
+    {
+      "op": "place",
+      "asset_id": "concrete_road_barrier",
+      "anchor_id": "lane:street:osm-way-street:0:p:0",
+      "crosswise": false
+    }
+  ]
+}

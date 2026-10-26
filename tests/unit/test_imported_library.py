@@ -1,0 +1,144 @@
+"""Local CC0 library: albedo and GLB only, buildings do not replace OSM."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+CATALOG = REPO / "config" / "dress" / "imported_library.json"
+
+
+def _load() -> dict:
+    document = json.loads(CATALOG.read_text(encoding="utf-8"))
+    assert document["schema"] == "onward_generator.imported_library"
+    assert document["schema_version"] == "0.1.0"
+    return document
+
+
+def test_imported_library_keeps_albedo_and_does_not_place_buildings() -> None:
+    document = _load()
+    rows = document["textures"] + document["objects"]
+    ids = [row["id"] for row in rows]
+    assert ids
+    assert len(ids) == len(set(ids))
+    surfaces = {row["surface"] for row in document["textures"]}
+    assert {"wall", "roof", "floor", "sidewalk", "street"} <= surfaces
+    for row in document["textures"]:
+        assert row["license"] == "CC0-1.0"
+        assert row["bound"] is False
+        assert row["path"].startswith("assets/textures/")
+        assert "Normal" not in row["path"]
+        assert "Roughness" not in row["path"]
+    for row in document["objects"]:
+        assert row["license"] == "CC0-1.0"
+        assert row["replaces_osm"] is False
+        assert row["placed"] is False
+        assert row["path"].endswith(".glb")
+        assert row["path"].startswith("assets/kenney/")
+
+
+def test_kenney_review_describes_every_mesh_and_drops_buildings() -> None:
+    catalogue = _load()
+    review = json.loads((REPO / "assets" / "kenney_review.json").read_text(encoding="utf-8"))
+    assert review["schema"] == "onward_generator.kenney_review"
+    rows = review["assets"]
+    assert len(rows) == 272
+    installed = [row for row in rows if row["installed"] is True]
+    removed = [row for row in rows if row["installed"] is False]
+    assert len(installed) == 201
+    assert len(removed) == 71
+    catalog_ids = {row["id"] for row in catalogue["objects"]}
+    assert catalog_ids == {row["id"] for row in installed}
+    assert all(row["role"] != "building" for row in catalogue["objects"])
+    for row in rows:
+        assert row["author"] == "Kenney"
+        assert row["license"] == "CC0"
+        assert row["reason"]
+        assert row["usable"] is row["installed"]
+    for row in installed:
+        assert (REPO / "assets" / "kenney" / row["normalized_file"]).is_file()
+    for row in removed:
+        assert "Removed on 2026-10-26" in row["reason"]
+        assert not list((REPO / "assets" / "kenney").glob(f"**/{row['name']}.glb"))
+
+
+def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
+    normalized = json.loads((REPO / "assets" / "normalized" / "manifest.json").read_text(encoding="utf-8"))
+    document = json.loads((REPO / "assets" / "kenney" / "manifest.json").read_text(encoding="utf-8"))
+    assert list(document) == list(normalized)
+    assert document["schema"] == normalized["schema"]
+    assert document["schema_version"] == normalized["schema_version"]
+    assert document["unit"] == "m"
+    assert document["collider"] == "none"
+    sample = normalized["assets"][0]
+    files = sorted(path.relative_to(REPO / "assets" / "kenney").as_posix() for path in (REPO / "assets" / "kenney").rglob("*.glb"))
+    listed = [row["file"] for row in document["assets"]]
+    assert sorted(listed) == files
+    assert len(listed) == len(set(row["id"] for row in document["assets"]))
+    for row in document["assets"]:
+        assert list(row) == list(sample)
+        assert row["use"]
+        assert row["collider"] == "none"
+        assert (REPO / "assets" / "kenney" / row["file"]).is_file()
+
+
+def test_overgrow_selection_includes_every_asset_catalogue() -> None:
+    from onward_generator.overgrow.library import load_library
+    from onward_generator.overgrow.library_catalog import LibraryError, choose_ids, installed_rows, library_directories
+
+    directories = library_directories(REPO / "assets")
+    assert {path.name for path in directories} == {"kenney", "normalized"}
+    rows = installed_rows(REPO / "assets")
+    ids = [row["id"] for row in rows]
+    assert len(ids) == len(set(ids)) == 250
+    assert "covered_car" in ids
+    assert "kenney_suburban_driveway_long" in ids
+    assert choose_ids(
+        REPO / "assets",
+        ["covered_car", "kenney_suburban_driveway_long"],
+        all_installed=False,
+    ) == ["covered_car", "kenney_suburban_driveway_long"]
+    props = load_library(REPO / "assets")
+    loaded = {prop.spec.id for prop in props}
+    assert loaded == set(ids)
+    driveway = next(prop for prop in props if prop.spec.id == "kenney_suburban_driveway_long")
+    texture = (REPO / "assets/kenney/suburban/Textures/colormap.png").read_bytes()
+    assert driveway.albedo == texture
+    from onward_generator.generation.gltf import read_glb
+    for glb in (REPO / "assets/kenney").rglob("*.glb"):
+        doc, _blob = read_glb(glb.read_bytes())
+        for image in doc.get("images") or []:
+            uri = image.get("uri")
+            if isinstance(uri, str):
+                assert (glb.parent / uri).is_file(), f"{glb} -> {uri}"
+
+
+def test_two_catalogues_cannot_share_an_id(tmp_path: Path) -> None:
+    from onward_generator.overgrow.library_catalog import LibraryError, installed_rows
+
+    for name in ("one", "two"):
+        folder = tmp_path / name
+        folder.mkdir()
+        (folder / "manifest.json").write_text(
+            json.dumps({"assets": [{"id": "shared", "file": "shared.glb"}]}),
+            encoding="utf-8",
+        )
+    with pytest.raises(LibraryError, match="shared"):
+        installed_rows(tmp_path)
+
+
+def test_imported_files_match_the_catalogue_when_present() -> None:
+    document = _load()
+    rows = document["textures"] + document["objects"]
+    first = REPO / rows[0]["path"]
+    if not first.is_file():
+        return
+    for row in rows:
+        path = REPO / row["path"]
+        assert path.is_file(), row["id"]
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        assert digest == row["sha256"]

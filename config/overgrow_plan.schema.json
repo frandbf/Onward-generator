@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/overgrow_plan.schema.json",
+  "title": "Overgrow placement plan",
+  "description": "Gestures a model may request for any map. Ids come from that run's digest and library. The model does not send matrices, code, or free metres except passage_m.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plan_version", "mood", "actions"],
+  "properties": {
+    "plan_version": { "const": "0.1.0" },
+    "mood": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "actions": {
+      "type": "array",
+      "maxItems": 24,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "asset_id", "from_id", "to_id", "passage_m"],
+            "properties": {
+              "op": { "const": "span" },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "from_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "to_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "passage_m": { "type": "number", "minimum": 1.2, "maximum": 2.4 }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "asset_id", "edge_id"],
+            "properties": {
+              "op": { "const": "cover" },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "edge_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "asset_id", "poi_id", "count"],
+            "properties": {
+              "op": { "const": "watch" },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "poi_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "count": { "type": "integer", "minimum": 1, "maximum": 3 }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "asset_id", "anchor_id", "crosswise"],
+            "properties": {
+              "op": { "const": "place" },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "anchor_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "crosswise": { "type": "boolean" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

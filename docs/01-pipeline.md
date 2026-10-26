@@ -1,0 +1,386 @@
+# Pipeline — create and revise a map
+
+Read the numbered files in `docs/` in order. This is `01`. `02` is configuration, then each stage through `12` (export). `abandoned-assets.md` is the prop catalogue. `legal/data-sources.md` is the licence record. Files in `decisions/` explain a choice. They are not the next chapter.
+
+Process contract. The command is `onward-generator` (`python -m onward_generator`). Murcia (Belluga, latitude 37.98407, longitude −1.12863, `MURCIA_CENTER` in the tests) is the test origin, not the name of the tool.
+
+Phase 07 stays **open**. `device_verified` is false until `quest_acceptance.md` is filled in on the headset (`docs/12-export.md`). This document does not authorise `CONFIRM_PUSH`.
+
+## Rules
+
+A stage is independent when it:
+
+- reads only the immutable output of the previous stage (manifest plus SHA-256);
+- writes a **new** directory;
+- refuses to write when the input hash does not match;
+- does not import Unity or the SDK. The exceptions are `export` and the Onward Launcher.
+
+`geo`, `generate`, and `detail` are deterministic: the same input and the same seed produce the same bytes.
+
+No command overwrites without `--overwrite`. An export package is **never** overwritten. If the folder exists, `export package` refuses. Unity also refuses to rebuild a scene or a launcher whose output directory already exists.
+
+## Order
+
+Stage 0 prepares the Unity project once. It is not repeated per map.
+
+Each box is a new directory. Dashed boxes are optional. `detail` reads the original `generate`. The wall is added at the end, on the dressed copy, and that copy is what `export` reads.
+
+```mermaid
+flowchart LR
+  mapCreate[map create] --> osm[Overpass from lat/lon]
+  osm --> geo[geo]
+  geo --> heights[heights]
+  cadastre[cadastre] -.-> heights
+  heights --> generate[generate]
+  generate --> detail[detail]
+  detail --> dress[dress style]
+  dress --> props[props place]
+  props --> materials[materials apply]
+  materials --> signs[signs place]
+  signs --> overgrow[overgrow place]
+  overgrow --> fit[overgrow fit]
+  fit --> bounds[bounds]
+  bounds --> layout[perf layout --playable]
+  layout --> exportPkg[export package]
+  exportPkg --> unity[Unity]
+  unity --> quest[Quest]
+```
+
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `cadastre` runs only when real storey counts are requested, and only in Spain. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+
+## 0. Unity project — once
+
+This is the project `export` and the Onward Launcher use. It lives in `~/Unity/OnwardPhase0Project`. Maps in this repository are not inside that folder.
+
+| Setting | Value |
+| --- | --- |
+| Editor | Unity 2021.3.23f1. A newer editor rewrites the project and 2021.3 can no longer open it |
+| URP | `com.unity.render-pipelines.universal` 12.1.11 |
+| Burst | Installed. The SDK `NavigationMapValues` uses `BurstCompile` |
+| Pipeline | In Graphics, `Assets/OnwardCustomContent/UniversalRenderPipelineAsset` (guid `7decc6ad7e4538047bac43b16df38ce6`). All six quality levels inherit it |
+| Colour | Linear |
+| Shader stripping | Lightmap Modes and Fog Modes on Custom, every lightmap and fog checkbox on |
+| Android | Active platform, IL2CPP, ARM64 |
+| XR | XR Plugin Management 4.5.2 and Oculus XR Plugin 3.3.0. Oculus on for PC and Android. PC: Single Pass Instanced. Android: Multiview |
+| macOS launcher | In `OnwardLauncher.cs`, only `.Replace('/', '\\')` is removed. The SDK original stays outside `Assets`. Reimporting the `.unitypackage` undoes the patch |
+| Navigation map | The Quest reads the `AI_NavBake` JSON, not the `NavigationMap` object. `tool` applies `patch_content_builder.py`. Reimporting the package undoes it. The next `tool` puts it back |
+| Graphics API | The project leaves it on automatic. When the scene is built, the adapter sets Vulkan, with OpenGLES3 as fallback |
+
+The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage`. `ExampleScene` is not renamed, and the `OnwardCustomContent` prefabs are not edited. Playable-map detail is in [11-onward-sdk.md](11-onward-sdk.md).
+
+`scene` opens that project in batch mode. If the Editor already has it open, the step cannot start. A freshly created project does not contain `Assets/OnwardAdapter/`.
+
+## What to rerun
+
+| What changed | Run again | Keep |
+| --- | --- | --- |
+| Centre, radius, or card name | `map create` and, if the area changed, everything from `geo` | the other maps |
+| OSM extract | `geo` and everything after it | the map folder |
+| Heights or Catastro | `heights`, then `generate` and everything after it | `geo` |
+| Volumes | `generate` and everything after it | `geo`, `heights` |
+| Facades | `detail` and everything after it | `generate` |
+| Generated trees and benches | `dress style` and everything after it | `detail` |
+| Asset Store instances | `props place` | the `detail` geometry |
+| Textures | `materials apply` | geometry and OSM footprints |
+| Street name | `signs place` on the dressed copy | the carriageway and the facades |
+| Abandoned city | `overgrow place`, then `overgrow fit` | building footprints and the drive lane |
+| Perimeter wall | `bounds` on the dressed copy, then layout and export | `generate` and `detail` |
+| Spawns, routes, modes | `perf layout --playable` and a new package | the geometry |
+| Lightmaps or shader | Unity on a **new package** | the input package |
+
+## 1. Map folder
+
+`onward-generator map create`. Configuration: [02-configuration.md](02-configuration.md).
+
+| | |
+| --- | --- |
+| Input | `--name` (1–80). The id and `maps/<id>` are that name in lower case, without accents, spaces as `_`. `--lat`, `--lon`, `--radius-m` (50–1500, default 400), `--margin-m` (default 30), `--lightmap-texels-per-m` (greater than 0 and at most 40, default 10) |
+| Output | `map.json`, `config/project.json`, `config/export.json`, `config/texture_plan.json`, `reference/aoi.geojson`, `data/raw/<id>.osm` |
+| Area | A square in local metres around the centre, converted to WGS84. Degrees are not treated as metres |
+| CRS | EPSG:25830 when the centre is in peninsular Spain. Otherwise the WGS84 UTM zone of that point (north `EPSG:326xx`, south `EPSG:327xx`). Stored in `map.json`. `map show` prints the `--crs` that `geo` must use |
+| OSM | One Overpass request for the square plus the margin. Writes `data/raw/<id>.osm` and a `.source.json`. Does not replace an extract that is already there unless `--overwrite` |
+| Textures | One plan for this map, chosen from the imported library. See below |
+| Does not | Generate geometry. It does not pick a global "active" map |
+
+`onward-generator run` walks the chain from `--name`, `--lat`, and `--lon`. `--brief` stores how the city should feel. If the sentence asks for an abandoned city, chaos, or blocked streets, `overgrow` leaves a few cars and barrels on the carriageway. Otherwise they stay on the kerb. `--ai` stores `ambient_ai`, and `overgrow` asks Ollama for a gesture plan. If it does not answer or the JSON does not validate, it retries once. If that attempt also fails, the rules place the props.
+
+Each `run` step prints an indented result and `OK` with its duration. At the end, `run: time` lists the steps that ran and the total. The Quest question is not included. File paths, the package listing, the layout JSON, and the full Unity log stay out of that summary. The editor log remains in `~/Library/Logs/onward-export/`.
+
+If a step exits non-zero, the console says `FAILED <step>` and `Next:` names the step to resume from. Earlier steps are not repeated. A second run with the same folder skips steps that already wrote their output and continues at the first one that is missing. A `map.json` without the OSM XML asks Overpass again (`osm download`) and does not repeat `map create`. When two or more steps are done and the terminal is interactive, it lists them and asks where to continue. `--from geo` answers without asking. Each step always writes the same directory (`bounds` writes `scene_playable`). If that directory already exists, the repeat passes `--overwrite`. A file older than the input it reads is pending: repeating `geo` asks for `heights` again, and so on to the end. `export package` is not overwritten. If `pkg_01` exists, the next package is `pkg_02`.
+
+After the Python steps, `unity` runs `tool scene launcher` on the package just written. If the scene is already baked, it is not repeated. Then the command asks whether to upload. Only `s` or `si` runs the existing `push`, which sets `CONFIRM_PUSH=yes`, backs up the map on the headset, and replaces it. Any other answer, or a terminal that cannot ask, uploads nothing. If `unity` fails, it does not ask.
+
+`map show DIRECTORY` prints the centre. At the end of each stage, `next:` prints the following command.
+
+If Overpass fails, the folder still exists and `osm download --map DIRECTORY` repeats the same request. The extract is not versioned (`maps/*/data/`). Licence: [legal/data-sources.md](legal/data-sources.md).
+
+## 2. Geo
+
+`onward-generator geo`. [03-geo-pipeline.md](03-geo-pipeline.md). [ADR-002](decisions/ADR-002-coordinate-system.md).
+
+| | |
+| --- | --- |
+| Input | `--source` (local `.osm`), `--aoi` (`reference/aoi.geojson`), `--origin LON LAT`, `--crs` from `map show` |
+| Output | `data/processed/geo/geo_scene.json`, `geo_report.json` |
+| Hashes | SHA-256 of the `.osm` before and after. A change stops the stage |
+| Contract | `onward_generator.geo_scene` 0.2.0. Local metres. Provenance per feature. No height estimates |
+
+The generator extrudes footprints the extract kept. It does not invent buildings.
+
+## 3. Heights
+
+`onward-generator heights`. [04-heights.md](04-heights.md).
+
+| | |
+| --- | --- |
+| Input | `geo_scene.json`. The scene SHA-256 must match when it is read again |
+| Output | `heights.json`, `heights_report.json` |
+| Classes | measured, inferred, fallback, needs_manual_review |
+
+`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. [05-cadastre.md](05-cadastre.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
+
+## 4. Generate
+
+`onward-generator generate`. [06-generation.md](06-generation.md). [ADR-003](decisions/ADR-003-geometry-engine.md).
+
+| | |
+| --- | --- |
+| Input | `geo_scene.json` plus `heights.json` from that same scene |
+| Output | `scene_visual.glb`, `scene_collision.glb`, `scene3d.json`, `generation_report.json` |
+| Collision | `collider/walkable` and `collider/carriageway`, separate from the visual mesh |
+| Exit | `0` when there is no critical error |
+
+This directory is the base for `detail`. The wall is not added here.
+
+## 5. Detail
+
+`onward-generator detail`. [07-detail.md](07-detail.md). [ADR-004](decisions/ADR-004-facade-detail.md).
+
+| | |
+| --- | --- |
+| Input | `--scene`, `--heights`, `--base` of the `generate` (requires `phase_03_exit.passed` and matching hashes) |
+| Output | A new directory: GLBs, `scene_detail.json`, `detail_report.json` |
+| Fidelity | Generic templates. Not a photographed facade |
+
+`--base` stays the original `generate` even after a later copy has the wall.
+
+## 6. Dress
+
+`onward-generator dress style`. [08-dress.md](08-dress.md). [ADR-009](decisions/ADR-009-dress-materials.md).
+
+Copies the `detail` GLB and replaces street instances (trees, benches, bins) and the atlas. It does not rebuild facades. `dress classify` only writes a report. `--apply` is refused.
+
+## 7. Props
+
+`onward-generator props catalog` validates [config/props/catalog.json](../config/props/catalog.json). `--inventory` binds the JSON Unity writes. `props place` copies the scene and writes `props_instances.json`.
+
+- An `asset_store` pack with no file stays `pending` and is not instantiated.
+- Cars only with surface `amenity=parking` or `parking_space`.
+- The Unity adapter does not place that list in the scene. Until the inventory has files, the visible furniture is `dress style` (`source: generated`) plus the overgrow library.
+- Store shaders do not replace `PP_Opaque_Simple_Lit`.
+
+## 8. Materials
+
+`onward-generator materials apply`. [08-dress.md](08-dress.md).
+
+| | |
+| --- | --- |
+| Input | `--base` (a `dress` or a `detail`) and this map's `config/texture_plan.json`. `map create` writes it by choosing textures from the imported library. `map create --textures` rewrites only that file |
+| Output | A new directory: a GLB with one image per material (repeated at `tile_m`), a contact `atlas.png`, and reports |
+| Shader | `PP_Opaque_Simple_Lit`: `_BaseColor × _BaseMap`. No normals, no 8k, no PBR |
+| UVs | Wall plane, V upward. A 30 m facade with a 2 m tile repeats 15 times. Windows and doors occupy 0–1 so the frame falls in the opening |
+| Network | Only `--download`, and only for an older Poly Haven plan (Diffuse 1k, CC0, cache in `assets/textures/`). A library plan reads files already in the imported library |
+
+Cobble is only `surface/pedestrian_cobble`. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. The window frame is a generated image, not a photograph. Do not commit the JPEGs.
+
+## 8b. Street plates
+
+`onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. The text uses Pillow's built-in font. It is not the official design of any city.
+
+| | |
+| --- | --- |
+| Input | `--base` (materials, dress, or detail) and `--scene` (`geo_scene.json`) |
+| Output | A new directory. `next:` from `materials apply` points here. `next:` from `signs` points at `overgrow` |
+
+## 8c. Overgrow
+
+`onward-generator overgrow place`, then `overgrow fit`. [ADR-010](decisions/ADR-010-overgrow-ai-plan.md). The prop cards are [abandoned-assets.md](abandoned-assets.md).
+
+Before a model is rejected for size, placement copies the mesh and scales it uniformly to the street. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. The library GLB is not rewritten. The scale stays on the node (`fit_scale`, `size_m`). Each site tries the next object when the scaled copy hits a building, blocks the side passage, or pulls a fire escape off the wall. `fit` reads the GLB already written and refuses to continue if any of those objects is out of size or out of place. Moss, grass, and trees are outside that measurement.
+
+The sidewalk and the foot of the facade receive moss and grass tufts. OSM trees (`natural=tree`) stay observed. The rest are generated off the drive lane. A few rusty cars may sit on the kerb, the carriageway, the sidewalk, a lot, or a plaza. They have no brand and they write a collision box. If the description blocks the streets, every third copy of a car, a gate, or a barrier that lands on the street turns 90° and sits across it. `fit` still requires 1.2 m of passage on one side. The same catalogue opens courtyards, streets, and plazas to barrels, barriers, and loose structures. On load, the lowest vertex is at z = 0. If the point falls inside `surface/carriageway`, the copy drops to that carriageway's height. The sidewalk, the courtyard, and the plaza stay at z = 0. A facade does not drop. The lane (4.2 m each side of the axis) gets no grass and no trees. The cap is 80 000 triangles of procedural mesh, plus up to 60 000 from the normalized models. Each building shifts its UV. One facade in five boards its windows with generated planks.
+
+| Flag | Effect |
+| --- | --- |
+| `--profile 10\|30\|100` | Multiplies densities. It is not a simulation. Default `100` |
+| `--seed` | Seed. Default `48152` |
+| `--zone-radius` | A disc in local metres around the origin. With no zone, the default is one block: a 110 m square |
+| `--zone-polygon` | A GeoJSON polygon in local metres |
+| `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail |
+| `--selection` | `prop_selection.json`. Only those ids, and they must be installed. Without this flag the whole library is used |
+| `--layout` | `layout.json`. Hunt and team spawns stay clear. If it is omitted and the map has a layout, that file is read |
+
+`run --ai` stores `ambient_ai` in `map.json`. Without that flag, overgrow uses the rules above. With `--ai`, the local model receives a digest in local metres (facades, corners, streets, OSM points, and sidewalk anchors), the library installed for that run, and the brief. It does not receive the GLB or the city name. It answers only the JSON of [overgrow_plan.schema.json](../config/overgrow_plan.schema.json): at most 24 `span`, `cover`, `watch`, or `place` gestures, with ids from the digest. Code repeats the copies, leaves the passage (`passage_m` between 1.2 and 2.4 m), scales uniformly, and stops at the roof. A gesture that does not fit whole is dropped. If Ollama does not answer or the JSON does not validate, it is tried once more and that second call quotes the failure. Rules are used only when that attempt also fails, and the reason is stored in `ambient_plan.json`. A later run with the same digest and the same brief reuses that reply and does not call the model. Moss, grass, vines, and OSM trees follow `--profile` in both modes. The profile does not change because of the map's sentence. Repeat the step with `--from overgrow` if `scene_overgrow` already exists.
+
+`overgrow fetch` downloads only the models named in the catalogue (CC0, glTF 1k), keeps the original, and writes the albedo GLB. It does not walk `/models/nature`, `/plants`, or `/trees`.
+
+`overgrow library list` shows every catalogue under `assets` and the Sketchfab licence review. `overgrow fetch-sketchfab` downloads only the models that review marks usable and adds them to `assets/normalized`. `overgrow library select --installed --out maps/<id>/config/prop_selection.json` writes every installed id from every `assets/*/manifest.json`. If that file exists, the `next:` from `signs` passes it to `overgrow place`. An id that is not installed is refused. Without a selection, `overgrow place` uses the whole catalogue.
+
+| | |
+| --- | --- |
+| Input | `--base` (the `signs` copy) and `--scene` |
+| Output | A new directory. `next:` points at `overgrow fit`. `fit` writes `fit.json` in that directory and its `next:` points at `bounds` |
+
+## 9. Bounds
+
+`onward-generator bounds`. Applied to the **latest dressed copy** (`overgrow`, or signs, materials, dress, or detail when there was no dressing). It is not applied to the `generate` that `detail --base` uses.
+
+| | |
+| --- | --- |
+| Input | `--base` of a `generate` or `detail` directory |
+| Output | A copy with `envelope/perimeter_wall` |
+| Size | 12 m high, 0.4 m thick, unless `--height-m` and `--thickness-m` |
+| Purpose | Closes the edge with a 12 m collider. It is not drawn. There is no concrete wall mesh |
+
+An export of a `gameplay_layout` refuses a `--detail` directory that does not contain that wall.
+
+## 10. Playable layout
+
+`onward-generator perf layout --playable`. [09-perf.md](09-perf.md). [11-onward-sdk.md](11-onward-sdk.md).
+
+| | |
+| --- | --- |
+| Input | `--scene`, `--heights`, `--base` (the original `generate`), `--detail` (street positions; may be the copy with the wall) |
+| Without `--playable` | `onward_generator.perf_layout` 0.1.0: the measurement fixture. Spawns, Uplink, map quad, and tent. No AI and no extra modes |
+| With `--playable` | `onward_generator.gameplay_layout` **0.3.0** |
+
+Version 0.3.0 is the default for a new map:
+
+| Mode | Code | What the layout writes |
+| --- | --- | --- |
+| Free Roam | 4 | The SDK guide requires it in addition to another mode |
+| Uplink | 1 | One objective and one `SpawnSystem` per team (8 points, the prefab's) |
+| Assault | 6 | A second block of 8 points per team and one boundary per team |
+| Escort | 2 | Two objective start positions |
+| Hunt | 10 | 32 AI, one route per bot on a sidewalk or a pedestrian way, starts at least 8 m apart, 4 boxes |
+| Evac | 11 | Those 32 points, defenders only, one extraction point |
+| Retrieval | 15 | The Hunt objective, the extraction point, and 3 hard drives |
+
+Routes follow the sidewalk or the axis of a pedestrian way. The street axis is shifted by half the carriageway plus half the sidewalk to each side. The carriageway has no spawns. Ammunition (4 points at 6 m), escort (2 at 8 m), evacuation (1 at 8 m), and hard drives (3 at 8 m) sit inside the largest remaining free ground, and each opens a circle of that separation. It is not a grid. If the ground cannot hold the points, the step fails.
+
+The ambience is `Suburban Day`, profile Urban/Day/`UrbanDay1`, far clip 1000, and flyover. A layout 0.2.0 remains valid and carries only Free Roam, Uplink, and Hunt. It is not rewritten just because 0.3.0 exists.
+
+The local card instantiates Free Roam, Hunt, and Uplink. The other modes stay in the layout. See [11-onward-sdk.md](11-onward-sdk.md).
+
+## 11. Export, Unity, and Quest
+
+`onward-generator export package` and `export verify`. [12-export.md](12-export.md). [ADR-007](decisions/ADR-007-onward-export-adapter.md).
+
+| | |
+| --- | --- |
+| Input | `--project` with `export.enabled`, `--detail` (the copy that has the wall), `--layout` |
+| Output | An immutable package: `onward_export.json`, GLBs, layout, options, `thumbnail.png` (512×256), `quest_acceptance.md` |
+| Unity | After `export package`, `onward-generator run` executes `tool scene launcher` on the stage-0 project. The Editor must be closed. If `scene_report.json` already exists, only the Launcher runs. While the scene is built, the adapter sets Vulkan and OpenGLES3 as fallback. While the scene is prepared, both directions of the navigation map are restored. The launcher puts the layout's riflemen back (`StableHuntBots` is 32). The scene fails, and does not continue, if a link still points backward or if the walk with no memory of seen nodes exceeds 400 levels. Node spacing comes from the mesh size and is raised until the chain fits. See [11-onward-sdk.md](11-onward-sdk.md) |
+| Quest | After Unity, the command asks. Only a yes runs `push` with `CONFIRM_PUSH=yes`. It replaces `unity-export.local.*` and takes a backup first |
+
+The headset has one local slot. The Launcher always writes `unity-export.local`. The name given to the map stays in the folder and in `config/export.json`. The Quest card is always `Unity Export`, which is the name the headset lists for Hunt. The filename does not change. Two maps on disk are built separately. The headset holds the last one that was uploaded.
+
+There is no single `validate` command. Each stage already refuses to write when its input fails. `export package` checks detail, the wall, and the layout again.
+
+## Recipe for a new map
+
+`run` is the usual path. The same stages, by hand:
+
+```text
+onward-generator map create --name "Map name" --lat LAT --lon LON
+onward-generator map show maps/<id>
+# paste the printed next: line
+
+onward-generator heights \
+  --scene maps/<id>/data/processed/geo/geo_scene.json \
+  --out   maps/<id>/data/processed/heights
+
+onward-generator generate \
+  --scene   maps/<id>/data/processed/geo/geo_scene.json \
+  --heights maps/<id>/data/processed/heights/heights.json \
+  --out     maps/<id>/data/processed/scene3d
+
+onward-generator detail \
+  --scene   maps/<id>/data/processed/geo/geo_scene.json \
+  --heights maps/<id>/data/processed/heights/heights.json \
+  --base    maps/<id>/data/processed/scene3d \
+  --out     maps/<id>/data/processed/scene_detail
+
+onward-generator dress style \
+  --detail maps/<id>/data/processed/scene_detail \
+  --out    maps/<id>/data/processed/scene_dress
+
+onward-generator materials apply \
+  --base maps/<id>/data/processed/scene_dress \
+  --plan maps/<id>/config/texture_plan.json \
+  --out  maps/<id>/data/processed/scene_materials
+
+onward-generator signs place \
+  --base  maps/<id>/data/processed/scene_materials \
+  --scene maps/<id>/data/processed/geo/geo_scene.json \
+  --out   maps/<id>/data/processed/scene_signs
+
+onward-generator overgrow place \
+  --base    maps/<id>/data/processed/scene_signs \
+  --scene   maps/<id>/data/processed/geo/geo_scene.json \
+  --library assets \
+  --profile 100 \
+  --seed    48152 \
+  --out     maps/<id>/data/processed/scene_overgrow
+
+onward-generator overgrow fit \
+  --scene maps/<id>/data/processed/geo/geo_scene.json \
+  --base  maps/<id>/data/processed/scene_overgrow \
+  --out   maps/<id>/data/processed/scene_overgrow/fit.json
+
+onward-generator bounds \
+  --base maps/<id>/data/processed/scene_overgrow \
+  --out  maps/<id>/data/processed/scene_playable
+
+onward-generator perf layout \
+  --scene   maps/<id>/data/processed/geo/geo_scene.json \
+  --heights maps/<id>/data/processed/heights/heights.json \
+  --base    maps/<id>/data/processed/scene3d \
+  --detail  maps/<id>/data/processed/scene_playable \
+  --playable \
+  --out     maps/<id>/data/processed/layout/layout.json
+
+onward-generator export package \
+  --project maps/<id>/config/project.json \
+  --detail  maps/<id>/data/processed/scene_playable \
+  --layout  maps/<id>/data/processed/layout/layout.json \
+  --config  maps/<id>/config/export.json \
+  --out     maps/<id>/data/processed/export/pkg_01
+```
+
+A library texture plan does not pass `--download`. Add `--download` only for an older Poly Haven plan. `cadastre`, when it is used, sits between `geo` and `generate`.
+
+## Do not mix
+
+- The Asset Store does not enter `generate` or the geo engine.
+- Do not apply an AI material plan to a whole map without a reviewed report.
+- A GLB is not an Onward map.
+- Do not rebuild Unity into the same scene folder. Use a new package.
+- Do not open `~/Unity/OnwardPhase0Project` with an editor other than 2021.3.23f1.
+- Do not commit OSM extracts, credentials, or private SDK files.
+- Do not set `device_verified` without the headset checklist.
+
+## Documents by stage
+
+- Unity project, once: stage 0 of this document and [11-onward-sdk.md](11-onward-sdk.md)
+- Folder and configuration: [02-configuration.md](02-configuration.md)
+- Geo: [03-geo-pipeline.md](03-geo-pipeline.md)
+- Heights: [04-heights.md](04-heights.md), [05-cadastre.md](05-cadastre.md)
+- Generate: [06-generation.md](06-generation.md)
+- Detail: [07-detail.md](07-detail.md)
+- Dress, props, and materials: [08-dress.md](08-dress.md)
+- Props that can be placed: [abandoned-assets.md](abandoned-assets.md)
+- Measurement and layout: [09-perf.md](09-perf.md)
+- SDK rules: [11-onward-sdk.md](11-onward-sdk.md)
+- Export: [12-export.md](12-export.md)
+- Licences: [legal/data-sources.md](legal/data-sources.md)

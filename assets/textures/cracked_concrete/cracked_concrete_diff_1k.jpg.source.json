@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "cracked_concrete",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/cracked_concrete",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/cracked_concrete/cracked_concrete_diff_1k.jpg",
+  "md5": "6b4a88cd8b09f9f465fe163d330249a9",
+  "sha256": "26b268b23dc71accc627cc25d889bdb56287518a5abb27565bb71bda26cec5c5",
+  "size_bytes": 849369,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/cracked_concrete/cracked_concrete_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:34+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

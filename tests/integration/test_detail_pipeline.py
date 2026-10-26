@@ -1,0 +1,312 @@
+"""Phase 04 on a synthetic street block around MURCIA_CENTER (geo → heights → phase 03 base → detail)."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import struct
+import zlib
+from pathlib import Path
+
+import numpy as np
+import pytest
+from shapely import Point
+from shapely.geometry import shape
+
+from onward_generator.cli import main
+from onward_generator.detail import DetailError, config_from_document, detail_scene, load_base, load_detail_config
+from onward_generator.detail.config import DEFAULT_CONFIG_PATH
+from onward_generator.generation import load_generation_config
+from onward_generator.generation.gltf import build_glb, read_glb
+from onward_generator.generation.mesh import Mesh, closed_manifold_defects, signed_volume, transform
+
+GEN = load_generation_config()
+CFG = load_detail_config()
+DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def _detail(inputs: tuple[Path, Path, Path], cfg=CFG):
+    scene, heights, base = inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    return detail_scene(generated, ref, heights, scene, cfg)
+
+
+@pytest.fixture(scope="module")
+def detailed(detail_inputs: tuple[Path, Path, Path]):
+    return _detail(detail_inputs)
+
+
+def _obj(d, oid: str):
+    return next(o for o in d.objects if o.id == oid)
+
+
+def _inside(mesh: Mesh, p: np.ndarray) -> bool:
+    """Ray-parity point-in-closed-mesh test (Möller–Trumbore), generic ray direction."""
+    direction = np.array([1.0, 0.1234, 0.0567])
+    v = mesh.vertices[mesh.triangles]
+    e1, e2 = v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]
+    h = np.cross(direction, e2)
+    a = np.einsum("ij,ij->i", e1, h)
+    ok = np.abs(a) > 1e-12
+    f = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)
+    s = p - v[:, 0]
+    u = f * np.einsum("ij,ij->i", s, h)
+    q = np.cross(s, e1)
+    w = f * (q @ direction)
+    t = f * np.einsum("ij,ij->i", e2, q)
+    hits = ok & (u >= 0) & (w >= 0) & (u + w <= 1) & (t > 1e-9)
+    return bool(hits.sum() % 2)
+
+
+# --- Base validation -------------------------------------------------------------
+
+
+def test_base_is_validated_against_inputs(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    scene, heights, base = detail_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    assert ref["manifest_sha256"] == hashlib.sha256((base / "scene3d.json").read_bytes()).hexdigest()
+    with pytest.raises(DetailError, match="sha256 mismatch"):
+        load_base(base, heights, heights, GEN)
+    with pytest.raises(DetailError, match="not found"):
+        load_base(tmp_path, scene, heights, GEN)
+
+    def copy_base(mutate) -> Path:
+        out = tmp_path / f"b{len(list(tmp_path.iterdir()))}"
+        out.mkdir()
+        for name in ("scene3d.json", "generation_report.json"):
+            doc = json.loads((base / name).read_text(encoding="utf-8"))
+            mutate(name, doc)
+            (out / name).write_text(json.dumps(doc), encoding="utf-8")
+        return out
+
+    failed = copy_base(lambda n, d: d["phase_03_exit"].update(passed=False) if n == "generation_report.json" else None)
+    with pytest.raises(DetailError, match="did not pass"):
+        load_base(failed, scene, heights, GEN)
+    tampered = copy_base(lambda n, d: d["objects"][0]["height"].update(height_m=99.0) if n == "scene3d.json" else None)
+    with pytest.raises(DetailError, match="differs from the stored base"):
+        load_base(tampered, scene, heights, GEN)
+
+
+# --- Facades ---------------------------------------------------------------------
+
+
+def test_no_critical_errors_and_every_facade_is_labelled_generic(detailed) -> None:
+    report = detailed.report()
+    assert report["phase_04_checks"]["automatic_checks_passed"], report["issues"]
+    assert report["phase_04_checks"]["visual_review"].startswith("pending")
+    buildings = [o for o in detailed.objects if o.type == "building"]
+    assert len(buildings) == 5
+    for o in buildings:
+        facade = o.record["facade"]
+        assert facade["representation"] == "generic_template" and facade["representative_of_real_facade"] is False
+        assert facade["attribute_origin"] == "generated" and "does not represent the real facade" in facade["note"]
+        assert o.record["checks"]["facade_open_edges"] == 0 and o.record["checks"]["roof_area_error_m2"] < 0.02
+        assert o.record["generation"]["seed"] == CFG.seed and o.record["generation"]["template_config_version"] == CFG.version
+    assert detailed.manifest()["fidelity"]["facades"] == "generic_templates"
+
+
+def test_templates_roofs_and_landmark(detailed) -> None:
+    church = _obj(detailed, "building/osm-way-314").record
+    assert church["facade"]["template"] == "landmark_placeholder" and church["facade"]["needs_custom_model"] is True
+    assert church["facade"]["openings"] == {"landmark_door": 1}
+    towers = [o.record for o in detailed.objects if o.type == "landmark_part" and o.record["kind"] == "tower"]
+    assert len(towers) == 1 and towers[0]["source_ids"][0] == "osm-way-314"
+    assert towers[0]["height"] == {"height_m": 40.0, "origin": "observed", "source_tag": "height",
+                                  "source_id": towers[0]["source_ids"][1]}
+    assert towers[0]["footprint"]["origin"] == "estimated" and towers[0]["representative_of_real_tower"] is False
+    shed = _obj(detailed, "building/osm-way-315").record
+    assert shed["facade"]["template"] == "generic_minor" and shed["roof"]["type"] == "hip"
+    assert 0 < shed["roof"]["rise_m"] <= 2.5
+    flat = _obj(detailed, "building/osm-way-311").record
+    assert flat["roof"]["type"] == "flat_parapet" and flat["roof"]["parapet_m"] == 1.0
+
+
+def test_party_walls_have_no_openings(detailed) -> None:
+    rec = _obj(detailed, "building/osm-way-312").record
+    assert rec["facade"]["party_wall_length_m"] == pytest.approx(28.0, abs=0.1)  # west 12 m (to 311) + east 16 m (to 313)
+    o = _obj(detailed, "building/osm-way-312")
+    for prim in o.visual:
+        if prim.material in ("glass_dark", "door_wood", "frame_stone", "railing_metal"):
+            x, y, z = prim.mesh.vertices.T
+            # Party spans: west wall against 311 (y 6–18), east wall against 313 (y 6–20). Parapet copings sit on top.
+            west = (x < -14.5) & (y > 6.5) & (y < 17.5)
+            east = (x > -0.5) & (y > 6.5) & (y < 19.5)
+            assert not ((west | east) & (z < rec["height"]["height_m"])).any(), prim.material
+    # The 4 m of the west wall above 311 (y 18–22) is street-facing and does get openings.
+    glass = next(p for p in o.visual if p.material == "glass_dark").mesh.vertices
+    assert ((glass[:, 0] < -14.5) & (glass[:, 1] > 18)).any()
+
+
+def test_shop_evidence_turns_the_ground_floor_into_shopfronts(detailed) -> None:
+    shop = _obj(detailed, "building/osm-way-312").record["facade"]
+    assert shop["ground_floor"] == "shopfront" and shop["ground_floor_evidence"]["source"] == "osm_poi"
+    assert shop["ground_floor_evidence"]["osm_poi_ids"]
+    assert shop["openings"].get("shopfront", 0) > 0
+    plain = _obj(detailed, "building/osm-way-311").record["facade"]
+    assert plain["ground_floor"] == "door_and_windows" and plain["ground_floor_evidence"] is None
+
+
+def test_opening_dimensions_stay_inside_the_facade(detailed) -> None:
+    for o in (x for x in detailed.objects if x.type == "building"):
+        h = o.record["height"]["height_m"]
+        parapet = o.record["roof"].get("parapet_m", 0.0)
+        hip = o.record["roof"].get("rise_m", 0.0)
+        for prim in o.visual:
+            z = prim.mesh.vertices[:, 2]
+            assert z.min() >= -1e-9, (o.id, prim.material)
+            assert z.max() <= h + parapet + hip + 1e-3, (o.id, prim.material)  # rise_m is rounded to mm
+            if prim.material in ("glass_dark", "door_wood"):
+                assert z.max() <= h - CFG.head_clearance_m + 1e-6, (o.id, prim.material)
+        assert o.record["visual"]["triangles"] > 2 * o.record["facade"]["openings"].get("window", 0)
+
+
+def test_balconies_do_not_hit_neighbours(detailed, detail_inputs: tuple[Path, Path, Path]) -> None:
+    scene = json.loads(detail_inputs[0].read_text(encoding="utf-8"))
+    fps = {f["id"]: shape(f["geometry"]) for f in scene["features"] if f["kind"] == "building"}
+    for o in (x for x in detailed.objects if x.type == "building"):
+        bid = o.record["source_ids"][0]
+        others = [g for k, g in fps.items() if k != bid]
+        for prim in o.visual:
+            if prim.material == "railing_metal":
+                for x, y in prim.mesh.vertices[:, :2]:
+                    assert not any(g.buffer(-0.01).contains(Point(x, y)) for g in others)
+
+
+# --- Colliders and interiors ------------------------------------------------------
+
+
+def test_colliders_are_separate_closed_and_positive(detailed) -> None:
+    for node in detailed.collision_nodes():
+        for prim in node.primitives:
+            assert prim.material == "collider"
+            assert closed_manifold_defects(prim.mesh) == 0, node.name
+            mesh = transform(prim.mesh, node.matrix) if node.matrix is not None else prim.mesh
+            assert signed_volume(mesh) > 0, node.name
+    assert all(p.material != "collider" for n in detailed.visual_nodes() for p in n.primitives)
+
+
+def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detailed) -> None:
+    interiors = [o for o in detailed.objects if o.type == "interior"]
+    assert 1 <= len(interiors) <= CFG.interiors.max_buildings
+    assert sorted(o.record["source_ids"][0] for o in interiors) == sorted(detailed.stats["interiors"])
+    church = _obj(detailed, "building/osm-way-314").record
+    assert church["interior"] is False
+    for it in interiors:
+        bid = it.record["source_ids"][0]
+        b = _obj(detailed, f"building/{bid}")
+        assert it.record["representative_of_real_interior"] is False
+        door = next(c for c in it.record["connections"] if c["type"] == "door")
+        stair = next(c for c in it.record["connections"] if c["type"] == "stair")
+        assert stair["riser_m"] <= CFG.interiors.stair.max_riser_m and stair["slope_deg"] < 40
+        assert stair["risers"] * stair["riser_m"] == pytest.approx(stair["rise_m"], abs=stair["risers"] * 5e-5)  # riser_m rounded
+        storey = it.record["rooms"][1]["floor_z_m"]
+        assert stair["rise_m"] == pytest.approx(storey)
+        colliders = b.colliders
+        assert b.record["collider"]["source"] == "interior_shell"
+        # Door: inside the wall thickness at knee height is free; beside the door the wall blocks.
+        px, py = door["position_m"]
+        t = CFG.interiors.wall_thickness_m
+        candidates = [np.array([px + dx, py + dy]) for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))]
+        verts = np.vstack([m.vertices for m in colliders])
+        centre = verts[:, :2].mean(axis=0)
+        inward = min(candidates, key=lambda c: np.linalg.norm(c - centre)) - np.array([px, py])
+        along = np.array([-inward[1], inward[0]])
+        mid_wall = np.array([px, py]) + inward * (t / 2)
+        assert not any(_inside(m, np.array([*mid_wall, 1.0])) for m in colliders)
+        beside = mid_wall + along * (door["width_m"] / 2 + 0.4)
+        assert any(_inside(m, np.array([*beside, 1.0])) for m in colliders)
+        room = np.array([px, py]) + inward * (t + 1.0)
+        assert not any(_inside(m, np.array([*room, 1.0])) for m in colliders)
+        # Upper solid above the accessible floors, slab at the first floor.
+        assert any(_inside(m, np.array([*room, 2 * storey + 0.5])) for m in colliders)
+
+
+# --- Urban elements -------------------------------------------------------------
+
+
+def test_urban_elements_observed_generated_and_rejected(detailed) -> None:
+    elements = [o for o in detailed.objects if o.type == "urban_element"]
+    kinds = {(o.record["kind"], o.record["attribute_origin"]) for o in elements}
+    assert {("tree", "observed"), ("bollard", "observed"), ("bicycle_parking", "observed"), ("street_lamp", "generated")} <= kinds
+    rejected = [i for i in detailed.issues if i.code == "urban_element_not_placed" and i.severity == "warning"]
+    assert len(rejected) == 1 and "tree" in rejected[0].message  # the tree inside building 311
+    nodes = [n for n in detailed.visual_nodes() if n.mesh_key]
+    assert len(nodes) == len(elements) and len({n.mesh_key for n in nodes}) == detailed.stats["shared_meshes"]
+    doc, _ = read_glb(build_glb(detailed.visual_nodes(), {**GEN.materials, **CFG.materials}))
+    lamp_nodes = [n for n in doc["nodes"] if n["name"].startswith("urban/street_lamp/")]
+    assert len({n["mesh"] for n in lamp_nodes}) == 1 and all("matrix" in n for n in lamp_nodes)
+
+
+# --- Budget and reproducibility ------------------------------------------------
+
+
+def test_budget_is_reported_and_exceeding_it_warns(detail_inputs: tuple[Path, Path, Path], detailed) -> None:
+    assert all(v["within"] for v in detailed.stats["budget"].values())
+    doc = copy.deepcopy(DOC)
+    doc["budget"]["max_visual_triangles"] = 100
+    tight = _detail(detail_inputs, config_from_document(doc))
+    assert not tight.stats["budget"]["max_visual_triangles"]["within"]
+    assert any(i.code == "budget_exceeded" and i.severity == "warning" for i in tight.issues)
+
+
+def test_seed_changes_variation_but_not_validity(detail_inputs: tuple[Path, Path, Path], detailed) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["seed"] = 7
+    other = _detail(detail_inputs, config_from_document(doc))
+    assert not other.critical
+    first = [o.record["facade"]["materials"]["wall"] for o in detailed.objects if o.type == "building"]
+    second = [o.record["facade"]["materials"]["wall"] for o in other.objects if o.type == "building"]
+    balconies = lambda d: [o.record["facade"]["openings"].get("balcony", 0) for o in d.objects if o.type == "building"]  # noqa: E731
+    assert first != second or balconies(detailed) != balconies(other)
+
+
+def _png_size(data: bytes) -> tuple[int, int]:
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    return struct.unpack(">II", data[16:24])
+
+
+def _png_pixels(data: bytes) -> np.ndarray:
+    w, h = _png_size(data)
+    pos, raw = 8, b""
+    while pos < len(data):
+        n = struct.unpack(">I", data[pos : pos + 4])[0]
+        kind = data[pos + 4 : pos + 8]
+        if kind == b"IDAT":
+            raw += data[pos + 8 : pos + 8 + n]
+        pos += 12 + n
+    rows = zlib.decompress(raw)
+    return np.frombuffer(rows, dtype=np.uint8).reshape(h, 1 + 3 * w)[:, 1:].reshape(h, w, 3)
+
+
+def test_cli_is_reproducible_and_writes_before_after(detail_inputs: tuple[Path, Path, Path], tmp_path: Path,
+                                                     capsys: pytest.CaptureFixture[str]) -> None:
+    scene, heights, base = detail_inputs
+    before = {p.name: p.read_bytes() for p in base.iterdir()}
+    args = ["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base)]
+    assert main([*args, "--out", str(tmp_path / "a")]) == 0
+    assert "phase 04 automatic checks: PASSED" in capsys.readouterr().out
+    assert main([*args, "--out", str(tmp_path / "b")]) == 0
+    names = ("scene_visual.glb", "scene_collision.glb", "scene_detail.json", "detail_report.json", "compare_overview.png", "compare_closeup.png")
+    for name in names:
+        assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes(), name
+    assert {p.name: p.read_bytes() for p in base.iterdir()} == before  # the phase 03 base is untouched
+
+    visual, _ = read_glb((tmp_path / "a" / "scene_visual.glb").read_bytes())
+    collision, _ = read_glb((tmp_path / "a" / "scene_collision.glb").read_bytes())
+    assert [m["name"] for m in collision["materials"]] == ["collider"]
+    assert "collider" not in [m["name"] for m in visual["materials"]]
+    assert visual["extras"]["attribution"][0]["license"] == "CC0-1.0"
+    assert "not a faithful reconstruction" in visual["extras"]["fidelity"]
+
+    for name in ("compare_overview.png", "compare_closeup.png"):
+        img = _png_pixels((tmp_path / "a" / name).read_bytes())
+        half = (img.shape[1] - 8) // 2
+        left, right = img[:, :half], img[:, half + 8 :]
+        assert left.shape == right.shape
+        assert (left != right).any(axis=2).mean() > 0.005, name  # the detail is visible
+
+    assert main([*args, "--out", str(tmp_path / "a")]) == 1
+    assert "refusing to overwrite" in capsys.readouterr().err
+    assert main([*args, "--out", str(base), "--overwrite", "--no-preview"]) == 1  # base files are protected
+    assert {p.name: p.read_bytes() for p in base.iterdir()} == before

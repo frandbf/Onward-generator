@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/dress/classify.output.schema.json",
+  "title": "Material recommendations produced by a model or the deterministic fallback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "recommendations"],
+  "properties": {
+    "schema": { "const": "onward_generator.material_recommendations" },
+    "schema_version": { "const": "0.1.0" },
+    "recommendations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/recommendation" }
+    }
+  },
+  "$defs": {
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface_id", "recommended_material_id", "confidence", "reason",
+        "alternative_material_ids", "needs_review"
+      ],
+      "properties": {
+        "surface_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "recommended_material_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "alternative_material_ids": {
+          "type": "array",
+          "maxItems": 4,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+        },
+        "needs_review": { "type": "boolean" }
+      }
+    }
+  }
+}

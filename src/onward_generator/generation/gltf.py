@@ -1,0 +1,454 @@
+"""Minimal deterministic glTF 2.0 binary (GLB) writer.
+
+GLB is an intermediate preview/transport format here (PRD §6.2); it is not
+assumed to be directly loadable by Onward. Local axes (x east, y north, z up)
+map to glTF axes (+X east, +Y up, +Z south): (x, y, z) → (x, z, −y), a proper
+rotation, so triangle winding is preserved.
+"""
+
+from __future__ import annotations
+
+import json
+import struct
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from onward_generator import __version__
+from onward_generator.generation.config import Material
+from onward_generator.generation.mesh import Mesh
+
+_TO_GLTF = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]])
+_ARRAY_BUFFER = 34962
+_ELEMENT_ARRAY_BUFFER = 34963
+_FLOAT = 5126
+_UINT = 5125
+
+
+@dataclass(frozen=True, slots=True)
+class Primitive:
+    mesh: Mesh
+    material: str
+    uvs: np.ndarray | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Node:
+    """A glTF node. ``matrix`` (4×4, local frame) places the primitives; nodes sharing ``mesh_key`` reuse one glTF mesh."""
+
+    name: str
+    primitives: tuple[Primitive, ...]
+    extras: Mapping[str, Any] = field(default_factory=dict)
+    matrix: np.ndarray | None = None
+    mesh_key: str | None = None
+
+    def world_primitives(self) -> tuple[Primitive, ...]:
+        if self.matrix is None:
+            return self.primitives
+        from onward_generator.generation.mesh import transform
+
+        return tuple(Primitive(transform(p.mesh, self.matrix), p.material) for p in self.primitives)
+
+
+def gltf_matrix(matrix: np.ndarray) -> list[float]:
+    """Local 4×4 → glTF column-major list, conjugated by the axis map."""
+    a = np.eye(4)
+    a[:3, :3] = _TO_GLTF
+    return [float(v) for v in (a @ matrix @ a.T).T.reshape(-1)]
+
+
+def vertex_normals(mesh: Mesh) -> np.ndarray:
+    """Area-weighted vertex normals (exact for the unwelded planar groups this package builds)."""
+    normals = np.zeros_like(mesh.vertices)
+    face = mesh.face_normals()
+    for k in range(3):
+        np.add.at(normals, mesh.triangles[:, k], face)
+    length = np.linalg.norm(normals, axis=1, keepdims=True)
+    length[length == 0] = 1.0
+    return normals / length
+
+
+class _Builder:
+    def __init__(self) -> None:
+        self.blob = bytearray()
+        self.views: list[dict[str, Any]] = []
+        self.accessors: list[dict[str, Any]] = []
+
+    def add(self, data: np.ndarray, *, target: int, component: int, kind: str, minmax: bool = False) -> int:
+        while len(self.blob) % 4:
+            self.blob.append(0)
+        raw = data.tobytes()
+        self.views.append({"buffer": 0, "byteOffset": len(self.blob), "byteLength": len(raw), "target": target})
+        self.blob.extend(raw)
+        accessor: dict[str, Any] = {
+            "bufferView": len(self.views) - 1,
+            "componentType": component,
+            "count": int(data.shape[0]) if kind != "SCALAR" else int(data.size),
+            "type": kind,
+        }
+        if minmax:
+            accessor["min"] = [float(v) for v in data.min(axis=0)]
+            accessor["max"] = [float(v) for v in data.max(axis=0)]
+        self.accessors.append(accessor)
+        return len(self.accessors) - 1
+
+
+def planar_uvs(vertices: np.ndarray, slot: tuple[float, float, float, float], tile_m: float) -> np.ndarray:
+    """World-metre planar UVs on the two largest extents, wrapped into an atlas tile."""
+    extent = vertices.max(axis=0) - vertices.min(axis=0)
+    axes = np.argsort(extent)[::-1][:2]
+    scale = max(float(tile_m), 1e-6)
+    local = np.mod(vertices[:, axes] / scale, 1.0)
+    u0, v0, u1, v1 = slot
+    return np.column_stack([u0 + local[:, 0] * (u1 - u0), v0 + local[:, 1] * (v1 - v0)]).astype(np.float32)
+
+
+def surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool = False) -> np.ndarray:
+    """UVs on the face plane, in repeats of ``tile_m`` metres.
+
+    Vertical faces use world up as V, so a tall wall repeats instead of stretching
+    one tile across the whole height. ``fit_unit`` maps each disconnected quad to
+    0–1 (a window or a door).
+    """
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    triangles = np.asarray(mesh.triangles, dtype=np.int64)
+    uvs = np.zeros((len(vertices), 2), dtype=np.float64)
+    if len(vertices) == 0 or len(triangles) == 0:
+        return uvs.astype(np.float32)
+    normals = mesh.face_normals()
+    length = np.linalg.norm(normals, axis=1, keepdims=True)
+    normals = normals / np.maximum(length, 1e-12)
+    horizontal = np.abs(normals[:, 2]) >= 0.75
+    tangent = np.cross(np.array([0.0, 0.0, 1.0]), normals)
+    tangent_length = np.linalg.norm(tangent, axis=1, keepdims=True)
+    fallback = horizontal | (tangent_length[:, 0] < 1e-8)
+    tangent = tangent / np.maximum(tangent_length, 1e-12)
+    bitangent = np.cross(normals, tangent)
+    bitangent_length = np.linalg.norm(bitangent, axis=1, keepdims=True)
+    bitangent = bitangent / np.maximum(bitangent_length, 1e-12)
+    down = (~fallback) & (bitangent[:, 2] < 0.0)
+    bitangent[down] *= -1.0
+    tangent[fallback] = (1.0, 0.0, 0.0)
+    bitangent[fallback] = (0.0, 1.0, 0.0)
+    scale = max(float(tile_m), 1e-6)
+    corners = vertices[triangles]
+    u = np.einsum("tij,tj->ti", corners, tangent) / scale
+    v = np.einsum("tij,tj->ti", corners, bitangent) / scale
+    for corner in range(3):
+        uvs[triangles[:, corner], 0] = u[:, corner]
+        uvs[triangles[:, corner], 1] = v[:, corner]
+    if fit_unit:
+        for group in _triangle_groups(triangles).values():
+            index = np.unique(triangles[np.array(group)].reshape(-1))
+            span_u = float(uvs[index, 0].max() - uvs[index, 0].min())
+            span_v = float(uvs[index, 1].max() - uvs[index, 1].min())
+            uvs[index, 0] = (uvs[index, 0] - uvs[index, 0].min()) / max(span_u, 1e-6)
+            uvs[index, 1] = (uvs[index, 1] - uvs[index, 1].min()) / max(span_v, 1e-6)
+    return uvs.astype(np.float32)
+
+
+def _triangle_groups(triangles: np.ndarray) -> dict[int, list[int]]:
+    """Triangles that share a vertex belong to one opening."""
+    parent = np.arange(len(triangles))
+
+    def find(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = int(parent[index])
+        return index
+
+    seen: dict[int, int] = {}
+    for tri_index, tri in enumerate(triangles):
+        for vertex in tri:
+            vertex = int(vertex)
+            other = seen.get(vertex)
+            if other is None:
+                seen[vertex] = tri_index
+                continue
+            left, right = find(other), find(tri_index)
+            if left != right:
+                parent[right] = left
+    groups: dict[int, list[int]] = {}
+    for tri_index in range(len(triangles)):
+        groups.setdefault(find(tri_index), []).append(tri_index)
+    return groups
+
+
+def build_glb(
+    nodes: Sequence[Node],
+    materials: Mapping[str, Material],
+    *,
+    extras: Mapping[str, Any] | None = None,
+    atlas_png: bytes | None = None,
+    atlas_slots: Mapping[str, tuple[float, float, float, float]] | None = None,
+    atlas_tile_m: Mapping[str, float] | None = None,
+    repeat_images: Mapping[str, bytes] | None = None,
+    repeat_tile_m: Mapping[str, float] | None = None,
+    unit_uv_materials: Collection[str] | None = None,
+    preserve_uvs: bool = False,
+) -> bytes:
+    builder = _Builder()
+    material_names = sorted({p.material for n in nodes for p in n.primitives})
+    material_index = {name: i for i, name in enumerate(material_names)}
+    repeat = {name: png for name, png in (repeat_images or {}).items() if name in material_index}
+    using_repeat = bool(repeat)
+    textured = atlas_png is not None and not using_repeat
+    unit_uv = frozenset(unit_uv_materials or ())
+    imaged = [name for name in material_names if name in repeat]
+    gltf_meshes: list[dict[str, Any]] = []
+    gltf_nodes: list[dict[str, Any]] = []
+    shared: dict[str, int] = {}
+    for node in nodes:
+        if node.mesh_key is not None and node.mesh_key in shared:
+            entry = {"name": node.name, "mesh": shared[node.mesh_key]}
+            if node.matrix is not None:
+                entry["matrix"] = gltf_matrix(node.matrix)
+            if node.extras:
+                entry["extras"] = dict(node.extras)
+            gltf_nodes.append(entry)
+            continue
+        prims = []
+        for prim in node.primitives:
+            if not prim.mesh.triangle_count:
+                continue
+            positions = (prim.mesh.vertices @ _TO_GLTF.T).astype(np.float32)
+            normals = (vertex_normals(prim.mesh) @ _TO_GLTF.T).astype(np.float32)
+            indices = prim.mesh.triangles.astype(np.uint32).reshape(-1)
+            attributes = {
+                "POSITION": builder.add(positions, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC3", minmax=True),
+                "NORMAL": builder.add(normals, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC3"),
+            }
+            if preserve_uvs and prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
+                attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
+            elif using_repeat and prim.material in repeat:
+                tile = float((repeat_tile_m or {}).get(prim.material, 2.0))
+                uvs = surface_uvs(prim.mesh, tile, fit_unit=prim.material in unit_uv)
+                phase = (node.extras or {}).get("uv_phase")
+                if phase and prim.material not in unit_uv:
+                    uvs = np.array(uvs, dtype=np.float32, copy=True)
+                    uvs[:, 0] += float(phase[0])
+                    uvs[:, 1] += float(phase[1])
+                attributes["TEXCOORD_0"] = builder.add(uvs, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
+            elif prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
+                attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
+            elif textured and atlas_slots is not None and prim.material in atlas_slots:
+                slot = atlas_slots[prim.material]
+                tile = (atlas_tile_m or {}).get(prim.material, 4.0)
+                uvs = planar_uvs(prim.mesh.vertices, slot, tile)
+                attributes["TEXCOORD_0"] = builder.add(uvs, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
+            prims.append(
+                {
+                    "attributes": attributes,
+                    "indices": builder.add(indices, target=_ELEMENT_ARRAY_BUFFER, component=_UINT, kind="SCALAR"),
+                    "material": material_index[prim.material],
+                    "mode": 4,
+                }
+            )
+        if not prims:
+            continue
+        gltf_meshes.append({"name": node.mesh_key or node.name, "primitives": prims})
+        if node.mesh_key is not None:
+            shared[node.mesh_key] = len(gltf_meshes) - 1
+        entry: dict[str, Any] = {"name": node.name, "mesh": len(gltf_meshes) - 1}
+        if node.matrix is not None:
+            entry["matrix"] = gltf_matrix(node.matrix)
+        if node.extras:
+            entry["extras"] = dict(node.extras)
+        gltf_nodes.append(entry)
+
+    doc: dict[str, Any] = {
+        "asset": {"version": "2.0", "generator": f"onward-generator {__version__}"},
+        "scene": 0,
+        "scenes": [{"name": "scene", "nodes": list(range(len(gltf_nodes)))}],
+        "nodes": gltf_nodes,
+        "meshes": gltf_meshes,
+        "materials": [
+            {
+                "name": name,
+                "pbrMetallicRoughness": {
+                    "baseColorFactor": list(materials[name].color),
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": materials[name].roughness,
+                    **(
+                        {"baseColorTexture": {"index": imaged.index(name), "texCoord": 0}}
+                        if using_repeat and name in repeat
+                        else {"baseColorTexture": {"index": 0, "texCoord": 0}}
+                        if textured
+                        else {}
+                    ),
+                },
+                "doubleSided": False,
+            }
+            for name in material_names
+        ],
+        "accessors": builder.accessors,
+        "bufferViews": builder.views,
+        "buffers": [{"byteLength": 0}],
+    }
+    if using_repeat or textured:
+        images_out: list[dict[str, Any]] = []
+        payloads = [repeat[name] for name in imaged] if using_repeat else [atlas_png or b""]
+        for png in payloads:
+            while len(builder.blob) % 4:
+                builder.blob.append(0)
+            view = {"buffer": 0, "byteOffset": len(builder.blob), "byteLength": len(png)}
+            builder.blob.extend(png)
+            builder.views.append(view)
+            images_out.append({"mimeType": "image/png", "bufferView": len(builder.views) - 1})
+        doc["images"] = images_out
+        doc["samplers"] = [{"magFilter": 9729, "minFilter": 9729, "wrapS": 10497, "wrapT": 10497}]
+        doc["textures"] = [{"sampler": 0, "source": index} for index in range(len(images_out))]
+    doc["buffers"] = [{"byteLength": len(builder.blob)}]
+    if extras:
+        doc["extras"] = dict(extras)
+    json_chunk = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * (-len(json_chunk) % 4)
+    bin_chunk = bytes(builder.blob) + b"\x00" * (-len(builder.blob) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    return b"".join(
+        [
+            struct.pack("<4sII", b"glTF", 2, total),
+            struct.pack("<I4s", len(json_chunk), b"JSON"),
+            json_chunk,
+            struct.pack("<I4s", len(bin_chunk), b"BIN\x00"),
+            bin_chunk,
+        ]
+    )
+
+
+def images_by_material(data: bytes) -> dict[str, bytes]:
+    """PNG bytes already embedded, keyed by material name."""
+    doc, blob = read_glb(data)
+    images: list[bytes] = []
+    for image in doc.get("images") or []:
+        view = doc["bufferViews"][int(image["bufferView"])]
+        start = int(view.get("byteOffset", 0))
+        images.append(bytes(blob[start : start + int(view["byteLength"])]))
+    found: dict[str, bytes] = {}
+    for material in doc.get("materials") or []:
+        info = (material.get("pbrMetallicRoughness") or {}).get("baseColorTexture")
+        if not info:
+            continue
+        found[str(material.get("name") or "")] = images[int(info["index"])]
+    return found
+
+
+def read_glb(data: bytes) -> tuple[dict[str, Any], bytes]:
+    """Parse a GLB container (used by tests and validation)."""
+    if len(data) < 28:
+        raise ValueError("not a glTF 2.0 binary: too short")
+    magic, version, total = struct.unpack_from("<4sII", data, 0)
+    if magic != b"glTF" or version != 2 or total != len(data):
+        raise ValueError("not a glTF 2.0 binary")
+    json_len, json_type = struct.unpack_from("<I4s", data, 12)
+    if json_type != b"JSON":
+        raise ValueError("first chunk must be JSON")
+    doc = json.loads(data[20 : 20 + json_len].decode("utf-8"))
+    bin_len, bin_type = struct.unpack_from("<I4s", data, 20 + json_len)
+    if bin_type != b"BIN\x00":
+        raise ValueError("second chunk must be BIN")
+    start = 28 + json_len
+    return doc, data[start : start + bin_len]
+
+
+def write_glb(path: Path, data: bytes) -> None:
+    from onward_generator.io import atomic_write_bytes
+
+    atomic_write_bytes(path, data)
+
+
+def _local_matrix(gltf_cols: Sequence[float]) -> np.ndarray:
+    """Inverse of :func:`gltf_matrix`."""
+    g = np.array([float(v) for v in gltf_cols], dtype=np.float64).reshape(4, 4).T
+    a = np.eye(4)
+    a[:3, :3] = _TO_GLTF
+    return a.T @ g @ a
+
+
+def _accessor(doc: Mapping[str, Any], blob: bytes, index: int) -> np.ndarray:
+    acc = doc["accessors"][index]
+    view = doc["bufferViews"][acc["bufferView"]]
+    offset = int(view.get("byteOffset", 0)) + int(acc.get("byteOffset", 0))
+    count = int(acc["count"])
+    components = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[acc["type"]]
+    dtype = {
+        5120: np.int8,
+        5121: np.uint8,
+        5122: np.int16,
+        5123: np.uint16,
+        5125: np.uint32,
+        5126: np.float32,
+    }[acc["componentType"]]
+    width = int(np.dtype(dtype).itemsize) * components
+    stride = view.get("byteStride")
+    if stride not in (None, width):
+        raise ValueError(f"accessor {index}: interleaved stride {stride} is not packed")
+    raw = blob[offset : offset + count * width]
+    if len(raw) != count * width:
+        raise ValueError(f"accessor {index}: buffer is short")
+    data = np.frombuffer(raw, dtype=dtype)
+    return data if components == 1 else data.reshape(count, components)
+
+
+def nodes_from_glb(data: bytes) -> tuple[list[Node], dict[str, Material]]:
+    """Read a generator GLB back into local-metre nodes. UVs are kept if present."""
+    doc, blob = read_glb(data)
+    materials: dict[str, Material] = {}
+    for i, raw in enumerate(doc.get("materials") or []):
+        pbr = raw.get("pbrMetallicRoughness") or {}
+        color = tuple(float(c) for c in (pbr.get("baseColorFactor") or [0.5, 0.5, 0.5, 1.0]))
+        if len(color) < 4:
+            color = (*color, 1.0)
+        materials[str(raw.get("name") or f"mat_{i}")] = Material(color, float(pbr.get("roughnessFactor", 1.0)))
+    mat_names = [str(m.get("name") or f"mat_{i}") for i, m in enumerate(doc.get("materials") or [])]
+    uses: dict[int, int] = {}
+    for node in doc.get("nodes") or []:
+        if "mesh" in node:
+            uses[int(node["mesh"])] = uses.get(int(node["mesh"]), 0) + 1
+    meshes: list[tuple[Primitive, ...] | None] = [None] * len(doc.get("meshes") or [])
+    nodes: list[Node] = []
+    for raw in doc.get("nodes") or []:
+        if "mesh" not in raw:
+            continue
+        mi = int(raw["mesh"])
+        if meshes[mi] is None:
+            prims: list[Primitive] = []
+            for prim in (doc["meshes"][mi].get("primitives") or []):
+                attrs = prim.get("attributes") or {}
+                if "POSITION" not in attrs or "indices" not in prim:
+                    continue
+                pos = (_accessor(doc, blob, attrs["POSITION"]).astype(np.float64)) @ _TO_GLTF
+                idx = _accessor(doc, blob, int(prim["indices"])).astype(np.int64).reshape(-1, 3)
+                uvs = None
+                if "TEXCOORD_0" in attrs:
+                    uvs = _accessor(doc, blob, attrs["TEXCOORD_0"]).astype(np.float32)
+                name = mat_names[int(prim.get("material", 0))] if mat_names else "ground"
+                prims.append(Primitive(Mesh(pos, idx), name, uvs))
+            meshes[mi] = tuple(prims)
+        key = None
+        mesh_name = (doc["meshes"][mi] or {}).get("name")
+        if uses.get(mi, 0) > 1 and mesh_name:
+            key = str(mesh_name)
+        matrix = _local_matrix(raw["matrix"]) if raw.get("matrix") else None
+        extras = dict(raw.get("extras") or {})
+        nodes.append(Node(str(raw.get("name") or f"node"), meshes[mi] or (), extras, matrix, key))
+    return nodes, materials
+
+
+def glb_append(data: bytes, nodes: Sequence[Node], materials: Mapping[str, Material]) -> bytes:
+    """Keep every existing mesh, material and image; append ``nodes`` at the end."""
+    existing, extra = nodes_from_glb(data)
+    merged_mats = dict(extra)
+    merged_mats.update(materials)
+    extras = read_glb(data)[0].get("extras") or {}
+    atlas_png = None
+    doc, blob = read_glb(data)
+    if doc.get("images"):
+        img = doc["images"][0]
+        view = doc["bufferViews"][img["bufferView"]]
+        start = int(view.get("byteOffset", 0))
+        atlas_png = bytes(blob[start : start + int(view["byteLength"])])
+    return build_glb([*existing, *nodes], merged_mats, extras=extras if extras else None, atlas_png=atlas_png)

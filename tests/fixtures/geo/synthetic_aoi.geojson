@@ -1,0 +1,20 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Synthetic AOI 200 m",
+    "margin_m": 30,
+    "note": "Synthetic test area: square from (-100,-100) to (100,100) m around the Murcia city-centre test origin lat 37.98407, lon -1.12863 in EPSG:25830."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-1.12979100, 37.98318730],
+        [-1.12751477, 37.98315107],
+        [-1.12746897, 37.98495269],
+        [-1.12974526, 37.98498892],
+        [-1.12979100, 37.98318730]
+      ]
+    ]
+  }
+}

@@ -1,0 +1,3893 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.1.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "assets": [
+    {
+      "id": "kenney_suburban_driveway_long",
+      "file": "suburban/driveway-long.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Long driveway. City Kit Suburban.",
+      "triangles": 12,
+      "length_m": 0.36,
+      "depth_m": 0.4,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_driveway_short",
+      "file": "suburban/driveway-short.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Short driveway. City Kit Suburban.",
+      "triangles": 12,
+      "length_m": 0.36,
+      "depth_m": 0.2,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_1x2",
+      "file": "suburban/fence-1x2.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 1 by 2 kit units. City Kit Suburban.",
+      "triangles": 156,
+      "length_m": 0.875,
+      "depth_m": 0.438,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_1x3",
+      "file": "suburban/fence-1x3.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 1 by 3 kit units. City Kit Suburban.",
+      "triangles": 204,
+      "length_m": 1.275,
+      "depth_m": 0.438,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_1x4",
+      "file": "suburban/fence-1x4.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 1 by 4 kit units. City Kit Suburban.",
+      "triangles": 252,
+      "length_m": 1.675,
+      "depth_m": 0.438,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_2x2",
+      "file": "suburban/fence-2x2.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 2 by 2 kit units. City Kit Suburban.",
+      "triangles": 236,
+      "length_m": 0.875,
+      "depth_m": 0.837,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_2x3",
+      "file": "suburban/fence-2x3.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 2 by 3 kit units. City Kit Suburban.",
+      "triangles": 284,
+      "length_m": 1.275,
+      "depth_m": 0.837,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_3x2",
+      "file": "suburban/fence-3x2.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 3 by 2 kit units. City Kit Suburban.",
+      "triangles": 316,
+      "length_m": 0.875,
+      "depth_m": 1.238,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_3x3",
+      "file": "suburban/fence-3x3.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel, 3 by 3 kit units. City Kit Suburban.",
+      "triangles": 364,
+      "length_m": 1.275,
+      "depth_m": 1.238,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence_low",
+      "file": "suburban/fence-low.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Low fence panel. City Kit Suburban.",
+      "triangles": 180,
+      "length_m": 1.275,
+      "depth_m": 0.837,
+      "height_m": 0.17,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_fence",
+      "file": "suburban/fence.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Fence panel. City Kit Suburban.",
+      "triangles": 88,
+      "length_m": 0.475,
+      "depth_m": 0.075,
+      "height_m": 0.27,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_path_long",
+      "file": "suburban/path-long.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Long garden path. City Kit Suburban.",
+      "triangles": 12,
+      "length_m": 0.2,
+      "depth_m": 0.4,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_path_short",
+      "file": "suburban/path-short.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Short garden path. City Kit Suburban.",
+      "triangles": 12,
+      "length_m": 0.2,
+      "depth_m": 0.2,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_path_stones_long",
+      "file": "suburban/path-stones-long.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Stone path, long layout. City Kit Suburban.",
+      "triangles": 48,
+      "length_m": 0.14,
+      "depth_m": 0.4,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_path_stones_messy",
+      "file": "suburban/path-stones-messy.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Stone path, messy layout. City Kit Suburban.",
+      "triangles": 36,
+      "length_m": 0.156,
+      "depth_m": 0.361,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_path_stones_short",
+      "file": "suburban/path-stones-short.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "park",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Stone path, short layout. City Kit Suburban.",
+      "triangles": 24,
+      "length_m": 0.14,
+      "depth_m": 0.2,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_planter",
+      "file": "suburban/planter.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Planter. City Kit Suburban.",
+      "triangles": 204,
+      "length_m": 0.4,
+      "depth_m": 0.3,
+      "height_m": 0.177,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_tree_large",
+      "file": "suburban/tree-large.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large broadleaf tree. City Kit Suburban.",
+      "triangles": 42,
+      "length_m": 0.21,
+      "depth_m": 0.243,
+      "height_m": 0.767,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_suburban_tree_small",
+      "file": "suburban/tree-small.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small broadleaf tree. City Kit Suburban.",
+      "triangles": 42,
+      "length_m": 0.21,
+      "depth_m": 0.243,
+      "height_m": 0.567,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_detail_ac_a",
+      "file": "modular/detail-ac-a.glb",
+      "category": "facade",
+      "role": "aircon",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall-mounted air conditioner, variant A. Modular Buildings.",
+      "triangles": 60,
+      "length_m": 0.24,
+      "depth_m": 0.24,
+      "height_m": 0.106,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_detail_ac_b",
+      "file": "modular/detail-ac-b.glb",
+      "category": "facade",
+      "role": "aircon",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall-mounted air conditioner, variant B. Modular Buildings.",
+      "triangles": 84,
+      "length_m": 0.31,
+      "depth_m": 0.125,
+      "height_m": 0.225,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_brown_glass",
+      "file": "modular/door-brown-glass.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown door with a glass panel. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_brown_window",
+      "file": "modular/door-brown-window.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown door with a window. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_brown",
+      "file": "modular/door-brown.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown solid door. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_white_glass",
+      "file": "modular/door-white-glass.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White door with a glass panel. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_white_window",
+      "file": "modular/door-white-window.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White door with a window. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_door_white",
+      "file": "modular/door-white.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White solid door. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_awning_a",
+      "file": "modular/roof-flat-awning-a.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof awning, variant A. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.11,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_awning_b",
+      "file": "modular/roof-flat-awning-b.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof awning, variant B. Modular Buildings.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.225,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_awning_c",
+      "file": "modular/roof-flat-awning-c.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof awning, variant C. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 1.0,
+      "depth_m": 1.225,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_center_corner",
+      "file": "modular/roof-flat-border-center-corner.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, border piece for a center corner. Modular Buildings.",
+      "triangles": 36,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_center",
+      "file": "modular/roof-flat-border-center.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, border piece for the center. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_corner_slanted_passage",
+      "file": "modular/roof-flat-border-corner-slanted-passage.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, slanted border corner with a passage. Modular Buildings.",
+      "triangles": 44,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_corner_slanted",
+      "file": "modular/roof-flat-border-corner-slanted.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, slanted border corner. Modular Buildings.",
+      "triangles": 32,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_corner",
+      "file": "modular/roof-flat-border-corner.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, border corner. Modular Buildings.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_end",
+      "file": "modular/roof-flat-border-end.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, border end. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_side",
+      "file": "modular/roof-flat-border-side.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, border side. Modular Buildings.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_border_straight",
+      "file": "modular/roof-flat-border-straight.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, straight border. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_center",
+      "file": "modular/roof-flat-center.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, center panel. Modular Buildings.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.106,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_corner_high",
+      "file": "modular/roof-flat-corner-high.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, high corner. Modular Buildings.",
+      "triangles": 16,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_corner",
+      "file": "modular/roof-flat-corner.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, corner. Modular Buildings.",
+      "triangles": 16,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.106,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_detail_a",
+      "file": "modular/roof-flat-detail-a.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof detail, variant A. Modular Buildings.",
+      "triangles": 50,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_detail_b",
+      "file": "modular/roof-flat-detail-b.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof detail, variant B. Modular Buildings.",
+      "triangles": 48,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_detail_c",
+      "file": "modular/roof-flat-detail-c.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof detail, variant C. Modular Buildings.",
+      "triangles": 34,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_detail_d",
+      "file": "modular/roof-flat-detail-d.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof detail, variant D. Modular Buildings.",
+      "triangles": 44,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_flat_top",
+      "file": "modular/roof-flat-top.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat roof, top cap. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.1,
+      "depth_m": 1.1,
+      "height_m": 0.212,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_gable_corner",
+      "file": "modular/roof-gable-corner.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Gable roof, corner. Modular Buildings.",
+      "triangles": 18,
+      "length_m": 1.046,
+      "depth_m": 1.046,
+      "height_m": 0.519,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_gable_end",
+      "file": "modular/roof-gable-end.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Gable roof, end piece. Modular Buildings.",
+      "triangles": 16,
+      "length_m": 1.091,
+      "depth_m": 1.0,
+      "height_m": 0.519,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_gable",
+      "file": "modular/roof-gable.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Gable roof piece. Modular Buildings.",
+      "triangles": 20,
+      "length_m": 1.091,
+      "depth_m": 1.0,
+      "height_m": 0.519,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_corner_a",
+      "file": "modular/roof-slanted-corner-a.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, corner, variant A. Modular Buildings.",
+      "triangles": 32,
+      "length_m": 1.139,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_corner_b",
+      "file": "modular/roof-slanted-corner-b.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, corner, variant B. Modular Buildings.",
+      "triangles": 26,
+      "length_m": 1.139,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_corner_c",
+      "file": "modular/roof-slanted-corner-c.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, corner, variant C. Modular Buildings.",
+      "triangles": 24,
+      "length_m": 1.139,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_corner_inner",
+      "file": "modular/roof-slanted-corner-inner.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, inner corner. Modular Buildings.",
+      "triangles": 18,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.725,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_detail",
+      "file": "modular/roof-slanted-detail.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof detail piece. Modular Buildings.",
+      "triangles": 42,
+      "length_m": 1.0,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_flat",
+      "file": "modular/roof-slanted-flat.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, flat insert. Modular Buildings.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.106,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted_window",
+      "file": "modular/roof-slanted-window.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof, piece with a window. Modular Buildings.",
+      "triangles": 80,
+      "length_m": 1.0,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_roof_slanted",
+      "file": "modular/roof-slanted.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Slanted roof piece. Modular Buildings.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.139,
+      "height_m": 0.782,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_detailed",
+      "file": "modular/window-brown-detailed.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown window with extra frame detail. Modular Buildings.",
+      "triangles": 34,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_large",
+      "file": "modular/window-brown-large.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large brown window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.375,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_narrow",
+      "file": "modular/window-brown-narrow.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Narrow brown window. Modular Buildings.",
+      "triangles": 80,
+      "length_m": 0.188,
+      "depth_m": 0.05,
+      "height_m": 0.422,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_round_low",
+      "file": "modular/window-brown-round-low.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown window with a round top, low piece. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.346,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_round_middle",
+      "file": "modular/window-brown-round-middle.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown window with a round top, middle piece. Modular Buildings.",
+      "triangles": 24,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.625,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_round_narrow",
+      "file": "modular/window-brown-round-narrow.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Narrow brown window with a round top. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.188,
+      "depth_m": 0.05,
+      "height_m": 0.422,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_round_top",
+      "file": "modular/window-brown-round-top.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown window, round top piece. Modular Buildings.",
+      "triangles": 52,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.466,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_round_wide",
+      "file": "modular/window-brown-round-wide.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide brown window with a round top. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.466,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_tall",
+      "file": "modular/window-brown-tall.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Tall brown window. Modular Buildings.",
+      "triangles": 80,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown_wide",
+      "file": "modular/window-brown-wide.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide brown window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.75,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_brown",
+      "file": "modular/window-brown.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brown window. Modular Buildings.",
+      "triangles": 80,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_detailed",
+      "file": "modular/window-white-detailed.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White window with extra frame detail. Modular Buildings.",
+      "triangles": 34,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_large",
+      "file": "modular/window-white-large.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large white window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.375,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_narrow",
+      "file": "modular/window-white-narrow.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Narrow white window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.188,
+      "depth_m": 0.05,
+      "height_m": 0.422,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_round_low",
+      "file": "modular/window-white-round-low.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White window with a round top, low piece. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.346,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_round_middle",
+      "file": "modular/window-white-round-middle.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White window with a round top, middle piece. Modular Buildings.",
+      "triangles": 24,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.625,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_round_narrow",
+      "file": "modular/window-white-round-narrow.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Narrow white window with a round top. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.188,
+      "depth_m": 0.05,
+      "height_m": 0.422,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_round_top",
+      "file": "modular/window-white-round-top.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White window, round top piece. Modular Buildings.",
+      "triangles": 52,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.466,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_round_wide",
+      "file": "modular/window-white-round-wide.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide white window with a round top. Modular Buildings.",
+      "triangles": 56,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.466,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_tall",
+      "file": "modular/window-white-tall.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Tall white window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white_wide",
+      "file": "modular/window-white-wide.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide white window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.75,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_modular_window_white",
+      "file": "modular/window-white.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "White window. Modular Buildings.",
+      "triangles": 40,
+      "length_m": 0.312,
+      "depth_m": 0.05,
+      "height_m": 0.38,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_balcony_ladder_bottom",
+      "file": "urban/balcony-ladder-bottom.glb",
+      "category": "facade",
+      "role": "balcony",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Balcony ladder, bottom section. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 0.284,
+      "height_m": 0.719,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_balcony_ladder_top",
+      "file": "urban/balcony-ladder-top.glb",
+      "category": "facade",
+      "role": "balcony",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Balcony ladder, top section. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 1.0,
+      "depth_m": 0.284,
+      "height_m": 0.281,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_balcony_type_a",
+      "file": "urban/balcony-type-a.glb",
+      "category": "facade",
+      "role": "balcony",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Balcony, variant A. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 1.0,
+      "depth_m": 0.284,
+      "height_m": 0.281,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_awning_small",
+      "file": "urban/detail-awning-small.glb",
+      "category": "facade",
+      "role": "awning",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small awning. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 0.598,
+      "depth_m": 0.3,
+      "height_m": 0.281,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_awning_wide",
+      "file": "urban/detail-awning-wide.glb",
+      "category": "facade",
+      "role": "awning",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide awning. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 0.3,
+      "height_m": 0.281,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_barrier_strong_damaged",
+      "file": "urban/detail-barrier-strong-damaged.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Damaged heavy barrier. Retro Urban Kit.",
+      "triangles": 40,
+      "length_m": 0.664,
+      "depth_m": 0.249,
+      "height_m": 0.332,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_barrier_strong_type_a",
+      "file": "urban/detail-barrier-strong-type-a.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Heavy barrier, variant A. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 0.664,
+      "depth_m": 0.249,
+      "height_m": 0.332,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_barrier_strong_type_b",
+      "file": "urban/detail-barrier-strong-type-b.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Heavy barrier, variant B. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 0.664,
+      "depth_m": 0.249,
+      "height_m": 0.332,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_barrier_type_a",
+      "file": "urban/detail-barrier-type-a.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Barrier, variant A. Retro Urban Kit.",
+      "triangles": 44,
+      "length_m": 0.433,
+      "depth_m": 0.134,
+      "height_m": 0.4,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_barrier_type_b",
+      "file": "urban/detail-barrier-type-b.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Barrier, variant B. Retro Urban Kit.",
+      "triangles": 44,
+      "length_m": 0.567,
+      "depth_m": 0.134,
+      "height_m": 0.3,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_beam",
+      "file": "urban/detail-beam.glb",
+      "category": "structures",
+      "role": "beam",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Structural beam. Retro Urban Kit.",
+      "triangles": 44,
+      "length_m": 0.25,
+      "depth_m": 1.0,
+      "height_m": 0.25,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_bench",
+      "file": "urban/detail-bench.glb",
+      "category": "furniture",
+      "role": "bench",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Street bench. Retro Urban Kit.",
+      "triangles": 84,
+      "length_m": 0.604,
+      "depth_m": 0.322,
+      "height_m": 0.409,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_block",
+      "file": "urban/detail-block.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Loose masonry block. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.5,
+      "depth_m": 0.5,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_bricks_type_a",
+      "file": "urban/detail-bricks-type-a.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brick pile, variant A. Retro Urban Kit.",
+      "triangles": 80,
+      "length_m": 0.571,
+      "depth_m": 0.534,
+      "height_m": 0.2,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_bricks_type_b",
+      "file": "urban/detail-bricks-type-b.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Brick pile, variant B. Retro Urban Kit.",
+      "triangles": 88,
+      "length_m": 0.645,
+      "depth_m": 0.426,
+      "height_m": 0.2,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_cables_type_a",
+      "file": "urban/detail-cables-type-a.glb",
+      "category": "facade",
+      "role": "cable",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Cable run, variant A. Retro Urban Kit.",
+      "triangles": 4,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 0.143,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_cables_type_b",
+      "file": "urban/detail-cables-type-b.glb",
+      "category": "facade",
+      "role": "cable",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Cable run, variant B. Retro Urban Kit.",
+      "triangles": 4,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 0.143,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_dumpster_closed",
+      "file": "urban/detail-dumpster-closed.glb",
+      "category": "waste",
+      "role": "trash",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Dumpster, closed. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 0.6,
+      "depth_m": 0.454,
+      "height_m": 0.545,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_dumpster_open",
+      "file": "urban/detail-dumpster-open.glb",
+      "category": "waste",
+      "role": "trash",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Dumpster, open. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 0.6,
+      "depth_m": 0.485,
+      "height_m": 0.55,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_light_double",
+      "file": "urban/detail-light-double.glb",
+      "category": "furniture",
+      "role": "lamp",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Double street light. Retro Urban Kit.",
+      "triangles": 96,
+      "length_m": 0.086,
+      "depth_m": 0.442,
+      "height_m": 0.96,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_light_single",
+      "file": "urban/detail-light-single.glb",
+      "category": "furniture",
+      "role": "lamp",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Single street light. Retro Urban Kit.",
+      "triangles": 68,
+      "length_m": 0.086,
+      "depth_m": 0.264,
+      "height_m": 0.96,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_detail_light_traffic",
+      "file": "urban/detail-light-traffic.glb",
+      "category": "furniture",
+      "role": "lamp",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Traffic light. Retro Urban Kit.",
+      "triangles": 114,
+      "length_m": 0.156,
+      "depth_m": 0.584,
+      "height_m": 1.04,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_door_type_a",
+      "file": "urban/door-type-a.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Door, variant A. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.398,
+      "depth_m": 0.05,
+      "height_m": 0.628,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_door_type_b",
+      "file": "urban/door-type-b.glb",
+      "category": "facade",
+      "role": "door",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Door, variant B. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.398,
+      "depth_m": 0.05,
+      "height_m": 0.628,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_grass_corner_inner",
+      "file": "urban/grass-corner-inner.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Grass tile, inner corner. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_grass_corner",
+      "file": "urban/grass-corner.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Grass tile, corner. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_grass_hill",
+      "file": "urban/grass-hill.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Grass tile on a rise. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_grass",
+      "file": "urban/grass.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flat grass tile. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_pallet_small",
+      "file": "urban/pallet-small.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small wooden pallet. Retro Urban Kit.",
+      "triangles": 60,
+      "length_m": 0.5,
+      "depth_m": 0.575,
+      "height_m": 0.15,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_pallet",
+      "file": "urban/pallet.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wooden pallet. Retro Urban Kit.",
+      "triangles": 84,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.15,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_planks",
+      "file": "urban/planks.glb",
+      "category": "waste",
+      "role": "debris",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Loose wooden planks. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.13,
+      "depth_m": 0.57,
+      "height_m": 0.1,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_center",
+      "file": "urban/road-asphalt-center.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, center tile. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_corner_inner",
+      "file": "urban/road-asphalt-corner-inner.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, inner corner. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_corner_outer",
+      "file": "urban/road-asphalt-corner-outer.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, outer corner. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_corner",
+      "file": "urban/road-asphalt-corner.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, corner. Retro Urban Kit.",
+      "triangles": 50,
+      "length_m": 2.0,
+      "depth_m": 2.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_damaged",
+      "file": "urban/road-asphalt-damaged.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, damaged tile. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_pavement",
+      "file": "urban/road-asphalt-pavement.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, tile with a pavement edge. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_side",
+      "file": "urban/road-asphalt-side.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, side tile. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_asphalt_straight",
+      "file": "urban/road-asphalt-straight.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Asphalt road, straight tile. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 1.0,
+      "depth_m": 2.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_center",
+      "file": "urban/road-dirt-center.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, center tile. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_corner_inner",
+      "file": "urban/road-dirt-corner-inner.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, inner corner. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_corner_outer",
+      "file": "urban/road-dirt-corner-outer.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, outer corner. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_corner",
+      "file": "urban/road-dirt-corner.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, corner. Retro Urban Kit.",
+      "triangles": 50,
+      "length_m": 2.0,
+      "depth_m": 2.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_damaged",
+      "file": "urban/road-dirt-damaged.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, damaged tile. Retro Urban Kit.",
+      "triangles": 24,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_pavement",
+      "file": "urban/road-dirt-pavement.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, tile with a pavement edge. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_side",
+      "file": "urban/road-dirt-side.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, side tile. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_straight",
+      "file": "urban/road-dirt-straight.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, straight tile. Retro Urban Kit.",
+      "triangles": 22,
+      "length_m": 1.0,
+      "depth_m": 2.0,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_road_dirt_tile",
+      "file": "urban/road-dirt-tile.glb",
+      "category": "structures",
+      "role": "road",
+      "surfaces": [
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "allow",
+      "clearance_m": 0.0,
+      "use": "Dirt road, plain tile. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.5,
+      "depth_m": 0.5,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_roof_metal_poles",
+      "file": "urban/roof-metal-poles.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Metal roof carried on poles. Retro Urban Kit.",
+      "triangles": 48,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.7,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_roof_metal_type_a",
+      "file": "urban/roof-metal-type-a.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Metal roof, variant A. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.137,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_roof_metal_type_b",
+      "file": "urban/roof-metal-type-b.glb",
+      "category": "structures",
+      "role": "roof",
+      "surfaces": [
+        "block_edge"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Metal roof, variant B. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.137,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_scaffolding_floor",
+      "file": "urban/scaffolding-floor.glb",
+      "category": "structures",
+      "role": "scaffold",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Scaffolding floor. Retro Urban Kit.",
+      "triangles": 38,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.07,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_scaffolding_poles",
+      "file": "urban/scaffolding-poles.glb",
+      "category": "structures",
+      "role": "scaffold",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Scaffolding poles. Retro Urban Kit.",
+      "triangles": 48,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_scaffolding_structure",
+      "file": "urban/scaffolding-structure.glb",
+      "category": "structures",
+      "role": "scaffold",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Scaffolding structure. Retro Urban Kit.",
+      "triangles": 124,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_large",
+      "file": "urban/tree-large.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large broadleaf tree. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 1.3,
+      "depth_m": 1.3,
+      "height_m": 1.7,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_park_large",
+      "file": "urban/tree-park-large.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large park tree. Retro Urban Kit.",
+      "triangles": 76,
+      "length_m": 1.04,
+      "depth_m": 1.04,
+      "height_m": 1.46,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_park_pine_large",
+      "file": "urban/tree-park-pine-large.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large park pine. Retro Urban Kit.",
+      "triangles": 76,
+      "length_m": 1.04,
+      "depth_m": 1.04,
+      "height_m": 1.46,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_pine_large",
+      "file": "urban/tree-pine-large.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Large pine. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 1.3,
+      "depth_m": 1.3,
+      "height_m": 1.7,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_pine_small",
+      "file": "urban/tree-pine-small.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small pine. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 0.7,
+      "depth_m": 0.7,
+      "height_m": 0.4,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_shrub",
+      "file": "urban/tree-shrub.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Shrub. Retro Urban Kit.",
+      "triangles": 32,
+      "length_m": 0.78,
+      "depth_m": 0.78,
+      "height_m": 0.3,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_tree_small",
+      "file": "urban/tree-small.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "park",
+        "plaza",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small broadleaf tree. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 0.78,
+      "depth_m": 0.78,
+      "height_m": 0.3,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_truck_flat",
+      "file": "urban/truck-flat.glb",
+      "category": "vehicles",
+      "role": "vehicle",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Flatbed truck. Retro Urban Kit.",
+      "triangles": 68,
+      "length_m": 0.83,
+      "depth_m": 1.643,
+      "height_m": 1.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_truck_green_cargo",
+      "file": "urban/truck-green-cargo.glb",
+      "category": "vehicles",
+      "role": "vehicle",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Green truck with a cargo box. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.83,
+      "depth_m": 1.168,
+      "height_m": 0.738,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_truck_green",
+      "file": "urban/truck-green.glb",
+      "category": "vehicles",
+      "role": "vehicle",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Green truck. Retro Urban Kit.",
+      "triangles": 48,
+      "length_m": 0.83,
+      "depth_m": 1.643,
+      "height_m": 1.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_truck_grey_cargo",
+      "file": "urban/truck-grey-cargo.glb",
+      "category": "vehicles",
+      "role": "vehicle",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Grey truck with a cargo box. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.83,
+      "depth_m": 1.168,
+      "height_m": 0.738,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_truck_grey",
+      "file": "urban/truck-grey.glb",
+      "category": "vehicles",
+      "role": "vehicle",
+      "surfaces": [
+        "curb",
+        "carriageway",
+        "sidewalk",
+        "yard",
+        "empty_lot",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Grey truck. Retro Urban Kit.",
+      "triangles": 48,
+      "length_m": 0.83,
+      "depth_m": 1.643,
+      "height_m": 1.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_column_painted",
+      "file": "urban/wall-a-column-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted column. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.25,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_column",
+      "file": "urban/wall-a-column.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, column. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.25,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_corner_painted",
+      "file": "urban/wall-a-corner-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted corner. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_corner",
+      "file": "urban/wall-a-corner.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, corner. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_detail_painted",
+      "file": "urban/wall-a-detail-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted detail. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.6,
+      "depth_m": 0.2,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_detail",
+      "file": "urban/wall-a-detail.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, detail strip. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.6,
+      "depth_m": 0.2,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_diagonal",
+      "file": "urban/wall-a-diagonal.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, diagonal brace. Retro Urban Kit.",
+      "triangles": 8,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_door",
+      "file": "urban/wall-a-door.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, door opening. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_flat_garage",
+      "file": "urban/wall-a-flat-garage.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, flat section with a garage. Retro Urban Kit.",
+      "triangles": 14,
+      "length_m": 1.0,
+      "depth_m": 0.1,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_flat_painted",
+      "file": "urban/wall-a-flat-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted flat section. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_flat_window",
+      "file": "urban/wall-a-flat-window.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, flat section with a window. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 1.0,
+      "depth_m": 0.1,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_flat",
+      "file": "urban/wall-a-flat.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, flat section. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_garage",
+      "file": "urban/wall-a-garage.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, garage opening. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_low_painted",
+      "file": "urban/wall-a-low-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted low section. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_low",
+      "file": "urban/wall-a-low.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, low section. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_open",
+      "file": "urban/wall-a-open.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, open section. Retro Urban Kit.",
+      "triangles": 60,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_painted_diagonal",
+      "file": "urban/wall-a-painted-diagonal.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted diagonal brace. Retro Urban Kit.",
+      "triangles": 8,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_painted",
+      "file": "urban/wall-a-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, painted face. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_roof_detailed",
+      "file": "urban/wall-a-roof-detailed.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, roof with extra detail. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.137,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_roof_slant_detailed",
+      "file": "urban/wall-a-roof-slant-detailed.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, detailed slanted roof. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 1.0,
+      "depth_m": 1.137,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_roof_slant",
+      "file": "urban/wall-a-roof-slant.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, slanted roof. Retro Urban Kit.",
+      "triangles": 8,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_roof",
+      "file": "urban/wall-a-roof.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, roof. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a_window",
+      "file": "urban/wall-a-window.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A, window. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_a",
+      "file": "urban/wall-a.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style A. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_column",
+      "file": "urban/wall-b-column.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, column. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 0.25,
+      "depth_m": 0.25,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_corner",
+      "file": "urban/wall-b-corner.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, corner. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_detail_painted",
+      "file": "urban/wall-b-detail-painted.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, painted detail. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 0.6,
+      "depth_m": 0.2,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_diagonal",
+      "file": "urban/wall-b-diagonal.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, diagonal brace. Retro Urban Kit.",
+      "triangles": 8,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_door",
+      "file": "urban/wall-b-door.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, door opening. Retro Urban Kit.",
+      "triangles": 38,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_flat_garage",
+      "file": "urban/wall-b-flat-garage.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, flat section with a garage. Retro Urban Kit.",
+      "triangles": 14,
+      "length_m": 1.0,
+      "depth_m": 0.1,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_flat_window",
+      "file": "urban/wall-b-flat-window.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, flat section with a window. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 1.0,
+      "depth_m": 0.1,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_flat",
+      "file": "urban/wall-b-flat.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, flat section. Retro Urban Kit.",
+      "triangles": 2,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_garage",
+      "file": "urban/wall-b-garage.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, garage opening. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_low",
+      "file": "urban/wall-b-low.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, low section. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_open",
+      "file": "urban/wall-b-open.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, open section. Retro Urban Kit.",
+      "triangles": 60,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_roof_detailed",
+      "file": "urban/wall-b-roof-detailed.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, roof with extra detail. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.137,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_roof_slant_detailed",
+      "file": "urban/wall-b-roof-slant-detailed.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, detailed slanted roof. Retro Urban Kit.",
+      "triangles": 16,
+      "length_m": 1.0,
+      "depth_m": 1.137,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_roof_slant",
+      "file": "urban/wall-b-roof-slant.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, slanted roof. Retro Urban Kit.",
+      "triangles": 8,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_roof",
+      "file": "urban/wall-b-roof.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, roof. Retro Urban Kit.",
+      "triangles": 20,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b_window",
+      "file": "urban/wall-b-window.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B, window. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_b",
+      "file": "urban/wall-b.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style B. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 1.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_broken_type_a",
+      "file": "urban/wall-broken-type-a.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Broken wall, variant A. Retro Urban Kit.",
+      "triangles": 44,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.4,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_broken_type_b",
+      "file": "urban/wall-broken-type-b.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Broken wall, variant B. Retro Urban Kit.",
+      "triangles": 56,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_c_flat_low",
+      "file": "urban/wall-c-flat-low.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style C, low flat section. Retro Urban Kit.",
+      "triangles": 4,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_c_flat",
+      "file": "urban/wall-c-flat.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wall, style C, flat section. Retro Urban Kit.",
+      "triangles": 4,
+      "length_m": 1.0,
+      "depth_m": 0.0,
+      "height_m": 1.0,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_fence",
+      "file": "urban/wall-fence.glb",
+      "category": "structures",
+      "role": "fence",
+      "surfaces": [
+        "block_edge",
+        "yard",
+        "curb"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Low wall used as a fence. Retro Urban Kit.",
+      "triangles": 32,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_steps_type_a",
+      "file": "urban/wall-steps-type-a.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Stepped wall, variant A. Retro Urban Kit.",
+      "triangles": 44,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.4,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_steps_type_b",
+      "file": "urban/wall-steps-type-b.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Stepped wall, variant B. Retro Urban Kit.",
+      "triangles": 52,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_type_a",
+      "file": "urban/wall-type-a.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Plain wall, variant A. Retro Urban Kit.",
+      "triangles": 12,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.4,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_wall_type_b",
+      "file": "urban/wall-type-b.glb",
+      "category": "structures",
+      "role": "wall",
+      "surfaces": [
+        "block_edge",
+        "yard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Plain wall, variant B. Retro Urban Kit.",
+      "triangles": 28,
+      "length_m": 1.0,
+      "depth_m": 0.07,
+      "height_m": 0.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_small_type_a",
+      "file": "urban/window-small-type-a.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small window, variant A. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.348,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_small_type_b",
+      "file": "urban/window-small-type-b.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Small window, variant B. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.348,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_wide_type_a",
+      "file": "urban/window-wide-type-a.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide window, variant A. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 0.598,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_wide_type_b",
+      "file": "urban/window-wide-type-b.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide window, variant B. Retro Urban Kit.",
+      "triangles": 36,
+      "length_m": 0.598,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_wide_type_c",
+      "file": "urban/window-wide-type-c.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide window, variant C. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.598,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_urban_window_wide_type_d",
+      "file": "urban/window-wide-type-d.glb",
+      "category": "facade",
+      "role": "window",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "Wide window, variant D. Retro Urban Kit.",
+      "triangles": 26,
+      "length_m": 0.598,
+      "depth_m": 0.05,
+      "height_m": 0.598,
+      "collider": "none"
+    }
+  ]
+}

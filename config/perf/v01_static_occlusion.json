@@ -1,0 +1,11 @@
+{
+  "variant": "v01_static_occlusion",
+  "description": "v00 geometry unchanged, plus Unity static batching and baked occlusion culling (both recommended by the Onward Custom Content Guide 2.0, p. 67). Occlusion parameters are Unity's defaults.",
+  "static_batching": true,
+  "occlusion_culling": true,
+  "lightmap_texels_per_m": 2.0,
+  "lightmap_max_size": 2048,
+  "lightmap_directional": true,
+  "occlusion_smallest_occluder_m": 5.0,
+  "occlusion_smallest_hole_m": 0.25
+}

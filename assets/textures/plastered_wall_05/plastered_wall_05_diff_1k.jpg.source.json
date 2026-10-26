@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "plastered_wall_05",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Charlotte Baglioni"
+  ],
+  "page_url": "https://polyhaven.com/a/plastered_wall_05",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plastered_wall_05/plastered_wall_05_diff_1k.jpg",
+  "md5": "b3802ea845531b87adaa61ae23a0ed27",
+  "sha256": "b10e2fc12c6f6bb8a355fe7c5d6eab19222337414ce055df0701e75f5f603764",
+  "size_bytes": 557082,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/plastered_wall_05/plastered_wall_05_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:28+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

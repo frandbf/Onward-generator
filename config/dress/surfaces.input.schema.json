@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/dress/surfaces.input.schema.json",
+  "title": "Grouped surfaces sent to the material classifier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "catalog_sha256", "groups"],
+  "properties": {
+    "schema": { "const": "onward_generator.surface_groups" },
+    "schema_version": { "const": "0.1.0" },
+    "catalog_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/group" }
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id", "surface_ids", "role", "object_type", "osm_tags",
+        "building_context", "orientation", "inclination_deg", "height_m",
+        "dimensions_m", "area_m2", "current_material", "current_origin",
+        "confidence_hint", "count"
+      ],
+      "properties": {
+        "group_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "surface_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "role": {
+          "enum": ["wall", "roof", "ground", "sidewalk", "street", "plaza", "curb", "water", "green", "opening", "accessory", "other"]
+        },
+        "object_type": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "osm_tags": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "building_context": {
+          "enum": ["historic", "residential", "commercial", "religious", "modern", "unknown"]
+        },
+        "orientation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["normal", "facing"],
+          "properties": {
+            "normal": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "type": "number" }
+            },
+            "facing": { "enum": ["horizontal", "vertical", "inclined", "unknown"] }
+          }
+        },
+        "inclination_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 90 },
+        "height_m": { "type": ["number", "null"] },
+        "dimensions_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width_m", "depth_m"],
+          "properties": {
+            "width_m": { "type": ["number", "null"] },
+            "depth_m": { "type": ["number", "null"] }
+          }
+        },
+        "area_m2": { "type": ["number", "null"], "minimum": 0 },
+        "current_material": { "type": ["string", "null"] },
+        "current_origin": { "enum": ["observed", "estimated", "generated", "unknown"] },
+        "confidence_hint": { "type": "number", "minimum": 0, "maximum": 1 },
+        "count": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

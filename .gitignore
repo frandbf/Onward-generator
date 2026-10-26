@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# Local editor logs. One of them records the headset serial.
+.cursor/debug-*.log
+
+# Secrets, if a local file is added later.
+.env
+*.pem
+
+# Scratch output stays out of version control.
+output/*
+!output/.gitkeep
+
+# Per-map workspaces keep their OSM extract and generated scenes out of git.
+maps/*/data/

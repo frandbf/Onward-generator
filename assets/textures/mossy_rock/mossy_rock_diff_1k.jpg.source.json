@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "mossy_rock",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/mossy_rock",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/mossy_rock/mossy_rock_diff_1k.jpg",
+  "md5": "a57fbbf55269eb64f8d40708fe3af26c",
+  "sha256": "4dbf37f1b0465c9c8914213163923be159716f5b97fb6946437b6c5e143ef540",
+  "size_bytes": 1124438,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/mossy_rock/mossy_rock_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:32+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

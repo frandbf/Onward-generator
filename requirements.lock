@@ -1,0 +1,17 @@
+# Exact environment used to run the tests (pip freeze, Python 3.14.6, macOS arm64).
+# Install with: .venv/bin/python -m pip install --only-binary=:all: -r requirements.lock
+attrs==26.1.0
+certifi==2026.10.18
+iniconfig==2.3.1
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+numpy==2.5.4
+packaging==26.3
+pillow==11.3.0
+pluggy==1.7.0
+Pygments==2.21.0
+pyproj==3.8.0
+pytest==9.1.1
+referencing==0.37.0
+rpds-py==2026.9.1
+shapely==2.2.0

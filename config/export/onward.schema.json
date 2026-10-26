@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/export/onward.schema.json",
+  "title": "Onward export adapter configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "adapter", "target", "map", "build"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "0.1.0" },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "onward_unity" },
+        "version": { "const": "0.1.0" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unity", "sdk", "platform"],
+      "properties": {
+        "unity": { "const": "2021.3.23f1" },
+        "sdk": { "const": "1.15" },
+        "platform": { "const": "quest" }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_]{1,40}$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["combine_cell_m", "static_batching", "occlusion_culling", "lightmap_texels_per_m", "lightmap_max_size", "lightmap_directional"],
+      "properties": {
+        "combine_cell_m": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "static_batching": { "type": "boolean" },
+        "occlusion_culling": { "type": "boolean" },
+        "lightmap_texels_per_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 40 },
+        "lightmap_max_size": { "enum": [512, 1024, 2048, 4096] },
+        "lightmap_directional": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,250 @@
+"""Material atlas: procedural greyscale tiles plus optional licensed photo slots.
+
+Tiles default to a mid-grey *pattern* (not the material colour). The Onward
+shader multiplies ``_BaseMap`` by ``_BaseColor``; a coloured or empty tile made
+trees and metal sample near-black on Quest. Photographic albedo is opt-in per
+slot and is supplied by the ``materials`` stage, not invented here.
+"""
+
+from __future__ import annotations
+
+import struct
+import zlib
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+
+import numpy as np
+
+from onward_generator.dress.catalog import MaterialCatalog
+from onward_generator.generation.config import Material
+
+MIN_TILE_PX = 256
+MIN_MEAN_LUMA = 80  # unused / fallback tiles stay visible after shader multiply
+
+
+@dataclass(frozen=True, slots=True)
+class Atlas:
+    png: bytes
+    size: int
+    tiles: int
+    slots: dict[str, tuple[float, float, float, float]]  # material id → (u0, v0, u1, v1)
+    note: str
+
+
+def encode_png_rgba(pixels: np.ndarray) -> bytes:
+    """Uncompressed-filter PNG. ``pixels`` is (h, w, 4) uint8."""
+    if pixels.ndim != 3 or pixels.shape[2] != 4 or pixels.dtype != np.uint8:
+        raise ValueError("pixels must be an HxWx4 uint8 array")
+    height, width, _ = pixels.shape
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+    raw = b"".join(b"\x00" + pixels[y].tobytes() for y in range(height))
+    return b"".join([
+        b"\x89PNG\r\n\x1a\n",
+        chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)),
+        chunk(b"IDAT", zlib.compress(raw, 9)),
+        chunk(b"IEND", b""),
+    ])
+
+
+def decode_png_rgba(data: bytes) -> np.ndarray:
+    """Inverse of ``encode_png_rgba`` (filter 0, 8-bit RGBA)."""
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("not a PNG")
+    offset = 8
+    width = height = 0
+    raw = b""
+    while offset + 12 <= len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        tag = data[offset + 4 : offset + 8]
+        payload = data[offset + 8 : offset + 8 + length]
+        offset += 12 + length
+        if tag == b"IHDR":
+            width, height = struct.unpack(">II", payload[:8])
+        elif tag == b"IDAT":
+            raw += payload
+        elif tag == b"IEND":
+            break
+    pixels = zlib.decompress(raw)
+    stride = 1 + width * 4
+    rows = []
+    for y in range(height):
+        row = pixels[y * stride : (y + 1) * stride]
+        if not row or row[0] != 0:
+            raise ValueError("only filter-0 PNG rows are supported")
+        rows.append(np.frombuffer(row[1:], dtype=np.uint8).reshape(width, 4))
+    return np.stack(rows, 0)
+
+
+def _grid(n: int) -> tuple[int, int]:
+    """Square power-of-two grid that fits ``n`` tiles; 256 px per tile, at least 512."""
+    count = max(int(n), 1)
+    tiles = 4
+    while tiles * tiles < count:
+        tiles *= 2
+    return tiles, max(512, tiles * MIN_TILE_PX)
+
+
+def pattern_kind(color_id: str) -> str:
+    if color_id.startswith("tree_canopy") or color_id == "green":
+        return "foliage"
+    if color_id.startswith("tree_trunk") or color_id == "door_wood":
+        return "wood"
+    if color_id.startswith("roof_tile"):
+        return "tiles"
+    if color_id == "carriageway":
+        return "asphalt"
+    if color_id in {"sidewalk", "pedestrian", "curb", "stair", "ground"}:
+        return "paving"
+    if "metal" in color_id:
+        return "metal"
+    if color_id.startswith("plaster") or color_id.startswith("stone") or color_id.startswith("roof_flat"):
+        return "plaster"
+    if color_id == "water":
+        return "water"
+    if color_id.startswith("glass"):
+        return "glass"
+    return "speckle"
+
+
+def _modulation(kind: str, size: int, seed: int) -> np.ndarray:
+    """Per-pixel multiplier in ~0.62–1.12 so ``_BaseColor * _BaseMap`` stays readable."""
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:size, 0:size].astype(np.float64)
+    noise = rng.normal(0.0, 1.0, (size, size))
+    if kind == "asphalt":
+        grit = 0.88 + 0.10 * noise
+        grit[rng.random((size, size)) < 0.035] *= 0.55
+        return grit
+    if kind == "paving":
+        cell = max(size // 8, 8)
+        grout = ((xx % cell) < 2) | ((yy % cell) < 2)
+        field = 0.96 + 0.04 * noise
+        return np.where(grout, 0.62, field)
+    if kind == "tiles":
+        row = max(size // 10, 8)
+        wave = ((xx + 5.0 * np.sin(yy / 6.0)) % (row * 1.6)) < 2.0
+        grout_y = (yy % row) < 2
+        field = 0.94 + 0.06 * noise
+        return np.where(wave | grout_y, 0.58, field)
+    if kind == "wood":
+        return 0.82 + 0.14 * np.sin(xx / 2.8) + 0.05 * noise
+    if kind == "foliage":
+        blobs = np.sin(xx / 9.0) * np.cos(yy / 11.0)
+        return 0.80 + 0.16 * blobs + 0.08 * noise
+    if kind == "metal":
+        return 0.78 + 0.16 * np.sin(yy / 2.2) + 0.04 * noise
+    if kind == "plaster":
+        mottling = np.sin((xx + yy) / 13.0) * np.cos(xx / 17.0)
+        return 0.86 + 0.10 * mottling + 0.06 * noise
+    if kind == "water":
+        return 0.76 + 0.14 * np.sin(xx / 7.0 + yy / 11.0) + 0.04 * noise
+    if kind == "glass":
+        return 0.72 + 0.10 * np.sin((xx + yy) / 8.0) + 0.03 * noise
+    return 0.88 + 0.08 * noise
+
+
+def _tile_pixels(color_id: str, size: int, seed: int) -> np.ndarray:
+    mod = np.clip(_modulation(pattern_kind(color_id), size, seed), 0.55, 1.15)
+    # Neutral grey so the shader tint (``_BaseColor``) keeps the material hue.
+    rgb = np.clip(np.round(200.0 * mod[..., None]), MIN_MEAN_LUMA, 255).astype(np.uint8)
+    rgb = np.broadcast_to(rgb, (size, size, 3)).copy()
+    rgb[0, :, :] = np.clip(rgb[0, :, :].astype(np.int16) - 18, 0, 255).astype(np.uint8)
+    rgb[:, 0, :] = np.clip(rgb[:, 0, :].astype(np.int16) - 18, 0, 255).astype(np.uint8)
+    alpha = np.full((size, size, 1), 255, dtype=np.uint8)
+    return np.concatenate([rgb, alpha], axis=2)
+
+
+def bake_photo_tile(rgb: np.ndarray, size: int, mode: str) -> np.ndarray:
+    """Resize an RGB photo into one atlas tile.
+
+    ``greyscale_modulation`` keeps cream/ochre on ``_BaseColor``.
+    ``color_albedo`` keeps the photograph and expects a near-white base colour.
+    """
+    if rgb.ndim != 3 or rgb.shape[2] < 3:
+        raise ValueError("photo must be HxWx3")
+    from PIL import Image
+
+    src = np.ascontiguousarray(rgb[..., :3], dtype=np.uint8)
+    image = Image.fromarray(src).resize((size, size), Image.Resampling.LANCZOS)
+    arr = np.asarray(image, dtype=np.uint8)
+    if mode == "greyscale_modulation":
+        luma = 0.2126 * arr[..., 0] + 0.7152 * arr[..., 1] + 0.0722 * arr[..., 2]
+        grey = np.clip(np.round(luma), MIN_MEAN_LUMA, 255).astype(np.uint8)
+        arr = np.stack([grey, grey, grey], axis=-1)
+    alpha = np.full((size, size, 1), 255, dtype=np.uint8)
+    return np.concatenate([arr, alpha], axis=2)
+
+
+def decode_jpeg_rgb(data: bytes) -> np.ndarray:
+    """Decode a JPEG (or other Pillow-readable still) to HxWx3 uint8."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    image = Image.open(BytesIO(data)).convert("RGB")
+    return np.asarray(image, dtype=np.uint8)
+
+
+def _unused_tile(size: int) -> np.ndarray:
+    rgb = np.full((size, size, 3), 200, dtype=np.uint8)
+    alpha = np.full((size, size, 1), 255, dtype=np.uint8)
+    return np.concatenate([rgb, alpha], axis=2)
+
+
+def build_atlas(
+    catalog: MaterialCatalog,
+    materials: Mapping[str, Material],
+    *,
+    used_color_ids: Sequence[str] | None = None,
+    seed: int = 48152,
+    photo_tiles: Mapping[str, tuple[np.ndarray, str]] | None = None,
+) -> Atlas:
+    """One tile per used material id. The grid grows so trees and metal are never dropped.
+
+    ``photo_tiles`` maps a slot key (generation colour id) to ``(HxWx3 RGB, albedo_mode)``.
+    """
+    _ = materials  # colours stay on the glTF / Unity ``_BaseColor`` unless apply sets white.
+    photos = dict(photo_tiles or {})
+    wanted = list(dict.fromkeys(used_color_ids or [e.color_id for e in catalog.entries]))
+    tiles, size = _grid(len(wanted))
+    tile = size // tiles
+    image = np.zeros((size, size, 4), dtype=np.uint8)
+    image[..., :3] = 200
+    image[..., 3] = 255
+    slots: dict[str, tuple[float, float, float, float]] = {}
+    photo_ids: list[str] = []
+    for index, color_id in enumerate(wanted):
+        row, col = divmod(index, tiles)
+        y0, x0 = row * tile, col * tile
+        if color_id in photos:
+            rgb, mode = photos[color_id]
+            image[y0 : y0 + tile, x0 : x0 + tile] = bake_photo_tile(rgb, tile, mode)
+            photo_ids.append(color_id)
+        else:
+            image[y0 : y0 + tile, x0 : x0 + tile] = _tile_pixels(color_id, tile, seed + index)
+        u0, v0 = col / tiles, 1.0 - (row + 1) / tiles
+        u1, v1 = (col + 1) / tiles, 1.0 - row / tiles
+        slots[color_id] = (u0, v0, u1, v1)
+    filled = len(wanted)
+    for index in range(filled, tiles * tiles):
+        row, col = divmod(index, tiles)
+        y0, x0 = row * tile, col * tile
+        image[y0 : y0 + tile, x0 : x0 + tile] = _unused_tile(tile)
+    pending = [e.id for e in catalog.entries if e.textures["kind"] == "pending"]
+    note = (
+        f"Atlas {size}², {len(slots)} tiles on a {tiles}×{tiles} grid "
+        f"({len(photo_ids)} photographic, rest greyscale procedural). "
+        "Not a photograph of Murcia. "
+        + (f"Photo slots: {', '.join(photo_ids)}. " if photo_ids else "")
+        + (f"Pending photographic textures: {', '.join(pending)}." if pending else "")
+    )
+    return Atlas(encode_png_rgba(image), size, tiles, slots, note)
+
+
+def tile_luminance(pixels: np.ndarray) -> float:
+    """Mean Rec. 709 luma of an RGB or RGBA tile."""
+    rgb = pixels[..., :3].astype(np.float64)
+    return float((0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]).mean())

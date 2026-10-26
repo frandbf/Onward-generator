@@ -1,0 +1,437 @@
+"""Copy a dress/detail scene and remap atlas tiles from a texture plan.
+
+Does not call detail_scene, does not restyle urban props, does not write Unity.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from onward_generator import __version__
+from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.dress.atlas import MIN_MEAN_LUMA, _tile_pixels, bake_photo_tile, build_atlas, decode_jpeg_rgb, encode_png_rgba
+from onward_generator.dress.catalog import MaterialCatalog, load_catalog
+from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
+from onward_generator.dress.surfaces import _load_features, _tags_of
+from onward_generator.generation.config import Material
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
+from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.materials.openings import boarded_png, window_png
+from onward_generator.materials.plan import TexturePlan, load_texture_plan
+from onward_generator.materials.polyhaven import (
+    DEFAULT_CACHE,
+    DownloadError,
+    Fetcher,
+    TextureRecord,
+    ensure_diffuse_1k,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
+OUTPUT_FILES = (
+    "scene_visual.glb",
+    "scene_collision.glb",
+    "scene_detail.json",
+    "detail_report.json",
+    "atlas.png",
+    "materials_report.json",
+    "materials.catalog.json",
+)
+PROTECTED_OUTPUT_NAMES = frozenset({
+    "scene_detail_v07_2",
+    "scene_detail_v08",
+    "scene_detail_dress_01",
+    "scene_detail_dress_02",
+    "scene_detail_dress_03",
+    "scene_detail_materials_01",
+    "scene_detail_materials_02",
+    "scene_detail_materials_03",
+})
+WALL_COLOR_IDS = frozenset({
+    "plaster_ochre", "plaster_cream", "plaster_white", "plaster_salmon",
+    "stone_light", "stone_warm", "building_wall",
+})
+WHITE = (1.0, 1.0, 1.0, 1.0)
+MAX_PHOTO_PX = 1024
+UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "door_wood"})
+
+
+def _photo_png(rgb: Any, mode: str) -> bytes:
+    side = min(MAX_PHOTO_PX, max(int(rgb.shape[0]), int(rgb.shape[1]), 1))
+    return encode_png_rgba(bake_photo_tile(rgb, side, mode))
+
+
+def _procedural_png(color_id: str, seed: int) -> bytes:
+    return encode_png_rgba(_tile_pixels(color_id, 256, seed))
+
+
+class MaterialsError(ValueError):
+    """The materials stage cannot apply the plan to this scene."""
+
+
+def _rel(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path.resolve())
+
+
+def _base_hashes(base: Path) -> dict[str, str | None]:
+    return {
+        "scene_detail.json": file_sha256(base / "scene_detail.json"),
+        "scene_visual.glb": file_sha256(base / "scene_visual.glb"),
+        "scene_collision.glb": file_sha256(base / "scene_collision.glb"),
+    }
+
+
+def _objects(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+    objects = manifest.get("objects") or []
+    return [o for o in objects if isinstance(o, dict)]
+
+
+def _scene_path(manifest: Mapping[str, Any], explicit: str | Path | None) -> Path | None:
+    if explicit:
+        path = Path(explicit).expanduser()
+        return path if path.is_file() else None
+    raw = ((manifest.get("inputs") or {}).get("geo_scene") or {}).get("path")
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_file() else None
+
+
+def has_pedestrian_cobble(objects: Sequence[Mapping[str, Any]]) -> bool:
+    """True when generate split out a cobble-tagged pedestrian piece."""
+    for obj in objects:
+        if obj.get("id") == "surface/pedestrian_cobble":
+            return True
+        if obj.get("type") == "surface" and obj.get("paving") == "cobble":
+            return True
+    return False
+
+
+def rematerialize_cobble_nodes(nodes: Sequence[Node]) -> tuple[list[Node], list[str]]:
+    """Give the cobble split its own material slot so asphalt/plaza remainder stay unpainted."""
+    out: list[Node] = []
+    changed: list[str] = []
+    for node in nodes:
+        extras = node.extras or {}
+        name = node.name.split("#", 1)[0]
+        if name != "surface/pedestrian_cobble" and extras.get("object_id") != "surface/pedestrian_cobble":
+            out.append(node)
+            continue
+        prims = [Primitive(p.mesh, "cobblestone_paving", p.uvs) for p in node.primitives]
+        out.append(replace(node, primitives=tuple(prims)))
+        changed.append(node.name)
+    return out, changed
+
+
+def _is_brick_building(source_ids: Sequence[str], features: Mapping[str, Mapping[str, Any]]) -> bool:
+    tags = _tags_of(features, source_ids)
+    value = tags.get("building:material") or tags.get("material")
+    return value == "brick"
+
+
+def rematerialize_brick_walls(
+    nodes: Sequence[Node],
+    features: Mapping[str, Mapping[str, Any]],
+) -> tuple[list[Node], list[str]]:
+    """Reassign wall primitives of OSM-brick buildings to ``brick_red``."""
+    out: list[Node] = []
+    changed: list[str] = []
+    for node in nodes:
+        extras = node.extras or {}
+        source_ids = [str(s) for s in extras.get("source_ids") or []]
+        if extras.get("type") != "building" or not _is_brick_building(source_ids, features):
+            out.append(node)
+            continue
+        prims: list[Primitive] = []
+        touched = False
+        for prim in node.primitives:
+            if prim.material in WALL_COLOR_IDS:
+                prims.append(Primitive(prim.mesh, "brick_red", prim.uvs))
+                touched = True
+            else:
+                prims.append(prim)
+        out.append(replace(node, primitives=tuple(prims)))
+        if touched:
+            changed.append(node.name)
+    return out, changed
+
+
+def building_uv_phase(name: str) -> tuple[float, float]:
+    digest = hashlib.sha256(f"uv:{name}".encode("utf-8")).digest()
+    return (digest[0] / 255.0, digest[1] / 255.0)
+
+
+def building_boarded(name: str) -> bool:
+    return hashlib.sha256(f"board:{name}".encode("utf-8")).digest()[0] % 5 == 0
+
+
+def stamp_abandoned_facades(nodes: Sequence[Node], *, board: bool) -> list[Node]:
+    """Shift each building's repeating albedo, and board some windows when the plan is abandoned."""
+    out: list[Node] = []
+    for node in nodes:
+        extras = dict(node.extras or {})
+        if extras.get("type") != "building":
+            out.append(node)
+            continue
+        extras["uv_phase"] = list(building_uv_phase(node.name))
+        prims = list(node.primitives)
+        if board and building_boarded(node.name):
+            prims = [
+                Primitive(prim.mesh, "glass_boarded", prim.uvs) if prim.material == "glass_dark" else prim
+                for prim in prims
+            ]
+        out.append(replace(node, primitives=tuple(prims), extras=extras))
+    return out
+
+
+def _used_materials(nodes: Sequence[Node]) -> list[str]:
+    return sorted({p.material for n in nodes for p in n.primitives})
+
+
+def _catalog_snapshot(
+    catalog: MaterialCatalog,
+    applied: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    doc = json.loads(catalog.path.read_text(encoding="utf-8"))
+    by_file = {row["catalog_id"]: row for row in applied}
+    for entry in doc["materials"]:
+        row = by_file.get(entry["id"])
+        if not row:
+            continue
+        entry["textures"] = {
+            "kind": "file",
+            "paths": [row["repo_path"]],
+            "note": f"{row.get('provider', 'library')} {row['asset_id']} albedo ({row['albedo_mode']}).",
+        }
+        entry["license"] = "CC0"
+        entry["source"] = row["page_url"]
+    return doc
+
+
+def apply_materials(
+    base_dir: str | Path,
+    out_dir: str | Path,
+    *,
+    plan_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
+    scene_path: str | Path | None = None,
+    cache_dir: str | Path = DEFAULT_CACHE,
+    download: bool = False,
+    overwrite: bool = False,
+    fetch: Fetcher | None = None,
+    seed: int = 48152,
+) -> dict[str, Any]:
+    base = Path(base_dir).expanduser().resolve()
+    out = Path(out_dir).expanduser().resolve()
+    if not (base / "scene_visual.glb").is_file() or not (base / "scene_detail.json").is_file():
+        raise MaterialsError(f"{base}: needs scene_visual.glb and scene_detail.json")
+    if out.name in PROTECTED_OUTPUT_NAMES:
+        raise MaterialsError(f"refusing to write protected artifact directory {out.name}")
+    if out == base:
+        raise MaterialsError("output must be a new directory; will not overwrite the base scene")
+
+    catalog = load_catalog(catalog_path)
+    plan = load_texture_plan(plan_path, catalog=catalog)
+    try:
+        manifest, _ = read_json_document(base / "scene_detail.json", max_bytes=MAX_SCENE_BYTES)
+    except ConfigLoadError as exc:
+        raise MaterialsError(str(exc)) from exc
+
+    before_hashes = _base_hashes(base)
+    objects = _objects(manifest)
+    before_geo = geometry_fingerprint([o for o in objects if o.get("type") in GEOGRAPHIC])
+    scene = _scene_path(manifest, scene_path)
+    features = _load_features(scene)
+
+    records: dict[str, TextureRecord] = {}
+    for binding in plan.entries:
+        if binding.library_id:
+            from onward_generator.materials.library_plan import texture_record
+            records[binding.id] = texture_record(binding.library_id)
+            continue
+        try:
+            records[binding.id] = ensure_diffuse_1k(
+                binding.url, cache_dir=cache_dir, download=download, fetch=fetch,
+            )
+        except DownloadError:
+            raise
+
+    visual_nodes, vis_mats = nodes_from_glb((base / "scene_visual.glb").read_bytes())
+    brick_nodes: list[str] = []
+    cobble_nodes: list[str] = []
+    if "brick" in plan.by_id:
+        visual_nodes, brick_nodes = rematerialize_brick_walls(visual_nodes, features)
+    if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
+        visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
+    visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
+    used = set(_used_materials(visual_nodes))
+    cobble_ok = bool(cobble_nodes)
+
+    materials = dict(vis_mats)
+    photo_tiles: dict[str, tuple[Any, str]] = {}
+    applied: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+
+    for binding in plan.entries:
+        record = records[binding.id]
+        rgb = decode_jpeg_rgb(Path(record.path).read_bytes())
+        if binding.id == "streets_plazas" and not cobble_ok:
+            skipped.append({
+                "id": binding.id,
+                "catalog_ids": list(binding.catalog_ids),
+                "reason": "no_pedestrian_cobble_split",
+            })
+            continue
+        if binding.id == "brick" and not brick_nodes and "brick_red" not in used:
+            skipped.append({
+                "id": binding.id,
+                "catalog_ids": list(binding.catalog_ids),
+                "reason": "no_osm_brick_buildings",
+            })
+            continue
+        for catalog_id in binding.catalog_ids:
+            entry = catalog.get(catalog_id)
+            if entry is None:
+                skipped.append({"id": binding.id, "catalog_id": catalog_id, "reason": "missing_catalog_id"})
+                continue
+            slot = "cobblestone_paving" if binding.id == "streets_plazas" else entry.color_id
+            if slot not in used:
+                skipped.append({
+                    "id": binding.id,
+                    "catalog_id": catalog_id,
+                    "color_id": slot,
+                    "reason": "color_id_not_used",
+                })
+                continue
+            photo_tiles[slot] = (rgb, binding.albedo_mode)
+            if binding.albedo_mode == "color_albedo":
+                prev = materials.get(slot) or materials.get(entry.color_id) or Material(WHITE, 0.9)
+                materials[slot] = Material(WHITE, prev.roughness)
+            applied.append({
+                "id": binding.id,
+                "catalog_id": catalog_id,
+                "color_id": slot,
+                "albedo_mode": binding.albedo_mode,
+                "asset_id": record.asset_id,
+                "provider": record.provider,
+                "license": record.license,
+                "authors": list(record.authors),
+                "page_url": record.page_url,
+                "md5": record.md5,
+                "sha256": record.sha256,
+                "repo_path": _rel(Path(record.path)),
+            })
+
+    after_hashes = _base_hashes(base)
+    if after_hashes != before_hashes:
+        raise MaterialsError("base scene changed while applying materials; nothing was written")
+
+    collision = base / "scene_collision.glb"
+    protected = (
+        base / "scene_visual.glb",
+        base / "scene_collision.glb",
+        base / "scene_detail.json",
+    )
+    targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite, protected=protected)
+    used_ids = _used_materials(visual_nodes)
+    built = build_atlas(catalog, materials, used_color_ids=used_ids, seed=seed, photo_tiles=photo_tiles)
+    extras: dict[str, Any] = {
+        "attribution": manifest.get("attribution"),
+        "manifest": "scene_detail.json",
+        "fidelity": "materials 0.2: one repeating albedo per material, openings fit 0-1, no facade regen",
+        "materials": {
+            "plan": str(plan.path),
+            "plan_sha256": plan.sha256,
+            "applied": [row["catalog_id"] for row in applied],
+        },
+        "atlas": {"size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note},
+    }
+    tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
+    cobble_entry = catalog.get("cobblestone_paving")
+    if cobble_entry is not None:
+        tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
+    repeat_images: dict[str, bytes] = {}
+    for index, color_id in enumerate(sorted(used_ids)):
+        if color_id == "glass_dark":
+            repeat_images[color_id] = window_png()
+            prev = materials.get(color_id) or Material(WHITE, 0.15)
+            materials[color_id] = Material(WHITE, prev.roughness)
+            continue
+        if color_id == "glass_boarded":
+            repeat_images[color_id] = boarded_png()
+            materials[color_id] = Material(WHITE, 0.85)
+            continue
+        if color_id in photo_tiles:
+            rgb, mode = photo_tiles[color_id]
+            repeat_images[color_id] = _photo_png(rgb, mode)
+            continue
+        repeat_images[color_id] = _procedural_png(color_id, seed + index)
+    visual = build_glb(
+        visual_nodes, materials, extras=extras,
+        repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
+    )
+    atomic_write_bytes(targets[0], visual)
+    if collision.is_file():
+        atomic_write_bytes(targets[1], collision.read_bytes())
+    else:
+        atomic_write_bytes(targets[1], b"")
+    written = dict(manifest)
+    written["fidelity"] = {
+        **dict(manifest.get("fidelity") or {}),
+        "materials": "copy; facades not regenerated; each material repeats its own albedo",
+    }
+    atomic_write_json(targets[2], written)
+    report_src = base / "detail_report.json"
+    detail_report: dict[str, Any] = {}
+    if report_src.is_file():
+        detail_report = json.loads(report_src.read_text(encoding="utf-8"))
+    after_geo = geometry_fingerprint([o for o in objects if o.get("type") in GEOGRAPHIC])
+    compare = compare_fingerprints(before_geo, after_geo)
+    detail_report["materials"] = {
+        "schema": "onward_generator.materials_apply_report",
+        "schema_version": "0.1.0",
+        "applied_ai_materials": False,
+        "regenerated_facades": False,
+        "geometry": compare,
+        "source_base_sha256": before_hashes,
+    }
+    atomic_write_json(targets[3], detail_report)
+    atomic_write_bytes(targets[4], built.png)
+    snapshot = _catalog_snapshot(catalog, applied)
+    atomic_write_json(targets[6], snapshot)
+    materials_report = {
+        "schema": "onward_generator.materials_report",
+        "schema_version": "0.1.0",
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generator_version": __version__,
+        "base_dir": str(base),
+        "plan": {"path": str(plan.path), "sha256": plan.sha256},
+        "catalog": {"path": str(catalog.path), "sha256": catalog.sha256},
+        "applied": applied,
+        "skipped": skipped,
+        "brick_nodes": brick_nodes,
+        "cobble_applied": any(row["id"] == "streets_plazas" for row in applied),
+        "atlas": {"size": built.size, "grid": built.tiles, "note": built.note},
+        "textures": {
+            "mode": "repeat",
+            "materials": sorted(repeat_images),
+            "unit_uv": sorted(UNIT_UV_MATERIALS & set(repeat_images)),
+            "window": "project-generated frame, not a photograph",
+        },
+        "geometry": compare,
+        "input_hashes": before_hashes,
+        "min_mean_luma": MIN_MEAN_LUMA,
+    }
+    atomic_write_json(targets[5], materials_report)
+    if not compare["identical"]:
+        raise MaterialsError("materials apply mutated geographic object records; this is a bug")
+    return materials_report

@@ -1,0 +1,151 @@
+{
+  "version": "0.2.0",
+  "description": "Phase 04/07.2 assumptions: generic facade templates, a warmer Murcia palette, roofs, urban elements, selected interiors, and landmark towers only when OSM records an observed height. Every number that is not tagged observed is a modelling assumption.",
+  "seed": 48152,
+  "exposure": {
+    "probe_m": 1.0,
+    "min_facade_length_m": 2.5,
+    "courtyard_openings": false
+  },
+  "storey": { "min_m": 2.6, "max_m": 6.0, "fallback_m": 3.0 },
+  "openings": {
+    "edge_margin_m": 0.6,
+    "min_pier_m": 0.5,
+    "head_clearance_m": 0.35,
+    "recess_depth_m": 0.15
+  },
+  "templates": {
+    "generic_residential": {
+      "applies_to": ["residential_multi", "residential_small", "unknown"],
+      "bay_m": 3.2,
+      "window": { "width_m": 1.1, "height_m": 1.5, "sill_m": 0.9 },
+      "narrow_window": { "width_m": 0.8, "height_m": 1.2, "sill_m": 1.0 },
+      "ground": "door_and_windows",
+      "balcony": { "share": 0.35, "door_width_m": 1.0, "door_height_m": 2.2, "width_m": 1.6, "depth_m": 0.6, "slab_m": 0.15, "railing_m": 1.0 },
+      "wall_materials": ["plaster_ochre", "plaster_cream"],
+      "roof": { "parapet_m": 1.0, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light", "roof_flat_grey"], "hip": null }
+    },
+    "generic_commercial": {
+      "applies_to": ["commercial"],
+      "bay_m": 3.6,
+      "window": { "width_m": 1.6, "height_m": 1.8, "sill_m": 0.8 },
+      "narrow_window": { "width_m": 1.0, "height_m": 1.3, "sill_m": 0.9 },
+      "ground": "shopfront",
+      "balcony": null,
+      "wall_materials": ["plaster_cream", "plaster_ochre"],
+      "roof": { "parapet_m": 1.0, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light"], "hip": null }
+    },
+    "generic_public": {
+      "applies_to": ["public", "industrial"],
+      "bay_m": 3.8,
+      "window": { "width_m": 1.4, "height_m": 2.0, "sill_m": 0.9 },
+      "narrow_window": { "width_m": 0.9, "height_m": 1.2, "sill_m": 1.0 },
+      "ground": "door_and_windows",
+      "balcony": null,
+      "wall_materials": ["stone_warm", "plaster_cream"],
+      "roof": { "parapet_m": 1.2, "parapet_thickness_m": 0.3, "flat_materials": ["roof_flat_grey"], "hip": null }
+    },
+    "generic_minor": {
+      "applies_to": ["minor"],
+      "bay_m": 4.0,
+      "window": { "width_m": 0.8, "height_m": 0.8, "sill_m": 1.4 },
+      "narrow_window": { "width_m": 0.6, "height_m": 0.6, "sill_m": 1.4 },
+      "ground": "door_and_windows",
+      "balcony": null,
+      "wall_materials": ["plaster_white"],
+      "roof": { "parapet_m": 0.0, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_grey"],
+                "hip": { "max_area_m2": 200.0, "pitch_deg": 22.0, "max_rise_m": 2.5, "material": "roof_tile" } }
+    },
+    "landmark_placeholder": {
+      "applies_to": ["religious"],
+      "bay_m": 6.0,
+      "window": { "width_m": 1.2, "height_m": 3.0, "sill_m": 3.0 },
+      "narrow_window": { "width_m": 0.8, "height_m": 2.0, "sill_m": 3.0 },
+      "ground": "main_door_only",
+      "balcony": null,
+      "wall_materials": ["stone_warm"],
+      "roof": { "parapet_m": 0.0, "parapet_thickness_m": 0.3, "flat_materials": ["roof_tile"], "hip": null }
+    }
+  },
+  "landmark_template": "landmark_placeholder",
+  "doors": {
+    "main": { "width_m": 1.2, "height_m": 2.4 },
+    "landmark": { "width_m": 2.4, "height_m": 4.0 },
+    "shopfront": { "width_m": 2.4, "height_m": 2.5 },
+    "shop_evidence_keys": ["shop", "amenity", "office", "craft"],
+    "shop_evidence_distance_m": 2.0
+  },
+  "interiors": {
+    "enabled": true,
+    "max_buildings": 2,
+    "include_ids": [],
+    "exclude_ids": [],
+    "rule": { "categories": ["residential_multi", "unknown"], "min_levels": 3, "min_area_m2": 80.0, "max_area_m2": 400.0, "min_rectangularity": 0.85 },
+    "floors": 2,
+    "wall_thickness_m": 0.3,
+    "slab_m": 0.2,
+    "door": { "width_m": 1.2, "height_m": 2.4 },
+    "stair": { "width_m": 1.1, "max_riser_m": 0.185, "tread_m": 0.28, "landing_m": 1.0 },
+    "door_clearance_m": 1.5
+  },
+  "urban": {
+    "observed": {
+      "tree": { "natural": ["tree"] },
+      "bollard": { "barrier": ["bollard"] },
+      "bicycle_parking": { "amenity": ["bicycle_parking"] },
+      "bus_stop": { "highway": ["bus_stop"] },
+      "fire_hydrant": { "emergency": ["fire_hydrant"] },
+      "traffic_signals": { "highway": ["traffic_signals"] },
+      "street_lamp": { "highway": ["street_lamp"] },
+      "bench": { "amenity": ["bench"] },
+      "waste_basket": { "amenity": ["waste_basket"] }
+    },
+    "generated_street_lamps": { "enabled": true, "spacing_m": 25.0, "curb_offset_m": 0.5, "min_building_distance_m": 1.0, "min_spacing_m": 8.0 },
+    "generated_furniture": {
+      "enabled": true,
+      "items": [
+        { "kind": "bench", "spacing_m": 28.0, "offset_m": 0.4, "max_count": 80 },
+        { "kind": "waste_basket", "spacing_m": 40.0, "offset_m": 0.6, "max_count": 40 }
+      ]
+    },
+    "clearance_m": 0.1
+  },
+  "budget": {
+    "note": "Provisional ceilings for review; the device budget is set in phase 05 on the Quest.",
+    "max_visual_triangles": 600000,
+    "max_collision_triangles": 120000,
+    "max_materials": 32,
+    "max_nodes": 2500
+  },
+  "preview": { "closeup_focus_m": [0.0, 0.0, 70.0], "closeup_elevation_deg": 30.0 },
+  "materials": {
+    "plaster_ochre": { "color": [0.93, 0.66, 0.28, 1.0], "roughness": 0.9 },
+    "plaster_cream": { "color": [0.96, 0.86, 0.62, 1.0], "roughness": 0.9 },
+    "plaster_white": { "color": [0.93, 0.92, 0.89, 1.0], "roughness": 0.9 },
+    "plaster_salmon": { "color": [0.88, 0.68, 0.58, 1.0], "roughness": 0.9 },
+    "stone_light": { "color": [0.80, 0.74, 0.63, 1.0], "roughness": 0.85 },
+    "stone_warm": { "color": [0.84, 0.70, 0.46, 1.0], "roughness": 0.85 },
+    "roof_flat_light": { "color": [0.78, 0.68, 0.54, 1.0], "roughness": 0.95 },
+    "roof_flat_grey": { "color": [0.58, 0.58, 0.57, 1.0], "roughness": 0.95 },
+    "roof_tile": { "color": [0.74, 0.30, 0.16, 1.0], "roughness": 0.9 },
+    "frame_stone": { "color": [0.90, 0.88, 0.83, 1.0], "roughness": 0.8 },
+    "glass_dark": { "color": [0.16, 0.20, 0.24, 1.0], "roughness": 0.15 },
+    "door_wood": { "color": [0.36, 0.24, 0.16, 1.0], "roughness": 0.7 },
+    "railing_metal": { "color": [0.16, 0.16, 0.17, 1.0], "roughness": 0.5 },
+    "urban_metal": { "color": [0.22, 0.24, 0.24, 1.0], "roughness": 0.5 },
+    "tree_trunk": { "color": [0.40, 0.31, 0.22, 1.0], "roughness": 1.0 },
+    "tree_canopy": { "color": [0.30, 0.46, 0.24, 1.0], "roughness": 1.0 },
+    "interior_wall": { "color": [0.90, 0.89, 0.86, 1.0], "roughness": 0.9 },
+    "interior_floor": { "color": [0.62, 0.55, 0.47, 1.0], "roughness": 0.8 },
+    "stair": { "color": [0.70, 0.67, 0.62, 1.0], "roughness": 0.85 },
+    "brick_red": { "color": [0.62, 0.28, 0.22, 1.0], "roughness": 0.9 }
+  },
+  "landmarks": {
+    "enabled": true,
+    "tower_half_width_m": 6.0,
+    "max_tower_height_m": 120.0,
+    "min_clip_area_m2": 8.0,
+    "wall_material": "stone_warm",
+    "roof_material": "roof_tile"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "rock_wall_11",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/rock_wall_11",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_wall_11/rock_wall_11_diff_1k.jpg",
+  "md5": "c5fa88ab542e0e308f8a18ec45227da6",
+  "sha256": "850f45c4ea8692c4ea990a2bb8b673cb1a94a2240c4a5dedab5d8a3d695256f6",
+  "size_bytes": 762222,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/rock_wall_11/rock_wall_11_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T12:22:54+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

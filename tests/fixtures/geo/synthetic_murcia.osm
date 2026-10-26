@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SYNTHETIC FIXTURE. Not OpenStreetMap data: every id, tag and coordinate was
+  invented for tests (CC0-1.0). Coordinates were produced from a local grid in
+  EPSG:25830 around the Murcia city-centre test origin lat 37.98407,
+  lon -1.12863; the comments give the intended local position (x east,
+  y north, metres). See README.md here.
+-->
+<osm version="0.6" generator="onward-synthetic-fixture">
+  <meta osm_base="2026-10-18T00:00:00Z"/>
+  <!-- B1 inside AOI: (-50,-50) to (-20,-20) -->
+  <node id="1" version="1" lat="37.98362865" lon="-1.12921051"/>
+  <node id="2" version="1" lat="37.98362322" lon="-1.12886907"/>
+  <node id="3" version="1" lat="37.98389346" lon="-1.12886220"/>
+  <node id="4" version="1" lat="37.98389889" lon="-1.12920364"/>
+  <!-- B2 crosses the AOI edge x=100: (80,0) to (120,30) -->
+  <node id="5" version="1" lat="37.98405551" lon="-1.12771950"/>
+  <node id="6" version="1" lat="37.98404826" lon="-1.12726424"/>
+  <node id="7" version="1" lat="37.98431850" lon="-1.12725737"/>
+  <node id="8" version="1" lat="37.98432575" lon="-1.12771263"/>
+  <!-- B3 far outside: (200,200) to (220,220) -->
+  <node id="9" version="1" lat="37.98583537" lon="-1.12630791"/>
+  <node id="10" version="1" lat="37.98583174" lon="-1.12608028"/>
+  <node id="11" version="1" lat="37.98601190" lon="-1.12607569"/>
+  <node id="12" version="1" lat="37.98601553" lon="-1.12630333"/>
+  <!-- B4 only inside the margin: (110,-60) to (125,-45) -->
+  <node id="13" version="1" lat="37.98350958" lon="-1.12739180"/>
+  <node id="14" version="1" lat="37.98350686" lon="-1.12722108"/>
+  <node id="15" version="1" lat="37.98364198" lon="-1.12721764"/>
+  <node id="16" version="1" lat="37.98364470" lon="-1.12738836"/>
+  <!-- Road along y=10 from x=-200 to x=200 -->
+  <node id="17" version="1" lat="37.98419629" lon="-1.13090398"/>
+  <node id="18" version="1" lat="37.98416008" lon="-1.12862771"/>
+  <node id="19" version="1" lat="37.98412383" lon="-1.12635145"/>
+  <!-- Footway inside: (-80,60) to (80,60) -->
+  <node id="20" version="1" lat="37.98462497" lon="-1.12952678"/>
+  <node id="21" version="1" lat="37.98459599" lon="-1.12770576"/>
+  <!-- Bow-tie: (0,-80) (20,-60) (20,-80) (0,-60) -->
+  <node id="22" version="1" lat="37.98334935" lon="-1.12864831"/>
+  <node id="23" version="1" lat="37.98352589" lon="-1.12841611"/>
+  <node id="24" version="1" lat="37.98334573" lon="-1.12842068"/>
+  <node id="25" version="1" lat="37.98352951" lon="-1.12864373"/>
+  <!-- Way with a missing node: (-90,80) (-70,80) + node 999 -->
+  <node id="26" version="1" lat="37.98480695" lon="-1.12963602"/>
+  <node id="27" version="1" lat="37.98480333" lon="-1.12940839"/>
+  <!-- Multipolygon outer (30,-40) to (70,0), inner (45,-25) to (55,-15) -->
+  <node id="30" version="1" lat="37.98370424" lon="-1.12829772"/>
+  <node id="31" version="1" lat="37.98369699" lon="-1.12784247"/>
+  <node id="32" version="1" lat="37.98405732" lon="-1.12783331"/>
+  <node id="33" version="1" lat="37.98406457" lon="-1.12828856"/>
+  <node id="34" version="1" lat="37.98383665" lon="-1.12812356"/>
+  <node id="35" version="1" lat="37.98383483" lon="-1.12800975"/>
+  <node id="36" version="1" lat="37.98392491" lon="-1.12800746"/>
+  <node id="37" version="1" lat="37.98392673" lon="-1.12812127"/>
+  <!-- POI inside (-5,40) and POI outside (300,0) -->
+  <node id="40" version="1" lat="37.98443123" lon="-1.12867775">
+    <tag k="amenity" v="fountain"/>
+    <tag k="name" v="Fuente Sintética"/>
+  </node>
+  <node id="41" version="1" lat="37.98401561" lon="-1.12521561">
+    <tag k="amenity" v="bench"/>
+  </node>
+  <!-- B5 crosses the margin edge x=130: (120,80) to (150,100) -->
+  <node id="42" version="1" lat="37.98476890" lon="-1.12724592"/>
+  <node id="43" version="1" lat="37.98476346" lon="-1.12690448"/>
+  <node id="44" version="1" lat="37.98494363" lon="-1.12689990"/>
+  <node id="45" version="1" lat="37.98494907" lon="-1.12724134"/>
+
+  <way id="101" version="3">
+    <nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/>
+    <tag k="building" v="yes"/>
+    <tag k="height" v="12"/>
+    <tag k="building:levels" v="4"/>
+    <tag k="name" v="Edificio Sintético A"/>
+  </way>
+  <way id="102" version="1">
+    <nd ref="5"/><nd ref="6"/><nd ref="7"/><nd ref="8"/><nd ref="5"/>
+    <tag k="building" v="residential"/>
+    <tag k="building:levels" v="3"/>
+  </way>
+  <way id="103" version="1">
+    <nd ref="9"/><nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="9"/>
+    <tag k="building" v="yes"/>
+  </way>
+  <way id="104" version="1">
+    <nd ref="13"/><nd ref="14"/><nd ref="15"/><nd ref="16"/><nd ref="13"/>
+    <tag k="building" v="yes"/>
+    <tag k="height" v="tall"/>
+  </way>
+  <way id="105" version="2">
+    <nd ref="17"/><nd ref="18"/><nd ref="19"/>
+    <tag k="highway" v="residential"/>
+    <tag k="name" v="Calle Sintética"/>
+  </way>
+  <way id="106" version="1">
+    <nd ref="20"/><nd ref="21"/>
+    <tag k="highway" v="footway"/>
+    <tag k="width" v="2.5"/>
+  </way>
+  <way id="107" version="1">
+    <nd ref="22"/><nd ref="23"/><nd ref="24"/><nd ref="25"/><nd ref="22"/>
+    <tag k="building" v="yes"/>
+  </way>
+  <way id="108" version="1">
+    <nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/>
+    <tag k="building" v="yes"/>
+  </way>
+  <way id="109" version="1">
+    <nd ref="26"/><nd ref="27"/><nd ref="999"/><nd ref="26"/>
+    <tag k="building" v="yes"/>
+  </way>
+  <way id="110" version="1">
+    <nd ref="30"/><nd ref="31"/><nd ref="32"/><nd ref="33"/><nd ref="30"/>
+  </way>
+  <way id="111" version="1">
+    <nd ref="34"/><nd ref="35"/><nd ref="36"/><nd ref="37"/><nd ref="34"/>
+  </way>
+  <way id="112" version="1">
+    <nd ref="1"/><nd ref="2"/><nd ref="1"/>
+    <tag k="building" v="yes"/>
+  </way>
+  <way id="113" version="1">
+    <nd ref="42"/><nd ref="43"/><nd ref="44"/><nd ref="45"/><nd ref="42"/>
+    <tag k="building" v="commercial"/>
+  </way>
+  <!-- Repeated id: must be reported and ignored -->
+  <way id="101" version="3">
+    <nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/>
+    <tag k="building" v="yes"/>
+  </way>
+
+  <relation id="201" version="1">
+    <member type="way" ref="110" role="outer"/>
+    <member type="way" ref="111" role="inner"/>
+    <tag k="type" v="multipolygon"/>
+    <tag k="building" v="yes"/>
+    <tag k="name" v="Patio Sintético"/>
+  </relation>
+  <relation id="202" version="1">
+    <member type="way" ref="105" role=""/>
+    <tag k="type" v="route"/>
+    <tag k="route" v="bus"/>
+  </relation>
+</osm>

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/detail.schema.json",
+  "title": "Phase 04 facades, roofs, urban elements and interiors configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "seed", "exposure", "storey", "openings", "templates", "landmark_template", "doors", "interiors", "urban", "budget", "preview", "materials"],
+  "$defs": {
+    "len": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+    "len0": { "type": "number", "minimum": 0, "maximum": 50 },
+    "opening": {
+      "type": "object", "additionalProperties": false, "required": ["width_m", "height_m"],
+      "properties": { "width_m": { "$ref": "#/$defs/len" }, "height_m": { "$ref": "#/$defs/len" }, "sill_m": { "$ref": "#/$defs/len0" } }
+    },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "names": { "type": "array", "items": { "$ref": "#/$defs/name" }, "minItems": 1, "uniqueItems": true },
+    "ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "tagList": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true }
+    },
+    "template": {
+      "type": "object", "additionalProperties": false,
+      "required": ["applies_to", "bay_m", "window", "narrow_window", "ground", "balcony", "wall_materials", "roof"],
+      "properties": {
+        "applies_to": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true },
+        "bay_m": { "type": "number", "minimum": 1.5, "maximum": 12 },
+        "window": { "$ref": "#/$defs/opening", "required": ["width_m", "height_m", "sill_m"] },
+        "narrow_window": { "$ref": "#/$defs/opening", "required": ["width_m", "height_m", "sill_m"] },
+        "ground": { "enum": ["door_and_windows", "shopfront", "main_door_only"] },
+        "balcony": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["share", "door_width_m", "door_height_m", "width_m", "depth_m", "slab_m", "railing_m"],
+              "properties": {
+                "share": { "type": "number", "minimum": 0, "maximum": 1 },
+                "door_width_m": { "$ref": "#/$defs/len" }, "door_height_m": { "$ref": "#/$defs/len" },
+                "width_m": { "$ref": "#/$defs/len" }, "depth_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 2 },
+                "slab_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 }, "railing_m": { "type": "number", "minimum": 0.8, "maximum": 1.5 }
+              }
+            }
+          ]
+        },
+        "wall_materials": { "$ref": "#/$defs/names" },
+        "roof": {
+          "type": "object", "additionalProperties": false, "required": ["parapet_m", "parapet_thickness_m", "flat_materials", "hip"],
+          "properties": {
+            "parapet_m": { "type": "number", "minimum": 0, "maximum": 3 },
+            "parapet_thickness_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "flat_materials": { "$ref": "#/$defs/names" },
+            "hip": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object", "additionalProperties": false, "required": ["max_area_m2", "pitch_deg", "max_rise_m", "material"],
+                  "properties": {
+                    "max_area_m2": { "type": "number", "exclusiveMinimum": 0 },
+                    "pitch_deg": { "type": "number", "minimum": 5, "maximum": 45 },
+                    "max_rise_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 },
+                    "material": { "$ref": "#/$defs/name" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "material": {
+      "type": "object", "additionalProperties": false, "required": ["color", "roughness"],
+      "properties": {
+        "color": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 4, "maxItems": 4 },
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string" },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "exposure": {
+      "type": "object", "additionalProperties": false, "required": ["probe_m", "min_facade_length_m", "courtyard_openings"],
+      "properties": {
+        "probe_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 },
+        "min_facade_length_m": { "$ref": "#/$defs/len" },
+        "courtyard_openings": { "type": "boolean" }
+      }
+    },
+    "storey": {
+      "type": "object", "additionalProperties": false, "required": ["min_m", "max_m", "fallback_m"],
+      "properties": { "min_m": { "$ref": "#/$defs/len" }, "max_m": { "$ref": "#/$defs/len" }, "fallback_m": { "$ref": "#/$defs/len" } }
+    },
+    "openings": {
+      "type": "object", "additionalProperties": false, "required": ["edge_margin_m", "min_pier_m", "head_clearance_m", "recess_depth_m"],
+      "properties": {
+        "edge_margin_m": { "$ref": "#/$defs/len0" }, "min_pier_m": { "$ref": "#/$defs/len" },
+        "head_clearance_m": { "$ref": "#/$defs/len0" }, "recess_depth_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 }
+      }
+    },
+    "templates": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/template" } },
+    "landmark_template": { "$ref": "#/$defs/name" },
+    "doors": {
+      "type": "object", "additionalProperties": false, "required": ["main", "landmark", "shopfront", "shop_evidence_keys", "shop_evidence_distance_m"],
+      "properties": {
+        "main": { "$ref": "#/$defs/opening" }, "landmark": { "$ref": "#/$defs/opening" }, "shopfront": { "$ref": "#/$defs/opening" },
+        "shop_evidence_keys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "shop_evidence_distance_m": { "$ref": "#/$defs/len0" }
+      }
+    },
+    "interiors": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "max_buildings", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
+        "include_ids": { "$ref": "#/$defs/ids" },
+        "exclude_ids": { "$ref": "#/$defs/ids" },
+        "rule": {
+          "type": "object", "additionalProperties": false, "required": ["categories", "min_levels", "min_area_m2", "max_area_m2", "min_rectangularity"],
+          "properties": {
+            "categories": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true },
+            "min_levels": { "type": "integer", "minimum": 2, "maximum": 50 },
+            "min_area_m2": { "type": "number", "minimum": 0 },
+            "max_area_m2": { "type": "number", "exclusiveMinimum": 0 },
+            "min_rectangularity": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "floors": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "wall_thickness_m": { "type": "number", "minimum": 0.1, "maximum": 1 },
+        "slab_m": { "type": "number", "minimum": 0.1, "maximum": 0.5 },
+        "door": { "$ref": "#/$defs/opening" },
+        "stair": {
+          "type": "object", "additionalProperties": false, "required": ["width_m", "max_riser_m", "tread_m", "landing_m"],
+          "properties": {
+            "width_m": { "type": "number", "minimum": 0.8, "maximum": 3 },
+            "max_riser_m": { "type": "number", "minimum": 0.1, "maximum": 0.2 },
+            "tread_m": { "type": "number", "minimum": 0.22, "maximum": 0.4 },
+            "landing_m": { "type": "number", "minimum": 0.8, "maximum": 3 }
+          }
+        },
+        "door_clearance_m": { "$ref": "#/$defs/len" }
+      }
+    },
+    "urban": {
+      "type": "object", "additionalProperties": false, "required": ["observed", "generated_street_lamps", "clearance_m"],
+      "properties": {
+        "observed": { "type": "object", "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/tagList" } },
+        "generated_street_lamps": {
+          "type": "object", "additionalProperties": false, "required": ["enabled", "spacing_m", "curb_offset_m", "min_building_distance_m", "min_spacing_m"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "spacing_m": { "type": "number", "minimum": 5, "maximum": 200 },
+            "curb_offset_m": { "type": "number", "minimum": 0.2, "maximum": 3 },
+            "min_building_distance_m": { "$ref": "#/$defs/len0" },
+            "min_spacing_m": { "$ref": "#/$defs/len0" }
+          }
+        },
+        "generated_furniture": {
+          "type": "object", "additionalProperties": false, "required": ["enabled", "items"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "items": {
+              "type": "array", "maxItems": 6,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "spacing_m", "offset_m", "max_count"],
+                "properties": {
+                  "kind": { "enum": ["bench", "waste_basket"] },
+                  "spacing_m": { "type": "number", "minimum": 8, "maximum": 80 },
+                  "offset_m": { "type": "number", "minimum": 0, "maximum": 3 },
+                  "max_count": { "type": "integer", "minimum": 0, "maximum": 200 }
+                }
+              }
+            }
+          }
+        },
+        "clearance_m": { "$ref": "#/$defs/len0" }
+      }
+    },
+    "budget": {
+      "type": "object", "additionalProperties": false, "required": ["max_visual_triangles", "max_collision_triangles", "max_materials", "max_nodes"],
+      "properties": {
+        "note": { "type": "string" },
+        "max_visual_triangles": { "type": "integer", "minimum": 1 },
+        "max_collision_triangles": { "type": "integer", "minimum": 1 },
+        "max_materials": { "type": "integer", "minimum": 1 },
+        "max_nodes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "preview": {
+      "type": "object", "additionalProperties": false, "required": ["closeup_focus_m", "closeup_elevation_deg"],
+      "properties": {
+        "closeup_focus_m": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "closeup_elevation_deg": { "type": "number", "minimum": 5, "maximum": 89 }
+      }
+    },
+    "materials": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/material" } },
+    "landmarks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "tower_half_width_m", "max_tower_height_m", "min_clip_area_m2", "wall_material", "roof_material"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "tower_half_width_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 20 },
+        "max_tower_height_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 200 },
+        "min_clip_area_m2": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+        "wall_material": { "$ref": "#/$defs/name" },
+        "roof_material": { "$ref": "#/$defs/name" }
+      }
+    }
+  }
+}

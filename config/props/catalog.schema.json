@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/props/catalog.schema.json",
+  "title": "Murcia generator prop catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "description", "packs", "props"],
+  "properties": {
+    "schema": { "const": "onward_generator.prop_catalog" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "packs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pack" }
+    },
+    "props": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/prop" }
+    }
+  },
+  "$defs": {
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "name", "url", "license", "license_url", "license_text",
+        "category", "include_name_any", "exclude_name_any", "status"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9]{3,8}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "url": { "type": "string", "minLength": 8, "maxLength": 260 },
+        "license": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "license_url": { "type": "string", "minLength": 8, "maxLength": 260 },
+        "license_text": { "type": "string", "minLength": 20, "maxLength": 2000 },
+        "category": { "$ref": "#/$defs/category" },
+        "include_name_any": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "exclude_name_any": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+        },
+        "status": { "enum": ["approved", "rejected"] }
+      }
+    },
+    "prop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prop_id", "category", "pack_id", "source", "path", "license",
+        "lods", "has_collision", "allowed_origin", "notes"
+      ],
+      "properties": {
+        "prop_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+        "category": { "$ref": "#/$defs/category" },
+        "pack_id": { "type": "string", "pattern": "^[0-9]{3,8}$" },
+        "source": { "enum": ["generated", "asset_store", "pending"] },
+        "path": { "type": "string", "maxLength": 400 },
+        "license": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "lods": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lod0": { "type": "string", "maxLength": 400 },
+            "lod1": { "type": "string", "maxLength": 400 },
+            "lod2": { "type": "string", "maxLength": 400 },
+            "lod3": { "type": "string", "maxLength": 400 }
+          }
+        },
+        "has_collision": { "type": "boolean" },
+        "allowed_origin": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["osm", "placed", "generated"] }
+        },
+        "notes": { "type": "string", "maxLength": 400 }
+      }
+    },
+    "category": { "enum": ["defensive", "vehicle", "military", "ambient"] }
+  }
+}

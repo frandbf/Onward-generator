@@ -1,0 +1,340 @@
+"""Validated configuration for phase 04 (facades, roofs, urban elements, interiors)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
+from types import MappingProxyType
+from typing import Any
+
+from jsonschema import Draft202012Validator
+
+from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.generation.config import Material
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "detail.default.json"
+SCHEMA_PATH = REPO_ROOT / "config" / "detail.schema.json"
+
+
+class DetailConfigError(ValueError):
+    def __init__(self, path: Path | str, problems: list[str]) -> None:
+        super().__init__(f"{path}: " + "; ".join(problems))
+        self.problems = problems
+
+
+@dataclass(frozen=True, slots=True)
+class Opening:
+    width_m: float
+    height_m: float
+    sill_m: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class Balcony:
+    share: float
+    door: Opening
+    width_m: float
+    depth_m: float
+    slab_m: float
+    railing_m: float
+
+
+@dataclass(frozen=True, slots=True)
+class HipRoof:
+    max_area_m2: float
+    pitch_deg: float
+    max_rise_m: float
+    material: str
+
+
+@dataclass(frozen=True, slots=True)
+class Template:
+    name: str
+    applies_to: frozenset[str]
+    bay_m: float
+    window: Opening
+    narrow_window: Opening
+    ground: str
+    balcony: Balcony | None
+    wall_materials: tuple[str, ...]
+    parapet_m: float
+    parapet_thickness_m: float
+    flat_roof_materials: tuple[str, ...]
+    hip: HipRoof | None
+
+
+@dataclass(frozen=True, slots=True)
+class InteriorRule:
+    categories: frozenset[str]
+    min_levels: int
+    min_area_m2: float
+    max_area_m2: float
+    min_rectangularity: float
+
+
+@dataclass(frozen=True, slots=True)
+class Stair:
+    width_m: float
+    max_riser_m: float
+    tread_m: float
+    landing_m: float
+
+
+@dataclass(frozen=True, slots=True)
+class Interiors:
+    enabled: bool
+    max_buildings: int
+    include_ids: tuple[str, ...]
+    exclude_ids: frozenset[str]
+    rule: InteriorRule
+    floors: int
+    wall_thickness_m: float
+    slab_m: float
+    door: Opening
+    stair: Stair
+    door_clearance_m: float
+
+
+@dataclass(frozen=True, slots=True)
+class LandmarkSettings:
+    enabled: bool
+    tower_half_width_m: float
+    max_tower_height_m: float
+    min_clip_area_m2: float
+    wall_material: str
+    roof_material: str
+
+
+@dataclass(frozen=True, slots=True)
+class StreetLamps:
+    enabled: bool
+    spacing_m: float
+    curb_offset_m: float
+    min_building_distance_m: float
+    min_spacing_m: float
+
+
+@dataclass(frozen=True, slots=True)
+class FurnitureItem:
+    kind: str
+    spacing_m: float
+    offset_m: float
+    max_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class StreetFurniture:
+    enabled: bool
+    items: tuple[FurnitureItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DetailConfig:
+    version: str
+    seed: int
+    probe_m: float
+    min_facade_length_m: float
+    courtyard_openings: bool
+    storey_min_m: float
+    storey_max_m: float
+    storey_fallback_m: float
+    edge_margin_m: float
+    min_pier_m: float
+    head_clearance_m: float
+    recess_depth_m: float
+    templates: Mapping[str, Template]
+    landmark_template: str
+    main_door: Opening
+    landmark_door: Opening
+    shopfront: Opening
+    shop_evidence_keys: tuple[str, ...]
+    shop_evidence_distance_m: float
+    interiors: Interiors
+    urban_observed: Mapping[str, Mapping[str, frozenset[str]]]
+    street_lamps: StreetLamps
+    street_furniture: StreetFurniture
+    urban_clearance_m: float
+    budget: Mapping[str, int]
+    closeup_focus: tuple[float, float, float]
+    closeup_elevation_deg: float
+    materials: Mapping[str, Material]
+    landmarks: LandmarkSettings
+    document: Mapping[str, Any]
+    path: str | None = None
+    sha256: str | None = None
+
+    def template_for(self, category: str, landmark: bool) -> Template:
+        if landmark:
+            return self.templates[self.landmark_template]
+        for template in self.templates.values():
+            if category in template.applies_to:
+                return template
+        return self.templates["generic_residential"] if "generic_residential" in self.templates else next(iter(self.templates.values()))
+
+
+@cache
+def _validator() -> Draft202012Validator:
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+def _furniture(d: Mapping[str, Any] | None) -> StreetFurniture:
+    if not d or not d.get("enabled"):
+        return StreetFurniture(False, ())
+    items = tuple(
+        FurnitureItem(item["kind"], float(item["spacing_m"]), float(item["offset_m"]), int(item["max_count"]))
+        for item in d.get("items", [])
+    )
+    return StreetFurniture(True, items)
+
+
+def _landmarks(d: Mapping[str, Any] | None) -> LandmarkSettings:
+    if not d:
+        return LandmarkSettings(False, 6.0, 120.0, 8.0, "stone_warm", "roof_tile")
+    return LandmarkSettings(bool(d["enabled"]), float(d["tower_half_width_m"]), float(d["max_tower_height_m"]),
+                            float(d["min_clip_area_m2"]), d["wall_material"], d["roof_material"])
+
+
+def _opening(d: Mapping[str, Any]) -> Opening:
+    return Opening(float(d["width_m"]), float(d["height_m"]), float(d.get("sill_m", 0.0)))
+
+
+def _template(name: str, d: Mapping[str, Any]) -> Template:
+    b, roof = d["balcony"], d["roof"]
+    hip = roof["hip"]
+    return Template(
+        name=name,
+        applies_to=frozenset(d["applies_to"]),
+        bay_m=float(d["bay_m"]),
+        window=_opening(d["window"]),
+        narrow_window=_opening(d["narrow_window"]),
+        ground=d["ground"],
+        balcony=None if b is None else Balcony(float(b["share"]), Opening(float(b["door_width_m"]), float(b["door_height_m"])),
+                                               float(b["width_m"]), float(b["depth_m"]), float(b["slab_m"]), float(b["railing_m"])),
+        wall_materials=tuple(d["wall_materials"]),
+        parapet_m=float(roof["parapet_m"]),
+        parapet_thickness_m=float(roof["parapet_thickness_m"]),
+        flat_roof_materials=tuple(roof["flat_materials"]),
+        hip=None if hip is None else HipRoof(float(hip["max_area_m2"]), float(hip["pitch_deg"]), float(hip["max_rise_m"]), hip["material"]),
+    )
+
+
+def _semantic(cfg: DetailConfig) -> list[str]:
+    problems: list[str] = []
+    mats = set(cfg.materials)
+    seen: dict[str, str] = {}
+    if cfg.landmark_template not in cfg.templates:
+        problems.append(f"/landmark_template: {cfg.landmark_template!r} is not a template")
+    if not cfg.storey_min_m < cfg.storey_max_m or not cfg.storey_min_m <= cfg.storey_fallback_m <= cfg.storey_max_m:
+        problems.append("/storey: need min_m < max_m and fallback_m within [min_m, max_m]")
+    for t in cfg.templates.values():
+        where = f"/templates/{t.name}"
+        for category in t.applies_to:
+            if category in seen:
+                problems.append(f"{where}/applies_to: {category!r} already mapped to {seen[category]!r}")
+            seen[category] = t.name
+        used = [*t.wall_materials, *t.flat_roof_materials, *([t.hip.material] if t.hip else [])]
+        problems += [f"{where}: material {m!r} is not defined in /materials" for m in used if m not in mats]
+        for label, w in (("window", t.window), ("narrow_window", t.narrow_window)):
+            if w.width_m + cfg.min_pier_m > t.bay_m:
+                problems.append(f"{where}/{label}: width + min_pier_m exceeds bay_m")
+        if t.narrow_window.sill_m + t.narrow_window.height_m + cfg.head_clearance_m > cfg.storey_min_m and t.name != cfg.landmark_template:
+            problems.append(f"{where}/narrow_window: does not fit the minimum storey ({cfg.storey_min_m} m)")
+        if t.balcony is not None:
+            if t.balcony.width_m + cfg.min_pier_m > t.bay_m:
+                problems.append(f"{where}/balcony: width_m + min_pier_m exceeds bay_m")
+            if t.balcony.door.width_m > t.balcony.width_m:
+                problems.append(f"{where}/balcony: door wider than the balcony")
+    rule = cfg.interiors.rule
+    if rule.min_area_m2 >= rule.max_area_m2:
+        problems.append("/interiors/rule: min_area_m2 must be below max_area_m2")
+    if cfg.recess_depth_m >= cfg.interiors.wall_thickness_m:
+        problems.append("/openings/recess_depth_m must be thinner than /interiors/wall_thickness_m")
+    for name in ("frame_stone", "glass_dark", "door_wood", "railing_metal", "urban_metal", "tree_trunk", "tree_canopy",
+                 "interior_wall", "interior_floor", "stair"):
+        if name not in mats:
+            problems.append(f"/materials: required material {name!r} is missing")
+    if cfg.landmarks.enabled:
+        for key in ("wall_material", "roof_material"):
+            name = getattr(cfg.landmarks, key)
+            if name not in mats:
+                problems.append(f"/landmarks/{key}: material {name!r} is not defined in /materials")
+    return problems
+
+
+def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha256: str | None = None) -> DetailConfig:
+    errors = sorted(_validator().iter_errors(doc), key=lambda e: (list(e.absolute_path), e.message))
+    problems = [f"/{'/'.join(map(str, e.absolute_path))}: {e.message}" for e in errors]
+    if problems:
+        raise DetailConfigError(path or "<document>", problems)
+    i, lamps, ex, op = doc["interiors"], doc["urban"]["generated_street_lamps"], doc["exposure"], doc["openings"]
+    cfg = DetailConfig(
+        version=doc["version"],
+        seed=int(doc["seed"]),
+        probe_m=float(ex["probe_m"]),
+        min_facade_length_m=float(ex["min_facade_length_m"]),
+        courtyard_openings=bool(ex["courtyard_openings"]),
+        storey_min_m=float(doc["storey"]["min_m"]),
+        storey_max_m=float(doc["storey"]["max_m"]),
+        storey_fallback_m=float(doc["storey"]["fallback_m"]),
+        edge_margin_m=float(op["edge_margin_m"]),
+        min_pier_m=float(op["min_pier_m"]),
+        head_clearance_m=float(op["head_clearance_m"]),
+        recess_depth_m=float(op["recess_depth_m"]),
+        templates=MappingProxyType({name: _template(name, t) for name, t in doc["templates"].items()}),
+        landmark_template=doc["landmark_template"],
+        main_door=_opening(doc["doors"]["main"]),
+        landmark_door=_opening(doc["doors"]["landmark"]),
+        shopfront=_opening(doc["doors"]["shopfront"]),
+        shop_evidence_keys=tuple(doc["doors"]["shop_evidence_keys"]),
+        shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
+        interiors=Interiors(
+            enabled=bool(i["enabled"]),
+            max_buildings=int(i["max_buildings"]),
+            include_ids=tuple(i["include_ids"]),
+            exclude_ids=frozenset(i["exclude_ids"]),
+            rule=InteriorRule(frozenset(i["rule"]["categories"]), int(i["rule"]["min_levels"]), float(i["rule"]["min_area_m2"]),
+                              float(i["rule"]["max_area_m2"]), float(i["rule"]["min_rectangularity"])),
+            floors=int(i["floors"]),
+            wall_thickness_m=float(i["wall_thickness_m"]),
+            slab_m=float(i["slab_m"]),
+            door=_opening(i["door"]),
+            stair=Stair(float(i["stair"]["width_m"]), float(i["stair"]["max_riser_m"]), float(i["stair"]["tread_m"]), float(i["stair"]["landing_m"])),
+            door_clearance_m=float(i["door_clearance_m"]),
+        ),
+        urban_observed=MappingProxyType(
+            {kind: MappingProxyType({k: frozenset(v) for k, v in tags.items()}) for kind, tags in sorted(doc["urban"]["observed"].items())}
+        ),
+        street_lamps=StreetLamps(bool(lamps["enabled"]), float(lamps["spacing_m"]), float(lamps["curb_offset_m"]),
+                                 float(lamps["min_building_distance_m"]), float(lamps["min_spacing_m"])),
+        street_furniture=_furniture(doc["urban"].get("generated_furniture")),
+        urban_clearance_m=float(doc["urban"]["clearance_m"]),
+        budget=MappingProxyType({k: int(v) for k, v in doc["budget"].items() if k != "note"}),
+        closeup_focus=tuple(float(v) for v in doc["preview"]["closeup_focus_m"]),  # type: ignore[arg-type]
+        closeup_elevation_deg=float(doc["preview"]["closeup_elevation_deg"]),
+        materials=MappingProxyType(
+            {name: Material(tuple(m["color"]), float(m["roughness"])) for name, m in sorted(doc["materials"].items())}  # type: ignore[arg-type]
+        ),
+        landmarks=_landmarks(doc.get("landmarks")),
+        document=MappingProxyType(json.loads(json.dumps(doc))),
+        path=path,
+        sha256=sha256,
+    )
+    problems = _semantic(cfg)
+    if problems:
+        raise DetailConfigError(path or "<document>", problems)
+    return cfg
+
+
+def load_detail_config(path: str | Path | None = None) -> DetailConfig:
+    try:
+        doc, resolved = read_json_document(path or DEFAULT_CONFIG_PATH)
+    except ConfigLoadError as exc:
+        raise DetailConfigError(path or DEFAULT_CONFIG_PATH, [exc.diagnostic.message]) from exc
+    return config_from_document(doc, path=str(resolved), sha256=hashlib.sha256(resolved.read_bytes()).hexdigest())

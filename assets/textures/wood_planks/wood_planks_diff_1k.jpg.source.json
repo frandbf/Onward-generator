@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "wood_planks",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/wood_planks",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_planks/wood_planks_diff_1k.jpg",
+  "md5": "922505c35c2d0dc6a44da7ac77757134",
+  "sha256": "3b0669f683e4bf10f5a55a381cfa9669a7b8dfd921901829daa3b35acc2bbdec",
+  "size_bytes": 609525,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/wood_planks/wood_planks_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T14:09:30+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

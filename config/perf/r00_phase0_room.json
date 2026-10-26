@@ -1,0 +1,9 @@
+{
+  "variant": "r00_phase0_room",
+  "description": "Reference map: the phase 0 room (12 m room, 2 materials, one baked light), built with SDK v1.15 in phase 0. Measures Onward's own cost with an almost empty map. Not rebuilt: the phase 0 Launcher output is used as is.",
+  "static_batching": false,
+  "occlusion_culling": false,
+  "lightmap_texels_per_m": 8.0,
+  "lightmap_max_size": 1024,
+  "lightmap_directional": true
+}

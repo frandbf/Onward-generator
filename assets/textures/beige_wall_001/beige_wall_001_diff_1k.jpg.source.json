@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "beige_wall_001",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva",
+    "Rico Cilliers"
+  ],
+  "page_url": "https://polyhaven.com/a/beige_wall_001",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/beige_wall_001/beige_wall_001_diff_1k.jpg",
+  "md5": "a99610d7d72ec6fb20ae991ad69b3eb7",
+  "sha256": "72104704d0b9bd3713c5f6238971252b63eccf6e61263059c674caa8f3d0fa6d",
+  "size_bytes": 33074,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/beige_wall_001/beige_wall_001_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T19:36:17+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

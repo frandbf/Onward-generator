@@ -1,0 +1,110 @@
+"""``onward-generator cadastre download|match``."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+from onward_generator.cadastre.acquire import CadastreError, bbox_from_scene, download_building_parts, load_download_record
+from onward_generator.contracts import is_schema
+from onward_generator.cadastre.gml import parse_building_parts
+from onward_generator.cadastre.match import (
+    DEFAULT_MIN_COVERAGE,
+    MatchOptions,
+    match_buildings,
+    match_report,
+    overrides_document,
+)
+from onward_generator.geo.sources import sha256_file
+from onward_generator.io import atomic_write_json, prepare_outputs
+
+OVERRIDES_FILE = "heights_overrides.catastro.json"
+REPORT_FILE = "cadastre_match_report.json"
+
+
+def _load_scene(path: str) -> tuple[dict, dict]:
+    scene_path = Path(path).expanduser().resolve()
+    if not scene_path.is_file():
+        raise CadastreError(f"scene not found: {scene_path}")
+    scene = json.loads(scene_path.read_text(encoding="utf-8"))
+    if not is_schema(scene.get("schema"), "onward_generator.geo_scene"):
+        raise CadastreError("input is not a onward_generator.geo_scene")
+    return scene, {"path": str(scene_path), "sha256": sha256_file(scene_path), "schema_version": scene.get("schema_version")}
+
+
+def _download(args: argparse.Namespace) -> int:
+    scene, _ = _load_scene(args.scene)
+    bbox = bbox_from_scene(scene, args.margin_m)
+    record = download_building_parts(bbox, args.out, overwrite=args.overwrite)
+    print(f"downloaded {record.size_bytes} bytes, sha256 {record.sha256}")
+    print(f"bbox {record.bbox} ({record.crs}); licence {record.license}")
+    print(f"wrote {args.out} and its .source.json sidecar")
+    return 0
+
+
+def _match(args: argparse.Namespace) -> int:
+    scene, scene_ref = _load_scene(args.scene)
+    gml_path = Path(args.gml).expanduser().resolve()
+    record = load_download_record(gml_path)
+    parts, part_issues = parse_building_parts(gml_path)
+    options = MatchOptions(min_coverage=args.min_coverage)
+    matches = match_buildings(scene, parts, options)
+    if sha256_file(gml_path) != record.sha256:
+        raise CadastreError("cadastre file changed while being read")
+    overrides = overrides_document(matches, record)
+    report = match_report(
+        matches, record=record, gml={"path": str(gml_path)}, scene_ref=scene_ref,
+        part_count=len(parts), part_issues=part_issues, options=options,
+    )
+    out_overrides, out_report = prepare_outputs(
+        args.out, (OVERRIDES_FILE, REPORT_FILE), overwrite=args.overwrite, protected=(gml_path, Path(scene_ref["path"]))
+    )
+    atomic_write_json(out_overrides, overrides)
+    atomic_write_json(out_report, report)
+    c = report["counts"]
+    print(
+        f"parts={c['cadastre_parts']} buildings={c['osm_buildings']} matched={c['status_matched']} "
+        f"low_coverage={c['status_low_coverage']} no_parts={c['status_no_parts']} mixed={c['mixed_floors']}"
+    )
+    print(f"wrote {out_overrides}")
+    print(f"wrote {out_report}")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="onward-generator cadastre", description="Catastro INSPIRE building floors")
+    sub = parser.add_subparsers(dest="command", required=True)
+    dl = sub.add_parser("download", help="download BuildingPart features around a geo scene (network)")
+    dl.add_argument("--scene", required=True)
+    dl.add_argument("--out", required=True, help="target .gml under data/raw/")
+    dl.add_argument("--margin-m", type=float, default=20.0)
+    dl.add_argument("--overwrite", action="store_true")
+    dl.set_defaults(handler=_download)
+    mt = sub.add_parser("match", help="match a downloaded GML to the scene buildings (offline)")
+    mt.add_argument("--scene", required=True)
+    mt.add_argument("--gml", required=True)
+    mt.add_argument("--out", required=True)
+    mt.add_argument("--min-coverage", type=float, default=DEFAULT_MIN_COVERAGE)
+    mt.add_argument("--overwrite", action="store_true")
+    mt.set_defaults(handler=_match)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return 0 if exc.code in (0, None) else 2
+    try:
+        return args.handler(args)
+    except (CadastreError, FileExistsError, ValueError, OSError) as exc:
+        print(f"cadastre: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,44 @@
+{
+  "schema": "onward_generator.prop_catalog",
+  "schema_version": "0.1.0",
+  "description": "Approved Asset Store packs for the props layer. source asset_store requires a real file; without it the entry stays pending and is never instanced. European City buildings are excluded so they cannot replace OSM footprints. Vehicles stay static and need parking evidence.",
+  "packs": [
+    {
+      "id": "327313",
+      "name": "Mobile Optimize Free Low Poly Cars",
+      "url": "https://assetstore.unity.com/packages/3d/vehicles/mobile-optimize-free-low-poly-cars-327313",
+      "license": "Standard Unity Asset Store EULA",
+      "license_url": "https://unity.com/legal/as-terms",
+      "license_text": "Standard Unity Asset Store EULA (Appendix 1, 2024-12-04). Embed in a Licensed Product with substantial original content. Do not redistribute the .unitypackage or train AI on the assets.",
+      "category": "vehicle",
+      "include_name_any": ["car", "vehicle", "sedan", "van"],
+      "exclude_name_any": ["demo_scene", "example_scene"],
+      "status": "approved"
+    },
+    {
+      "id": "71042",
+      "name": "Low Poly European City Pack",
+      "url": "https://assetstore.unity.com/packages/3d/environments/urban/low-poly-european-city-pack-71042",
+      "license": "Standard Unity Asset Store EULA",
+      "license_url": "https://unity.com/legal/as-terms",
+      "license_text": "Standard Unity Asset Store EULA (Appendix 1, 2024-12-04). Furniture only: benches, lamps, fences, signs. Buildings and road tiles are excluded so they cannot replace OSM geometry.",
+      "category": "ambient",
+      "include_name_any": ["bench", "lamp", "light", "fence", "sign", "chair", "table", "umbrella", "bollard"],
+      "exclude_name_any": ["building", "house", "roof", "road", "tile", "platform"],
+      "status": "approved"
+    },
+    {
+      "id": "251403",
+      "name": "Stylized Trees Cartoon Lowpoly Mobile Pack Free",
+      "url": "https://assetstore.unity.com/packages/3d/vegetation/trees/stylized-trees-cartoon-lowpoly-mobile-pack-free-251403",
+      "license": "Standard Unity Asset Store EULA",
+      "license_url": "https://unity.com/legal/as-terms",
+      "license_text": "Standard Unity Asset Store EULA (Appendix 1, 2024-12-04). Low-poly trees, trunks, bushes and grass. Use with Onward PP_Opaque_Simple_Lit; do not import third-party tree shaders.",
+      "category": "ambient",
+      "include_name_any": ["tree", "trunk", "bush", "grass"],
+      "exclude_name_any": ["shader", "wind"],
+      "status": "approved"
+    }
+  ],
+  "props": []
+}

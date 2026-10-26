@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "concrete_wall_001",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva",
+    "Rico Cilliers"
+  ],
+  "page_url": "https://polyhaven.com/a/concrete_wall_001",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_001/concrete_wall_001_diff_1k.jpg",
+  "md5": "7be71d950acf3cf0d7927e4255a63b38",
+  "sha256": "c3c936da86d57997d9fc4022371c3798c8d438aeecb8f41546104da6d3947c02",
+  "size_bytes": 79320,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/concrete_wall_001/concrete_wall_001_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T14:09:36+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

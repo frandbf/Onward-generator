@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "brown_mud_leaves_01",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/brown_mud_leaves_01",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_leaves_01/brown_mud_leaves_01_diff_1k.jpg",
+  "md5": "5340848384f9bb19bfa6e7ac459683d7",
+  "sha256": "c598c555f13cd5328409fd5e2a45496a26e319e52299e3959042f1449c2f1b06",
+  "size_bytes": 1206953,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/brown_mud_leaves_01/brown_mud_leaves_01_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:39+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

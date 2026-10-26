@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/generator.schema.json",
+  "title": "Onward generator project configuration",
+  "description": "Contract from PRD §8.4. Units are explicit in field names (_m = metres). Geographic positions are WGS84 degrees.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "source", "area", "generation", "quality", "optimization", "export"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "target"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+        "target": { "enum": ["onward_quest"] }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "attribution_required"],
+      "properties": {
+        "provider": { "enum": ["openstreetmap"] },
+        "attribution_required": { "const": true }
+      }
+    },
+    "area": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["center", "boundary_file", "margin_m"],
+      "properties": {
+        "center": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latitude", "longitude"],
+          "properties": {
+            "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+            "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 }
+          }
+        },
+        "boundary_file": { "type": ["string", "null"], "minLength": 1, "pattern": "\\.geojson$" },
+        "margin_m": { "type": "number", "minimum": 0, "maximum": 500 },
+        "crs": { "type": "string", "pattern": "^EPSG:[0-9]+$" }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buildings", "roads", "sidewalks", "facades", "interiors"],
+      "properties": {
+        "buildings": { "type": "boolean" },
+        "roads": { "type": "boolean" },
+        "sidewalks": { "type": "boolean" },
+        "facades": { "type": "boolean" },
+        "interiors": { "type": "boolean" }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detail_level", "deterministic_seed"],
+      "properties": {
+        "detail_level": { "enum": ["low", "medium", "high"] },
+        "deterministic_seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "optimization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "generate_collisions", "generate_lods"],
+      "properties": {
+        "target": { "enum": ["quest_standalone"] },
+        "generate_collisions": { "type": "boolean" },
+        "generate_lods": { "type": "boolean" }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "enabled"],
+      "properties": {
+        "adapter": { "enum": ["onward"] },
+        "enabled": { "type": "boolean" }
+      }
+    }
+  }
+}

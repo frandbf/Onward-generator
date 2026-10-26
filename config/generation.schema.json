@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/generation.schema.json",
+  "title": "Phase 03 procedural geometry configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version", "road_classes", "default_width_m", "sidewalk_width_m", "carriageway_depth_m", "surface_tags",
+    "min_surface_area_m2", "precision_m", "collider", "overlap_warning_m2", "materials"
+  ],
+  "$defs": {
+    "tagList": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "roughness"],
+      "properties": {
+        "color": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 4, "maxItems": 4 },
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string" },
+    "road_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vehicular", "pedestrian"],
+      "properties": {
+        "vehicular": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "pedestrian": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "default_width_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vehicular", "pedestrian"],
+      "properties": {
+        "vehicular": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
+        "pedestrian": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 }
+      }
+    },
+    "sidewalk_width_m": { "type": "number", "minimum": 0, "maximum": 10 },
+    "carriageway_depth_m": { "type": "number", "minimum": 0, "maximum": 0.5 },
+    "surface_tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["water", "green"],
+      "properties": { "water": { "$ref": "#/$defs/tagList" }, "green": { "$ref": "#/$defs/tagList" } }
+    },
+    "min_surface_area_m2": { "type": "number", "minimum": 0 },
+    "precision_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1 },
+    "collider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["simplify_tolerance_m", "ground_thickness_m"],
+      "properties": {
+        "simplify_tolerance_m": { "type": "number", "minimum": 0, "maximum": 5 },
+        "ground_thickness_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 }
+      }
+    },
+    "overlap_warning_m2": { "type": "number", "minimum": 0 },
+    "materials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ground", "pedestrian", "sidewalk", "carriageway", "curb", "green", "water", "building_wall", "building_roof"],
+      "properties": {
+        "ground": { "$ref": "#/$defs/material" },
+        "pedestrian": { "$ref": "#/$defs/material" },
+        "sidewalk": { "$ref": "#/$defs/material" },
+        "carriageway": { "$ref": "#/$defs/material" },
+        "curb": { "$ref": "#/$defs/material" },
+        "green": { "$ref": "#/$defs/material" },
+        "water": { "$ref": "#/$defs/material" },
+        "building_wall": { "$ref": "#/$defs/material" },
+        "building_roof": { "$ref": "#/$defs/material" }
+      }
+    }
+  }
+}

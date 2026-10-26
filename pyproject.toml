@@ -1,0 +1,25 @@
+[project]
+name = "onward-generator"
+version = "0.1.0"
+description = "Local, AI-assisted 3D map generator from legal geographic data, initially targeting Onward custom maps."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "shapely==2.2.0",
+    "pyproj==3.8.0",
+    "jsonschema==4.26.0",
+    "pillow==11.3.0",
+]
+
+[project.scripts]
+onward-generator = "onward_generator.cli:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"

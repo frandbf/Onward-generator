@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/dress/texture_plan.schema.json",
+  "title": "Murcia generator texture plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "description", "provider", "resolution", "map", "format", "entries"],
+  "properties": {
+    "schema": { "const": "onward_generator.texture_plan" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "provider": { "enum": ["polyhaven", "library"] },
+    "selector": { "enum": ["ollama", "library"] },
+    "resolution": { "const": "1k" },
+    "map": { "const": "Diffuse" },
+    "format": { "const": "jpg" },
+    "atmosphere": { "enum": ["inhabited", "abandoned"] },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "catalog_ids", "albedo_mode"],
+      "properties": {
+        "id": {
+          "enum": ["historic_facades", "stone_monuments", "streets_plazas", "roofs", "brick", "carriageway", "sidewalks", "plain_pedestrian", "doors", "trunks", "flat_roofs", "plain_facades", "ochre_facades"]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 260,
+          "pattern": "^https://(www\\.)?polyhaven\\.com/a/[a-z0-9_]+(\\?[^\\s]*)?$"
+        },
+        "library_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,80}$"
+        },
+        "catalog_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" }
+        },
+        "albedo_mode": { "enum": ["greyscale_modulation", "color_albedo"] },
+        "forbidden_catalog_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" }
+        },
+        "note": { "type": "string", "maxLength": 400 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "id": { "const": "historic_facades" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["historic_plaster_cream", "plaster_ochre_wall"] } },
+              "albedo_mode": { "enum": ["greyscale_modulation", "color_albedo"] }
+            },
+            "not": {
+              "properties": {
+                "catalog_ids": { "contains": { "const": "plaster_white_wall" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "stone_monuments" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["limestone_warm", "stone_light_wall", "curb_stone"] } },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "streets_plazas" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["cobblestone_paving"] } },
+              "albedo_mode": { "const": "color_albedo" }
+            },
+            "not": {
+              "properties": {
+                "catalog_ids": { "contains": { "const": "asphalt_road" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "roofs" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["terracotta_roof"] } },
+              "albedo_mode": { "const": "color_albedo" }
+            },
+            "not": {
+              "properties": {
+                "catalog_ids": { "contains": { "enum": ["flat_roof_grey", "flat_roof_warm"] } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "brick" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": {
+                "items": { "enum": ["brick_red_wall"] },
+                "maxItems": 1
+              },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "carriageway" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["asphalt_road"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "sidewalks" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["sidewalk_concrete"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "plain_pedestrian" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["pedestrian_plain"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "doors" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["wood_door"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "trunks" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["tree_bark"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "flat_roofs" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["flat_roof_grey", "flat_roof_warm"] } },
+              "albedo_mode": { "enum": ["greyscale_modulation", "color_albedo"] }
+            },
+            "not": {
+              "properties": {
+                "catalog_ids": { "contains": { "const": "terracotta_roof" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "plain_facades" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["plaster_white_wall"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "ochre_facades" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["plaster_ochre_wall"] }, "maxItems": 1 },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

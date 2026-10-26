@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "cobblestone_color",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/cobblestone_color",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/cobblestone_color/cobblestone_color_diff_1k.jpg",
+  "md5": "6650dc413469e1113b85699a90c5a3c4",
+  "sha256": "bcd48286399ad7f5f5690a5b42147e564bc438ba9dd368e4df4999a727914a2a",
+  "size_bytes": 1115161,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/cobblestone_color/cobblestone_color_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T12:22:58+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

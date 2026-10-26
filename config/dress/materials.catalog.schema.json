@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/dress/materials.catalog.schema.json",
+  "title": "Murcia generator material catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "description", "materials"],
+  "properties": {
+    "schema": { "const": "onward_generator.material_catalog" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "materials": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "name", "description", "compatible_surfaces", "color_id",
+        "textures", "technical", "performance_cost", "source", "license", "status"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "compatible_surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/role" }
+        },
+        "color_id": {
+          "type": "string",
+          "description": "Existing generation or detail material used as the solid colour. Not a new asset."
+        },
+        "textures": { "$ref": "#/$defs/textures" },
+        "technical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shader_hint", "tile_m", "notes"],
+          "properties": {
+            "shader_hint": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "tile_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+            "notes": { "type": "string", "maxLength": 400 }
+          }
+        },
+        "performance_cost": { "enum": ["none", "low", "medium", "high"] },
+        "source": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "license": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "status": { "enum": ["available", "pending"] }
+      }
+    },
+    "role": {
+      "enum": ["wall", "roof", "ground", "sidewalk", "street", "plaza", "curb", "water", "green", "opening", "accessory", "other"]
+    },
+    "textures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "paths", "note"],
+      "properties": {
+        "kind": { "enum": ["none", "procedural", "file", "pending"] },
+        "paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 260 }
+        },
+        "note": { "type": "string", "maxLength": 400 }
+      }
+    }
+  }
+}

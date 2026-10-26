@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "white_plaster_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/white_plaster_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_plaster_02/white_plaster_02_diff_1k.jpg",
+  "md5": "7b10c2686bcfd76d1f309a20fd06b57e",
+  "sha256": "a1ebbe091bd1ae93d2abd5de8d69f9003a8d0ee6532bcf9a87c2492c97051f23",
+  "size_bytes": 527219,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/white_plaster_02/white_plaster_02_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T19:36:19+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

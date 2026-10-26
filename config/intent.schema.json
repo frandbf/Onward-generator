@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/intent.schema.json",
+  "title": "Generation intent (phase 06)",
+  "description": "What a natural-language instruction may change. Every parameter is optional (null = not requested) and maps to one validated configuration field. Area, coordinates, sources, performance limits and the export adapter cannot be expressed here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent_version", "parameters", "unsupported_requests", "summary"],
+  "properties": {
+    "intent_version": { "const": "0.1.0" },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facade_detail", "residential_levels", "interior_buildings", "performance_priority"],
+      "properties": {
+        "facade_detail": {
+          "description": "Requested facade detail. Recorded in project quality.detail_level.",
+          "enum": ["low", "medium", "high", null]
+        },
+        "residential_levels": {
+          "description": "Estimated storeys of multi-storey residential buildings without observed data (heights typical_levels.residential_multi).",
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 50
+        },
+        "interior_buildings": {
+          "description": "Maximum buildings with a simplified interior (detail interiors.max_buildings). 0 disables interiors.",
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 50
+        },
+        "performance_priority": {
+          "description": "max: refuse any change that adds cost beyond the configuration measured on the Quest. balanced: allow it with a warning.",
+          "enum": ["max", "balanced", null]
+        }
+      }
+    },
+    "unsupported_requests": {
+      "description": "Parts of the instruction that were not mapped to a parameter.",
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request", "reason"],
+        "properties": {
+          "request": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "reason": { "enum": ["protected_field", "not_supported", "ambiguous"] }
+        }
+      }
+    },
+    "summary": { "type": "string", "maxLength": 600 }
+  }
+}

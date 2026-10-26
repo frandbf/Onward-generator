@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "plastered_wall",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/plastered_wall",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plastered_wall/plastered_wall_diff_1k.jpg",
+  "md5": "9f64cd14ded4938e64ab6c6bb3de3c19",
+  "sha256": "73312ebb6eabc8e0a55addd8a82a8924bcd1e717b9488a887cc77f14b6ea554e",
+  "size_bytes": 617080,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/plastered_wall/plastered_wall_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T20:21:29+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

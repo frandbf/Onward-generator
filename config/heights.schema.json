@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/heights.schema.json",
+  "title": "Building-height estimation configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version", "bounds_m", "storey_height_m", "fallback_m", "typical_levels", "category_key_priority",
+    "categories", "landmark", "neighbourhood", "confidence", "overrides_file"
+  ],
+  "$defs": {
+    "category": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "positive": { "type": "number", "exclusiveMinimum": 0 },
+    "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "min", "max"],
+      "properties": {
+        "default": { "$ref": "#/$defs/positive" },
+        "min": { "$ref": "#/$defs/positive" },
+        "max": { "$ref": "#/$defs/positive" }
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string" },
+    "bounds_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": { "min": { "$ref": "#/$defs/positive" }, "max": { "$ref": "#/$defs/positive" } }
+    },
+    "storey_height_m": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/category" },
+      "additionalProperties": { "type": "number", "minimum": 2.0, "maximum": 10.0 },
+      "required": ["unknown"]
+    },
+    "fallback_m": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/category" },
+      "additionalProperties": { "$ref": "#/$defs/range" },
+      "required": ["unknown"]
+    },
+    "typical_levels": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/category" },
+      "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 50 }
+    },
+    "category_key_priority": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "$ref": "#/$defs/category" }
+      }
+    },
+    "landmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys", "tags", "levels_floor_at_category_default"],
+      "properties": {
+        "levels_floor_at_category_default": { "type": "boolean" },
+        "keys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "tags": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        }
+      }
+    },
+    "neighbourhood": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["radius_m", "block_gap_m", "min_samples", "reliable_sources"],
+      "properties": {
+        "radius_m": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "block_gap_m": { "type": "number", "minimum": 0, "maximum": 20 },
+        "min_samples": { "type": "integer", "minimum": 1 },
+        "reliable_sources": {
+          "type": "array",
+          "items": { "enum": ["explicit_height", "override", "authoritative_levels", "explicit_levels", "building_type"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explicit_height", "explicit_levels", "building_type", "neighbourhood_block_same_category",
+        "neighbourhood_block", "neighbourhood_radius_same_category", "neighbourhood_radius", "fallback",
+        "landmark_placeholder"
+      ],
+      "properties": {
+        "explicit_height": { "$ref": "#/$defs/probability" },
+        "explicit_levels": { "$ref": "#/$defs/probability" },
+        "building_type": { "$ref": "#/$defs/probability" },
+        "neighbourhood_block_same_category": { "$ref": "#/$defs/probability" },
+        "neighbourhood_block": { "$ref": "#/$defs/probability" },
+        "neighbourhood_radius_same_category": { "$ref": "#/$defs/probability" },
+        "neighbourhood_radius": { "$ref": "#/$defs/probability" },
+        "fallback": { "$ref": "#/$defs/probability" },
+        "landmark_placeholder": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "overrides_file": { "type": ["string", "null"], "pattern": "\\.json$" }
+  }
+}

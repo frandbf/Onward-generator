@@ -1,0 +1,31 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Murcia — Catedral y Plaza del Cardenal Belluga",
+    "version": "0.1.0",
+    "created": "2026-10-19",
+    "margin_m": 30,
+    "origin_wgs84": [-1.12863, 37.98407],
+    "local_bounds_m": { "x_min": -195, "y_min": -135, "x_max": 110, "y_max": 110 },
+    "crs_for_local_bounds": "EPSG:25830",
+    "boundary_notes": {
+      "south": "Glorieta de España, before Avenida Teniente Flomesta (y = -135 m)",
+      "west": "Calle Sol / Calle Puxamarina (x = -195 m)",
+      "north": "Calle Marín Baldo, before Calle Platería (y = 110 m)",
+      "east": "Calle Barahundillo / Calle Isidoro de la Cierva (x = 110 m)"
+    },
+    "note": "Initial rectangle of about 305 x 245 m (about 10 blocks) in local grid metres around the Murcia centre point. Editable; refine it to follow street centrelines."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-1.1308802, 37.9828892],
+        [-1.1274090, 37.9828340],
+        [-1.1273529, 37.9850410],
+        [-1.1308242, 37.9850962],
+        [-1.1308802, 37.9828892]
+      ]
+    ]
+  }
+}

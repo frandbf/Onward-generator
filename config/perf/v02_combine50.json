@@ -1,0 +1,10 @@
+{
+  "variant": "v02_combine50",
+  "description": "v00 with visual primitives merged per (50 m ground cell, material). v01 measured no draw-call reduction from static batching or occlusion culling, so both stay off to isolate this change. Predicted no-culling upper bound: 483 draws (perf.measure.combine_groups).",
+  "static_batching": false,
+  "occlusion_culling": false,
+  "lightmap_texels_per_m": 2.0,
+  "lightmap_max_size": 2048,
+  "lightmap_directional": true,
+  "combine_cell_m": 50.0
+}

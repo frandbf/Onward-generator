@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "concrete_floor_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/concrete_floor_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+  "md5": "1cfee53d2f82fa59726ab7ae6a2e8c09",
+  "sha256": "6db84a6d87dc50508b9d134d6fbd2b7e876b8081a5f43a118a249ca18de73af5",
+  "size_bytes": 776097,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+  "retrieved_at": "2026-10-19T14:09:27+00:00",
+  "user_agent": "murcia-generator/0.1.0 (local research tool)"
+}

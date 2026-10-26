@@ -1,0 +1,10 @@
+{
+  "variant": "v02_combine100",
+  "description": "v00 with visual primitives merged per (100 m ground cell, material). Static batching and occlusion culling off, as in v02_combine50. Predicted no-culling upper bound: 217 draws (perf.measure.combine_groups).",
+  "static_batching": false,
+  "occlusion_culling": false,
+  "lightmap_texels_per_m": 2.0,
+  "lightmap_max_size": 2048,
+  "lightmap_directional": true,
+  "combine_cell_m": 100.0
+}
