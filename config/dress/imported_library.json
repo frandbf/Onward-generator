@@ -2625,8 +2625,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/driveway-long.glb",
-      "sha256": "d6fc46e8a5363c87b616eaa65c5dbcffa9026b8af47f979dc6c38cfa91f53459",
-      "bytes": 2952,
+      "sha256": "41fe6dff1b0f15dae75bc44fc1b736ccded47214931de7fe35eee02729e44b06",
+      "bytes": 2972,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2642,8 +2642,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/driveway-short.glb",
-      "sha256": "7c7e81602cd6b1024fc98f3f32803db2e21222a3e30cfc838fb7f2282f593823",
-      "bytes": 2956,
+      "sha256": "cd432afb99499affa74f5abb692b9548f1e1cdf57ed2d9f3fe95860fe0f0cc35",
+      "bytes": 2976,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2659,8 +2659,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-1x2.glb",
-      "sha256": "54dd8d87f4ee0fd4d945b694a10a74eb7b20b1bd7468e09fd21fc32fb2b78397",
-      "bytes": 16492,
+      "sha256": "37ffb9628ff90a411fcc5c46520916c32509560687da1a571b64f602b390c111",
+      "bytes": 16500,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2676,7 +2676,7 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-1x3.glb",
-      "sha256": "b4f1b79a844381c29199df417dc4fe17c2eaa1b8aa719aaaa24a7f61687a3ca9",
+      "sha256": "2d62b81431700218460a2844a2ea408e414bd3da116aa865baf7907a432a13c0",
       "bytes": 21032,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
@@ -2693,8 +2693,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-1x4.glb",
-      "sha256": "f63d17e1bb8f83416cffefdc0a90615ddd5b2cb69d8ea721cebdd663f9b2c4fc",
-      "bytes": 25544,
+      "sha256": "017ac5f28e0d105b4f43b2f15a0b8085b4ffe9b2152532c36f2416cf7d4d42d1",
+      "bytes": 25548,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2710,8 +2710,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-2x2.glb",
-      "sha256": "91862d7ee50b70763b45498fc61401cd3a7f150d337b0815d50b9ce2e2dc3612",
-      "bytes": 23872,
+      "sha256": "d8f3304a5f9345d772c95a9dcdf599e53ff18b6b2578105eb9aa47ffdc777ce1",
+      "bytes": 23880,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2727,7 +2727,7 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-2x3.glb",
-      "sha256": "1a8270c40f650c9a2e58785945aad457fd58d42cc979b862b347e05a5f0a2f6f",
+      "sha256": "ffef11e75668d8bd887ac87d1c18c9bf3f47a3ea8b9618de81f5016c7685ba18",
       "bytes": 28412,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
@@ -2744,8 +2744,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-3x2.glb",
-      "sha256": "a14090e53a25bc55bede6197edd39983519d995aa831ff2f640d4d636d090a2b",
-      "bytes": 31280,
+      "sha256": "ec5fca290e0a8f0b7b178ec0f9e543d049b7f73db32b39e5c64876d8b4a6bfe4",
+      "bytes": 31284,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2761,8 +2761,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-3x3.glb",
-      "sha256": "8b4f5c808ea8fdea656bb79171cf489bf469a295cdb737c449ed8d387b5242e4",
-      "bytes": 35820,
+      "sha256": "3170d8b510115c004055573cbb70083011b312e53bfa6faa8ea4e32374eb561e",
+      "bytes": 35816,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2778,8 +2778,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence-low.glb",
-      "sha256": "fe0272d73820bb4c8db3bed408a28cbd5c042da1373142bd13122a1ac9d1a168",
-      "bytes": 18552,
+      "sha256": "1371171f4b6f00040b8e7c8d9a4757472c2204a7c47cf35b7f19efb192ef8470",
+      "bytes": 18572,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2795,8 +2795,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/fence.glb",
-      "sha256": "073bd2000ac51879516d49f835d5156dac4d5038085380b1232858fc3f562d02",
-      "bytes": 9672,
+      "sha256": "071cc3622ed980feeaf116309089ee66460996069e5a21c8d87bfe4abfcff4fd",
+      "bytes": 9696,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2812,8 +2812,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/path-long.glb",
-      "sha256": "af6869e19f9922e84df23a48795618f03565587dc2c397bd84cf1f066cfa39d5",
-      "bytes": 2940,
+      "sha256": "0af4dfa5cfc180250693a3a2a1827a433de78281079578ba956b5c116d74bd37",
+      "bytes": 2960,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2829,8 +2829,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/path-short.glb",
-      "sha256": "0f657ebadf8c56adcd54335b8da2e54120f539918ea50509812731790ef99c2b",
-      "bytes": 2944,
+      "sha256": "9a2a206e6f1a023680e8e0bd8c14a1552f70d6229b4edcbadc7b859731b436cd",
+      "bytes": 2964,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2846,8 +2846,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/path-stones-long.glb",
-      "sha256": "cbd73ca5746f2290f44a2e1fc6f0759076c2c5fcdb3cb3f1e3acd74d5751d114",
-      "bytes": 6664,
+      "sha256": "10c0739271955f05996b093036d9dfc8c05ee10a1fc3ffbceadf7e07e1acf0b2",
+      "bytes": 6680,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2863,8 +2863,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/path-stones-messy.glb",
-      "sha256": "5493589dfac443ecbc0ad5563d9bb98edcefdaa972a0dc65fa65575609fbcd92",
-      "bytes": 5476,
+      "sha256": "3bacdbdd53dcc3884c44787b309ea97b5a9e47ee12c1314b673aa25264934660",
+      "bytes": 5500,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2880,8 +2880,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/path-stones-short.glb",
-      "sha256": "63148e02c35d4ad249ee1dcbb0c5ee921cd719f501b25eb8b66bc0e1b20ce28c",
-      "bytes": 4284,
+      "sha256": "a2e3bd41bdf52cad462b9b4212a14683fe44cbff0228d4a043cb9ce5fc7c61a6",
+      "bytes": 4304,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2897,8 +2897,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/planter.glb",
-      "sha256": "a876e87d908f0397dcaf94b7705835447825c4c5b39195319535415386542c17",
-      "bytes": 20368,
+      "sha256": "a64e0475f91eb5e48de05aba34a2f0da74c2033970a1c9127bb52c7f5564bd7b",
+      "bytes": 20380,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2914,8 +2914,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/tree-large.glb",
-      "sha256": "16d1f95c149bc727a953a473cf20bf21de9bf1a88747c4f9d2eeb4ac7d43e291",
-      "bytes": 5812,
+      "sha256": "49215ae775400aa3ea6fba33858ab1bd3631c5e35fc1116f050b04fe4fff2717",
+      "bytes": 5828,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2931,8 +2931,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/suburban/tree-small.glb",
-      "sha256": "5f63359e5f392609d7617cc98070855ca1ffd4f4b4bc3978a5ff56ece88a58d6",
-      "bytes": 5812,
+      "sha256": "9d1a9cc54fa44aa0c7ff89d675f18c42c21da06ecc9a9baac9493b56c94aa86c",
+      "bytes": 5828,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2948,8 +2948,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/detail-ac-a.glb",
-      "sha256": "9301b6dd4a25a49225c375964b70280398d67ae33cf6a9733d4ded2fc965770d",
-      "bytes": 6560,
+      "sha256": "50fa8409d89581572c65452f9bef8196d3d889a1aeffae163a75564edb40bb89",
+      "bytes": 6576,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2965,8 +2965,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/detail-ac-b.glb",
-      "sha256": "d18769b363be1c858aeaf0b7921788f6ff211c61162c9c7e43ed9708d13f09e4",
-      "bytes": 8956,
+      "sha256": "57ab6bf8fe7822e7d986bf9516d6ea9fed4cac5576a28b29f3961d0d22b2a8a7",
+      "bytes": 8980,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2982,8 +2982,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-brown-glass.glb",
-      "sha256": "0aba787bb7c0d59a0d76b107226c0be2a534d501dd6483d91213c6e09ec57f95",
-      "bytes": 4072,
+      "sha256": "732919f7d7ce15ec2e129d807035ff8eb04f0d590939d2e10dc58e4d7bf14276",
+      "bytes": 4140,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -2999,8 +2999,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-brown-window.glb",
-      "sha256": "47f270606049b8b3790c0009186497899a16d73ad578171664fcc1d7d7dbd669",
-      "bytes": 4076,
+      "sha256": "b4ce9b447c63a48ed38c7658627657dbf91da8803df6ca86f2f93a9d651119fe",
+      "bytes": 4144,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3016,8 +3016,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-brown.glb",
-      "sha256": "05d107b6443dd210c451ae176db2fb2cc0f1c1729259aea7fbd26e89b6d769e0",
-      "bytes": 4072,
+      "sha256": "1f5d34bfc2bcc73869ca69d799c778d8ef43cf30cacf375e079f9b70f0c2f371",
+      "bytes": 4140,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3033,8 +3033,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-white-glass.glb",
-      "sha256": "e7f21a2a54519714f7149b0616fbc1534d09e5bb24bc740b4f5f3cdff6d36e2b",
-      "bytes": 4092,
+      "sha256": "74864cedec96866e498df3c0abb4c2ec46b8525b8a26305f5e63b64f24e89519",
+      "bytes": 4156,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3050,8 +3050,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-white-window.glb",
-      "sha256": "dc465c78d70faac302bfba0b52a1289aa89b9a7ba78c96770b86c53e92a82b41",
-      "bytes": 4092,
+      "sha256": "64349b7a9120c8384ba1a033be6138531e05139e686a9badcab5ec904ba0fff7",
+      "bytes": 4160,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3067,8 +3067,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/door-white.glb",
-      "sha256": "da55684ad9213adde6f1c01d4e1667ca538eec11507846c465eb7013d34c45b5",
-      "bytes": 4056,
+      "sha256": "ce457b73ab12f4b31f26385e765f62d56ca97542e9fa457e7324511770829d8a",
+      "bytes": 4120,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3084,8 +3084,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-awning-a.glb",
-      "sha256": "9fd940215f252ea982ad3df9301b46e4f1d1a8802779830df2e9780d658b9858",
-      "bytes": 4452,
+      "sha256": "0d2c89dade1e1f366f18ef0d59b3c871c6ac65bcbcbce24afee43032a068001d",
+      "bytes": 4476,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3101,8 +3101,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-awning-b.glb",
-      "sha256": "c0b6f7776ea76bfa84fa5d1e2bca8895da929ee04d4adca5521ae2ebd101377d",
-      "bytes": 3852,
+      "sha256": "d184bc9e7afaf02188a49e924d1e177cfee7f55423244cd8610617e133e906c5",
+      "bytes": 3876,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3118,8 +3118,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-awning-c.glb",
-      "sha256": "5586828be99383fb06305fcb0aceb01b1696dd2fc35f130603b27b6f9878d05a",
-      "bytes": 7044,
+      "sha256": "72b49ad4b37e62f9112dd28cbcfa831789a7189d679ba66060808a0043361807",
+      "bytes": 7068,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3135,8 +3135,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-center-corner.glb",
-      "sha256": "054d5c810a8bc196ccbbe8d71e3458eae0a8c97a0d0fcaf78ff80a72f5fdb397",
-      "bytes": 4716,
+      "sha256": "84b819fa5aad99582eb246d1c7d247de15113196a2d7572e4f3fed2e81c56ea8",
+      "bytes": 4796,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3152,8 +3152,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-center.glb",
-      "sha256": "13c21fea32027df0746d9d7429b47a342d4fca7fc3daeee921c7611759947dfa",
-      "bytes": 4092,
+      "sha256": "135f3b2b0f119e0c71199a19cfb47066f94185411ac9b2d8b01ed6d51fcf3958",
+      "bytes": 4176,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3169,8 +3169,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-corner-slanted-passage.glb",
-      "sha256": "0ac63e39c1b14f2fa70b7a2edd3904dc4170c80551f287cad170982482cdc607",
-      "bytes": 5344,
+      "sha256": "1cb4355e808f2b478569bd8437873976057242d7c6d73405a79b5439f7775c5a",
+      "bytes": 5424,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3186,8 +3186,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-corner-slanted.glb",
-      "sha256": "0c92d142424a23f3ac1ae7b715d2abf63e6c79f84864f2e4d0d13efd4d5d56e6",
-      "bytes": 4416,
+      "sha256": "e6528c875ab5af84b340ff5c9c0e25387b545e580f85c1c2ed55242411b88f6d",
+      "bytes": 4500,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3203,8 +3203,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-corner.glb",
-      "sha256": "da32f11eab7e5b3d996888402486e82f19b8c928a75f3bfb975a72c3078ccaa7",
-      "bytes": 3792,
+      "sha256": "5a3e17d15e2fd521e9ef017e810730bd7ffe698d21b82aefcd2be7083fe74847",
+      "bytes": 3876,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3220,8 +3220,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-end.glb",
-      "sha256": "6acf17c4107955f9cc8c772d355cc87d59cf21e618be4dbeba91cd328d17f5c2",
-      "bytes": 4084,
+      "sha256": "ce848ec804cc990bd07d91a833b85052cb18564cd13e4307ea321ab03afd72f7",
+      "bytes": 4164,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3237,8 +3237,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-side.glb",
-      "sha256": "de11c932dce59ad7ba9f4df205216b40a65a13b6350cfb61e4a907447e359e7e",
-      "bytes": 3484,
+      "sha256": "657df5d89effa91ccf80747794829da561ee16152a65b59fd965e9a2655531d6",
+      "bytes": 3568,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3254,8 +3254,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-border-straight.glb",
-      "sha256": "4360bb7e57ca38b405e51c7016941ec145b83d471a3b60435b6e8ce293dc3fae",
-      "bytes": 4096,
+      "sha256": "71ae39239b2b9bedfc37099d7ab77ae54f50f1e09c365474206e19fb66514b5c",
+      "bytes": 4180,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3271,8 +3271,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-center.glb",
-      "sha256": "e785aa9eec03c3720e97dd9046b2c567600dca1ab588c118e4f5ef138dc2d889",
-      "bytes": 2868,
+      "sha256": "60f8cfce9ed24ecf70afacd2b5060e3996964136582b24fdf83a478bda01b25c",
+      "bytes": 2952,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3288,8 +3288,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-corner-high.glb",
-      "sha256": "0e893e58cf0f32c3cc3b55852e4eefee25a5edaaf0a4118d31ac1b6ecb639f6a",
-      "bytes": 3184,
+      "sha256": "babc69762d41cf9c695a973537493d58d38fcd7eb312c3886a7a63864cfff393",
+      "bytes": 3268,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3305,8 +3305,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-corner.glb",
-      "sha256": "92e74059d5c729992a7246a9fb6cd140af31e63a3a8471a60575c3b1f4c0c8e4",
-      "bytes": 3168,
+      "sha256": "2063d8e9136aefa658e3abb0a7a798ef537501fbf84335d8a5aab4f2ea6dd3f8",
+      "bytes": 3252,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3322,8 +3322,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-detail-a.glb",
-      "sha256": "c7b91e7b2bbe6e63e03aedd15d038d78ed55cf16582d1f811366e5e4732c2fd1",
-      "bytes": 6892,
+      "sha256": "e8e76d91ff7247506f352ecf1beb4d8255a7a21acf4bc3d42466a1715b984afa",
+      "bytes": 6976,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3339,8 +3339,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-detail-b.glb",
-      "sha256": "10e3db8ad130f4d236e6d19507331f7f283d4fce82bdaa8b503fa74c2a98a963",
-      "bytes": 5676,
+      "sha256": "82f65e85d1401fc7675b1622ba92bd2285f5de36d88328cc45ea2fdd814762d1",
+      "bytes": 5760,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3356,8 +3356,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-detail-c.glb",
-      "sha256": "3224118bd375b6cc54344a4a78b5b1e7166c1df1316da962cac5bd1b2481dc7c",
-      "bytes": 5124,
+      "sha256": "33d2fa778fb9d2abb712dcf61b16b0a0f6c9ab079a50a7b5490b2211173885e0",
+      "bytes": 5204,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3373,8 +3373,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-detail-d.glb",
-      "sha256": "de2bd3691c5cdfceb8d991d87a57ca565822457ac6bd116b60c9adca285b3c95",
-      "bytes": 6148,
+      "sha256": "a27b4a33725012839fafce73ad815fa327394a42269caad17d419d4f28196ec0",
+      "bytes": 6232,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3390,8 +3390,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-flat-top.glb",
-      "sha256": "bba09a68499585628abe5c117ff0300ec79189c38036612aa1d3a22b69e9fd5c",
-      "bytes": 4212,
+      "sha256": "bdf7fe1915c0d0f0fc722cd0317b6e275105795c25ca2e12b20c11b5776fe23f",
+      "bytes": 4236,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3407,8 +3407,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-gable-corner.glb",
-      "sha256": "1c8bdaed97c920ad07d0ca7b31e0d9f29048c84e35eb984d50f58e8e09bec7fe",
-      "bytes": 3548,
+      "sha256": "ed77edfa538d162562346c384b51b7488fad5ba6a009a040c813a4aa945c8fcf",
+      "bytes": 3596,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3424,8 +3424,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-gable-end.glb",
-      "sha256": "b68db641f6bf36e9ced4fe00e92dc711e6b3edbc9cb85881f918a6af66ef8a28",
-      "bytes": 3452,
+      "sha256": "07a3af5ea3b406c2ae0458fc260b70076646c080b01219a698d5a40b69a3e4e7",
+      "bytes": 3484,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3441,8 +3441,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-gable.glb",
-      "sha256": "46c82911f18f6f6c65a5f814538626477321fc97c9eaf2d4549628c890f87dde",
-      "bytes": 3624,
+      "sha256": "69943ab10fe4c716131685697fc7f98b5105bf4a3ebfa5b3245ae378c0c82d86",
+      "bytes": 3676,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3458,8 +3458,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-corner-a.glb",
-      "sha256": "8aef6d4ee6dc6c8c9e5d9f631f99184d48185cc3dc02fb40841730b94f489b80",
-      "bytes": 4688,
+      "sha256": "78eb4e739486d4ae0064d2730b86b8a28ecc7cf9e640d3279fed6e8df52eb10b",
+      "bytes": 4736,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3475,8 +3475,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-corner-b.glb",
-      "sha256": "6d898e694bc230b16de71f4a43f5d1269f8324e03ffe723775ec5944873f104d",
-      "bytes": 4288,
+      "sha256": "8ab7640a1090cede9b2f0554ba2dfc3502ba16daf6dec96996c2c8ae060374e1",
+      "bytes": 4336,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3492,8 +3492,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-corner-c.glb",
-      "sha256": "8a585f96e9766e07a0cfc0b2efd2219dd2ab6b7c48999f64f01d1245b73f7cf8",
-      "bytes": 3992,
+      "sha256": "8fc3d40797bc5becd4774c7fa713efd8b94c6324b99a81a73e84abec63a2bb5c",
+      "bytes": 4040,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3509,8 +3509,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-corner-inner.glb",
-      "sha256": "bc13aa72d027c149f9b526bb35ef79a8737db6a05e15ad7222fc679fb0676cf6",
-      "bytes": 3428,
+      "sha256": "22c71ddfd2eb6b1d801c158df428794d1e016096d603dc132aec90fdb015ffd1",
+      "bytes": 3512,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3526,8 +3526,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-detail.glb",
-      "sha256": "ae18dec5a179505a03902c068e1f1d4e4882e2f4bce6df9cba2ee2bf22d72ed0",
-      "bytes": 5120,
+      "sha256": "205570506841bc24ee872bd42959b4f865b9b06b57f5e825738c0662071a46b0",
+      "bytes": 5184,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3543,8 +3543,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-flat.glb",
-      "sha256": "b979c64f35a5f036a8764c2468cd14c765ece83d50e34f9d2bc1a166957eb994",
-      "bytes": 2872,
+      "sha256": "f97885d31c85cb1b8a19c1fc52fce32287f955b89e0466dfbe208942e8ff8a72",
+      "bytes": 2956,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3560,8 +3560,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted-window.glb",
-      "sha256": "53c02f27ad166d96ca93cac0e61e52f9305290f2d14a9a87ad4803ea01a4386c",
-      "bytes": 9080,
+      "sha256": "7bdc552f074ca49a0457664b05dfdba9595d3058a2905d68680f9cf39f8f474e",
+      "bytes": 9144,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3577,8 +3577,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/roof-slanted.glb",
-      "sha256": "18a4bc25e2e411ed7236ae8000eb211194b59e04f6823b3f41f0a2f891610ccc",
-      "bytes": 4104,
+      "sha256": "0b46bcb1bf1c65c7546087f16f71d20320205021b4e9a25fd267bccbdb18623a",
+      "bytes": 4172,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3594,8 +3594,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-detailed.glb",
-      "sha256": "84d1aec5f074a08609eb46b2f064b19c5c8949a19fbe2ec7915665376111b6f2",
-      "bytes": 4324,
+      "sha256": "4073b5ac85ae1f51e4ab382ba9b183ff849ad883067f7d1370b4da8e43ddc5ca",
+      "bytes": 4352,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3611,8 +3611,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-large.glb",
-      "sha256": "67aa7208b5f237bfe80ecabd52f7076347e2d8f2ad17bed6b0900d3934acf9cf",
-      "bytes": 4504,
+      "sha256": "430381b2e3d9d9098e8d9a0dba4176b53fa11222a8cf537f6b84781b656557e0",
+      "bytes": 4568,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3628,8 +3628,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-narrow.glb",
-      "sha256": "9836a755654b65e85cf50e05abfa387049a9b44d9f82d84f0eb6ec13f1ab4063",
-      "bytes": 7344,
+      "sha256": "5381418ec74d5c10bd7b789b78e2d4d78f024fc2be6bb42755036ee2ea78137e",
+      "bytes": 7392,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3645,8 +3645,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-round-low.glb",
-      "sha256": "9c92630c3ce291af3ad1ef5213a302000895d4efb9ce9da45616886a92444163",
-      "bytes": 5948,
+      "sha256": "a84de567dd81bffa2d6f0bd28336290fcb371e4bb02afb211bc749858573383e",
+      "bytes": 5976,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3662,8 +3662,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-round-middle.glb",
-      "sha256": "4ec68aff73cef6e5b7ed83a424bf35858641e4fc4362363a6a5db128d1c875e5",
-      "bytes": 4116,
+      "sha256": "9bb5d1c57ed936114d64b8d9538bca8e713ed68594116aa9cd4bd0a684b27809",
+      "bytes": 4124,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3679,8 +3679,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-round-narrow.glb",
-      "sha256": "1072527a9367b015f0308720d94efab2d543740fe2632e4000c311ac52df0358",
-      "bytes": 5940,
+      "sha256": "284e6b7aa9e65f5b2b93915a64dfabf76c0766b5ce83cc4f99c2747bc8dc48c7",
+      "bytes": 5988,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3696,8 +3696,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-round-top.glb",
-      "sha256": "7c93b9632031dd5d11f7bdb8fcde8997f59317b84d4189ed18f2908bcd96053e",
-      "bytes": 5916,
+      "sha256": "5b81e73180dc19d8729f5ae2d23d57a8d0d181fb76b697a11d19d421cfaef46d",
+      "bytes": 5944,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3713,8 +3713,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-round-wide.glb",
-      "sha256": "eccb7b9e4fb1a4113eae9b2a67b2e8172d0f9eb60731b74ed32709d654f1d6d7",
-      "bytes": 5932,
+      "sha256": "905b6d8685950a57359a1a89192cce3cc72f5c0f641c18ed26dff7d7c53c0154",
+      "bytes": 5960,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3730,8 +3730,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-tall.glb",
-      "sha256": "57435424a52d092346b3428712727bbff23101f83cb47c7942adadf8ab722b11",
-      "bytes": 7320,
+      "sha256": "44ccb537c59ccef80daa3ca1e3254c1cd7535e8f4dd13c8c4182cf08769d46d0",
+      "bytes": 7364,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3747,8 +3747,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown-wide.glb",
-      "sha256": "b7e764d76093277316740b15d903491907e224f437abc24a00511c8cf9ef0403",
-      "bytes": 4516,
+      "sha256": "424406fc4fe3021cfb1dc35e16995a799d39f26d5f3eaec91bccb5823df60c67",
+      "bytes": 4568,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3764,8 +3764,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-brown.glb",
-      "sha256": "d0f6de0dae3e8e66c981fa89f970242562ded3e150599286b140ec5e8a5f75bd",
-      "bytes": 7320,
+      "sha256": "4bf2cdf74240e75281dc7d0f74c0137ee62fa2e06c3cd38043d3c5da58b80db5",
+      "bytes": 7352,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3781,8 +3781,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-detailed.glb",
-      "sha256": "0669529ff365456d090dbb524947486c7c85f1a152134d4ff2f5e0eae849eac5",
-      "bytes": 4324,
+      "sha256": "9f2777fe125248046b56c04375712cdea731430fa6ff71735b53b1a0e05420ae",
+      "bytes": 4352,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3798,8 +3798,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-large.glb",
-      "sha256": "9a2aeb9bd2e61bb6199bf8419c2a1b40f7c89032f5788bd800e30afdee0d9cfb",
-      "bytes": 4504,
+      "sha256": "8a8e31898d1cb58a72b31335c755ed0b7556dd8a6f3fd584cc71d041383e1a66",
+      "bytes": 4568,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3815,8 +3815,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-narrow.glb",
-      "sha256": "72e1b49a229c034b05a5ae469bc98bc06050ab1bac8476e72bcffdd10c78e5a6",
-      "bytes": 4524,
+      "sha256": "fbd734b68845d1e3e9d6dac8a594415ce633e8017b7c5e1d3879ddf64f46930c",
+      "bytes": 4572,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3832,8 +3832,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-round-low.glb",
-      "sha256": "20348c98f1a4f9198b8ab57ed14361dee7392b7a8114a0aafe3d81c5b363f8ff",
-      "bytes": 5928,
+      "sha256": "8925f643db54d86944e624f6e33e4f5ef105fb2ca852fdd2fc5651a0ef9abb9e",
+      "bytes": 5956,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3849,8 +3849,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-round-middle.glb",
-      "sha256": "69eb24ac5039b96cff160b0eccbeb263855652b84ffb705712404c24342e22c6",
-      "bytes": 4116,
+      "sha256": "4038f1b8f004d962d02ad5f04625a4e1b7ebf0498f58534764c73cfd47883e34",
+      "bytes": 4124,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3866,8 +3866,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-round-narrow.glb",
-      "sha256": "2acfa0e0e8755405fe453e06474414e3592c2a423b4ec945aeba14445f38e696",
-      "bytes": 5940,
+      "sha256": "921ec7298b4d152eb63ae6b27df48bc78eae1cde54fc7df9d9ce112316c922cb",
+      "bytes": 5988,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3883,8 +3883,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-round-top.glb",
-      "sha256": "0c1764efacecdfbd6d01e03724b5c9b0e18fb23e017bfa7ca7c6b243e401a650",
-      "bytes": 5916,
+      "sha256": "b5a037b25d39f1a55c6601f9016be3f5099a76a2500f5623b344db0e5bf75d65",
+      "bytes": 5944,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3900,8 +3900,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-round-wide.glb",
-      "sha256": "ff7071e1ecc11ce05c5c90cd43a7f1279843ef4e5bd22c8d09403fdea16defa3",
-      "bytes": 5932,
+      "sha256": "814e9fd38455f384a2e9a4ba30f446fc788298b1511194ee3ab9e8d5241eb369",
+      "bytes": 5960,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3917,8 +3917,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-tall.glb",
-      "sha256": "63acf228cfd610f7bdfaac82a0499467ec2492ac6dfcde4ad8d069fe703c7fdc",
-      "bytes": 4504,
+      "sha256": "47cd6d561ab3ccdfa13ebe31aa116b466a0345ccae7a3437b1480e339e2e5265",
+      "bytes": 4548,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3934,8 +3934,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white-wide.glb",
-      "sha256": "f63dc64f1dfcabaedcc655aaf586ede2bf5e3e1b19d355b20428ef3aefb1c382",
-      "bytes": 4532,
+      "sha256": "0b763b009f65735a327d0778e66af547d5121c936812c88ba3558d782d2d8b9e",
+      "bytes": 4584,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3951,8 +3951,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/modular/window-white.glb",
-      "sha256": "2bb5161351c1660fc619af68d2ef5db9b2c4296a991ba1d2ef882cd3bda08a62",
-      "bytes": 4504,
+      "sha256": "8fff5e79f9e85a763dbf4c8a2d36ef06d987cfe1e91f60067d40003eb8aa5458",
+      "bytes": 4532,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3968,8 +3968,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/balcony-ladder-bottom.glb",
-      "sha256": "266b04ffb06c53a17988f858646d1fd1072258050ac3d9ba653004a769cc37d1",
-      "bytes": 4196,
+      "sha256": "77420ace38cde1715e254cf4114bbaa9584b99ab6c88c578135f5943a0d4c305",
+      "bytes": 4248,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -3985,8 +3985,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/balcony-ladder-top.glb",
-      "sha256": "e4bdb19c168791c697c6824866e3a491c5843b6dc48dfa53f2e3e3683674ff48",
-      "bytes": 3672,
+      "sha256": "422a2c540b7b53005a817ad8dab669f8c722064054352f21d5cb92baf5694076",
+      "bytes": 3728,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4002,8 +4002,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/balcony-type-a.glb",
-      "sha256": "3ec0748d51787d9754444dbdcc17b5aa4cd6c5c01f47614b06a0b06e2ced9acf",
-      "bytes": 3352,
+      "sha256": "31b507af1f9dca7849b1a0eea2738aceb2c43fb543a7a218bb17aec50f54c280",
+      "bytes": 3408,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4019,8 +4019,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-awning-small.glb",
-      "sha256": "b012c04b39d39a66c7cb45392621d7374f1ff34c6054b4a05bee019abc55b155",
-      "bytes": 4056,
+      "sha256": "276deac0ca338e6e72b94abd348f3c3381f7813501d464e1d230d83fb53c9668",
+      "bytes": 4080,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4036,8 +4036,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-awning-wide.glb",
-      "sha256": "77ea699e4d3c668d909e549e236766feaa8c4d3438ef66234a5d81b46fef5821",
-      "bytes": 4020,
+      "sha256": "7e2009b34c13f7a03189882087f8e5a1e70eeabad2f0c3d6e82f8668ae2f80cd",
+      "bytes": 4076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4053,8 +4053,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-barrier-strong-damaged.glb",
-      "sha256": "bc14280b2ac6c4df26e0bdc8ab2f25b789170bf2b030d34fc9953c1e41413487",
-      "bytes": 5136,
+      "sha256": "591a1c90a2c1a63698d2236654a6a9155e1dcf3311078fecd7b4fb714a828f07",
+      "bytes": 5164,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4070,8 +4070,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-barrier-strong-type-a.glb",
-      "sha256": "3d7e238e7184673a56354bd87ee80089bcd2eeea3ce1d0312bfb1746520344ae",
-      "bytes": 4212,
+      "sha256": "e66c321e8c5ec33f31ceb60243c4b1071820051d109d19eb86cf17f9d3dbb5a1",
+      "bytes": 4240,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4087,8 +4087,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-barrier-strong-type-b.glb",
-      "sha256": "0f325134ee3f31e554dbcc4fd58f6e8a56ceb022b7e709a3a262526af79cf1d5",
-      "bytes": 4756,
+      "sha256": "50a348343f0baebdfba0622255b0c710232f2bf636cbd10e527e0e9045dc91a7",
+      "bytes": 4780,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4104,8 +4104,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-barrier-type-a.glb",
-      "sha256": "8ad30f159654cccd2cb176b84852275c375a2d4cb868b6969b184474d3d765ef",
-      "bytes": 5936,
+      "sha256": "d45f0a5d78e489102bf334b6d08835257f82cba82cdbefe8fecba3dd003a1a4f",
+      "bytes": 5956,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4121,8 +4121,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-barrier-type-b.glb",
-      "sha256": "1c222b41a2fa6ff3136cd260cc863b253b02ee1280204530815d212ac12bc970",
-      "bytes": 5936,
+      "sha256": "2a8fdb62e150b293b86d4bb930ed9ba86ef4bc84338cb5342e42cc5843847741",
+      "bytes": 5956,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4138,8 +4138,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-beam.glb",
-      "sha256": "b3ff8f0ffb2b6136219f52a0c62cc73f8edf8a1ebb73e63fb0ed4c513d23ca5f",
-      "bytes": 5784,
+      "sha256": "4c143cc770c5d5e26926ae2cbaa43df57c4237cd9a50844c228765ff85378ed7",
+      "bytes": 5884,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4155,8 +4155,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-bench.glb",
-      "sha256": "ccf6f0a95b04db1720c9a7040404ca0d676a0f850815aee90de5edc33b96c47c",
-      "bytes": 10260,
+      "sha256": "b598464f1a99fe7f51e809fc9c00411907f1a09c88d163a056a925ed8c223cdb",
+      "bytes": 10280,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4172,8 +4172,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-block.glb",
-      "sha256": "1af061728faba733b7d296af2a63d9ac1c509fa91b9f556b13a1d8c1b7b0b297",
-      "bytes": 2856,
+      "sha256": "1f7372f870dd97c0f7ed6091063bfbe8332114f09fe3e89731f9e8630df294e3",
+      "bytes": 2960,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4189,8 +4189,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-bricks-type-a.glb",
-      "sha256": "17ac348d9ef0049dc2fe3508fe7e6156ce7fb47f42e662d825731639fb221b56",
-      "bytes": 9200,
+      "sha256": "c4c10ee3a6585368728b570e6e1980cd5efb59d046762bef52f8fd79ae8fb35f",
+      "bytes": 9224,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4206,8 +4206,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-bricks-type-b.glb",
-      "sha256": "0cfc2aa773dce53eecc7517324b44fed2d5ae2a6931c8ca606e5ce68221651af",
-      "bytes": 10008,
+      "sha256": "baa24ab1f67d1d51fce93e8ff066cc1e6f11c6b47d4d500dade1a535a6531d6f",
+      "bytes": 10024,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4223,8 +4223,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-cables-type-a.glb",
-      "sha256": "4cbac18e8b595cdcae10fe20f6c06c260eb0b8e5433b2028c56e46f9157b6d88",
-      "bytes": 2152,
+      "sha256": "2128bdc986e31587886213e138f79643e3ace8837bb56e534bfe14b0524ebafe",
+      "bytes": 2208,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4240,8 +4240,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-cables-type-b.glb",
-      "sha256": "c895c99e352dd5ca00743663b9408a09bde9bd1f8dd2c7b2cc94d7d361f66559",
-      "bytes": 2152,
+      "sha256": "99ad5b7f20f42041363bd2e80373f2b674b10cb2d71eadb94b96d631d611668a",
+      "bytes": 2208,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4257,8 +4257,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-dumpster-closed.glb",
-      "sha256": "c2b54e446c95fa413929793f3d89cb0176077fa29e4a449dc03cada558bd07d9",
-      "bytes": 5056,
+      "sha256": "f770e580e3df50920df890b65c18f2b208cfb287c06e93dbf78440929cfcc5e0",
+      "bytes": 5076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4274,8 +4274,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-dumpster-open.glb",
-      "sha256": "d444697cf5a056842313be4d36d1232e052b1ceffdd99f0bbab37bb591ccede2",
-      "bytes": 5704,
+      "sha256": "0b6bdfe54b91d3c41e001470b966334bbc91a971225f2cf0906a641d718520ae",
+      "bytes": 5728,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4291,8 +4291,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-light-double.glb",
-      "sha256": "7ffb129be2565400449b32e349b3aeb33a4a2617d230320c4a03088f61507f63",
-      "bytes": 9332,
+      "sha256": "1ce1a4b0d557b6dfe62304a108165e72f4919369fb55501558a2301aec9f1c32",
+      "bytes": 9356,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4308,8 +4308,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-light-single.glb",
-      "sha256": "aac24987fa7651f8e892f4e661b3bb67c6866edb726e0ab092e9c747f0a69151",
-      "bytes": 7040,
+      "sha256": "29d6514e589218604f158203600998bae41cd882d8cfdf2d6e5d0be3501845ea",
+      "bytes": 7064,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4325,8 +4325,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/detail-light-traffic.glb",
-      "sha256": "c4a5653388ce3ae34057b39b95f28c46ce8ae8cdc55dc5e60143d6a295d901c7",
-      "bytes": 11332,
+      "sha256": "4d56e76863d6de55bee53089d90f3ab36f246cb5d02e7c027311f02ab16db89c",
+      "bytes": 11356,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4342,8 +4342,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/door-type-a.glb",
-      "sha256": "84583c26676636e3e0274a9842d841b04684d18a8b6e7f58ebefb7d91e5a0142",
-      "bytes": 4476,
+      "sha256": "9e869b28996ee483d7d5587c77b1629f662f7e41d0ea3b4f7c39f29229d37dbc",
+      "bytes": 4504,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4359,8 +4359,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/door-type-b.glb",
-      "sha256": "9e70e4d2e5d01ec9c45464ef0247c63f3e8171d3293e5855acbea3c0d3219fd4",
-      "bytes": 4476,
+      "sha256": "d85f63255b6b6867990ab6cc7c737cc96891ca2a5eb38447ce04959fd0a8d78b",
+      "bytes": 4504,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4376,8 +4376,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/grass-corner-inner.glb",
-      "sha256": "90e291dbe57cefa83f63db6e95fe59d6303a43dca1f727f6708f8b2b8eee3c59",
-      "bytes": 1972,
+      "sha256": "883ed9e595b9adb96828704738831f541c7651321b8e51fdcfd722c0141fe9cb",
+      "bytes": 2068,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4393,8 +4393,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/grass-corner.glb",
-      "sha256": "70e341fa34e90ba05126e18e8d32da9d0b8d9a26b62a51db3c1ff0e5d516751e",
-      "bytes": 1956,
+      "sha256": "5159863ad060d22e443d3e9efb93f0ca268556a4708732eca19416e8683c16ef",
+      "bytes": 2048,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4410,8 +4410,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/grass-hill.glb",
-      "sha256": "d7374785fb8b2f4112a7e633e2e509e707a5ee8d1f90edb1ba948d808d574f3c",
-      "bytes": 1912,
+      "sha256": "256cf1a0da55988d8053a611de73507c6af978ee65fb1de36af52610f45b489d",
+      "bytes": 2008,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4427,8 +4427,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/grass.glb",
-      "sha256": "9f7d3bc84706e31102ea82950522e2db6539640d5aee45072595b4a29f3fd580",
-      "bytes": 1832,
+      "sha256": "38595a1dbba98e82a574457ee307c2db8f2090f5313754842e98a66b60194443",
+      "bytes": 1916,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4444,8 +4444,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/pallet-small.glb",
-      "sha256": "a725edb767447fe29bd0b3eaee8dc14a62c5dfffa5dd97217178b02f1ed21318",
-      "bytes": 7716,
+      "sha256": "078e6f80d449224ebc008f660a80f91e706f340c77c06df70532c66197c54c40",
+      "bytes": 7772,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4461,8 +4461,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/pallet.glb",
-      "sha256": "1844660dfffda177d42efc35db47c22e7476f991737f4c35f6b5fbaf0d2ccf8b",
-      "bytes": 10044,
+      "sha256": "32d8e284abd5019978cf026dc387016f0cd812066c0e891491259cc7adfc2b3d",
+      "bytes": 10068,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4478,8 +4478,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/planks.glb",
-      "sha256": "fc9b61202853b6b2a4cc1dc2899136f1418e18153027e08cda5dbb8fa6a3d231",
-      "bytes": 5468,
+      "sha256": "53d31f2ed6b3134685af322fd07f48a83ace268d26ea030293bb0b8f56754a8c",
+      "bytes": 5476,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4495,8 +4495,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-center.glb",
-      "sha256": "69bb379a202c014d2a2f216a075c7d78c723dd786572b07584646c34ba9badf6",
-      "bytes": 1880,
+      "sha256": "3a6609905807fcd06ffc1c01ef9140409b7490dbd4d74db522f750f5e52361ce",
+      "bytes": 1968,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4512,8 +4512,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-corner-inner.glb",
-      "sha256": "69e2f072956b947f413c4404ee8623ba9ed58b00b5bf33dc573bfd4c51ca8636",
-      "bytes": 4260,
+      "sha256": "a1d1bb24490ef1867e57700edb4747d2738920f5d52f9088e3f24fe0eb81bc22",
+      "bytes": 4344,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4529,8 +4529,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-corner-outer.glb",
-      "sha256": "47ec8c6d18425bf703f8fbda757b0b012bbe21e58f5ef03840e0d92fb2868cef",
-      "bytes": 4172,
+      "sha256": "e651109add0099b536eb2ed8c131185158086b6eabb37cf6dab7426f8fed8204",
+      "bytes": 4256,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4546,8 +4546,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-corner.glb",
-      "sha256": "90c75780d746c60ff91f4af7a3b7ce86a66ef1de982232b47dfc483de07e933d",
-      "bytes": 5864,
+      "sha256": "5faeafa08245035e1c0ef208adf447f37709e1ac1ded06a6512027bcef907144",
+      "bytes": 5948,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4563,8 +4563,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-damaged.glb",
-      "sha256": "e23a7e7728430bd245c6da47078b04e49bd955d0fde2c5199f25f6d3291c6f09",
-      "bytes": 4212,
+      "sha256": "ee3d3470825906be052de57bc8b03e6a2377ba2e8b641745ca8ddef990ce6e5c",
+      "bytes": 4292,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4580,8 +4580,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-pavement.glb",
-      "sha256": "3a9996816455060f40bdbb33f59cf70e23b8996ceb318e06bd005f03edcc7997",
-      "bytes": 1872,
+      "sha256": "69dbaf94e74b3b094cf4591a0ba14ee6174a9db719cc421ebfadc44a002b635f",
+      "bytes": 1956,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4597,8 +4597,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-side.glb",
-      "sha256": "09aed7752daa81adc76e074ff9c45a53db373801f18ada581bf1d4705ba00bb4",
-      "bytes": 3412,
+      "sha256": "6d00ae1448cc0f095b4eb45049d0dcf78bcd950b168a2bc4451c305bc0a23281",
+      "bytes": 3496,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4614,8 +4614,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-asphalt-straight.glb",
-      "sha256": "33d5a25df63fdbfd696564972326de0dc7bdcf100649b8beb7bcd4dffec19c4e",
-      "bytes": 4436,
+      "sha256": "29cb2ebfbe5c63305879a3f35eae0d82fa9b62545bd7841116973b743713a96b",
+      "bytes": 4520,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4631,8 +4631,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-center.glb",
-      "sha256": "d4c6e2770e5097056a5981c5e23b0e53c005785e5bedfa9c3ca611be356616b1",
-      "bytes": 1860,
+      "sha256": "3cd2db6a48676c80ee449ae85df2bfd78df52bbbe1e8d8c77cd3a6e607e70ab9",
+      "bytes": 1944,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4648,8 +4648,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-corner-inner.glb",
-      "sha256": "156739a7e44d05abb0c71456c3f3874b60b0cfdde22fceeae785fe8b3a1b0592",
-      "bytes": 4244,
+      "sha256": "d6c5f206089e96643dad058a6210a67d559aa18c5b392b3f29851b88aa0b69e8",
+      "bytes": 4328,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4665,8 +4665,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-corner-outer.glb",
-      "sha256": "4c6bb5c90d36db0c4d4aa33069d756bce693f5959b6dc4c23fb671e785f66949",
-      "bytes": 4156,
+      "sha256": "1ddd40d611fd4f3110e57d3cae4b440f9ab5a8a43d1c18698cf63ba43b32d62b",
+      "bytes": 4236,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4682,8 +4682,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-corner.glb",
-      "sha256": "e97a66814d046f1807e091dad21b5a5c6400ad43151c3a756031b4476572f679",
-      "bytes": 6352,
+      "sha256": "405426357b6b1ba115069a73007fc544a87670fa75dd1a872f958937f8501a1f",
+      "bytes": 6436,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4699,8 +4699,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-damaged.glb",
-      "sha256": "38d1cc186679dcc8fc269dd0333c87a0a6e3417689a3cf73b062385a7500ed55",
-      "bytes": 4192,
+      "sha256": "ae6616ee0094efa8005212f9d858c2ce2854999b453581e70b3d882f5ce5d796",
+      "bytes": 4272,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4716,8 +4716,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-pavement.glb",
-      "sha256": "9923fee37f272b7937dd20c6f1dea8cf89ea7c00c7b274c0f297a0fecabc24c4",
-      "bytes": 1864,
+      "sha256": "1a5a39e6413e71aefe25bacbd93957e90b65b82ca5e48a9fa259649e867e28a0",
+      "bytes": 1952,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4733,8 +4733,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-side.glb",
-      "sha256": "95dce7f766edff09c127bf8a048b3446efea9fb0f198ed96b049c6e7df45acf3",
-      "bytes": 3396,
+      "sha256": "143b01868577c4c773d70a72d551ef15f19101fd97e5b1074b173873f451a6ce",
+      "bytes": 3480,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4750,8 +4750,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-straight.glb",
-      "sha256": "4211107c208a9ec075da0b3e51aea141b8ad8200e92a2a1c70fa64a8e3ea961e",
-      "bytes": 4420,
+      "sha256": "fe3c861ab76626f0e5b7d7d01e32614c6508fa72194a1032d581a58b9597e2fa",
+      "bytes": 4500,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4767,8 +4767,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/road-dirt-tile.glb",
-      "sha256": "72b721f12e235fbff007689e41b2b73651df857e614cd7801c9ef4dc4aa9a5de",
-      "bytes": 2892,
+      "sha256": "cf7d1c5c24dae11156832a8a76be3dad7425e9e112590ca05be1649838c05b9c",
+      "bytes": 2972,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4784,8 +4784,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/roof-metal-poles.glb",
-      "sha256": "0935e22cc002df2c9c468ff6b7d70a766c9ddac109ae3f139c6e47ae5d3a3a3e",
-      "bytes": 6980,
+      "sha256": "62ee878407910c51d43bf1cc516bc27ece8ef07a5b3cda934b0349e1f2025db3",
+      "bytes": 7068,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4801,8 +4801,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/roof-metal-type-a.glb",
-      "sha256": "91c5f28be3d30dfd209a6be24786a20d5c279256baaa8274d933e34a058de40a",
-      "bytes": 5620,
+      "sha256": "902e508ccdf550c1f27b5c2606b050034da31ded682c64beccd1b7a63154393b",
+      "bytes": 5684,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4818,8 +4818,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/roof-metal-type-b.glb",
-      "sha256": "b9c08bcc050c69e8804fc6aff6d1eb4605566659cbbdd4cfe64d51f8ed03df3b",
-      "bytes": 6116,
+      "sha256": "127e9ec89766b9fd1d82f2d881477e2ba7c2557fc780a3f7e27de2fdf8b145ff",
+      "bytes": 6180,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4835,8 +4835,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/scaffolding-floor.glb",
-      "sha256": "64e205f2863a5de7b23089932a06bea1549dd44fb617bb3e310a48cfde36f9a0",
-      "bytes": 5244,
+      "sha256": "6e6343dd8b561b2a19bb1a919633135ea1176ec64ef0372deea5a2f56978111c",
+      "bytes": 5324,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4852,8 +4852,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/scaffolding-poles.glb",
-      "sha256": "e21203c32f6a0cefbd13d3369190ae06ec62a452fa51f03b1d4f2b80d2605ecf",
-      "bytes": 6588,
+      "sha256": "bbc2919c7ea9fe42b8df0bdc8e30309cec0d8333c2d99713be2c9f3cd7ab3ed1",
+      "bytes": 6688,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4869,8 +4869,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/scaffolding-structure.glb",
-      "sha256": "07ab47ab16499808ccf73d91e19783d55d0269e361fc1e8252d721b2c89ea5ab",
-      "bytes": 11168,
+      "sha256": "a0a98931fe2e8ac0f42bf89a67a32d2b659b0af006c5d02932fea2cf013adbb3",
+      "bytes": 11268,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4886,8 +4886,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-large.glb",
-      "sha256": "2b17134078e452cfd4a074fd628e86de0789f71e5215d6111fcfc98b15f3fd0c",
-      "bytes": 2992,
+      "sha256": "3f69bae8745a9949d1a367c60963272c55a4fdfea226a7cb5efa85842ad00a5b",
+      "bytes": 3016,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4903,8 +4903,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-park-large.glb",
-      "sha256": "ef15a84309719f770da2efc0de42052882274e132ccc2ed72c254d7fe51678cd",
-      "bytes": 7960,
+      "sha256": "c7ab19c40fb22bec1cdc4fa24049cd959d8c1199f06e52d0f4418a82aa408b7b",
+      "bytes": 7984,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4920,8 +4920,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-park-pine-large.glb",
-      "sha256": "7f8854543965e906e655c20140fbb2e79be9093157896af63821bbbc69092c9d",
-      "bytes": 7976,
+      "sha256": "31bfd23f80df8ad2de455a3af8f3455e85df2e49c392eb299f3887f554dbb267",
+      "bytes": 8000,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4937,8 +4937,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-pine-large.glb",
-      "sha256": "acc41b114a60e25c14f72c91c75a3ef21129badf420ac60a47b08e8bebf41c46",
-      "bytes": 3008,
+      "sha256": "8cad11501d3e15512d96d3b6df73329521cab521fa3fd1b8afd247ca23b1c526",
+      "bytes": 3032,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4954,8 +4954,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-pine-small.glb",
-      "sha256": "a4cc51046248885ff375f31553a3ce219bb754e3e177c966fe55359f9db634b7",
-      "bytes": 3024,
+      "sha256": "be769110384d370544dec3274d3a3cbf0162de7b9e430b67ecf033064ecb293a",
+      "bytes": 3044,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4971,8 +4971,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-shrub.glb",
-      "sha256": "b75bd1b2cddbae7d6b517a6ecd34c2beaddf9a19d4a0b4fc48a9bc61cf58b4fa",
-      "bytes": 4224,
+      "sha256": "703b50e26e4ccec4a829cf0275bae56125a9d3c45b32973add8ac3555792bf82",
+      "bytes": 4248,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -4988,8 +4988,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/tree-small.glb",
-      "sha256": "702217578e8ec1d5e08cab668dcc00c3174630e579f79760e805db12dae42c98",
-      "bytes": 3008,
+      "sha256": "3cfa6cec3d2efb94a285986dcc290b8d4e912061cd892489723f957a6c736ced",
+      "bytes": 3032,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5005,8 +5005,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/truck-flat.glb",
-      "sha256": "0238d4c1c54524fc2a42889f16b270cf29ae71627368ebf6bfd6015e7d76005c",
-      "bytes": 7480,
+      "sha256": "89cc2b9f8b9cd45f764d349a52ec3499c7bf4b7772ec3ef7cf84e1f53f2eaa4a",
+      "bytes": 7504,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5022,8 +5022,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/truck-green-cargo.glb",
-      "sha256": "0352d5a34094b766a6d5d0d5805aa0c967a4da71f976f2a12c900e748890c289",
-      "bytes": 3020,
+      "sha256": "33144fb00099d5b0cae2ef5c6cc3cdc04c7b4808b7ba8a3d6e85b482b72b71c8",
+      "bytes": 3044,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5039,8 +5039,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/truck-green.glb",
-      "sha256": "a322288e2dbdc56b126751951451cf5d3014f5b04232fa66e84b74d1a941f9f4",
-      "bytes": 5500,
+      "sha256": "969adf60790a8fc9d925d29398afc6232ec7e2f752755fbfb4b5e305921b673b",
+      "bytes": 5524,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5056,8 +5056,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/truck-grey-cargo.glb",
-      "sha256": "4afb8f74d113c9805af020c1f28fa1d91ca824ecb1e03466e727a99f36cd6ec4",
-      "bytes": 2992,
+      "sha256": "ce59ffa7fc70f4dd0f7f2d5ae9d0451ca2f39ba61ddf2f265d819e5ef46502fb",
+      "bytes": 3016,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5073,8 +5073,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/truck-grey.glb",
-      "sha256": "873e33b96f5c6509c08df3348164c38a5ed2633c34fd3c461df081d446e48737",
-      "bytes": 5472,
+      "sha256": "d3e3c4e5cc62f6ad7e6d53573bdd2252364612f289e7e2bb5af526fb25299527",
+      "bytes": 5496,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5090,8 +5090,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-column-painted.glb",
-      "sha256": "c52c80849456610b81e29834c1512c461df726a4161a4efa91fba728f6eb4c04",
-      "bytes": 4804,
+      "sha256": "12465401a5ea88c8e4e8a7583de3b15c67fdaa36f4bef9c3942b0f033954126d",
+      "bytes": 4900,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5107,8 +5107,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-column.glb",
-      "sha256": "73768464dc68eb03b6a570663dc5771a7099890c3c5c2a0e4f1683e1d4bedcd3",
-      "bytes": 4820,
+      "sha256": "cd8f06b2afa9c03afd3ae5fa7fba49cfa31704d74b48b0478cc5880a470a136b",
+      "bytes": 4912,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5124,8 +5124,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-corner-painted.glb",
-      "sha256": "d0b13918618608c1cc0ba440d9a46fd4f8336c7f153f0312f7862142bc858778",
-      "bytes": 3976,
+      "sha256": "c1a5263a16b3a2ddd3a15cffb55a319d98153dab6d917ca2258b0ef06c68d40a",
+      "bytes": 4076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5141,8 +5141,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-corner.glb",
-      "sha256": "d65f9899e415af46f1340220e3d83e8af217eecbb2dfef3012f69ba1f97a0e3a",
-      "bytes": 3976,
+      "sha256": "70057529f959c208c0b16bf6358e5d1368502c0a48eb985747bb629fb99f0b8b",
+      "bytes": 4076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5158,8 +5158,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-detail-painted.glb",
-      "sha256": "5a6935c461f3ff2fde147016ed45c8f39fa883af43e762fbd52f1f37303dab4c",
-      "bytes": 3892,
+      "sha256": "62334c9fba674116297a6dd793b98bb6036a785661ba6b43c6409700444922e2",
+      "bytes": 3928,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5175,8 +5175,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-detail.glb",
-      "sha256": "b626b6900e1440019d65bc05584caacd3c95c2ee575f3e08311d2966804224ac",
-      "bytes": 3876,
+      "sha256": "c8f248001a708ec71bddb5015e681c3e82a9c0cf549abd8c9ff533c3ab8af728",
+      "bytes": 3908,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5192,8 +5192,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-diagonal.glb",
-      "sha256": "3adc6a5311827acf0b84101d8eccec4b70f6d729297e9824446fb77d94077074",
-      "bytes": 3124,
+      "sha256": "0887005703e4444efb693d2d18384119c0f51ab414b082c24344eaa15ba9401b",
+      "bytes": 3224,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5209,8 +5209,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-door.glb",
-      "sha256": "554f1c0cedac9b31b73ee8c623395059a4bca05290ecf8f6a8920363d6f487bf",
-      "bytes": 6100,
+      "sha256": "22a1047fb7f44a1ba73e99c5e95ff8a858f538be113c0f644b1a42d9b0909995",
+      "bytes": 6200,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5226,8 +5226,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-flat-garage.glb",
-      "sha256": "0cbb275ad1b00e9689bdca03a5448ae36ecb93a6d570fb1240af8a5f3a72a7ba",
-      "bytes": 3920,
+      "sha256": "634487675079a2c90bb38cf85abb18048406f324c17e50e1bb98b209d35d544a",
+      "bytes": 3992,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5243,8 +5243,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-flat-painted.glb",
-      "sha256": "b88b2cfe1d896b07db7f46071b3109e214d7acd6d02b1b1512f5c330c5667cf1",
-      "bytes": 1888,
+      "sha256": "b48d9a5c044a6fab6759293c73d9f039369f8834f486073244a1a14ffb897ef9",
+      "bytes": 1924,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5260,8 +5260,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-flat-window.glb",
-      "sha256": "bb171dffa5015747641e3131bf171dbf429042ee3b47408c409a7e4acc17cf66",
-      "bytes": 4544,
+      "sha256": "190ad53c10157f30d90e32a772f89cef7c57ab196ac6c28095f175873367c4d0",
+      "bytes": 4612,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5277,8 +5277,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-flat.glb",
-      "sha256": "c8e2d94e330ee62a476cd4350fb62fe1577ee87843d8d344e12c675c386a9408",
-      "bytes": 1868,
+      "sha256": "702845a5bffbaf844f84e7334aab70e7e47cdc390397e6cfbdf614695bb21a90",
+      "bytes": 1936,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5294,8 +5294,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-garage.glb",
-      "sha256": "1388f38936e576e73c2df01f12d5afdaf78f22bf9af01132d77d38f8c0949d1c",
-      "bytes": 5076,
+      "sha256": "de39f8f0dba4339404e72b1aecc1c39bf3446f4680b3cb797a4da14a66ba6cbe",
+      "bytes": 5176,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5311,8 +5311,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-low-painted.glb",
-      "sha256": "2690865ffecf18fa3037db5408c73e31dd02cb940850f34346030bfb4e81d92f",
-      "bytes": 4160,
+      "sha256": "4b6cbffb144b3f0c9fd26db2733a36220419cef00ff393584fc1eaf81c90d9c4",
+      "bytes": 4260,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5328,8 +5328,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-low.glb",
-      "sha256": "e8496bd86af33040ded10e128b9892ca9af28ca01248540b6289ff5d1f5ae850",
-      "bytes": 3340,
+      "sha256": "f886234aa1f0be4be6b529e8cc384287f6f87157dabcf7c73a8be7649ea8f1ed",
+      "bytes": 3440,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5345,8 +5345,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-open.glb",
-      "sha256": "82b153c90f63dbec15fcde89dce20ce752b129c668225edfd0982e6e34a0797f",
-      "bytes": 6976,
+      "sha256": "4c82a6b1c984e9fe0a7843a02b054534afc88f4948fdc34cd0852a162e7142d5",
+      "bytes": 7076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5362,8 +5362,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-painted-diagonal.glb",
-      "sha256": "30dac23e0b786f696598ba794cf47a2a54a0ebcb7acc24c7502830c1d38e4d65",
-      "bytes": 3124,
+      "sha256": "b3257cc04ae44e4f57ba8169522138db7ca728820c3457affa026403ab76b7e2",
+      "bytes": 3220,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5379,8 +5379,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-painted.glb",
-      "sha256": "3a1861895971cd5df54c729e174e467c6bc2742a942cdfc0304abacfc7ad3b9b",
-      "bytes": 3352,
+      "sha256": "38cf03630b4f5fafea18ac24bb9de59f1f9bd3fbe393b3e9fb743e6357885c1b",
+      "bytes": 3452,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5396,8 +5396,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-roof-detailed.glb",
-      "sha256": "dbce71e1a0ff4d98ad5369cbce6f873f4e54a188c0e220af6d493f98a20121da",
-      "bytes": 6012,
+      "sha256": "4d78d0cc011b313b09ffb5d4aa60cba1a9933b4bc3138ff3e48d66441f114f59",
+      "bytes": 6076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5413,8 +5413,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-roof-slant-detailed.glb",
-      "sha256": "598919b6f29a599ceb976510fdc5bfe80f5cf54dd722d9341c40fa19ff7a7f1e",
-      "bytes": 4404,
+      "sha256": "c6705d513a45ab9c419f1843685577bb42b339710798a1556c39d111993044d4",
+      "bytes": 4472,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5430,8 +5430,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-roof-slant.glb",
-      "sha256": "16f631c9df61161bf790c7bb8032b0fa46dffaefdbfac874a16cc28a284c5d10",
-      "bytes": 3640,
+      "sha256": "81f6e94e9325436d98f9dd17b346649ca622f945f5f8bda99e5b4791e2e65018",
+      "bytes": 3736,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5447,8 +5447,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-roof.glb",
-      "sha256": "74b8263e1a28ecfca6b59e84709dd9dae1df9c9aa9b81ec0d3f83906c934545c",
-      "bytes": 4640,
+      "sha256": "c3df1bee4fdb9e0a3d6882e44eac03215f01054756cac8a7ce79b040d3be190b",
+      "bytes": 4736,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5464,8 +5464,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a-window.glb",
-      "sha256": "4a5ecc11c1c8820f555375ccabb426c6420ebd2bc9c7bcb5f2c472f655c3b03b",
-      "bytes": 6016,
+      "sha256": "32ed71b2e09c8d8aaa7256b92e8d93bfa814d8203fe56d1f36851f68763a61e5",
+      "bytes": 6116,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5481,8 +5481,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-a.glb",
-      "sha256": "6fceda24c30d2c22694f232f03fe2115fb1a462046fbbf719a90eea10dc9af00",
-      "bytes": 3352,
+      "sha256": "871a0c1205e0c5cc5f1e842f2feca7cef360626eb145a2f75b77a570ae4bbef7",
+      "bytes": 3452,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5498,8 +5498,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-column.glb",
-      "sha256": "8ef517ba4a77fd4d7e0a3b4d2ef6f27c85a955c62eb782075c29843be5da91ef",
-      "bytes": 4804,
+      "sha256": "a2a58b8123d1e01610410940385c3fdf4cbe55f634b5eca8fa44e3ad1dea745d",
+      "bytes": 4900,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5515,8 +5515,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-corner.glb",
-      "sha256": "1005b023c22e377a5331aaebd2e56000c8f79244bc1781e63c14cbd0d96a494e",
-      "bytes": 3976,
+      "sha256": "5174e84000880e0beb55f776649f300b376169d88ef68f1f5475f675850607b4",
+      "bytes": 4076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5532,8 +5532,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-detail-painted.glb",
-      "sha256": "1578f91b2b9ae33d0b4426f4c75e9211e361e5cede7af822f2b91eb61dec17d0",
-      "bytes": 4412,
+      "sha256": "72f3155a9e60ef65c2213e43d68fd3685240f115ea446d462ab40808ac2272af",
+      "bytes": 4444,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5549,8 +5549,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-diagonal.glb",
-      "sha256": "984d1796e72e30324c709f99e4d4242672623f3ff96c31b35fc803b6683873fb",
-      "bytes": 3124,
+      "sha256": "04a0fcdbb0347f07f1e2ff240c1bcf3391dbd3b0335c15a1a1ce07bf8d405533",
+      "bytes": 3224,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5566,8 +5566,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-door.glb",
-      "sha256": "1a47116484e5ad3539cf01e39f8dfd5e0c8ae5be6ea1f85d686707b009f4c0e2",
-      "bytes": 6192,
+      "sha256": "254f65258919d34752ecb87f8f4a6a8afe8a807155daeda29885cf578415b89d",
+      "bytes": 6292,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5583,8 +5583,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-flat-garage.glb",
-      "sha256": "94def59d3f6661b0606b90424e8894a6dab2e3b095256c5e979c16ae9131b152",
-      "bytes": 3436,
+      "sha256": "5aabe390d9951507750a4cb3ba51600eb97169a81076d9e86029d76a173bac82",
+      "bytes": 3504,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5600,8 +5600,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-flat-window.glb",
-      "sha256": "256a94aa9bb5169a6dd4e355065cee227712b78971678f8c29fc210d2db877f5",
-      "bytes": 4548,
+      "sha256": "3d3db49e3f846041e6dff0934ede47c28013c901c86bdbd171de2c3a63eb5ca2",
+      "bytes": 4600,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5617,8 +5617,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-flat.glb",
-      "sha256": "cc8be2348142f7e0d05a746f3c20d258f91b79ee86a03dfe5faab0e6a05542ef",
-      "bytes": 1892,
+      "sha256": "de2f2dca665b00685fb0d9f056d9dcbb18db3402afa95b6a1f421829e230bc16",
+      "bytes": 1924,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5634,8 +5634,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-garage.glb",
-      "sha256": "f7db9f06021b80d82a1d7e71bce94f2eb4c0f8302480bf76b12cb22c4a8e04e2",
-      "bytes": 5100,
+      "sha256": "45f2ce92a6894cb36aa84614eede1b2ee65451475d05749534ddbdb954fd452a",
+      "bytes": 5200,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5651,8 +5651,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-low.glb",
-      "sha256": "d6ac0eda9035fd1d8342f71c2eb49bdadfb03593f824dc80d34321a79ac7aba1",
-      "bytes": 3364,
+      "sha256": "f0ed7954ac7ac600e47c2e18c594d85df0005732087dfcb1a0a3e4cca1109ae1",
+      "bytes": 3464,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5668,8 +5668,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-open.glb",
-      "sha256": "8e0d33339f95b01401cf4a883d6644feef6592d6cd243f3059b292f7b55e9fdc",
-      "bytes": 6976,
+      "sha256": "28a913c0f658eaf57c2f2e8d05a232d005ea264bead7c0bb1fd1f544603b085b",
+      "bytes": 7076,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5685,8 +5685,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-roof-detailed.glb",
-      "sha256": "bee6ad77829a1e2881f124688d165688d978c87f52a8b8067d2feb6ccbd4e60e",
-      "bytes": 6040,
+      "sha256": "c9011393ab719453ae168b5ff1de271268be70b54f2ee9f7a1ea59fcabcd0c53",
+      "bytes": 6104,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5702,8 +5702,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-roof-slant-detailed.glb",
-      "sha256": "e4361a305c9ac2fa6e984c3614c91b24b29a9f527b391d1df91759bf9346a837",
-      "bytes": 4400,
+      "sha256": "6a05899eae8569fe4ccfe158e17bdf2d29e8279e0d7501d16e172a9ae8c2194c",
+      "bytes": 4468,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5719,8 +5719,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-roof-slant.glb",
-      "sha256": "21f6374079c298671db8aa5b348f74c2420b89bac05a5eb2cc4450927b659f00",
-      "bytes": 3636,
+      "sha256": "a8a6e053e416d7fb141836b3322486a013fc7abe8cd945cd13a8164ff8f88fd0",
+      "bytes": 3732,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5736,8 +5736,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-roof.glb",
-      "sha256": "667e8db01953bac7534f26cea3e9a0e04d611d0dd581adbed7d9ecc1af60a185",
-      "bytes": 4668,
+      "sha256": "21bb3a712e3222d5d1cd51d18639030c6bc76b4dc3c91399d2ac8690156f2a7c",
+      "bytes": 4764,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5753,8 +5753,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b-window.glb",
-      "sha256": "b579cff0a0c17ff69a37abd87bb9ef9b9cd06ce4538a00368b75d3ed1a47e96f",
-      "bytes": 6004,
+      "sha256": "a3d2092a3ac85f49e88fc5477dae78552769c349631337c0b6d532a73aa9dc0c",
+      "bytes": 6104,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5770,8 +5770,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-b.glb",
-      "sha256": "8fca42a344b37c34add41c6dda88ee35899b26444237f88b7f0fe9da14f09e28",
-      "bytes": 3352,
+      "sha256": "0d16662011a362c6aa2eb954970a0ae57aaca8a108c86efba99fb98c915276dd",
+      "bytes": 3452,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5787,8 +5787,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-broken-type-a.glb",
-      "sha256": "0bd361f3821635c11d1cfaa05cb259a478efd51fe94e9b36bf0f0bbf9359684f",
-      "bytes": 5492,
+      "sha256": "eec929ff33ba2510ef47fa9782cb385c5d0cd40453b90ed1685e4fd83543aeeb",
+      "bytes": 5540,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5804,8 +5804,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-broken-type-b.glb",
-      "sha256": "edd4afbaca5865f95fb6cce30bf8a1a2873a4b5dd60fd6d7b1872200f5c244e9",
-      "bytes": 6364,
+      "sha256": "3876dde54b28fc7597a93906238948554a313f88a82ce0a4c97e116f56c2f7f6",
+      "bytes": 6432,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5821,8 +5821,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-c-flat-low.glb",
-      "sha256": "785115d7785e73bb3c12c6bcaf7c5d2b3a74ad2a6f28fd9701544c2c3c279629",
-      "bytes": 2060,
+      "sha256": "104a05eb63b4f2c8a1661206bdc9521e96e39ac97ee710bdfd7f67f040d9a199",
+      "bytes": 2132,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5838,8 +5838,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-c-flat.glb",
-      "sha256": "9c6d1ceb6969e7d38960186b4a12ace7217e13bbcc5be7b90536c0cf391f3450",
-      "bytes": 2048,
+      "sha256": "1510fbebda67522cc4859e725c648c66f6daad8e5621ecf56e7bb40a8676e94a",
+      "bytes": 2120,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5855,8 +5855,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-fence.glb",
-      "sha256": "739feaa09ec6a86893fb45f458e00586c1e36ffcab900a726214262f06659367",
-      "bytes": 5724,
+      "sha256": "2fe293ff69815febd8a2ad0881b81842b820fe22c417609847d68c21598d7fb5",
+      "bytes": 5792,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5872,8 +5872,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-steps-type-a.glb",
-      "sha256": "dda6f420c2d38d6f1d6377e4e17b156fe94e52673ffd9d94727a4356b8d20085",
-      "bytes": 5856,
+      "sha256": "1e6916079daa6074b46b1d799f87f94d7d515c3212f1e480cb45cf7376917f29",
+      "bytes": 5908,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5889,8 +5889,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-steps-type-b.glb",
-      "sha256": "4f2edffbc44b7ef62ef1c2154af90d0c8a59d082f2af2f81e3e7029ece9402c5",
-      "bytes": 6428,
+      "sha256": "79d79c8400ed0f2f0773ef777ea91ef91558196522a6c46131a80f21cdf651ac",
+      "bytes": 6496,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5906,8 +5906,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-type-a.glb",
-      "sha256": "deb733ff4581dfbe7f3cf25626fa0a6fe927bd00be70333cc7e1779056c530a2",
-      "bytes": 3436,
+      "sha256": "cde183773c0a6c2118bd2833ef3d59d31cf14fb740163be826b45cc68eca0e2a",
+      "bytes": 3484,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5923,8 +5923,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/wall-type-b.glb",
-      "sha256": "b37ec43f05d28bb715bddcda8e772b5aac6af888ade6b8f258abe418abf44b9d",
-      "bytes": 4620,
+      "sha256": "af143c748629c1769f0b3412108f9011bb483c0baa66405f2f8eb80a2795514c",
+      "bytes": 4688,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5940,8 +5940,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-small-type-a.glb",
-      "sha256": "ded392c6c33bd22ca67e6922f6e0f0bc18ae21428d9949d42e01fa293a441025",
-      "bytes": 4504,
+      "sha256": "9b9ff219b693a96834d17074282d876f80defa36d1a3d4f14a4544d8a320693b",
+      "bytes": 4536,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5957,8 +5957,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-small-type-b.glb",
-      "sha256": "32d21568a65331acd6b8ba7712b7d1a413d7214614227da7e74a7d378ff8a72a",
-      "bytes": 4504,
+      "sha256": "bd5ad8d5a32e52584ca2ed2327ad3e1fbb88cd2131022842a1998caa3fcd932f",
+      "bytes": 4536,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5974,8 +5974,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-wide-type-a.glb",
-      "sha256": "30d570addbdda3ee49d5e7f3d45016b8ef552aea72351c89582b39684dddbc64",
-      "bytes": 4924,
+      "sha256": "9aaec39fc4c0240ec76e9cc8f85c7d2f12ec3319c53dc6bdf37fd266cfd91996",
+      "bytes": 4952,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -5991,8 +5991,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-wide-type-b.glb",
-      "sha256": "4997ccdd54140b8bad3f88f630b463163395ebde7620476f8cd8705e92a54786",
-      "bytes": 4924,
+      "sha256": "5d178089a219d0d17f19fe4a4758d8d32572a4c6b6d274c86d6184a23b56d661",
+      "bytes": 4952,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -6008,8 +6008,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-wide-type-c.glb",
-      "sha256": "ef0d0d12951b852659b84fa54d745d5a3ed8208fe5bc94ee9ad6efc9488bc58a",
-      "bytes": 4504,
+      "sha256": "44b73907369a41f583895c1a2495abcbf5db298aa7ffa2ae280ea8cd8a91aa2e",
+      "bytes": 4532,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     },
     {
@@ -6025,8 +6025,8 @@
       "replaces_osm": false,
       "placed": false,
       "path": "assets/kenney/urban/window-wide-type-d.glb",
-      "sha256": "8ede6aa4ffbb9f3eaa733a7089f4d401ea67d67514385811575190b69dae930f",
-      "bytes": 4504,
+      "sha256": "30faae911b330d1ebf19ae4afba4ce9b3a110eb8f3e2986c786285320ac9c0d2",
+      "bytes": 4532,
       "note": "GLB plus the Textures PNG it references. FBX and OBJ copies were not imported. A building does not replace an OSM footprint."
     }
   ]
