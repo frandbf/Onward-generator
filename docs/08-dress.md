@@ -52,7 +52,7 @@ PYTHONPATH=src .venv/bin/python -m onward_generator dress style \
 
 If the detail manifest stores the paths, `--scene`, `--heights`, and `--base` are filled in. The detail directory is not overwritten.
 
-`--no-atlas` leaves the GLB with flat colour only. `--scene` and `--heights` are used to place furniture on free ground. Facades are not rebuilt.
+`--no-atlas` leaves the GLB with flat colour only. `--scene` and `--heights` are used to place furniture on free ground. Facades are not rebuilt. Interior meshes are copied with the building: the floor, the walls that face the room, and the stair steps. The stair ramp stays on the building collider. Dropping the interior node leaves the ground colour, a wall that is invisible from inside, and a stair that can be climbed but not seen.
 
 The atlas is a PNG generated in code: **greyscale modulation** (cobble, tile, asphalt, bark, foliage) so `PP_Opaque_Simple_Lit` can do `_BaseColor × _BaseMap` without darkening the tint. Each tile is 256 px. The grid grows (8×8, up to 2048²) so `tree_canopy`, `tree_trunk`, and `urban_metal` do not land on an empty or dark-metal tile. Historic plaster uses a 2 m `tile_m`. Licence: `project-generated`.
 
@@ -62,6 +62,6 @@ There are no vehicles in this step. Inventing cars on the carriageway is not OSM
 
 ## Materials
 
-`onward-generator materials apply` is the texture step. It reads `maps/<id>/config/texture_plan.json`. `map create` writes that plan from the imported library. `map create --textures` replaces it and leaves the rest of the map alone. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. An older Poly Haven plan can still download Diffuse 1k with `--download`. The GLB carries one image per material, repeated on the wall plane. The 256 px atlas stays as a contact sheet. Windows and doors map to 0–1. This step does not apply `dress classify`. Licences: [legal/data-sources.md](legal/data-sources.md).
+`onward-generator materials apply` is the texture step. It reads `maps/<id>/config/texture_plan.json`. `map create` writes that plan from the imported library. `map create --textures` replaces it and leaves the rest of the map alone. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. An older Poly Haven plan can still download Diffuse 1k with `--download`. The GLB carries one image per material, repeated on the wall plane. The 256 px atlas stays as a contact sheet. Windows and doors map to 0–1. Interior walls reuse the plain-facade photograph when the plan has one, otherwise the historic or ochre plaster. Interior floors reuse the door wood. Stairs reuse the sidewalk concrete. A colour photograph is shown with a white base colour. A greyscale photograph keeps the interior tint. These surfaces are not new plan slots. This step does not apply `dress classify`. Licences: [legal/data-sources.md](legal/data-sources.md).
 
 Phase 07 stays open. `device_verified` stays false until the headset checklist is filled in.

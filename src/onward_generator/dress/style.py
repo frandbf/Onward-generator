@@ -109,15 +109,22 @@ def generated_accessories(
     return extra, rejected
 
 
-GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part", "building_part"})
+GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part", "building_part", "interior"})
 
 
 def _is_geographic_node(node: Node) -> bool:
+    """Keep shells, ground, and the interior meshes that belong to a building.
+
+    The stair ramp and the wall prisms live on the building collider. The floor,
+    the inward walls, and the stair steps are a separate visual node. Dropping
+    that node leaves a coloured ground, a wall that disappears from inside, and
+    a stair that can be climbed but not seen.
+    """
     kind = str((node.extras or {}).get("type") or "")
     if kind in GEOGRAPHIC or kind in {"ground_collider"}:
         return True
     name = node.name.split("#", 1)[0]
-    return name.startswith(("building/", "building_part/", "surface/", "collider/", "landmark"))
+    return name.startswith(("building/", "building_part/", "surface/", "collider/", "landmark", "interior/"))
 
 
 def _elements_from_records(objects: Sequence[Mapping[str, Any]], prototypes: Mapping[str, Prototype]) -> list[Element]:

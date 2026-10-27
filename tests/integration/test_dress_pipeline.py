@@ -62,6 +62,19 @@ def test_style_keeps_geographic_geometry_and_writes_atlas(detail_inputs: tuple[P
                    for n in nodes_from_glb((styled / "scene_visual.glb").read_bytes())[0]
                    if n.name.startswith("building/")}
     assert before_nodes == after_nodes
+    before_interiors = {
+        n.name: [(p.material, p.mesh.triangle_count) for p in n.primitives]
+        for n in nodes_from_glb((detail / "scene_visual.glb").read_bytes())[0]
+        if n.name.startswith("interior/")
+    }
+    after_interiors = {
+        n.name: [(p.material, p.mesh.triangle_count) for p in n.primitives]
+        for n in nodes_from_glb((styled / "scene_visual.glb").read_bytes())[0]
+        if n.name.startswith("interior/")
+    }
+    assert before_interiors, "the fixture builds at least one interior"
+    assert after_interiors == before_interiors
+    assert {mat for parts in after_interiors.values() for mat, _ in parts} >= {"interior_wall", "interior_floor", "stair"}
 
 
 def test_classify_on_real_detail_is_dry_run(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
