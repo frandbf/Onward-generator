@@ -55,6 +55,10 @@ namespace OnwardGenerator
         private const string SdkRoot = "Assets/OnwardCustomContent";
         private const string PrefabRoot = SdkRoot + "/Prefabs";
         private const string LitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Simple_Lit.shadergraph";
+        // PP_Sprite_Lit is already transparent, Render Face Both, no alpha clip.
+        // It has no _BaseColor. Alpha is vertex alpha times _MainTex alpha.
+        private const string SpriteShaderPath = SdkRoot + "/Internal/Shaders/PP_Sprite_Lit.shadergraph";
+        private const string ViewGlassMaterial = "glass_view";
         private const string WorkRoot = "Assets/OnwardAdapter";
         private const string LauncherBinPathPref = "_ONWARD_BIN_PATH_";
         private const string LauncherPlatformPref = "_ONWARD_PLATFORM_";
@@ -342,6 +346,18 @@ namespace OnwardGenerator
             return mesh;
         }
 
+        // PP_Sprite_Lit multiplies by vertex alpha. A missing channel is unsafe:
+        // alpha 0 hides the pane from both sides. White keeps the texture alpha.
+        private static void SetWhiteVertexColors(Mesh mesh)
+        {
+            var colors = new Color[mesh.vertexCount];
+            for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;
+            mesh.SetColors(colors);
+        }
+
+        private static bool IsViewGlass(GMaterial material) =>
+            material != null && material.name == ViewGlassMaterial;
+
         private static void ApplyMatrix(Transform t, float[] m)
         {
             if (m == null || m.Length != 16) return;
@@ -408,6 +424,8 @@ namespace OnwardGenerator
                     combined.CombineMeshes(g.Value.ToArray(), true, true, false);
                     combined.RecalculateBounds();
                     Unwrapping.GenerateSecondaryUVSet(combined);
+                    if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
+                        SetWhiteVertexColors(combined);
                     AssetDatabase.CreateAsset(combined, $"{root}/Meshes/{name}.asset");
                     built.Add((name, combined, mat));
                 }
@@ -489,6 +507,8 @@ namespace OnwardGenerator
                         visualMeshes[i] = mesh;
                         if (opt.combine_cell_m > 0) continue;
                         Unwrapping.GenerateSecondaryUVSet(mesh);
+                        if (visualMaterials[i].Any(k => k >= 0 && k < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[k])))
+                            SetWhiteVertexColors(mesh);
                         AssetDatabase.CreateAsset(mesh, $"{root}/Meshes/V{i:D4}.asset");
                     }
                 }
@@ -2125,6 +2145,19 @@ namespace OnwardGenerator
             string path = $"{folder}/M_{safe}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null) return existing;
+            if (safe == ViewGlassMaterial)
+            {
+                // Compiled shader already blends and draws both faces. Do not set
+                // Surface, Cull, or _BaseColor: this graph does not expose them.
+                var sprite = AssetDatabase.LoadAssetAtPath<Shader>(SpriteShaderPath)
+                    ?? throw new InvalidOperationException($"Missing SDK shader at {SpriteShaderPath}.");
+                var view = new Material(sprite) { name = $"M_{safe}" };
+                if (atlas != null && view.HasProperty("_MainTex"))
+                    view.SetTexture("_MainTex", atlas);
+                view.enableInstancing = false;
+                AssetDatabase.CreateAsset(view, path);
+                return view;
+            }
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(LitShaderPath)
                 ?? throw new InvalidOperationException($"Missing SDK shader at {LitShaderPath}.");
             var material = new Material(shader) { name = $"M_{safe}" };

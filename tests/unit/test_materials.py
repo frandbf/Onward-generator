@@ -149,6 +149,9 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True) -> Path
         "roof_tile": Material(tile, 0.9),
         "roof_flat_grey": Material(flat, 0.95),
         "tree_canopy": Material((0.30, 0.46, 0.24, 1.0), 1.0),
+        "interior_wall": Material((0.90, 0.89, 0.86, 1.0), 0.9),
+        "interior_floor": Material((0.62, 0.55, 0.47, 1.0), 0.8),
+        "stair": Material((0.70, 0.67, 0.62, 1.0), 0.85),
     }
     nodes = [
         _node("building/osm-way-1", "plaster_ochre", {"type": "building", "source_ids": ["osm-way-1"], "object_id": "building/osm-way-1"}),
@@ -159,6 +162,9 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True) -> Path
         _node("surface/carriageway", "carriageway", {"type": "surface", "source_ids": ["osm-way-road"], "object_id": "surface/carriageway"}),
         _node("surface/pedestrian", "pedestrian", {"type": "surface", "source_ids": ["osm-way-other"], "object_id": "surface/pedestrian"}),
         _node("tree/1", "tree_canopy", {"type": "urban_element", "source_ids": [], "object_id": "tree/1"}),
+        _node("interior/wall", "interior_wall", {"type": "interior", "source_ids": ["osm-way-1"], "object_id": "interior/wall"}),
+        _node("interior/floor", "interior_floor", {"type": "interior", "source_ids": ["osm-way-1"], "object_id": "interior/floor"}),
+        _node("interior/stair", "stair", {"type": "interior", "source_ids": ["osm-way-1"], "object_id": "interior/stair"}),
     ]
     if cobble:
         nodes.append(_node(
@@ -337,6 +343,10 @@ def test_apply_remaps_only_listed_ids(tmp_path: Path) -> None:
     assert by_name["cobblestone_paving"][:3] == [1.0, 1.0, 1.0]
     assert by_name["roof_tile"][:3] == [1.0, 1.0, 1.0]
     assert by_name["roof_flat_grey"][0] < 0.7
+    assert by_name["interior_wall"][:3] == [1.0, 1.0, 1.0]
+    assert by_name["interior_floor"][:3] == [1.0, 1.0, 1.0]
+    assert by_name["stair"][:3] == [1.0, 1.0, 1.0]
+    assert {row["color_id"] for row in report["textures"]["interior"]} == {"interior_wall", "interior_floor", "stair"}
     assert "brick_red" not in by_name
     atlas = decode_png_rgba((out / "atlas.png").read_bytes())
     unused = atlas[atlas.shape[0] // 2 :, atlas.shape[1] // 2 :]

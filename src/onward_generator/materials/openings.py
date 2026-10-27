@@ -9,13 +9,16 @@ import numpy as np
 
 from onward_generator.dress.atlas import encode_png_rgba
 
+# Dark fill only. Frame and mullions stay opaque. PP_Sprite_Lit multiplies this by vertex alpha.
+GLASS_ALPHA = 0.35
+
 
 def window_rgba(size: int = 256) -> np.ndarray:
     image = np.zeros((size, size, 4), dtype=np.uint8)
     image[..., 0] = 28
     image[..., 1] = 34
     image[..., 2] = 42
-    image[..., 3] = 255
+    image[..., 3] = int(round(GLASS_ALPHA * 255))
     border = max(size // 10, 4)
     frame = np.array([176, 168, 154, 255], dtype=np.uint8)
     image[:border, :] = frame

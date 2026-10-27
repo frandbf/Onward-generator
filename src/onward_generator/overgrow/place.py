@@ -332,7 +332,7 @@ def overgrow(
         [*nodes, *extra_nodes], materials,
         extras={"manifest": "scene_detail.json", "overgrow": len(records)},
         repeat_images=images, preserve_uvs=True,
-        unit_uv_materials={"glass_dark", "glass_boarded", "door_wood"},
+        unit_uv_materials={"glass_dark", "glass_boarded", "glass_view", "door_wood"},
     )
     atomic_write_bytes(targets[0], visual)
     colliders = [*wreck_colliders, *planted.colliders]

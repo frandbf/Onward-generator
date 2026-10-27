@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,7 +59,58 @@ WALL_COLOR_IDS = frozenset({
 })
 WHITE = (1.0, 1.0, 1.0, 1.0)
 MAX_PHOTO_PX = 1024
-UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "door_wood"})
+UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "door_wood"})
+# The see-through pane keeps its RGBA window image. The contact atlas is opaque.
+ATLAS_SKIP = frozenset({"glass_view"})
+# Interior surfaces are not plan slots. They reuse a photograph the plan already chose.
+INTERIOR_PHOTO_SLOTS: dict[str, tuple[str, ...]] = {
+    "interior_wall": ("plain_facades", "historic_facades", "ochre_facades"),
+    "interior_floor": ("doors",),
+    "stair": ("sidewalks",),
+}
+
+
+def share_interior_photos(
+    plan: TexturePlan,
+    records: Mapping[str, TextureRecord],
+    catalog: MaterialCatalog,
+    used: Collection[str],
+    photo_tiles: dict[str, tuple[Any, str]],
+    materials: dict[str, Material],
+) -> list[dict[str, Any]]:
+    """Give interior walls, floors, and stairs a photograph from the texture plan.
+
+    Walls prefer the plain facade, then historic plaster, then ochre. Floors use
+    the door wood. Stairs use the sidewalk concrete. A colour albedo is shown
+    with a white base colour; a greyscale photo keeps the interior tint.
+    """
+    shared: list[dict[str, Any]] = []
+    for target, slots in INTERIOR_PHOTO_SLOTS.items():
+        if target not in used or target in photo_tiles:
+            continue
+        for slot in slots:
+            binding = plan.by_id.get(slot)
+            record = records.get(slot)
+            if binding is None or record is None or not binding.catalog_ids:
+                continue
+            entry = catalog.get(binding.catalog_ids[0])
+            if entry is None:
+                continue
+            rgb = decode_jpeg_rgb(Path(record.path).read_bytes())
+            photo_tiles[target] = (rgb, binding.albedo_mode)
+            if binding.albedo_mode == "color_albedo":
+                prev = materials.get(target) or Material(WHITE, 0.9)
+                materials[target] = Material(WHITE, prev.roughness)
+            shared.append({
+                "color_id": target,
+                "slot": slot,
+                "source_color_id": entry.color_id,
+                "albedo_mode": binding.albedo_mode,
+                "tile_m": float(entry.technical["tile_m"]),
+                "asset_id": record.asset_id,
+            })
+            break
+    return shared
 
 
 def _photo_png(rgb: Any, mode: str) -> bytes:
@@ -330,6 +381,7 @@ def apply_materials(
                 "sha256": record.sha256,
                 "repo_path": _rel(Path(record.path)),
             })
+    interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
 
     after_hashes = _base_hashes(base)
     if after_hashes != before_hashes:
@@ -343,7 +395,8 @@ def apply_materials(
     )
     targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite, protected=protected)
     used_ids = _used_materials(visual_nodes)
-    built = build_atlas(catalog, materials, used_color_ids=used_ids, seed=seed, photo_tiles=photo_tiles)
+    atlas_ids = [color_id for color_id in used_ids if color_id not in ATLAS_SKIP]
+    built = build_atlas(catalog, materials, used_color_ids=atlas_ids, seed=seed, photo_tiles=photo_tiles)
     extras: dict[str, Any] = {
         "attribution": manifest.get("attribution"),
         "manifest": "scene_detail.json",
@@ -356,12 +409,14 @@ def apply_materials(
         "atlas": {"size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note},
     }
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
+    for row in interior_shared:
+        tile_m[str(row["color_id"])] = float(row["tile_m"])
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
         tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
     repeat_images: dict[str, bytes] = {}
     for index, color_id in enumerate(sorted(used_ids)):
-        if color_id == "glass_dark":
+        if color_id in ("glass_dark", "glass_view"):
             repeat_images[color_id] = window_png()
             prev = materials.get(color_id) or Material(WHITE, 0.15)
             materials[color_id] = Material(WHITE, prev.roughness)
@@ -426,6 +481,7 @@ def apply_materials(
             "materials": sorted(repeat_images),
             "unit_uv": sorted(UNIT_UV_MATERIALS & set(repeat_images)),
             "window": "project-generated frame, not a photograph",
+            "interior": interior_shared,
         },
         "geometry": compare,
         "input_hashes": before_hashes,

@@ -69,7 +69,7 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 
 ## Quest budget
 
-Figures from the guide, not from the Editor: about 150 draw calls, about 250 000 triangles, about 1 GB of textures, counting players. Share `PP_Opaque_Simple_Lit`. This texture set has no normals, so it is not promoted to `PP_Opaque_Lit`. Transparency on Quest is expensive. Glass waits for a performance test. It is not in this package.
+Figures from the guide, not from the Editor: about 150 draw calls, about 250 000 triangles, about 1 GB of textures, counting players. Share `PP_Opaque_Simple_Lit`. This texture set has no normals, so it is not promoted to `PP_Opaque_Lit`. Interior panes below the accessible ceiling use the SDK shader `PP_Sprite_Lit` (`_MainTex` only). No new shader is added and the SDK graphs are not edited. Transparency on Quest is expensive. That cost is a known limit, not a measurement from this package.
 
 Occlusion culling and static batching are what the guide recommends. v01 was measured on the headset and did not lower draw calls (ADR-005). They stay off.
 

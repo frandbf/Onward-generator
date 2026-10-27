@@ -125,4 +125,8 @@ def test_materials_apply_on_detail_copy(detail_inputs: tuple[Path, Path, Path], 
     # asphalt stays a generation colour, not remapped to cobble
     carriage = next(m for m in doc["materials"] if m["name"] == "carriageway")
     assert carriage["pbrMetallicRoughness"]["baseColorFactor"][:3] == [1.0, 1.0, 1.0]
+    for name in ("interior_wall", "interior_floor", "stair"):
+        surface = next(m for m in doc["materials"] if m["name"] == name)
+        assert surface["pbrMetallicRoughness"]["baseColorFactor"][:3] == [1.0, 1.0, 1.0]
+        assert "baseColorTexture" in surface["pbrMetallicRoughness"]
     assert (detail / "scene_visual.glb").read_bytes() != (out / "scene_visual.glb").read_bytes()
