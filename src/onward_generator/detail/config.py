@@ -88,6 +88,7 @@ class Stair:
 @dataclass(frozen=True, slots=True)
 class Interiors:
     enabled: bool
+    min_buildings: int
     max_buildings: int
     include_ids: tuple[str, ...]
     exclude_ids: frozenset[str]
@@ -252,12 +253,14 @@ def _semantic(cfg: DetailConfig) -> list[str]:
             if t.balcony.door.width_m > t.balcony.width_m:
                 problems.append(f"{where}/balcony: door wider than the balcony")
     rule = cfg.interiors.rule
+    if cfg.interiors.max_buildings > 0 and cfg.interiors.min_buildings > cfg.interiors.max_buildings:
+        problems.append("/interiors: min_buildings must be at most max_buildings")
     if rule.min_area_m2 >= rule.max_area_m2:
         problems.append("/interiors/rule: min_area_m2 must be below max_area_m2")
     if cfg.recess_depth_m >= cfg.interiors.wall_thickness_m:
         problems.append("/openings/recess_depth_m must be thinner than /interiors/wall_thickness_m")
-    for name in ("frame_stone", "glass_dark", "door_wood", "railing_metal", "urban_metal", "tree_trunk", "tree_canopy",
-                 "interior_wall", "interior_floor", "stair"):
+    for name in ("frame_stone", "glass_dark", "glass_view", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
+                 "tree_canopy", "interior_wall", "interior_floor", "stair"):
         if name not in mats:
             problems.append(f"/materials: required material {name!r} is missing")
     if cfg.landmarks.enabled:
@@ -296,6 +299,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
         interiors=Interiors(
             enabled=bool(i["enabled"]),
+            min_buildings=int(i["min_buildings"]),
             max_buildings=int(i["max_buildings"]),
             include_ids=tuple(i["include_ids"]),
             exclude_ids=frozenset(i["exclude_ids"]),

@@ -223,8 +223,9 @@ def test_example_instruction_maps_without_geometry_changes(base) -> None:  # typ
                     performance_priority="max")
     assert plan.valid
     assert {(c.document, c.path) for c in plan.changes} == {("project", "/quality/detail_level"),
-                                                           ("project", "/generation/interiors")}
-    assert all(c.effect == "recorded_only" for c in plan.changes)
+                                                           ("project", "/generation/interiors"),
+                                                           ("detail", "/interiors/max_buildings")}
+    assert all(c.effect == "recorded_only" or c.cost == "decrease" for c in plan.changes)
     assert "instruction_mentions_unsupported" in codes(plan.diagnostics)
     assert plan.needs_confirmation
 
@@ -266,7 +267,7 @@ def test_cost_decrease_is_allowed_under_max_but_still_confirmed(base) -> None:  
 
 
 def test_unchanged_values_are_not_changes(base) -> None:  # type: ignore[no-untyped-def]
-    plan = plan_for(base, residential_levels=4, interior_buildings=2, facade_detail="low")
+    plan = plan_for(base, residential_levels=4, interior_buildings=5, facade_detail="low")
     assert [c.path for c in plan.changes] == ["/generation/interiors"]
     assert not plan.needs_confirmation
 

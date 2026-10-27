@@ -17,6 +17,7 @@ from onward_generator.detail.facades import (
     refine_exposure,
     stable_choice,
     stable_unit,
+    interior_storey,
     storeys_for,
 )
 from onward_generator.detail.modules import (
@@ -187,6 +188,22 @@ def test_parapet_strip_is_exact_with_courtyards() -> None:
     strip = parapet_strip(p, inner)
     assert strip is not None and strip.area == pytest.approx(p.area - inner.area)
     assert set(p.exterior.coords) <= {c for g in getattr(strip, "geoms", [strip]) for c in g.exterior.coords}
+
+
+def test_interior_storey_raises_an_estimate_and_keeps_a_measurement() -> None:
+    short = storeys_for(8.0, 3, False, CFG)
+    assert short.height_m == pytest.approx(8.0 / 3)
+    raised = interior_storey(8.0, short, "fallback")
+    assert raised is not None
+    height, storeys = raised
+    assert height == pytest.approx(8.4) and storeys.count == 3
+    assert storeys.height_m == pytest.approx(2.8) and storeys.origin == "interior_storey"
+    assert interior_storey(8.4, storeys, "fallback") is None
+    assert interior_storey(8.0, short, "explicit_height") is None
+    assert interior_storey(8.0, short, "override") is None
+    assert interior_storey(8.0, short, "authoritative_levels") is None
+    tall = storeys_for(12.0, 4, False, CFG)
+    assert interior_storey(12.0, tall, "building_type") is None
 
 
 def test_storeys_follow_heights_levels_or_are_recomputed() -> None:

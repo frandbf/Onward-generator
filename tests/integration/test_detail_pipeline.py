@@ -127,7 +127,7 @@ def test_party_walls_have_no_openings(detailed) -> None:
     assert rec["facade"]["party_wall_length_m"] == pytest.approx(28.0, abs=0.1)  # west 12 m (to 311) + east 16 m (to 313)
     o = _obj(detailed, "building/osm-way-312")
     for prim in o.visual:
-        if prim.material in ("glass_dark", "door_wood", "frame_stone", "railing_metal"):
+        if prim.material in ("glass_dark", "glass_view", "door_wood", "frame_stone", "railing_metal"):
             x, y, z = prim.mesh.vertices.T
             # Party spans: west wall against 311 (y 6–18), east wall against 313 (y 6–20). Parapet copings sit on top.
             west = (x < -14.5) & (y > 6.5) & (y < 17.5)
@@ -156,7 +156,7 @@ def test_opening_dimensions_stay_inside_the_facade(detailed) -> None:
             z = prim.mesh.vertices[:, 2]
             assert z.min() >= -1e-9, (o.id, prim.material)
             assert z.max() <= h + parapet + hip + 1e-3, (o.id, prim.material)  # rise_m is rounded to mm
-            if prim.material in ("glass_dark", "door_wood"):
+            if prim.material in ("glass_dark", "glass_view", "door_wood"):
                 assert z.max() <= h - CFG.head_clearance_m + 1e-6, (o.id, prim.material)
         assert o.record["visual"]["triangles"] > 2 * o.record["facade"]["openings"].get("window", 0)
 
@@ -188,7 +188,7 @@ def test_colliders_are_separate_closed_and_positive(detailed) -> None:
 
 def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detailed) -> None:
     interiors = [o for o in detailed.objects if o.type == "interior"]
-    assert 1 <= len(interiors) <= CFG.interiors.max_buildings
+    assert CFG.interiors.min_buildings <= len(interiors) <= CFG.interiors.max_buildings
     assert sorted(o.record["source_ids"][0] for o in interiors) == sorted(detailed.stats["interiors"])
     church = _obj(detailed, "building/osm-way-314").record
     assert church["interior"] is False
@@ -197,11 +197,21 @@ def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detai
         b = _obj(detailed, f"building/{bid}")
         assert it.record["representative_of_real_interior"] is False
         door = next(c for c in it.record["connections"] if c["type"] == "door")
-        stair = next(c for c in it.record["connections"] if c["type"] == "stair")
-        assert stair["riser_m"] <= CFG.interiors.stair.max_riser_m and stair["slope_deg"] < 40
-        assert stair["risers"] * stair["riser_m"] == pytest.approx(stair["rise_m"], abs=stair["risers"] * 5e-5)  # riser_m rounded
+        stairs = [c for c in it.record["connections"] if c["type"] == "stair"]
+        assert it.record["accessible_floors"] in (2, 3)
+        assert len(it.record["rooms"]) == it.record["accessible_floors"]
+        furnished = [
+            c for c in stairs
+            if c["to"].rsplit("/", 1)[-1].startswith("L")
+            and int(c["to"].rsplit("L", 1)[-1]) < it.record["accessible_floors"]
+        ]
+        assert len(furnished) == it.record["accessible_floors"] - 1
+        assert stairs[-1]["to"] == "roof"
         storey = it.record["rooms"][1]["floor_z_m"]
-        assert stair["rise_m"] == pytest.approx(storey)
+        for stair in stairs:
+            assert stair["riser_m"] <= CFG.interiors.stair.max_riser_m and stair["slope_deg"] < 40
+            assert stair["risers"] * stair["riser_m"] == pytest.approx(stair["rise_m"], abs=stair["risers"] * 5e-5)
+            assert stair["rise_m"] == pytest.approx(storey)
         colliders = b.colliders
         assert b.record["collider"]["source"] == "interior_shell"
         # Door: inside the wall thickness at knee height is free; beside the door the wall blocks.
@@ -218,8 +228,22 @@ def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detai
         assert any(_inside(m, np.array([*beside, 1.0])) for m in colliders)
         room = np.array([px, py]) + inward * (t + 1.0)
         assert not any(_inside(m, np.array([*room, 1.0])) for m in colliders)
-        # Upper solid above the accessible floors, slab at the first floor.
-        assert any(_inside(m, np.array([*room, 2 * storey + 0.5])) for m in colliders)
+        # The furnished floor above the entrance is open. The roof deck is solid,
+        # and a stair in the connections reaches it.
+        assert not any(_inside(m, np.array([*room, storey + 0.5])) for m in colliders)
+        assert any(c["to"] == "roof" for c in it.record["connections"])
+        roof_z = b.record["height"]["height_m"]
+        assert any(_inside(m, np.array([*room, roof_z - 0.05])) for m in colliders)
+        ceiling = it.record["rooms"][-1]["ceiling_z_m"]
+        assert it.record["through_windows"] > 0
+        opaque = [p for p in b.visual if p.material == "glass_dark"]
+        for prim in opaque:
+            assert prim.mesh.vertices[:, 2].min() >= ceiling - 1e-3
+        view = [p for p in b.visual if p.material == "glass_view"]
+        assert len(view) == 1
+        assert view[0].mesh.triangle_count == 2 * it.record["through_windows"]
+        assert view[0].mesh.vertices[:, 2].min() < ceiling
+        assert all(p.material != "glass_view" for n in detailed.collision_nodes() for p in n.primitives)
 
 
 # --- Urban elements -------------------------------------------------------------

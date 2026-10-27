@@ -23,7 +23,7 @@ from shapely.geometry.polygon import orient
 
 from onward_generator.detail.config import DetailConfig, Opening, Template
 from onward_generator.detail.modules import Prototype, balcony, frame_matrix, recess, recess_rim
-from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, quad, transform, upward_area, walls
+from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
 
 SNAP_M = 0.05
 WELD_M = 1e-6  # vertex identity for watertightness checks (modules and faces agree to ~1e-14 m)
@@ -160,11 +160,17 @@ class Hole:
         return rect_uv(self.s0, self.v0, self.s0 + self.width, self.v0 + self.height)
 
 
+# A 2.4 m door plus the 0.35 m lintel needs 2.75 m. Interior storeys are at least 2.8 m.
+INTERIOR_MIN_STOREY_M = 2.8
+# OSM `height`, a Catastro height override, and Catastro levels stay as recorded.
+MEASURED_HEIGHT_SOURCES = frozenset({"explicit_height", "override", "authoritative_levels"})
+
+
 @dataclass(slots=True)
 class Storeys:
     count: int
     height_m: float
-    origin: str  # heights_levels | recomputed | single_band
+    origin: str  # heights_levels | recomputed | single_band | interior_storey
 
 
 def storeys_for(height: float, levels: int | None, landmark: bool, cfg: DetailConfig) -> Storeys:
@@ -176,6 +182,24 @@ def storeys_for(height: float, levels: int | None, landmark: bool, cfg: DetailCo
     while n > 1 and height / n < cfg.storey_min_m:
         n -= 1
     return Storeys(n, height / n, "recomputed")
+
+
+def interior_storey(height: float, storeys: Storeys, height_source: str | None) -> tuple[float, Storeys] | None:
+    """Raise an estimated shell so each storey is at least 2.8 m.
+
+    The storey count stays. A measured height is left unchanged. ``None`` means
+    the current storey already fits, or the height must not be edited.
+    """
+    if storeys.origin == "single_band" or storeys.count < 1:
+        return None
+    if height_source in MEASURED_HEIGHT_SOURCES:
+        return None
+    if storeys.height_m + 1e-9 >= INTERIOR_MIN_STOREY_M:
+        return None
+    return (
+        storeys.count * INTERIOR_MIN_STOREY_M,
+        Storeys(storeys.count, INTERIOR_MIN_STOREY_M, "interior_storey"),
+    )
 
 
 def _fits(opening: Opening, bay_w: float, storey_h: float, cfg: DetailConfig) -> bool:
@@ -309,6 +333,9 @@ class Shell:
     rims: list[tuple[tuple[float, float, float], tuple[float, float, float]]]
     balcony_colliders: list[Mesh]
     counts: dict[str, int]
+    roof_deck: BaseGeometry | None = None
+    roof_z: float | None = None
+    parapet_collider: Mesh | None = None
 
 
 def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh, float] | None:
@@ -368,6 +395,8 @@ def build_shell(
         if strip is None:
             inner = None
     z_top = height + parapet if inner is not None else height
+    roof_deck: BaseGeometry | None = None
+    parapet_collider: Mesh | None = None
 
     roof_area = 0.0
     if inner is not None:
@@ -376,6 +405,9 @@ def build_shell(
         parts[wall_material].append(walls(inner, height, z_top, inward=True))
         parts["frame_stone"].append(cap(strip, z_top))
         roof_area = upward_area(cap(inner, height)) + upward_area(cap(strip, z_top))
+        roof_deck = inner
+        if z_top > height + 1e-6:
+            parapet_collider = prism(strip, height, z_top, bottom=True)
         roof_info = {"type": "flat_parapet", "parapet_m": parapet, "parapet_thickness_m": template.parapet_thickness_m}
     elif hip is not None:
         mesh, rise = hip
@@ -388,6 +420,7 @@ def build_shell(
         roof_mesh = cap(refined, height)
         parts[roof_material].append(roof_mesh)
         roof_area = upward_area(roof_mesh)
+        roof_deck = refined
         roof_info = {"type": "flat"}
     roof_info["material"] = roof_material
 
@@ -429,7 +462,22 @@ def build_shell(
         counts["balcony"] += 1
 
     footprint_area = sum(p.area for p in polygons)
-    return Shell(dict(parts), roof_info, z_top, defects, abs(roof_area - footprint_area), rims, balcony_colliders, dict(counts))
+    return Shell(
+        dict(parts), roof_info, z_top, defects, abs(roof_area - footprint_area), rims, balcony_colliders, dict(counts),
+        roof_deck, height, parapet_collider,
+    )
+
+
+def cut_roof_deck(shell: Shell, well: BaseGeometry) -> None:
+    """Open the flat roof deck where a stair arrives. The parapet stays."""
+    deck = shell.roof_deck
+    if deck is None or shell.roof_z is None or shell.roof.get("type") not in ("flat", "flat_parapet"):
+        return
+    holed = deck.difference(well)
+    if holed.is_empty or not holed.is_valid:
+        return
+    material = str(shell.roof.get("material") or "")
+    shell.parts[material] = [cap(holed, shell.roof_z)]
 
 
 def exposed_frontage(segments: list[Segment]) -> Segment | None:

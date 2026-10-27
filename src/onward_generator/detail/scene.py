@@ -26,12 +26,22 @@ from onward_generator.detail.grammar import choose_roof, choose_wall
 from onward_generator.detail.facades import (
     Layout,
     build_shell,
+    cut_roof_deck,
     exposed_frontage,
+    Storeys,
+    interior_storey,
     layout_segment,
     refine_exposure,
+    stable_unit,
     storeys_for,
 )
-from onward_generator.detail.interiors import build_interior, plan_interior, rectangularity
+from onward_generator.detail.interiors import (
+    build_interior,
+    pierce_room_windows,
+    plan_interior,
+    rectangularity,
+    room_window_cuts,
+)
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
@@ -190,9 +200,27 @@ def _ground_evidence(ground: str, template: Template, category: str, poi_ids: li
     return {"source": "osm_poi", "osm_poi_ids": poi_ids}
 
 
+def interior_quota(cfg: DetailConfig) -> int:
+    """How many interiors this seed builds, from ``min_buildings`` through ``max_buildings``.
+
+    A maximum of 0, or interiors turned off, builds none. The draw is
+    ``sha256(seed, interiors, quota)``. A map with fewer matching buildings
+    builds only those.
+    """
+    ic = cfg.interiors
+    if not ic.enabled or ic.max_buildings <= 0:
+        return 0
+    low = min(ic.min_buildings, ic.max_buildings)
+    high = ic.max_buildings
+    if high <= low:
+        return high
+    span = high - low + 1
+    return low + int(stable_unit(cfg.seed, "interiors", "quota") * span)
+
+
 def _select_interiors(candidates: list[tuple[str, Mapping[str, Any], BaseGeometry]], cfg: DetailConfig, issues: list[Issue]) -> list[str]:
     ic = cfg.interiors
-    if not ic.enabled or ic.max_buildings == 0:
+    if interior_quota(cfg) == 0:
         return []
     known = {bid for bid, _, _ in candidates}
     ordered: list[str] = []
@@ -335,7 +363,7 @@ def detail_scene(
 
     candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids]
     interior_queue = _select_interiors(candidates, cfg, issues)
-    interiors_left = cfg.interiors.max_buildings
+    interiors_left = interior_quota(cfg)
 
     objects: list[DetailObject] = []
     counts: Counter[str] = Counter()
@@ -366,12 +394,13 @@ def detail_scene(
             tags, template, cfg.seed, bid, geom.area, convex=convex,
         )
         door_spec = cfg.landmark_door if landmark else cfg.main_door
+        previous_height = height
 
-        def run_layout(door_kind: str, door_depth: float, door_opening: Any) -> Layout:
+        def run_layout(door_kind: str, door_depth: float, door_opening: Any, storeys_used: Storeys) -> Layout:
             layout = Layout()
             for seg in segments:
                 if seg.exposed:
-                    layout_segment(seg, storeys, template, ground, door_opening if seg is main else None, door_kind, door_depth,
+                    layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,
                                    bid, refined, others, cfg, layout)
             return layout
 
@@ -379,16 +408,34 @@ def detail_scene(
         layout = None
         if bid in interior_queue and interiors_left > 0 and main is not None:
             ic = cfg.interiors
-            trial = run_layout("interior_door", ic.wall_thickness_m, ic.door)
+            raised = interior_storey(height, storeys, h.get("height_source") or o.record["height"].get("height_source"))
+            attempt_height, attempt_storeys = raised if raised is not None else (height, storeys)
+            trial = run_layout("interior_door", ic.wall_thickness_m, ic.door, attempt_storeys)
             door = next((x for x in trial.holes if x.kind == "interior_door"), None)
-            plan = plan_interior(bid, refined, door, main, height, storeys.height_m, storeys.count, cfg) if door else "no_door_position"
+            plan = plan_interior(
+                bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
+                roof_access=shell_template.parapet_m > 0,
+            ) if door else "no_door_position"
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))
             else:
+                height = attempt_height
+                storeys = attempt_storeys
                 layout = trial
                 interior = plan
         if layout is None:
-            layout = run_layout("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec)
+            layout = run_layout("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec, storeys)
+        opened_windows = omitted_windows = 0
+        if interior is not None:
+            opened_windows, omitted_windows = pierce_room_windows(
+                layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
+                interior.floors * interior.storey_m,
+            )
+            if omitted_windows:
+                issues.append(Issue(
+                    "interior_window_omitted", "info", bid,
+                    f"{omitted_windows} windows omitted; they did not meet the inner wall",
+                ))
 
         shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
         shell.roof["origin"] = roof_origin
@@ -401,15 +448,26 @@ def detail_scene(
         base_collider = o.collider
         interior_record = None
         if interior is not None:
-            built = build_interior(interior, height, shell.z_top, refined, cfg)
+            built = build_interior(
+                interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
+            )
             if built.defects:
                 issues.append(Issue("interior_collider_not_closed", "critical", bid, f"{built.defects} defects"))
+            if built.roof_well is not None:
+                cut_roof_deck(shell, built.roof_well)
             colliders = [m for _, m in built.colliders]
-            interior_record = built.spec | {"checks": built.checks, "collider_parts": [n for n, _ in built.colliders]}
+            if shell.parapet_collider is not None and built.roof_well is not None:
+                colliders.append(shell.parapet_collider)
+            interior_record = built.spec | {
+                "checks": built.checks,
+                "collider_parts": [n for n, _ in built.colliders],
+                "through_windows": opened_windows,
+                "omitted_windows": omitted_windows,
+            }
             objects.append(DetailObject(
                 f"interior/{bid}", "interior",
                 [Primitive(merge(ms), mat) for mat, ms in sorted(built.visual.items()) if ms],
-                [], {"id": f"interior/{bid}", "type": "interior", "source_ids": [bid], **built.spec,
+                [], {"id": f"interior/{bid}", "type": "interior", "source_ids": [bid], **interior_record,
                      "generation": {"method": "generic_simplified_interior", "attribute_origin": "generated"}},
             ))
             interiors_built.append(bid)
@@ -461,6 +519,13 @@ def detail_scene(
                          "balconies": len(shell.balcony_colliders)},
             "checks": {"facade_open_edges": shell.defects, "roof_area_error_m2": round(shell.roof_area_error, 4)},
         }
+        if storeys.origin == "interior_storey":
+            record["height"] = {
+                **record["height"],
+                "height_m": round(height, 3),
+                "previous_height_m": round(previous_height, 3),
+                "interior_storey_origin": "estimated",
+            }
         objects.append(DetailObject(o.id, "building", visual, colliders, record))
         if landmark:
             towers, tower_issues = attach_towers(bid, geom, features, cfg)
