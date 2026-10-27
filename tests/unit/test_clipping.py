@@ -38,11 +38,24 @@ def test_polygon_inside() -> None:
     assert decision.status is ClipStatus.INSIDE
 
 
-def test_polygon_crossing_zone_edge_is_kept_whole() -> None:
-    building = box(120, 80, 150, 100)
+def test_building_fully_inside_the_margin_is_kept_whole() -> None:
+    building = box(105, -20, 120, 10)
     decision = clip_feature(FeatureKind.BUILDING, building, AOI, ZONE)
     assert decision.status is ClipStatus.MARGIN
     assert decision.geometry is not None and decision.geometry.equals(building)
+
+
+def test_building_that_leaves_the_map_is_dropped_whole() -> None:
+    building = box(120, 80, 150, 100)
+    decision = clip_feature(FeatureKind.BUILDING, building, AOI, ZONE)
+    assert decision.status is ClipStatus.OUTSIDE and decision.geometry is None
+
+
+def test_area_crossing_the_zone_edge_is_kept_whole() -> None:
+    park = box(120, 80, 150, 100)
+    decision = clip_feature(FeatureKind.AREA, park, AOI, ZONE)
+    assert decision.status is ClipStatus.MARGIN
+    assert decision.geometry is not None and decision.geometry.equals(park)
 
 
 def test_polygon_outside_is_dropped() -> None:

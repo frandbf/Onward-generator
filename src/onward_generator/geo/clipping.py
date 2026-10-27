@@ -1,8 +1,9 @@
 """Area-of-interest selection in local metres.
 
-Inclusion zone = AOI polygon buffered by ``margin_m``. Polygons and points
-that touch the zone are kept whole (no abrupt cuts through buildings);
-lines are cut to the zone.
+Inclusion zone = AOI polygon buffered by ``margin_m``. A building is kept only
+when that zone covers it. A building that leaves the zone is dropped whole:
+it is not cut, and the part outside is not kept. Other polygons and points
+that touch the zone stay whole. Lines are cut to the zone.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.geo.osm_import import FeatureKind
 
 MIN_AOI_AREA_M2 = 1.0
+# A sliver this small is treated as the boundary, not as a building outside the map.
+BUILDING_OUTSIDE_TOLERANCE_M2 = 0.01
 
 
 class ClipError(ValueError):
@@ -27,7 +30,7 @@ class ClipStatus(StrEnum):
     INSIDE = "inside"
     """Covered by the AOI itself."""
     MARGIN = "margin"
-    """Touches the inclusion zone but is not covered by the AOI; kept whole."""
+    """Inside the inclusion zone but not covered by the AOI. A building is kept only when the zone covers it."""
     CLIPPED = "clipped"
     """A line cut to the inclusion zone."""
     OUTSIDE = "outside"
@@ -57,9 +60,19 @@ def _is_linear(geometry: BaseGeometry) -> bool:
     return isinstance(geometry, (LineString, MultiLineString))
 
 
+def covered_by(zone: BaseGeometry, geometry: BaseGeometry, tolerance_m2: float = BUILDING_OUTSIDE_TOLERANCE_M2) -> bool:
+    """True when ``geometry`` lies in ``zone``, ignoring an outside sliver of at most ``tolerance_m2``."""
+    if zone.covers(geometry):
+        return True
+    outside = geometry.difference(zone)
+    return outside.is_empty or float(outside.area) <= tolerance_m2
+
+
 def clip_feature(kind: FeatureKind, geometry: BaseGeometry, aoi_local: Polygon, zone: Polygon) -> ClipDecision:
     """Decide whether a valid local geometry is kept, and its kept shape."""
     if geometry.is_empty or not geometry.intersects(zone):
+        return ClipDecision(ClipStatus.OUTSIDE, None)
+    if kind is FeatureKind.BUILDING and not covered_by(zone, geometry):
         return ClipDecision(ClipStatus.OUTSIDE, None)
     if aoi_local.covers(geometry):
         return ClipDecision(ClipStatus.INSIDE, geometry)

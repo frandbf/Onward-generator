@@ -33,11 +33,11 @@ The inclusion zone is the area of interest expanded by `margin_m`, with mitre co
 | Status | Meaning |
 | --- | --- |
 | `inside` | Covered by the area of interest. |
-| `margin` | Touches the inclusion zone and is not covered by the area of interest. Buildings, areas, and points are kept whole. |
+| `margin` | Touches the inclusion zone and is not covered by the area of interest. Areas and points are kept whole. A building is kept only when the zone covers it. |
 | `clipped` | A line cut at the inclusion boundary. |
-| `outside` | Misses the zone. Dropped and counted in `dropped_outside`. |
+| `outside` | Misses the zone, or a building that is not completely inside it. Dropped and counted in `dropped_outside`. |
 
-A building that sits just outside the inclusion zone is dropped. The generator does not invent a footprint OSM did not provide inside that zone.
+A building that leaves the inclusion zone is dropped whole. It is not cut, and the part that sticks out is not kept. An outside sliver of at most 0.01 m² is treated as the boundary. The generator does not invent a footprint OSM did not provide inside that zone.
 
 ## Geometry checks
 

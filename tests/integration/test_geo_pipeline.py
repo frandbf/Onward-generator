@@ -47,7 +47,6 @@ def test_clipping_keeps_expected_entities(pipeline_result: GeoResult) -> None:
         WAY(101): ClipStatus.INSIDE,
         WAY(102): ClipStatus.MARGIN,
         WAY(104): ClipStatus.MARGIN,
-        WAY(113): ClipStatus.MARGIN,
         WAY(105): ClipStatus.CLIPPED,
         WAY(106): ClipStatus.INSIDE,
         WAY(108): ClipStatus.INSIDE,
@@ -55,13 +54,11 @@ def test_clipping_keeps_expected_entities(pipeline_result: GeoResult) -> None:
         OsmRef("node", 40): ClipStatus.INSIDE,
     }
     counts = pipeline_result.report.counts
-    assert counts["dropped_outside"] == 2  # way 103 and node 41
+    assert counts["dropped_outside"] == 3  # way 103, way 113, node 41
 
 
-def test_buildings_crossing_the_edge_are_not_cut(pipeline_result: GeoResult) -> None:
-    b5 = pipeline_result.feature(WAY(113))
-    assert b5 is not None
-    assert b5.geometry_local.bounds == pytest.approx((120, 80, 150, 100), abs=0.005)
+def test_building_that_leaves_the_map_is_absent(pipeline_result: GeoResult) -> None:
+    assert pipeline_result.feature(WAY(113)) is None
 
 
 def test_road_is_cut_at_the_margin(pipeline_result: GeoResult) -> None:
@@ -70,12 +67,13 @@ def test_road_is_cut_at_the_margin(pipeline_result: GeoResult) -> None:
     assert road.geometry_local.bounds == pytest.approx((-130, 10, 130, 10), abs=0.01)
 
 
-def test_smaller_margin_drops_margin_only_building(synthetic_source, synthetic_aoi) -> None:
+def test_smaller_margin_drops_buildings_that_no_longer_fit(synthetic_source, synthetic_aoi) -> None:
     from dataclasses import replace
 
     result = run_geo_pipeline(synthetic_source, replace(synthetic_aoi, margin_m=5.0), origin=ORIGIN)
     assert result.feature(WAY(104)) is None
-    assert result.feature(WAY(102)) is not None
+    assert result.feature(WAY(102)) is None  # reaches x = 120; a 5 m margin ends at 105
+    assert result.feature(WAY(101)) is not None
 
 
 # --- Demonstration 3: geometric errors are detected. ---
@@ -164,9 +162,9 @@ def test_observed_and_inferred_attributes_are_distinguished(pipeline_result: Geo
 def test_report_counts(pipeline_result: GeoResult) -> None:
     counts = pipeline_result.report.counts
     assert counts["osm_nodes"] == 41 and counts["osm_ways"] == 13 and counts["osm_relations"] == 2
-    assert counts["kept"] == 9
-    assert counts["kept_building"] == 6 and counts["kept_highway"] == 2 and counts["kept_poi"] == 1
-    assert counts["status_inside"] == 5 and counts["status_margin"] == 3 and counts["status_clipped"] == 1
+    assert counts["kept"] == 8
+    assert counts["kept_building"] == 5 and counts["kept_highway"] == 2 and counts["kept_poi"] == 1
+    assert counts["status_inside"] == 5 and counts["status_margin"] == 2 and counts["status_clipped"] == 1
     assert counts["errors"] >= 3 and counts["warnings"] >= 3
 
 
@@ -182,7 +180,7 @@ def test_outputs_written_and_reproducible(pipeline_result: GeoResult, tmp_path: 
     assert feature["geometry"]["unit"] == "m"
     assert feature["source"] == {"provider": "synthetic-fixture", "license": "CC0-1.0", "osm_type": "way", "osm_id": 101}
     assert feature["attributes"]["height_m"] == {"value": 12.0, "origin": "observed", "source_tag": "height"}
-    assert report["counts"]["kept"] == 9
+    assert report["counts"]["kept"] == 8
     assert report["issues_by_code"]["invalid_geometry"] == 1
     assert "tiny_polygon" not in report["issues_by_code"]
     coords = [c for f in scene["features"] if f["geometry"]["type"] == "Polygon" for c in f["geometry"]["coordinates"][0]]
@@ -213,6 +211,6 @@ def test_cli_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     args = ["--source", str(OSM_FIXTURE), "--aoi", str(AOI_FIXTURE), "--out", str(out), "--origin", *map(str, ORIGIN)]
     assert main(args) == 0
     assert (out / "geo_scene.json").is_file() and (out / "geo_report.json").is_file()
-    assert "kept:     9" in capsys.readouterr().out
+    assert "kept:     8" in capsys.readouterr().out
     assert main(args) == 1
     assert "refusing to overwrite" in capsys.readouterr().err

@@ -32,7 +32,7 @@ Returns `0` when the phase 03 → 04 check passes (no critical error) and `1` ot
 | `surface/ground` | The rest of the site | 0 | Generated |
 | `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point is opened by 1 cm so the slab stays manifold | top 0 / −0.15 | Generated |
 
-The site is the area of interest plus its margin, unioned with building footprints kept in the margin.
+The site is the area of interest plus its margin. A building that is not completely inside that polygon is omitted (`building_outside_map`) and does not extend the ground. Footprints that remain inside the site are unioned with it.
 
 If two footprints overlap by more than 95%, the duplicate is not built and `duplicate_building_skipped` is recorded. Other overlaps above 1 m² raise `overlapping_buildings`.
 
@@ -60,7 +60,7 @@ Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 | `surface_overlap` above 0.5 m² | critical |
 | `building_missing_height`, `building_invalid_footprint`, `non_finite_vertices` | critical |
 | `surface_gap` above 0.5 m², `overlapping_buildings`, `duplicate_building_skipped`, `footprint_repaired` | warning |
-| `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `feature_not_generated` | info |
+| `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `feature_not_generated`, `building_outside_map` | info |
 
 Outputs are deterministic byte for byte and are not overwritten without `--overwrite`.
 

@@ -31,6 +31,7 @@ def test_synthetic_block_generates_without_critical_errors(inputs: tuple[Path, P
     ids = {o.id for o in generated.objects}
     assert {"building/osm-way-101", "building/osm-way-102", "building/osm-relation-201"} <= ids
     assert "building/osm-way-108" not in ids  # duplicate of 101
+    assert "building/osm-way-113" not in ids  # leaves the map; omitted whole
     assert "duplicate_building_skipped" in report["issues_by_code"]
     assert {"surface/carriageway", "surface/sidewalk", "surface/pedestrian", "surface/ground", "surface/curb"} <= ids
     assert {"collider/walkable", "collider/carriageway"} <= ids
@@ -60,12 +61,12 @@ def test_heights_from_another_scene_are_rejected(inputs: tuple[Path, Path], tmp_
 def test_missing_height_is_critical(inputs: tuple[Path, Path], tmp_path: Path) -> None:
     scene, heights = inputs
     doc = json.loads(heights.read_text(encoding="utf-8"))
-    doc["buildings"] = [b for b in doc["buildings"] if b["building_id"] != "osm-way-113"]
+    doc["buildings"] = [b for b in doc["buildings"] if b["building_id"] != "osm-way-102"]
     edited = tmp_path / "edited_heights.json"
     edited.write_text(json.dumps(doc), encoding="utf-8")
     report = generate_scene(scene, edited, CFG).report()
     assert not report["phase_03_exit"]["passed"]
-    assert [i["object_id"] for i in report["issues"] if i["severity"] == "critical"] == ["osm-way-113"]
+    assert [i["object_id"] for i in report["issues"] if i["severity"] == "critical"] == ["osm-way-102"]
 
 
 def test_degrees_are_refused(inputs: tuple[Path, Path], tmp_path: Path) -> None:

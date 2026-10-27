@@ -33,15 +33,16 @@ def test_heights_for_geo_fixture(scene_path: Path, tmp_path: Path) -> None:
     assert heights["scene"]["sha256"] == before
     assert heights["attribution"]["license"] == "CC0-1.0"
     assert heights["assumptions"]["fallback_m"]["unknown"]["default"] == 8.0
-    assert len(by_id) == report["counts"]["buildings"] == 6
+    assert len(by_id) == report["counts"]["buildings"] == 5
+    assert "osm-way-113" not in by_id
     assert by_id["osm-way-101"]["height_m"] == 12.0 and by_id["osm-way-101"]["height_source"] == "explicit_height"
     assert by_id["osm-way-102"]["height_source"] == "explicit_levels" and by_id["osm-way-102"]["height_m"] == 9.0
     for b in by_id.values():
         assert b["height_m"] > 0 and b["height_source"] and 0 <= b["height_confidence"] <= 1 and b["estimated_levels"] >= 1
 
     assert sum(report["percent_by_class"].values()) == pytest.approx(100.0, abs=0.05)
-    assert sum(report["counts"]["by_source"].values()) == 6
-    assert report["percent_by_class"]["measured"] == pytest.approx(100 * 1 / 6, abs=0.01)
+    assert sum(report["counts"]["by_source"].values()) == 5
+    assert report["percent_by_class"]["measured"] == pytest.approx(100 * 1 / 5, abs=0.01)
 
 
 def test_outputs_are_deterministic_and_not_overwritten(scene_path: Path, tmp_path: Path) -> None:
@@ -73,7 +74,7 @@ def test_rejects_non_scene_input(tmp_path: Path) -> None:
 def test_cli(scene_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     out = tmp_path / "cli"
     assert main(["heights", "--scene", str(scene_path), "--out", str(out)]) == 0
-    assert "buildings=6" in capsys.readouterr().out
+    assert "buildings=5" in capsys.readouterr().out
     assert (out / "heights.json").is_file() and (out / "heights_report.json").is_file()
     assert main(["heights", "--scene", str(scene_path), "--out", str(out)]) == 1
     assert "refusing to overwrite" in capsys.readouterr().err

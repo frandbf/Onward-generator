@@ -45,7 +45,7 @@ from onward_generator.generation.surfaces import (
     build_partition,
     split_pedestrian_by_paving,
 )
-from onward_generator.geo.clipping import inclusion_zone
+from onward_generator.geo.clipping import covered_by, inclusion_zone
 from onward_generator.geo.projection import LocalFrame
 
 SCENE_SCHEMA = "onward_generator.geo_scene"
@@ -212,6 +212,12 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
             issues.append(Issue("footprint_repaired", "warning", f["id"], "invalid footprint repaired with make_valid"))
         if geom.is_empty or geom.area <= 0:
             issues.append(Issue("building_invalid_footprint", "critical", f["id"], "empty footprint after repair"))
+            continue
+        if not covered_by(site, geom):
+            issues.append(Issue(
+                "building_outside_map", "info", f["id"],
+                "part of the footprint lies outside the map; the building is omitted",
+            ))
             continue
         footprints.append((f, geom))
 
