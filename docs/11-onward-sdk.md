@@ -18,7 +18,7 @@ The local card does not instantiate every mode the layout describes. `GameModes`
 | `EnableReverbInjection` or `AreaReverb` does nothing on its own | Enabled only for `gameplay_layout` |
 | Library ambience, not custom clips | `Suburban Day`, `Birds Park`, `Wind Rooftop` |
 | Hunt: 32 Rifleman points and 32 routes | Layout. The launcher puts those bots back. `StableHuntBots` is 32. Snipers are not kept |
-| A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh, at least 8 m from the next start |
+| A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh. The next start is 8 m away when the streets hold 32, and otherwise the largest 0.1 m step that still does, never at or below 5 m |
 | Navigation-map origin on walkable ground, near the centre, plus an outdoor area | The Uplink, after it is snapped to the navmesh |
 | Flight goes to `LevelHeight / 2` of the MapQuad. A volume that crosses it clips the aircraft | `LevelHeight` puts the ceiling 20 m above the highest collider |
 | Tent under the play space, `DamageVolume` under the map, do not edit SDK prefabs | Already the case |
@@ -120,7 +120,7 @@ A layout 0.3.0 places the prefabs the SDK v1.15 validator requires. The codes co
 
 `GameVariantTypes` does not name 15. The Launcher writes the integer on the component. It has not been shown on the Quest that the list displays it as Retrieval. On headset 2.0.4, a one-player local map offered Free Roam. Uplink, Assault, and Escort are the SDK's competitive modes, and Evac, Hunt, and Retrieval are the cooperative ones. This document does not claim the one-player menu lists them until the headset shows it.
 
-The Hunt objective has attacker spawns and an empty defender list. Otherwise the component clears it and throws. Evac is the opposite: defenders yes, attackers no. Hunt picks the spawn at random and patrols only when that point is within 5 m of a route start. There is one route per bot. The spawn is the first point of that route, and the next start is at least 8 m away. Two bots on the same start appear in the same place.
+The Hunt objective has attacker spawns and an empty defender list. Otherwise the component clears it and throws. Evac is the opposite: defenders yes, attackers no. Hunt picks the spawn at random and patrols only when that point is within 5 m of a route start. There is one route per bot. The spawn is the first point of that route. The next start is 8 m away when that fits, and otherwise as close as 5.1 m, which stays outside the 5 m patrol link. Two bots on the same start appear in the same place.
 
 ## Do not
 

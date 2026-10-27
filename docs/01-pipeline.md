@@ -262,7 +262,7 @@ Version 0.3.0 is the default for a new map:
 | Uplink | 1 | One objective and one `SpawnSystem` per team (8 points, the prefab's) |
 | Assault | 6 | A second block of 8 points per team and one boundary per team |
 | Escort | 2 | Two objective start positions |
-| Hunt | 10 | 32 AI, one route per bot on a sidewalk or a pedestrian way, starts at least 8 m apart, 4 boxes |
+| Hunt | 10 | 32 AI, one route per bot on a sidewalk or a pedestrian way, starts 8 m apart when the streets hold them and otherwise the largest 0.1 m step down to 5.1 m, 4 boxes |
 | Evac | 11 | Those 32 points, defenders only, one extraction point |
 | Retrieval | 15 | The Hunt objective, the extraction point, and 3 hard drives |
 

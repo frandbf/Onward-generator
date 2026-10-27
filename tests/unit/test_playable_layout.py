@@ -12,12 +12,14 @@ from onward_generator.generation.surfaces import LinearWay
 from onward_generator.perf.layout import (
     AI_COUNT,
     GAMEPLAY_VERSION,
+    MIN_SPAWN_SEPARATION_M,
     MODE_CODES,
     SPAWN_SEPARATION_M,
     LayoutError,
     _routes,
     component_holding,
     extra_spawn_block,
+    fit_spawn_separation,
     patrol_seeds,
     patrol_spawns,
     scatter_points,
@@ -126,6 +128,44 @@ def test_a_street_places_hunt_starts_on_both_sidewalks() -> None:
     )
 
 
+def _pedestrian(length: float):
+    class Config:
+        sidewalk_width_m = 2.0
+
+    class Base:
+        ways = [LinearWay("foot", "pedestrian", LineString([(0.0, 0.0), (0.0, length)]), 3.0, "config_default")]
+        config = Config()
+
+    return Base(), box(-5, -5, 5, length + 5)
+
+
+def test_spawn_separation_stays_at_8_m_on_a_long_street() -> None:
+    base, free = _pedestrian(400.0)
+    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
+    assert separation == SPAWN_SEPARATION_M
+    assert len(routes) >= AI_COUNT
+
+
+def test_spawn_separation_shrinks_until_32_starts_fit() -> None:
+    base, free = _pedestrian(240.0)
+    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
+    assert MIN_SPAWN_SEPARATION_M <= separation < SPAWN_SEPARATION_M
+    assert len(routes) >= AI_COUNT
+    assert len(_routes(base, free, round(separation + 0.1, 2))) < AI_COUNT
+    starts = [(route["points"][0]["x"], route["points"][0]["y"]) for route in routes]
+    assert all(
+        math.hypot(a[0] - b[0], a[1] - b[1]) >= separation - 1e-6
+        for i, a in enumerate(starts)
+        for b in starts[i + 1 :]
+    )
+
+
+def test_spawn_separation_stops_above_the_patrol_link() -> None:
+    base, free = _pedestrian(80.0)
+    with pytest.raises(LayoutError, match="5.1"):
+        fit_spawn_separation(base, free, AI_COUNT)
+
+
 def test_hunt_spawns_refuse_a_shared_start() -> None:
     routes = [
         {"points": [{"x": 0, "y": 0}, {"x": 20, "y": 0}]},
@@ -169,3 +209,13 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
     assert any("32 AI" in problem for problem in _check_layout(doc))
     stacked = {**doc, "ai_m": [{"x": 0, "y": 0}] * 32, "routes": [{"points": [{"x": 0, "y": 0}, {"x": 0, "y": 14}]}]}
     assert any("closer than" in problem for problem in _check_layout(stacked))
+    close = {
+        **doc,
+        "ai_m": [{"x": i * 6.5, "y": 0} for i in range(32)],
+        "routes": [{"points": [{"x": i * 6.5, "y": 0}, {"x": i * 6.5, "y": 14}]} for i in range(32)],
+    }
+    assert any("closer than 8" in problem for problem in _check_layout(close))
+    close["ai_separation_m"] = 6.5
+    assert _check_layout(close) == []
+    close["ai_separation_m"] = 4.0
+    assert any("ai_separation_m" in problem for problem in _check_layout(close))

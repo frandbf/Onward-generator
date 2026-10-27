@@ -26,7 +26,13 @@ from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, rea
 from onward_generator.config.validation import validate_config_file
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.export.thumbnail import render_listing_thumbnail
-from onward_generator.perf.layout import GAMEPLAY_VERSION, MODE_CODES, hunt_spawn_problems
+from onward_generator.perf.layout import (
+    GAMEPLAY_VERSION,
+    MIN_SPAWN_SEPARATION_M,
+    MODE_CODES,
+    SPAWN_SEPARATION_M,
+    hunt_spawn_problems,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPORT_CONFIG_DEFAULT = REPO_ROOT / "config" / "export" / "onward.default.json"
@@ -141,7 +147,18 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
         if not routes or any(len(route.get("points") or []) < 2 for route in routes):
             problems.append("layout: each Hunt route needs at least 2 points")
         else:
-            problems.extend(hunt_spawn_problems(ai, routes))
+            separation = doc.get("ai_separation_m", SPAWN_SEPARATION_M)
+            if (
+                not isinstance(separation, (int, float))
+                or isinstance(separation, bool)
+                or separation < MIN_SPAWN_SEPARATION_M
+                or separation > SPAWN_SEPARATION_M
+            ):
+                problems.append(
+                    f"layout: ai_separation_m must be from {MIN_SPAWN_SEPARATION_M:g} m to {SPAWN_SEPARATION_M:g} m"
+                )
+            else:
+                problems.extend(hunt_spawn_problems(ai, routes, separation_m=float(separation)))
         if doc.get("audio_global") != "Suburban Day":
             problems.append("layout: audio_global must be the SDK clip Suburban Day")
         if doc.get("environment") != "Urban" or doc.get("time_of_day") != "Day" or doc.get("profile") != "UrbanDay1":

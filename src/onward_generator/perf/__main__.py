@@ -119,6 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             parts.append(f"routes={len(doc['routes'])}")
         if "ai_m" in doc:
             parts.append(f"hunt={len(doc['ai_m'])}")
+        if "ai_separation_m" in doc:
+            parts.append(f"separation={doc['ai_separation_m']} m")
         for team in ("attackers", "defenders"):
             points = doc.get(team)
             if isinstance(points, dict) and "points_m" in points:

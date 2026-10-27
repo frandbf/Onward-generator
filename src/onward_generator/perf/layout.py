@@ -50,12 +50,16 @@ AI_COUNT = 32
 AMMO_COUNT = 4
 AI_SPACING_M = 8.0
 # One spawn per route. Starts closer than this share a spot, and Hunt then
-# drops several bots on what reads as a single position.
+# drops several bots on what reads as a single position. A short sidewalk
+# uses a smaller gap, down to MIN_SPAWN_SEPARATION_M, so the 32 still fit.
 SPAWN_SEPARATION_M = 8.0
+SEPARATION_STEP_M = 0.1
 # The SDK links a bot to a waypoint set only when the spawn is within 5 m of
 # that set's start. The spawn is the start itself, so the link does not depend
-# on a second snap.
+# on a second snap. The floor stays 0.1 m past that link: a closer start would
+# put the next bot inside it.
 PATROL_LINK_M = 5.0
+MIN_SPAWN_SEPARATION_M = 5.1
 
 SPAWN_COLUMNS = 4
 SPAWN_POINTS = 8
@@ -397,13 +401,13 @@ def _sample_route(line: Any, free: BaseGeometry, start_m: float) -> list[dict[st
     return points
 
 
-def _routes(base: GeneratedScene, free: BaseGeometry) -> list[dict[str, Any]]:
+def _routes(base: GeneratedScene, free: BaseGeometry, separation_m: float = SPAWN_SEPARATION_M) -> list[dict[str, Any]]:
     """Patrols on pedestrian ways and on both sidewalks of each street.
 
-    A long way is cut into several routes whose starts are at least 8 m apart.
-    Each route begins on walkable ground and keeps the points ahead of that
-    start. A second start on the same corner is dropped. The carriageway
-    itself is not used: bots spawn on the sidewalk.
+    A long way is cut into several routes whose starts are at least
+    ``separation_m`` apart. Each route begins on walkable ground and keeps the
+    points ahead of that start. A second start on the same corner is dropped.
+    The carriageway itself is not used: bots spawn on the sidewalk.
     """
     candidates: list[list[dict[str, float]]] = []
     for way in sorted(base.ways, key=lambda item: item.id):
@@ -413,15 +417,34 @@ def _routes(base: GeneratedScene, free: BaseGeometry) -> list[dict[str, Any]]:
                 points = _sample_route(line, free, distance)
                 if len(points) >= 2:
                     candidates.append(points)
-                distance += SPAWN_SEPARATION_M
+                distance += separation_m
     candidates.sort(key=lambda points: (points[0]["x"], points[0]["y"], points[-1]["x"], points[-1]["y"]))
     routes: list[dict[str, Any]] = []
     for points in candidates:
         start = points[0]
-        if any(math.hypot(start["x"] - kept["points"][0]["x"], start["y"] - kept["points"][0]["y"]) < SPAWN_SEPARATION_M - 1e-6 for kept in routes):
+        if any(math.hypot(start["x"] - kept["points"][0]["x"], start["y"] - kept["points"][0]["y"]) < separation_m - 1e-6 for kept in routes):
             continue
         routes.append({"points": points})
     return routes
+
+
+def fit_spawn_separation(
+    base: GeneratedScene, free: BaseGeometry, count: int,
+) -> tuple[list[dict[str, Any]], float]:
+    """Largest gap in ``[5.1, 8]`` m that still yields ``count`` route starts.
+
+    The search steps down by 0.1 m from 8 m. A map that already holds the roster
+    keeps 8 m. The floor stays above the 5 m patrol link.
+    """
+    separation = SPAWN_SEPARATION_M
+    held = 0
+    while separation >= MIN_SPAWN_SEPARATION_M - 1e-9:
+        routes = _routes(base, free, separation)
+        held = len(routes)
+        if held >= count:
+            return routes, round(separation, 2)
+        separation = round(separation - SEPARATION_STEP_M, 2)
+    raise LayoutError(f"route starts hold {held} spawns at {MIN_SPAWN_SEPARATION_M:g} m; {count} are required")
 
 
 def spread_routes(routes: list[dict[str, Any]], count: int, origin: tuple[float, float]) -> list[dict[str, Any]]:
@@ -458,8 +481,9 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
 
     The measurement fixture stays ``perf_layout``. This document is what a
     playable package exports. There is one AI point per route, on that route's
-    start, and those starts are at least 8 m apart. The SDK only patrols a bot
-    that spawns within 5 m of a start, and a second bot on the same start is
+    start. The gap is 8 m when the sidewalks hold 32 starts, and otherwise the
+    largest 0.1 m step that still does, down to 5.1 m. The SDK only patrols a
+    bot that spawns within 5 m of a start, and a second bot on the same start is
     the pile seen in game. Audio names are copied from the SDK v1.15 library.
     Rules that the adapter applies from the same guide live in ``docs/11-onward-sdk.md``.
     """
@@ -474,8 +498,9 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     area = component_holding(parts, uplink)
     focus = _focus_xy(base, heights) or uplink
 
-    routes = spread_routes(_routes(base, free), AI_COUNT, focus)
-    ai = patrol_spawns(routes, AI_COUNT)
+    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
+    routes = spread_routes(routes, AI_COUNT, focus)
+    ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
     occupied = union_all([Point(p).buffer(3.0) for p in ai])
     ammo_region = area.difference(occupied)
     ammo = scatter_points(ammo_region if not ammo_region.is_empty else area, AMMO_COUNT, 6.0, uplink)
@@ -527,6 +552,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "attackers": with_yaw(doc["attackers"]),
         "defenders": with_yaw(doc["defenders"]),
         "ai_m": [_xy(*p, focus) for p in ai],
+        "ai_separation_m": separation,
         "routes": routes,
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": "Suburban Day",
