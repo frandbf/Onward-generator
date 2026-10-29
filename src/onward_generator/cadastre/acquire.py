@@ -132,7 +132,7 @@ def _http_fetch(url: str, timeout: float) -> bytes:
         allowed_hosts=WFS_HOSTS,
         max_bytes=MAX_BYTES,
         timeout=timeout,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"},  # pragma: no mutate: urllib capitalizes header names
+        headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"},
         error=CadastreError,
         error_body=True,
     )

@@ -141,9 +141,9 @@ def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
         max_bytes=MAX_BYTES,
         timeout=timeout,
         headers={
-            "User-Agent": USER_AGENT,  # pragma: no mutate: urllib capitalizes header names
-            "Accept": "application/xml, text/xml",  # pragma: no mutate: urllib capitalizes header names
-            "Content-Type": "application/x-www-form-urlencoded",  # pragma: no mutate: urllib capitalizes header names
+            "User-Agent": USER_AGENT,
+            "Accept": "application/xml, text/xml",
+            "Content-Type": "application/x-www-form-urlencoded",
         },
         data=urllib.parse.urlencode({"data": query}).encode(),
         error=OsmDownloadError,

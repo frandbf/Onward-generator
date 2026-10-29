@@ -3,15 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from shapely import LineString, Point, Polygon
+from shapely import Point
 
 from onward_generator.domain.models import OsmRef
 from onward_generator.geo.issues import GeoIssue
 from onward_generator.geo.osm_import import (
     FeatureKind,
     OsmImportError,
-    _member_segments,
-    _ring_crossings,
     build_source_features,
     is_area,
     parse_osm_xml,
@@ -295,14 +293,39 @@ def test_inner_crossing_the_outer_edge_follows_even_odd(tmp_path: Path) -> None:
     assert geometry.contains(Point(LON + 11 * 0.0001, LAT + 5 * 0.0001))
 
 
-def test_a_ray_through_a_vertex_counts_once_per_side() -> None:
-    face = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
-    y = face.representative_point().y
-    # A triangle whose lowest vertex sits on the ray: the ray touches it and stays outside.
-    touching = LineString([(3, y + 1), (4, y), (5, y + 1), (3, y + 1)])
-    assert _ring_crossings(face, _member_segments([touching])) == 2
-    upside_down = LineString([(3, y - 1), (4, y), (5, y - 1), (3, y - 1)])
-    assert _ring_crossings(face, _member_segments([upside_down])) == 0
+def _two_outers_sharing_a_way(tmp_path: Path, with_inner: bool) -> Path:
+    # Outers A (0,0)-(10,10) and B (10,0)-(20,10); way 12 is the wall between them, used once.
+    points = {1: (0, 0), 2: (10, 0), 3: (10, 10), 4: (0, 10), 5: (20, 0), 6: (20, 10)} | _square(7, 2, 2, 8, 8)
+    ways = {11: [2, 1, 4, 3], 12: [2, 3], 13: [3, 6, 5, 2], 14: _ring(7)}
+    members = [(11, "outer"), (12, "outer"), (13, "outer")] + ([(14, "inner")] if with_inner else [])
+    return _multipolygon_file(tmp_path, points, ways, members)
+
+
+def test_two_outers_sharing_a_way_are_both_filled(tmp_path: Path) -> None:
+    features, issues, _ = build_source_features(parse_osm_xml(_two_outers_sharing_a_way(tmp_path, with_inner=False)))
+    assert issues == []
+    [feature] = features
+    assert feature.ref == OsmRef("relation", 30)
+    assert feature.geometry_wgs84.area == pytest.approx(200e-8)
+    assert feature.geometry_wgs84.contains(Point(LON + 5 * 0.0001, LAT + 5 * 0.0001))
+    assert feature.geometry_wgs84.contains(Point(LON + 15 * 0.0001, LAT + 5 * 0.0001))
+
+
+def test_inner_in_one_of_two_outers_sharing_a_way_is_a_hole(tmp_path: Path) -> None:
+    features, issues, _ = build_source_features(parse_osm_xml(_two_outers_sharing_a_way(tmp_path, with_inner=True)))
+    assert issues == []
+    geometry = features[0].geometry_wgs84
+    assert geometry.area == pytest.approx((200 - 36) * 1e-8)
+    assert not geometry.contains(Point(LON + 5 * 0.0001, LAT + 5 * 0.0001))
+
+
+def test_outer_inside_outer_sharing_an_edge_is_kept_filled(tmp_path: Path) -> None:
+    # Known limitation: without inner members this is the same linework as two adjacent outers.
+    points = _square(1, 0, 0, 10, 10) | _square(5, 0, 3, 4, 7)
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "outer")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    assert features[0].geometry_wgs84.area == pytest.approx(100e-8)
 
 
 def test_two_inners_sharing_an_edge_are_both_holes(tmp_path: Path) -> None:

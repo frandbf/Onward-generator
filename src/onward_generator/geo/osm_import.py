@@ -13,8 +13,6 @@ from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 
-import numpy as np
-
 from shapely import LineString, MultiPolygon, Point, Polygon, polygonize_full, unary_union
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
@@ -278,39 +276,33 @@ def _faces(lines: list[LineString]) -> tuple[list[Polygon], int]:
     return faces, len(cuts.geoms) + len(dangles.geoms) + len(invalid.geoms)
 
 
-def _member_segments(lines: list[LineString]) -> np.ndarray:
-    """Every segment of every member way as ``(x1, y1, x2, y2)`` rows.
+def _role_rings(lines: list[LineString]) -> list[Polygon]:
+    """Rings that the member ways of one role close among themselves, filled.
 
-    A segment that two member ways both run along appears twice, once per way.
+    Each role is polygonized on its own, so an inner ring that runs along its
+    outer is still a ring of its own, and two outer rings that share one way
+    are two rings although the way is listed once.
     """
-    rows = [np.hstack([coords[:-1], coords[1:]]) for coords in (np.asarray(line.coords) for line in lines)]
-    return np.vstack(rows)
+    faces, _ = _faces(lines)
+    return [Polygon(face.exterior) for face in faces]
 
 
-def _ring_crossings(face: Polygon, segments: np.ndarray) -> int:
-    """How many member way segments a ray from inside ``face`` towards +x crosses.
-
-    The count is taken over the member ways, not the faces, so a stretch where
-    an inner ring runs along its outer counts twice. Each segment is half-open
-    in y, so a ray through a vertex counts the two segments meeting there once.
-    """
+def _nesting_depth(face: Polygon, rings: list[Polygon]) -> int:
+    """How many rings enclose ``face``."""
     probe = face.representative_point()
-    x, y = probe.x, probe.y
-    straddling = segments[(segments[:, 1] > y) != (segments[:, 3] > y)]
-    x1, y1, x2, y2 = straddling.T
-    x_at = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-    return int(np.count_nonzero(x_at > x))  # pragma: no mutate: the probe is strictly inside a face, never on a segment
+    return sum(1 for ring in rings if ring.contains(probe))
 
 
 def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssue]) -> BaseGeometry | None:
-    """Assemble a multipolygon by the even-odd rule over the member ways.
+    """Assemble a multipolygon by even-odd nesting of the member rings.
 
-    Member roles are advisory. A face is filled when a ray from it crosses the
-    member ways an odd number of times, and is a hole when it crosses them an
-    even number of times. A courtyard that shares an edge or a vertex with its
-    outer ring is therefore a hole, although polygonize returns it as a face of
-    its own. A role that disagrees with the
-    nesting is reported, and the nesting wins. Exteriors run counter-clockwise
+    The faces come from all member ways noded together. The rings come from
+    the outer ways and the inner ways polygonized per role. A face enclosed
+    by an odd number of rings is filled and an even number is a hole, so a
+    courtyard that shares an edge or a vertex with its outer ring is a hole
+    and two outer rings that share a way are both filled. Member roles are
+    otherwise advisory: a role that disagrees with the nesting is reported,
+    and the nesting wins. Exteriors run counter-clockwise
     and holes clockwise, as in RFC 7946.
     """
     ref = OsmRef("relation", rel.id)
@@ -340,13 +332,13 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
             )
         )
         return None
-    segments = _member_segments(outer + inner)
+    rings = _role_rings(outer) + _role_rings(inner)
     outer_lines = unary_union(outer)
     inner_lines = unary_union(inner)
     filled: list[Polygon] = []
     for face in faces:
         from_inner = inner_lines.covers(face.exterior)
-        if _ring_crossings(face, segments) % 2 == 1:
+        if _nesting_depth(face, rings) % 2 == 1:
             filled.append(face)
             if from_inner:
                 issues.append(

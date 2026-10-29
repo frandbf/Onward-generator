@@ -14,7 +14,7 @@ Documentation is in English. Working rules for changes are in `AGENTS.md`. The o
   - `shapely==2.2.0` (GEOS 3.14.1): geometry.
   - `pyproj==3.8.0` (PROJ 9.8.1): projections. The EPSG database is included and works offline.
   - `jsonschema==4.26.0`: configuration checks against JSON Schema 2020-12.
-  - `pillow==11.3.0`: every PNG the generator writes or reads (atlases, thumbnails, previews, plaques), and JPEG albedo decode in `materials apply`.
+  - `pillow==11.3.0`: image decode and encode. Every PNG the generator writes or reads (atlases, thumbnails, previews, plaques), JPEG inputs (albedo textures in `materials apply`, Panoramax street photos), and the decode and resize of imported overgrow textures.
   - `pytest==9.1.1`: tests.
 - The locked environment, including transitive dependencies, is `requirements.lock`.
 - Optional, for phase 06, texture selection, and overgrow plans: [Ollama](https://ollama.com) on loopback with a model already installed (tested with Ollama 0.33.2 and `qwen3:14b`). There is no extra Python dependency. The client uses the standard-library `urllib`. Without Ollama, placement and texture selection use the deterministic fallback.
