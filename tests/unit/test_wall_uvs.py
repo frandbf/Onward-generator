@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
 
 import numpy as np
@@ -23,6 +24,7 @@ from onward_generator.detail.facades import (
 )
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import (
+    FRAME_TOL_M,
     Node,
     Primitive,
     _accessor,
@@ -290,6 +292,43 @@ def test_frame_skips_inward_faces_off_plane_faces_and_empty_runs() -> None:
     plain = surface_uvs(mesh, 2.0).astype(np.float64)
     assert np.allclose(uvs[:4], [[0, 0], [2, 0], [2, 2], [0, 2]])
     assert np.array_equal(uvs[4:], plain[4:])
+
+
+def test_a_single_wall_triangle_follows_its_run() -> None:
+    triangle = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 3.0]]), np.array([[0, 1, 2]], dtype=np.int64))
+    uvs = surface_uvs(triangle, 2.0, frame={"runs": [[[0.0, 0.0, 4.0, 0.0]]], "storey_h": 3.0}).astype(np.float64)
+    # Two repeats along the 4 m run, two per 3 m storey.
+    assert np.allclose(uvs, [[0, 0], [2, 0], [2, 2]])
+
+
+def test_a_face_ending_within_the_tolerance_past_a_segment_still_follows_it() -> None:
+    end = 4.0 + FRAME_TOL_M
+    wall = quad((0.0, 0.0, 0.0), (end, 0.0, 0.0), (end, 0.0, 3.0), (0.0, 0.0, 3.0))
+    uvs = surface_uvs(wall, 2.0, frame={"runs": [[[0.0, 0.0, 4.0, 0.0]]], "storey_h": 3.0}).astype(np.float64)
+    assert np.allclose(uvs[:, 0], [0.0, end / 2.0, end / 2.0, 0.0])
+    assert np.allclose(uvs[:, 1], [0.0, 0.0, 2.0, 2.0])
+
+
+def test_a_short_run_and_a_zero_length_segment_still_place_u() -> None:
+    """A run under a metre still holds one repeat; a repeated point in a run adds nothing and warns nothing."""
+    short = quad((0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (0.5, 0.0, 3.0), (0.0, 0.0, 3.0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        alone = surface_uvs(short, 2.0, frame={"runs": [[[0.0, 0.0, 0.5, 0.0]]], "storey_h": 3.0})
+        doubled = surface_uvs(short, 2.0, frame={"runs": [[[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.5, 0.0]]], "storey_h": 3.0})
+    assert np.allclose(alone, [[0, 0], [1, 0], [1, 2], [0, 2]])
+    assert np.array_equal(doubled, alone)
+
+
+def test_a_face_on_two_runs_keeps_the_first() -> None:
+    wall = quad((0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, 0.0, 3.0), (0.0, 0.0, 3.0))
+    first = [[0.0, 0.0, 4.0, 0.0]]
+    elsewhere = [[0.0, 10.0, 4.0, 10.0]]
+    later = [[-2.0, 0.0, 4.0, 0.0]]  # the same plane, 2 m longer: U would start at one repeat
+    uvs = surface_uvs(wall, 2.0, frame={"runs": [first, elsewhere, later], "storey_h": None}).astype(np.float64)
+    alone = surface_uvs(wall, 2.0, frame={"runs": [first], "storey_h": None}).astype(np.float64)
+    assert np.array_equal(uvs, alone)
+    assert np.allclose(uvs[:, 0], [0.0, 2.0, 2.0, 0.0])
 
 
 def test_recentre_moves_each_run_as_one_island() -> None:

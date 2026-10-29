@@ -189,16 +189,14 @@ def _facade_uvs(mesh: Mesh, tile_m: float, frame: Mapping[str, Any], uvs: np.nda
     for index, run in enumerate(frame.get("runs") or []):
         segments = np.asarray(run, dtype=np.float64).reshape(-1, 4)
         lengths = np.hypot(segments[:, 2] - segments[:, 0], segments[:, 3] - segments[:, 1])
-        total = float(lengths.sum())
-        if total <= 0.0:
-            continue
-        tile_u = _snapped(total, scale)
+        # A run of zero length skips every segment below, so it needs no check of its own.
+        tile_u = _snapped(float(lengths.sum()), scale)
         s0 = 0.0
-        for (ax, ay, bx, by), length in zip(segments, lengths, strict=True):
+        for (ax, ay, bx, by), length in zip(segments, lengths, strict=True):  # pragma: no mutate: lengths is computed row by row from segments, so both always have the same length
             if length > 0.0:
                 along = np.array([bx - ax, by - ay, 0.0]) / length
                 out = np.array([along[1], -along[0], 0.0])
-                rel = corners - np.array([ax, ay, 0.0])
+                rel = corners - np.array([ax, ay, 0.0])  # pragma: no mutate: along and out have zero z, so this z never reaches t or the plane distance
                 t = rel @ along
                 hit = (
                     free

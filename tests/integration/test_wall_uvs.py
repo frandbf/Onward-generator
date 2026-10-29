@@ -104,3 +104,39 @@ def test_dress_style_aligns_murcia_walls_to_runs_and_storeys(
             assert np.allclose(uvs[vertex, 1], points[vertex, 2] * k / storey_h, atol=1e-3)
             aligned += 1
     assert aligned
+
+
+def test_detail_stage_writes_each_building_frame_and_keeps_its_glass_colliders(
+    detail_inputs: tuple[Path, Path, Path], tmp_path: Path,
+) -> None:
+    """The frame reaches the visual GLB node of its building; the glass panes still reach the collision GLB.
+
+    ``detail`` runs inside this test (not a shared fixture) so it is the test that covers ``detail_scene``.
+    """
+    scene, heights, base = detail_inputs
+    out = tmp_path / "detail"
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+                 "--out", str(out), "--no-preview"]) == 0
+    visual, _ = read_glb((out / "scene_visual.glb").read_bytes())
+    collision, _ = read_glb((out / "scene_collision.glb").read_bytes())
+    manifest = json.loads((out / "scene_detail.json").read_text(encoding="utf-8"))
+    buildings = {o["id"]: o for o in manifest["objects"] if o.get("type") == "building"}
+    frames = {n["name"]: (n.get("extras") or {}).get("uv_frame") for n in visual["nodes"]}
+    assert {name for name, frame in frames.items() if frame is not None} == set(buildings)
+    aligned = 0
+    for bid, record in buildings.items():
+        frame = frames[bid]
+        storeys = record["facade"]["storeys"]
+        if storeys["origin"] == "single_band":
+            assert frame["storey_h"] is None and frame["storeys_origin"] is None
+        else:
+            # The storeys come from the heights stage's estimated levels, with their origin.
+            assert frame["storey_h"] == pytest.approx(storeys["height_m"], abs=1e-3)
+            assert frame["storeys_origin"] == storeys["origin"]
+            aligned += 1
+        length = sum(float(np.hypot(bx - ax, by - ay)) for run in frame["runs"] for ax, ay, bx, by in run)
+        assert length == pytest.approx(record["facade"]["exposed_length_m"], abs=1e-2)
+    assert aligned
+    glass = {n["name"] for n in collision["nodes"] if n["name"].endswith("#glass")}
+    paned = {f"{bid}#glass" for bid, record in buildings.items() if record["collider"]["glass_panes"]}
+    assert paned and glass == paned
