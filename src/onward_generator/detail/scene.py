@@ -34,6 +34,7 @@ from onward_generator.detail.facades import (
     refine_exposure,
     stable_unit,
     storeys_for,
+    wall_uv_frame,
 )
 from onward_generator.detail.interiors import (
     build_interior,
@@ -74,6 +75,7 @@ class DetailObject:
     instance_of: str | None = None
     matrix: np.ndarray | None = None
     glass_colliders: list[Mesh] = field(default_factory=list)
+    uv_frame: dict[str, Any] | None = None  # visual node extras only (ADR-012)
 
 
 @dataclass(slots=True)
@@ -94,6 +96,8 @@ class DetailedScene:
         nodes = []
         for o in self.objects:
             extras = {"object_id": o.id, "type": o.type, "source_ids": o.record.get("source_ids", [])}
+            if o.uv_frame is not None:
+                extras["uv_frame"] = o.uv_frame
             if o.instance_of is not None:
                 proto = self.prototypes[o.instance_of]
                 nodes.append(Node(o.id, tuple(Primitive(m, mat) for mat, m in proto.parts), extras, o.matrix, proto.key))
@@ -538,7 +542,8 @@ def detail_scene(
                 "previous_height_m": round(previous_height, 3),
                 "interior_storey_origin": "estimated",
             }
-        objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders))
+        frame = wall_uv_frame(segments, storeys, h.get("estimated_levels"))
+        objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders, uv_frame=frame))
         if landmark:
             towers, tower_issues = attach_towers(bid, geom, features, cfg)
             issues.extend(tower_issues)

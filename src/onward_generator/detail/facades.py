@@ -202,6 +202,44 @@ def interior_storey(height: float, storeys: Storeys, height_source: str | None) 
     )
 
 
+def exposed_runs(segments: list[Segment]) -> list[list[Segment]]:
+    """Chains of exposed segments in ring order. A party wall ends a chain.
+
+    A ring with no party wall is one chain starting at its first segment. A chain
+    that runs over the ring start continues from the last segment to the first.
+    """
+    rings: dict[tuple[int, int], list[Segment]] = defaultdict(list)
+    for seg in segments:
+        rings[(seg.part, seg.ring)].append(seg)
+    runs: list[list[Segment]] = []
+    for key in sorted(rings):
+        ring = rings[key]
+        start = next((i for i, s in enumerate(ring) if not s.exposed), 0)
+        current: list[Segment] = []
+        for seg in ring[start:] + ring[:start]:
+            if seg.exposed:
+                current.append(seg)
+            elif current:
+                runs.append(current)
+                current = []
+        if current:
+            runs.append(current)
+    return runs
+
+
+def wall_uv_frame(segments: list[Segment], storeys: Storeys, levels: int | None) -> dict[str, object]:
+    """Node extras that align wall UVs to exposed runs and storeys (ADR-012).
+
+    Without levels, or on a single band, ``storey_h`` is ``None`` and V keeps ``tile_m``.
+    """
+    aligned = bool(levels) and storeys.origin != "single_band"
+    return {
+        "runs": [[[round(c, 6) for c in (*s.a, *s.b)] for s in run] for run in exposed_runs(segments)],
+        "storey_h": storeys.height_m if aligned else None,
+        "storeys_origin": storeys.origin if aligned else None,
+    }
+
+
 def _fits(opening: Opening, bay_w: float, storey_h: float, cfg: DetailConfig) -> bool:
     return opening.width_m + cfg.min_pier_m <= bay_w + 1e-9 and opening.sill_m + opening.height_m + cfg.head_clearance_m <= storey_h + 1e-9
 

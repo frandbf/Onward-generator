@@ -103,15 +103,22 @@ FLAT_NZ = 0.75
 ROOF_FLAT_NZ = 0.98
 
 
-def surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool = False, roof: bool = False) -> np.ndarray:
+def surface_uvs(
+    mesh: Mesh, tile_m: float, *, fit_unit: bool = False, roof: bool = False, frame: Mapping[str, Any] | None = None,
+) -> np.ndarray:
     """UVs on the face plane, in repeats of ``tile_m`` metres.
 
     Vertical faces use world up as V, so a tall wall repeats instead of stretching
     one tile across the whole height. ``fit_unit`` maps each disconnected quad to
     0–1 (a window or a door). ``roof`` keeps slope-aligned UVs on faces up to
     ``ROOF_FLAT_NZ``, so a pitched roof is measured along the slope, not top-down.
+    ``frame`` is a building's ``uv_frame`` (ADR-012): faces on an exposed run follow
+    the run and the storeys instead.
     """
-    return _surface_uvs(mesh, tile_m, fit_unit=fit_unit, roof=roof).astype(np.float32)
+    uvs = _surface_uvs(mesh, tile_m, fit_unit=fit_unit, roof=roof)
+    if frame is not None:
+        _facade_uvs(mesh, tile_m, frame, uvs)
+    return uvs.astype(np.float32)
 
 
 def _surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool, roof: bool) -> np.ndarray:
@@ -152,6 +159,64 @@ def _surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool, roof: bool) -> np
     return uvs
 
 
+# A wall triangle belongs to a run segment when it lies this close to the segment's plane and span.
+FRAME_TOL_M = 1e-3
+
+
+def _snapped(length: float, tile_m: float) -> float:
+    """``tile_m`` stretched so ``length`` holds a whole number of repeats (at least one)."""
+    return length / max(1, round(length / tile_m))
+
+
+def _facade_uvs(mesh: Mesh, tile_m: float, frame: Mapping[str, Any], uvs: np.ndarray) -> np.ndarray:
+    """Overwrite the UVs of faces on an exposed run. Return each vertex's run, or −1.
+
+    U is the distance along the run, in a whole number of repeats per run. V is the
+    height, in a whole number of repeats per storey when ``storey_h`` is set.
+    """
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    triangles = np.asarray(mesh.triangles, dtype=np.int64)
+    run_of = np.full(len(vertices), -1, dtype=np.int64)
+    if len(triangles) == 0:
+        return run_of
+    scale = max(float(tile_m), 1e-6)
+    storey_h = frame.get("storey_h")
+    tile_v = _snapped(float(storey_h), scale) if storey_h else scale
+    normals = mesh.face_normals()
+    normals = normals / np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-12)
+    corners = vertices[triangles]
+    free = np.ones(len(triangles), dtype=bool)
+    for index, run in enumerate(frame.get("runs") or []):
+        segments = np.asarray(run, dtype=np.float64).reshape(-1, 4)
+        lengths = np.hypot(segments[:, 2] - segments[:, 0], segments[:, 3] - segments[:, 1])
+        total = float(lengths.sum())
+        if total <= 0.0:
+            continue
+        tile_u = _snapped(total, scale)
+        s0 = 0.0
+        for (ax, ay, bx, by), length in zip(segments, lengths, strict=True):
+            if length > 0.0:
+                along = np.array([bx - ax, by - ay, 0.0]) / length
+                out = np.array([along[1], -along[0], 0.0])
+                rel = corners - np.array([ax, ay, 0.0])
+                t = rel @ along
+                hit = (
+                    free
+                    & (normals @ out > 0.999)
+                    & (np.abs(rel @ out) <= FRAME_TOL_M).all(axis=1)
+                    & (t >= -FRAME_TOL_M).all(axis=1)
+                    & (t <= length + FRAME_TOL_M).all(axis=1)
+                )
+                for corner in range(3):
+                    vertex = triangles[hit, corner]
+                    uvs[vertex, 0] = (s0 + t[hit, corner]) / tile_u
+                    uvs[vertex, 1] = corners[hit, corner, 2] / tile_v
+                    run_of[vertex] = index
+                free &= ~hit
+            s0 += float(length)
+    return run_of
+
+
 def uv_islands(triangles: np.ndarray, count: int) -> np.ndarray:
     """One label per vertex. Vertices joined through triangles share a label."""
     label = np.arange(count, dtype=np.int64)
@@ -172,17 +237,21 @@ def uv_islands(triangles: np.ndarray, count: int) -> np.ndarray:
         np.minimum.at(label, np.maximum(a[differ], b[differ]), np.minimum(a[differ], b[differ]))
 
 
-def recentre_uvs(uvs: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+def recentre_uvs(uvs: np.ndarray, triangles: np.ndarray, runs: np.ndarray | None = None) -> np.ndarray:
     """Subtract ``floor(min)`` per UV island so repeat UVs stay small.
 
     World projections reach hundreds of repeats far from the origin, where a
     half-precision shader loses the fraction. An integer shift is invisible with
-    Repeat wrapping, and each island moves as one, so no seam opens.
+    Repeat wrapping, and each island moves as one, so no seam opens. A vertex with
+    ``runs ≥ 0`` belongs to that run's island instead, so a facade run stays continuous.
     """
     out = np.array(uvs, dtype=np.float64, copy=True)
     if len(out) == 0:
         return out
-    _, island = np.unique(uv_islands(triangles, len(out)), return_inverse=True)
+    labels = uv_islands(triangles, len(out))
+    if runs is not None:
+        labels = np.where(runs >= 0, len(out) + runs, labels)
+    _, island = np.unique(labels, return_inverse=True)
     low = np.full((int(island.max()) + 1, 2), np.inf)
     np.minimum.at(low, island, out)
     out -= np.floor(low)[island]
@@ -265,13 +334,18 @@ def build_glb(
             elif using_repeat and prim.material in repeat:
                 tile = float((repeat_tile_m or {}).get(prim.material, 2.0))
                 unit = prim.material in unit_uv
-                uvs = _surface_uvs(prim.mesh, tile, fit_unit=unit, roof=prim.material in roof_uv)
+                roof = prim.material in roof_uv
+                uvs = _surface_uvs(prim.mesh, tile, fit_unit=unit, roof=roof)
                 if not unit:
+                    frame = (node.extras or {}).get("uv_frame") if node.matrix is None and not roof else None
+                    runs = _facade_uvs(prim.mesh, tile, frame, uvs) if frame else np.full(len(uvs), -1)
                     phase = (node.extras or {}).get("uv_phase")
                     if phase:
                         uvs[:, 0] += float(phase[0])
-                        uvs[:, 1] += float(phase[1])
-                    uvs = recentre_uvs(uvs, prim.mesh.triangles)
+                        # Storey-aligned V keeps its ground line; only U takes the building phase.
+                        storeys = (runs >= 0) if frame and frame.get("storey_h") else np.zeros(len(uvs), dtype=bool)
+                        uvs[~storeys, 1] += float(phase[1])
+                    uvs = recentre_uvs(uvs, prim.mesh.triangles, runs)
                 attributes["TEXCOORD_0"] = builder.add(uvs.astype(np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             elif prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
                 attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
