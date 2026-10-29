@@ -22,7 +22,8 @@ jobs:
   linux:
     name: linux (docker)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # About four times the measured p90 (1.5 min).
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-task@v2
@@ -44,17 +45,35 @@ jobs:
   mutate:
     name: mutate (changed functions)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Measured 9-13 min with source changes; well under 1 min without.
+    timeout-minutes: 30
+    env:
+      BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # The check still reports when nothing in src/ changed; it just skips the image build and mutmut.
+      - name: Changed source
+        id: changes
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE=HEAD~1; fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          if git diff --quiet "$(git merge-base "$BASE" HEAD)" HEAD -- src/onward_generator; then
+            echo "src=false" >> "$GITHUB_OUTPUT"
+            echo "No change under src/onward_generator since $BASE: nothing to mutate." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: arduino/setup-task@v2
+        if: steps.changes.outputs.src == 'true'
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
+        if: steps.changes.outputs.src == 'true'
       - name: Build image
+        if: steps.changes.outputs.src == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -63,8 +82,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: task mutate
+        if: steps.changes.outputs.src == 'true'
         env:
-          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
-        run: |
-          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE=HEAD~1; fi
-          task mutate BASE="$BASE"
+          MUTATE_BASE_REF: ${{ steps.changes.outputs.base }}
+        run: task mutate BASE="$MUTATE_BASE_REF"

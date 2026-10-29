@@ -46,11 +46,11 @@ tasks:
       - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
 
   ci:
-    desc: Everything the CI gate runs
+    desc: Everything the CI gate runs, cheapest first so a lint failure stops it early
     cmds:
-      - task: test
       - task: lint:shell
       - task: smoke
+      - task: test
 
   shell:
     desc: Open a shell in the image
