@@ -15,7 +15,7 @@ from onward_generator.geo.pipeline import GeoOptions, GeoResult, run_geo_pipelin
 from onward_generator.geo.sources import SourceError, register_local_source, sha256_file
 from tests.conftest import AOI_FIXTURE, ORIGIN, OSM_FIXTURE, SYNTHETIC_LICENSE
 
-WAY = lambda i: OsmRef("way", i)  # noqa: E731
+WAY = lambda i: OsmRef("way", i)  # noqa: E731 - a short alias for the fixtures below
 
 
 # --- Demonstration 1: known geometry lands where it should, in metres. ---

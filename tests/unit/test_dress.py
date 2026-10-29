@@ -23,7 +23,7 @@ from onward_generator.dress.geometry import compare_fingerprints, file_sha256, g
 from onward_generator.dress.surfaces import building_context, collect_surfaces, osm_material_override
 from onward_generator.generation.config import load_generation_config
 from tests.conftest import MURCIA_CENTER
-from tests.unit.test_ai import fake_ollama  # noqa: F401
+from tests.unit.test_ai import fake_ollama  # noqa: F401 - a pytest fixture used by name
 
 REPO = Path(__file__).resolve().parents[2]
 

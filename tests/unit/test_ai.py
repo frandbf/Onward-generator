@@ -391,11 +391,11 @@ class FakeOllama(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler names it
         body = {"/api/version": {"version": "0.0.test"}, "/api/tags": self.tags}.get(self.path)
         self._send(200 if body is not None else 404, json.dumps(body or {"error": "not found"}).encode())
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler names it
         length = int(self.headers["Content-Length"])
         type(self).requests.append({"path": self.path, "body": json.loads(self.rfile.read(length))})
         chat = self.chat if isinstance(self.chat, bytes) else json.dumps(self.chat).encode()
