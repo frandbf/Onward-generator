@@ -37,6 +37,14 @@ tasks:
       - "{{.RUN}} onward-generator version"
       - "{{.RUN}} onward-generator validate-config config/murcia-belluga.example.json"
 
+  mutate:
+    desc: Mutation-test the functions changed since BASE (default main); fails when a mutant survives
+    vars:
+      BASE: '{{.BASE | default "main"}}'
+      MAX: '{{.MAX | default "40"}}'
+    cmds:
+      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
+
   ci:
     desc: Everything the CI gate runs
     cmds:

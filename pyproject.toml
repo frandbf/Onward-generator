@@ -32,3 +32,9 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.mutmut]
+# task mutate (tools/mutate/run.py) passes the changed functions; this is the copy mutmut tests against.
+source_paths = ["src/"]
+also_copy = ["config/", "assets/", "tests/", "tools/", "docs/", "requirements.lock", "requirements-mutate.lock", "README.md"]
+mutate_only_covered_lines = true

@@ -20,3 +20,9 @@ maps/*/data/
 
 # Shared Panoramax JPEGs. The per-map search index stays under maps/<id>/data/.
 cache/
+
+# mutmut working copy (task mutate).
+mutants/
+
+# Claude Code worktrees.
+.claude/

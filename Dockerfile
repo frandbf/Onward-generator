@@ -3,7 +3,7 @@
 FROM python:3.14-slim-bookworm
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends shellcheck \
+    && apt-get install -y --no-install-recommends shellcheck git \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -13,8 +13,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HOME=/tmp/home
 
 WORKDIR /work
-COPY requirements.lock ./
-RUN python -m pip install --only-binary=:all: -r requirements.lock
+COPY requirements.lock requirements-mutate.lock ./
+RUN python -m pip install --only-binary=:all: -r requirements.lock \
+    && python -m pip install -r requirements-mutate.lock
 
 # Editable install: at run time the bind mount at /work replaces these files,
 # and the installed path still points at /work/src.

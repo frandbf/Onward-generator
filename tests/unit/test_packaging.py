@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src" / "onward_generator"
 # Import name → distribution name, where they differ.
 DISTRIBUTION = {"PIL": "pillow"}
+# mutmut adds this import to the mutated copy it tests (task mutate); the package never imports it.
+INJECTED = {"mutmut"}
 
 
 def _declared() -> set[str]:
@@ -29,7 +31,7 @@ def _third_party_imports() -> dict[str, Path]:
                 continue
             for name in names:
                 top = name.split(".")[0]
-                if top != "onward_generator" and top not in sys.stdlib_module_names:
+                if top != "onward_generator" and top not in sys.stdlib_module_names and top not in INJECTED:
                     found.setdefault(top, path)
     return found
 
