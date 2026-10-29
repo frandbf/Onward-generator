@@ -1,24 +1,37 @@
 """Print the next pipeline command as one line that can be pasted in a shell.
 
 Run it from the repository root. Paths are relative to the current directory
-when they sit inside it.
+when they sit inside it. Each command is kept as its argument list, so
+``run`` executes it without parsing the printed line back.
 """
 
 from __future__ import annotations
 
 import json
 import shlex
+from dataclasses import dataclass
 from pathlib import Path
 
-_PREFIX = "PYTHONPATH=src .venv/bin/python -m onward_generator"
+_PREFIX = ".venv/bin/python -m onward_generator"
 
 
-def emit(command: str) -> None:
-    print(f"next: {command}")
+@dataclass(frozen=True)
+class StageCommand:
+    """One CLI call after ``python -m onward_generator``. ``argv`` is what runs."""
+
+    argv: tuple[str, ...]
+
+    def display(self) -> str:
+        """The shell line printed after ``next:``."""
+        return _PREFIX + " " + shlex.join(self.argv)
 
 
-def invoke(*parts: str) -> str:
-    return _PREFIX + " " + " ".join(shlex.quote(part) for part in parts)
+def emit(command: StageCommand) -> None:
+    print(f"next: {command.display()}")
+
+
+def invoke(*parts: str) -> StageCommand:
+    return StageCommand(tuple(parts))
 
 
 def show(path: Path) -> str:
@@ -49,7 +62,7 @@ def stage_path(start: Path, *relative: str) -> Path:
     return stage_dir.parent.joinpath(*relative)
 
 
-def geo_command(directory: str | Path, retrieved_at: str | None = None) -> str:
+def geo_command(directory: str | Path, retrieved_at: str | None = None) -> StageCommand:
     from onward_generator.maps.workspace import load_map
 
     root = Path(directory).expanduser().resolve()
@@ -71,11 +84,11 @@ def geo_command(directory: str | Path, retrieved_at: str | None = None) -> str:
     return invoke(*parts)
 
 
-def heights_command(scene: Path) -> str:
+def heights_command(scene: Path) -> StageCommand:
     return invoke("heights", "--scene", show(scene), "--out", show(stage_path(scene, "heights")))
 
 
-def generate_command(scene: Path, heights: Path) -> str:
+def generate_command(scene: Path, heights: Path) -> StageCommand:
     return invoke(
         "generate",
         "--scene", show(scene),
@@ -84,7 +97,7 @@ def generate_command(scene: Path, heights: Path) -> str:
     )
 
 
-def detail_command(scene: Path, heights: Path, base: Path) -> str:
+def detail_command(scene: Path, heights: Path, base: Path) -> StageCommand:
     return invoke(
         "detail",
         "--scene", show(scene),
@@ -94,7 +107,7 @@ def detail_command(scene: Path, heights: Path, base: Path) -> str:
     )
 
 
-def materials_command(base: Path) -> str:
+def materials_command(base: Path) -> StageCommand:
     """``materials apply`` with the map's own plan. ``--download`` is the explicit network step."""
     root = map_root(base)
     plan = (root / "config" / "texture_plan.json") if root is not None else base.parent / "texture_plan.json"
@@ -107,7 +120,7 @@ def materials_command(base: Path) -> str:
     )
 
 
-def dress_command(detail: Path, scene: Path | None = None, heights: Path | None = None) -> str:
+def dress_command(detail: Path, scene: Path | None = None, heights: Path | None = None) -> StageCommand:
     parts = ["dress", "style", "--detail", show(detail)]
     if scene is not None:
         parts.extend(["--scene", show(scene)])
@@ -129,7 +142,7 @@ def _geo_for(base: Path) -> Path:
     return _existing(_inputs(base), "geo_scene", "path") or Path("geo_scene.json")
 
 
-def after_materials(base: Path) -> str:
+def after_materials(base: Path) -> StageCommand:
     """The command printed after ``materials apply``.
 
     A map that did not ask for street photos continues at the plates.
@@ -142,7 +155,7 @@ def after_materials(base: Path) -> str:
     return signs_command(base)
 
 
-def panoramax_command(base: Path) -> str:
+def panoramax_command(base: Path) -> StageCommand:
     """Copy materials forward and project 360 photos. Runs only when the map asks for it."""
     return invoke(
         "panoramax", "apply",
@@ -151,7 +164,7 @@ def panoramax_command(base: Path) -> str:
     )
 
 
-def signs_command(base: Path) -> str:
+def signs_command(base: Path) -> StageCommand:
     scene = _geo_for(base)
     out_name = "scene_signs_compact" if "compact" in Path(base).name else "scene_signs"
     return invoke(
@@ -162,7 +175,7 @@ def signs_command(base: Path) -> str:
     )
 
 
-def fit_command(scene: Path, base: Path) -> str:
+def fit_command(scene: Path, base: Path) -> StageCommand:
     return invoke(
         "overgrow", "fit",
         "--scene", show(scene),
@@ -171,7 +184,7 @@ def fit_command(scene: Path, base: Path) -> str:
     )
 
 
-def overgrow_command(base: Path) -> str:
+def overgrow_command(base: Path) -> StageCommand:
     root = map_root(base)
     compact = "compact" in Path(base).name
     scene = _geo_for(base)
@@ -203,7 +216,7 @@ def overgrow_command(base: Path) -> str:
     return invoke(*parts)
 
 
-def bounds_command(base: Path) -> str:
+def bounds_command(base: Path) -> StageCommand:
     out = stage_path(base, "scene_playable")
     if out.exists():
         compact = stage_path(base, "scene_playable_compact")
@@ -211,7 +224,7 @@ def bounds_command(base: Path) -> str:
     return invoke("bounds", "--base", show(base), "--out", show(out))
 
 
-def layout_command(playable: Path) -> str | None:
+def layout_command(playable: Path) -> StageCommand | None:
     inputs = _inputs(playable)
     scene = _existing(inputs, "geo_scene", "path")
     heights = _existing(inputs, "heights", "path")
@@ -234,23 +247,30 @@ def layout_command(playable: Path) -> str | None:
     )
 
 
-def export_command(detail: Path, layout: Path) -> str | None:
+def export_command(detail: Path, layout: Path) -> StageCommand | None:
     root = map_root(detail) or map_root(layout)
     if root is None:
         return None
-    project = root / "config" / "project.json"
-    if not project.is_file():
+    if not (root / "config" / "project.json").is_file():
         return None
+    return export_invocation(root, detail, layout, stage_path(detail, "export", "pkg_01"))
+
+
+def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> StageCommand:
+    """``export package`` for the map at ``root``.
+
+    ``--config`` is passed only when ``config/export.json`` exists. Without it
+    the exporter uses its default configuration.
+    """
     parts = [
         "export", "package",
-        "--project", show(project),
+        "--project", show(root / "config" / "project.json"),
         "--detail", show(detail),
-        "--layout", show(layout),
-        "--out", show(stage_path(detail, "export", "pkg_01")),
     ]
     config = root / "config" / "export.json"
     if config.is_file():
-        parts[6:6] = ["--config", show(config)]
+        parts.extend(["--config", show(config)])
+    parts.extend(["--layout", show(layout), "--out", show(out)])
     return invoke(*parts)
 
 

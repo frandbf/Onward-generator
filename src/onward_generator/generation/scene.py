@@ -144,7 +144,7 @@ class GeneratedScene:
             "issues_by_code": dict(sorted(Counter(i.code for i in self.issues).items())),
             "severity": {k: severities.get(k, 0) for k in ("critical", "warning", "info")},
             "phase_03_exit": {
-                "condition": "buildings and streets generated without critical topological errors (PRD §11.1)",
+                "condition": "buildings and streets generated without critical topological errors (docs/06-generation.md, Checks)",
                 "critical_errors": severities.get("critical", 0),
                 "passed": severities.get("critical", 0) == 0,
             },

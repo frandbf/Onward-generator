@@ -7,13 +7,12 @@ normalized meshes and a manifest. Category index pages are not downloads.
 from __future__ import annotations
 
 import json
-import ssl
 import urllib.error
-import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from urllib.parse import urlparse
 
 from onward_generator import __version__
+from onward_generator.net import fetch_bytes
 from onward_generator.overgrow.catalog import ALL_ASSETS, WEAR_NOTE
 from onward_generator.overgrow.normalize import gltf_to_local, normalize_arrays, write_normalized_glb
 
@@ -24,6 +23,7 @@ PAGE_URL = "https://polyhaven.com/a/{id}"
 USER_AGENT = f"onward-generator/{__version__} (local research tool)"
 ALLOWED = frozenset({"api.polyhaven.com", "dl.polyhaven.org", "polyhaven.com", "www.polyhaven.com"})
 MAX_BYTES = 260 * 1024 * 1024
+TIMEOUT_S = 180.0
 CC0 = frozenset({"cc0", "cc0 1.0", "cc0-1.0"})
 VERIFIED_ON = "2026-10-19"
 
@@ -32,20 +32,31 @@ class FetchError(ValueError):
     """A download cannot be saved."""
 
 
-def fetch_library(raw_dir: str | Path, library_dir: str | Path, inventory_path: str | Path) -> dict:
+Getter = Callable[[str], tuple[int, bytes]]
+"""``url -> (http_status, body)``. The default is ``_get``; tests pass a fake."""
+
+
+def fetch_library(
+    raw_dir: str | Path,
+    library_dir: str | Path,
+    inventory_path: str | Path,
+    *,
+    get: Getter | None = None,
+) -> dict:
     raw_root = Path(raw_dir).expanduser().resolve()
     library = Path(library_dir).expanduser().resolve()
     inventory = Path(inventory_path).expanduser().resolve()
     raw_root.mkdir(parents=True, exist_ok=True)
     library.mkdir(parents=True, exist_ok=True)
-    license_status, license_body = _get(LICENSE_URL)
+    get = get or _get
+    license_status, license_body = get(LICENSE_URL)
     if license_status != 200 or b"CC0" not in license_body:
         raise FetchError(f"Poly Haven licence page HTTP {license_status}; refusing the batch")
     rows = []
     manifest_assets = []
     for spec in ALL_ASSETS:
         try:
-            row, prefab = _one(spec, raw_root, library)
+            row, prefab = _one(spec, raw_root, library, get)
         except (FetchError, OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
             row, prefab = {
                 "name": spec.id,
@@ -96,13 +107,13 @@ def fetch_library(raw_dir: str | Path, library_dir: str | Path, inventory_path: 
     return document
 
 
-def _one(spec, raw_root: Path, library: Path) -> tuple[dict, dict | None]:
+def _one(spec, raw_root: Path, library: Path, get: Getter) -> tuple[dict, dict | None]:
     folder = raw_root / spec.id
     folder.mkdir(parents=True, exist_ok=True)
     if _local_ready(folder, spec.id):
         return _from_local(spec, folder, library)
-    info_status, info_body = _get(INFO_URL.format(id=spec.id))
-    files_status, files_body = _get(FILES_URL.format(id=spec.id))
+    info_status, info_body = get(INFO_URL.format(id=spec.id))
+    files_status, files_body = get(FILES_URL.format(id=spec.id))
     base = {
         "name": spec.id,
         "source_url": PAGE_URL.format(id=spec.id),
@@ -139,7 +150,7 @@ def _one(spec, raw_root: Path, library: Path) -> tuple[dict, dict | None]:
     if not entry.get("url"):
         base["import_status"] = "no_gltf_1k"
         return base, None
-    gltf_status, gltf_body = _get(str(entry["url"]))
+    gltf_status, gltf_body = get(str(entry["url"]))
     base["http_status"]["gltf"] = gltf_status
     if gltf_status != 200:
         base["import_status"] = "gltf_failed"
@@ -148,12 +159,12 @@ def _one(spec, raw_root: Path, library: Path) -> tuple[dict, dict | None]:
     gltf_path.write_bytes(gltf_body)
     doc = json.loads(gltf_body.decode("utf-8"))
     include = entry.get("include") or {}
-    bin_status = _save_uri(folder, doc, include, _buffer_uri(doc), "bin", base)
+    bin_status = _save_uri(folder, include, _buffer_uri(doc), "bin", base, get)
     albedo_uri = _albedo_uri(doc)
-    albedo_status = _save_uri(folder, doc, include, albedo_uri, "albedo", base)
+    albedo_status = _save_uri(folder, include, albedo_uri, "albedo", base, get)
     for name in include:
         if "_diff_" in name and name != albedo_uri:
-            _save_uri(folder, doc, include, name, "albedo_extra", base)
+            _save_uri(folder, include, name, "albedo_extra", base, get)
     if bin_status != 200 or albedo_status != 200:
         base["import_status"] = "missing_bin_or_albedo"
         return base, None
@@ -322,8 +333,7 @@ def _albedo_uri(doc: dict) -> str | None:
     return None
 
 
-def _save_uri(folder: Path, doc: dict, include: dict, uri: str | None, label: str, row: dict) -> int:
-    del doc
+def _save_uri(folder: Path, include: dict, uri: str | None, label: str, row: dict, get: Getter) -> int:
     if not uri:
         row["http_status"][label] = 0
         return 0
@@ -331,7 +341,7 @@ def _save_uri(folder: Path, doc: dict, include: dict, uri: str | None, label: st
     if not isinstance(meta, dict) or not meta.get("url"):
         row["http_status"][label] = 0
         return 0
-    status, body = _get(str(meta["url"]))
+    status, body = get(str(meta["url"]))
     row["http_status"][label] = status
     if status == 200:
         target = folder / uri
@@ -341,22 +351,17 @@ def _save_uri(folder: Path, doc: dict, include: dict, uri: str | None, label: st
 
 
 def _get(url: str) -> tuple[int, bytes]:
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname not in ALLOWED:
-        raise FetchError(f"refusing host {parsed.hostname}")
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+    """``(200, body)``, or ``(status, b"")`` for an HTTP error. Other failures raise ``FetchError``."""
     try:
-        with urllib.request.urlopen(request, timeout=180, context=ssl.create_default_context()) as response:
-            chunks = []
-            total = 0
-            while True:
-                block = response.read(256 * 1024)
-                if not block:
-                    break
-                total += len(block)
-                if total > MAX_BYTES:
-                    raise FetchError(f"{url} is larger than {MAX_BYTES} bytes")
-                chunks.append(block)
-            return int(response.status), b"".join(chunks)
-    except urllib.error.HTTPError as exc:
-        return int(exc.code), b""
+        return 200, fetch_bytes(
+            url,
+            allowed_hosts=ALLOWED,
+            max_bytes=MAX_BYTES,
+            timeout=TIMEOUT_S,
+            headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
+            error=FetchError,
+        )
+    except FetchError as exc:
+        if isinstance(exc.__cause__, urllib.error.HTTPError):
+            return int(exc.__cause__.code), b""
+        raise

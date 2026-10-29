@@ -5,7 +5,7 @@ Defined by `config/generator.schema.json` (JSON Schema 2020-12) and the example 
 ## Validation
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator validate-config config/murcia-belluga.example.json [--json]
+.venv/bin/python -m onward_generator validate-config config/murcia-belluga.example.json [--json]
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` usage error.

@@ -1,0 +1,59 @@
+# Same tasks locally and in CI (.github/workflows/ci.yml runs `task ci`).
+# Every task runs inside the Docker image through tools/docker/run.sh; nothing is installed on the host.
+# https://taskfile.dev
+version: "3"
+
+vars:
+  RUN: tools/docker/run.sh
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  image:
+    desc: Build the Docker image (onward-generator:dev)
+    cmds:
+      - docker compose -f compose.yaml build dev
+    env:
+      HOST_UID:
+        sh: id -u
+      HOST_GID:
+        sh: id -g
+
+  test:
+    desc: Run the test suite
+    cmds:
+      - "{{.RUN}} pytest -q -p no:cacheprovider {{.CLI_ARGS}}"
+
+  lint:shell:
+    desc: Check the shell scripts with shellcheck
+    cmds:
+      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh"
+
+  smoke:
+    desc: Run the CLI against the example configuration
+    cmds:
+      - "{{.RUN}} onward-generator version"
+      - "{{.RUN}} onward-generator validate-config config/murcia-belluga.example.json"
+
+  mutate:
+    desc: Mutation-test the functions changed since BASE (default main); fails when a mutant survives
+    vars:
+      BASE: '{{.BASE | default "main"}}'
+      MAX: '{{.MAX | default "40"}}'
+    cmds:
+      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
+
+  ci:
+    desc: Everything the CI gate runs
+    cmds:
+      - task: test
+      - task: lint:shell
+      - task: smoke
+
+  shell:
+    desc: Open a shell in the image
+    interactive: true
+    cmds:
+      - "{{.RUN}} bash"

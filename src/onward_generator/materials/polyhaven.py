@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import ssl
-import urllib.error
-import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -19,6 +16,7 @@ from urllib.parse import urlparse
 
 from onward_generator import __version__
 from onward_generator.io import atomic_write_bytes, atomic_write_json
+from onward_generator.net import fetch_bytes
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CACHE = REPO_ROOT / "assets" / "textures"
@@ -83,28 +81,15 @@ def cached_jpeg(cache_dir: Path, asset_id: str) -> Path:
     return Path(cache_dir) / asset_id / f"{asset_id}_diff_1k.jpg"
 
 
-def _ssl_context() -> ssl.SSLContext:
-    return ssl.create_default_context()
-
-
 def default_fetch(url: str, *, timeout_s: float = TIMEOUT_S) -> bytes:
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_FETCH_HOSTS:
-        raise DownloadError(f"refusing to fetch host {parsed.hostname!r}")
-    request = urllib.request.Request(
+    return fetch_bytes(
         url,
+        allowed_hosts=ALLOWED_FETCH_HOSTS,
+        max_bytes=MAX_BYTES,
+        timeout=timeout_s,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json,image/jpeg"},
+        error=DownloadError,
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_s, context=_ssl_context()) as response:  # noqa: S310
-            data = response.read(MAX_BYTES + 1)
-    except urllib.error.HTTPError as exc:
-        raise DownloadError(f"HTTP {exc.code} for {url}") from exc
-    except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
-        raise DownloadError(f"network error for {url}: {exc}") from exc
-    if len(data) > MAX_BYTES:
-        raise DownloadError(f"{url}: larger than {MAX_BYTES} bytes")
-    return data
 
 
 def _get_json(url: str, fetch: Fetcher) -> dict[str, Any]:

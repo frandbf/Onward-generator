@@ -1,0 +1,70 @@
+# Verification gate for every pull request. It runs `task ci` in the same Docker image
+# as a local `task ci`, so a failure here reproduces on any machine with Docker and go-task.
+# Linux only: macOS runners are not free for this private repository.
+# `mutate` mutates only the functions the change touched (tools/mutate/run.py) and fails
+# when a mutant survives, i.e. when no test notices the changed behaviour.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  linux:
+    name: linux (docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: onward-generator:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: task ci
+        run: task ci
+
+  mutate:
+    name: mutate (changed functions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: onward-generator:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: task mutate
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE=HEAD~1; fi
+          task mutate BASE="$BASE"

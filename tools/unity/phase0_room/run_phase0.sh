@@ -3,16 +3,20 @@
 # Each step runs Unity in batch mode and writes its own log under $LOG_DIR.
 # The project and outputs live outside the repository on purpose: the SDK is
 # third-party content and must not be committed.
+#
+#   run_phase0.sh [--platform macos|linux|auto] [all | step...]
 set -euo pipefail
 
-UNITY_VERSION="2021.3.23f1"
-UNITY="${UNITY:-/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity}"
+TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib.sh
+source "$TOOL_DIR/../lib.sh"
+resolve_host "$@"
+shift "$HOST_SHIFT"
 SDK_PACKAGE="${SDK_PACKAGE:-$HOME/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage}"
 SDK_SHA256="ad1f6d37725dbcbf4928bff19ad5df8a71ed3fe11320979a7ed4aba12c475315"
 PROJECT="${PROJECT:-$HOME/Unity/OnwardPhase0Project}"
 OUT_DIR="${OUT_DIR:-$HOME/Unity/OnwardPhase0Out}"
-LOG_DIR="${LOG_DIR:-$HOME/Library/Logs/onward-phase0}"
-TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LOG_DIR:-$LOG_ROOT/onward-phase0}"
 
 STEPS=(create import patch tool xr configure room launcher)
 
@@ -61,7 +65,7 @@ URP_VERSION="12.1.11"
 step_create() {
   [[ -e "$PROJECT" ]] && { log "project already exists at $PROJECT; skipping create"; return; }
   local resources builtin tgz tmp
-  resources="$(dirname "$UNITY")/../Resources/PackageManager"
+  resources="$UNITY_RESOURCES/PackageManager"
   builtin="$resources/BuiltInPackages"
   tgz="$(ls "$resources"/ProjectTemplates/com.unity.template.3d-*.tgz 2>/dev/null | head -1 || true)"
   [[ -n "$tgz" ]] || { log "3D template not found in $resources/ProjectTemplates"; exit 1; }
@@ -91,7 +95,7 @@ PY
 
 step_import() {
   local actual
-  actual="$(shasum -a 256 "$SDK_PACKAGE" | cut -d' ' -f1)"
+  actual="$(file_sha256 "$SDK_PACKAGE" | cut -d' ' -f1)"
   [[ "$actual" == "$SDK_SHA256" ]] || { log "SDK checksum mismatch: $actual"; exit 1; }
   run_unity import no-marker -importPackage "$SDK_PACKAGE" -quit
 }
@@ -103,7 +107,7 @@ step_tool() {
 }
 
 # Local deviation from SDK v1.15: OnwardLauncher.cs converts the bundle path
-# to Windows separators before File.Copy, which fails on macOS. Only that
+# to Windows separators before File.Copy, which fails on macOS and Linux. Only that
 # conversion is removed; the original file is kept outside Assets/.
 step_patch() {
   local target="$PROJECT/Assets/OnwardCustomContent/Internal/Scripts/Editor/OnwardLauncher.cs"

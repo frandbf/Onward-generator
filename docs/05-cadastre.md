@@ -5,16 +5,16 @@ Module `onward_generator.cadastre`. Licence obligations are in `docs/legal/data-
 Download and processing are separate. Only `download` uses the network. The service covers Spain. A map outside Spain skips this step.
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator cadastre download \
+.venv/bin/python -m onward_generator cadastre download \
   --scene maps/<id>/data/processed/geo/geo_scene.json \
   --out   maps/<id>/data/raw/catastro.gml
 
-PYTHONPATH=src .venv/bin/python -m onward_generator cadastre match \
+.venv/bin/python -m onward_generator cadastre match \
   --scene maps/<id>/data/processed/geo/geo_scene.json \
   --gml   maps/<id>/data/raw/catastro.gml \
   --out   maps/<id>/data/processed/cadastre
 
-PYTHONPATH=src .venv/bin/python -m onward_generator heights \
+.venv/bin/python -m onward_generator heights \
   --scene     maps/<id>/data/processed/geo/geo_scene.json \
   --overrides maps/<id>/data/processed/cadastre/heights_overrides.catastro.json \
   --out       maps/<id>/data/processed/heights

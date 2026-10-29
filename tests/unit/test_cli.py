@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -67,3 +68,52 @@ def test_geo_subcommand_delegates(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert main(args) == 0
     assert (out / "geo_scene.json").is_file()
     capsys.readouterr()
+
+
+def test_global_platform_flag_before_subcommand(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    main(["--platform", "linux", "doctor", "--json"])
+    report = json.loads(capsys.readouterr().out)
+    platform = {c["name"]: c for c in report["checks"]}["host:platform"]
+    assert platform["status"] == "ok" and platform["detail"].startswith("linux")
+    assert main(["--platform=macos", "version"]) == 0
+    capsys.readouterr()
+
+
+def test_global_platform_flag_reaches_module_subcommands(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("ONWARD_PLATFORM", "auto")
+    with pytest.raises(SystemExit) as exited:
+        main(["--platform", "linux", "map", "--help"])
+    assert exited.value.code == 0
+    assert "unrecognized" not in capsys.readouterr().err
+    assert os.environ["ONWARD_PLATFORM"] == "linux"
+
+
+def test_platform_command_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.platform import resolve_host
+
+    monkeypatch.setenv("ONWARD_PLATFORM", "linux")
+    assert main(["platform", "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report == resolve_host().to_dict()
+    assert report["name"] == "linux" and report["source"] == "env"
+    assert main(["--platform", "macos", "platform"]) == 0
+    assert "macos" in capsys.readouterr().out
+
+
+def test_bad_platform_exits_invalid(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setenv("ONWARD_PLATFORM", "auto")
+    assert main(["--platform", "windows", "doctor"]) == 2
+    assert "unknown platform 'windows'" in capsys.readouterr().err
+    assert main(["--platform"]) == 2
+    assert main(["run", "--platform", "windows", "--name", "x", "--lat", "1", "--lon", "1"]) == 2
+    monkeypatch.setenv("ONWARD_PLATFORM", "windows")
+    assert main(["platform"]) == 2
+    capsys.readouterr()
+
+
+def test_doctor_fails_on_an_unknown_platform_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ONWARD_PLATFORM", "windows")
+    checks = {c.name: c for c in run_checks()}
+    assert checks["host:platform"].status == "fail"
+    assert "onward:unity_editor" not in checks

@@ -88,7 +88,7 @@ def test_tampered_file_is_detected(downloaded: Path) -> None:
 
 def test_bbox_from_scene(pipeline_result: GeoResult) -> None:
     xmin, ymin, xmax, ymax = bbox_from_scene(pipeline_result.scene_dict(), 10.0)
-    assert xmin == pytest.approx(664343.977 - 60, abs=0.01) and ymax == pytest.approx(4205699.652 + 110, abs=0.01)
+    assert xmin == pytest.approx(664343.977 - 60, abs=0.01) and ymax == pytest.approx(4205699.652 + 40, abs=0.01)
 
 
 # --- Parsing. ---
@@ -140,7 +140,7 @@ def test_match_statuses(pipeline_result: GeoResult) -> None:
     assert matches["osm-relation-201"].levels == 7 and matches["osm-relation-201"].coverage > 0.95
     assert matches["osm-way-102"].status == "no_parts"  # only an underground part
     assert matches["osm-way-104"].status == "low_coverage" and matches["osm-way-104"].coverage == pytest.approx(1 / 3, abs=0.01)
-    assert matches["osm-way-113"].status == "no_parts"
+    assert "osm-way-113" not in matches  # dropped by geo: not fully inside the map
 
 
 def test_overrides_feed_heights_as_authoritative_levels(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:

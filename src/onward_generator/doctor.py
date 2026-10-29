@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from onward_generator.config.validation import REPO_ROOT, load_schema_validator, schema_path
+from onward_generator.platform import PLATFORM_ENV, UNITY_VERSION, HostProfile, PlatformError, resolve_host
 
 Status = Literal["ok", "warn", "fail"]
 
@@ -21,8 +22,6 @@ MIN_FREE_GB = 10.0
 # Centre of the first built map (Belluga). It checks the projection; it does not name the tool.
 MURCIA_CENTER = (-1.12863, 37.98407)
 MURCIA_CENTER_EPSG25830 = (664343.977, 4205699.652)
-UNITY_EDITOR = Path("/Applications/Unity/Hub/Editor/2021.3.23f1/Unity.app")
-UNITY_ADB = Path("/Applications/Unity/Hub/Editor/2021.3.23f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb")
 ONWARD_SDK = Path("~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage").expanduser()
 
 
@@ -114,17 +113,36 @@ def _disk(root: Path) -> Check:
     return Check("disk", status, f"{free_gb:.1f} GiB free on the project volume (warn below {MIN_FREE_GB:.0f})")
 
 
-def _toolchain() -> list[Check]:
-    """Phase 0 build chain. Missing tools only matter for export, so they warn."""
-    items = [
-        ("onward:unity_editor", UNITY_EDITOR, "Unity 2021.3.23f1"),
-        ("onward:adb", UNITY_ADB, "adb from Unity Android SDK"),
-        ("onward:sdk_package", ONWARD_SDK, "Onward Custom Content SDK v1.15"),
+def _present(name: str, path: Path, label: str) -> Check:
+    return Check(name, "ok" if path.exists() else "warn", f"{label}: {path}" + ("" if path.exists() else " (not found)"))
+
+
+def _toolchain(host: HostProfile | PlatformError) -> list[Check]:
+    """Phase 0 build chain. Missing tools only matter for export, so they warn.
+
+    An unsupported host fails ``host:platform``; the Unity and adb paths are then unknown.
+    """
+    sdk = _present("onward:sdk_package", ONWARD_SDK, "Onward Custom Content SDK v1.15")
+    if isinstance(host, PlatformError):
+        return [Check("host:platform", "fail", str(host)), sdk]
+    origin = {"flag": "from --platform", "env": f"from env {PLATFORM_ENV}", "auto": "detected"}[host.source]
+    return [
+        Check("host:platform", "ok", f"{host.name} ({origin})"),
+        _present("onward:unity_editor", host.unity_editor, f"Unity {UNITY_VERSION}"),
+        _present("onward:adb", host.adb, "adb from Unity Android SDK"),
+        sdk,
     ]
-    return [Check(name, "ok" if path.exists() else "warn", f"{label}: {path}" + ("" if path.exists() else " (not found)")) for name, path, label in items]
 
 
-def run_checks(root: Path = REPO_ROOT) -> list[Check]:
+def run_checks(root: Path = REPO_ROOT, host: HostProfile | None = None) -> list[Check]:
+    resolved: HostProfile | PlatformError
+    if host is not None:
+        resolved = host
+    else:
+        try:
+            resolved = resolve_host()
+        except PlatformError as exc:
+            resolved = exc
     steps: list[Callable[[], Check | list[Check]]] = [
         _python,
         _packages,
@@ -132,7 +150,7 @@ def run_checks(root: Path = REPO_ROOT) -> list[Check]:
         _schema,
         lambda: _directories(root),
         lambda: _disk(root),
-        _toolchain,
+        lambda: _toolchain(resolved),
     ]
     checks: list[Check] = []
     for step in steps:

@@ -4,7 +4,7 @@ A provider turns (system prompt, instruction, JSON schema) into raw text and
 reports what produced it. It never interprets the text: validation happens in
 ``intent.parse_intent``. Only local Ollama is supported; any host other than
 loopback is refused, and system proxies are bypassed so the prompt cannot leave
-the machine (PRD §2.5, §10.3).
+the machine (docs/10-ai.md, ADR-006).
 """
 
 from __future__ import annotations

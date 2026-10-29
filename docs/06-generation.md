@@ -3,7 +3,7 @@
 Module `onward_generator.generation`. The design decision is `docs/decisions/ADR-003-geometry-engine.md`.
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator generate \
+.venv/bin/python -m onward_generator generate \
   --scene   maps/<id>/data/processed/geo/geo_scene.json \
   --heights maps/<id>/data/processed/heights/heights.json \
   --out     maps/<id>/data/processed/scene3d \

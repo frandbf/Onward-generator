@@ -73,7 +73,7 @@ Figures from the guide, not from the Editor: about 150 draw calls, about 250 000
 
 Occlusion culling and static batching are what the guide recommends. v01 was measured on the headset and did not lower draw calls (ADR-005). They stay off.
 
-Textures at 1k, with Unity's import compression. If the headset shows them pixelated, the guide asks to move the shader precision from Half to Single. That is checked on the Quest. The SDK shader is not changed in advance.
+Textures are 1k. The adapter reads each PNG from the GLB with `Texture2D.LoadImage` into an uncompressed RGBA32 texture asset with mipmaps (`LoadPng` in `OnwardMapAdapter.cs`). They are not compressed for the Quest yet. Importing them as ASTC is planned. If the headset shows them pixelated, the guide asks to move the shader precision from Half to Single. That is checked on the Quest. The SDK shader is not changed in advance.
 
 ## Unity project (not edited per map)
 
@@ -83,10 +83,11 @@ Checked on disk, without opening a newer editor:
 - Shader stripping: Lightmap Modes and Fog Modes on Custom, every checkbox on. Required if Spec Ops is ever added.
 - Do not rename `ExampleScene` into the working scene, and do not edit the `OnwardCustomContent` prefabs.
 - On macOS, `OnwardLauncher.cs` must not convert the bundle path to `\`. The patch removes only `.Replace('/', '\\')`. Reimporting the `.unitypackage` undoes it (`docs/12-export.md`).
+- The `tool` step patches the SDK's `ContentBuilder.cs` with `tools/unity/onward_adapter/patch_content_builder.py`: the launcher copies the `AI_NavBake` JSON, removes the navigation baker from the bundled scene, and puts it back afterwards. The original is kept as `ContentBuilder.cs.sdk-v1.15.orig`, outside `Assets`. Reimporting the SDK `.unitypackage` undoes the patch. The next `tool` applies it again.
 
 XR (Oculus, Single Pass Instanced on PC, Multiview on Android) is a guide requirement. Android does not keep the automatic graphics API: Vulkan first, OpenGLES3 as fallback. The adapter sets that again when it builds the scene.
 
-The export bake follows the Onward lightmap guide (August 2023), at the low end of the range for a city: Progressive GPU, 256 direct samples, 512 indirect and environment, 2 to 4 bounces, ambient occlusion, Open Image denoiser, non-directional lightmaps, the map's texels per metre (default 10, at most 40), and 2048 px. After the bake, Android textures become ASTC 8×8. Occlusion culling and static batching stay off.
+The export bake follows the Onward lightmap guide (August 2023), at the low end of the range for a city: Progressive GPU, 256 direct samples, 512 indirect and environment, 2 to 4 bounces, ambient occlusion, Open Image denoiser, non-directional lightmaps, the map's texels per metre (default 10, at most 40), and 2048 px. After the bake, the Android lightmaps become ASTC 8×8. Occlusion culling and static batching stay off.
 
 A higher texel density makes the bake much longer. It does not change the navigation rules.
 

@@ -10,13 +10,13 @@ An isolated step after phase 04. It does not apply an AI material plan to the sc
 | Geometry | Volumes in `generate`, generic facades in `detail`. The classifier does not rebuild them. |
 | Format | Intermediate GLB. The Unity adapter `onward_unity` 0.1.0 reads `TEXCOORD_0` and an embedded PNG when one exists. |
 | Ollama | The same loopback `OllamaProvider` as phase 06. Default model `qwen3:14b`. `format` is the JSON Schema. |
-| Textures | `dress style` embeds a procedural atlas. `materials apply` remaps tiles from that map's `config/texture_plan.json`. See ADR-009. |
+| Textures | `dress style` embeds one procedural tile per material. `materials apply` replaces them from that map's `config/texture_plan.json`. Both repeat each image on the face plane and write `atlas.png` as a contact sheet. See ADR-009. |
 | Applying the classifier | Off. `--apply` is refused. |
 
 ## Classify
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator dress classify \
+.venv/bin/python -m onward_generator dress classify \
   --detail maps/<id>/data/processed/scene_detail \
   --out    maps/<id>/data/processed/dress_classify \
   --provider none \
@@ -45,16 +45,16 @@ Rules:
 ## Style
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator dress style \
+.venv/bin/python -m onward_generator dress style \
   --detail maps/<id>/data/processed/scene_detail \
   --out    maps/<id>/data/processed/scene_dress
 ```
 
 If the detail manifest stores the paths, `--scene`, `--heights`, and `--base` are filled in. The detail directory is not overwritten.
 
-`--no-atlas` leaves the GLB with flat colour only. `--scene` and `--heights` are used to place furniture on free ground. Facades are not rebuilt. Interior meshes are copied with the building: the floor, the walls that face the room, and the stair steps. The stair ramp stays on the building collider. Dropping the interior node leaves the ground colour, a wall that is invisible from inside, and a stair that can be climbed but not seen.
+`--no-atlas` leaves the GLB with flat colour only and writes no `atlas.png`. `--scene` and `--heights` are used to place furniture on free ground. Facades are not rebuilt. Interior meshes are copied with the building: the floor, the walls that face the room, and the stair steps. The stair ramp stays on the building collider. Dropping the interior node leaves the ground colour, a wall that is invisible from inside, and a stair that can be climbed but not seen.
 
-The atlas is a PNG generated in code: **greyscale modulation** (cobble, tile, asphalt, bark, foliage) so `PP_Opaque_Simple_Lit` can do `_BaseColor × _BaseMap` without darkening the tint. Each tile is 256 px. The grid grows (8×8, up to 2048²) so `tree_canopy`, `tree_trunk`, and `urban_metal` do not land on an empty or dark-metal tile. Historic plaster uses a 2 m `tile_m`. Licence: `project-generated`.
+The tiles are generated in code: **greyscale modulation** (cobble, tile, asphalt, bark, foliage) so `PP_Opaque_Simple_Lit` can do `_BaseColor × _BaseMap` without darkening the tint. Each tile is 256 px. The GLB embeds one tile per material as its own image, repeated in metres of the catalogue `tile_m` (2 m when the catalogue has none), the same way as `materials apply`. Historic plaster uses a 2 m `tile_m`. `atlas.png` puts the same tiles on one grid (8×8, up to 2048²) as a contact sheet for review. No material samples it, and the GLB extras mark it `"role": "contact_sheet"`. Before this change the GLB embedded that grid and wrapped each vertex into its slot, which smeared every triangle that crossed a tile edge. Scenes already written keep the old atlas. Licence: `project-generated`.
 
 The adapter does not bake lightmaps on trees or urban metal. At a low texel density, poles and canopies came out black.
 
@@ -62,6 +62,19 @@ There are no vehicles in this step. Inventing cars on the carriageway is not OSM
 
 ## Materials
 
-`onward-generator materials apply` is the texture step. It reads `maps/<id>/config/texture_plan.json`. `map create` writes that plan from the imported library. `map create --textures` replaces it and leaves the rest of the map alone. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. An older Poly Haven plan can still download Diffuse 1k with `--download`. The GLB carries one image per material, repeated on the wall plane. The 256 px atlas stays as a contact sheet. Windows and doors map to 0–1. Interior walls reuse the plain-facade photograph when the plan has one, otherwise the historic or ochre plaster. Interior floors reuse the door wood. Stairs reuse the sidewalk concrete. A colour photograph is shown with a white base colour. A greyscale photograph keeps the interior tint. These surfaces are not new plan slots. This step does not apply `dress classify`. Licences: [legal/data-sources.md](legal/data-sources.md).
+`onward-generator materials apply` is the texture step. It reads `maps/<id>/config/texture_plan.json`. `map create` writes that plan from the imported library. `map create --textures` replaces it and leaves the rest of the map alone. A slot whose family has no texture in the library is named in the plan description and keeps the procedural tile. The library has no bark yet, so `trunks` is one of them. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. An older Poly Haven plan can still download Diffuse 1k with `--download`. The GLB carries one image per material, repeated on the wall plane. The 256 px atlas stays as a contact sheet. Windows and doors map to 0–1. Interior walls reuse the plain-facade photograph when the plan has one, otherwise the historic or ochre plaster. Interior floors reuse the door wood. Stairs reuse the sidewalk concrete. A colour photograph is shown with a white base colour. A greyscale photograph keeps the interior tint. These surfaces are not new plan slots. This step does not apply `dress classify`. Licences: [legal/data-sources.md](legal/data-sources.md).
+
+## Texture coordinates
+
+`dress style` and `materials apply` write `TEXCOORD_0` the same way for every material with a repeating image:
+
+- **Walls and other steep faces:** U runs along the face, V runs up in world metres, both divided by `tile_m`.
+- **Level faces:** world X/Y, divided by `tile_m`. A face counts as level when `|n.z| ≥ 0.75`.
+- **Roofs:** catalogue entries whose `compatible_surfaces` include `roof` use the face plane up to `|n.z| < 0.98`. U runs along the eave and V up the slope, so a 22° hip or gable measures true metres along the slope instead of a top-down projection that is about 8% short. Only roofs get this rule. `cap()` shares vertices across a whole ground or slab surface, which must keep one planar projection.
+- **Windows and doors** (`glass_dark`, `glass_boarded`, `glass_view`, `door_wood` in `materials apply`): each opening fits 0–1.
+- **Per-building phase:** `materials apply` adds the hashed `uv_phase` of each building before the next step.
+- **Recentring:** for every connected island of triangles (vertices shared through triangles), `floor(min)` is subtracted from U and V. The fraction of every UV is unchanged, so the texture looks identical with Repeat wrapping, but the values stay within the island's extent plus one repeat instead of reaching hundreds or thousands far from the origin. That keeps the fraction exact if the shader works in half precision. Openings already fit 0–1 and are not shifted.
+
+UVs already stored on a primitive (overgrow meshes, Panoramax facades) are copied as they are.
 
 Phase 07 stays open. `device_verified` stays false until the headset checklist is filled in.

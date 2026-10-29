@@ -12,8 +12,10 @@ import pytest
 
 from onward_generator.cli import main
 from onward_generator.maps.workspace import create_map
+from onward_generator.next_step import export_command, geo_command
 from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import (
+    _build_package,
     _push_package,
     _stage_summary,
     _unity_summary,
@@ -26,6 +28,7 @@ from onward_generator.pipeline_run import (
     run_steps,
     unity_editor_open,
 )
+from onward_generator.platform import resolve_host
 from tests.conftest import MURCIA_CENTER
 
 LON, LAT = MURCIA_CENTER
@@ -193,16 +196,17 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
         "total 131000",
         "-rw-r--r--  1 frandbf  staff  67067253 Oct 21 19:06 unity-export.local.content3",
         "info3 MapName='Unity Export' package_title='LasCondes' environment=Urban",
-        "[export] content3 md5 76ec57e757646c7dd9c488dfdae47957",
+        "[export] content3 md5 0000000000000000000000000000000a",
         "[export] device backup: /tmp/backup (2 files)",
         "[export] pushed lascondes_b31e46f683 (md5 76ec57e757646c7dd9c488dfdae47957 verified on device)",
     ])
-    summary = _unity_summary(text, failed=False)
+    summary = _unity_summary(text, failed=False, content_md5="76ec57e757646c7dd9c488dfdae47957")
     assert "445 nodes" in summary
     assert "routes dropped: 1" in summary
     assert "launcher OK in 21.2 s, 64 MB" in summary
     assert "info3 MapName='Unity Export'" in summary
     assert "content3 md5 76ec57e75764" in summary
+    assert "000000000000" not in summary
     assert "device backup saved" in summary
     assert "pushed lascondes_b31e46f683" in summary
     assert "Scene saved" not in summary
@@ -210,12 +214,43 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
     assert "onward-export" not in summary
 
 
+def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    steps = dict(plan_steps(root))
+    assert steps["geo"] == list(geo_command(root).argv)
+    playable = root / "data" / "processed" / "scene_playable"
+    layout = root / "data" / "processed" / "layout" / "layout.json"
+    exported = export_command(playable, layout)
+    assert exported is not None
+    assert steps["export"] == list(exported.argv)
+
+
+def test_unity_summary_reads_md5_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    package = tmp_path / "pkg_01"
+    (package / "build").mkdir(parents=True)
+    (package / "build" / "content3.md5").write_text("76ec57e757646c7dd9c488dfdae47957\n", encoding="utf-8")
+    log = "info3 MapName='Unity Export'\n[export] content3 md5 ffffffffffffffffffffffffffffffff\n"
+    monkeypatch.setattr("onward_generator.pipeline_run._run_export", lambda args, env=None: (0, log))
+    assert _build_package(package, ["launcher"]) == 0
+    assert capsys.readouterr().out == "  info3 MapName='Unity Export'\n  content3 md5 76ec57e75764\n"
+
+
+def test_missing_md5_file_is_silent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    package = tmp_path / "pkg_01"
+    package.mkdir()
+    log = "[export] content3 md5 76ec57e757646c7dd9c488dfdae47957\n"
+    monkeypatch.setattr("onward_generator.pipeline_run._run_export", lambda args, env=None: (0, log))
+    assert _build_package(package, ["launcher"]) == 0
+    assert "md5" not in capsys.readouterr().out
+
+
 def test_a_successful_step_prints_its_result_without_the_file_list(capsys: pytest.CaptureFixture[str]) -> None:
     def execute(argv: list[str]) -> int:
         print("signs: plates=2")
         print("  Calle Mayor at [1.0, 2.0, 2.55]")
         print("wrote maps/murcia/scene_signs")
-        print("next: PYTHONPATH=src .venv/bin/python -m onward_generator bounds")
+        print("next: .venv/bin/python -m onward_generator bounds")
         print('{"schema": "onward_generator.gameplay_layout", "purpose": "playable"}')
         return 0
 
@@ -555,6 +590,49 @@ def test_push_sets_confirm_only_for_the_script(monkeypatch: pytest.MonkeyPatch, 
     assert seen["confirm"] == "yes"
     assert seen["args"][-2:] == [str(tmp_path), "push"]
     assert os.environ.get("CONFIRM_PUSH") == before
+
+
+def _capture_run(seen: dict[str, object]):
+    def fake_run(args, *, env, check, capture_output, text):
+        seen["args"] = list(args)
+        seen["env"] = dict(env)
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    return fake_run
+
+
+def test_build_package_passes_host_env(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", _capture_run(seen))
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    host = resolve_host("linux", env={"HOME": "/home/tester"})
+    assert _build_package(tmp_path, ["tool", "scene"], host=host) == 0
+    env = seen["env"]
+    assert isinstance(env, dict)
+    assert env["ONWARD_PLATFORM"] == "linux"
+    assert env["UNITY"] == "/home/tester/Unity/Hub/Editor/2021.3.23f1/Editor/Unity"
+    assert env["LOG_ROOT"] == "/home/tester/.local/state/onward-generator"
+    assert seen["args"][-3:] == [str(tmp_path), "tool", "scene"]
+
+
+def test_push_keeps_confirm_and_host(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", _capture_run(seen))
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    monkeypatch.delenv("UNITY", raising=False)
+    assert _push_package(tmp_path) == 0
+    env = seen["env"]
+    assert isinstance(env, dict)
+    assert env["CONFIRM_PUSH"] == "yes"
+    assert env["ONWARD_PLATFORM"] == "macos"
+    assert env["UNITY"] == "/Applications/Unity/Hub/Editor/2021.3.23f1/Unity.app/Contents/MacOS/Unity"
+
+
+def test_an_unknown_platform_does_not_start_unity(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", lambda *a, **k: pytest.fail("Unity started"))
+    monkeypatch.setenv("ONWARD_PLATFORM", "windows")
+    assert _build_package(tmp_path, ["tool"]) == 2
+    assert "unknown platform" in capsys.readouterr().out
 
 
 def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> None:

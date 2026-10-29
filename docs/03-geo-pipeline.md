@@ -22,8 +22,9 @@ Turns a local OSM XML file into a normalized scene in local metres, with an audi
 - **Deleted elements.** `action="delete"` or `visible="false"` are skipped (`deleted_element`).
 - **Untagged nodes and ways** are geometry, not entities.
 - **Areas.** A closed way is an area when it has `building`, `landuse`, `leisure`, `amenity`, `natural`, `place`, `shop`, `tourism`, or `historic`, or `area=yes`. `area=no` cancels that. Other ways are lines.
-- **Relations.** Only `type=multipolygon` is assembled, with outer and inner roles. Others warn `unsupported_relation`.
-- **Construction errors** (the entity is not created): `missing_node_reference`, `degenerate_way`, `degenerate_ring`, `missing_member`, `missing_outer_ring`, `unclosed_multipolygon_ring`.
+- **Relations.** Only `type=multipolygon` is assembled. Others warn `unsupported_relation`.
+- **Multipolygon rings.** The member ways are noded together and polygonized, so a ring may be split across any number of ways, and rings may touch at a node. A face enclosed by an odd number of rings is filled and an even number is a hole (even-odd nesting), so an island inside a courtyard is kept. Member roles are advisory: an `inner` ring that no ring encloses warns `inner_ring_outside_outer` and stays an area, and an `outer` ring nested in another outer warns `outer_ring_inside_outer` and becomes a hole. The relation still needs at least one `outer` member. Exteriors are written counter-clockwise and holes clockwise (RFC 7946). Vertices are the OSM node positions; noding adds a vertex only where two member ways cross.
+- **Construction errors** (the entity is not created): `missing_node_reference`, `degenerate_way`, `degenerate_ring`, `missing_member`, `missing_outer_ring`, `unclosed_multipolygon_ring` (a member way leaves a dangle, a cut edge, or an invalid ring).
 - **Data date.** If the source record does not set it, `source.data_timestamp` comes from the file: Overpass `<meta osm_base>` or the `<osm>` `timestamp`.
 
 ## Clipping

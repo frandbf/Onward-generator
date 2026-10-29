@@ -1,4 +1,4 @@
-"""Typed, immutable view of a validated project configuration (PRD §8.4)."""
+"""Typed, immutable view of a validated project configuration (docs/02-configuration.md)."""
 
 from __future__ import annotations
 

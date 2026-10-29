@@ -8,7 +8,7 @@ Documentation is in English. Working rules for changes are in `AGENTS.md`. The o
 
 ## Requirements
 
-- macOS (tested on macOS 26.6.2, Apple M4 Pro).
+- macOS (tested on macOS 26.6.2, Apple M4 Pro) or Linux. The host is detected, or chosen with `--platform macos|linux` or `ONWARD_PLATFORM`; see [docs/01-pipeline.md](docs/01-pipeline.md#host-platform). The Linux Unity paths are the Unity Hub defaults and have not been checked with Unity on Linux.
 - Python 3.12 or newer (tested with 3.14.6).
 - Pinned dependencies, all from binary wheels:
   - `shapely==2.2.0` (GEOS 3.14.1): geometry.
@@ -25,10 +25,43 @@ Documentation is in English. Working rules for changes are in `AGENTS.md`. The o
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --only-binary=:all: -r requirements.lock
-export PYTHONPATH=src
+.venv/bin/python -m pip install --no-deps -e .
 ```
 
-`PYTHONPATH=src` is required for every `python -m onward_generator` command below. The shell does not keep it after a new terminal.
+The editable install (`-e .`) is required: the code finds `config/` and `assets/` relative to the repository. It also installs the `.venv/bin/onward-generator` command, which is the same as `.venv/bin/python -m onward_generator`.
+
+### Docker (optional)
+
+To keep the machine clean, the Python pipeline and its checks can run in a container instead of `.venv`. The image installs `requirements.lock` and `shellcheck`. The repository is mounted at `/work`, so outputs land in `maps/` as usual and belong to your user. The container uses the host network, so loopback Ollama works the same way. Unity and `adb` stay on the host.
+
+The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
+
+```bash
+task --list            # test, lint:shell, smoke, ci, mutate, image, shell
+task ci                # everything the CI gate runs
+task test -- -k cadastre
+```
+
+### Mutation testing
+
+`task mutate` changes the code a branch touched and checks that some test notices. Only functions in `src/onward_generator` that contain an added or changed line since `BASE` (default `main`, uncommitted edits included) are mutated, with [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock`. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one.
+
+```bash
+task mutate                         # functions changed since main
+task mutate BASE=fork/main MAX=10   # another base; at most 10 functions
+```
+
+Exit 0 means every mutant was killed. Exit 1 lists each survivor with its diff: a behaviour no test holds. Write a test that fails on that edit, or, when the edit changes nothing a caller can see, end that line with `# pragma: no mutate: <reason>`. The reason must not start with `block`, `start` or `end`, which are mutmut keywords. Exit 2 means the tool could not run. Functions over `MAX` are listed as not mutated. mutmut works on a copy in `mutants/` (gitignored), and a second run only retests what changed. On a pull request, CI runs the same task against the target branch.
+
+Any other command goes through the same wrapper:
+
+```bash
+tools/docker/run.sh onward-generator doctor
+tools/docker/run.sh onward-generator run --name "Map name" --lat 37.98407 --lon -1.12863
+tools/docker/run.sh --build pytest -q   # rebuild after requirements.lock changes
+```
+
+The first call builds the image `onward-generator:dev`. Unity is not in the image: inside the container, `run` writes the export package and then fails at the Unity step. Build that package on the host with `tools/unity/onward_adapter/run_export.sh`.
 
 Check the environment:
 
@@ -47,7 +80,7 @@ Export needs Unity **2021.3.23f1** and the Onward Custom Content SDK v1.15. Neit
 ~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage
 ```
 
-Create the project, import the SDK, patch the macOS launcher path, and install the XR packages:
+Create the project, import the SDK, patch the launcher path (macOS and Linux), and install the XR packages:
 
 ```bash
 tools/unity/phase0_room/run_phase0.sh create import patch tool xr configure
@@ -60,7 +93,6 @@ The project is `~/Unity/OnwardPhase0Project`. Do not open it with another Unity 
 `--lat` is the WGS84 latitude. `--lon` is the WGS84 longitude. A negative longitude uses the hyphen on the keyboard (`-3.65288`). A typographic minus is rejected.
 
 ```bash
-export PYTHONPATH=src
 .venv/bin/python -m onward_generator run \
   --name "Map name" \
   --lat 37.98407 \
@@ -105,7 +137,7 @@ If Overpass fails after the folder exists:
 
 The headset has one local slot. The launcher always writes `unity-export.local`. The card title on the headset is `Unity Export`. The name passed to `run` is the folder name and the title stored in `maps/<id>/config/export.json`.
 
-Each stage prints an indented result and `OK` with its duration. At the end, `run: time` lists the stages that ran and the total. The Quest question is excluded. Full paths and the Unity log stay out of that summary. The editor log is `~/Library/Logs/onward-export/`.
+Each stage prints an indented result and `OK` with its duration. At the end, `run: time` lists the stages that ran and the total. The Quest question is excluded. Full paths and the Unity log stay out of that summary. The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/onward-generator/onward-export/` on Linux.
 
 To build or upload without going through `run`:
 
@@ -121,7 +153,6 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 `run` is the usual path. The same stages, one command at a time. `map show` prints the `geo` command for that folder, including its CRS.
 
 ```bash
-export PYTHONPATH=src
 .venv/bin/python -m onward_generator map create --name "Map name" --lat 37.98407 --lon -1.12863
 .venv/bin/python -m onward_generator map show maps/<id>
 
@@ -228,12 +259,13 @@ Inputs, outputs, and the rules for repeating one stage: [docs/01-pipeline.md](do
 
 ## Command reference
 
-Every command is `PYTHONPATH=src .venv/bin/python -m onward_generator <command>`. `version` prints `0.1.0`.
+Every command is `.venv/bin/python -m onward_generator <command>`. `version` prints `0.1.0`.
 
 | Command | What it does | Exit |
 | --- | --- | --- |
 | `version` | Print the generator version. | `0` |
-| `doctor` | Read-only check of Python and the pinned versions, GEOS, PROJ, and EPSG:25830 offline, the configuration schema, free disk, and the export toolchain (Unity 2021.3.23f1, adb, and the SDK package). A missing toolchain file is a warning. | `0` ok, `1` if something fails |
+| `platform` | Print the host (`macos` or `linux`), where it came from, and the Unity, adb, log, and Asset Store cache paths. `--json` for machine output. The global `--platform` goes before any command. | `0`, `2` for an unknown platform |
+| `doctor` | Read-only check of Python and the pinned versions, GEOS, PROJ, and EPSG:25830 offline, the configuration schema, free disk, and the host platform, and the export toolchain (Unity 2021.3.23f1, adb, and the SDK package). A missing toolchain file is a warning. An unknown platform fails `host:platform`. | `0` ok, `1` if something fails |
 | `validate-config` | Strict read, JSON Schema, and semantic rules. Each finding names the field, cause, and code. See `docs/02-configuration.md`. | `0` valid, `1` invalid |
 | `run` | Create a map and run every Python stage through `export package`, then Unity, then an optional Quest upload. See [Make a map](#make-a-map). | `0` / `1` |
 | `map create` / `map show` | One folder per map: name, latitude, longitude, radius, and area of interest. The id and `maps/<id>` come from the name. `create` downloads that square's `.osm` and writes `config/texture_plan.json`. `--textures` on an existing map rewrites only that plan. `show` prints the `geo` command for the folder. | `0` / `1` |
@@ -314,7 +346,7 @@ Look these up when you need them. They are not the next chapter:
 
 - `docs/abandoned-assets.md`: the 49 props overgrow can place, with a picture of each.
 - `docs/legal/data-sources.md`: licences, attribution, and ODbL obligations.
-- `docs/decisions/`: why a choice was made. ADR-002 coordinates, ADR-003 geometry, ADR-004 facades, ADR-005 Quest performance, ADR-006 the AI intent, ADR-007 the export adapter, ADR-008 landmark towers, ADR-009 materials, ADR-010 overgrow gestures.
+- `docs/decisions/`: why a choice was made. ADR-002 coordinates, ADR-003 geometry, ADR-004 facades, ADR-005 Quest performance, ADR-006 the AI intent, ADR-007 the export adapter, ADR-008 landmark towers, ADR-009 materials, ADR-010 overgrow gestures, ADR-011 the host platform.
 - `tools/unity/phase0_room/`: phase-0 test room.
 - `tools/unity/perf_harness/`: phase-05 measurement harness (`MurciaPerfBuilder.cs`, `run_perf.sh`).
 - `tools/unity/onward_adapter/`: export adapter (`OnwardMapAdapter.cs`, `run_export.sh`).
@@ -346,6 +378,7 @@ src/onward_generator/
 ├── pipeline_run.py                    ordered run, stage timing, condensed log
 ├── next_step.py                       the next command each stage prints
 ├── doctor.py                          environment check
+├── platform.py                        host platform: macOS or Linux paths
 ├── io.py                              shared atomic JSON writes
 ├── config/                            loader, validation, models, diagnostics
 ├── domain/models.py                   entities with no GIS dependency

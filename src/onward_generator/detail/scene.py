@@ -149,7 +149,7 @@ class DetailedScene:
             "phase_04_checks": {
                 "automatic_checks_passed": severities.get("critical", 0) == 0,
                 "critical_errors": severities.get("critical", 0),
-                "visual_review": "pending (PRD §11.1: 'Escena visualmente revisada y funcional' requires a human review)",
+                "visual_review": "pending (docs/07-detail.md: a person must review the scene visually)",
             },
             "issues": [i.to_dict() for i in self.issues],
         }

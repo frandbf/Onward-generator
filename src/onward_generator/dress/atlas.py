@@ -8,10 +8,9 @@ slot and is supplied by the ``materials`` stage, not invented here.
 
 from __future__ import annotations
 
-import struct
-import zlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from io import BytesIO
 
 import numpy as np
 
@@ -31,51 +30,38 @@ class Atlas:
     note: str
 
 
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
 def encode_png_rgba(pixels: np.ndarray) -> bytes:
-    """Uncompressed-filter PNG. ``pixels`` is (h, w, 4) uint8."""
+    """8-bit RGBA PNG through Pillow. ``pixels`` is (h, w, 4) uint8.
+
+    Fixed save options and no metadata chunks, so the same pixels give the
+    same bytes for the pinned Pillow version.
+    """
     if pixels.ndim != 3 or pixels.shape[2] != 4 or pixels.dtype != np.uint8:
         raise ValueError("pixels must be an HxWx4 uint8 array")
-    height, width, _ = pixels.shape
+    from PIL import Image
 
-    def chunk(tag: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-    raw = b"".join(b"\x00" + pixels[y].tobytes() for y in range(height))
-    return b"".join([
-        b"\x89PNG\r\n\x1a\n",
-        chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)),
-        chunk(b"IDAT", zlib.compress(raw, 9)),
-        chunk(b"IEND", b""),
-    ])
+    image = Image.fromarray(np.ascontiguousarray(pixels))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG", optimize=False, compress_level=9)
+    return buffer.getvalue()
 
 
 def decode_png_rgba(data: bytes) -> np.ndarray:
-    """Inverse of ``encode_png_rgba`` (filter 0, 8-bit RGBA)."""
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+    """Decode a PNG to (h, w, 4) uint8 RGBA. Anything that is not a PNG is refused."""
+    if not data.startswith(PNG_SIGNATURE):
         raise ValueError("not a PNG")
-    offset = 8
-    width = height = 0
-    raw = b""
-    while offset + 12 <= len(data):
-        length = struct.unpack(">I", data[offset : offset + 4])[0]
-        tag = data[offset + 4 : offset + 8]
-        payload = data[offset + 8 : offset + 8 + length]
-        offset += 12 + length
-        if tag == b"IHDR":
-            width, height = struct.unpack(">II", payload[:8])
-        elif tag == b"IDAT":
-            raw += payload
-        elif tag == b"IEND":
-            break
-    pixels = zlib.decompress(raw)
-    stride = 1 + width * 4
-    rows = []
-    for y in range(height):
-        row = pixels[y * stride : (y + 1) * stride]
-        if not row or row[0] != 0:
-            raise ValueError("only filter-0 PNG rows are supported")
-        rows.append(np.frombuffer(row[1:], dtype=np.uint8).reshape(width, 4))
-    return np.stack(rows, 0)
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.format != "PNG":
+                raise ValueError("not a PNG")
+            return np.asarray(image.convert("RGBA"), dtype=np.uint8)
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise ValueError(f"unreadable PNG: {exc}") from exc
 
 
 def _grid(n: int) -> tuple[int, int]:
@@ -180,8 +166,6 @@ def bake_photo_tile(rgb: np.ndarray, size: int, mode: str) -> np.ndarray:
 
 def decode_jpeg_rgb(data: bytes) -> np.ndarray:
     """Decode a JPEG (or other Pillow-readable still) to HxWx3 uint8."""
-    from io import BytesIO
-
     from PIL import Image
 
     image = Image.open(BytesIO(data)).convert("RGB")

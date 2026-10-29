@@ -60,6 +60,7 @@ Phases 00 through 06 are done. Phase 07, the final export, stays open. `device_v
 - Tests use the Murcia city-centre point latitude 37.98407, longitude −1.12863 (`MURCIA_CENTER` in `tests/conftest.py`) as origin and reference location.
 - Test invalid input and failure cases.
 - Do not claim tests passed unless they were actually executed.
+- Before a pull request, run `task ci` and `task mutate`. A surviving mutant needs a test that kills it, or `# pragma: no mutate: <reason>` on that line when the edit is not observable.
 - Test game compatibility on the real headset when the task requires it.
 
 ## Scope control

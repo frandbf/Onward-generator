@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Phase 07: Onward export adapter (onward_unity 0.1.0).
 #
-#   run_export.sh PACKAGE_DIR step...
+#   run_export.sh [--platform macos|linux|auto] PACKAGE_DIR step...
 #   steps: tool scene launcher push
 #
 # PACKAGE_DIR is written by `onward-generator export package`; its files are
@@ -11,12 +11,13 @@
 # unity-export.local.*): it requires CONFIRM_PUSH=yes and backs up the device copy first.
 set -euo pipefail
 
-UNITY_VERSION="2021.3.23f1"
-UNITY="${UNITY:-/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity}"
-ADB="${ADB:-/Applications/Unity/Hub/Editor/${UNITY_VERSION}/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb}"
-PROJECT="${PROJECT:-$HOME/Unity/OnwardPhase0Project}"
-LOG_DIR="${LOG_DIR:-$HOME/Library/Logs/onward-export}"
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib.sh
+source "$TOOL_DIR/../lib.sh"
+resolve_host "$@"
+shift "$HOST_SHIFT"
+PROJECT="${PROJECT:-$HOME/Unity/OnwardPhase0Project}"
+LOG_DIR="${LOG_DIR:-$LOG_ROOT/onward-export}"
 REPO="$(cd "$TOOL_DIR/../../.." && pwd)"
 PYTHON="${PYTHON:-$REPO/.venv/bin/python}"
 DEVICE_DIR="/sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent"
@@ -91,8 +92,8 @@ PY
     thumb="$TOOL_DIR/Editor/Thumbnails/apocalipsis_murciana.png"
   fi
   [[ -f "$thumb" ]] && cp "$thumb" "$BUILD/launcher/thumbnail.png"
-  md5 -q "$BUILD/launcher/unity-export.local.content3" > "$BUILD/content3.md5"
-  shasum -a 256 "$BUILD/launcher/unity-export.local.content3" "$BUILD/launcher/unity-export.local.info3" > "$BUILD/launcher.sha256"
+  file_md5 "$BUILD/launcher/unity-export.local.content3" > "$BUILD/content3.md5"
+  file_sha256 "$BUILD/launcher/unity-export.local.content3" "$BUILD/launcher/unity-export.local.info3" > "$BUILD/launcher.sha256"
   log "content3 md5 $(cat "$BUILD/content3.md5")"
 }
 
@@ -113,11 +114,11 @@ step_push() {
   [[ -f "$thumb" ]] || { log "launcher thumbnail is missing; export package should contain thumbnail.png"; exit 1; }
   "$ADB" push "$thumb" "$DEVICE_DIR/unity-export.local.png" >/dev/null
   local thumb_md5 device_thumb
-  thumb_md5="$(md5 -q "$thumb")"
+  thumb_md5="$(file_md5 "$thumb")"
   device_thumb="$("$ADB" shell md5sum "$DEVICE_DIR/unity-export.local.png" | cut -d' ' -f1)"
   [[ "$thumb_md5" == "$device_thumb" ]] || { log "thumbnail md5 mismatch on device: $device_thumb != $thumb_md5"; exit 1; }
   local local_md5 device_md5
-  local_md5="$(md5 -q "$content")"
+  local_md5="$(file_md5 "$content")"
   device_md5="$("$ADB" shell md5sum "$DEVICE_DIR/unity-export.local.content3" | cut -d' ' -f1)"
   [[ "$local_md5" == "$device_md5" ]] || { log "md5 mismatch on device: $device_md5 != $local_md5"; exit 1; }
   printf '%s pushed %s md5 %s backup %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PACKAGE_ID" "$local_md5" "$backup" >> "$BUILD/push.log"

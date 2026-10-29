@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from onward_generator import __version__
+from onward_generator.platform import PLATFORM_CHOICES, PLATFORM_ENV, PlatformError, resolve_host
 
 EXIT_OK = 0
 EXIT_INVALID = 1
@@ -37,6 +39,31 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT_INVALID if failed else EXIT_OK
 
 
+def _cmd_platform(args: argparse.Namespace) -> int:
+    try:
+        host = resolve_host()
+    except PlatformError as exc:
+        print(f"platform: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    if args.json:
+        print(json.dumps(host.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        for key, value in host.to_dict().items():
+            print(f"{key:18} {value}")
+    return EXIT_OK
+
+
+def _select_platform(value: str) -> str | None:
+    """Validate a ``--platform`` value and export it to child processes. Returns an error or None."""
+    try:
+        resolve_host(value)
+    except PlatformError as exc:
+        return str(exc)
+    if value != "auto":
+        os.environ[PLATFORM_ENV] = value
+    return None
+
+
 def _cmd_validate_config(args: argparse.Namespace) -> int:
     from onward_generator.config.validation import validate_config_file
 
@@ -54,6 +81,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from onward_generator.maps.workspace import MapError, map_directory
     from onward_generator.pipeline_run import run_map
 
+    host = None
+    if args.platform is not None:
+        error = _select_platform(args.platform)
+        if error is not None:
+            print(f"run: {error}", file=sys.stderr)
+            return EXIT_USAGE
+        host = resolve_host()
     try:
         directory = map_directory(args.name)
     except MapError as exc:
@@ -75,6 +109,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         overwrite=args.overwrite,
         start=args.start,
+        host=host,
     )
 
 
@@ -104,6 +139,12 @@ def _cmd_heights(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="onward-generator", description="Onward map generator")
+    parser.add_argument(
+        "--platform",
+        choices=PLATFORM_CHOICES,
+        default=None,
+        help=f"host for the Unity paths (default: ${PLATFORM_ENV}, else detected); goes before the command",
+    )
     sub = parser.add_subparsers(dest="command", required=True, metavar="command")
 
     version = sub.add_parser("version", help="print the generator version")
@@ -113,6 +154,10 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="check the environment and dependencies (read-only)")
     doctor.add_argument("--json", action="store_true")
     doctor.set_defaults(handler=_cmd_doctor)
+
+    host = sub.add_parser("platform", help="print the host platform and the Unity, adb and log paths it uses")
+    host.add_argument("--json", action="store_true")
+    host.set_defaults(handler=_cmd_platform)
 
     validate = sub.add_parser("validate-config", help="validate a project configuration file")
     validate.add_argument("path", help="configuration JSON file")
@@ -159,13 +204,30 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")
+    run.add_argument("--platform", choices=PLATFORM_CHOICES, default=None, help="host for the Unity steps; same as the global --platform")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
     return parser
 
 
+def _global_platform(argv: list[str]) -> tuple[list[str], str | None]:
+    """Remove a leading ``--platform X`` or ``--platform=X``. Module subcommands never see it."""
+    if argv[:1] == ["--platform"]:
+        if len(argv) < 2:
+            return argv[1:], ""
+        return argv[2:], argv[1]
+    if argv and argv[0].startswith("--platform="):
+        return argv[1:], argv[0].split("=", 1)[1]
+    return argv, None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    argv = list(sys.argv[1:] if argv is None else argv)
+    argv, platform = _global_platform(list(sys.argv[1:] if argv is None else argv))
+    if platform is not None:
+        error = _select_platform(platform)
+        if error is not None:
+            print(f"onward-generator: {error}", file=sys.stderr)
+            return EXIT_USAGE
     if argv[:1] == ["geo"]:
         from onward_generator.geo.__main__ import main as geo_main
 

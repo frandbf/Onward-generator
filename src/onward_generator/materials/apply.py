@@ -433,6 +433,7 @@ def apply_materials(
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
+        roof_uv_materials={e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces},
     )
     atomic_write_bytes(targets[0], visual)
     if collision.is_file():

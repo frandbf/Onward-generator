@@ -65,13 +65,32 @@ This is the project `export` and the Onward Launcher use. It lives in `~/Unity/O
 | Shader stripping | Lightmap Modes and Fog Modes on Custom, every lightmap and fog checkbox on |
 | Android | Active platform, IL2CPP, ARM64 |
 | XR | XR Plugin Management 4.5.2 and Oculus XR Plugin 3.3.0. Oculus on for PC and Android. PC: Single Pass Instanced. Android: Multiview |
-| macOS launcher | In `OnwardLauncher.cs`, only `.Replace('/', '\\')` is removed. The SDK original stays outside `Assets`. Reimporting the `.unitypackage` undoes the patch |
+| Launcher path | In `OnwardLauncher.cs`, only `.Replace('/', '\\')` is removed. Needed on macOS and Linux. The SDK original stays outside `Assets`. Reimporting the `.unitypackage` undoes the patch |
 | Navigation map | The Quest reads the `AI_NavBake` JSON, not the `NavigationMap` object. `tool` applies `patch_content_builder.py`. Reimporting the package undoes it. The next `tool` puts it back |
 | Graphics API | The project leaves it on automatic. When the scene is built, the adapter sets Vulkan, with OpenGLES3 as fallback |
 
 The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage`. `ExampleScene` is not renamed, and the `OnwardCustomContent` prefabs are not edited. Playable-map detail is in [11-onward-sdk.md](11-onward-sdk.md).
 
 `scene` opens that project in batch mode. If the Editor already has it open, the step cannot start. Before the first stage, `onward-generator run` checks that lock: an exclusive hold on `Temp/UnityLockfile`, or `Library/EditorInstance.json` when its process is still alive. A terminal tells the user to close the Editor and waits for `s` or `si`. The stages start only after that answer and only once the project is closed. Any other answer cancels the run. A terminal that cannot ask stops with `FAILED unity` and does not start the stages. A freshly created project does not contain `Assets/OnwardAdapter/`.
+
+## Host platform
+
+The Unity, adb, log, and Asset Store cache paths depend on the host. The host is macOS or Linux. It is chosen by a flag or a variable, never by editing a path. Decision: [ADR-011](decisions/ADR-011-host-platform.md).
+
+1. `--platform macos|linux|auto`. It goes before the command (`onward-generator --platform linux run ...`) and is also accepted by `run`. The Unity scripts take it as their first argument (`run_export.sh --platform linux PACKAGE_DIR ...`). `auto` counts as not given.
+2. The `ONWARD_PLATFORM` variable. The global flag sets it, so every child process sees the same host.
+3. Detection: `platform.system()` in Python, `uname -s` in the scripts. `Darwin` is macOS, `Linux` is Linux.
+
+Any other value, or another system, is a usage error (exit `2`). It is never ignored. `doctor` reports it as a failed `host:platform` check. After the host is chosen, `UNITY`, `ADB`, `LOG_ROOT`, and `ASSET_STORE_CACHE` still override one path each, and `LOG_DIR` still overrides one script's log folder. `onward-generator platform [--json]` prints the result.
+
+| | macOS | Linux |
+| --- | --- | --- |
+| Unity executable | `/Applications/Unity/Hub/Editor/2021.3.23f1/Unity.app/Contents/MacOS/Unity` | `~/Unity/Hub/Editor/2021.3.23f1/Editor/Unity` |
+| adb | `/Applications/Unity/Hub/Editor/2021.3.23f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb` | `~/Unity/Hub/Editor/2021.3.23f1/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb` |
+| `LOG_ROOT` | `~/Library/Logs` | `${XDG_STATE_HOME:-~/.local/state}/onward-generator` |
+| Asset Store cache | `~/Library/Unity/Asset Store-5.x` | `~/.local/share/unity3d/Asset Store-5.x` |
+
+The macOS values are the ones used before the option existed. The Linux values are the Unity Hub defaults. They have not been checked on a Linux host with Unity installed. `run` passes `ONWARD_PLATFORM`, `UNITY`, `ADB`, and `LOG_ROOT` to `run_export.sh`. The scripts share `tools/unity/lib.sh`, which also picks `md5 -q` or `md5sum` and `shasum -a 256` or `sha256sum`.
 
 ## What to rerun
 
@@ -108,7 +127,7 @@ The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage
 
 `onward-generator run` walks the chain from `--name`, `--lat`, and `--lon`. `--brief` stores how the city should feel. If the sentence asks for an abandoned city, chaos, or blocked streets, `overgrow` leaves a few cars and barrels on the carriageway. Otherwise they stay on the kerb. `--ai` stores `ambient_ai`, and `overgrow` asks Ollama for a gesture plan. If it does not answer or the JSON does not validate, it retries once. If that attempt also fails, the rules place the props. `--panoramax` stores `panoramax`. It is written only when the argument is present, the same way as `--ai`. A later run without the flag does not turn it off. Absent on an older `map.json` means off.
 
-Each `run` step prints an indented result and `OK` with its duration. At the end, `run: time` lists the steps that ran and the total. The Quest question is not included. File paths, the package listing, the layout JSON, and the full Unity log stay out of that summary. The editor log remains in `~/Library/Logs/onward-export/`.
+Each `run` step prints an indented result and `OK` with its duration. At the end, `run: time` lists the steps that ran and the total. The Quest question is not included. File paths, the package listing, the layout JSON, and the full Unity log stay out of that summary. The editor log remains in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS, `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. See [Host platform](#host-platform). The `content3 md5` line comes from `build/content3.md5`, not from the log. Without that file, no md5 line is printed. `run` executes each stage from its argument list. It does not parse the printed `next:` line, so a path with spaces or quotes runs as written. `export package` gets `--config config/export.json` only when that file exists, the same as its `next:` line.
 
 If a step exits non-zero, the console says `FAILED <step>` and `Next:` names the step to resume from. Earlier steps are not repeated. A second run with the same folder skips steps that already wrote their output and continues at the first one that is missing. A `map.json` without the OSM XML asks Overpass again (`osm download`) and does not repeat `map create`. When two or more steps are done and the terminal is interactive, it lists them and asks where to continue. `--from geo` answers without asking. Each step always writes the same directory (`bounds` writes `scene_playable`). If that directory already exists, the repeat passes `--overwrite`. A file older than the input it reads is pending: repeating `geo` asks for `heights` again, and so on to the end. Turning `panoramax` on after a finished run inserts `panoramax apply`. `scene_panoramax` is not there, so `signs` is no longer fresh and the repeat passes `--overwrite` to `signs` and every later directory. `export package` is not overwritten. If `pkg_01` exists, the next package is `pkg_02`.
 
