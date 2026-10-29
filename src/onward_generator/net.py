@@ -97,7 +97,7 @@ def fetch_bytes(
     delay = retry_delay_s
     retries = 0
     while True:
-        request = urllib.request.Request(url, data=data, headers=dict(headers), method="POST" if data is not None else "GET")
+        request = urllib.request.Request(url, data=data, headers=dict(headers), method="POST" if data is not None else "GET")  # pragma: no mutate: urllib infers the same method from data
         try:
             with opener(request, timeout) as response:
                 return _read_capped(response, max_bytes, url, error)
@@ -109,7 +109,7 @@ def fetch_bytes(
                 continue
             if exc.code == 429:
                 raise error(f"rate limited: HTTP 429 for {safe}") from exc
-            detail = exc.read(400).decode("utf-8", "replace").strip() if error_body else ""
+            detail = exc.read(400).decode(errors="replace").strip() if error_body else ""
             raise error(f"HTTP {exc.code} for {safe}" + (f": {detail}" if detail else "")) from exc
         except urllib.error.URLError as exc:
             raise error(f"request to {safe} failed: {exc.reason}") from exc

@@ -299,7 +299,7 @@ def _ring_crossings(face: Polygon, segments: np.ndarray) -> int:
     straddling = segments[(segments[:, 1] > y) != (segments[:, 3] > y)]
     x1, y1, x2, y2 = straddling.T
     x_at = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-    return int(np.count_nonzero(x_at > x))
+    return int(np.count_nonzero(x_at > x))  # pragma: no mutate: the probe is strictly inside a face, never on a segment
 
 
 def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssue]) -> BaseGeometry | None:
@@ -342,10 +342,10 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
         return None
     segments = _member_segments(outer + inner)
     outer_lines = unary_union(outer)
-    inner_lines = unary_union(inner) if inner else None
+    inner_lines = unary_union(inner)
     filled: list[Polygon] = []
     for face in faces:
-        from_inner = inner_lines is not None and inner_lines.covers(face.exterior)
+        from_inner = inner_lines.covers(face.exterior)
         if _ring_crossings(face, segments) % 2 == 1:
             filled.append(face)
             if from_inner:
@@ -367,7 +367,7 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
                 )
             )
     merged = unary_union(filled)
-    return MultiPolygon([orient(part, sign=1.0) for part in getattr(merged, "geoms", [merged])])
+    return MultiPolygon([orient(part, sign=1.0) for part in getattr(merged, "geoms", [merged])])  # pragma: no mutate: orient reads only the sign, and 1.0 is its default
 
 
 def build_source_features(doc: OsmDocument) -> tuple[list[SourceFeature], list[GeoIssue], dict[str, int]]:

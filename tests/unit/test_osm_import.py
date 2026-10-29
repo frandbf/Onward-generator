@@ -3,12 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from shapely import Point
+from shapely import LineString, Point, Polygon
 
 from onward_generator.domain.models import OsmRef
+from onward_generator.geo.issues import GeoIssue
 from onward_generator.geo.osm_import import (
     FeatureKind,
     OsmImportError,
+    _member_segments,
+    _ring_crossings,
     build_source_features,
     is_area,
     parse_osm_xml,
@@ -82,7 +85,7 @@ def test_multipolygon_without_outer_is_reported(tmp_path: Path) -> None:
     )
     features, issues, _ = build_source_features(parse_osm_xml(path))
     assert features == []
-    assert [(i.code, i.ref) for i in issues] == [("missing_outer_ring", OsmRef("relation", 20))]
+    assert issues == [GeoIssue("missing_outer_ring", "error", "osm-relation-20 has no outer member", OsmRef("relation", 20))]
 
 
 def test_is_area_rules() -> None:
@@ -164,14 +167,47 @@ def test_multipolygon_open_outer_is_reported(tmp_path: Path) -> None:
     path = _multipolygon_file(tmp_path, _square(1, 0, 0, 10, 10), {10: [1, 2, 3, 4]}, [(10, "outer")])
     features, issues, _ = build_source_features(parse_osm_xml(path))
     assert features == []
-    assert [(i.code, i.ref) for i in issues] == [("unclosed_multipolygon_ring", OsmRef("relation", 30))]
+    assert issues == [
+        GeoIssue(
+            "unclosed_multipolygon_ring",
+            "error",
+            "osm-relation-30 has rings that do not close (1 open piece(s) in the member ways)",
+            OsmRef("relation", 30),
+        )
+    ]
+
+
+def test_multipolygon_closed_outer_with_an_open_inner_is_reported(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 8, 8)
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: [5, 6, 7]}, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert features == []
+    assert [i.code for i in issues] == ["unclosed_multipolygon_ring"]
+
+
+@pytest.mark.parametrize("ways", [{10: _ring(1)}, {10: _ring(1), 11: [5]}])
+def test_multipolygon_missing_or_short_member_is_reported(tmp_path: Path, ways: dict[int, list[int]]) -> None:
+    points = _square(1, 0, 0, 10, 10) | {5: (2, 2)}
+    path = _multipolygon_file(tmp_path, points, ways, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert features == []
+    assert issues[-1] == GeoIssue(
+        "missing_member", "error", "osm-relation-30 member way/11 is missing or incomplete", OsmRef("relation", 30)
+    )
 
 
 def test_inner_outside_outer_is_reported(tmp_path: Path) -> None:
     points = _square(1, 0, 0, 10, 10) | _square(5, 20, 0, 24, 4)
     path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "inner")])
     features, issues, _ = build_source_features(parse_osm_xml(path))
-    assert [(i.code, i.severity) for i in issues] == [("inner_ring_outside_outer", "warning")]
+    assert issues == [
+        GeoIssue(
+            "inner_ring_outside_outer",
+            "warning",
+            "osm-relation-30 has an inner ring that no outer ring encloses; it is kept as an area",
+            OsmRef("relation", 30),
+        )
+    ]
     [feature] = features
     polygons = sorted(feature.geometry_wgs84.geoms, key=lambda p: p.area)
     assert [p.area for p in polygons] == pytest.approx([16e-8, 1e-6])
@@ -237,6 +273,28 @@ def test_inner_touching_an_outer_corner_is_a_hole(tmp_path: Path) -> None:
     assert not polygon.contains(Point(LON + 1.3 * 0.0001, LAT + 1.3 * 0.0001))
 
 
+def test_inner_crossing_the_outer_edge_follows_even_odd(tmp_path: Path) -> None:
+    # The part of the inner inside the outer is a hole; the part outside is filled. Neither is reported.
+    points = _square(1, 0, 0, 10, 10) | _square(5, 8, 4, 12, 6)
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    geometry = features[0].geometry_wgs84
+    assert geometry.area == pytest.approx(100e-8)
+    assert not geometry.contains(Point(LON + 9 * 0.0001, LAT + 5 * 0.0001))
+    assert geometry.contains(Point(LON + 11 * 0.0001, LAT + 5 * 0.0001))
+
+
+def test_a_ray_through_a_vertex_counts_once_per_side() -> None:
+    face = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
+    y = face.representative_point().y
+    # A triangle whose lowest vertex sits on the ray: the ray touches it and stays outside.
+    touching = LineString([(3, y + 1), (4, y), (5, y + 1), (3, y + 1)])
+    assert _ring_crossings(face, _member_segments([touching])) == 2
+    upside_down = LineString([(3, y - 1), (4, y), (5, y - 1), (3, y - 1)])
+    assert _ring_crossings(face, _member_segments([upside_down])) == 0
+
+
 def test_two_inners_sharing_an_edge_are_both_holes(tmp_path: Path) -> None:
     points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 5, 8) | {9: (8, 2), 10: (8, 8)}
     path = _multipolygon_file(
@@ -256,6 +314,13 @@ def test_nested_outer_without_inner_is_reported_as_hole(tmp_path: Path) -> None:
     points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 8, 8)
     path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "outer")])
     features, issues, _ = build_source_features(parse_osm_xml(path))
-    assert [i.code for i in issues] == ["outer_ring_inside_outer"]
+    assert issues == [
+        GeoIssue(
+            "outer_ring_inside_outer",
+            "warning",
+            "osm-relation-30 has an outer ring inside another outer ring; it is kept as a hole",
+            OsmRef("relation", 30),
+        )
+    ]
     [polygon] = features[0].geometry_wgs84.geoms
     assert len(polygon.interiors) == 1

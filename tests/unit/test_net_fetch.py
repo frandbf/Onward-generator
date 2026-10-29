@@ -96,13 +96,27 @@ def test_fetch_bytes_refuses_host(url: str) -> None:
     assert seen == []
 
 
+def test_fetch_bytes_names_a_missing_scheme() -> None:
+    opener, _ = _opener(b"never")
+    with pytest.raises(FetchFailed) as caught:
+        fetch_bytes("//example.org/data", allowed_hosts=HOSTS, max_bytes=10, timeout=5.0, headers={}, error=FetchFailed, opener=opener)
+    assert str(caught.value) == "refusing to fetch host 'example.org' over no scheme"
+
+
+def test_fetch_bytes_needs_a_positive_cap() -> None:
+    opener, _ = _opener(b"x")
+    with pytest.raises(ValueError, match="max_bytes must be positive"):
+        _fetch(opener, max_bytes=0)
+    assert _fetch(opener, max_bytes=1) == b"x"
+
+
 def test_fetch_bytes_caps_size() -> None:
     opener, _ = _opener(b"x" * 1024)
     assert len(_fetch(opener)) == 1024
     opener, _ = _opener(b"x" * 1025)
-    with pytest.raises(FetchFailed, match="larger than 1024 bytes") as caught:
+    with pytest.raises(FetchFailed) as caught:
         _fetch(opener)
-    assert "secret" not in str(caught.value)
+    assert str(caught.value) == "https://example.org/data: larger than 1024 bytes"
 
 
 def test_fetch_bytes_maps_http_error_without_body_by_default() -> None:
@@ -121,6 +135,10 @@ def test_fetch_bytes_appends_body_when_asked() -> None:
     assert message.startswith("HTTP 504 for https://example.org/data: server overloaded x")
     assert len(message) == len("HTTP 504 for https://example.org/data: ") + 400 - 2
     assert "secret" not in message
+    opener, _ = _opener(_http_error(502, b"bad \xff byte"))
+    with pytest.raises(FetchFailed) as caught:
+        _fetch(opener, error_body=True)
+    assert str(caught.value) == "HTTP 502 for https://example.org/data: bad \ufffd byte"
     opener, _ = _opener(_http_error(500, b"   "))
     with pytest.raises(FetchFailed) as caught:
         _fetch(opener, error_body=True)
@@ -150,13 +168,20 @@ def test_fetch_bytes_retries_429() -> None:
     assert waits == [50.0, 90.0]
 
 
+def test_fetch_bytes_doubles_the_429_wait() -> None:
+    waits: list[float] = []
+    opener, _ = _opener(_http_error(429), _http_error(429), _http_error(429), b"done")
+    assert _fetch(opener, retry_429=3, retry_delay_s=10.0, sleep=waits.append) == b"done"
+    assert waits == [10.0, 20.0, 40.0]
+
+
 def test_fetch_bytes_gives_up_after_429_retries() -> None:
     waits: list[float] = []
-    opener, seen = _opener(_http_error(429), _http_error(429))
+    opener, seen = _opener(_http_error(429), _http_error(429), _http_error(429), b"never")
     with pytest.raises(FetchFailed, match="rate limited"):
-        _fetch(opener, retry_429=1, sleep=waits.append)
-    assert len(seen) == 2
-    assert waits == [8.0]
+        _fetch(opener, retry_429=2, sleep=waits.append)
+    assert len(seen) == 3
+    assert waits == [8.0, 16.0]
 
 
 def test_fetch_bytes_does_not_retry_429_by_default() -> None:
