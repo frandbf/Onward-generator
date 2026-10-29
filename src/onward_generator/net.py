@@ -97,7 +97,7 @@ def fetch_bytes(
     delay = retry_delay_s
     retries = 0
     while True:
-        request = urllib.request.Request(url, data=data, headers=dict(headers), method="POST" if data is not None else "GET")
+        request = urllib.request.Request(url, data=data, headers=dict(headers), method="POST" if data is not None else "GET")  # pragma: no mutate: only dropping the method survives, urllib infers the same one from data; test_net_callers pins the rest
         try:
             with opener(request, timeout) as response:
                 return _read_capped(response, max_bytes, url, error)
