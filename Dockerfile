@@ -17,11 +17,13 @@ COPY requirements.lock requirements-mutate.lock ./
 RUN python -m pip install --only-binary=:all: -r requirements.lock \
     && python -m pip install -r requirements-mutate.lock
 
-# Editable install: at run time the bind mount at /work replaces these files,
-# and the installed path still points at /work/src.
-COPY pyproject.toml README.md ./
-COPY src ./src
-RUN python -m pip install --no-deps -e . \
+# Editable install against an empty package: at run time the bind mount at /work
+# brings the real src/ to the path the install points at. Only pyproject.toml is
+# copied, so a code or README change does not rebuild this layer.
+COPY pyproject.toml ./
+RUN mkdir -p src/onward_generator \
+    && touch README.md src/onward_generator/__init__.py \
+    && python -m pip install --no-deps -e . \
     && mkdir -p /tmp/home && chmod 1777 /tmp/home
 
 CMD ["onward-generator", "--help"]

@@ -38,7 +38,8 @@ jobs:
           load: true
           tags: onward-generator:dev
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Pull requests read the cache; only main writes it.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
       - name: task ci
         run: task ci
 
@@ -80,7 +81,8 @@ jobs:
           load: true
           tags: onward-generator:dev
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Pull requests read the cache; only main writes it.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
       - name: task mutate
         if: steps.changes.outputs.src == 'true'
         env:
