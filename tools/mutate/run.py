@@ -24,6 +24,7 @@ import difflib
 import fnmatch
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -193,6 +194,13 @@ def _summary(counts: Counter[str]) -> str:
     return ", ".join(f"{counts[k]} {k}" for k in keys if counts[k])
 
 
+def clear_mutants(root: Path = REPO) -> None:
+    """Delete mutmut's ``mutants/`` tree. mutmut reuses a file it finds there even when
+    the source changed since, so a stale tree generates fewer mutants than CI and maps
+    them to the wrong lines."""
+    shutil.rmtree(root / MUTANTS, ignore_errors=True)
+
+
 def _mutmut(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["mutmut", *args], cwd=REPO, capture_output=True, text=True)
 
@@ -220,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         for f in dropped:
             print(f"  skipped {f.module}.{f.mangled}")
     print(f"mutate: {len(targets)} changed functions since {args.base}")
+    clear_mutants()
 
     if args.whole_functions:
         selected = [f.pattern for f in targets]

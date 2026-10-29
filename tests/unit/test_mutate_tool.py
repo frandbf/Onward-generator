@@ -115,3 +115,13 @@ def test_on_changed_lines_keeps_only_mutants_on_changed_lines(tmp_path, monkeypa
 def test_statuses_filters_by_pattern() -> None:
     results = "    a.x_f__mutmut_1: killed\n    a.x_f__mutmut_2: survived\n    a.x_fg__mutmut_1: survived\n"
     assert mutate.statuses(results, ["a.x_f__mutmut_*"]) == {"a.x_f__mutmut_1": "killed", "a.x_f__mutmut_2": "survived"}
+
+
+def test_clear_mutants_removes_a_stale_tree_and_accepts_none(tmp_path: Path) -> None:
+    stale = tmp_path / "mutants" / "src" / "onward_generator"
+    stale.mkdir(parents=True)
+    (stale / "old.py").write_text("x = 1\n", encoding="utf-8")
+    mutate.clear_mutants(tmp_path)
+    assert not (tmp_path / "mutants").exists()
+    mutate.clear_mutants(tmp_path)
+    assert tmp_path.exists()
