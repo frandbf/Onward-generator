@@ -76,6 +76,35 @@ def test_hash_helpers_match_hashlib(tmp_path: Path) -> None:
     assert sha_line == f"{hashlib.sha256(sample.read_bytes()).hexdigest()}  {sample}"
 
 
+def _tool_dir(tmp_path: Path, *names: str) -> Path:
+    """A PATH directory holding only the named host tools."""
+    bin_dir = tmp_path / "tools"
+    bin_dir.mkdir()
+    for name in names:
+        found = shutil.which(name)
+        if found is None:
+            pytest.skip(f"{name} is not installed")
+        (bin_dir / name).symlink_to(found)
+    return bin_dir
+
+
+def test_file_md5_follows_the_installed_tool_not_the_platform(tmp_path: Path) -> None:
+    sample = tmp_path / "sample.bin"
+    sample.write_bytes(b"content3\n")
+    bin_dir = _tool_dir(tmp_path, "bash", "md5sum", "cut")
+    script = 'source "$LIB"; ONWARD_PLATFORM=macos; file_md5 "$1"'
+    result = _bash(tmp_path, script, str(sample), env={"PATH": str(bin_dir)})
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"{hashlib.md5(sample.read_bytes()).hexdigest()}\n"
+
+    fake_md5 = bin_dir / "md5"
+    fake_md5.write_text('#!/bin/sh\necho "md5 $*"\n', encoding="utf-8")
+    fake_md5.chmod(0o755)
+    script = 'source "$LIB"; ONWARD_PLATFORM=linux; file_md5 "$1"'
+    result = _bash(tmp_path, script, str(sample), env={"PATH": str(bin_dir)})
+    assert result.stdout == f"md5 -q {sample}\n"
+
+
 @pytest.mark.parametrize("args, env, system", [(("--platform", "windows"), {}, "Linux"), ((), {"ONWARD_PLATFORM": "bsd"}, "Linux"), ((), {}, "FreeBSD"), (("--platform",), {}, "Linux")])
 def test_unknown_platform_exits_2(tmp_path: Path, args: tuple[str, ...], env: dict[str, str], system: str) -> None:
     result = _bash(tmp_path, SHOW, *args, env=env, system=system)
