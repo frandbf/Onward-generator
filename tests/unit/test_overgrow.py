@@ -11,12 +11,12 @@ from pathlib import Path
 import numpy as np
 from shapely.geometry import Polygon
 
+from onward_generator.ai.providers import StaticProvider
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh, cap
-from onward_generator.materials.apply import building_boarded, building_uv_phase, stamp_abandoned_facades
 from onward_generator.maps.workspace import create_map
-from onward_generator.ai.providers import StaticProvider
+from onward_generator.materials.apply import building_boarded, building_uv_phase, stamp_abandoned_facades
 from onward_generator.overgrow.ambient import is_solid, plan_from_brief
 from onward_generator.overgrow.place import overgrow
 from tests.conftest import MURCIA_CENTER

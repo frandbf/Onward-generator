@@ -23,7 +23,19 @@ from shapely.geometry.polygon import orient
 from onward_generator.detail.config import DetailConfig
 from onward_generator.detail.facades import UP, Hole, Layout, Segment, face_with_openings, stable_unit
 from onward_generator.detail.modules import StairGeometry, frame_matrix, stair, stair_geometry
-from onward_generator.generation.mesh import Mesh, box, cap, closed_manifold_defects, merge, polygons_of, prism, quad, signed_volume, transform, walls
+from onward_generator.generation.mesh import (
+    Mesh,
+    box,
+    cap,
+    closed_manifold_defects,
+    merge,
+    polygons_of,
+    prism,
+    quad,
+    signed_volume,
+    transform,
+    walls,
+)
 
 WALL_INSET_M = 0.05
 RIM_TOLERANCE_M = 1e-3

@@ -26,3 +26,4 @@ mutants/
 
 # Claude Code worktrees.
 .claude/
+.ruff_cache/

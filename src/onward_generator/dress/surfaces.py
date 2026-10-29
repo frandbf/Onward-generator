@@ -368,7 +368,7 @@ def group_drafts(drafts: Sequence[_Draft]) -> list[SurfaceGroup]:
         buckets[_group_key(d)].append(d)
     groups: list[SurfaceGroup] = []
     used_ids: set[str] = set()
-    for key, items in sorted(buckets.items(), key=lambda kv: (kv[1][0].role, kv[1][0].surface_id)):
+    for _key, items in sorted(buckets.items(), key=lambda kv: (kv[1][0].role, kv[1][0].surface_id)):
         first = items[0]
         areas = [i.area_m2 for i in items if i.area_m2 is not None]
         heights = [i.height_m for i in items if i.height_m is not None]

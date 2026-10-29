@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +14,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
-from onward_generator.props.catalog import CatalogError, PropCatalog, PropEntry, load_catalog
+from onward_generator.props.catalog import PropCatalog, PropEntry, load_catalog
 
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 OUTPUT_FILES = (

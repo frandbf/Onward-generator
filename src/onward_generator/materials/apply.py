@@ -217,12 +217,12 @@ def rematerialize_brick_walls(
 
 
 def building_uv_phase(name: str) -> tuple[float, float]:
-    digest = hashlib.sha256(f"uv:{name}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"uv:{name}".encode()).digest()
     return (digest[0] / 255.0, digest[1] / 255.0)
 
 
 def building_boarded(name: str) -> bool:
-    return hashlib.sha256(f"board:{name}".encode("utf-8")).digest()[0] % 5 == 0
+    return hashlib.sha256(f"board:{name}".encode()).digest()[0] % 5 == 0
 
 
 def stamp_abandoned_facades(nodes: Sequence[Node], *, board: bool) -> list[Node]:

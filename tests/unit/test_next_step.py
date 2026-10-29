@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from onward_generator.maps.workspace import create_map
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.maps.workspace import create_map
 from onward_generator.next_step import (
     StageCommand,
     dress_command,

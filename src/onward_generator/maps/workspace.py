@@ -14,13 +14,13 @@ from typing import Any
 
 from shapely import box
 
+from onward_generator.ai.providers import Provider
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
 from onward_generator.export.package import ExportError, load_export_config
 from onward_generator.geo.aoi import AoiError, load_aoi_geojson
-from onward_generator.geo.projection import ProjectionError, frame_for_origin
-from onward_generator.ai.providers import Provider
-from onward_generator.io import atomic_write_bytes, atomic_write_json
+from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_for_origin
+from onward_generator.io import atomic_write_json
 from onward_generator.materials.library_plan import select_texture_plan
 
 MAP_SCHEMA = "onward_generator.map"

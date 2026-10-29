@@ -13,9 +13,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HOME=/tmp/home
 
 WORKDIR /work
-COPY requirements.lock requirements-mutate.lock ./
+COPY requirements.lock requirements-mutate.lock requirements-lint.lock ./
 RUN python -m pip install --only-binary=:all: -r requirements.lock \
-    && python -m pip install -r requirements-mutate.lock
+    && python -m pip install -r requirements-mutate.lock -r requirements-lint.lock
 
 # Editable install against an empty package: at run time the bind mount at /work
 # brings the real src/ to the path the install points at. Only pyproject.toml is

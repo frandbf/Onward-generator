@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from shapely import Point, box
-from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.detail.config import DetailConfig

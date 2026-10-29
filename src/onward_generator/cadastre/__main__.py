@@ -9,7 +9,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from onward_generator.cadastre.acquire import CadastreError, bbox_from_scene, download_building_parts, load_download_record
-from onward_generator.contracts import is_schema
 from onward_generator.cadastre.gml import parse_building_parts
 from onward_generator.cadastre.match import (
     DEFAULT_MIN_COVERAGE,
@@ -18,6 +17,7 @@ from onward_generator.cadastre.match import (
     match_report,
     overrides_document,
 )
+from onward_generator.contracts import is_schema
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_json, prepare_outputs
 

@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from shapely.geometry import Polygon, shape
+from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.contracts import is_schema

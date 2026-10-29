@@ -27,23 +27,23 @@ from onward_generator.maps.workspace import (
     store_brief,
     store_panoramax,
 )
-from onward_generator.osm.acquire import osm_target
-from onward_generator.platform import HostProfile, PlatformError, resolve_host
 from onward_generator.next_step import (
     detail_command,
     dress_command,
     export_invocation,
+    fit_command,
     generate_command,
     geo_command,
     heights_command,
     invoke,
     materials_command,
-    fit_command,
     overgrow_command,
     panoramax_command,
     show,
     signs_command,
 )
+from onward_generator.osm.acquire import osm_target
+from onward_generator.platform import HostProfile, PlatformError, resolve_host
 
 Execute = Callable[[Sequence[str]], int]
 Ask = Callable[[], str]

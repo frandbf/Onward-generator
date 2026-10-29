@@ -33,9 +33,10 @@ def frame_for_origin(origin_lon: float, origin_lat: float) -> LocalFrame:
     except ProjectionError as exc:
         if "outside the area of use" not in str(exc):
             raise
+        outside = exc
     zone = int((origin_lon + 180.0) / 6.0) + 1
     if not 1 <= zone <= 60:
-        raise ProjectionError(f"longitude {origin_lon} does not fall in a UTM zone") from exc
+        raise ProjectionError(f"longitude {origin_lon} does not fall in a UTM zone") from outside
     code = (32600 if origin_lat >= 0 else 32700) + zone
     return LocalFrame.create(origin_lon, origin_lat, f"EPSG:{code}")
 

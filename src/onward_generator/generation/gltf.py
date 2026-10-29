@@ -542,7 +542,7 @@ def nodes_from_glb(data: bytes) -> tuple[list[Node], dict[str, Material]]:
             key = str(mesh_name)
         matrix = _local_matrix(raw["matrix"]) if raw.get("matrix") else None
         extras = dict(raw.get("extras") or {})
-        nodes.append(Node(str(raw.get("name") or f"node"), meshes[mi] or (), extras, matrix, key))
+        nodes.append(Node(str(raw.get("name") or "node"), meshes[mi] or (), extras, matrix, key))
     return nodes, materials
 
 

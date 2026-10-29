@@ -7,7 +7,7 @@ import math
 import pytest
 from shapely import LineString, Point, Polygon
 
-from onward_generator.geo.projection import DEFAULT_CRS, LocalFrame, ProjectionError
+from onward_generator.geo.projection import DEFAULT_CRS, LocalFrame, ProjectionError, frame_for_origin
 from tests.conftest import MURCIA_CENTER
 
 # GRS80 (ETRS89) and UTM zone 30N constants.
@@ -110,3 +110,10 @@ def test_origin_outside_crs_area_is_rejected() -> None:
 def test_area_of_use_check(frame: LocalFrame) -> None:
     assert frame.within_area_of_use(Point(*MURCIA))
     assert not frame.within_area_of_use(Point(3.0, 40.0))
+
+
+def test_frame_for_origin_rejects_the_antimeridian_with_a_projection_error() -> None:
+    # Longitude 180 is outside EPSG:25830 and gives UTM zone 61, which does not exist.
+    with pytest.raises(ProjectionError, match="does not fall in a UTM zone") as raised:
+        frame_for_origin(180.0, 10.0)
+    assert "outside the area of use" in str(raised.value.__cause__)

@@ -22,13 +22,12 @@ from shapely.geometry.base import BaseGeometry
 
 from onward_generator import __version__
 from onward_generator.detail.config import DetailConfig, Template
-from onward_generator.detail.grammar import choose_roof, choose_wall
 from onward_generator.detail.facades import (
     Layout,
+    Storeys,
     build_shell,
     cut_roof_deck,
     exposed_frontage,
-    Storeys,
     interior_storey,
     layout_segment,
     refine_exposure,
@@ -36,6 +35,7 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
+from onward_generator.detail.grammar import choose_roof, choose_wall
 from onward_generator.detail.interiors import (
     build_interior,
     glass_penetrations,
@@ -49,7 +49,7 @@ from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
-from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, polygons_of, prism, signed_volume, walls
+from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene
 from onward_generator.generation.surfaces import SurfaceClass
 
@@ -409,10 +409,10 @@ def detail_scene(
 
         def run_layout(door_kind: str, door_depth: float, door_opening: Any, storeys_used: Storeys) -> Layout:
             layout = Layout()
-            for seg in segments:
+            for seg in segments:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                 if seg.exposed:
-                    layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,
-                                   bid, refined, others, cfg, layout)
+                    layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
+                                   bid, refined, others, cfg, layout)  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
             return layout
 
         interior = None

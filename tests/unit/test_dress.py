@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from onward_generator.ai.providers import OllamaProvider, ProviderError
+from onward_generator.ai.providers import OllamaProvider
 from onward_generator.cli import main
 from onward_generator.dress.atlas import build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import CatalogError, load_catalog
@@ -252,7 +252,7 @@ def test_disconnected_ollama_is_reported(tmp_path: Path) -> None:
     assert report["applied"] is False
 
 
-def test_fake_ollama_response_is_validated(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]
+def test_fake_ollama_response_is_validated(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]  # noqa: F811 - pytest injects the fixture imported above
     host, handler = fake_ollama
     detail, scene = write_sample(tmp_path)
     groups = collect_surfaces(detail, scene_path=scene, limit=1)

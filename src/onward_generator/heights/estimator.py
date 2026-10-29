@@ -356,7 +356,7 @@ def _blocks(footprints: Sequence[BaseGeometry | None], gap_m: float) -> list[int
     indexed = [(i, g) for i, g in enumerate(footprints) if g is not None]
     if indexed:
         tree = STRtree([g for _, g in indexed])
-        for local_i, (i, geom) in enumerate(indexed):
+        for i, geom in indexed:
             for local_j in tree.query(geom, predicate="dwithin", distance=gap_m):
                 j = indexed[int(local_j)][0]
                 if j != i:

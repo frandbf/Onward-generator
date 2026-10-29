@@ -8,9 +8,10 @@ import pytest
 
 from onward_generator import __version__
 from onward_generator.cli import main
-from onward_generator.doctor import MURCIA_CENTER, MURCIA_CENTER_EPSG25830, run_checks
 from onward_generator.config.validation import REPO_ROOT
-from tests.conftest import AOI_FIXTURE, MURCIA_CENTER as TEST_CENTER, ORIGIN, OSM_FIXTURE
+from onward_generator.doctor import MURCIA_CENTER, MURCIA_CENTER_EPSG25830, run_checks
+from tests.conftest import AOI_FIXTURE, ORIGIN, OSM_FIXTURE
+from tests.conftest import MURCIA_CENTER as TEST_CENTER
 
 EXAMPLE = REPO_ROOT / "config" / "murcia-belluga.example.json"
 

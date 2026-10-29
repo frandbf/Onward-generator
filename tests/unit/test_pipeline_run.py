@@ -456,7 +456,6 @@ def _write_launcher(package: Path) -> None:
 
 def test_unity_builds_the_quest_files_before_asking(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _ready_map(tmp_path)
-    package = root / "data" / "processed" / "export" / "pkg_01"
     built: list[list[str]] = []
     pushed: list[str] = []
 

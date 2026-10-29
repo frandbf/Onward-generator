@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from onward_generator.cli import main
+from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
@@ -26,7 +27,6 @@ from onward_generator.export.package import (
     sha256_file,
     verify_package,
 )
-from onward_generator.config.loader import read_json_document
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]

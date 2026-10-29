@@ -27,7 +27,9 @@ from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, merge, transform
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.maps.workspace import MapError, load_map
 from onward_generator.next_step import map_root
+from onward_generator.overgrow.ambient import cross_yaw, plan_from_brief
 from onward_generator.overgrow.constants import (
     LANE_M,
     MAX_ADDED_TRIS,
@@ -38,12 +40,21 @@ from onward_generator.overgrow.constants import (
     MAX_WRECKS,
     SEED,
 )
-from onward_generator.maps.workspace import MapError, load_map
-from onward_generator.overgrow.ambient import cross_yaw, plan_from_brief
 from onward_generator.overgrow.dressing import block_reason, collider_mesh, dress, keep, load_spawns
 from onward_generator.overgrow.fit import object_reason
 from onward_generator.overgrow.ground import road_floor
-from onward_generator.overgrow.growth import canopy_png, grass_png, grass_tuft, moss_png, moss_skirt, rust_png, tree_parts, trunk_png, vine_png, wreck_mesh
+from onward_generator.overgrow.growth import (
+    canopy_png,
+    grass_png,
+    grass_tuft,
+    moss_png,
+    moss_skirt,
+    rust_png,
+    tree_parts,
+    trunk_png,
+    vine_png,
+    wreck_mesh,
+)
 from onward_generator.overgrow.library import load_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
