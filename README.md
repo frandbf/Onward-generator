@@ -37,10 +37,21 @@ To keep the machine clean, the Python pipeline and its checks can run in a conta
 The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
 
 ```bash
-task --list            # test, lint:shell, smoke, ci, image, shell
+task --list            # test, lint:shell, smoke, ci, mutate, image, shell
 task ci                # everything the CI gate runs
 task test -- -k cadastre
 ```
+
+### Mutation testing
+
+`task mutate` changes the code a branch touched and checks that some test notices. Only functions in `src/onward_generator` that contain an added or changed line since `BASE` (default `main`, uncommitted edits included) are mutated, with [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock`. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one.
+
+```bash
+task mutate                         # functions changed since main
+task mutate BASE=fork/main MAX=10   # another base; at most 10 functions
+```
+
+Exit 0 means every mutant was killed. Exit 1 lists each survivor with its diff: a behaviour no test holds. Write a test that fails on that edit, or, when the edit changes nothing a caller can see, end that line with `# pragma: no mutate: <reason>`. The reason must not start with `block`, `start` or `end`, which are mutmut keywords. Exit 2 means the tool could not run. Functions over `MAX` are listed as not mutated. mutmut works on a copy in `mutants/` (gitignored), and a second run only retests what changed. On a pull request, CI runs the same task against the target branch.
 
 Any other command goes through the same wrapper:
 
