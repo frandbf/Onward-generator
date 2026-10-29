@@ -12,7 +12,6 @@ from __future__ import annotations
 import io
 import json
 import os
-import shlex
 import subprocess
 import sys
 import time
@@ -32,6 +31,7 @@ from onward_generator.osm.acquire import osm_target
 from onward_generator.next_step import (
     detail_command,
     dress_command,
+    export_invocation,
     generate_command,
     geo_command,
     heights_command,
@@ -54,13 +54,6 @@ _YES = {"s", "si", "sí", "y", "yes"}
 
 class PipelineError(ValueError):
     """The runner cannot build or continue the pipeline."""
-
-
-def command_argv(command: str) -> list[str]:
-    """Drop the ``python -m onward_generator`` prefix from a ``next:`` line."""
-    parts = shlex.split(command)
-    marker = parts.index("onward_generator")
-    return parts[marker + 1 :]
 
 
 def map_create_argv(
@@ -105,32 +98,34 @@ def map_create_argv(
 def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
     """Stages after ``map create``, in pipeline order. Stops before Unity."""
     root = Path(directory)
-    geo_argv = command_argv(geo_command(root))
+    geo_argv = list(geo_command(root).argv)
     scene = _flag(geo_argv, "--out") / "geo_scene.json"
-    heights_argv = command_argv(heights_command(scene))
+    heights_argv = list(heights_command(scene).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
-    generate_argv = command_argv(generate_command(scene, heights))
+    generate_argv = list(generate_command(scene, heights).argv)
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = command_argv(detail_command(scene, heights, scene3d))
+    detail_argv = list(detail_command(scene, heights, scene3d).argv)
     detail = _flag(detail_argv, "--out")
-    dress_argv = command_argv(dress_command(detail, scene, heights))
+    dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
-    materials_argv = command_argv(materials_command(dress))
+    materials_argv = list(materials_command(dress).argv)
     materials = _flag(materials_argv, "--out")
     panoramax_argv: list[str] | None = None
     signs_base = materials
     if panoramax_enabled(root):
-        panoramax_argv = command_argv(panoramax_command(materials))
+        panoramax_argv = list(panoramax_command(materials).argv)
         signs_base = _flag(panoramax_argv, "--out")
-    signs_argv = command_argv(signs_command(signs_base))
+    signs_argv = list(signs_command(signs_base).argv)
     signs = _flag(signs_argv, "--out")
-    overgrow_argv = command_argv(overgrow_command(signs))
+    overgrow_argv = list(overgrow_command(signs).argv)
     overgrow = _flag(overgrow_argv, "--out")
-    fit_argv = command_argv(fit_command(scene, overgrow))
+    fit_argv = list(fit_command(scene, overgrow).argv)
+    # bounds, layout and export are planned before their inputs exist, so the
+    # ``next:`` helpers that look for those inputs are not used here.
     playable = root / "data" / "processed" / "scene_playable"
-    bounds_argv = command_argv(invoke("bounds", "--base", show(overgrow), "--out", show(playable)))
+    bounds_argv = list(invoke("bounds", "--base", show(overgrow), "--out", show(playable)).argv)
     layout_path = root / "data" / "processed" / "layout" / "layout.json"
-    layout_argv = command_argv(invoke(
+    layout_argv = list(invoke(
         "perf", "layout",
         "--scene", show(scene),
         "--heights", show(heights),
@@ -138,15 +133,10 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
         "--detail", show(playable),
         "--playable",
         "--out", show(layout_path),
-    ))
-    export_argv = command_argv(invoke(
-        "export", "package",
-        "--project", show(root / "config" / "project.json"),
-        "--detail", show(playable),
-        "--config", show(root / "config" / "export.json"),
-        "--layout", show(layout_path),
-        "--out", show(root / "data" / "processed" / "export" / "pkg_01"),
-    ))
+    ).argv)
+    export_argv = list(export_invocation(
+        root, playable, layout_path, root / "data" / "processed" / "export" / "pkg_01",
+    ).argv)
     picture_steps: list[tuple[str, list[str]]] = []
     if panoramax_argv is not None:
         picture_steps.append(("panoramax", panoramax_argv))
@@ -252,8 +242,11 @@ def _stage_summary(text: str) -> str:
     return "\n".join(f"  {line}" for line in kept)
 
 
-def _unity_summary(text: str, *, failed: bool) -> str:
-    """The Unity and Quest lines that say what happened. The full editor log stays on disk."""
+def _unity_summary(text: str, *, failed: bool, content_md5: str | None = None) -> str:
+    """The Unity and Quest lines that say what happened. The full editor log stays on disk.
+
+    ``content_md5`` is read from ``build/content3.md5``, not from the log.
+    """
     kept: list[str] = []
     dropped_routes = 0
     for raw in text.splitlines():
@@ -287,8 +280,6 @@ def _unity_summary(text: str, *, failed: bool) -> str:
             kept.append(stripped)
             continue
         if stripped.startswith("[export] content3 md5 "):
-            digest = stripped.split()[-1]
-            kept.append(f"content3 md5 {digest[:12]}")
             continue
         if stripped.startswith("[export] pushed "):
             kept.append(stripped.removeprefix("[export] "))
@@ -298,6 +289,8 @@ def _unity_summary(text: str, *, failed: bool) -> str:
             continue
         if failed and any(token in stripped for token in ("FAILED", "Exception", "error CS", "Crash", "mismatch")):
             kept.append(stripped.removeprefix("[export] "))
+    if content_md5:
+        kept.append(f"content3 md5 {content_md5[:12]}")
     if dropped_routes:
         kept.append(f"routes dropped: {dropped_routes}")
     return "\n".join(f"  {line}" for line in kept)
@@ -868,10 +861,19 @@ def _run_export(args: Sequence[str], env: dict[str, str] | None = None) -> tuple
 def _build_package(package: Path, steps: Sequence[str]) -> int:
     """Run ``tool``, ``scene`` and ``launcher`` for the substeps that are still missing."""
     code, text = _run_export([str(_quest_script()), str(package), *steps])
-    summary = _unity_summary(text, failed=code != 0)
+    summary = _unity_summary(text, failed=code != 0, content_md5=_content_md5(package))
     if summary:
         print(summary, flush=True)
     return code
+
+
+def _content_md5(package: Path) -> str | None:
+    """The digest the launcher step wrote. ``None`` when that file is missing or empty."""
+    try:
+        digest = (package / "build" / "content3.md5").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return digest.split()[0] if digest else None
 
 
 def _push_package(package: Path) -> int:
