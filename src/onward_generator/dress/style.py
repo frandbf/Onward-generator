@@ -1,4 +1,4 @@
-"""Copy a detailed scene with better trees, generated sidewalk furniture and an optional atlas.
+"""Copy a detailed scene with better trees, generated sidewalk furniture and optional repeating textures.
 
 Does not apply AI material recommendations. Does not move OSM footprints, streets or plazas.
 """
@@ -17,7 +17,7 @@ from onward_generator.detail.config import DetailConfig
 from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import Prototype, urban_prototypes, yaw_matrix
 from onward_generator.detail.urban import Element, Rejected, _footprint
-from onward_generator.dress.atlas import build_atlas
+from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import MaterialCatalog
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import GenerationConfig, Material
@@ -249,25 +249,31 @@ def write_styled(
     extras: dict[str, Any] = {
         "attribution": attribution,
         "manifest": "scene_detail.json",
-        "fidelity": "dress style 0.2: copy of detail GLB, urban overlay, generated atlas, no AI material apply",
+        "fidelity": "dress style 0.3: copy of detail GLB, urban overlay, one repeating procedural tile per material, no AI material apply",
         "dress": {"tree_sides": TREE_SIDES, "tree_variants": TREE_VARIANTS, "atlas": atlas, "regenerated_facades": False},
     }
-    atlas_png = None
-    slots = None
-    tile_m = None
+    repeat_images: dict[str, bytes] = {}
+    tile_m: dict[str, float] = {}
+    roofs: set[str] = set()
     atlas_note = None
     if atlas:
+        # The GLB repeats one tile per material on the face plane. atlas.png is only the contact sheet.
         built = build_atlas(catalog, materials, used_color_ids=used, seed=seed)
-        atlas_png, slots = built.png, built.slots
+        repeat_images = {
+            color_id: encode_png_rgba(_tile_pixels(color_id, MIN_TILE_PX, seed + index))
+            for index, color_id in enumerate(used)
+        }
         tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
+        roofs = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
         extras["atlas"] = {
             "size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note,
+            "role": "contact_sheet",
         }
         atlas_note = built.note
         atomic_write_bytes(targets["atlas"], built.png)
     visual = build_glb(
         visual_nodes, materials, extras=extras,
-        atlas_png=atlas_png, atlas_slots=slots, atlas_tile_m=tile_m,
+        repeat_images=repeat_images, repeat_tile_m=tile_m, roof_uv_materials=roofs,
     )
     collision = build_glb(collision_nodes, materials, extras=extras)
     atomic_write_bytes(targets["visual"], visual)
