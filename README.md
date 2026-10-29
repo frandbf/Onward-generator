@@ -34,8 +34,17 @@ The editable install (`-e .`) is required: the code finds `config/` and `assets/
 
 To keep the machine clean, the Python pipeline and its checks can run in a container instead of `.venv`. The image installs `requirements.lock` and `shellcheck`. The repository is mounted at `/work`, so outputs land in `maps/` as usual and belong to your user. The container uses the host network, so loopback Ollama works the same way. Unity and `adb` stay on the host.
 
+The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
+
 ```bash
-tools/docker/run.sh pytest -q
+task --list            # test, lint:shell, smoke, ci, image, shell
+task ci                # everything the CI gate runs
+task test -- -k cadastre
+```
+
+Any other command goes through the same wrapper:
+
+```bash
 tools/docker/run.sh onward-generator doctor
 tools/docker/run.sh onward-generator run --name "Map name" --lat 37.98407 --lon -1.12863
 tools/docker/run.sh --build pytest -q   # rebuild after requirements.lock changes
