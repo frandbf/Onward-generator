@@ -7,7 +7,13 @@ from pathlib import Path
 
 from onward_generator.ai.providers import StaticProvider
 from onward_generator.maps.workspace import create_map, refresh_texture_plan
-from onward_generator.materials.library_plan import select_texture_plan
+from onward_generator.materials.library_plan import (
+    deterministic_choices,
+    library_rows,
+    select_texture_plan,
+    texture_family,
+    unfilled_slots,
+)
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -57,3 +63,25 @@ def test_refresh_replaces_only_the_texture_plan(tmp_path: Path) -> None:
     assert next(row["library_id"] for row in plan["entries"] if row["id"] == "roofs") == "acg_roofingtiles011b"
     assert (root / "map.json").read_text(encoding="utf-8") == before
     assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_a_bark_texture_fills_the_trunks_slot() -> None:
+    bark = {
+        "id": "ph_bark_brown_02", "name": "bark_brown_02", "provider": "polyhaven",
+        "path": "assets/textures/bark_brown_02/bark_brown_02_diff_1k.jpg", "license": "CC0-1.0",
+    }
+    rows = [*library_rows(), bark]
+    assert texture_family(bark) == "bark"
+    assert "trunks" not in unfilled_slots(rows)
+    assert deterministic_choices(rows, 3)["trunks"] == "ph_bark_brown_02"
+
+
+def test_a_slot_without_a_library_family_is_reported() -> None:
+    rows = library_rows()
+    assert unfilled_slots(rows) == ["trunks"]
+    plan = select_texture_plan(
+        name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+        brief=None, seed=3, library=rows,
+    )
+    assert "trunks" not in {row["id"] for row in plan["entries"]}
+    assert "no texture for trunks (bark)" in plan["description"]

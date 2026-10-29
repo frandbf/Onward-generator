@@ -1,6 +1,6 @@
 """Minimal deterministic glTF 2.0 binary (GLB) writer.
 
-GLB is an intermediate preview/transport format here (PRD §6.2); it is not
+GLB is an intermediate preview/transport format here (docs/06-generation.md); it is not
 assumed to be directly loadable by Onward. Local axes (x east, y north, z up)
 map to glTF axes (+X east, +Y up, +Z south): (x, y, z) → (x, z, −y), a proper
 rotation, so triangle winding is preserved.

@@ -750,30 +750,6 @@ namespace OnwardGenerator
             EditorSceneManager.SaveScene(scene);
         }
 
-        /// <summary>
-        /// Writes the Hunt fixes into the saved Las Condes and Murcia v12 scenes:
-        /// riflemen only, three agents, looping routes on walkable navmesh, and the navigation map generator.
-        /// </summary>
-        public static void RepairSavedHuntScenes()
-        {
-            RunGuarded(() =>
-            {
-                string[] scenes =
-                {
-                    "Assets/OnwardAdapter/lascondes_b31e46f683/lascondes_b31e46f683.unity",
-                    "Assets/OnwardAdapter/murciav12_593e40d431/murciav12_593e40d431.unity",
-                };
-                foreach (string scenePath in scenes)
-                {
-                    EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
-                    int incompatible = CountIncompatibleSceneMaterials();
-                    PrepareHuntPatrol();
-                    var baker = UnityEngine.Object.FindObjectOfType<NavigationMeshBaker>();
-                    Debug.Log($"{LogPrefix} Repair {scenePath}: incompatible materials {incompatible}, lightmaps {LightmapSettings.lightmaps.Length}, baker {(baker != null && baker.NavMeshData != null)}.");
-                }
-            });
-        }
-
         // Keeps the first `keep` riflemen and routes. Loops stays on.
         private static void KeepHuntBots(int keep)
         {
@@ -841,43 +817,6 @@ namespace OnwardGenerator
                 PrefabUtility.RecordPrefabInstancePropertyModifications(hunt);
             EditorUtility.SetDirty(hunt);
             Debug.Log($"{LogPrefix} Hunt diagnostic: {keptSpawns.Count} spawns kept, {riflemen} riflemen, removed {removedBots} spawns and {removedRoutes} routes, route points [{keptPointCounts}].");
-        }
-
-        // Same rule as ONWARD/Find materials incompatible with Onward: a renderer
-        // material must use a Shader Graphs/PP_ shader, or a graph that references
-        // the SDK preprocessing shaders. Spawn and internal materials are skipped.
-        private static int CountIncompatibleSceneMaterials()
-        {
-            const string PpGuid = "906eff91f52b69846b5522d23074530b";
-            const string PpLiteGuid = "30c964ff6f8c29d49800b117941637c3";
-            int incompatible = 0;
-            var seen = new HashSet<int>();
-            Renderer[] renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                Material[] materials = renderers[i].sharedMaterials;
-                if (materials == null) continue;
-                for (int m = 0; m < materials.Length; m++)
-                {
-                    Material material = materials[m];
-                    if (material == null || material.shader == null) continue;
-                    if (material.name == "M_Internal" || material.name == "M_OnwardCustomContent_Spawnpoint") continue;
-                    if (!seen.Add(material.GetInstanceID())) continue;
-                    if (material.shader.name.Contains("Shader Graphs/PP_")) continue;
-                    bool graphUsesSdk = false;
-                    string shaderPath = AssetDatabase.GetAssetPath(material.shader);
-                    if (!string.IsNullOrEmpty(shaderPath))
-                    {
-                        string content = File.ReadAllText(shaderPath);
-                        graphUsesSdk = content.Contains(PpGuid) || content.Contains(PpLiteGuid);
-                    }
-                    if (graphUsesSdk) continue;
-                    incompatible++;
-                    Debug.LogWarning($"{LogPrefix} Incompatible material {material.name} shader {material.shader.name} on {renderers[i].name}.");
-                }
-            }
-            Debug.Log($"{LogPrefix} Incompatible scene materials: {incompatible}.");
-            return incompatible;
         }
 
         private static void EnsureLightmapsAssigned()

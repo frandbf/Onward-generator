@@ -5,8 +5,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import struct
-import zlib
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +15,7 @@ from shapely.geometry import shape
 from onward_generator.cli import main
 from onward_generator.detail import DetailError, config_from_document, detail_scene, load_base, load_detail_config
 from onward_generator.detail.config import DEFAULT_CONFIG_PATH
+from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation import load_generation_config
 from onward_generator.generation.gltf import build_glb, read_glb
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects, signed_volume, transform
@@ -296,22 +295,8 @@ def test_seed_changes_variation_but_not_validity(detail_inputs: tuple[Path, Path
     assert first != second or balconies(detailed) != balconies(other)
 
 
-def _png_size(data: bytes) -> tuple[int, int]:
-    assert data[:8] == b"\x89PNG\r\n\x1a\n"
-    return struct.unpack(">II", data[16:24])
-
-
 def _png_pixels(data: bytes) -> np.ndarray:
-    w, h = _png_size(data)
-    pos, raw = 8, b""
-    while pos < len(data):
-        n = struct.unpack(">I", data[pos : pos + 4])[0]
-        kind = data[pos + 4 : pos + 8]
-        if kind == b"IDAT":
-            raw += data[pos + 8 : pos + 8 + n]
-        pos += 12 + n
-    rows = zlib.decompress(raw)
-    return np.frombuffer(rows, dtype=np.uint8).reshape(h, 1 + 3 * w)[:, 1:].reshape(h, w, 3)
+    return decode_png_rgba(data)[..., :3]
 
 
 def test_cli_is_reproducible_and_writes_before_after(detail_inputs: tuple[Path, Path, Path], tmp_path: Path,

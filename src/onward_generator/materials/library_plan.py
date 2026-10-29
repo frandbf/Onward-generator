@@ -131,6 +131,8 @@ def texture_family(row: Mapping[str, Any]) -> str | None:
         return "concrete"
     if name.startswith("asphalt"):
         return "asphalt"
+    if name.startswith("bark"):
+        return "bark"
     if name.startswith("door_wood") and "lit" not in name and "overlay" not in name:
         return "door"
     return None
@@ -146,6 +148,12 @@ def _pools(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]
     for family in pools:
         pools[family].sort(key=lambda row: str(row["id"]))
     return pools
+
+
+def unfilled_slots(rows: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Slots whose texture family has no row in the library, e.g. trunks without bark."""
+    pools = _pools(rows)
+    return [slot for slot, family in SLOT_FAMILY.items() if not pools.get(family)]
 
 
 def _entry(slot: str, row: Mapping[str, Any]) -> dict[str, Any]:
@@ -178,10 +186,15 @@ def _document(name: str, choices: Mapping[str, str], rows: Sequence[Mapping[str,
     entries = [_entry(slot, by_id[library_id]) for slot, library_id in choices.items()]
     entries.sort(key=lambda row: row["id"])
     atmosphere = "abandoned" if brief and "abandon" in brief.lower() else "inhabited"
+    description = f"Textures for {name}, chosen from the imported library ({selector})."
+    gaps = unfilled_slots(rows)
+    if gaps:
+        families = ", ".join(f"{slot} ({SLOT_FAMILY[slot]})" for slot in gaps)
+        description += f" The library has no texture for {families}; those slots keep the procedural tile."
     return {
         "schema": "onward_generator.texture_plan",
         "schema_version": "0.1.0",
-        "description": f"Textures for {name}, chosen from the imported library ({selector}).",
+        "description": description,
         "provider": "library",
         "resolution": "1k",
         "map": "Diffuse",
