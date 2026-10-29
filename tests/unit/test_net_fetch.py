@@ -105,8 +105,9 @@ def test_fetch_bytes_names_a_missing_scheme() -> None:
 
 def test_fetch_bytes_needs_a_positive_cap() -> None:
     opener, _ = _opener(b"x")
-    with pytest.raises(ValueError, match="max_bytes must be positive"):
+    with pytest.raises(ValueError) as caught:
         _fetch(opener, max_bytes=0)
+    assert str(caught.value) == "max_bytes must be positive"
     assert _fetch(opener, max_bytes=1) == b"x"
 
 

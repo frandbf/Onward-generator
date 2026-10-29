@@ -146,6 +146,16 @@ def _ring(first: int) -> list[int]:
     return [first, first + 1, first + 2, first + 3, first]
 
 
+def test_multipolygon_skips_a_node_member(tmp_path: Path) -> None:
+    path = _multipolygon_file(tmp_path, _square(1, 0, 0, 10, 10), {10: _ring(1)}, [(10, "outer")])
+    text = path.read_text(encoding="utf-8").replace('<relation id="30">', '<relation id="30"><member type="node" ref="1" role="label"/>')
+    path.write_text(text, encoding="utf-8")
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [polygon] = features[0].geometry_wgs84.geoms
+    assert polygon.area == pytest.approx(1e-6)
+
+
 def test_multipolygon_outer_split_across_three_ways(tmp_path: Path) -> None:
     path = _multipolygon_file(
         tmp_path,
