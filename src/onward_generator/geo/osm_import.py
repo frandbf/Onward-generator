@@ -13,9 +13,9 @@ from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 
-from shapely import LineString, MultiPolygon, Point, Polygon
+from shapely import LineString, MultiPolygon, Point, Polygon, polygonize_full, unary_union
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import linemerge
+from shapely.geometry.polygon import orient
 
 from onward_generator.domain.models import OsmRef, validate_lon_lat
 from onward_generator.geo.issues import GeoIssue
@@ -264,16 +264,32 @@ def _build_way(way: OsmWay, doc: OsmDocument, issues: list[GeoIssue]) -> BaseGeo
     return LineString(coords)
 
 
-def _assemble_rings(lines: list[LineString]) -> tuple[list[Polygon], bool]:
-    if not lines:
-        return [], True
-    merged = linemerge(lines)
-    parts = list(getattr(merged, "geoms", [merged]))
-    rings = [Polygon(part.coords) for part in parts if part.is_closed and len(part.coords) >= 4]
-    return rings, len(rings) == len(parts)
+def _faces(lines: list[LineString]) -> tuple[list[Polygon], int]:
+    """Faces of the noded member linework, and how many pieces close no face.
+
+    Ways are joined wherever they meet, including nodes shared by three or
+    more ways and rings that touch. Dangles, cuts and invalid rings count as
+    open pieces.
+    """
+    polygons, cuts, dangles, invalid = polygonize_full([unary_union(lines)])
+    faces = [face for face in polygons.geoms if isinstance(face, Polygon) and not face.is_empty]
+    return faces, len(cuts.geoms) + len(dangles.geoms) + len(invalid.geoms)
+
+
+def _nesting_depth(face: Polygon, shells: list[Polygon]) -> int:
+    """How many face outlines enclose ``face``, itself included."""
+    probe = face.representative_point()
+    return sum(1 for shell in shells if shell.contains(probe))
 
 
 def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssue]) -> BaseGeometry | None:
+    """Assemble a multipolygon by even-odd nesting of the closed member rings.
+
+    Member roles are advisory. A face nested an odd number of times is filled
+    and an even number of times is a hole. A role that disagrees with the
+    nesting is reported, and the nesting wins. Exteriors run counter-clockwise
+    and holes clockwise, as in RFC 7946.
+    """
     ref = OsmRef("relation", rel.id)
     outer: list[LineString] = []
     inner: list[LineString] = []
@@ -290,16 +306,45 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
     if not outer:
         issues.append(GeoIssue("missing_outer_ring", "error", f"{ref.key} has no outer member", ref))
         return None
-    outers, outer_ok = _assemble_rings(outer)
-    inners, inner_ok = _assemble_rings(inner)
-    if not outers or not (outer_ok and inner_ok):
-        issues.append(GeoIssue("unclosed_multipolygon_ring", "error", f"{ref.key} has rings that do not close", ref))
+    faces, open_pieces = _faces(outer + inner)
+    if not faces or open_pieces:
+        issues.append(
+            GeoIssue(
+                "unclosed_multipolygon_ring",
+                "error",
+                f"{ref.key} has rings that do not close ({open_pieces} open piece(s) in the member ways)",
+                ref,
+            )
+        )
         return None
-    polygons = []
-    for shell in outers:
-        holes = [h.exterior.coords for h in inners if shell.contains(h)]
-        polygons.append(Polygon(shell.exterior.coords, holes))
-    return MultiPolygon(polygons)
+    shells = [Polygon(face.exterior) for face in faces]
+    outer_lines = unary_union(outer)
+    inner_lines = unary_union(inner) if inner else None
+    filled: list[Polygon] = []
+    for face in faces:
+        from_inner = inner_lines is not None and inner_lines.covers(face.exterior)
+        if _nesting_depth(face, shells) % 2 == 1:
+            filled.append(face)
+            if from_inner:
+                issues.append(
+                    GeoIssue(
+                        "inner_ring_outside_outer",
+                        "warning",
+                        f"{ref.key} has an inner ring that no outer ring encloses; it is kept as an area",
+                        ref,
+                    )
+                )
+        elif not from_inner and outer_lines.covers(face.exterior):
+            issues.append(
+                GeoIssue(
+                    "outer_ring_inside_outer",
+                    "warning",
+                    f"{ref.key} has an outer ring inside another outer ring; it is kept as a hole",
+                    ref,
+                )
+            )
+    merged = unary_union(filled)
+    return MultiPolygon([orient(part, sign=1.0) for part in getattr(merged, "geoms", [merged])])
 
 
 def build_source_features(doc: OsmDocument) -> tuple[list[SourceFeature], list[GeoIssue], dict[str, int]]:

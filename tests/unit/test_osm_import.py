@@ -119,3 +119,101 @@ def test_malformed_and_deleted_elements_are_reported(tmp_path: Path) -> None:
     doc = parse_osm_xml(path)
     assert list(doc.nodes) == [4]
     assert sorted(i.code for i in doc.issues) == ["deleted_element", "malformed_element", "malformed_element", "malformed_element"]
+
+
+def _multipolygon_file(tmp_path: Path, points: dict[int, tuple[int, int]], ways: dict[int, list[int]], members: list[tuple[int, str]]) -> Path:
+    """Nodes on a grid of 0.0001 degrees, ways by node id, and one ``building`` multipolygon."""
+    nodes = "".join(f'<node id="{i}" lat="{LAT + y * 0.0001}" lon="{LON + x * 0.0001}"/>' for i, (x, y) in points.items())
+    way_xml = "".join(f'<way id="{w}">' + "".join(f'<nd ref="{n}"/>' for n in refs) + "</way>" for w, refs in ways.items())
+    member_xml = "".join(f'<member type="way" ref="{w}" role="{role}"/>' for w, role in members)
+    return write(
+        tmp_path,
+        f"""<osm version="0.6">{nodes}{way_xml}
+        <relation id="30">{member_xml}<tag k="type" v="multipolygon"/><tag k="building" v="yes"/></relation>
+        </osm>""",
+    )
+
+
+def _square(first: int, x0: int, y0: int, x1: int, y1: int) -> dict[int, tuple[int, int]]:
+    return {first: (x0, y0), first + 1: (x1, y0), first + 2: (x1, y1), first + 3: (x0, y1)}
+
+
+def _ring(first: int) -> list[int]:
+    return [first, first + 1, first + 2, first + 3, first]
+
+
+def test_multipolygon_outer_split_across_three_ways(tmp_path: Path) -> None:
+    path = _multipolygon_file(
+        tmp_path,
+        _square(1, 0, 0, 10, 10),
+        {10: [1, 2], 11: [2, 3, 4], 12: [4, 1]},
+        [(11, "outer"), (10, "outer"), (12, "outer")],
+    )
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [feature] = features
+    assert feature.ref == OsmRef("relation", 30)
+    assert feature.geometry_wgs84.geom_type == "MultiPolygon"
+    [polygon] = feature.geometry_wgs84.geoms
+    assert polygon.area == pytest.approx(1e-6)
+    assert len(polygon.interiors) == 0
+
+
+def test_multipolygon_open_outer_is_reported(tmp_path: Path) -> None:
+    path = _multipolygon_file(tmp_path, _square(1, 0, 0, 10, 10), {10: [1, 2, 3, 4]}, [(10, "outer")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert features == []
+    assert [(i.code, i.ref) for i in issues] == [("unclosed_multipolygon_ring", OsmRef("relation", 30))]
+
+
+def test_inner_outside_outer_is_reported(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | _square(5, 20, 0, 24, 4)
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert [(i.code, i.severity) for i in issues] == [("inner_ring_outside_outer", "warning")]
+    [feature] = features
+    polygons = sorted(feature.geometry_wgs84.geoms, key=lambda p: p.area)
+    assert [p.area for p in polygons] == pytest.approx([16e-8, 1e-6])
+    assert all(len(p.interiors) == 0 for p in polygons)
+
+
+def test_island_inside_hole(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 8, 8) | _square(9, 4, 4, 6, 6)
+    path = _multipolygon_file(
+        tmp_path,
+        points,
+        {10: _ring(1), 11: _ring(5), 12: _ring(9)},
+        [(10, "outer"), (11, "inner"), (12, "outer")],
+    )
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [feature] = features
+    shell, island = sorted(feature.geometry_wgs84.geoms, key=lambda p: p.area, reverse=True)
+    assert len(shell.interiors) == 1
+    assert shell.area == pytest.approx((100 - 36) * 1e-8)
+    assert len(island.interiors) == 0
+    assert island.area == pytest.approx(4e-8)
+    assert shell.exterior.is_ccw and not shell.interiors[0].is_ccw
+
+
+def test_inner_touching_outer_at_a_node_is_a_hole(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | {5: (0, 5), 6: (3, 3), 7: (3, 7)}
+    path = _multipolygon_file(
+        tmp_path,
+        points,
+        {10: [1, 2, 3, 4, 5, 1], 11: [5, 6, 7, 5]},
+        [(10, "outer"), (11, "inner")],
+    )
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [polygon] = features[0].geometry_wgs84.geoms
+    assert polygon.area == pytest.approx((100 - 6) * 1e-8)
+
+
+def test_nested_outer_without_inner_is_reported_as_hole(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 8, 8)
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: _ring(5)}, [(10, "outer"), (11, "outer")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert [i.code for i in issues] == ["outer_ring_inside_outer"]
+    [polygon] = features[0].geometry_wgs84.geoms
+    assert len(polygon.interiors) == 1
