@@ -31,6 +31,11 @@ tasks:
     cmds:
       - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh"
 
+  lint:actions:
+    desc: Check the GitHub Actions workflows with actionlint (pinned image, nothing installed)
+    cmds:
+      - docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
   smoke:
     desc: Run the CLI against the example configuration
     cmds:
@@ -49,6 +54,7 @@ tasks:
     desc: Everything the CI gate runs, cheapest first so a lint failure stops it early
     cmds:
       - task: lint:shell
+      - task: lint:actions
       - task: smoke
       - task: test
 

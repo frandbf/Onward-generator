@@ -1,0 +1,16 @@
+# Weekly update pull requests for the pinned GitHub Actions and the Docker base image.
+# Python pins live in requirements.lock / requirements-mutate.lock, which Dependabot does not read;
+# regenerate them in the Docker image when a dependency needs to move.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
