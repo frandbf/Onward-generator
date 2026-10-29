@@ -96,32 +96,34 @@ class _Builder:
         return len(self.accessors) - 1
 
 
-def planar_uvs(vertices: np.ndarray, slot: tuple[float, float, float, float], tile_m: float) -> np.ndarray:
-    """World-metre planar UVs on the two largest extents, wrapped into an atlas tile."""
-    extent = vertices.max(axis=0) - vertices.min(axis=0)
-    axes = np.argsort(extent)[::-1][:2]
-    scale = max(float(tile_m), 1e-6)
-    local = np.mod(vertices[:, axes] / scale, 1.0)
-    u0, v0, u1, v1 = slot
-    return np.column_stack([u0 + local[:, 0] * (u1 - u0), v0 + local[:, 1] * (v1 - v0)]).astype(np.float32)
+# A face this close to level is projected on world X/Y. Steeper faces use the face plane.
+FLAT_NZ = 0.75
+# Roofs follow the slope down to almost flat. Only roofs: ``cap`` shares vertices
+# across a whole ground or slab surface, which must keep one planar projection.
+ROOF_FLAT_NZ = 0.98
 
 
-def surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool = False) -> np.ndarray:
+def surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool = False, roof: bool = False) -> np.ndarray:
     """UVs on the face plane, in repeats of ``tile_m`` metres.
 
     Vertical faces use world up as V, so a tall wall repeats instead of stretching
     one tile across the whole height. ``fit_unit`` maps each disconnected quad to
-    0–1 (a window or a door).
+    0–1 (a window or a door). ``roof`` keeps slope-aligned UVs on faces up to
+    ``ROOF_FLAT_NZ``, so a pitched roof is measured along the slope, not top-down.
     """
+    return _surface_uvs(mesh, tile_m, fit_unit=fit_unit, roof=roof).astype(np.float32)
+
+
+def _surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool, roof: bool) -> np.ndarray:
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     triangles = np.asarray(mesh.triangles, dtype=np.int64)
     uvs = np.zeros((len(vertices), 2), dtype=np.float64)
     if len(vertices) == 0 or len(triangles) == 0:
-        return uvs.astype(np.float32)
+        return uvs
     normals = mesh.face_normals()
     length = np.linalg.norm(normals, axis=1, keepdims=True)
     normals = normals / np.maximum(length, 1e-12)
-    horizontal = np.abs(normals[:, 2]) >= 0.75
+    horizontal = np.abs(normals[:, 2]) >= (ROOF_FLAT_NZ if roof else FLAT_NZ)
     tangent = np.cross(np.array([0.0, 0.0, 1.0]), normals)
     tangent_length = np.linalg.norm(tangent, axis=1, keepdims=True)
     fallback = horizontal | (tangent_length[:, 0] < 1e-8)
@@ -147,7 +149,44 @@ def surface_uvs(mesh: Mesh, tile_m: float, *, fit_unit: bool = False) -> np.ndar
             span_v = float(uvs[index, 1].max() - uvs[index, 1].min())
             uvs[index, 0] = (uvs[index, 0] - uvs[index, 0].min()) / max(span_u, 1e-6)
             uvs[index, 1] = (uvs[index, 1] - uvs[index, 1].min()) / max(span_v, 1e-6)
-    return uvs.astype(np.float32)
+    return uvs
+
+
+def uv_islands(triangles: np.ndarray, count: int) -> np.ndarray:
+    """One label per vertex. Vertices joined through triangles share a label."""
+    label = np.arange(count, dtype=np.int64)
+    tris = np.asarray(triangles, dtype=np.int64).reshape(-1, 3)
+    left = np.concatenate([tris[:, 0], tris[:, 1]])
+    right = np.concatenate([tris[:, 1], tris[:, 2]])
+    while True:
+        while True:
+            jumped = label[label]
+            if np.array_equal(jumped, label):
+                break
+            label = jumped
+        a, b = label[left], label[right]
+        differ = a != b
+        if not differ.any():
+            return label
+        # Hook the larger root under the smaller one; labels only decrease, so no cycle forms.
+        np.minimum.at(label, np.maximum(a[differ], b[differ]), np.minimum(a[differ], b[differ]))
+
+
+def recentre_uvs(uvs: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+    """Subtract ``floor(min)`` per UV island so repeat UVs stay small.
+
+    World projections reach hundreds of repeats far from the origin, where a
+    half-precision shader loses the fraction. An integer shift is invisible with
+    Repeat wrapping, and each island moves as one, so no seam opens.
+    """
+    out = np.array(uvs, dtype=np.float64, copy=True)
+    if len(out) == 0:
+        return out
+    _, island = np.unique(uv_islands(triangles, len(out)), return_inverse=True)
+    low = np.full((int(island.max()) + 1, 2), np.inf)
+    np.minimum.at(low, island, out)
+    out -= np.floor(low)[island]
+    return out
 
 
 def _triangle_groups(triangles: np.ndarray) -> dict[int, list[int]]:
@@ -183,11 +222,10 @@ def build_glb(
     *,
     extras: Mapping[str, Any] | None = None,
     atlas_png: bytes | None = None,
-    atlas_slots: Mapping[str, tuple[float, float, float, float]] | None = None,
-    atlas_tile_m: Mapping[str, float] | None = None,
     repeat_images: Mapping[str, bytes] | None = None,
     repeat_tile_m: Mapping[str, float] | None = None,
     unit_uv_materials: Collection[str] | None = None,
+    roof_uv_materials: Collection[str] | None = None,
     preserve_uvs: bool = False,
 ) -> bytes:
     builder = _Builder()
@@ -197,6 +235,7 @@ def build_glb(
     using_repeat = bool(repeat)
     textured = atlas_png is not None and not using_repeat
     unit_uv = frozenset(unit_uv_materials or ())
+    roof_uv = frozenset(roof_uv_materials or ())
     imaged = [name for name in material_names if name in repeat]
     gltf_meshes: list[dict[str, Any]] = []
     gltf_nodes: list[dict[str, Any]] = []
@@ -225,20 +264,17 @@ def build_glb(
                 attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             elif using_repeat and prim.material in repeat:
                 tile = float((repeat_tile_m or {}).get(prim.material, 2.0))
-                uvs = surface_uvs(prim.mesh, tile, fit_unit=prim.material in unit_uv)
-                phase = (node.extras or {}).get("uv_phase")
-                if phase and prim.material not in unit_uv:
-                    uvs = np.array(uvs, dtype=np.float32, copy=True)
-                    uvs[:, 0] += float(phase[0])
-                    uvs[:, 1] += float(phase[1])
-                attributes["TEXCOORD_0"] = builder.add(uvs, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
+                unit = prim.material in unit_uv
+                uvs = _surface_uvs(prim.mesh, tile, fit_unit=unit, roof=prim.material in roof_uv)
+                if not unit:
+                    phase = (node.extras or {}).get("uv_phase")
+                    if phase:
+                        uvs[:, 0] += float(phase[0])
+                        uvs[:, 1] += float(phase[1])
+                    uvs = recentre_uvs(uvs, prim.mesh.triangles)
+                attributes["TEXCOORD_0"] = builder.add(uvs.astype(np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             elif prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
                 attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
-            elif textured and atlas_slots is not None and prim.material in atlas_slots:
-                slot = atlas_slots[prim.material]
-                tile = (atlas_tile_m or {}).get(prim.material, 4.0)
-                uvs = planar_uvs(prim.mesh.vertices, slot, tile)
-                attributes["TEXCOORD_0"] = builder.add(uvs, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             prims.append(
                 {
                     "attributes": attributes,
