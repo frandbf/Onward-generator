@@ -36,7 +36,10 @@ flowchart LR
   detail --> dress[dress style]
   dress --> props[props place]
   props --> materials[materials apply]
-  materials --> signs[signs place]
+  materials --> gate{panoramax}
+  gate -->|false| signs[signs place]
+  gate -->|true| pano[panoramax apply]
+  pano --> signs
   signs --> overgrow[overgrow place]
   overgrow --> fit[overgrow fit]
   fit --> bounds[bounds]
@@ -46,7 +49,7 @@ flowchart LR
   unity --> quest[Quest]
 ```
 
-`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `cadastre` runs only when real storey counts are requested, and only in Spain. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `cadastre` runs only when real storey counts are requested, and only in Spain. `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
 
 ## 0. Unity project — once
 
@@ -68,7 +71,7 @@ This is the project `export` and the Onward Launcher use. It lives in `~/Unity/O
 
 The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage`. `ExampleScene` is not renamed, and the `OnwardCustomContent` prefabs are not edited. Playable-map detail is in [11-onward-sdk.md](11-onward-sdk.md).
 
-`scene` opens that project in batch mode. If the Editor already has it open, the step cannot start. A freshly created project does not contain `Assets/OnwardAdapter/`.
+`scene` opens that project in batch mode. If the Editor already has it open, the step cannot start. Before the first stage, `onward-generator run` checks that lock: an exclusive hold on `Temp/UnityLockfile`, or `Library/EditorInstance.json` when its process is still alive. A terminal tells the user to close the Editor and waits for `s` or `si`. The stages start only after that answer and only once the project is closed. Any other answer cancels the run. A terminal that cannot ask stops with `FAILED unity` and does not start the stages. A freshly created project does not contain `Assets/OnwardAdapter/`.
 
 ## What to rerun
 
@@ -82,6 +85,7 @@ The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage
 | Generated trees and benches | `dress style` and everything after it | `detail` |
 | Asset Store instances | `props place` | the `detail` geometry |
 | Textures | `materials apply` | geometry and OSM footprints |
+| Street photos | `panoramax apply`, under development, only when `map.json` has `"panoramax": true` | collision, roofs, interiors, and buildings without a photo |
 | Street name | `signs place` on the dressed copy | the carriageway and the facades |
 | Abandoned city | `overgrow place`, then `overgrow fit` | building footprints and the drive lane |
 | Perimeter wall | `bounds` on the dressed copy, then layout and export | `generate` and `detail` |
@@ -102,11 +106,13 @@ The SDK package is `~/Unity/OnwardSDK/OnwardCustomContent_SDK_v1.15.unitypackage
 | Textures | One plan for this map, chosen from the imported library. See below |
 | Does not | Generate geometry. It does not pick a global "active" map |
 
-`onward-generator run` walks the chain from `--name`, `--lat`, and `--lon`. `--brief` stores how the city should feel. If the sentence asks for an abandoned city, chaos, or blocked streets, `overgrow` leaves a few cars and barrels on the carriageway. Otherwise they stay on the kerb. `--ai` stores `ambient_ai`, and `overgrow` asks Ollama for a gesture plan. If it does not answer or the JSON does not validate, it retries once. If that attempt also fails, the rules place the props.
+`onward-generator run` walks the chain from `--name`, `--lat`, and `--lon`. `--brief` stores how the city should feel. If the sentence asks for an abandoned city, chaos, or blocked streets, `overgrow` leaves a few cars and barrels on the carriageway. Otherwise they stay on the kerb. `--ai` stores `ambient_ai`, and `overgrow` asks Ollama for a gesture plan. If it does not answer or the JSON does not validate, it retries once. If that attempt also fails, the rules place the props. `--panoramax` stores `panoramax`. It is written only when the argument is present, the same way as `--ai`. A later run without the flag does not turn it off. Absent on an older `map.json` means off.
 
 Each `run` step prints an indented result and `OK` with its duration. At the end, `run: time` lists the steps that ran and the total. The Quest question is not included. File paths, the package listing, the layout JSON, and the full Unity log stay out of that summary. The editor log remains in `~/Library/Logs/onward-export/`.
 
-If a step exits non-zero, the console says `FAILED <step>` and `Next:` names the step to resume from. Earlier steps are not repeated. A second run with the same folder skips steps that already wrote their output and continues at the first one that is missing. A `map.json` without the OSM XML asks Overpass again (`osm download`) and does not repeat `map create`. When two or more steps are done and the terminal is interactive, it lists them and asks where to continue. `--from geo` answers without asking. Each step always writes the same directory (`bounds` writes `scene_playable`). If that directory already exists, the repeat passes `--overwrite`. A file older than the input it reads is pending: repeating `geo` asks for `heights` again, and so on to the end. `export package` is not overwritten. If `pkg_01` exists, the next package is `pkg_02`.
+If a step exits non-zero, the console says `FAILED <step>` and `Next:` names the step to resume from. Earlier steps are not repeated. A second run with the same folder skips steps that already wrote their output and continues at the first one that is missing. A `map.json` without the OSM XML asks Overpass again (`osm download`) and does not repeat `map create`. When two or more steps are done and the terminal is interactive, it lists them and asks where to continue. `--from geo` answers without asking. Each step always writes the same directory (`bounds` writes `scene_playable`). If that directory already exists, the repeat passes `--overwrite`. A file older than the input it reads is pending: repeating `geo` asks for `heights` again, and so on to the end. Turning `panoramax` on after a finished run inserts `panoramax apply`. `scene_panoramax` is not there, so `signs` is no longer fresh and the repeat passes `--overwrite` to `signs` and every later directory. `export package` is not overwritten. If `pkg_01` exists, the next package is `pkg_02`.
+
+Before those steps, `run` checks that the Editor does not have `~/Unity/OnwardPhase0Project` open. If it does, the terminal asks the user to close it. The chain starts after `s` or `si`, and only when the project is actually closed. Any other answer cancels. A terminal that cannot ask does not start.
 
 After the Python steps, `unity` runs `tool scene launcher` on the package just written. If the scene is already baked, it is not repeated. Then the command asks whether to upload. Only `s` or `si` runs the existing `push`, which sets `CONFIRM_PUSH=yes`, backs up the map on the headset, and replaces it. Any other answer, or a terminal that cannot ask, uploads nothing. If `unity` fails, it does not ask.
 
@@ -193,14 +199,31 @@ Copies the `detail` GLB and replaces street instances (trees, benches, bins) and
 
 Cobble is only `surface/pedestrian_cobble`. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. The window frame is a generated image, not a photograph. Interior walls reuse the plain-facade photograph, floors the door wood, and stairs the sidewalk concrete. Do not commit the JPEGs.
 
+With the flag off, `next:` from `materials apply` is `signs place`. With the flag on, `next:` is `panoramax apply`.
+
+## 8a. Street photos
+
+`onward-generator panoramax apply` is under development. It runs only when `map.json` has `"panoramax": true`. With the flag off the command prints `panoramax off`, writes nothing, and exits 0.
+
+The step searches the Panoramax metacatalogue for the map square and keeps pictures whose field of view is 360°. A flat picture is recorded as `skipped: flat` and its JPEG is not stored. The JPEG and its sidecar go to `cache/panoramax/<picture id>`, shared by every map. `data/raw/panoramax/` keeps only this map's search index. A file whose SHA-256 still matches is not downloaded again. A JPEG left in a map folder is moved into the catalogue. If the download fails, the step exits non-zero and does not create `scene_panoramax`.
+
+A picture is offered to an exposed facade of a `building` that was not given an interior. `landmark_part` stays out. The camera is converted to local metres with the CRS in `map.json`. It has to stand outside the footprint, between 2 m and 30 m. Only the stretch seen at 30° or less to the wall normal is kept, and that stretch has to be at least 3 m. Several pictures can share one face; on each sample the nearest one wins. A view that only grazes the wall is not stretched across it. Horizontal accuracy worse than 8 m rejects that picture. Missing accuracy is recorded as `unknown` and the picture may be used.
+
+Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.2 m above the ground up to the height a 35° ray from the camera still meets. A camera too close to paint that much wall keeps the generated facade. The generated windows, the roof, and the rest of the wall stay. The photograph keeps the real width and height of that stretch, up to 80 px per metre and 512 px on the long side. Several stretches of one face share one image. The new material is white, so the shader does not tint the photograph. `scene_collision.glb` is copied byte for byte. Interiors, landmarks, and buildings without a photo keep their vertices. The report and the GLB extras store the picture id, the author, `CC-BY-SA-4.0`, and origin `observed`. The licence record is [legal/data-sources.md](legal/data-sources.md).
+
+| | |
+| --- | --- |
+| Input | `--base` (`scene_materials`) |
+| Output | `data/processed/scene_panoramax/`. `next:` points at `signs place`, and that command's `--base` is this directory |
+
 ## 8b. Street plates
 
 `onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. The text uses Pillow's built-in font. It is not the official design of any city.
 
 | | |
 | --- | --- |
-| Input | `--base` (materials, dress, or detail) and `--scene` (`geo_scene.json`) |
-| Output | A new directory. `next:` from `materials apply` points here. `next:` from `signs` points at `overgrow` |
+| Input | `--base` (`scene_materials`, or `scene_panoramax` when the map asked for photos; dress or detail also work) and `--scene` (`geo_scene.json`) |
+| Output | A new directory. With the flag off, `next:` from `materials apply` points here. With the flag on, `next:` from `panoramax apply` points here. `next:` from `signs` points at `overgrow` |
 
 ## 8c. Overgrow
 
@@ -280,7 +303,7 @@ The local card instantiates Free Roam, Hunt, and Uplink. The other modes stay in
 | --- | --- |
 | Input | `--project` with `export.enabled`, `--detail` (the copy that has the wall), `--layout` |
 | Output | An immutable package: `onward_export.json`, GLBs, layout, options, `thumbnail.png` (512×256), `quest_acceptance.md` |
-| Unity | After `export package`, `onward-generator run` executes `tool scene launcher` on the stage-0 project. The Editor must be closed. If `scene_report.json` already exists, only the Launcher runs. While the scene is built, the adapter sets Vulkan and OpenGLES3 as fallback. While the scene is prepared, both directions of the navigation map are restored. The launcher puts the layout's riflemen back (`StableHuntBots` is 32). The scene fails, and does not continue, if a link still points backward or if the walk with no memory of seen nodes exceeds 400 levels. Node spacing comes from the mesh size and is raised until the chain fits. See [11-onward-sdk.md](11-onward-sdk.md) |
+| Unity | After `export package`, `onward-generator run` executes `tool scene launcher` on the stage-0 project. The Editor must be closed; `run` checks that before the first stage and waits for confirmation. If `scene_report.json` already exists, only the Launcher runs. While the scene is built, the adapter sets Vulkan and OpenGLES3 as fallback. While the scene is prepared, both directions of the navigation map are restored. The launcher puts the layout's riflemen back (`StableHuntBots` is 32). The scene fails, and does not continue, if a link still points backward or if the walk with no memory of seen nodes exceeds 400 levels. Node spacing comes from the mesh size and is raised until the chain fits. See [11-onward-sdk.md](11-onward-sdk.md) |
 | Quest | After Unity, the command asks. Only a yes runs `push` with `CONFIRM_PUSH=yes`. It replaces `unity-export.local.*` and takes a backup first |
 
 The headset has one local slot. The Launcher always writes `unity-export.local`. The name given to the map stays in the folder and in `config/export.json`. The Quest card is always `Unity Export`, which is the name the headset lists for Hunt. The filename does not change. Two maps on disk are built separately. The headset holds the last one that was uploaded.
@@ -319,6 +342,11 @@ onward-generator materials apply \
   --base maps/<id>/data/processed/scene_dress \
   --plan maps/<id>/config/texture_plan.json \
   --out  maps/<id>/data/processed/scene_materials
+
+# under development; only when map.json has "panoramax": true; then signs --base is scene_panoramax
+onward-generator panoramax apply \
+  --base maps/<id>/data/processed/scene_materials \
+  --out  maps/<id>/data/processed/scene_panoramax
 
 onward-generator signs place \
   --base  maps/<id>/data/processed/scene_materials \

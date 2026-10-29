@@ -571,6 +571,9 @@ namespace OnwardGenerator
                         var physic = groupObject.AddComponent<SetPhysicMaterial>();
                         physic.MaterialType = kind;
                         physic.IncludeChildren = true;
+                        // Glass is the SDK penetrable type. AISeeThrough stays off every other collider:
+                        // a concrete wall with that flag lets bots shoot through the whole facade.
+                        physic.AISeeThrough = kind == SetPhysicMaterial.EPhysicMaterialType.Glass;
                         group = groupObject.transform;
                         physicGroups[kind] = group;
                     }
@@ -970,6 +973,8 @@ namespace OnwardGenerator
             string name = (nodeName ?? "").ToLowerInvariant();
             if (name.Contains("water")) return SetPhysicMaterial.EPhysicMaterialType.Water;
             if (name.Contains("green") || name.Contains("grass")) return SetPhysicMaterial.EPhysicMaterialType.Grass;
+            // The suffix is the collision node, not a prop whose id happens to contain "glass".
+            if (name.Contains("#glass")) return SetPhysicMaterial.EPhysicMaterialType.Glass;
             return SetPhysicMaterial.EPhysicMaterialType.Concrete;
         }
 
@@ -1295,23 +1300,6 @@ namespace OnwardGenerator
                     previous = node;
                     previousIsNew = created;
                 }
-                int previousNode = -1;
-                for (int i = 0; i < route.Points.Count; i++)
-                {
-                    int node = NearestLinkedNode(map, route.Points[i]);
-                    if (previousNode >= 0 && (Hops(map, previousNode, node) < 0 || Hops(map, node, previousNode) < 0)
-                        && !LinkNodesAlongPath(map, previousNode, node))
-                    {
-                        Debug.LogWarning($"{LogPrefix} {route.name} WP-{i} dropped: no return path from the previous point.");
-                        route.Points.RemoveAt(i);
-                        if (PrefabUtility.IsPartOfPrefabInstance(route))
-                            PrefabUtility.RecordPrefabInstancePropertyModifications(route);
-                        EditorUtility.SetDirty(route);
-                        i--;
-                        continue;
-                    }
-                    previousNode = NearestLinkedNode(map, route.Points[i]);
-                }
                 if (route.Points.Count < 2)
                 {
                     Debug.LogWarning($"{LogPrefix} {route.name} dropped: fewer than 2 points on a walkable path.");
@@ -1325,17 +1313,92 @@ namespace OnwardGenerator
                         PrefabUtility.RecordPrefabInstancePropertyModifications(hunt);
                     EditorUtility.SetDirty(hunt);
                     r--;
-                    continue;
                 }
             }
+            // Later routes insert nodes. A waypoint can then sit closer to a
+            // node that was never tied to its own route. Re-snap after every
+            // insertion and drop a step that still cannot be walked back.
+            PruneStepsWithoutReturnPath(map, hunt, hole);
             EditorUtility.SetDirty(map);
-            Debug.Log($"{LogPrefix} Waypoint nodes anchored: {added}, grid hole {hole:F2} m.");
+            Debug.Log($"{LogPrefix} Waypoint nodes anchored: {added}, grid hole {hole:F2} m, routes {hunt.AI_WaypointSet.Count}.");
             return hole;
         }
 
-        // The hole is the one measured before the new nodes. A point that is
-        // still farther than that, or a step that cannot be walked back, is
-        // the map the Quest left standing at the far waypoint.
+        // The node a waypoint keeps is the nearest one, inside the grid hole,
+        // that can walk to the previous waypoint and back. A navmesh link that
+        // only joins the old nearest pair is not enough: the check that follows
+        // looks again, and a newer corner can be closer.
+        private static void PruneStepsWithoutReturnPath(CustomContentNavigationMap map, ObjectiveOpHunt hunt, float hole)
+        {
+            for (int pass = 0; pass < 16; pass++)
+            {
+                bool dropped = false;
+                for (int r = 0; r < hunt.AI_WaypointSet.Count; r++)
+                {
+                    WaypointSet route = hunt.AI_WaypointSet[r];
+                    if (route == null || route.Points == null) continue;
+                    int previous = -1;
+                    for (int i = 0; i < route.Points.Count; i++)
+                    {
+                        int node = previous < 0
+                            ? NearestLinkedNode(map, route.Points[i])
+                            : ConnectedNode(map, route.Points[i], previous, hole);
+                        if (node < 0 && previous >= 0)
+                        {
+                            int raw = NearestLinkedNode(map, route.Points[i]);
+                            if (LinkNodesAlongPath(map, previous, raw))
+                                node = ConnectedNode(map, route.Points[i], previous, hole);
+                        }
+                        if (node < 0)
+                        {
+                            Debug.LogWarning($"{LogPrefix} {route.name} WP-{i} dropped: no return path from the previous point.");
+                            route.Points.RemoveAt(i);
+                            if (PrefabUtility.IsPartOfPrefabInstance(route))
+                                PrefabUtility.RecordPrefabInstancePropertyModifications(route);
+                            EditorUtility.SetDirty(route);
+                            dropped = true;
+                            i--;
+                            continue;
+                        }
+                        previous = node;
+                    }
+                    if (route.Points.Count >= 2) continue;
+                    Debug.LogWarning($"{LogPrefix} {route.name} dropped: fewer than 2 points on a walkable path.");
+                    UnityEngine.Object.DestroyImmediate(route.gameObject);
+                    hunt.AI_WaypointSet.RemoveAt(r);
+                    if (r < hunt.AI_SpawnPoints.Count && hunt.AI_SpawnPoints[r] != null)
+                        UnityEngine.Object.DestroyImmediate(hunt.AI_SpawnPoints[r].gameObject);
+                    if (r < hunt.AI_SpawnPoints.Count)
+                        hunt.AI_SpawnPoints.RemoveAt(r);
+                    if (PrefabUtility.IsPartOfPrefabInstance(hunt))
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(hunt);
+                    EditorUtility.SetDirty(hunt);
+                    dropped = true;
+                    r--;
+                }
+                if (!dropped) return;
+            }
+        }
+
+        private static int ConnectedNode(CustomContentNavigationMap map, Vector3 point, int previous, float maxGap)
+        {
+            int best = -1;
+            float bestStep = float.MaxValue;
+            for (int i = 0; i < map.Nodes.Count; i++)
+            {
+                if (!HasNeighbors(map, i)) continue;
+                float step = Vector3.Distance(point, NodePosition(map, i));
+                if (step > maxGap || step >= bestStep) continue;
+                if (Hops(map, previous, i) < 0 || Hops(map, i, previous) < 0) continue;
+                bestStep = step;
+                best = i;
+            }
+            return best;
+        }
+
+        // The hole is the one measured before the new nodes. Prune already
+        // removed a step that cannot be walked back. A kept point that is
+        // still farther than the hole, or still has no return path, stops the build.
         private static void ValidateHuntNavigation(float hole)
         {
             CustomContentNavigationMapGenerator generator = UnityEngine.Object.FindObjectOfType<CustomContentNavigationMapGenerator>();
@@ -1356,12 +1419,14 @@ namespace OnwardGenerator
                 int previous = -1;
                 for (int i = 0; i < route.Points.Count; i++)
                 {
-                    int node = NearestLinkedNode(map, route.Points[i]);
+                    int node = previous < 0
+                        ? NearestLinkedNode(map, route.Points[i])
+                        : ConnectedNode(map, route.Points[i], previous, hole);
+                    if (node < 0)
+                        throw new InvalidOperationException($"{route.name} has no return path between WP-{i - 1} and WP-{i}.");
                     float gap = Vector3.Distance(route.Points[i], NodePosition(map, node));
                     if (gap > hole)
                         throw new InvalidOperationException($"{route.name} WP-{i} is {gap:F2} m from the nearest linked node. The grid hole is {hole:F2} m.");
-                    if (previous >= 0 && (Hops(map, previous, node) < 0 || Hops(map, node, previous) < 0))
-                        throw new InvalidOperationException($"{route.name} has no return path between WP-{i - 1} and WP-{i}.");
                     previous = node;
                 }
             }

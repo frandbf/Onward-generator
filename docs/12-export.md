@@ -56,7 +56,7 @@ tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 
 CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 push
 ```
 
-`onward-generator run` calls `tool scene launcher` after the Python stages and then asks before `push`. Only `s` or `si` uploads.
+`onward-generator run` calls `tool scene launcher` after the Python stages and then asks before `push`. Only `s` or `si` uploads. Before the first stage it checks that this project is not already open. A terminal asks for the Editor to be closed; the stages start after `s` or `si` and only once the lock is free.
 
 | Step | Effect |
 | --- | --- |
@@ -65,7 +65,7 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 | `launcher` | Calls the Onward Launcher for Quest. Writes `build/launcher/unity-export.local.{content3,info3}`, `build/content3.md5`, and `build/launcher.sha256`. Never overwrites |
 | `push` | **Only with `CONFIRM_PUSH=yes`.** Backs up the local map already on the headset (`build/device_backup/`), copies the new one, checks the MD5 on the device, and records it in `build/push.log` |
 
-Unity logs stay in `~/Library/Logs/onward-export/`. The Editor must be closed before `scene` starts. A newer Unity editor rewrites the project and 2021.3.23f1 can no longer open it.
+Unity logs stay in `~/Library/Logs/onward-export/`. The Editor must be closed before `scene` starts. `run` detects that from the exclusive lock on `Temp/UnityLockfile`, or from `Library/EditorInstance.json` when the lock file is absent and its process is still alive. A newer Unity editor rewrites the project and 2021.3.23f1 can no longer open it.
 
 ## Known limits
 

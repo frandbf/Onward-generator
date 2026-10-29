@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,10 +24,17 @@ from onward_generator.pipeline_run import (
     prepare_from,
     run_map,
     run_steps,
+    unity_editor_open,
 )
 from tests.conftest import MURCIA_CENTER
 
 LON, LAT = MURCIA_CENTER
+
+
+@pytest.fixture(autouse=True)
+def _unity_editor_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The developer's Editor may be open. These tests do not ask it to close."""
+    monkeypatch.setattr("onward_generator.pipeline_run.unity_editor_open", lambda: False)
 
 
 def test_map_create_keeps_latitude_then_longitude() -> None:
@@ -59,6 +68,46 @@ def test_plan_runs_python_stages_and_stops_before_unity(tmp_path) -> None:
     assert "unity" not in joined
     assert "push" not in joined
     assert f"--origin {LON} {LAT}" in joined
+    assert "panoramax" not in names
+
+
+def test_a_map_without_the_panoramax_key_keeps_the_current_graph(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document.pop("panoramax")
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    steps = dict(plan_steps(root))
+    assert "panoramax" not in steps
+    signs = steps["signs"]
+    assert "scene_materials" in signs[signs.index("--base") + 1]
+
+
+def test_panoramax_true_inserts_the_step_before_signs(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(
+        root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400, panoramax=True,
+    )
+    names = [name for name, _argv in plan_steps(root)]
+    assert names[names.index("materials") + 1] == "panoramax"
+    assert names[names.index("panoramax") + 1] == "signs"
+    steps = dict(plan_steps(root))
+    signs = steps["signs"]
+    assert steps["panoramax"][0] == "panoramax"
+    assert "scene_panoramax" in signs[signs.index("--base") + 1]
+
+
+def test_panoramax_off_writes_nothing(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    out = tmp_path / "scene_panoramax"
+    code = main([
+        "panoramax", "apply",
+        "--base", str(root / "data" / "processed" / "scene_materials"),
+        "--out", str(out),
+    ])
+    assert code == 0
+    assert not out.exists()
 
 
 def test_failure_is_reported_and_later_steps_do_not_start(capsys: pytest.CaptureFixture[str]) -> None:
@@ -529,6 +578,156 @@ def test_bounds_stays_on_scene_playable_when_later_copies_exist(tmp_path: Path) 
     assert Path(bounds[bounds.index("--out") + 1]).name == "scene_playable"
 
 
+def test_an_open_editor_asks_before_any_stage_starts(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    seen: list[str] = []
+    state = {"open": True, "asks": 0}
+
+    def unity_open() -> bool:
+        return state["open"]
+
+    def ask() -> str:
+        state["asks"] += 1
+        if state["asks"] == 1:
+            return "s"
+        state["open"] = False
+        return "si"
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=LAT,
+        longitude=LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        execute=lambda argv: seen.append(argv[0]) or 1,
+        interactive=True,
+        ask=ask,
+        unity_open=unity_open,
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert state["asks"] == 2
+    assert seen == ["osm"]
+    assert "Unity tiene abierto" in captured.out
+    assert "Sigue abierto" in captured.out
+    assert "run: Unity está cerrado. El pipeline empieza." in captured.out
+    assert captured.out.index("El pipeline empieza.") < captured.out.index("run: 1/")
+
+
+def test_declining_to_close_unity_does_not_start(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    seen: list[str] = []
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=LAT,
+        longitude=LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        execute=lambda argv: seen.append(argv[0]) or 0,
+        interactive=True,
+        ask=lambda: "",
+        unity_open=lambda: True,
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert seen == []
+    assert "run: cancelled. El pipeline no ha empezado." in captured.out
+    assert "run: 1/" not in captured.out
+
+
+def test_a_closed_editor_starts_without_asking(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    asked = {"n": 0}
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=LAT,
+        longitude=LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        execute=lambda _argv: 1,
+        interactive=True,
+        ask=lambda: asked.__setitem__("n", asked["n"] + 1) or "s",
+        unity_open=lambda: False,
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert asked["n"] == 0
+    assert "Unity tiene abierto" not in captured.out
+    assert "FAILED osm" in captured.out
+
+
+def test_a_non_interactive_run_stops_when_unity_is_open(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    seen: list[str] = []
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=LAT,
+        longitude=LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        execute=lambda argv: seen.append(argv[0]) or 0,
+        interactive=False,
+        unity_open=lambda: True,
+    )
+    captured = capsys.readouterr()
+    assert code == 1
+    assert seen == []
+    assert "FAILED unity. Unity tiene abierto" in captured.out
+    assert "terminal" in captured.out
+
+
+def test_unity_editor_open_reads_a_live_instance_or_a_held_lock(tmp_path: Path) -> None:
+    assert unity_editor_open(tmp_path) is False
+    instance = tmp_path / "Library" / "EditorInstance.json"
+    instance.parent.mkdir(parents=True)
+    finished = subprocess_pid()
+    instance.write_text(json.dumps({"process_id": finished}), encoding="utf-8")
+    assert unity_editor_open(tmp_path) is False
+    instance.write_text(json.dumps({"process_id": os.getpid()}), encoding="utf-8")
+    assert unity_editor_open(tmp_path) is True
+    lock = tmp_path / "Temp" / "UnityLockfile"
+    lock.parent.mkdir()
+    lock.write_bytes(b"")
+    assert unity_editor_open(tmp_path) is False
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import fcntl,sys,time; f=open(sys.argv[1],'rb'); fcntl.flock(f.fileno(), fcntl.LOCK_EX); print('held', flush=True); time.sleep(30)",
+            str(lock),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout is not None
+        assert holder.stdout.readline().strip() == "held"
+        assert unity_editor_open(tmp_path) is True
+    finally:
+        holder.kill()
+        holder.wait(timeout=5)
+
+
+def subprocess_pid() -> int:
+    finished = subprocess.run([sys.executable, "-c", "import os; print(os.getpid())"], check=True, capture_output=True, text=True)
+    return int(finished.stdout.strip())
+
+
 def test_an_incomplete_directory_is_rerun_with_overwrite(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
     out = root / "data" / "processed" / "scene_detail"
@@ -537,6 +736,46 @@ def test_an_incomplete_directory_is_rerun_with_overwrite(tmp_path: Path) -> None
     prepared = prepare_from([("detail", ["detail", "--out", str(out)])], "detail", root)
     assert "--overwrite" in prepared[0][1]
     assert not output_ready("detail", prepared[0][1], root)
+
+
+def test_turning_panoramax_on_rewrites_signs_and_keeps_the_package(tmp_path: Path) -> None:
+    root = _ready_map(tmp_path)
+    assert not (root / "data" / "processed" / "scene_panoramax").exists()
+    seen: list[list[str]] = []
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=LAT,
+        longitude=LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        panoramax=True,
+        execute=lambda argv: seen.append(list(argv)) or 0,
+        interactive=False,
+        push=lambda _path: 0,
+    )
+    assert code == 0
+    assert not output_ready("signs", [], root)
+
+    def label(argv: list[str]) -> str:
+        if argv[:2] == ["overgrow", "fit"]:
+            return "fit"
+        if argv[:2] == ["perf", "layout"]:
+            return "layout"
+        return argv[0]
+
+    by_name = {label(argv): argv for argv in seen}
+    assert label(seen[0]) == "panoramax"
+    assert "--overwrite" not in by_name["panoramax"]
+    assert "scene_panoramax" in by_name["signs"][by_name["signs"].index("--base") + 1]
+    for name in ("signs", "overgrow", "fit", "bounds", "layout"):
+        assert "--overwrite" in by_name[name]
+    export = by_name["export"]
+    assert "--overwrite" not in export
+    assert Path(export[export.index("--out") + 1]).name == "pkg_02"
+    assert (root / "data" / "processed" / "export" / "pkg_01").is_dir()
 
 
 def test_a_newer_layout_exports_the_next_package(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

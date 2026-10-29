@@ -37,6 +37,7 @@ from onward_generator.detail.facades import (
 )
 from onward_generator.detail.interiors import (
     build_interior,
+    glass_penetrations,
     pierce_room_windows,
     plan_interior,
     rectangularity,
@@ -72,6 +73,7 @@ class DetailObject:
     record: dict[str, Any]
     instance_of: str | None = None
     matrix: np.ndarray | None = None
+    glass_colliders: list[Mesh] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -109,6 +111,11 @@ class DetailedScene:
                     nodes.append(Node(f"{o.id}#collider", (Primitive(proto.collider, "collider"),), extras, o.matrix, proto.key + "#collider"))
             elif o.colliders:
                 nodes.append(Node(f"{o.id}#collider", tuple(Primitive(m, "collider") for m in o.colliders if m.triangle_count), extras))
+            if o.instance_of is None and o.glass_colliders:
+                panes = tuple(Primitive(m, "collider") for m in o.glass_colliders if m.triangle_count)
+                if panes:
+                    # ``#glass`` is the collision role. The primitive material stays ``collider``.
+                    nodes.append(Node(f"{o.id}#glass", panes, extras))
         return nodes
 
     def manifest(self) -> dict[str, Any]:
@@ -445,17 +452,21 @@ def detail_scene(
         if shell.roof_area_error > max(0.02, 1e-3 * geom.area):
             issues.append(Issue("roof_area_mismatch", "critical", bid, f"roof differs from footprint by {shell.roof_area_error:.3f} m²"))
         colliders: list[Mesh] = []
+        glass_colliders: list[Mesh] = []
         base_collider = o.collider
         interior_record = None
         if interior is not None:
+            assert layout is not None
             built = build_interior(
                 interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
+                glass_penetrations(layout, segments),
             )
             if built.defects:
                 issues.append(Issue("interior_collider_not_closed", "critical", bid, f"{built.defects} defects"))
             if built.roof_well is not None:
                 cut_roof_deck(shell, built.roof_well)
             colliders = [m for _, m in built.colliders]
+            glass_colliders = list(built.glass_colliders)
             if shell.parapet_collider is not None and built.roof_well is not None:
                 colliders.append(shell.parapet_collider)
             interior_record = built.spec | {
@@ -516,7 +527,8 @@ def detail_scene(
             "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
             "collider": {"source": "interior_shell" if interior_record else "phase03_simplified_prism",
                          "parts": len(colliders), "triangles": sum(m.triangle_count for m in colliders),
-                         "balconies": len(shell.balcony_colliders)},
+                         "balconies": len(shell.balcony_colliders),
+                         "glass_panes": len(glass_colliders)},
             "checks": {"facade_open_edges": shell.defects, "roof_area_error_m2": round(shell.roof_area_error, 4)},
         }
         if storeys.origin == "interior_storey":
@@ -526,7 +538,7 @@ def detail_scene(
                 "previous_height_m": round(previous_height, 3),
                 "interior_storey_origin": "estimated",
             }
-        objects.append(DetailObject(o.id, "building", visual, colliders, record))
+        objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders))
         if landmark:
             towers, tower_issues = attach_towers(bid, geom, features, cfg)
             issues.extend(tower_issues)
@@ -572,7 +584,7 @@ def detail_scene(
         for prim in o.visual:
             if not np.isfinite(prim.mesh.vertices).all():
                 issues.append(Issue("non_finite_vertices", "critical", o.id, "mesh has NaN or infinite coordinates"))
-        for m in o.colliders:
+        for m in (*o.colliders, *o.glass_colliders):
             if m.triangle_count and o.type in ("building", "landmark_part") and signed_volume(m) <= 0:
                 issues.append(Issue("collider_not_closed", "critical", o.id, "collider volume is not positive"))
 

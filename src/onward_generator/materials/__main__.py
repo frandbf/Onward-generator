@@ -11,7 +11,7 @@ from onward_generator.dress.catalog import CatalogError
 from onward_generator.materials.apply import MaterialsError, apply_materials
 from onward_generator.materials.plan import PlanError
 from onward_generator.materials.polyhaven import DEFAULT_CACHE, DownloadError
-from onward_generator.next_step import emit, signs_command
+from onward_generator.next_step import after_materials, emit
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,7 +56,7 @@ def _run_apply(args: argparse.Namespace) -> int:
     for row in skipped:
         print(f"  skip {row.get('catalog_id') or row.get('id')}: {row['reason']}")
     print(f"wrote {Path(args.out).expanduser()}")
-    emit(signs_command(Path(args.out)))
+    emit(after_materials(Path(args.out)))
     return 0
 
 

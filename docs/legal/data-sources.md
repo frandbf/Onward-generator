@@ -75,6 +75,20 @@ Phase 04 does not use external models. Windows, balconies, roofs, street furnitu
 
 `signs place` paints the OSM `name` of the way on a generated plate. The name is ODbL data. The map keeps the OpenStreetMap attribution. The name is not translated and not invented. A way with no `name` gets no plate.
 
+## Panoramax
+
+Street photographs used by `panoramax apply`. The step is under development. It is off unless `map.json` has `"panoramax": true`.
+
+| | |
+| --- | --- |
+| Provider | Panoramax (GeoVisio). Search is the metacatalogue `https://api.panoramax.xyz/api/search` |
+| Licence | CC BY-SA 4.0. `https://spdx.org/licenses/CC-BY-SA-4.0.html` |
+| What is stored | A picture whose `field_of_view` is 360, its JPEG, and a sidecar: provider, licence, licence URL, attribution, URL, author, SHA-256, `retrieved_at`. A flat picture is listed as `skipped: flat` and the JPEG is not downloaded |
+| Where | JPEGs and sidecars: `cache/panoramax/<picture id>`, gitignored, shared by every map. Each map keeps its search index in `maps/<id>/data/raw/panoramax/` |
+| On the building | One cropped facade per exposed face. The material stays `CC-BY-SA-4.0` with origin `observed`. It is not relicensed to CC0 and its pixels are not mixed into the catalogue atlas |
+
+The Spanish instance `panoramax.openstreetmap.es` publishes under CC BY-SA 4.0. The extra grant that OSM-FR gives for non-photographic derivatives does not apply to pictures from the Spanish instance or from MapComplete. A facade crop keeps the picture's author and the CC BY-SA 4.0 attribution. The GLB extras and `panoramax_report.json` record the picture id, the author, the licence, and `observed`.
+
 ## Textures
 
 A new map's plan is `maps/<id>/config/texture_plan.json`, written by `map create` from [config/dress/imported_library.json](../../config/dress/imported_library.json). There is no shared Murcia or generic template.

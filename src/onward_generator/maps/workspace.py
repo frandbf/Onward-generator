@@ -50,6 +50,7 @@ def create_map(
     description: str | None = None,
     brief: str | None = None,
     ambient_ai: bool = False,
+    panoramax: bool = False,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
     overwrite: bool = False,
     texture_provider: Provider | None = None,
@@ -106,6 +107,7 @@ def create_map(
         "description": description,
         "brief": brief,
         "ambient_ai": ambient_ai,
+        "panoramax": bool(panoramax),
         "center": {"latitude": latitude, "longitude": longitude},
         "radius_m": radius_m,
         "margin_m": margin_m,
@@ -121,6 +123,26 @@ def create_map(
     }
     atomic_write_json(root / "map.json", document)
     return document
+
+
+def panoramax_enabled(directory: str | Path) -> bool:
+    """True only when this map's ``map.json`` asks for Panoramax pictures.
+
+    A map written before the flag existed has no key. That map stays off.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    return bool(document.get("panoramax", False))
+
+
+def store_panoramax(directory: str | Path, enabled: bool) -> None:
+    """Record the Panoramax switch on an existing map. Does not rewrite scenes."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["panoramax"] = bool(enabled)
+    atomic_write_json(root / "map.json", document)
 
 
 def load_map(directory: str | Path) -> dict[str, Any]:

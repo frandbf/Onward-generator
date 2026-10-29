@@ -75,6 +75,8 @@ export PYTHONPATH=src
 
 `run` creates `maps/<id>/` from the name, downloads that square from Overpass, and runs every Python stage through the export package. It then builds in Unity (`tool scene launcher`) and asks before uploading. Only `s` or `si` uploads. Any other answer, or a terminal that cannot ask, leaves the headset alone.
 
+If the Editor already has `~/Unity/OnwardPhase0Project` open, `run` stops before the first stage and asks you to close it. The stages start after `s` or `si`, and only once that project is closed. Any other answer cancels the run.
+
 The stages inside `run` are:
 
 `map` → `geo` → `heights` → `generate` → `detail` → `dress` → `materials` → `signs` → `overgrow` → `fit` → `bounds` → `layout` → `export` → Unity → Quest
@@ -154,6 +156,11 @@ export PYTHONPATH=src
   --base maps/<id>/data/processed/scene_dress \
   --plan maps/<id>/config/texture_plan.json \
   --out  maps/<id>/data/processed/scene_materials
+
+# under development; only when map.json has "panoramax": true; then signs --base is scene_panoramax
+.venv/bin/python -m onward_generator panoramax apply \
+  --base maps/<id>/data/processed/scene_materials \
+  --out  maps/<id>/data/processed/scene_panoramax
 
 .venv/bin/python -m onward_generator signs place \
   --base  maps/<id>/data/processed/scene_materials \
@@ -242,6 +249,7 @@ Every command is `PYTHONPATH=src .venv/bin/python -m onward_generator <command>`
 | `props catalog` | Validate the Asset Store catalogue and, with `--inventory`, bind imported prefabs. | `0` / `1` |
 | `props place` | Copy a scene and write instances that have OSM evidence (surface parking). Does not put cars on the carriageway. Does not bake FBX into the GLB. | `0` / `1` |
 | `materials apply` | Copy a `dress` or `detail` scene and remap atlas tiles from that map's `config/texture_plan.json`. `--download` is the only network step, and it is for an older Poly Haven plan. A library plan reads files already in `config/dress/imported_library.json`. See `docs/01-pipeline.md`. | `0` / `1` |
+| `panoramax apply` | Under development. With `map.json` `"panoramax": true`, project 360° street photos onto exposed facades and write `scene_panoramax`. Off, it writes nothing. Collision is copied byte for byte. Photos stay CC BY-SA 4.0. See `docs/01-pipeline.md`. | `0` / `1` |
 | `signs place` | Copy the dressed scene and hang one plate, with the OSM `name`, on the facade at a junction. A street with no name gets no plate. Collision is unchanged. | `0` / `1` |
 | `overgrow place` | Copy the scene and add moss, grass, vines, trees, wrecks, and the props in `--library`. `--profile` is 10, 30, or 100. `--seed` defaults to 48152. `--zone-radius` or `--zone-polygon` is in local metres. With no zone, the default is a 110 m block. The drive lane and the building footprints stay. `overgrow fit` then rejects a prop that is the wrong size or in the wrong place. | `0` / `1` |
 | `overgrow library` / `fetch` / `fetch-sketchfab` | List the installed props and the Sketchfab licence review, download the named CC0 Poly Haven models, or download Sketchfab models the review already marked usable. | `0` / `1` |
@@ -280,7 +288,7 @@ Tests do not use the network. The Catastro download is tested with a stand-in fe
 
 - OpenStreetMap data is ODbL-1.0. Derived maps keep the attribution `© OpenStreetMap contributors`.
 - Catastro INSPIRE BU is CC-BY 4.0 and is used for Spain only.
-- Raw extracts under `maps/*/data/` are gitignored. Do not commit credentials, private SDK files, or large source extracts.
+- Raw extracts under `maps/*/data/` are gitignored. Panoramax JPEGs live in `cache/panoramax/` and are shared by every map; that directory is gitignored too. Do not commit credentials, private SDK files, or large source extracts.
 - The prop and texture libraries record the licence of every imported file. See `docs/legal/data-sources.md` and `docs/abandoned-assets.md`.
 
 ## Documentation

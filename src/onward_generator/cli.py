@@ -71,6 +71,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         description=args.description,
         brief=args.brief,
         ambient_ai=args.ai,
+        panoramax=args.panoramax,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         overwrite=args.overwrite,
         start=args.start,
@@ -137,6 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("bounds", help="copy a scene and add a playable perimeter wall (see: bounds --help)", add_help=False)
     sub.add_parser("props", help="Asset Store prop catalogue (see: props --help)", add_help=False)
     sub.add_parser("materials", help="apply a texture-plan JSON to a scene copy (see: materials --help)", add_help=False)
+    sub.add_parser("panoramax", help="under development: project 360 street photos onto exposed facades (see: panoramax --help)", add_help=False)
     sub.add_parser("signs", help="hang OSM street-name plates on facades (see: signs --help)", add_help=False)
     sub.add_parser("overgrow", help="add abandoned-city moss, grass, trees and wrecks (see: overgrow --help)", add_help=False)
     sub.add_parser("map", help="create or inspect one map folder (see: map --help)", add_help=False)
@@ -154,6 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
+    run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")
     run.set_defaults(handler=_cmd_run)
@@ -207,6 +210,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from onward_generator.materials.__main__ import main as materials_main
 
         return materials_main(argv[1:])
+    if argv[:1] == ["panoramax"]:
+        from onward_generator.panoramax.__main__ import main as panoramax_main
+
+        return panoramax_main(argv[1:])
     if argv[:1] == ["signs"]:
         from onward_generator.signs.__main__ import main as signs_main
 

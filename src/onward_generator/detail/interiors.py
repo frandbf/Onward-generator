@@ -2,8 +2,9 @@
 
 An interior is generic and *not* a reconstruction of the real building: one open
 room per furnished floor, a through-door from the street, and a straight stair
-between each pair of floors. A building tall enough for three floors gets the
-third when the seed says so. From the top floor a switchback continues to the
+between each pair of floors. A see-through window is a hole in that wall plus one
+closed pane. A building tall enough for three floors gets the third when the seed
+says so. From the top floor a switchback continues to the
 flat roof. Slabs and colliders leave the doorway and the stairs walkable.
 """
 
@@ -15,17 +16,24 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
-from shapely import Point, Polygon
+from shapely import Point, Polygon, make_valid
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator.detail.config import DetailConfig
 from onward_generator.detail.facades import UP, Hole, Layout, Segment, face_with_openings, stable_unit
 from onward_generator.detail.modules import StairGeometry, frame_matrix, stair, stair_geometry
-from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, polygons_of, prism, quad, signed_volume, transform, walls
+from onward_generator.generation.mesh import Mesh, box, cap, closed_manifold_defects, merge, polygons_of, prism, quad, signed_volume, transform, walls
 
 WALL_INSET_M = 0.05
 RIM_TOLERANCE_M = 1e-3
+# The door already cuts 5 cm past each face of the wall. Window holes use the same overlap
+# so the concrete ring actually opens, instead of leaving a sliver on one side.
+CUT_OVERLAP_M = 0.05
+# Closed pane in the middle of the opening. Thin enough that the shot crosses one volume,
+# inset from the jambs so it does not weld into the concrete.
+PANE_THICKNESS_M = 0.02
+PANE_INSET_M = 0.01
 # Openings the player can stand on either side of. One quad, material glass_view.
 # The adapter draws both faces with PP_Sprite_Lit. Do not add a second quad.
 GLASS_VIEW = "glass_view"
@@ -68,6 +76,7 @@ class Interior:
     defects: int = 0
     checks: dict[str, Any] = field(default_factory=dict)
     roof_well: Polygon | None = None
+    glass_colliders: list[Mesh] = field(default_factory=list)
 
 
 def rectangularity(geometry: BaseGeometry) -> float:
@@ -274,6 +283,15 @@ def pierce_room_windows(
     return opened, omitted
 
 
+def glass_penetrations(layout: Layout, segments: Sequence[Segment]) -> list[tuple[Segment, Hole]]:
+    """See-through openings ``pierce_room_windows`` kept. One pane each, both directions."""
+    return [
+        (segments[hole.segment], hole)
+        for hole in layout.holes
+        if hole.back == GLASS_VIEW and hole.kind in ROOM_GLASS
+    ]
+
+
 def room_window_cuts(layout: Layout, segments: Sequence[Segment]) -> list[WallCut]:
     """Inner-wall spans of the room panes ``pierce_room_windows`` kept."""
     cuts: list[WallCut] = []
@@ -321,6 +339,68 @@ def _inner_walls(inner: Polygon, z0: float, z1: float, cuts: Sequence[WallCut]) 
     return merge(parts)
 
 
+def _pane(seg: Segment, hole: Hole, thickness: float) -> Mesh:
+    """Closed box centred in the wall. The collision node that owns it is named ``#glass``."""
+    inset = PANE_INSET_M if hole.width > 2 * PANE_INSET_M + 0.05 else 0.0
+    half = PANE_THICKNESS_M / 2
+    mid = thickness / 2
+    local = box(
+        hole.s0 + inset, hole.s0 + hole.width - inset,
+        mid - half, mid + half,
+        hole.v0, hole.v0 + hole.height,
+    )
+    origin = np.array([seg.a[0], seg.a[1], 0.0])
+    return transform(local, frame_matrix(origin, seg.u, -seg.n_out))
+
+
+def _pierced_walls(
+    ring: BaseGeometry,
+    gap: Polygon,
+    penetrations: Sequence[tuple[Segment, Hole]],
+    thickness: float,
+    door_height: float,
+    z_top: float,
+) -> tuple[list[tuple[str, Mesh]], list[Mesh]]:
+    """Concrete bands with the door and each see-through opening removed, plus one pane per opening.
+
+    Bands split on the door head and on every opening edge, so a band is either fully
+    open or fully solid. The band above an opening keeps the full ring: a downward
+    navmesh ray still hits concrete, and the sill or the pier still stops a body.
+    """
+    cuts: list[tuple[Polygon, float, float]] = []
+    for seg, hole in penetrations:
+        rect = seg.plan_rect(
+            hole.s0, hole.s0 + hole.width,
+            -(thickness + CUT_OVERLAP_M), CUT_OVERLAP_M,
+        )
+        cuts.append((rect, hole.v0, hole.v0 + hole.height))
+    levels = {0.0, float(door_height), float(z_top)}
+    for _, z0, z1 in cuts:
+        if 1e-4 < z0 < z_top:
+            levels.add(float(z0))
+        if 1e-4 < z1 < z_top:
+            levels.add(float(z1))
+    walls_out: list[tuple[str, Mesh]] = []
+    ordered = sorted(levels)
+    for index, (za, zb) in enumerate(zip(ordered, ordered[1:])):
+        if zb - za < 1e-4:
+            continue
+        poly: BaseGeometry = ring
+        if zb <= door_height + 1e-6:
+            poly = poly.difference(gap)
+        for rect, z0, z1 in cuts:
+            if z0 <= za + 1e-6 and zb <= z1 + 1e-6:
+                poly = poly.difference(rect)
+        if poly.is_empty:
+            continue
+        poly = make_valid(poly)
+        if poly.is_empty or float(poly.area) < 1e-4:
+            continue
+        walls_out.append((f"walls_{index}", prism(poly, za, zb, bottom=True)))
+    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations]
+    return walls_out, panes
+
+
 def build_interior(
     plan: InteriorPlan,
     height: float,
@@ -328,6 +408,7 @@ def build_interior(
     refined: BaseGeometry,
     cfg: DetailConfig,
     window_cuts: Sequence[WallCut] = (),
+    penetrations: Sequence[tuple[Segment, Hole]] = (),
 ) -> Interior:
     ic = cfg.interiors
     s, k, t = plan.storey_m, plan.floors, ic.wall_thickness_m
@@ -341,9 +422,9 @@ def build_interior(
     colliders: list[tuple[str, Mesh]] = []
 
     ring = refined.difference(plan.inner)
-    gap = seg.plan_rect(door.s0, door.s0 + door.width, -(t + 0.05), 0.05)
-    colliders.append(("walls_doorway", prism(ring.difference(gap), 0.0, door.height, bottom=True)))
-    colliders.append(("walls_upper", prism(ring, door.height, z_top, bottom=True)))
+    gap = seg.plan_rect(door.s0, door.s0 + door.width, -(t + CUT_OVERLAP_M), CUT_OVERLAP_M)
+    wall_parts, glass = _pierced_walls(ring, gap, penetrations, t, door.height, z_top)
+    colliders.extend(wall_parts)
     if not roof_flights:
         visual["interior_wall"].append(cap(plan.inner, top, up=False))
         colliders.append(("upper_solid", prism(plan.inner, top, height, bottom=True)))
@@ -395,6 +476,10 @@ def build_interior(
         d = closed_manifold_defects(mesh)
         defects += d
         volumes[name] = round(signed_volume(mesh), 3)
+    for index, mesh in enumerate(glass):
+        d = closed_manifold_defects(mesh)
+        defects += d
+        volumes[f"glass_{index}"] = round(signed_volume(mesh), 3)
     spec = {
         "building_id": plan.building_id,
         "representation": "generic_simplified_interior",
@@ -404,5 +489,8 @@ def build_interior(
         "wall_thickness_m": t,
         "accessible_floors": k,
         "roof_access": roof_well is not None,
+        "glass_panes": len(glass),
     }
-    return Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)
+    built = Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)
+    built.glass_colliders = glass
+    return built

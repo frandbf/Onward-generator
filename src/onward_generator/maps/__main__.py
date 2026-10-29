@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     create.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
+    create.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     create.add_argument("--overwrite", action="store_true", help="replace map.json and configs when processed/ is empty")
     create.add_argument("--textures", action="store_true", help="write or replace only config/texture_plan.json")
 
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                 description=args.description,
                 brief=args.brief,
                 ambient_ai=args.ai,
+                panoramax=args.panoramax,
                 lightmap_texels_per_m=args.lightmap_texels_per_m,
                 overwrite=args.overwrite,
                 texture_provider=_texture_provider(args.seed),

@@ -10,6 +10,7 @@ up the previous one first.
 from __future__ import annotations
 
 import io
+import json
 import os
 import shlex
 import subprocess
@@ -19,7 +20,14 @@ from collections.abc import Callable, Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from onward_generator.maps.workspace import MapError, load_map, map_directory, store_brief
+from onward_generator.maps.workspace import (
+    MapError,
+    load_map,
+    map_directory,
+    panoramax_enabled,
+    store_brief,
+    store_panoramax,
+)
 from onward_generator.osm.acquire import osm_target
 from onward_generator.next_step import (
     detail_command,
@@ -31,6 +39,7 @@ from onward_generator.next_step import (
     materials_command,
     fit_command,
     overgrow_command,
+    panoramax_command,
     show,
     signs_command,
 )
@@ -39,6 +48,7 @@ Execute = Callable[[Sequence[str]], int]
 Ask = Callable[[], str]
 Push = Callable[[Path], int]
 Build = Callable[[Path, Sequence[str]], int]
+UnityOpen = Callable[[], bool]
 _YES = {"s", "si", "sí", "y", "yes"}
 
 
@@ -64,6 +74,7 @@ def map_create_argv(
     description: str | None = None,
     brief: str | None = None,
     ambient_ai: bool = False,
+    panoramax: bool = False,
     lightmap_texels_per_m: float = 10.0,
     overwrite: bool = False,
 ) -> list[str]:
@@ -84,6 +95,8 @@ def map_create_argv(
         argv.extend(["--brief", brief])
     if ambient_ai:
         argv.append("--ai")
+    if panoramax:
+        argv.append("--panoramax")
     if overwrite:
         argv.append("--overwrite")
     return argv
@@ -104,7 +117,12 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
     dress = _flag(dress_argv, "--out")
     materials_argv = command_argv(materials_command(dress))
     materials = _flag(materials_argv, "--out")
-    signs_argv = command_argv(signs_command(materials))
+    panoramax_argv: list[str] | None = None
+    signs_base = materials
+    if panoramax_enabled(root):
+        panoramax_argv = command_argv(panoramax_command(materials))
+        signs_base = _flag(panoramax_argv, "--out")
+    signs_argv = command_argv(signs_command(signs_base))
     signs = _flag(signs_argv, "--out")
     overgrow_argv = command_argv(overgrow_command(signs))
     overgrow = _flag(overgrow_argv, "--out")
@@ -129,6 +147,9 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
         "--layout", show(layout_path),
         "--out", show(root / "data" / "processed" / "export" / "pkg_01"),
     ))
+    picture_steps: list[tuple[str, list[str]]] = []
+    if panoramax_argv is not None:
+        picture_steps.append(("panoramax", panoramax_argv))
     return [
         ("geo", geo_argv),
         ("heights", heights_argv),
@@ -136,6 +157,7 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
         ("detail", detail_argv),
         ("dress", dress_argv),
         ("materials", materials_argv),
+        *picture_steps,
         ("signs", signs_argv),
         ("overgrow", overgrow_argv),
         ("fit", fit_argv),
@@ -331,6 +353,7 @@ def _canon(root: Path, name: str) -> Path | None:
         "detail": processed / "scene_detail" / "scene_visual.glb",
         "dress": processed / "scene_dress" / "scene_visual.glb",
         "materials": processed / "scene_materials" / "scene_visual.glb",
+        "panoramax": processed / "scene_panoramax" / "scene_visual.glb",
         "signs": processed / "scene_signs" / "scene_visual.glb",
         "overgrow": processed / "scene_overgrow" / "scene_visual.glb",
         "fit": processed / "scene_overgrow" / "fit.json",
@@ -341,19 +364,21 @@ def _canon(root: Path, name: str) -> Path | None:
 
 
 def _input_markers(root: Path, name: str) -> list[Path]:
-    previous = {
+    previous_of = {
         "geo": "osm",
         "heights": "geo",
         "generate": "heights",
         "detail": "generate",
         "dress": "detail",
         "materials": "dress",
-        "signs": "materials",
+        "signs": "panoramax" if panoramax_enabled(root) else "materials",
+        "panoramax": "materials",
         "overgrow": "signs",
         "fit": "overgrow",
         "bounds": "fit",
         "layout": "bounds",
-    }.get(name)
+    }
+    previous = previous_of.get(name)
     if previous == "osm":
         return [osm_target(root)]
     if previous is None:
@@ -485,6 +510,101 @@ def prepare_from(steps: Sequence[tuple[str, list[str]]], start: str, root: Path)
     return prepared
 
 
+def unity_project() -> Path:
+    """The stage-0 project ``run_export.sh`` opens. ``PROJECT`` overrides the default."""
+    return Path(os.environ.get("PROJECT", Path.home() / "Unity" / "OnwardPhase0Project"))
+
+
+def unity_editor_open(project: Path | None = None) -> bool:
+    """True when an Editor already has this project open.
+
+    A running Editor holds an exclusive lock on ``Temp/UnityLockfile``. If that
+    file is absent, ``Library/EditorInstance.json`` is used when its process is
+    still alive. A leftover file from a crash does not count.
+    """
+    root = project if project is not None else unity_project()
+    lock = root / "Temp" / "UnityLockfile"
+    if lock.is_file():
+        return _unity_lock_held(lock)
+    return _editor_instance_alive(root)
+
+
+def confirm_unity_closed(
+    *,
+    interactive: bool,
+    ask: Ask | None,
+    unity_open: UnityOpen,
+) -> int:
+    """Return 0 when the Editor is closed. 1 when the run must not start."""
+    if not unity_open():
+        return 0
+    project = unity_project()
+    if not interactive:
+        print(
+            f"FAILED unity. Unity tiene abierto {project}. "
+            "Ciérralo y vuelve a ejecutar el comando en un terminal.",
+            flush=True,
+        )
+        return 1
+    print(
+        f"Unity tiene abierto {project}.\n"
+        "Ciérralo: el pipeline abre ese mismo proyecto y Unity no admite dos instancias.",
+        flush=True,
+    )
+    while True:
+        print("Cuando lo hayas cerrado, confirma para iniciar el pipeline [s]:", flush=True)
+        answer = (ask() if ask is not None else input()).strip().lower()
+        if answer not in _YES:
+            print("run: cancelled. El pipeline no ha empezado.", flush=True)
+            return 1
+        if not unity_open():
+            print("run: Unity está cerrado. El pipeline empieza.", flush=True)
+            return 0
+        print(f"Sigue abierto {project}. Ciérralo y confirma otra vez.", flush=True)
+
+
+def _editor_instance_alive(root: Path) -> bool:
+    path = root / "Library" / "EditorInstance.json"
+    try:
+        pid = int(json.loads(path.read_text(encoding="utf-8"))["process_id"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return _pid_alive(pid)
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _unity_lock_held(path: Path) -> bool:
+    """True when another process holds the exclusive lock Unity takes on open."""
+    try:
+        import fcntl
+    except ImportError:
+        return False
+    try:
+        handle = path.open("rb")
+    except OSError:
+        return True
+    try:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return False
+    finally:
+        handle.close()
+
+
 def run_map(
     *,
     map_id: str,
@@ -498,6 +618,7 @@ def run_map(
     description: str | None = None,
     brief: str | None = None,
     ambient_ai: bool = False,
+    panoramax: bool = False,
     lightmap_texels_per_m: float = 10.0,
     overwrite: bool = False,
     start: str | None = None,
@@ -506,6 +627,7 @@ def run_map(
     interactive: bool | None = None,
     push: Push | None = None,
     build: Build | None = None,
+    unity_open: UnityOpen | None = None,
 ) -> int:
     """Create the map folder, then run every Python stage through ``export package``.
 
@@ -513,10 +635,20 @@ def run_map(
     of those stages present, a terminal asks where to continue. ``--from`` skips
     that question. When the Python stages are done, Unity builds the Quest
     files (``tool scene launcher``) and the terminal then asks whether to upload.
+
+    If the Editor already has the stage-0 project open, nothing starts until
+    the user closes it and confirms. Any other answer cancels the run.
     """
     runner = execute if execute is not None else _execute_cli
     root = Path(out)
     prompting = sys.stdin.isatty() if interactive is None else interactive
+    gate = confirm_unity_closed(
+        interactive=prompting,
+        ask=ask,
+        unity_open=unity_open if unity_open is not None else unity_editor_open,
+    )
+    if gate != 0:
+        return gate
     ran: list[tuple[str, list[str]]] = []
     times: list[tuple[str, float]] = []
     if not (root / "map.json").is_file():
@@ -547,6 +679,7 @@ def run_map(
                     description=description,
                     brief=brief,
                     ambient_ai=ambient_ai,
+                    panoramax=panoramax,
                     lightmap_texels_per_m=lightmap_texels_per_m,
                     overwrite=overwrite,
                 ),
@@ -570,6 +703,8 @@ def run_map(
             _same_request(root, map_id, latitude, longitude, radius_m, margin_m)
             if brief is not None or ambient_ai:
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
+            if panoramax:
+                store_panoramax(root, True)
             steps = resume_steps(root)
             done = [step for step, argv in steps if output_ready(step, argv, root)]
             done.insert(0, "map")

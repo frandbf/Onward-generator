@@ -244,6 +244,17 @@ def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detai
         assert view[0].mesh.triangle_count == 2 * it.record["through_windows"]
         assert view[0].mesh.vertices[:, 2].min() < ceiling
         assert all(p.material != "glass_view" for n in detailed.collision_nodes() for p in n.primitives)
+        glass_nodes = [n for n in detailed.collision_nodes() if n.name.endswith("#glass")]
+        open_ids = {it.record["source_ids"][0] for it in interiors if it.record["through_windows"] > 0}
+        assert {n.name for n in glass_nodes} == {f"building/{bid}#glass" for bid in open_ids}
+        for it in interiors:
+            assert it.record["glass_panes"] == it.record["through_windows"]
+        for node in glass_nodes:
+            concrete = next(n for n in detailed.collision_nodes() if n.name == node.name.removesuffix("#glass") + "#collider")
+            for prim in node.primitives:
+                centre = prim.mesh.vertices.mean(axis=0)
+                assert _inside(prim.mesh, centre)
+                assert not any(_inside(part.mesh, centre) for part in concrete.primitives)
 
 
 # --- Urban elements -------------------------------------------------------------

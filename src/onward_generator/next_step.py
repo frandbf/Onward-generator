@@ -129,6 +129,28 @@ def _geo_for(base: Path) -> Path:
     return _existing(_inputs(base), "geo_scene", "path") or Path("geo_scene.json")
 
 
+def after_materials(base: Path) -> str:
+    """The command printed after ``materials apply``.
+
+    A map that did not ask for street photos continues at the plates.
+    """
+    from onward_generator.maps.workspace import panoramax_enabled
+
+    root = map_root(base)
+    if root is not None and panoramax_enabled(root):
+        return panoramax_command(base)
+    return signs_command(base)
+
+
+def panoramax_command(base: Path) -> str:
+    """Copy materials forward and project 360 photos. Runs only when the map asks for it."""
+    return invoke(
+        "panoramax", "apply",
+        "--base", show(base),
+        "--out", show(stage_path(base, "scene_panoramax")),
+    )
+
+
 def signs_command(base: Path) -> str:
     scene = _geo_for(base)
     out_name = "scene_signs_compact" if "compact" in Path(base).name else "scene_signs"

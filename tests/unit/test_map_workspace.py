@@ -28,6 +28,7 @@ def test_create_writes_an_isolated_square_around_the_centre(tmp_path: Path) -> N
     )
     assert document["name"] == "Plaza de prueba"
     assert document["seed"] == 7
+    assert document["panoramax"] is False
     assert (root / "config" / "project.json").is_file()
     assert json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["map"]["title"] == "Plaza de prueba"
     assert json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]["lightmap_texels_per_m"] == 10.0

@@ -17,3 +17,6 @@ output/*
 
 # Per-map workspaces keep their OSM extract and generated scenes out of git.
 maps/*/data/
+
+# Shared Panoramax JPEGs. The per-map search index stays under maps/<id>/data/.
+cache/
