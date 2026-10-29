@@ -1,0 +1,66 @@
+# Verification gate for every pull request. The `linux` job uses the same image as
+# tools/docker/run.sh, so a local `tools/docker/run.sh pytest -q` reproduces it.
+# The repository is private: the macOS job (10x billed minutes) runs on main,
+# on demand, or on a pull request labelled `macos`.
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  linux:
+    name: linux (docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: onward-generator:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Tests
+        run: tools/docker/run.sh pytest -q -p no:cacheprovider
+      - name: Shell scripts
+        run: tools/docker/run.sh shellcheck -S warning tools/docker/run.sh tools/unity/*/*.sh
+      - name: CLI smoke
+        run: |
+          tools/docker/run.sh onward-generator version
+          tools/docker/run.sh onward-generator validate-config config/murcia-belluga.example.json
+
+  macos:
+    name: macos (native)
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'macos')
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --only-binary=:all: -r requirements.lock
+          .venv/bin/python -m pip install --no-deps -e .
+      - name: Tests
+        run: .venv/bin/python -m pytest -q -p no:cacheprovider
+      - name: CLI smoke
+        run: .venv/bin/onward-generator version
