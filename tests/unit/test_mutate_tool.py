@@ -56,14 +56,60 @@ def test_module_name_handles_packages() -> None:
 
 
 def test_functions_use_mutmut_names_and_include_decorators() -> None:
-    found = {f.mangled: (f.first_line, f.last_line) for f in mutate.functions(SOURCE, "m")}
-    assert found == {"x_first": (4, 5), "x_second": (8, 10), "xǁBoxǁgrow": (16, 17)}
+    found = {f.mangled: (f.first_line, f.last_line, f.def_line) for f in mutate.functions(SOURCE, "src/onward_generator/m.py")}
+    assert found == {"x_first": (4, 5, 4), "x_second": (8, 10, 9), "xǁBoxǁgrow": (16, 17, 16)}
 
 
 def test_touched_selects_only_functions_with_changed_lines() -> None:
     picked = mutate.touched(SOURCE, "src/onward_generator/m.py", {8, 14})
     assert [f.pattern for f in picked] == ["onward_generator.m.x_second__mutmut_*"]
+    assert picked[0].changed == frozenset({8})
     assert mutate.touched(SOURCE, "src/onward_generator/m.py", {1, 2, 14}) == []
+
+
+# Shape of mutmut 3.8 generated code: the original and each mutant as separate functions.
+MUTATED = """def x_area__mutmut_orig(w, h=1):
+    side = w * h
+    return side + 0
+
+
+def x_area__mutmut_1(w, h=2):
+    side = w * h
+    return side + 0
+
+
+def x_area__mutmut_2(w, h=1):
+    side = w / h
+    return side + 0
+
+
+def x_area__mutmut_3(w, h=1):
+    side = w * h
+    return side - 0
+
+
+def x_area__mutmut_4(w, h=1):
+    side = None
+    return side + 0
+"""
+
+
+def test_mutant_lines_maps_each_edit_to_the_original_file_line() -> None:
+    # In the real file, ``def area`` is on line 20, so its body starts on 21.
+    assert mutate.mutant_lines(MUTATED, "x_area", 20) == {1: 20, 2: 21, 3: 22, 4: 21}
+
+
+def test_mutant_lines_without_an_original_maps_nothing() -> None:
+    assert mutate.mutant_lines("def x_other__mutmut_1():\n    return 1\n", "x_area", 20) == {}
+
+
+def test_on_changed_lines_keeps_only_mutants_on_changed_lines(tmp_path, monkeypatch) -> None:
+    mutated = tmp_path / "mutants" / "src" / "onward_generator" / "m.py"
+    mutated.parent.mkdir(parents=True)
+    mutated.write_text(MUTATED, encoding="utf-8")
+    monkeypatch.setattr(mutate, "REPO", tmp_path)
+    target = mutate.Function("src/onward_generator/m.py", "onward_generator.m", "x_area", 20, 22, 20, frozenset({21}))
+    assert mutate.on_changed_lines([target]) == ["onward_generator.m.x_area__mutmut_2", "onward_generator.m.x_area__mutmut_4"]
 
 
 def test_statuses_filters_by_pattern() -> None:

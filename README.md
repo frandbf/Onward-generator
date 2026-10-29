@@ -44,10 +44,10 @@ task test -- -k cadastre
 
 ### Mutation testing
 
-`task mutate` changes the code a branch touched and checks that some test notices. Only functions in `src/onward_generator` that contain an added or changed line since `BASE` (default `main`, uncommitted edits included) are mutated, with [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock`. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one.
+`task mutate` changes the lines a branch touched and checks that some test notices. It takes the lines in `src/onward_generator` added or changed since `BASE` (default `main`, uncommitted edits included), lets [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock` generate the mutants of the functions that contain them, and runs only the mutants whose edit falls on one of those lines. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one. `task mutate -- --whole-functions` runs every mutant of those functions instead, which also measures the old code around the change.
 
 ```bash
-task mutate                         # functions changed since main
+task mutate                         # lines changed since main
 task mutate BASE=fork/main MAX=10   # another base; at most 10 functions
 ```
 
