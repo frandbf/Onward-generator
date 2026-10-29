@@ -174,9 +174,9 @@ def _facade_uvs(mesh: Mesh, tile_m: float, frame: Mapping[str, Any], uvs: np.nda
     U is the distance along the run, in a whole number of repeats per run. V is the
     height, in a whole number of repeats per storey when ``storey_h`` is set.
     """
-    vertices = np.asarray(mesh.vertices, dtype=np.float64)
-    triangles = np.asarray(mesh.triangles, dtype=np.int64)
-    run_of = np.full(len(vertices), -1, dtype=np.int64)
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)  # pragma: no mutate: Mesh vertices are float64 by contract, so the dtype changes nothing
+    triangles = np.asarray(mesh.triangles, dtype=np.int64)  # pragma: no mutate: triangles are only used as indices, and any integer dtype indexes the same vertices
+    run_of = np.full(len(vertices), -1, dtype=np.int64)  # pragma: no mutate: numpy infers int64 from -1, and callers only test run_of >= 0, so any negative fill reads as no run
     if len(triangles) == 0:
         return run_of
     scale = max(float(tile_m), 1e-6)
@@ -187,7 +187,7 @@ def _facade_uvs(mesh: Mesh, tile_m: float, frame: Mapping[str, Any], uvs: np.nda
     corners = vertices[triangles]
     free = np.ones(len(triangles), dtype=bool)
     for index, run in enumerate(frame.get("runs") or []):
-        segments = np.asarray(run, dtype=np.float64).reshape(-1, 4)
+        segments = np.asarray(run, dtype=np.float64).reshape(-1, 4)  # pragma: no mutate: hypot and every later step promote integer coordinates to the same float64 values, and numpy reads any negative size as the unknown one
         lengths = np.hypot(segments[:, 2] - segments[:, 0], segments[:, 3] - segments[:, 1])
         # A run of zero length skips every segment below, so it needs no check of its own.
         tile_u = _snapped(float(lengths.sum()), scale)
@@ -336,7 +336,7 @@ def build_glb(
                 uvs = _surface_uvs(prim.mesh, tile, fit_unit=unit, roof=roof)
                 if not unit:
                     frame = (node.extras or {}).get("uv_frame") if node.matrix is None and not roof else None
-                    runs = _facade_uvs(prim.mesh, tile, frame, uvs) if frame else np.full(len(uvs), -1)
+                    runs = _facade_uvs(prim.mesh, tile, frame, uvs) if frame else np.full(len(uvs), -1)  # pragma: no mutate: runs is only tested >= 0, so any negative fill reads as no run
                     phase = (node.extras or {}).get("uv_phase")
                     if phase:
                         uvs[:, 0] += float(phase[0])

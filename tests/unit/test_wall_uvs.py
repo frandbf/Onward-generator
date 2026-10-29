@@ -272,6 +272,18 @@ def test_glb_keeps_storeys_through_phase_and_other_surfaces_byte_for_byte() -> N
     assert np.array_equal(uvs[rest], plain["building/b1"][WALL][1][rest])
 
 
+def test_glb_without_storeys_shifts_v_of_run_faces_by_the_phase() -> None:
+    """With no levels the run faces keep V = z / tile_m, so the building phase still moves V."""
+    prims, frame, _, _ = _building(_rect(), None, 9.6, None)
+    phase = [0.37, 0.61]
+    positions, uvs, indices = _glb([Node("building/b1", tuple(prims),
+                                         {"type": "building", "uv_frame": frame, "uv_phase": phase})])["building/b1"][WALL]
+    points = _local(positions)
+    mask = _on_run(points, indices, frame["runs"][0])  # type: ignore[index]
+    assert mask.any()
+    assert np.allclose(uvs[mask, 1], points[mask, 2] / TILE[WALL] + phase[1], atol=1e-4)
+
+
 def test_glb_with_a_frame_on_a_moved_node_is_ignored() -> None:
     prims, frame, _, _ = _building(_rect(), None, 9.6, 3, openings=False)
     moved = np.eye(4)
@@ -320,6 +332,45 @@ def test_a_short_run_and_a_zero_length_segment_still_place_u() -> None:
     assert np.array_equal(doubled, alone)
 
 
+def test_a_small_face_on_a_run_follows_it_with_a_small_tile() -> None:
+    """A 0.4 m wall piece with a 0.5 m tile: U from the run start, V from the ground, both snapped."""
+    piece = quad((1.0, 0.0, 0.6), (1.4, 0.0, 0.6), (1.4, 0.0, 1.0), (1.0, 0.0, 1.0))
+    uvs = surface_uvs(piece, 0.5, frame={"runs": [[[-1.0, 0.0, 4.0, 0.0]]], "storey_h": 2.8}).astype(np.float64)
+    tile_u, tile_v = 5.0 / 10, 2.8 / 6  # 10 repeats on the 5 m run, 6 per 2.8 m storey
+    assert np.allclose(uvs[:, 0], (np.array([1.0, 1.4, 1.4, 1.0]) + 1.0) / tile_u)
+    assert np.allclose(uvs[:, 1], np.array([0.6, 0.6, 1.0, 1.0]) / tile_v)
+
+
+def test_faces_at_the_plane_and_start_tolerance_follow_the_run_and_a_lean_of_0999_does_not() -> None:
+    """``FRAME_TOL_M`` off the plane or before the start still counts; a unit normal of exactly 0.999 along
+    the outward one is too steep and keeps the face projection."""
+    run = {"runs": [[[0.0, 0.0, 4.0, 0.0]]], "storey_h": 3.0}
+    off = -FRAME_TOL_M
+    in_front = quad((0.0, off, 0.0), (4.0, off, 0.0), (4.0, off, 3.0), (0.0, off, 3.0))
+    early = quad((off, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, 0.0, 3.0), (off, 0.0, 3.0))
+    for face, xs in ((in_front, [0.0, 4.0, 4.0, 0.0]), (early, [off, 4.0, 4.0, off])):
+        uvs = surface_uvs(face, 2.0, frame=run).astype(np.float64)
+        assert np.allclose(uvs[:, 0], np.array(xs) / 2.0)
+        assert np.allclose(uvs[:, 1], np.array([0.0, 0.0, 3.0, 3.0]) / 1.5)
+    h = 0.01
+    lean = h * np.sqrt(1 - 0.999**2) / 0.999  # 2.56°, within 0.5 mm of the plane
+    tilted = quad((0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, -lean, h), (0.0, -lean, h))
+    unit = tilted.face_normals() / np.linalg.norm(tilted.face_normals(), axis=1, keepdims=True)
+    assert np.array_equal(unit @ np.array([0.0, -1.0, 0.0]), [0.999, 0.999])
+    assert np.array_equal(surface_uvs(tilted, 2.0, frame=run), surface_uvs(tilted, 2.0))
+
+
+def test_recentre_keeps_a_run_apart_from_the_face_after_it() -> None:
+    """Run 3 is its own island even when the last face of the mesh starts at vertex ``len − 3``."""
+    wall = quad((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (0.0, 0.0, 1.0))
+    reveal = Mesh(np.array([[0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 1.0, 1.0]]), np.array([[0, 1, 2]], dtype=np.int64))
+    mesh = merge([wall, reveal])
+    uvs = np.array([[5.2, 0.5], [6.2, 0.5], [6.2, 1.5], [5.2, 1.5], [2.3, 0.5], [3.3, 0.5], [3.3, 1.5]])
+    out = recentre_uvs(uvs, mesh.triangles, np.array([3, 3, 3, 3, -1, -1, -1]))
+    assert np.allclose(out[:4, 0], [0.2, 1.2, 1.2, 0.2])
+    assert np.allclose(out[4:, 0], [0.3, 1.3, 1.3])
+
+
 def test_a_face_on_two_runs_keeps_the_first() -> None:
     wall = quad((0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, 0.0, 3.0), (0.0, 0.0, 3.0))
     first = [[0.0, 0.0, 4.0, 0.0]]
@@ -346,3 +397,8 @@ def test_frame_on_an_empty_mesh_returns_nothing() -> None:
     empty = Mesh.empty()
     assert surface_uvs(empty, 2.0, frame={"runs": [[[0.0, 0.0, 1.0, 0.0]]], "storey_h": None}).shape == (0, 2)
     assert MURCIA_CENTER == (-1.12863, 37.98407)
+
+
+def test_framed_uvs_are_float32_like_texcoord_0() -> None:
+    wall = quad((0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, 0.0, 3.0), (0.0, 0.0, 3.0))
+    assert surface_uvs(wall, 2.0, frame={"runs": [[[0.0, 0.0, 4.0, 0.0]]], "storey_h": 3.0}).dtype == np.float32
