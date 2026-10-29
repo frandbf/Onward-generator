@@ -24,4 +24,10 @@ fi
 
 tty=()
 [[ -t 0 && -t 1 ]] || tty=(-T)
-exec "${compose[@]}" run --rm "${tty[@]}" dev "$@"
+# In a git worktree, .git points at the main repository by absolute path; mount it there so git works inside.
+mounts=()
+common="$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [[ -n "$common" && "$common" != "$REPO/.git" ]]; then
+  mounts=(-v "$common:$common")
+fi
+exec "${compose[@]}" run --rm "${tty[@]}" "${mounts[@]}" dev "$@"
