@@ -147,6 +147,7 @@ def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
         },
         data=urllib.parse.urlencode({"data": query}).encode("utf-8"),
         error=OsmDownloadError,
+        error_body=True,
     )
 
 

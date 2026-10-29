@@ -134,6 +134,7 @@ def _http_fetch(url: str, timeout: float) -> bytes:
         timeout=timeout,
         headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"},
         error=CadastreError,
+        error_body=True,
     )
 
 

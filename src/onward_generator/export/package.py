@@ -334,7 +334,8 @@ def checklist(manifest: Mapping[str, Any]) -> str:
         "",
         f"Paquete `{manifest['package_id']}`, adaptador {manifest['adapter']['name']} {manifest['adapter']['version']}, "
         f"Unity {manifest['target']['unity']}, SDK {manifest['target']['sdk']}.",
-        "Anota para cada punto: sí / no / no probado, y qué se observó. Ver docs/12-export.md.",
+        "Anota para cada punto: sí / no / no probado, y qué se observó. Ver docs/12-export.md (sección «Export package»).",
+        f"`device_verified` sigue en false hasta que este `{CHECKLIST_FILE}` esté completo en el visor.",
         "",
         "| # | Comprobación | Resultado | Observación |",
         "| --- | --- | --- | --- |",

@@ -76,12 +76,28 @@ def test_a_bark_texture_fills_the_trunks_slot() -> None:
     assert deterministic_choices(rows, 3)["trunks"] == "ph_bark_brown_02"
 
 
+def _fixture_row(library_id: str, name: str) -> dict[str, str]:
+    return {"id": library_id, "name": name, "provider": "ambientcg", "path": f"assets/textures/{library_id}.jpg", "license": "CC0-1.0"}
+
+
+# One texture per family except bark and rock, so the real library can gain bark without breaking the test.
+FIXTURE_LIBRARY = [
+    _fixture_row("fx_plaster", "PaintedPlaster001"),
+    _fixture_row("fx_paving", "PavingStones001"),
+    _fixture_row("fx_roof", "RoofingTiles001"),
+    _fixture_row("fx_brick", "Bricks001"),
+    _fixture_row("fx_asphalt", "Asphalt001"),
+    _fixture_row("fx_concrete", "Concrete001"),
+    _fixture_row("fx_door", "door_wood"),
+]
+
+
 def test_a_slot_without_a_library_family_is_reported() -> None:
-    rows = library_rows()
-    assert unfilled_slots(rows) == ["trunks"]
+    rows = FIXTURE_LIBRARY
+    assert unfilled_slots(rows) == ["stone_monuments", "trunks"]
     plan = select_texture_plan(
         name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
         brief=None, seed=3, library=rows,
     )
-    assert "trunks" not in {row["id"] for row in plan["entries"]}
-    assert "no texture for trunks (bark)" in plan["description"]
+    assert {row["id"] for row in plan["entries"]}.isdisjoint({"stone_monuments", "trunks"})
+    assert "no texture for stone_monuments (rock), trunks (bark)" in plan["description"]

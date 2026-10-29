@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://onward-generator.local/schemas/generator.schema.json",
   "title": "Onward generator project configuration",
-  "description": "Contract from PRD §8.4. Units are explicit in field names (_m = metres). Geographic positions are WGS84 degrees.",
+  "description": "Contract described in docs/02-configuration.md. Units are explicit in field names (_m = metres). Geographic positions are WGS84 degrees.",
   "type": "object",
   "additionalProperties": false,
   "required": ["project", "source", "area", "generation", "quality", "optimization", "export"],

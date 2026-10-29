@@ -105,12 +105,26 @@ def test_fetch_bytes_caps_size() -> None:
     assert "secret" not in str(caught.value)
 
 
-def test_fetch_bytes_maps_http_error() -> None:
+def test_fetch_bytes_maps_http_error_without_body_by_default() -> None:
     opener, _ = _opener(_http_error(404, b"no such asset"))
-    with pytest.raises(FetchFailed, match="HTTP 404 for https://example.org/data: no such asset") as caught:
+    with pytest.raises(FetchFailed) as caught:
         _fetch(opener)
+    assert str(caught.value) == "HTTP 404 for https://example.org/data"
     assert isinstance(caught.value.__cause__, urllib.error.HTTPError)
-    assert "secret" not in str(caught.value)
+
+
+def test_fetch_bytes_appends_body_when_asked() -> None:
+    opener, _ = _opener(_http_error(504, b"  server overloaded " + b"x" * 500))
+    with pytest.raises(FetchFailed) as caught:
+        _fetch(opener, error_body=True)
+    message = str(caught.value)
+    assert message.startswith("HTTP 504 for https://example.org/data: server overloaded x")
+    assert len(message) == len("HTTP 504 for https://example.org/data: ") + 400 - 2
+    assert "secret" not in message
+    opener, _ = _opener(_http_error(500, b"   "))
+    with pytest.raises(FetchFailed) as caught:
+        _fetch(opener, error_body=True)
+    assert str(caught.value) == "HTTP 500 for https://example.org/data"
 
 
 def test_fetch_bytes_maps_network_errors() -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from shapely import Point
 
 from onward_generator.domain.models import OsmRef
 from onward_generator.geo.osm_import import (
@@ -208,6 +209,47 @@ def test_inner_touching_outer_at_a_node_is_a_hole(tmp_path: Path) -> None:
     assert issues == []
     [polygon] = features[0].geometry_wgs84.geoms
     assert polygon.area == pytest.approx((100 - 6) * 1e-8)
+
+
+@pytest.mark.parametrize("outer_has_the_shared_nodes", [True, False])
+def test_inner_sharing_an_edge_with_outer_is_a_hole(tmp_path: Path, outer_has_the_shared_nodes: bool) -> None:
+    # The courtyard runs along the west wall, so polygonize yields two simply connected faces.
+    points = _square(1, 0, 0, 10, 10) | _square(5, 0, 3, 4, 7)
+    outer = [1, 2, 3, 4, 8, 5, 1] if outer_has_the_shared_nodes else _ring(1)
+    path = _multipolygon_file(tmp_path, points, {10: outer, 11: _ring(5)}, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [feature] = features
+    assert feature.ref == OsmRef("relation", 30)
+    [polygon] = feature.geometry_wgs84.geoms
+    assert polygon.area == pytest.approx((100 - 16) * 1e-8)
+    assert len(polygon.interiors) == 0
+    assert not polygon.contains(Point(LON + 2 * 0.0001, LAT + 5 * 0.0001))
+
+
+def test_inner_touching_an_outer_corner_is_a_hole(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | {5: (3, 1), 6: (1, 3)}
+    path = _multipolygon_file(tmp_path, points, {10: _ring(1), 11: [1, 5, 6, 1]}, [(10, "outer"), (11, "inner")])
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [polygon] = features[0].geometry_wgs84.geoms
+    assert polygon.area == pytest.approx((100 - 4) * 1e-8)
+    assert not polygon.contains(Point(LON + 1.3 * 0.0001, LAT + 1.3 * 0.0001))
+
+
+def test_two_inners_sharing_an_edge_are_both_holes(tmp_path: Path) -> None:
+    points = _square(1, 0, 0, 10, 10) | _square(5, 2, 2, 5, 8) | {9: (8, 2), 10: (8, 8)}
+    path = _multipolygon_file(
+        tmp_path,
+        points,
+        {10: _ring(1), 11: _ring(5), 12: [6, 9, 10, 7, 6]},
+        [(10, "outer"), (11, "inner"), (12, "inner")],
+    )
+    features, issues, _ = build_source_features(parse_osm_xml(path))
+    assert issues == []
+    [polygon] = features[0].geometry_wgs84.geoms
+    assert polygon.area == pytest.approx((100 - 36) * 1e-8)
+    assert len(polygon.interiors) == 1
 
 
 def test_nested_outer_without_inner_is_reported_as_hole(tmp_path: Path) -> None:
