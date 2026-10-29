@@ -28,6 +28,7 @@ from onward_generator.maps.workspace import (
     store_panoramax,
 )
 from onward_generator.osm.acquire import osm_target
+from onward_generator.platform import HostProfile, PlatformError, resolve_host
 from onward_generator.next_step import (
     detail_command,
     dress_command,
@@ -621,6 +622,7 @@ def run_map(
     push: Push | None = None,
     build: Build | None = None,
     unity_open: UnityOpen | None = None,
+    host: HostProfile | None = None,
 ) -> int:
     """Create the map folder, then run every Python stage through ``export package``.
 
@@ -734,8 +736,8 @@ def run_map(
         package_for_quest(root, ran),
         interactive=prompting,
         ask=ask,
-        push=push if push is not None else _push_package,
-        build=build if build is not None else _build_package,
+        push=push if push is not None else lambda package: _push_package(package, host=host),
+        build=build if build is not None else lambda package, steps: _build_package(package, steps, host=host),
         times=times,
     )
     _print_times(times)
@@ -852,15 +854,26 @@ def _quest_script() -> Path:
     return Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adapter" / "run_export.sh"
 
 
-def _run_export(args: Sequence[str], env: dict[str, str] | None = None) -> tuple[int, str]:
+def _run_export(args: Sequence[str], env: dict[str, str]) -> tuple[int, str]:
     completed = subprocess.run(list(args), env=env, check=False, capture_output=True, text=True)
     text = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
     return int(completed.returncode), text
 
 
-def _build_package(package: Path, steps: Sequence[str]) -> int:
+def _script_env(host: HostProfile | None) -> dict[str, str]:
+    """The current environment plus the host paths ``tools/unity/lib.sh`` reads."""
+    profile = host if host is not None else resolve_host()
+    return os.environ | profile.script_env()
+
+
+def _build_package(package: Path, steps: Sequence[str], host: HostProfile | None = None) -> int:
     """Run ``tool``, ``scene`` and ``launcher`` for the substeps that are still missing."""
-    code, text = _run_export([str(_quest_script()), str(package), *steps])
+    try:
+        env = _script_env(host)
+    except PlatformError as exc:
+        print(f"unity: {exc}", flush=True)
+        return 2
+    code, text = _run_export([str(_quest_script()), str(package), *steps], env=env)
     summary = _unity_summary(text, failed=code != 0, content_md5=_content_md5(package))
     if summary:
         print(summary, flush=True)
@@ -876,9 +889,13 @@ def _content_md5(package: Path) -> str | None:
     return digest.split()[0] if digest else None
 
 
-def _push_package(package: Path) -> int:
+def _push_package(package: Path, host: HostProfile | None = None) -> int:
     """Run the existing push. ``CONFIRM_PUSH`` is set only after the user said yes."""
-    env = os.environ.copy()
+    try:
+        env = _script_env(host)
+    except PlatformError as exc:
+        print(f"push: {exc}", flush=True)
+        return 2
     env["CONFIRM_PUSH"] = "yes"
     code, text = _run_export([str(_quest_script()), str(package), "push"], env=env)
     summary = _unity_summary(text, failed=code != 0)

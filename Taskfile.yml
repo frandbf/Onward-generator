@@ -29,7 +29,7 @@ tasks:
   lint:shell:
     desc: Check the shell scripts with shellcheck
     cmds:
-      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/*/*.sh"
+      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh"
 
   smoke:
     desc: Run the CLI against the example configuration

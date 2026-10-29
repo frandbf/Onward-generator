@@ -28,6 +28,7 @@ from onward_generator.pipeline_run import (
     run_steps,
     unity_editor_open,
 )
+from onward_generator.platform import resolve_host
 from tests.conftest import MURCIA_CENTER
 
 LON, LAT = MURCIA_CENTER
@@ -589,6 +590,49 @@ def test_push_sets_confirm_only_for_the_script(monkeypatch: pytest.MonkeyPatch, 
     assert seen["confirm"] == "yes"
     assert seen["args"][-2:] == [str(tmp_path), "push"]
     assert os.environ.get("CONFIRM_PUSH") == before
+
+
+def _capture_run(seen: dict[str, object]):
+    def fake_run(args, *, env, check, capture_output, text):
+        seen["args"] = list(args)
+        seen["env"] = dict(env)
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    return fake_run
+
+
+def test_build_package_passes_host_env(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", _capture_run(seen))
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    host = resolve_host("linux", env={"HOME": "/home/tester"})
+    assert _build_package(tmp_path, ["tool", "scene"], host=host) == 0
+    env = seen["env"]
+    assert isinstance(env, dict)
+    assert env["ONWARD_PLATFORM"] == "linux"
+    assert env["UNITY"] == "/home/tester/Unity/Hub/Editor/2021.3.23f1/Editor/Unity"
+    assert env["LOG_ROOT"] == "/home/tester/.local/state/onward-generator"
+    assert seen["args"][-3:] == [str(tmp_path), "tool", "scene"]
+
+
+def test_push_keeps_confirm_and_host(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", _capture_run(seen))
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    monkeypatch.delenv("UNITY", raising=False)
+    assert _push_package(tmp_path) == 0
+    env = seen["env"]
+    assert isinstance(env, dict)
+    assert env["CONFIRM_PUSH"] == "yes"
+    assert env["ONWARD_PLATFORM"] == "macos"
+    assert env["UNITY"] == "/Applications/Unity/Hub/Editor/2021.3.23f1/Unity.app/Contents/MacOS/Unity"
+
+
+def test_an_unknown_platform_does_not_start_unity(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", lambda *a, **k: pytest.fail("Unity started"))
+    monkeypatch.setenv("ONWARD_PLATFORM", "windows")
+    assert _build_package(tmp_path, ["tool"]) == 2
+    assert "unknown platform" in capsys.readouterr().out
 
 
 def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> None:

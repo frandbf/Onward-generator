@@ -2,21 +2,22 @@
 # Phase 05: build a generated Murcia scene for Quest with the official Onward
 # SDK (Launcher), copy it to the headset and collect device measurements.
 #
-#   run_perf.sh VARIANT_JSON SCENE_DIR LAYOUT_JSON step...
+#   run_perf.sh [--platform macos|linux|auto] VARIANT_JSON SCENE_DIR LAYOUT_JSON step...
 #   steps: tool scene launcher push session-start record drawcalls session-end
 #
-# Reuses the phase 0 project (SDK v1.15 imported, Launcher patched for macOS).
+# Reuses the phase 0 project (SDK v1.15 imported, Launcher patched for POSIX hosts).
 # The SDK Launcher always writes the local test map as unity-export.local.*;
 # "push" backs up whatever the headset has under that name before replacing it.
 set -euo pipefail
 
-UNITY_VERSION="2021.3.23f1"
-UNITY="${UNITY:-/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity}"
-ADB="${ADB:-/Applications/Unity/Hub/Editor/${UNITY_VERSION}/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb}"
+TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib.sh
+source "$TOOL_DIR/../lib.sh"
+resolve_host "$@"
+shift "$HOST_SHIFT"
 PROJECT="${PROJECT:-$HOME/Unity/OnwardPhase0Project}"
 OUT_ROOT="${OUT_ROOT:-$HOME/Unity/MurciaPerfOut}"
-LOG_DIR="${LOG_DIR:-$HOME/Library/Logs/murcia-perf}"
-TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LOG_DIR:-$LOG_ROOT/murcia-perf}"
 DEVICE_DIR="/sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent"
 METRICS_DIR="/sdcard/Android/data/com.oculus.ovrmonitormetricsservice/files/CapturedMetrics"
 METRICS_RX="com.oculus.ovrmonitormetricsservice/.SettingsBroadcastReceiver"
@@ -61,7 +62,7 @@ step_scene() {
   mkdir -p "$OUT"
   cp "$OPTIONS" "$OUT/options.json"
   cp "$LAYOUT" "$OUT/layout.json"
-  shasum -a 256 "$SCENE_DIR/scene_visual.glb" "$SCENE_DIR/scene_collision.glb" > "$OUT/inputs.sha256"
+  file_sha256 "$SCENE_DIR/scene_visual.glb" "$SCENE_DIR/scene_collision.glb" > "$OUT/inputs.sha256"
   run_unity scene -executeMethod MurciaPerf.MurciaPerfBuilder.BuildScene \
     -perfScene "$SCENE_DIR" -perfOptions "$OPTIONS" -perfLayout "$LAYOUT" -perfStats "$OUT/unity_stats.json"
 }
@@ -70,7 +71,7 @@ step_launcher() {
   mkdir -p "$OUT/launcher"
   run_unity launcher -executeMethod MurciaPerf.MurciaPerfBuilder.BuildQuestViaLauncher -perfOptions "$OPTIONS" -perfOut "$OUT/launcher"
   ls -l "$OUT/launcher"
-  md5 -q "$OUT/launcher/unity-export.local.content3" > "$OUT/launcher/content3.md5"
+  file_md5 "$OUT/launcher/unity-export.local.content3" > "$OUT/launcher/content3.md5"
 }
 
 step_push() {
@@ -86,7 +87,7 @@ step_push() {
   log "device backup: $backup ($(ls "$backup" | wc -l | tr -d ' ') files)"
   "$ADB" push "$content" "$info" "$DEVICE_DIR/" >/dev/null
   local local_md5 device_md5
-  local_md5="$(md5 -q "$content")"
+  local_md5="$(file_md5 "$content")"
   device_md5="$("$ADB" shell md5sum "$DEVICE_DIR/unity-export.local.content3" | cut -d' ' -f1)"
   [[ "$local_md5" == "$device_md5" ]] || { log "md5 mismatch on device: $device_md5 != $local_md5"; exit 1; }
   log "pushed $VARIANT (md5 $local_md5 verified on device)"

@@ -124,9 +124,21 @@ namespace MurciaGenerator
             EditorApplication.update += tick;
         }
 
+        // Same defaults as tools/unity/lib.sh, which exports ASSET_STORE_CACHE before Unity runs.
+        private static string AssetStoreCache()
+        {
+            string overridden = Environment.GetEnvironmentVariable("ASSET_STORE_CACHE");
+            if (!string.IsNullOrEmpty(overridden))
+                return overridden;
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+            if (Application.platform == RuntimePlatform.LinuxEditor)
+                return Path.Combine(home, ".local/share/unity3d/Asset Store-5.x");
+            return Path.Combine(home, "Library/Unity/Asset Store-5.x");
+        }
+
         private static string FindLocalPackage(string productId)
         {
-            string cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "Library/Unity/Asset Store-5.x");
+            string cache = AssetStoreCache();
             if (!Directory.Exists(cache))
                 return "";
             string[] hints;
