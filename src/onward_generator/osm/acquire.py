@@ -11,11 +11,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import ssl
 import tempfile
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -30,8 +27,10 @@ from onward_generator.geo.clipping import ClipError, inclusion_zone
 from onward_generator.geo.projection import LocalFrame, ProjectionError
 from onward_generator.geo.sources import OPENSTREETMAP, sha256_file
 from onward_generator.maps.workspace import MapError, load_map
+from onward_generator.net import fetch_bytes
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_HOSTS = frozenset({"overpass-api.de"})
 USER_AGENT = f"onward-generator/{__version__} (local map generator)"
 MAX_BYTES = 32 * 1024 * 1024
 MAX_SIDE_M = 4100.0
@@ -133,40 +132,22 @@ def overpass_query(bbox: BBox) -> str:
     )
 
 
-def _ssl_context() -> ssl.SSLContext:
-    try:
-        import certifi
-
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
-
-
 def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
     if endpoint != OVERPASS_URL:
         raise OsmDownloadError("refusing an Overpass endpoint other than overpass-api.de")
-    body = urllib.parse.urlencode({"data": query}).encode("utf-8")
-    request = urllib.request.Request(
+    return fetch_bytes(
         endpoint,
-        data=body,
+        allowed_hosts=OVERPASS_HOSTS,
+        max_bytes=MAX_BYTES,
+        timeout=timeout,
         headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/xml, text/xml",
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        method="POST",
+        data=urllib.parse.urlencode({"data": query}).encode("utf-8"),
+        error=OsmDownloadError,
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:  # noqa: S310 - fixed https host
-            data = response.read(MAX_BYTES + 1)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(400).decode("utf-8", "replace")
-        raise OsmDownloadError(f"Overpass HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise OsmDownloadError(f"Overpass request failed: {exc.reason}") from exc
-    if len(data) > MAX_BYTES:
-        raise OsmDownloadError(f"response larger than {MAX_BYTES} bytes")
-    return data
 
 
 def _check_payload(data: bytes) -> str | None:

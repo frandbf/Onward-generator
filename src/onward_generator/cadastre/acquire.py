@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import json
 import os
-import ssl
 import tempfile
 import urllib.parse
-import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -22,8 +20,10 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.geo.sources import LicenseInfo, sha256_file
+from onward_generator.net import fetch_bytes
 
 WFS_BU_URL = "https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx"
+WFS_HOSTS = frozenset({"ovc.catastro.meh.es"})
 CRS = "EPSG:25830"
 USER_AGENT = f"onward-generator/{__version__} (local research tool)"
 MAX_AREA_KM2 = 1.0
@@ -123,25 +123,18 @@ def bbox_from_scene(scene: Mapping[str, Any], margin_m: float) -> BBox:
     return (e0 + min(xs) - margin_m, n0 + min(ys) - margin_m, e0 + max(xs) + margin_m, n0 + max(ys) + margin_m)
 
 
-def _ssl_context() -> ssl.SSLContext:
-    try:
-        import certifi
-
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
-
-
 Fetcher = Callable[[str, float], bytes]
 
 
 def _http_fetch(url: str, timeout: float) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"})
-    with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:  # noqa: S310 - fixed https host
-        data = response.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise CadastreError(f"response larger than {MAX_BYTES} bytes")
-    return data
+    return fetch_bytes(
+        url,
+        allowed_hosts=WFS_HOSTS,
+        max_bytes=MAX_BYTES,
+        timeout=timeout,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"},
+        error=CadastreError,
+    )
 
 
 def _check_payload(data: bytes) -> None:
