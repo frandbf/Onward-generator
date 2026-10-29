@@ -5,7 +5,7 @@ Goal: a plausible, consistent skyline, not architectural precision. Every height
 The module does not import `geo` and does not modify the scene. It reads `geo_scene.json` (0.1.0 or 0.2.0) and checks the SHA-256 before and after the read.
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator heights \
+.venv/bin/python -m onward_generator heights \
   --scene maps/<id>/data/processed/geo/geo_scene.json \
   --out   maps/<id>/data/processed/heights \
   [--config config/heights.default.json] [--overrides <overrides.json>] [--overwrite]

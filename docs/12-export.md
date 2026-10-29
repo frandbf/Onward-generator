@@ -16,7 +16,7 @@ The generation engine does not know the adapter. The adapter only reads the pack
 ## Export package
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator export package \
+.venv/bin/python -m onward_generator export package \
   --project maps/<id>/config/project.json \
   --detail  maps/<id>/data/processed/scene_playable \
   --layout  maps/<id>/data/processed/layout/layout.json \

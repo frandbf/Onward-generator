@@ -215,7 +215,7 @@ def test_a_successful_step_prints_its_result_without_the_file_list(capsys: pytes
         print("signs: plates=2")
         print("  Calle Mayor at [1.0, 2.0, 2.55]")
         print("wrote maps/murcia/scene_signs")
-        print("next: PYTHONPATH=src .venv/bin/python -m onward_generator bounds")
+        print("next: .venv/bin/python -m onward_generator bounds")
         print('{"schema": "onward_generator.gameplay_layout", "purpose": "playable"}')
         return 0
 

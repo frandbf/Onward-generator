@@ -10,7 +10,7 @@ import json
 import shlex
 from pathlib import Path
 
-_PREFIX = "PYTHONPATH=src .venv/bin/python -m onward_generator"
+_PREFIX = ".venv/bin/python -m onward_generator"
 
 
 def emit(command: str) -> None:

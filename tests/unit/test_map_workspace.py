@@ -131,7 +131,7 @@ def test_cli_create_and_show(tmp_path: Path, capsys: pytest.CaptureFixture[str],
     assert "--origin -0.986 37.625" in shown
     assert "--crs EPSG:25830" in shown
     assert "sha256 abc" in shown
-    assert "next: PYTHONPATH=src .venv/bin/python -m onward_generator geo " in shown
+    assert "next: .venv/bin/python -m onward_generator geo " in shown
 
 
 def _polygon(ring: tuple[tuple[float, float], ...]):

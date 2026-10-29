@@ -1,0 +1,11 @@
+# Optional. See README "Docker (optional)". Use tools/docker/run.sh rather than calling this directly.
+services:
+  dev:
+    build: .
+    image: onward-generator:dev
+    working_dir: /work
+    volumes:
+      - .:/work
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    # Host network so the pipeline reaches loopback Ollama (127.0.0.1:11434) as it does natively.
+    network_mode: host

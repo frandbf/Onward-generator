@@ -25,10 +25,23 @@ Documentation is in English. Working rules for changes are in `AGENTS.md`. The o
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --only-binary=:all: -r requirements.lock
-export PYTHONPATH=src
+.venv/bin/python -m pip install --no-deps -e .
 ```
 
-`PYTHONPATH=src` is required for every `python -m onward_generator` command below. The shell does not keep it after a new terminal.
+The editable install (`-e .`) is required: the code finds `config/` and `assets/` relative to the repository. It also installs the `.venv/bin/onward-generator` command, which is the same as `.venv/bin/python -m onward_generator`.
+
+### Docker (optional)
+
+To keep the machine clean, the Python pipeline and its checks can run in a container instead of `.venv`. The image installs `requirements.lock` and `shellcheck`. The repository is mounted at `/work`, so outputs land in `maps/` as usual and belong to your user. The container uses the host network, so loopback Ollama works the same way. Unity and `adb` stay on the host.
+
+```bash
+tools/docker/run.sh pytest -q
+tools/docker/run.sh onward-generator doctor
+tools/docker/run.sh onward-generator run --name "Map name" --lat 37.98407 --lon -1.12863
+tools/docker/run.sh --build pytest -q   # rebuild after requirements.lock changes
+```
+
+The first call builds the image `onward-generator:dev`. Unity is not in the image: inside the container, `run` writes the export package and then fails at the Unity step. Build that package on the host with `tools/unity/onward_adapter/run_export.sh`.
 
 Check the environment:
 
@@ -60,7 +73,6 @@ The project is `~/Unity/OnwardPhase0Project`. Do not open it with another Unity 
 `--lat` is the WGS84 latitude. `--lon` is the WGS84 longitude. A negative longitude uses the hyphen on the keyboard (`-3.65288`). A typographic minus is rejected.
 
 ```bash
-export PYTHONPATH=src
 .venv/bin/python -m onward_generator run \
   --name "Map name" \
   --lat 37.98407 \
@@ -121,7 +133,6 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 `run` is the usual path. The same stages, one command at a time. `map show` prints the `geo` command for that folder, including its CRS.
 
 ```bash
-export PYTHONPATH=src
 .venv/bin/python -m onward_generator map create --name "Map name" --lat 37.98407 --lon -1.12863
 .venv/bin/python -m onward_generator map show maps/<id>
 
@@ -228,7 +239,7 @@ Inputs, outputs, and the rules for repeating one stage: [docs/01-pipeline.md](do
 
 ## Command reference
 
-Every command is `PYTHONPATH=src .venv/bin/python -m onward_generator <command>`. `version` prints `0.1.0`.
+Every command is `.venv/bin/python -m onward_generator <command>`. `version` prints `0.1.0`.
 
 | Command | What it does | Exit |
 | --- | --- | --- |

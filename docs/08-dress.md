@@ -16,7 +16,7 @@ An isolated step after phase 04. It does not apply an AI material plan to the sc
 ## Classify
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator dress classify \
+.venv/bin/python -m onward_generator dress classify \
   --detail maps/<id>/data/processed/scene_detail \
   --out    maps/<id>/data/processed/dress_classify \
   --provider none \
@@ -45,7 +45,7 @@ Rules:
 ## Style
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator dress style \
+.venv/bin/python -m onward_generator dress style \
   --detail maps/<id>/data/processed/scene_detail \
   --out    maps/<id>/data/processed/scene_dress
 ```

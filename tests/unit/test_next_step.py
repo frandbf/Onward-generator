@@ -19,7 +19,7 @@ def test_geo_command_is_pasteable_and_uses_the_map_crs(tmp_path: Path) -> None:
     root = tmp_path / "obelisco"
     create_map(root, map_id="obelisco", name="Obelisco", latitude=LAT, longitude=LON, radius_m=400)
     command = geo_command(root)
-    assert command.startswith("PYTHONPATH=src .venv/bin/python -m onward_generator geo ")
+    assert command.startswith(".venv/bin/python -m onward_generator geo ")
     assert f"--origin {LON} {LAT}" in command
     assert "--crs EPSG:32721" in command
     assert "--retrieved-at" not in command

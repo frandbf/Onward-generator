@@ -2,7 +2,7 @@
 
 Usage::
 
-    PYTHONPATH=src .venv/bin/python -m onward_generator.geo \\
+    .venv/bin/python -m onward_generator.geo \\
         --source maps/<id>/data/raw/<id>.osm --aoi maps/<id>/reference/aoi.geojson --out maps/<id>/data/processed/geo
 """
 

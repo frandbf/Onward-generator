@@ -3,7 +3,7 @@
 Module `onward_generator.detail`. Design decisions: `docs/decisions/ADR-004-facade-detail.md`. The tower volume is ADR-008.
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m onward_generator detail \
+.venv/bin/python -m onward_generator detail \
   --scene   maps/<id>/data/processed/geo/geo_scene.json \
   --heights maps/<id>/data/processed/heights/heights.json \
   --base    maps/<id>/data/processed/scene3d \

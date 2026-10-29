@@ -125,7 +125,7 @@ def bbox_from_scene(scene: Mapping[str, Any], margin_m: float) -> BBox:
 
 def _ssl_context() -> ssl.SSLContext:
     try:
-        import certifi  # transitively installed (pyproj); optional
+        import certifi
 
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
