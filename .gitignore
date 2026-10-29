@@ -27,3 +27,4 @@ mutants/
 # Claude Code worktrees.
 .claude/
 .ruff_cache/
+.mypy_cache/

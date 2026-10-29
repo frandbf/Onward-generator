@@ -56,3 +56,16 @@ external = ["BLE001", "N802", "PLR0124", "S310"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["onward_generator", "tests"]
+
+[tool.mypy]
+# task typecheck. Errors that existed when mypy was added are listed in mypy-baseline.txt; only new ones fail.
+python_version = "3.12"
+files = ["src"]
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# No inline types. types-shapely would add about 1100 errors; adopt it in its own change.
+module = ["shapely", "shapely.*", "jsonschema", "jsonschema.*"]
+ignore_missing_imports = true

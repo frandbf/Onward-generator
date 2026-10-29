@@ -8,3 +8,4 @@ output
 mutants
 .claude
 .ruff_cache/
+.mypy_cache/

@@ -36,6 +36,16 @@ tasks:
     cmds:
       - "{{.RUN}} ruff check {{.CLI_ARGS}} src tests tools"
 
+  typecheck:
+    desc: Type-check src with mypy; fails only on errors not in mypy-baseline.txt, or when a listed one is fixed
+    cmds:
+      - "{{.RUN}} sh -c 'mypy --no-color-output | mypy-baseline filter --no-colors --baseline-path mypy-baseline.txt'"
+
+  typecheck:baseline:
+    desc: Rewrite mypy-baseline.txt from the current errors (only to drop fixed ones; review the diff)
+    cmds:
+      - "{{.RUN}} sh -c 'mypy --no-color-output | mypy-baseline sync --baseline-path mypy-baseline.txt --sort-baseline'"
+
   lint:actions:
     desc: Check the GitHub Actions workflows with actionlint (pinned image, nothing installed)
     cmds:
@@ -60,6 +70,7 @@ tasks:
     cmds:
       - task: lint:shell
       - task: lint
+      - task: typecheck
       - task: lint:actions
       - task: smoke
       - task: test
