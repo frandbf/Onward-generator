@@ -116,6 +116,23 @@ The placeable meshes are the 49 albedo GLBs in `assets/normalized`. Each card, i
 
 A withdrawn model stays in the review with `usable: false` so it is not downloaded again. `modular_chainlink_fence` and `post_apocalyptic_buildings` were removed from the library.
 
+## Street-plate font
+
+`signs place` draws the street name with a vendored TrueType font, loaded by path so the plate does not depend on the fonts of the machine that runs it.
+
+| Field | Value |
+| --- | --- |
+| Font | DejaVu Sans Bold (`DejaVuSans-Bold.ttf`), version 2.37 |
+| Files | `assets/fonts/dejavu/DejaVuSans-Bold.ttf`, with the licence text in `assets/fonts/dejavu/LICENSE` |
+| Source | `dejavu-fonts-ttf-2.37.tar.bz2` from the official release, https://github.com/dejavu-fonts/dejavu-fonts/releases/tag/version_2_37 |
+| Licence | Bitstream Vera Fonts licence, with Arev additions under the same terms; DejaVu changes are public domain. Redistribution is allowed. The font may not be sold on its own, and a modified version must change its name |
+| Archive SHA-256 | `fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7` |
+| Archive SHA-512 | `bafa39321021097432777f0825d700190c23f917d754a4504722cd8946716c22c083836294dab7f3ae7cf20af63c4d0944f3423bf4aa25dbca562d1f30e00654` |
+| `DejaVuSans-Bold.ttf` SHA-256 | `e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724` |
+| `LICENSE` SHA-256 | `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93` |
+
+GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo; the font file is not part of the exported map.
+
 ## Asset Store
 
 `config/props/catalog.json` records Unity Asset Store packs that were reviewed and not baked into the GLB. `props place` can write instances that have OSM evidence. The Unity adapter does not instantiate that list. Visible furniture in the exported scene is the generated furniture from `dress style`, plus the normalized library from `overgrow`.

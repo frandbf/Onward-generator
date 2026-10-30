@@ -376,6 +376,7 @@ assets/normalized_review.json          licence review for that library
 assets/textures/                       tileable albedo images (ambientCG, Kenney, Poly Haven cache)
 assets/kenney/                         Kenney CC0 GLBs and manifest.json, without the building kit
 assets/kenney_review.json              one card per Kenney mesh
+assets/fonts/dejavu/                   DejaVu Sans Bold for street plates, with its licence
 src/onward_generator/
 ├── cli.py, __main__.py                CLI
 ├── pipeline_run.py                    ordered run, stage timing, condensed log

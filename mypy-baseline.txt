@@ -83,5 +83,3 @@ src/onward_generator/perf/__main__.py:0: error: Value of type "Collection[str]" 
 src/onward_generator/perf/__main__.py:0: error: Value of type "Collection[str]" is not indexable  [index]
 src/onward_generator/perf/__main__.py:0: error: Value of type "Collection[str]" is not indexable  [index]
 src/onward_generator/perf/measure.py:0: error: Unused "type: ignore" comment  [unused-ignore]
-src/onward_generator/signs/plaque.py:0: error: Incompatible return value type (got "FreeTypeFont | ImageFont", expected "ImageFont")  [return-value]
-src/onward_generator/signs/plaque.py:0: error: Incompatible return value type (got "FreeTypeFont | ImageFont", expected "ImageFont")  [return-value]
