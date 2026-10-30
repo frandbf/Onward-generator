@@ -162,7 +162,7 @@ After the Python steps, `unity` runs `tool scene launcher` on the package just w
 
 `map show DIRECTORY` prints the centre. At the end of each stage, `next:` prints the following command.
 
-If Overpass fails, the folder still exists and `osm download --map DIRECTORY` repeats the same request. The extract is not versioned (`maps/*/data/`). Licence: [legal/data-sources.md](legal/data-sources.md).
+Overpass is retried on its own: HTTP 429 and 5xx, a dropped connection and a timeout three times each with a doubling wait from 8 s (at most 90 s), and an answer with a runtime-error remark twice, 30 s apart. If it still fails, the folder still exists and `osm download --map DIRECTORY` repeats the same request. The extract is not versioned (`maps/*/data/`). Licence: [legal/data-sources.md](legal/data-sources.md).
 
 ## 2. Geo
 

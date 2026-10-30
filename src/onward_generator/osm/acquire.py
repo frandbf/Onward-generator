@@ -12,6 +12,7 @@ import json
 import os
 import re
 import tempfile
+import time
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -36,11 +37,23 @@ MAX_BYTES = 32 * 1024 * 1024
 MAX_SIDE_M = 4100.0
 """radius 1500 m plus margin 500 m, on both sides, with a little rounding."""
 
+# A busy Overpass answers 429, 5xx or drops the connection, and a later request
+# usually succeeds. Waits double from 8 s: 8, 16 and 32 s.
+OVERPASS_RETRIES = 3
+# Under load Overpass also answers 200 with a runtime error remark (timeout,
+# out of memory). The same query is sent again after this wait.
+REMARK_RETRIES = 2
+REMARK_RETRY_DELAY_S = 30.0
+
 _OSM_BASE = re.compile(br'osm_base="([^"]+)"')
 
 
 class OsmDownloadError(ValueError):
     """The map area cannot be fetched, or Overpass did not return OSM XML."""
+
+
+class OverpassRemarkError(OsmDownloadError):
+    """Overpass answered with a runtime error remark instead of the data."""
 
 
 BBox = tuple[float, float, float, float]
@@ -132,7 +145,7 @@ def overpass_query(bbox: BBox) -> str:
     )
 
 
-def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
+def _http_fetch(endpoint: str, query: str, timeout: float, sleep: Callable[[float], None] = time.sleep) -> bytes:
     if endpoint != OVERPASS_URL:
         raise OsmDownloadError("refusing an Overpass endpoint other than overpass-api.de")
     return fetch_bytes(
@@ -146,8 +159,11 @@ def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
             "Content-Type": "application/x-www-form-urlencoded",  # pragma: no mutate: only key case changes survive, urllib capitalizes header names; test_net_callers pins the rest
         },
         data=urllib.parse.urlencode({"data": query}).encode(),
+        retry_429=OVERPASS_RETRIES,
+        retry_transient=OVERPASS_RETRIES,
         error=OsmDownloadError,
         error_body=True,
+        sleep=sleep,
     )
 
 
@@ -167,7 +183,7 @@ def _check_payload(data: bytes) -> str | None:
         end = text.find("</remark>")
         remark = text[start + len("<remark>") : end].strip() if 0 <= start < end else "overpass remark"
         if any(word in remark.lower() for word in ("error", "runtime", "timeout")):
-            raise OsmDownloadError(f"Overpass refused the query: {remark[:300]}")
+            raise OverpassRemarkError(f"Overpass refused the query: {remark[:300]}")
     match = _OSM_BASE.search(head)
     return match.group(1).decode("ascii") if match else None
 
@@ -179,8 +195,13 @@ def download_map_osm(
     timeout: float = 120.0,
     fetch: Fetcher = _http_fetch,
     now: datetime | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> DownloadRecord:
-    """Fetch ``data/raw/<id>.osm`` for the centre and radius stored in the map folder."""
+    """Fetch ``data/raw/<id>.osm`` for the centre and radius stored in the map folder.
+
+    An answer with an Overpass runtime error remark is requested again up to
+    ``REMARK_RETRIES`` times. Network and HTTP retries happen inside ``fetch``.
+    """
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
     target = osm_target(root)
@@ -190,8 +211,17 @@ def download_map_osm(
     bbox = inclusion_bbox(root)
     query = overpass_query(bbox)
     retrieved = (now or datetime.now(tz=UTC)).isoformat(timespec="seconds")
-    data = fetch(OVERPASS_URL, query, timeout)
-    osm_base = _check_payload(data)
+    attempt = 0
+    while True:
+        data = fetch(OVERPASS_URL, query, timeout)
+        try:
+            osm_base = _check_payload(data)
+            break
+        except OverpassRemarkError:
+            if attempt >= REMARK_RETRIES:
+                raise
+            attempt += 1
+            sleep(REMARK_RETRY_DELAY_S)
 
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")

@@ -32,10 +32,13 @@ def http_503(monkeypatch: pytest.MonkeyPatch) -> Seen:
 
 
 def test_overpass_posts_the_query_and_keeps_the_error_body(http_503: Seen) -> None:
+    waits: list[float] = []
     with pytest.raises(osm_acquire.OsmDownloadError) as caught:
-        osm_acquire._http_fetch(osm_acquire.OVERPASS_URL, "[out:xml];", 5.0)
+        osm_acquire._http_fetch(osm_acquire.OVERPASS_URL, "[out:xml];", 5.0, sleep=waits.append)
     assert str(caught.value) == f"HTTP 503 for {osm_acquire.OVERPASS_URL}: runtime error: query timed out"
-    [(request, timeout)] = http_503
+    assert waits == [8.0, 16.0, 32.0]
+    assert len(http_503) == 4
+    (request, timeout) = http_503[0]
     assert timeout == 5.0
     assert request.get_method() == "POST"
     assert request.data == b"data=%5Bout%3Axml%5D%3B"
@@ -44,6 +47,31 @@ def test_overpass_posts_the_query_and_keeps_the_error_body(http_503: Seen) -> No
         "Accept": "application/xml, text/xml",
         "Content-type": "application/x-www-form-urlencoded",
     }
+
+
+def test_overpass_retries_rate_limits_and_dropped_connections(monkeypatch: pytest.MonkeyPatch) -> None:
+    failures: list[Exception] = [
+        urllib.error.HTTPError(osm_acquire.OVERPASS_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        urllib.error.HTTPError(osm_acquire.OVERPASS_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        urllib.error.HTTPError(osm_acquire.OVERPASS_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        ConnectionResetError("reset"),
+        TimeoutError("slow"),
+        urllib.error.URLError("refused"),
+    ]
+
+    class Body(io.BytesIO):
+        def __enter__(self) -> Body:
+            return self
+
+    def urlopen(request: urllib.request.Request, timeout: float | None = None, context: object = None) -> Body:
+        if failures:
+            raise failures.pop(0)
+        return Body(b"<osm/>")
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    waits: list[float] = []
+    assert osm_acquire._http_fetch(osm_acquire.OVERPASS_URL, "[out:xml];", 5.0, sleep=waits.append) == b"<osm/>"
+    assert waits == [8.0, 16.0, 32.0, 64.0, 90.0, 90.0]
 
 
 def test_catastro_gets_the_url_and_keeps_the_error_body(http_503: Seen) -> None:

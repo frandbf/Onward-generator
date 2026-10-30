@@ -82,7 +82,7 @@ Each stage prints one line: number, name, duration and its key numbers. Breakdow
 ```
 
 - **Resuming.** If a stage fails, the console prints `FAILED` and the stage to resume from. Run the same command again: finished stages are skipped. `--from <stage>` resumes at a named stage without asking. A second `run` with the same name and centre continues that folder; a different centre is refused. `--overwrite` replaces `map.json` only while `data/processed/` is empty.
-- **Overpass.** If the download fails after the folder exists, `onward-generator osm download --map maps/<id>` retries it.
+- **Overpass.** A busy server is retried on its own: HTTP 429 and 5xx, a dropped connection and a timeout three times each, waiting 8, 16, 32 s and up to 90 s, and a runtime-error remark twice, 30 s apart. If the download still fails after the folder exists, `onward-generator osm download --map maps/<id>` tries again.
 - **Packages.** An export package is never overwritten; the next one is `pkg_02`.
 - **Unity.** If the Editor has `~/Unity/OnwardPhase0Project` open, `run` asks you to close it first. After the build it asks before uploading; only `s` or `si` uploads.
 - **One slot.** The headset has one local slot. The card title is `Unity Export`; the name passed to `run` is the folder name and the title in `maps/<id>/config/export.json`.
