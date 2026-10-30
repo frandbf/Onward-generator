@@ -31,6 +31,11 @@ def _feature(kind: str, geometry: dict, tags: dict, feature_id: str) -> dict:
     }
 
 
+def test_boarded_buildings_are_a_fixed_hash_of_the_name() -> None:
+    # Golden values: the choice must not drift between runs or releases.
+    assert [i for i in range(40) if building_boarded(f"building/{i}")] == [6, 21, 34, 38]
+
+
 def test_each_building_shifts_its_albedo_and_some_windows_are_boarded() -> None:
     wall = Mesh(
         np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 3.0]], dtype=np.float64),
