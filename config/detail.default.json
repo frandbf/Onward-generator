@@ -75,6 +75,14 @@
     "shop_evidence_keys": ["shop", "amenity", "office", "craft"],
     "shop_evidence_distance_m": 2.0
   },
+  "facade_palettes": {
+    "residential": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white", "brick_red"],
+    "retail": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white"],
+    "institutional": ["brick_red", "plaster_white", "plaster_cream"],
+    "office": ["stone_warm", "plaster_white", "plaster_cream"],
+    "historic": ["plaster_cream", "stone_warm"],
+    "industrial": ["plaster_white", "brick_red"]
+  },
   "interiors": {
     "enabled": true,
     "min_buildings": 5,

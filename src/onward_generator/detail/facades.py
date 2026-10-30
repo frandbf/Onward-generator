@@ -523,5 +523,68 @@ def exposed_frontage(segments: list[Segment]) -> Segment | None:
     return max(exposed, key=lambda s: (round(s.length, 6), -s.index)) if exposed else None
 
 
+DOOR_KINDS = frozenset({"door", "landmark_door", "interior_door"})
+# The smallest door the fallback cuts: a narrow wall or a low storey shrinks the template door to this.
+MIN_DOOR_WIDTH_M = 0.9
+MIN_DOOR_HEIGHT_M = 2.0
+
+
+def door_walls(segments: list[Segment], main: Segment | None, others: BaseGeometry, cfg: DetailConfig) -> list[Segment]:
+    """Outer walls that may take a door, best first.
+
+    The main frontage, then the other street-facing walls, longest first, then the
+    outer walls too short to count as street-facing whose ``probe_m`` strip outside
+    meets no neighbour. A party wall is never listed.
+    """
+    def free(seg: Segment) -> bool:
+        return not others.intersects(seg.plan_rect(0.0, seg.length, 0.0, cfg.probe_m).buffer(-SNAP_M))
+
+    outer = sorted((s for s in segments if s.ring == 0 and s is not main), key=lambda s: (-s.length, s.index))
+    exposed = [s for s in outer if s.exposed]
+    blind = [s for s in outer if not s.exposed and free(s)]
+    return [*([main] if main is not None else []), *exposed, *blind]
+
+
+def ensure_door(
+    layout: Layout,
+    walls_in_order: list[Segment],
+    storeys: Storeys,
+    door_kind: str,
+    door: Opening,
+    template: Template,
+    footprint: BaseGeometry,
+    cfg: DetailConfig,
+) -> str:
+    """Give a building without a door one on the first wall of ``walls_in_order`` that holds it.
+
+    Returns ``template`` when the layout already has a door, ``fallback`` when one was
+    added, and ``none`` when no wall holds the smallest door. The door sits in the
+    centre bay, shrinks to the wall and the storey (not below ``MIN_DOOR_WIDTH_M`` ×
+    ``MIN_DOOR_HEIGHT_M``), and replaces the openings of that wall within ``min_pier_m``
+    of it. Upper storeys start above the door, so only ground-floor openings go.
+    """
+    if any(h.kind in DOOR_KINDS for h in layout.holes):
+        return "template"
+    height = min(door.height_m, storeys.height_m - cfg.head_clearance_m)
+    if height < MIN_DOOR_HEIGHT_M:
+        return "none"
+    for seg in walls_in_order:
+        usable = seg.length - 2 * cfg.edge_margin_m
+        bays = max(1, math.floor(usable / template.bay_m))
+        centre = cfg.edge_margin_m + usable / bays * (bays // 2 + 0.5)
+        width = min(door.width_m, 2 * (min(centre, seg.length - centre) - cfg.min_pier_m))
+        s0 = centre - width / 2
+        if width >= MIN_DOOR_WIDTH_M and footprint.buffer(1e-6).contains(seg.plan_rect(s0, s0 + width, -cfg.recess_depth_m, 0.0)):
+            hole = Hole(
+                door_kind, seg.index, s0, 0.0, width, height, cfg.recess_depth_m, "door_wood",
+                -1, 0,  # pragma: no mutate: nothing reads the column or the storey of a fallback door
+            )
+            clear = rect_uv(hole.s0 - cfg.min_pier_m, hole.v0, hole.s0 + hole.width + cfg.min_pier_m, hole.v0 + hole.height)
+            layout.holes = [h for h in layout.holes if h.segment != seg.index or not clear.intersects(h.uv_rect())]
+            layout.holes.append(hole)
+            return "fallback"
+    return "none"
+
+
 def line_of(seg: Segment) -> LineString:
     return LineString([seg.a, seg.b])

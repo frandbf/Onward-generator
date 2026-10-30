@@ -237,6 +237,8 @@ def _mutated(path: list[str | int], value: object) -> dict:
         (["templates", "generic_residential", "bay_m"], 1.5, "exceeds bay_m"),
         (["templates", "generic_commercial", "applies_to"], ["unknown"], "already mapped"),
         (["landmark_template"], "nope", "not a template"),
+        (["facade_palettes", "office"], ["stone_warm", "missing_stone"], "/facade_palettes/office: material 'missing_stone' is not defined"),
+        (["facade_palettes", "retail"], [], "should be non-empty"),
         (["openings", "recess_depth_m"], 0.4, "thinner than"),
         (["interiors", "rule", "min_area_m2"], 500.0, "below max_area_m2"),
         (["templates", "generic_residential", "narrow_window", "height_m"], 2.0, "minimum storey"),
@@ -251,6 +253,16 @@ def _mutated(path: list[str | int], value: object) -> dict:
 def test_invalid_detail_config_is_rejected(path: list[str | int], value: object, fragment: str) -> None:
     with pytest.raises(DetailConfigError, match=fragment):
         config_from_document(_mutated(path, value))
+
+
+def test_facade_palettes_are_required_and_read_per_use() -> None:
+    doc = copy.deepcopy(DOC)
+    del doc["facade_palettes"]["industrial"]
+    with pytest.raises(DetailConfigError, match="'industrial' is a required property"):
+        config_from_document(doc)
+    cfg = config_from_document(_mutated(["facade_palettes", "historic"], ["stone_light"]))
+    assert cfg.facade_palettes["historic"] == ("stone_light",)
+    assert dict(cfg.facade_palettes) == {use: tuple(names) for use, names in DOC["facade_palettes"].items()} | {"historic": ("stone_light",)}
 
 
 def test_interior_triangle_budget_is_required_and_read_as_given() -> None:

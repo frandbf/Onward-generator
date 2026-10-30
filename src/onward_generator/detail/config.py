@@ -19,6 +19,8 @@ from onward_generator.generation.config import Material
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "detail.default.json"
 SCHEMA_PATH = REPO_ROOT / "config" / "detail.schema.json"
+# Facade uses, most specific first. A building with several uses takes the first one.
+FACADE_USES = ("historic", "institutional", "office", "retail", "industrial", "residential")
 
 
 class DetailConfigError(ValueError):
@@ -156,6 +158,7 @@ class DetailConfig:
     shopfront: Opening
     shop_evidence_keys: tuple[str, ...]
     shop_evidence_distance_m: float
+    facade_palettes: Mapping[str, tuple[str, ...]]
     interiors: Interiors
     urban_observed: Mapping[str, Mapping[str, frozenset[str]]]
     street_lamps: StreetLamps
@@ -253,6 +256,8 @@ def _semantic(cfg: DetailConfig) -> list[str]:
                 problems.append(f"{where}/balcony: width_m + min_pier_m exceeds bay_m")
             if t.balcony.door.width_m > t.balcony.width_m:
                 problems.append(f"{where}/balcony: door wider than the balcony")
+    for use, palette in cfg.facade_palettes.items():
+        problems += [f"/facade_palettes/{use}: material {m!r} is not defined in /materials" for m in palette if m not in mats]
     rule = cfg.interiors.rule
     if cfg.interiors.max_buildings > 0 and cfg.interiors.min_buildings > cfg.interiors.max_buildings:
         problems.append("/interiors: min_buildings must be at most max_buildings")
@@ -298,6 +303,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         shopfront=_opening(doc["doors"]["shopfront"]),
         shop_evidence_keys=tuple(doc["doors"]["shop_evidence_keys"]),
         shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
+        facade_palettes=MappingProxyType({use: tuple(doc["facade_palettes"][use]) for use in FACADE_USES}),
         interiors=Interiors(
             enabled=bool(i["enabled"]),
             min_buildings=int(i["min_buildings"]),

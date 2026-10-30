@@ -27,6 +27,8 @@ from onward_generator.detail.facades import (
     Storeys,
     build_shell,
     cut_roof_deck,
+    door_walls,
+    ensure_door,
     exposed_frontage,
     interior_storey,
     layout_segment,
@@ -35,7 +37,7 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
-from onward_generator.detail.grammar import choose_roof, choose_wall
+from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
     build_interior,
     fits_triangle_budget,
@@ -207,6 +209,65 @@ def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, Base
     return evidence
 
 
+def _use_evidence(
+    features: list[Mapping[str, Any]], footprints: dict[str, BaseGeometry], cfg: DetailConfig,
+) -> dict[str, list[tuple[str, Mapping[str, str], str]]]:
+    """OSM features that may name a building's use: ``(source id, tags, match)`` per building.
+
+    A POI inside a footprint is ``poi_inside``. A POI outside every footprint goes to the
+    nearest one within ``shop_evidence_distance_m`` as ``poi_near``. An area whose
+    tags name a use (an ``amenity=school`` ground) is ``enclosing_area`` for every
+    building whose representative point it contains. Street furniture is not evidence.
+    """
+    ids = sorted(footprints)
+    tree = STRtree([footprints[i] for i in ids])
+    related: dict[str, list[tuple[str, Mapping[str, str], str]]] = defaultdict(list)
+    for f in features:
+        tags = f.get("tags") or {}
+        if f.get("kind") not in ("poi", "area") or facade_use(tags) is None or classify_poi(tags, cfg) is not None:
+            continue
+        geom = shape(f["geometry"])
+        if f["kind"] == "area":
+            for k in sorted(int(x) for x in tree.query(geom, predicate="intersects")):
+                if geom.contains(footprints[ids[k]].representative_point()):
+                    related[ids[k]].append((f["id"], tags, "enclosing_area"))
+            continue
+        inside = sorted(int(x) for x in tree.query(geom, predicate="intersects"))
+        match = "poi_inside" if inside else "poi_near"
+        hits = inside or sorted(int(x) for x in tree.query_nearest(geom, max_distance=cfg.shop_evidence_distance_m, all_matches=True))
+        for k in hits:
+            related[ids[k]].append((f["id"], tags, match))
+    return related
+
+
+def _facade_walls(
+    ids: list[str], footprints: dict[str, BaseGeometry], tree: STRtree, feature_of: Mapping[str, Mapping[str, Any]],
+    height_of: Mapping[str, Mapping[str, Any]], features: list[Mapping[str, Any]], cfg: DetailConfig,
+) -> dict[str, tuple[FacadeUse, str, str]]:
+    """``(use, wall, wall origin)`` per building, in id order so a wall can avoid its neighbours' walls.
+
+    A landmark (flagged by the heights stage from its tags) keeps its template walls. Every
+    other building draws from the palette of its use.
+    Neighbours are the footprints within ``probe_m``.
+    """
+    related = _use_evidence(features, footprints, cfg)
+    out: dict[str, tuple[FacadeUse, str, str]] = {}
+    for bid in ids:
+        h = height_of[bid]
+        tags = dict(feature_of[bid].get("tags") or {})
+        if h.get("landmark"):
+            use = FacadeUse("landmark", "observed", bid, None, "landmark")
+            palette = cfg.templates[cfg.landmark_template].wall_materials
+        else:
+            use = resolve_use(bid, tags, related.get(bid, []))
+            palette = cfg.facade_palettes[use.use]
+        near = [ids[k] for k in tree.query(footprints[bid], predicate="dwithin", distance=cfg.probe_m)]
+        avoid = {out[n][1] for n in near if n in out}
+        wall, origin = choose_wall(tags, palette, cfg.seed, bid, avoid)
+        out[bid] = (use, wall, origin)
+    return out
+
+
 def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str]) -> dict[str, Any] | None:
     if ground != "shopfront":
         return None
@@ -322,7 +383,7 @@ def _building_parts(
                                 "building:part does not overlap a building footprint; skipped"))
             continue
         clipped = orient(clipped, sign=1.0)
-        wall, wall_origin = choose_wall(tags, template, cfg.seed, str(f["id"]))
+        wall, wall_origin = choose_wall(tags, template.wall_materials, cfg.seed, str(f["id"]))
         collider = prism(clipped, min_h, height, bottom=True)
         defects = closed_manifold_defects(collider)
         if defects:
@@ -375,6 +436,7 @@ def detail_scene(
     ids = sorted(footprints)
     tree = STRtree([footprints[i] for i in ids])
     evidence = _shop_evidence(features, footprints, cfg)
+    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
 
     candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids]
     interior_queue = _select_interiors(candidates, cfg, issues)
@@ -384,6 +446,7 @@ def detail_scene(
     counts: Counter[str] = Counter()
     templates_used: Counter[str] = Counter()
     roof_types: Counter[str] = Counter()
+    door_rules: Counter[str] = Counter()
     interiors_built: list[str] = []
     interior_triangles = 0
     exposed_m = party_m = 0.0
@@ -412,7 +475,7 @@ def detail_scene(
         ground = "shopfront" if evidence.get(bid) and template.ground != "main_door_only" else template.ground
         main = exposed_frontage(segments)
         tags = dict(feature_of[bid].get("tags") or {})
-        wall_material, wall_origin = choose_wall(tags, template, cfg.seed, bid)
+        use, wall_material, wall_origin = facade_walls[bid]
         convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
         shell_template, roof_material, roof_origin, roof_shape = choose_roof(
             tags, template, cfg.seed, bid, geom.area, convex=convex,
@@ -451,6 +514,9 @@ def detail_scene(
                 interior = plan
         if layout is None:
             layout = run_layout(*plain_door, storeys)
+        shop = ground == "shopfront"
+        doors_on = door_walls(segments, main, others, cfg)
+        door_rule = ensure_door(layout, [] if shop else doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         opened_windows = omitted_windows = 0
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
@@ -475,6 +541,7 @@ def detail_scene(
                 interior = built = None
                 height, storeys = previous_height, plain_storeys
                 layout = run_layout(*plain_door, storeys)
+                door_rule = ensure_door(layout, [] if shop else doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget test pins the rebuilt shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
@@ -527,6 +594,7 @@ def detail_scene(
         for kind, n in shell.counts.items():
             counts[kind] += n
         roof_types[str(shell.roof["type"])] += 1
+        door_rules[door_rule] += 1
         seg_exposed = sum(s.length for s in segments if s.exposed)
         exposed_m += seg_exposed
         party_m += sum(s.length for s in segments if not s.exposed)
@@ -552,6 +620,8 @@ def detail_scene(
                 "openings": dict(sorted(shell.counts.items())),
                 "skipped": dict(sorted(layout.skipped.items())),
                 "materials": {"wall": wall_material, "wall_origin": wall_origin, "roof": shell.roof["material"], "roof_origin": roof_origin},
+                "use": use.to_record(),
+                "door": door_rule,
             },
             "roof": shell.roof,
             "interior": interior_record is not None,
@@ -635,6 +705,9 @@ def detail_scene(
     }
     detailed.stats = _stats(detailed, counts, templates_used, roof_types, interiors_built, exposed_m, party_m, elements)
     detailed.stats["interior_visual_triangles"] = interior_triangles
+    detailed.stats["doors"] = dict(sorted(door_rules.items()))
+    detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in facade_walls.values()).items()))
+    detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in facade_walls.values()).items()))
     _budget(detailed)
     return detailed
 

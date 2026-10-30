@@ -4,7 +4,7 @@
   "title": "Phase 04 facades, roofs, urban elements and interiors configuration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "seed", "exposure", "storey", "openings", "templates", "landmark_template", "doors", "interiors", "urban", "budget", "preview", "materials"],
+  "required": ["version", "seed", "exposure", "storey", "openings", "templates", "landmark_template", "doors", "facade_palettes", "interiors", "urban", "budget", "preview", "materials"],
   "$defs": {
     "len": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
     "len0": { "type": "number", "minimum": 0, "maximum": 50 },
@@ -199,6 +199,19 @@
       }
     },
     "materials": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/material" } },
+    "facade_palettes": {
+      "description": "Wall materials per facade use. The use comes from OSM tags on the building, a POI on its footprint, or an enclosing amenity area; without one it is residential.",
+      "type": "object", "additionalProperties": false,
+      "required": ["residential", "retail", "institutional", "office", "historic", "industrial"],
+      "properties": {
+        "residential": { "$ref": "#/$defs/names" },
+        "retail": { "$ref": "#/$defs/names" },
+        "institutional": { "$ref": "#/$defs/names" },
+        "office": { "$ref": "#/$defs/names" },
+        "historic": { "$ref": "#/$defs/names" },
+        "industrial": { "$ref": "#/$defs/names" }
+      }
+    },
     "landmarks": {
       "type": "object",
       "additionalProperties": false,

@@ -68,6 +68,28 @@ INTERIOR_PHOTO_SLOTS: dict[str, tuple[str, ...]] = {
     "interior_floor": ("doors",),
     "stair": ("sidewalks",),
 }
+# A facade colour with no plan slot of its own. It takes a plaster photograph the plan
+# already chose, in greyscale, so its own tint stays on _BaseColor and it does not look
+# like the slot it borrows from.
+SHARED_FACADE_SLOTS: dict[str, tuple[str, ...]] = {
+    "plaster_salmon": ("plain_facades", "ochre_facades", "historic_facades"),
+}
+
+
+def share_facade_photos(
+    records: Mapping[str, TextureRecord],
+    used: Collection[str],
+    photo_tiles: dict[str, tuple[Any, str]],
+) -> list[dict[str, Any]]:
+    """Give each used colour of ``SHARED_FACADE_SLOTS`` the first listed slot's photograph, in greyscale."""
+    shared: list[dict[str, Any]] = []
+    for target, slots in SHARED_FACADE_SLOTS.items():
+        slot = next((name for name in slots if name in records), None)
+        if target in used and target not in photo_tiles and slot is not None:
+            photo_tiles[target] = (decode_jpeg_rgb(Path(records[slot].path).read_bytes()), "greyscale_modulation")
+            shared.append({"color_id": target, "slot": slot, "albedo_mode": "greyscale_modulation",
+                           "asset_id": records[slot].asset_id})
+    return shared
 
 
 def share_interior_photos(
@@ -382,6 +404,7 @@ def apply_materials(
                 "repo_path": _rel(Path(record.path)),
             })
     interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
+    facade_shared = share_facade_photos(records, used, photo_tiles)
 
     after_hashes = _base_hashes(base)
     if after_hashes != before_hashes:
@@ -483,6 +506,7 @@ def apply_materials(
             "unit_uv": sorted(UNIT_UV_MATERIALS & set(repeat_images)),
             "window": "project-generated frame, not a photograph",
             "interior": interior_shared,
+            "facade_shared": facade_shared,
         },
         "geometry": compare,
         "input_hashes": before_hashes,

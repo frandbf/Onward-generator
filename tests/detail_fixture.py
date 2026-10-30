@@ -38,7 +38,32 @@ POIS: dict[int, tuple[tuple[float, float], dict[str, str]]] = {
 }
 
 
-def write_block_osm(path: Path, origin: tuple[float, float]) -> Path:
+# A second block for per-building facades and doors: six touching buildings on one street.
+# 602 holds a school POI, 603 a bank POI, 606 a shop POI. 604 has a measured height whose storeys
+# (8 m / 3 = 2.67 m) are too low for the 2.4 m template door. 605 is 2 m wide between two
+# neighbours, so no wall reaches the 2.5 m street-facing minimum. 606 is a shop with 604's low
+# storeys: its door stays with the shopfront rules.
+ROW_BUILDINGS: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = {
+    601: ([(-40, 6), (-30, 6), (-30, 18), (-40, 18)], {"building": "apartments", "building:levels": "4"}),
+    602: ([(-30, 6), (-20, 6), (-20, 18), (-30, 18)], {"building": "yes", "building:levels": "3"}),
+    603: ([(-20, 6), (-10, 6), (-10, 18), (-20, 18)], {"building": "yes", "building:levels": "3"}),
+    604: ([(-10, 6), (0, 6), (0, 18), (-10, 18)], {"building": "yes", "building:levels": "3", "height": "8"}),
+    605: ([(0, 6), (2, 6), (2, 18), (0, 18)], {"building": "yes", "building:levels": "3"}),
+    606: ([(2, 6), (14, 6), (14, 18), (2, 18)], {"building": "yes", "building:levels": "3", "height": "8"}),
+}
+ROW_POIS: dict[int, tuple[tuple[float, float], dict[str, str]]] = {
+    701: ((-25, 12), {"amenity": "school", "name": "Colegio Sintético"}),
+    702: ((-15, 12), {"amenity": "bank"}),
+    703: ((8, 7), {"shop": "bakery"}),
+}
+
+
+def write_block_osm(
+    path: Path,
+    origin: tuple[float, float],
+    buildings: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = BUILDINGS,
+    pois: dict[int, tuple[tuple[float, float], dict[str, str]]] = POIS,
+) -> Path:
     frame = LocalFrame.create(origin[0], origin[1])
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<osm version="0.6" generator="onward-synthetic-fixture">',
              '  <meta osm_base="2026-10-18T00:00:00Z"/>']
@@ -65,11 +90,11 @@ def write_block_osm(path: Path, origin: tuple[float, float]) -> Path:
         ways.extend(f"    <tag k={quoteattr(k)} v={quoteattr(v)}/>" for k, v in tags.items())
         ways.append("  </way>")
 
-    for wid, (ring, tags) in BUILDINGS.items():
+    for wid, (ring, tags) in buildings.items():
         refs = [node(x, y) for x, y in ring]
         way(wid, [*refs, refs[0]], tags)
     way(301, [node(x, y) for x, y in ROAD[0]], ROAD[1])
-    for _pid, ((x, y), tags) in POIS.items():
+    for _pid, ((x, y), tags) in pois.items():
         node(x, y, tags)
     lines += ways
     lines.append("</osm>")

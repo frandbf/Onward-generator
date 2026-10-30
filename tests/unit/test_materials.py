@@ -13,16 +13,16 @@ import pytest
 from PIL import Image
 
 from onward_generator.cli import main
-from onward_generator.dress.atlas import MIN_MEAN_LUMA, MIN_TILE_PX, build_atlas, decode_png_rgba, tile_luminance
+from onward_generator.dress.atlas import MIN_MEAN_LUMA, MIN_TILE_PX, build_atlas, decode_jpeg_rgb, decode_png_rgba, tile_luminance
 from onward_generator.dress.catalog import load_catalog
 from onward_generator.dress.surfaces import osm_material_override
 from onward_generator.generation.config import Material, load_generation_config
-from onward_generator.generation.gltf import Node, Primitive, build_glb, read_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.materials.apply import apply_materials
+from onward_generator.materials.apply import apply_materials, share_facade_photos
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.materials.plan import PlanError, load_texture_plan
-from onward_generator.materials.polyhaven import DownloadError, ensure_diffuse_1k, resolve_polyhaven_id
+from onward_generator.materials.polyhaven import DownloadError, TextureRecord, ensure_diffuse_1k, resolve_polyhaven_id
 from tests.conftest import MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -129,7 +129,7 @@ def _node(name: str, material: str, extras: dict[str, Any]) -> Node:
     return Node(name, (Primitive(_mesh(), material),), extras)
 
 
-def _write_base(root: Path, *, brick: bool = False, cobble: bool = True) -> Path:
+def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False) -> Path:
     _ = MURCIA_CENTER
     detail = root / "base"
     detail.mkdir()
@@ -170,6 +170,12 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True) -> Path
         nodes.append(_node(
             "surface/pedestrian_cobble", "pedestrian",
             {"type": "surface", "source_ids": ["osm-way-plaza"], "object_id": "surface/pedestrian_cobble"},
+        ))
+    if salmon:
+        materials["plaster_salmon"] = Material((0.88, 0.68, 0.58, 1.0), 0.9)
+        nodes.append(_node(
+            "building/osm-way-salmon", "plaster_salmon",
+            {"type": "building", "source_ids": ["osm-way-salmon"], "object_id": "building/osm-way-salmon"},
         ))
     if brick:
         nodes.append(_node(
@@ -347,6 +353,7 @@ def test_apply_remaps_only_listed_ids(tmp_path: Path) -> None:
     assert by_name["interior_floor"][:3] == [1.0, 1.0, 1.0]
     assert by_name["stair"][:3] == [1.0, 1.0, 1.0]
     assert {row["color_id"] for row in report["textures"]["interior"]} == {"interior_wall", "interior_floor", "stair"}
+    assert report["textures"]["facade_shared"] == []
     assert "brick_red" not in by_name
     atlas = decode_png_rgba((out / "atlas.png").read_bytes())
     unused = atlas[atlas.shape[0] // 2 :, atlas.shape[1] // 2 :]
@@ -367,6 +374,49 @@ def test_apply_brick_only_when_osm_says_brick(tmp_path: Path) -> None:
     assert "brick_red" in names
     brick = next(m for m in doc["materials"] if m["name"] == "brick_red")
     assert brick["pbrMetallicRoughness"]["baseColorFactor"][:3] == [1.0, 1.0, 1.0]
+
+
+def test_salmon_walls_borrow_a_plaster_photo_in_greyscale_under_their_own_tint(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, salmon=True)
+    out = tmp_path / "with_salmon"
+    report = apply_materials(base, out, cache_dir=cache, download=False, plan_path=_polyhaven_plan(tmp_path / "plan.json"))
+    assert report["textures"]["facade_shared"] == [{
+        "color_id": "plaster_salmon", "slot": "plain_facades", "albedo_mode": "greyscale_modulation",
+        "asset_id": "concrete_wall_001",
+    }]
+    data = (out / "scene_visual.glb").read_bytes()
+    doc, _ = read_glb(data)
+    salmon = next(m for m in doc["materials"] if m["name"] == "plaster_salmon")
+    assert salmon["pbrMetallicRoughness"]["baseColorFactor"] == pytest.approx([0.88, 0.68, 0.58, 1.0])
+    tile = decode_png_rgba(images_by_material(data)["plaster_salmon"])[..., :3].astype(int)
+    assert (tile[..., 0] == tile[..., 1]).all() and (tile[..., 1] == tile[..., 2]).all()
+    # The photograph is concrete_wall_001 (180, 178, 170), not the procedural tile.
+    assert abs(int(tile.mean()) - 178) <= 2
+
+
+def _record(tmp_path: Path, name: str, color: tuple[int, int, int]) -> TextureRecord:
+    path = tmp_path / f"{name}.jpg"
+    path.write_bytes(_jpeg_bytes(color))
+    return TextureRecord("library", name, "CC0", "", ("fixture",), "", "", "", "", 0, "Diffuse", "1k", "jpg", str(path), "", "test")
+
+
+def test_share_facade_photos_takes_the_first_plaster_slot_the_plan_has(tmp_path: Path) -> None:
+    ochre, cream = _record(tmp_path, "ochre", (200, 150, 60)), _record(tmp_path, "cream", (220, 200, 160))
+    tiles: dict[str, tuple[Any, str]] = {}
+    shared = share_facade_photos({"historic_facades": cream, "ochre_facades": ochre}, {"plaster_salmon"}, tiles)
+    assert shared == [{"color_id": "plaster_salmon", "slot": "ochre_facades", "albedo_mode": "greyscale_modulation", "asset_id": "ochre"}]
+    rgb, mode = tiles["plaster_salmon"]
+    assert mode == "greyscale_modulation"
+    assert np.array_equal(rgb, decode_jpeg_rgb(Path(ochre.path).read_bytes()))
+    # Not used, already textured, or no plaster slot in the plan: nothing is shared.
+    assert share_facade_photos({"ochre_facades": ochre}, {"plaster_ochre"}, {}) == []
+    kept = {"plaster_salmon": ("photo", "color_albedo")}
+    assert share_facade_photos({"ochre_facades": ochre}, {"plaster_salmon"}, kept) == []
+    assert kept == {"plaster_salmon": ("photo", "color_albedo")}
+    empty: dict[str, tuple[Any, str]] = {}
+    assert share_facade_photos({"doors": ochre}, {"plaster_salmon"}, empty) == [] and empty == {}
 
 
 def test_cli_refuses_protected_output(tmp_path: Path) -> None:
