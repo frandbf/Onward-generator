@@ -30,7 +30,7 @@ import numpy as np
 from PIL import Image
 
 from onward_generator.generation.gltf import Primitive, images_by_material, read_glb, scene_primitives
-from onward_generator.generation.mesh import Mesh, merge, transform
+from onward_generator.generation.mesh import Mesh, merge
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
 from onward_generator.overgrow.constants import FLAT_VEGETATION_MAX_M
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
@@ -242,7 +242,7 @@ def _read(path: Path, spec: AssetSpec, yaw_deg: float) -> Prop:
             uvs.append(_uvs(primitive))
             end += primitive.mesh.triangle_count
         parts.append(PropPart(end, albedo))
-    mesh = rest_on_ground(transform(merge(meshes), _yaw(yaw_deg)))
+    mesh = rest_on_ground(_turned(merge(meshes), yaw_deg))
     return Prop(spec, mesh, np.concatenate(uvs), parts[0].albedo, parts=tuple(parts))
 
 
@@ -254,12 +254,13 @@ def _uvs(primitive: Primitive) -> np.ndarray:
     return uvs
 
 
-def _yaw(degrees: float) -> np.ndarray:
+def _turned(mesh: Mesh, degrees: float) -> Mesh:
     """Counter-clockwise turn about +Z (up). 90 puts the file's +Y on -X."""
     angle = math.radians(degrees)
-    matrix = np.eye(4)
-    matrix[:2, :2] = [[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]]
-    return matrix
+    cos, sin = math.cos(angle), math.sin(angle)
+    # Row vectors times the transpose of the rotation [[cos, -sin], [sin, cos]].
+    rotation = np.array([[cos, sin, 0.0], [-sin, cos, 0.0], [0.0, 0.0, 1.0]])
+    return Mesh(mesh.vertices @ rotation, mesh.triangles)
 
 
 def _albedo(path: Path, data: bytes, material: str) -> bytes:

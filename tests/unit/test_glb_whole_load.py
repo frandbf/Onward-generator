@@ -288,6 +288,8 @@ def test_yaw_turns_the_long_side_and_refused_rows_are_rejected(tmp_path: Path) -
     assert (by_id["plain"].length_m, by_id["plain"].half_y * 2) == pytest.approx((1.0, 4.0))
     assert (by_id["truck"].length_m, by_id["truck"].half_y * 2) == pytest.approx((4.0, 1.0))
     assert by_id["truck"].height_m == pytest.approx(2.0)
+    assert np.allclose(by_id["truck"].mesh.vertices, [[0, 0, 0], [0, 1, 0], [-4, 0, 0], [0, 0, 2]])
+    assert by_id["truck"].mesh.triangles.tolist() == [[0, 1, 2], [0, 2, 3]]
     # A quarter turn counter-clockwise puts the file's +Y (north) on -X.
     assert by_id["truck"].mesh.vertices[:, 0].min() == pytest.approx(-4.0)
     assert by_id["truck"].mesh.vertices[:, 1].max() == pytest.approx(1.0)
@@ -374,6 +376,7 @@ def test_a_planned_cover_keeps_every_part() -> None:
     first = dressing.nodes[0]
     assert [prim.material for prim in first.primitives] == ["prop_modular_fire_escape", "prop_modular_fire_escape__1"]
     assert dressing.images == {"prop_modular_fire_escape": RED, "prop_modular_fire_escape__1": BLUE}
+    assert len(dressing.nodes) > 1 and all(node.primitives == () for node in dressing.nodes[1:])
     assert float(first.primitives[1].mesh.vertices[:, 2].max()) == pytest.approx(3.0 * dressing.records[0]["fit_scale"])
 
 
