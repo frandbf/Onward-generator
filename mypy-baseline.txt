@@ -47,8 +47,6 @@ src/onward_generator/dress/surfaces.py:0: error: Value of type "Any | dict[Any, 
 src/onward_generator/dress/surfaces.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
 src/onward_generator/dress/surfaces.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
 src/onward_generator/dress/surfaces.py:0: note: Perhaps you need a type annotation for "features"? Suggestion: "dict[str, Mapping[str, Any]]"
-src/onward_generator/export/thumbnail.py:0: error: Incompatible return value type (got "FreeTypeFont | ImageFont", expected "ImageFont")  [return-value]
-src/onward_generator/export/thumbnail.py:0: error: Incompatible return value type (got "FreeTypeFont | ImageFont", expected "ImageFont")  [return-value]
 src/onward_generator/generation/config.py:0: error: Unused "type: ignore" comment  [unused-ignore]
 src/onward_generator/generation/gltf.py:0: error: Argument 1 to "Material" has incompatible type "tuple[float, ...]"; expected "tuple[float, float, float, float]"  [arg-type]
 src/onward_generator/generation/gltf.py:0: error: Name "entry" already defined on line 0  [no-redef]
