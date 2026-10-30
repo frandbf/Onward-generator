@@ -50,9 +50,10 @@ def plaque_font(size: int) -> ImageFont.FreeTypeFont:
 
 
 def _fit(draw: ImageDraw.ImageDraw, text: str, max_w: int, max_h: int) -> ImageFont.FreeTypeFont:
-    for size in range(_MAX_SIZE, _MIN_SIZE - 1, -2):
+    """The largest even size from 64 down to 16 that fits. A name too long for 16 still gets 16."""
+    for size in range(_MAX_SIZE, _MIN_SIZE - 2, -2):
         font = plaque_font(size)
         box = draw.textbbox((0, 0), text, font=font)
         if box[2] - box[0] <= max_w and box[3] - box[1] <= max_h:
             return font
-    return plaque_font(_MIN_SIZE)
+    return font

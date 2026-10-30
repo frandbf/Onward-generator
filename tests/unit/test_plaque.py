@@ -8,7 +8,7 @@ from io import BytesIO
 
 import numpy as np
 import pytest
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from onward_generator.signs.plaque import FONT_PATH, PLATE_H, PLATE_W, plaque_font, plaque_png, plaque_text
 
@@ -105,6 +105,18 @@ def test_short_name_uses_the_largest_size() -> None:
     assert _plate_ink_size("Peña") == _ink_size("Peña", 64)
 
 
+def test_sizes_step_down_two_at_a_time() -> None:
+    # Too wide at 64 and 62, fits at 61 and 60: only even sizes are tried.
+    name = "Plaza de Peña"
+    assert _ink_size(name, 60) not in (_ink_size(name, 61), _ink_size(name, 62))
+    assert _plate_ink_size(name) == _ink_size(name, 60)
+
+
+def test_font_uses_basic_layout() -> None:
+    # Basic layout gives the same glyph positions whether or not libraqm is installed.
+    assert plaque_font(32).layout_engine == ImageFont.Layout.BASIC
+
+
 def test_long_name_shrinks_until_it_fits() -> None:
     name = "Calle de María del Carmen"
     width, _ = _plate_ink_size(name)
@@ -115,8 +127,9 @@ def test_long_name_shrinks_until_it_fits() -> None:
 def test_name_too_long_for_any_size_uses_the_smallest() -> None:
     name = plaque_text("Avenida " * 12)
     assert _ink_size(name, 16)[0] > PLATE_W
-    assert _ink_size(name, 16)[1] != _ink_size(name, 18)[1]
-    assert _plate_ink_size(name)[1] == _ink_size(name, 16)[1]
+    heights = {size: _ink_size(name, size)[1] for size in (14, 16, 18)}
+    assert len(set(heights.values())) == 3
+    assert _plate_ink_size(name)[1] == heights[16]
 
 
 def test_plate_is_deterministic() -> None:
