@@ -44,12 +44,24 @@ from onward_generator.next_step import (
 )
 from onward_generator.osm.acquire import osm_target
 from onward_generator.platform import HostProfile, PlatformError, resolve_host
+from onward_generator.run_log import (
+    SETUP_STEPS,
+    Palette,
+    RunLog,
+    StageReport,
+    plural,
+    render,
+    stage_line,
+    summarize,
+    use_color,
+)
 
 Execute = Callable[[Sequence[str]], int]
 Ask = Callable[[], str]
 Push = Callable[[Path], int]
 Build = Callable[[Path, Sequence[str]], int]
 UnityOpen = Callable[[], bool]
+Summarize = Callable[[str, Sequence[str]], StageReport]
 _YES = {"s", "si", "sí", "y", "yes"}
 
 
@@ -170,48 +182,94 @@ def format_duration(seconds: float) -> str:
     return f"{hours} h {minutes:02d} min"
 
 
-def _print_times(times: Sequence[tuple[str, float]]) -> None:
-    if not times:
+def say(text: str = "") -> None:
+    """One console line, flushed so progress shows through a pipe."""
+    print(text, flush=True)  # pragma: no mutate: flush only changes when a pipe sees the line, not its text
+
+
+def print_header(
+    name: str,
+    root: Path,
+    *,
+    latitude: float,
+    longitude: float,
+    radius_m: float,
+    margin_m: float,
+    lightmap_texels_per_m: float,
+) -> None:
+    """The map and its area. Map setup has no numbered row; its time is in the final line."""
+    say(f"{name}  {show(root)}")
+    say(f"{latitude}, {longitude}  r {radius_m:g} m  margin {margin_m:g} m  lightmap {lightmap_texels_per_m:g} t/m")
+    say()
+
+
+def print_total(log: RunLog, *, failed: bool) -> None:
+    """``✓ Python 9.6 s  (map setup 56.4 s)  0 warnings``. Nothing when no step ran."""
+    if not log.times:
         return
-    width = max(len(name) for name, _seconds in times)
-    width = max(width, len("total"))
-    print("run: time", flush=True)
-    total = 0.0
-    for name, seconds in times:
-        total += seconds
-        print(f"  {name:<{width}}  {format_duration(seconds)}", flush=True)
-    print(f"  {'total':<{width}}  {format_duration(total)}", flush=True)
+    setup = [seconds for name, seconds in log.times if name in SETUP_STEPS]
+    python = sum(seconds for name, seconds in log.times if name not in SETUP_STEPS)
+    mark = log.palette.error("✗") if failed else log.palette.ok("✓")
+    parts = [f"{mark} Python {format_duration(python)}"]
+    if setup:
+        parts.append(f"(map setup {format_duration(sum(setup))})")
+    warnings = plural(log.warnings, "warning")
+    parts.append(log.palette.warning(warnings) if log.warnings else warnings)
+    say()
+    say("  ".join(parts))
 
 
 def run_steps(
     steps: Sequence[tuple[str, Sequence[str]]],
     *,
     execute: Execute,
-    times: list[tuple[str, float]] | None = None,
+    log: RunLog | None = None,
+    summarize_stage: Summarize = summarize,
 ) -> int:
-    """Run ``steps`` in order. On the first failure, that report is the next console text."""
-    total = len(steps)
-    for index, (name, argv) in enumerate(steps, start=1):
-        print(f"run: {index}/{total} {name}", flush=True)
+    """Run ``steps`` in order. On the first failure, that report is the next console text.
+
+    A finished stage prints one line from the report it wrote. ``map`` and ``osm``
+    are map setup: they print nothing unless they fail or ``log.verbose`` is set.
+    """
+    state = log if log is not None else RunLog()
+    total = sum(1 for name, _argv in steps if name not in SETUP_STEPS)
+    index = 0
+    for name, argv in steps:
+        setup = name in SETUP_STEPS
+        if not setup:
+            index += 1
         started = time.perf_counter()
         captured_out, captured_err = io.StringIO(), io.StringIO()
         with redirect_stdout(captured_out), redirect_stderr(captured_err):
             code = execute(list(argv))
         elapsed = time.perf_counter() - started
-        if times is not None:
-            times.append((name, elapsed))
+        state.times.append((name, elapsed))
         duration = format_duration(elapsed)
         if code != 0:
+            step = "" if setup else f" Step {index}/{total}."
+            where = "" if setup else f" (step {index}/{total})"
             print(
-                f"FAILED {name} (exit {code}, {duration}). Step {index}/{total}. The following steps were not started.\n"
-                f"Next: run again from {name} (step {index}/{total}). The steps before it do not need to run again.",
+                f"{state.palette.error('FAILED')} {name} (exit {code}, {duration}).{step} The following steps were not started.\n"
+                f"Next: run again from {name}{where}. The steps before it do not need to run again.",
                 flush=True,
             )
             _emit_captured(captured_err.getvalue(), captured_out.getvalue())
             return code
-        _emit_captured("", captured_out.getvalue())
-        print(f"OK {name}  {duration}", flush=True)
+        if not setup:
+            report = summarize_stage(name, argv)
+            state.warnings += report.warnings
+            say(stage_line(index, total, name, duration, report.summary))
+            for line in render(report, state.palette):
+                say(line)
+        if state.verbose:
+            _emit_verbose(captured_out.getvalue(), captured_err.getvalue())
     return 0
+
+
+def _emit_verbose(out: str, err: str) -> None:
+    for text in (out, err):
+        if text.strip():
+            say(text.rstrip())
 
 
 def _stage_summary(text: str) -> str:
@@ -623,6 +681,9 @@ def run_map(
     build: Build | None = None,
     unity_open: UnityOpen | None = None,
     host: HostProfile | None = None,
+    verbose: bool = False,
+    no_unity: bool = False,
+    palette: Palette | None = None,
 ) -> int:
     """Create the map folder, then run every Python stage through ``export package``.
 
@@ -633,19 +694,32 @@ def run_map(
 
     If the Editor already has the stage-0 project open, nothing starts until
     the user closes it and confirms. Any other answer cancels the run.
+
+    ``no_unity`` stops after ``export`` and prints the command for the Unity
+    steps, so the Python stages can run where Unity is not installed. It does
+    not check the Editor either. ``verbose`` adds each stage's own output.
     """
     runner = execute if execute is not None else _execute_cli
     root = Path(out)
     prompting = sys.stdin.isatty() if interactive is None else interactive
-    gate = confirm_unity_closed(
-        interactive=prompting,
-        ask=ask,
-        unity_open=unity_open if unity_open is not None else unity_editor_open,
-    )
-    if gate != 0:
-        return gate
+    if not no_unity:
+        gate = confirm_unity_closed(
+            interactive=prompting,
+            ask=ask,
+            unity_open=unity_open if unity_open is not None else unity_editor_open,
+        )
+        if gate != 0:
+            return gate
+    log = RunLog(palette=palette if palette is not None else Palette(use_color(sys.stdout)), verbose=verbose)
+
+    def header(directory: Path) -> None:
+        print_header(
+            name, directory,
+            latitude=latitude, longitude=longitude, radius_m=radius_m, margin_m=margin_m,
+            lightmap_texels_per_m=lightmap_texels_per_m,
+        )
+
     ran: list[tuple[str, list[str]]] = []
-    times: list[tuple[str, float]] = []
     if not (root / "map.json").is_file():
         try:
             root = map_directory(name)
@@ -661,6 +735,7 @@ def run_map(
                 flush=True,
             )
             return 1
+        header(root)
         code = run_steps(
             [(
                 "map",
@@ -680,20 +755,20 @@ def run_map(
                 ),
             )],
             execute=runner,
-            times=times,
+            log=log,
         )
         if code != 0:
-            _print_times(times)
+            print_total(log, failed=True)
             return code
         try:
             steps = plan_steps(out)
         except PipelineError as exc:
             print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
             return 1
-        _announce_export(steps)
-        code = run_steps(steps, execute=runner, times=times)
+        code = run_steps(steps, execute=runner, log=log)
         ran = steps
     else:
+        header(root)
         try:
             _same_request(root, map_id, latitude, longitude, radius_m, margin_m)
             if brief is not None or ambient_ai:
@@ -724,30 +799,36 @@ def run_map(
             except PipelineError as exc:
                 print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
                 return 1
-            print(f"run: continue from {chosen}", flush=True)
-            _announce_export(steps)
-            code = run_steps(steps, execute=runner, times=times)
+            say(f"continue from {chosen}")
+            code = run_steps(steps, execute=runner, log=log)
             ran = steps
+    print_total(log, failed=code != 0)
     if code != 0:
-        _print_times(times)
         return code
-    print("run: Python stages are complete.", flush=True)
-    code = finish_device(
-        package_for_quest(root, ran),
+    package = package_for_quest(root, ran)
+    if no_unity:
+        return print_unity_command(package)
+    return finish_device(
+        package,
         interactive=prompting,
         ask=ask,
         push=push if push is not None else lambda package: _push_package(package, host=host),
         build=build if build is not None else lambda package, steps: _build_package(package, steps, host=host),
-        times=times,
     )
-    _print_times(times)
-    return code
 
 
-def _announce_export(steps: Sequence[tuple[str, Sequence[str]]]) -> None:
-    for name, argv in steps:
-        if name == "export":
-            print(f"run: export -> {_flag(argv, '--out')}", flush=True)
+def print_unity_command(package: Path) -> int:
+    """What ``--no-unity`` leaves for the host: the Unity steps for this package."""
+    if not (package / "onward_export.json").is_file():
+        say("→ Unity: skipped. The export package is not on disk.")
+        return 0
+    steps = unity_steps(package)
+    if not steps:
+        say(f"→ Unity: the Quest build is already in {show(package)}")
+        return 0
+    say(f"→ Unity: {', '.join(steps)}. On the host, run:")
+    say(f"  task unity -- {show(package)}")
+    return 0
 
 
 def unity_steps(package: Path) -> list[str]:
@@ -775,20 +856,17 @@ def finish_device(
     ask: Ask | None,
     push: Push,
     build: Build,
-    times: list[tuple[str, float]] | None = None,
 ) -> int:
     """Build the Quest files, then ask before copying them to the headset."""
     if not (package / "onward_export.json").is_file():
-        print("run: unity skipped. The export package is not on disk.", flush=True)
+        say("→ Unity: skipped. The export package is not on disk.")
         return 0
     steps = unity_steps(package)
     if steps:
-        print(f"run: unity {' '.join(steps)}", flush=True)
+        say(f"→ Unity: {', '.join(steps)}")
         started = time.perf_counter()
         code = build(package, steps)
         elapsed = time.perf_counter() - started
-        if times is not None:
-            times.append(("unity", elapsed))
         if code != 0:
             print(f"FAILED unity (exit {code}). Quest upload was not asked.", flush=True)
             return code
@@ -800,8 +878,8 @@ def finish_device(
             return 1
         print(f"OK unity  {format_duration(elapsed)}", flush=True)
     else:
-        print("run: unity already has the Quest build.", flush=True)
-    return offer_quest_upload(package, interactive=interactive, ask=ask, push=push, times=times)
+        say("→ Unity: already has the Quest build.")
+    return offer_quest_upload(package, interactive=interactive, ask=ask, push=push)
 
 
 def offer_quest_upload(
@@ -810,7 +888,6 @@ def offer_quest_upload(
     interactive: bool,
     ask: Ask | None,
     push: Push,
-    times: list[tuple[str, float]] | None = None,
 ) -> int:
     """Ask before replacing the headset's local map. Empty or any other answer skips it."""
     if not interactive:
@@ -840,8 +917,6 @@ def offer_quest_upload(
     started = time.perf_counter()
     code = push(package)
     elapsed = time.perf_counter() - started
-    if times is not None:
-        times.append(("quest", elapsed))
     duration = format_duration(elapsed)
     if code != 0:
         print(f"FAILED quest (exit {code}, {duration}). The headset map was not replaced.", flush=True)

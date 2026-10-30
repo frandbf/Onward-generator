@@ -141,7 +141,7 @@ If Overpass fails after the folder exists:
 
 The headset has one local slot. The launcher always writes `unity-export.local`. The card title on the headset is `Unity Export`. The name passed to `run` is the folder name and the title stored in `maps/<id>/config/export.json`.
 
-Each stage prints an indented result and `OK` with its duration. At the end, `run: time` lists the stages that ran and the total. The Quest question is excluded. Full paths and the Unity log stay out of that summary. The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/onward-generator/onward-export/` on Linux.
+Each stage prints one line: number, name, duration and its key numbers, read from the report it wrote. Breakdowns go on indented lines and non-zero warnings on their own line, in colour on a terminal unless `NO_COLOR` is set. The last line gives the Python time, the map setup time and the warning count, then the Unity steps. `--verbose` adds each stage's full output. `--no-unity` stops after `export` and prints the Unity command for the host. Full paths and the Unity log stay out of that summary. The format is in [docs/01-pipeline.md](docs/01-pipeline.md#1-map-folder). The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/onward-generator/onward-export/` on Linux.
 
 To build or upload without going through `run`:
 
