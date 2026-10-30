@@ -574,7 +574,7 @@ def scene_primitives(data: bytes) -> list[Primitive]:
         raw = nodes[index]
         world = parent @ _node_matrix(raw)
         if "mesh" in raw:
-            local = _local_matrix(world.T.reshape(-1))
+            local = _local_matrix(world.T.flatten())
             for prim in _mesh_primitives(doc, blob, int(raw["mesh"]), mat_names):
                 found.append(Primitive(transform(prim.mesh, local), prim.material, prim.uvs))
         stack.extend((int(child), world) for child in reversed(raw.get("children") or []))
@@ -602,7 +602,7 @@ def _node_matrix(raw: Mapping[str, Any]) -> np.ndarray:
             [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
         ]
     # Each column takes its axis scale: R·S.
-    matrix[:3, :3] *= [float(v) for v in raw.get("scale") or (1.0, 1.0, 1.0)]
+    matrix[:3, :3] = matrix[:3, :3] @ np.diag([float(v) for v in raw.get("scale") or (1.0, 1.0, 1.0)])
     matrix[:3, 3] = [float(v) for v in raw.get("translation") or (0.0, 0.0, 0.0)]
     return matrix
 

@@ -302,7 +302,12 @@ def test_a_glb_without_triangles_is_skipped(tmp_path: Path) -> None:
     assert read_library(tmp_path / "lib") == ([], [])
     spec = AssetSpec("bench", "furniture", "bench", ("sidewalk",), "ground", "test bench")
     with pytest.raises(ValueError, match=r"^\S*empty\.glb: no mesh$"):
-        _read(tmp_path / "lib" / "empty.glb", spec)
+        _read(tmp_path / "lib" / "empty.glb", spec, 0.0)
+    # An empty primitive before a real one is passed over, not the end of the file.
+    mixed = _glb([[{"positions": TRIANGLE, "indices": np.zeros(0, dtype=np.uint32)}, _tri()]], [{"mesh": 0}],
+                 scenes=[{"nodes": [0]}])
+    (tmp_path / "mixed.glb").write_bytes(mixed)
+    assert _read(tmp_path / "mixed.glb", spec, 0.0).triangles == 1
 
 
 def test_the_manifest_checks_and_keeps_the_load_fields() -> None:
@@ -393,3 +398,31 @@ def test_fit_measures_every_primitive_of_a_placed_prop(tmp_path: Path) -> None:
     checked, problems = check_scene(base, scene)
     assert checked == 2
     assert len(problems) == 2 and all("wrong_size 9.00x1.60x1.50" in problem for problem in problems)
+
+
+def test_fit_reports_a_placed_node_without_triangles(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    scene.write_text(json.dumps({"features": []}), encoding="utf-8")
+    base = tmp_path / "scene_overgrow"
+    base.mkdir()
+    lines_only = _glb([[_tri(mode=1)], [_tri()]], [
+        {"name": "overgrow/wreck/0", "mesh": 0},
+        {"name": "overgrow/wreck/1", "mesh": 1, "translation": [0.0, 0.0, 30.0]},
+    ], scenes=[{"nodes": [0, 1]}])
+    (base / "scene_visual.glb").write_bytes(lines_only)
+    checked, problems = check_scene(base, scene)
+    assert checked == 2
+    assert problems[0] == "overgrow/wreck/0 missing_mesh"
+    assert problems[1].startswith("overgrow/wreck/1 wrong_size")
+
+
+def test_a_blocking_wreck_stands_in_the_lane() -> None:
+    spec = AssetSpec("car", "vehicles", "wreck", ("curb",), "ground", "car")
+    car = mesh_box(-2.1, 2.1, -0.9, 0.9, 0.0, 1.5)
+    lane = LineString([(-30.0, 0.0), (120.0, 0.0)])
+    planted = dress(
+        [Prop(spec, car, np.zeros((car.vertex_count, 2), dtype=np.float32), RED)],
+        [], [], STRtree([box(0.0, 30.0, 20.0, 50.0)]), [lane], STRtree([lane]), square_zone(80.0),
+        profile_for(100), 48152, [], grass_mesh=None, grass_left=0, triangle_budget=60_000, block_streets=True,
+    )
+    assert abs(planted.records[0]["position_m"][1]) == pytest.approx(0.9)

@@ -219,7 +219,7 @@ def _semantics(row: dict) -> dict[str, Any]:
     return found
 
 
-def _read(path: Path, spec: AssetSpec, yaw_deg: float = 0.0) -> Prop:
+def _read(path: Path, spec: AssetSpec, yaw_deg: float) -> Prop:
     """Every primitive of the scene, grouped by albedo, turned by ``yaw_deg`` and set on the ground."""
     data = path.read_bytes()
     albedos: dict[str, bytes] = {}
