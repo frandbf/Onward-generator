@@ -1,0 +1,5 @@
+#!/bin/sh
+# Opt-in: git config core.hooksPath .githooks
+# Runs the cheap gates before a push. CI still runs everything, including task mutate.
+set -eu
+task lint typecheck test

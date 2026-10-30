@@ -2,7 +2,8 @@
 # as a local `task ci`, so a failure here reproduces on any machine with Docker and go-task.
 # Linux only: macOS runners are not free for this private repository.
 # `mutate` mutates only the functions the change touched (tools/mutate/run.py) and fails
-# when a mutant survives, i.e. when no test notices the changed behaviour.
+# when a mutant survives, i.e. when no test notices the changed behaviour. Before that,
+# `task guard` fails when the same change edits src/ and a quality gate.
 name: ci
 
 on:
@@ -83,6 +84,12 @@ jobs:
           cache-from: type=gha
           # Pull requests read the cache; only main writes it.
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max' || '' }}
+      # A change to src/ must not also loosen a gate; see AGENTS.md, Quality gates.
+      - name: task guard
+        if: steps.changes.outputs.src == 'true' && github.event_name == 'pull_request'
+        env:
+          GUARD_BASE_REF: ${{ steps.changes.outputs.base }}
+        run: task guard BASE="$GUARD_BASE_REF"
       - name: task mutate
         if: steps.changes.outputs.src == 'true'
         env:

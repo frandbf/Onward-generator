@@ -110,6 +110,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         overwrite=args.overwrite,
         start=args.start,
         host=host,
+        verbose=args.verbose,
+        no_unity=args.no_unity,
     )
 
 
@@ -185,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("materials", help="apply a texture-plan JSON to a scene copy (see: materials --help)", add_help=False)
     sub.add_parser("panoramax", help="under development: project 360 street photos onto exposed facades (see: panoramax --help)", add_help=False)
     sub.add_parser("signs", help="hang OSM street-name plates on facades (see: signs --help)", add_help=False)
-    sub.add_parser("overgrow", help="add abandoned-city moss, grass, trees and wrecks (see: overgrow --help)", add_help=False)
+    sub.add_parser("overgrow", help="add abandoned-city grass, trees and wrecks (see: overgrow --help)", add_help=False)
     sub.add_parser("map", help="create or inspect one map folder (see: map --help)", add_help=False)
     run = sub.add_parser(
         "run",
@@ -205,6 +207,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")
     run.add_argument("--platform", choices=PLATFORM_CHOICES, default=None, help="host for the Unity steps; same as the global --platform")
+    run.add_argument("--verbose", action="store_true", help="also print each stage's full output")
+    run.add_argument("--no-unity", action="store_true", help="stop after export and print the command for the Unity steps (task map uses this)")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
     return parser

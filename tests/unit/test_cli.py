@@ -118,3 +118,14 @@ def test_doctor_fails_on_an_unknown_platform_env(monkeypatch: pytest.MonkeyPatch
     checks = {c.name: c for c in run_checks()}
     assert checks["host:platform"].status == "fail"
     assert "onward:unity_editor" not in checks
+
+
+def test_overgrow_subcommand_defers_its_help_to_the_overgrow_parser() -> None:
+    import argparse
+
+    from onward_generator.cli import build_parser
+
+    sub = next(action for action in build_parser()._actions if isinstance(action, argparse._SubParsersAction))
+    assert sub.choices["overgrow"].add_help is False
+    helps = {choice.dest: choice.help for choice in sub._choices_actions}
+    assert helps["overgrow"] == "add abandoned-city grass, trees and wrecks (see: overgrow --help)"

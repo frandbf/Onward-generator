@@ -1,23 +1,37 @@
 """Copy a scene directory and add a closed collision barrier on the site ring.
 
-The barrier is not added to the visual mesh.
+The barrier is not added to the visual mesh. An optional backdrop ring outside it
+is visual only (ADR-014).
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from io import BytesIO
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from PIL import Image
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
+from shapely.geometry.polygon import orient
 
 from onward_generator.contracts import is_schema
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, glb_append, nodes_from_glb
-from onward_generator.generation.mesh import polygons_of, prism
+from onward_generator.generation.gltf import (
+    Node,
+    Primitive,
+    build_glb,
+    glb_append,
+    images_by_material,
+    nodes_from_glb,
+    read_glb,
+)
+from onward_generator.generation.mesh import Mesh, polygons_of, prism
 from onward_generator.geo.clipping import inclusion_zone
 from onward_generator.geo.projection import LocalFrame
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
@@ -97,6 +111,92 @@ def wall_nodes(site: BaseGeometry, *, height_m: float, thickness_m: float) -> tu
     return visual, collision
 
 
+# ---- Horizon backdrop (optional, docs/12-export.md) ------------------------------------------
+BACKDROP_ID = "horizon/backdrop"
+BACKDROP_MATERIAL = "horizon_backdrop"
+DEFAULT_BACKDROP_OFFSET_M = 2.0
+DEFAULT_BACKDROP_HEIGHT_M = 30.0
+# Below the ground line, so no gap shows between the ground edge and the ring.
+BACKDROP_BASE_Z_M = -1.0
+# The simplified hull lies up to this far inside the true hull; the offset adds it back.
+BACKDROP_SIMPLIFY_M = 1.0
+# sRGB. The bottom is the default export fog colour (config/export/onward.default.json).
+HAZE_HEX = "#C8CDD2"
+SKY_HEX = "#D6E0EC"
+GRADIENT_ROWS = 64
+
+
+def _rgb(hex_colour: str) -> np.ndarray:
+    return np.array([int(hex_colour[k : k + 2], 16) for k in (1, 3, 5)])
+
+
+def backdrop_png() -> bytes:
+    """A vertical gradient, sky at the top row and haze at the bottom row. 4 px wide, no noise."""
+    t = np.linspace(0.0, 1.0, GRADIENT_ROWS)[:, None]
+    rows = np.rint(_rgb(SKY_HEX) * (1.0 - t) + _rgb(HAZE_HEX) * t).astype(np.uint8)
+    image = Image.fromarray(np.ascontiguousarray(np.repeat(rows[:, None, :], 4, axis=1)))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")  # pragma: no mutate: PIL reads the format name case-insensitively, so "png" writes the same bytes
+    return buffer.getvalue()
+
+
+def backdrop_node(site: BaseGeometry, *, offset_m: float, height_m: float) -> Node:
+    """One inward-facing quad per edge of the site's convex hull, ``offset_m`` outside it.
+
+    Visual only: no collider, no building. V runs from the bottom row of the gradient
+    (haze) to its top row (sky), at the centres of the first and last rows.
+    """
+    if not 0 < offset_m <= 200:
+        raise BoundsError("backdrop offset_m must be in (0, 200] metres")
+    if not 2 <= height_m <= 200:
+        raise BoundsError("backdrop height_m must be between 2 and 200 metres")
+    hull = site.convex_hull.simplify(BACKDROP_SIMPLIFY_M)
+    ring = orient(hull.buffer(offset_m + BACKDROP_SIMPLIFY_M, join_style="mitre")).exterior.coords
+    edges = list(pairwise(ring))
+    z0, z1 = BACKDROP_BASE_Z_M, float(height_m)
+    v0, v1 = 0.5 / GRADIENT_ROWS, 1.0 - 0.5 / GRADIENT_ROWS
+    vertices: list[tuple[float, float, float]] = []
+    uvs: list[tuple[float, float]] = []
+    triangles: list[tuple[int, int, int]] = []
+    for (ax, ay), (bx, by) in edges:
+        # Counter-clockwise ring: b → a seen from inside, so the normal points into the site.
+        base = len(vertices)
+        vertices += [(bx, by, z0), (ax, ay, z0), (ax, ay, z1), (bx, by, z1)]
+        uvs += [(0.5, v0), (0.5, v0), (0.5, v1), (0.5, v1)]
+        triangles += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+    mesh = Mesh(np.array(vertices), np.array(triangles))
+    extras = {"object_id": BACKDROP_ID, "type": "backdrop", "attribute_origin": "generated", "source_ids": []}
+    return Node(BACKDROP_ID, (Primitive(mesh, BACKDROP_MATERIAL, np.array(uvs)),), extras)
+
+
+def with_backdrop(visual: bytes, node: Node) -> bytes:
+    """The visual GLB with ``node`` appended. Every image, UV and node extra is kept."""
+    nodes, materials = nodes_from_glb(visual)
+    images = images_by_material(visual)
+    images[BACKDROP_MATERIAL] = backdrop_png()
+    materials[BACKDROP_MATERIAL] = Material((1.0, 1.0, 1.0, 1.0), 1.0)
+    extras = read_glb(visual)[0].get("extras")
+    return build_glb([*nodes, node], materials, extras=extras, repeat_images=images, preserve_uvs=True)
+
+
+def _backdrop_record(node: Node, offset_m: float, height_m: float) -> dict[str, Any]:
+    triangles = node.primitives[0].mesh.triangle_count
+    return {
+        "id": BACKDROP_ID,
+        "type": "backdrop",
+        "attribute_origin": "generated",
+        "generation": {"method": "horizon_backdrop_ring"},
+        "offset_m": offset_m,
+        "height_m": height_m,
+        "quads": triangles // 2,
+        "material": BACKDROP_MATERIAL,
+        "visual": {"triangles": triangles},
+        "collider": {"triangles": 0},
+        "lightmap": False,
+        "visible": True,
+    }
+
+
 def _wall_record(height_m: float, thickness_m: float, site: BaseGeometry, triangles: int) -> dict[str, Any]:
     return {
         "id": WALL_ID,
@@ -120,8 +220,11 @@ def apply_bounds(
     height_m: float = DEFAULT_HEIGHT_M,
     thickness_m: float = DEFAULT_THICKNESS_M,
     overwrite: bool = False,
+    backdrop: bool = False,
+    backdrop_offset_m: float = DEFAULT_BACKDROP_OFFSET_M,
+    backdrop_height_m: float = DEFAULT_BACKDROP_HEIGHT_M,
 ) -> dict[str, Any]:
-    """Write a new directory: copied scene plus the perimeter wall. Inputs are not modified."""
+    """Write a new directory: copied scene plus the perimeter wall, and the backdrop ring when asked. Inputs are not modified."""
     base = Path(base_dir).expanduser().resolve()
     kind, manifest = _detect(base)
     visual_path = base / "scene_visual.glb"
@@ -133,6 +236,7 @@ def apply_bounds(
     site = site_polygon(manifest)
     visual_wall, collision_wall = wall_nodes(site, height_m=height_m, thickness_m=thickness_m)
     tris = visual_wall.primitives[0].mesh.triangle_count
+    ring = backdrop_node(site, offset_m=backdrop_offset_m, height_m=backdrop_height_m) if backdrop else None
 
     names = ("scene_visual.glb", "scene_collision.glb", "bounds_report.json")
     if kind == "detail":
@@ -143,17 +247,22 @@ def apply_bounds(
     targets = prepare_outputs(out_dir, names, overwrite=overwrite, protected=protected)
 
     wall_mats = {"collider": Material((0.2, 0.8, 0.3, 1.0), 1.0)}
-    atomic_write_bytes(targets[0], visual_path.read_bytes())
+    visual = visual_path.read_bytes()
+    atomic_write_bytes(targets[0], visual if ring is None else with_backdrop(visual, ring))
     atomic_write_bytes(targets[1], glb_append(collision_path.read_bytes(), (collision_wall,), wall_mats))
 
     objects = list(manifest.get("objects") or [])
     objects.append(_wall_record(height_m, thickness_m, site, tris))
+    ring_record = None if ring is None else _backdrop_record(ring, backdrop_offset_m, backdrop_height_m)
+    if ring_record is not None:
+        objects.append(ring_record)
     written = dict(manifest)
     written["objects"] = objects
     written.setdefault("envelope", {})
     written["envelope"] = {
         "id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m,
         "source_sha256": file_sha256(protected[2]),
+        "backdrop": ring_record,
     }
 
     before = geometry_fingerprint([o for o in (manifest.get("objects") or []) if o.get("type") in GEOGRAPHIC])
@@ -168,6 +277,7 @@ def apply_bounds(
         "base": {"dir": str(base), "kind": kind, "manifest_sha256": file_sha256(protected[2])},
         "wall": {"id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m, "triangles": tris,
                  "site_area_m2": round(float(site.area), 3)},
+        "backdrop": ring_record,
         "geometry": compare,
         "note": "DamageVolume in the layout remains a fall-kill. The perimeter is a collision barrier and is not drawn.",
     }

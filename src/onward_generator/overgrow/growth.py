@@ -22,10 +22,6 @@ def _png(rgb: tuple[int, int, int], seed: int, size: int = 128) -> bytes:
     return encode_png_rgba(image)
 
 
-def moss_png() -> bytes:
-    return _png((78, 96, 48), 11)
-
-
 def grass_png() -> bytes:
     return _png((62, 104, 38), 23)
 
@@ -44,20 +40,6 @@ def trunk_png() -> bytes:
 
 def vine_png() -> bytes:
     return _png((48, 72, 36), 29)
-
-
-def moss_skirt(start: np.ndarray, end: np.ndarray, outward: np.ndarray) -> Mesh:
-    """A strip 0.8 m tall on the outside of a wall. Two triangles."""
-    offset = outward * 0.04
-    a = start + offset
-    b = end + offset
-    z0, z1 = 0.05, 0.85
-    return quad(
-        (float(a[0]), float(a[1]), z0),
-        (float(b[0]), float(b[1]), z0),
-        (float(b[0]), float(b[1]), z1),
-        (float(a[0]), float(a[1]), z1),
-    )
 
 
 def grass_tuft() -> Mesh:

@@ -76,6 +76,7 @@ class DetailObject:
     matrix: np.ndarray | None = None
     glass_colliders: list[Mesh] = field(default_factory=list)
     uv_frame: dict[str, Any] | None = None  # visual node extras only (ADR-012)
+    light_anchors: dict[str, Any] | None = None  # visual node extras only (ADR-013)
 
 
 @dataclass(slots=True)
@@ -98,6 +99,8 @@ class DetailedScene:
             extras = {"object_id": o.id, "type": o.type, "source_ids": o.record.get("source_ids", [])}
             if o.uv_frame is not None:
                 extras["uv_frame"] = o.uv_frame
+            if o.light_anchors is not None:
+                extras["light_anchors"] = o.light_anchors
             if o.instance_of is not None:
                 proto = self.prototypes[o.instance_of]
                 nodes.append(Node(o.id, tuple(Primitive(m, mat) for mat, m in proto.parts), extras, o.matrix, proto.key))
@@ -484,6 +487,7 @@ def detail_scene(
                 [Primitive(merge(ms), mat) for mat, ms in sorted(built.visual.items()) if ms],
                 [], {"id": f"interior/{bid}", "type": "interior", "source_ids": [bid], **interior_record,
                      "generation": {"method": "generic_simplified_interior", "attribute_origin": "generated"}},
+                light_anchors=built.light_anchors,
             ))
             interiors_built.append(bid)
             interiors_left -= 1

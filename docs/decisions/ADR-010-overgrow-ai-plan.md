@@ -11,7 +11,7 @@ Status: accepted · 20 October 2026
 1. **The switch is the existing `--ai` flag, stored as `ambient_ai`.** Without it, the rules do not change. With it, `overgrow place` does not ask the model for a `street_blocking` boolean.
 2. **The model fills `config/overgrow_plan.schema.json` (0.1.0).** At most 24 actions: `span`, `cover`, `watch`, `place`. Ids come from that run's digest and from the installed library. The schema has no city list and no fixed asset list.
 3. **The digest ignores the frame and the origin.** It reads `features` from geo: facades, corners, ways, and points or areas tagged `amenity`, `leisure`, `shop`, `tourism`, or `historic`. The prompt uses abstract examples.
-4. **Code places the copies.** It repeats, scales uniformly, reserves the passage, and drops a whole gesture that does not fit. Moss, grass, vines, and OSM trees still follow the profile. The prop grid and wreck boxes are not also spawned when the plan is valid.
+4. **Code places the copies.** It repeats, scales uniformly, reserves the passage, and drops a whole gesture that does not fit. Grass, vines, and OSM trees still follow the profile. The prop grid and wreck boxes are not also spawned when the plan is valid.
 5. **A failure is retried once before the rules.** If Ollama does not answer or the JSON does not validate, the second call quotes that failure. Rules are used only when that attempt also fails. The raw reply, the digest hash, and the instruction hash are stored in `scene_overgrow/ambient_plan.json`. A later run with the same digest and brief reuses that reply.
 6. **`intent.schema.json` is not widened.** It remains the phase-06 contract.
 

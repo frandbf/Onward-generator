@@ -47,7 +47,13 @@
         "occlusion_culling": { "type": "boolean" },
         "lightmap_texels_per_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 40 },
         "lightmap_max_size": { "enum": [512, 1024, 2048, 4096] },
-        "lightmap_directional": { "type": "boolean" }
+        "lightmap_directional": { "type": "boolean" },
+        "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
+        "fog_enabled": { "type": "boolean" },
+        "fog_start_m": { "type": "number", "minimum": 0, "maximum": 3000 },
+        "fog_end_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 3000 },
+        "fog_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
       }
     }
   }

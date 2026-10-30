@@ -7,5 +7,8 @@ services:
     volumes:
       - .:/work
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    # Passed through so tools can tell a CI runner from a workstation (task mutate --jobs).
+    environment:
+      - CI
     # Host network so the pipeline reaches loopback Ollama (127.0.0.1:11434) as it does natively.
     network_mode: host

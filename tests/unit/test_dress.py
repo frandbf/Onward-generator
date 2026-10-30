@@ -23,7 +23,7 @@ from onward_generator.dress.geometry import compare_fingerprints, file_sha256, g
 from onward_generator.dress.surfaces import building_context, collect_surfaces, osm_material_override
 from onward_generator.generation.config import load_generation_config
 from tests.conftest import MURCIA_CENTER
-from tests.unit.test_ai import fake_ollama  # noqa: F401
+from tests.unit.test_ai import fake_ollama  # noqa: F401 - a pytest fixture used by name
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -153,6 +153,14 @@ def test_osm_surface_tags_win() -> None:
     assert osm_material_override("wall", {"building:material": "brick"}) == "brick_red_wall"
     assert osm_material_override("roof", {"roof:material": "tile"}) == "terracotta_roof"
     assert osm_material_override("wall", {}) is None
+
+
+def test_groups_carry_the_numeric_heights_and_skip_missing_ones(tmp_path: Path) -> None:
+    detail, scene = write_sample(tmp_path)
+    groups = collect_surfaces(detail, scene_path=scene).groups
+    walls = [g for g in groups if g.role == "wall"]
+    assert {g.height_m for g in walls} >= {15.0, 40.0}
+    assert all(g.height_m is None for g in groups if g.role in ("street", "plaza"))
 
 
 def test_groups_and_osm_overrides(tmp_path: Path) -> None:

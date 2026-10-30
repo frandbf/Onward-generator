@@ -52,6 +52,9 @@ class PlacementRule:
     clearance_m: float = 0.0
 
 
+SIDEWALK_COVER_RULE = "manhole_sidewalk"
+
+
 def _spec(asset_id: str, category: str, role: str, surfaces: tuple[str, ...], anchor: str, use: str, **kwargs: object) -> AssetSpec:
     return AssetSpec(asset_id, category, role, surfaces, anchor, use, **kwargs)  # type: ignore[arg-type]
 
@@ -88,7 +91,7 @@ NAMED_ASSETS: tuple[AssetSpec, ...] = (
     _spec("security_camera_01", "facade", "camera", ("facade",), "facade", "camera on a wall"),
     _spec("concrete_road_barrier", "barriers", "barrier", _BARRIER, "ground", "barrier at the curb, across the street, on a sidewalk or in a plaza"),
     _spec("concrete_road_barrier_02", "barriers", "barrier", _BARRIER, "ground", "barrier at the curb, across the street, on a sidewalk or in a plaza"),
-    _spec("water_manhole_cover", "barriers", "manhole", ("carriageway",), "flat", "manhole on the carriageway", lane="allow"),
+    _spec("water_manhole_cover", "barriers", "manhole", ("carriageway", "sidewalk"), "flat", "manhole on the carriageway or a sidewalk", lane="allow"),
 )
 
 # Few plants and one bush. No ivy model exists on the Poly Haven model API.
@@ -110,10 +113,14 @@ PLACEMENT_RULES: tuple[PlacementRule, ...] = (
     PlacementRule("facade_wall", "facade", ("facade",), "forbid", 8),
     PlacementRule("barriers_curb", "barriers", ("curb", "carriageway", "sidewalk", "plaza"), "forbid", 4, ("barrier",)),
     PlacementRule("manhole_lane", "barriers", ("carriageway",), "allow", 2, ("manhole",)),
+    # Placed by ``dressing.sidewalk_covers`` at seeded spacing, not on the shared spot grid.
+    PlacementRule(SIDEWALK_COVER_RULE, "barriers", ("sidewalk",), "forbid", 6, ("manhole",)),
     PlacementRule("plants", "vegetation", ("sidewalk", "yard", "empty_lot"), "forbid", 8, ("plant",)),
     PlacementRule("bushes", "vegetation", ("courtyard", "yard", "plaza", "park"), "forbid", 4, ("bush",)),
     PlacementRule("trees", "vegetation", ("park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"), "forbid", 2, ("tree",), 3.5),
 )
+
+RULES_BY_ID = {rule.id: rule for rule in PLACEMENT_RULES}
 
 FACADE_Z_M = {"aircon": 2.4, "camera": 3.1, "fire_escape": 0.0}
 

@@ -31,7 +31,12 @@ def test_create_writes_an_isolated_square_around_the_centre(tmp_path: Path) -> N
     assert document["panoramax"] is False
     assert (root / "config" / "project.json").is_file()
     assert json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["map"]["title"] == "Plaza de prueba"
-    assert json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]["lightmap_texels_per_m"] == 10.0
+    build = json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]
+    assert build["lightmap_texels_per_m"] == 10.0
+    # Fog starts at the wall: radius plus margin from the centre (ADR-014).
+    margin = document["margin_m"]
+    assert (build["fog_enabled"], build["fog_start_m"], build["fog_end_m"], build["fog_color"]) == (
+        True, 200 + margin, 200 + margin + 600.0, "#C8CDD2")
     aoi = load_aoi_geojson(root / "reference" / "aoi.geojson")
     area = _polygon(aoi.polygon)
     assert area.covers(Point(MURCIA_CENTER_LON, MURCIA_CENTER_LAT))

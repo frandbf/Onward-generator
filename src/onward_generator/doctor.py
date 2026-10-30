@@ -89,7 +89,7 @@ def _schema() -> Check:
         return Check("config:schema", "fail", f"missing {path}")
     try:
         load_schema_validator()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - any failure here is a diagnostic
         return Check("config:schema", "fail", f"{path}: {exc}")
     return Check("config:schema", "ok", f"{path} (JSON Schema 2020-12)")
 

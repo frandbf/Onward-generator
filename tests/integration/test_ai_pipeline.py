@@ -17,7 +17,7 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.models import GeneratorConfig
 from tests.conftest import MURCIA_CENTER
-from tests.unit.test_ai import EXAMPLE, fake_ollama, intent_doc  # noqa: F401  (fixture)
+from tests.unit.test_ai import EXAMPLE, fake_ollama, intent_doc  # noqa: F401 - fake_ollama is a pytest fixture used by name
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIGS = ("project.json", "heights.json", "detail.json", "intent.json")
@@ -192,7 +192,7 @@ def test_remote_ollama_host_is_refused(tmp_path: Path) -> None:
     assert plan("--instruction", EXAMPLE, "--host", "http://203.0.113.5:11434", "--out", str(tmp_path / "o")) == 1
 
 
-def test_ollama_run_records_model_and_parameters(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]  # noqa: F811
+def test_ollama_run_records_model_and_parameters(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]  # noqa: F811 - pytest injects the fixture imported above
     host, handler = fake_ollama
     out = tmp_path / "out"
     assert plan("--instruction", EXAMPLE, "--host", host, "--seed", "3", "--out", str(out)) == 3

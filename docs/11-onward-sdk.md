@@ -13,7 +13,7 @@ The local card does not instantiate every mode the layout describes. `GameModes`
 | Guide rule | Where it lands |
 | --- | --- |
 | Free Roam and at least one other mode | Card: Free Roam, Hunt, Uplink. Layout 0.3.0 also describes the modes in the table below |
-| Lightmap, one baked directional light, built-in skybox, far clip 1000 m | Adapter, profile `Urban` / `Day` / `UrbanDay1` |
+| Lightmap, one baked directional light, built-in skybox, far clip 1000 m | Adapter, profile `Urban` / `Day` / `UrbanDay1`. The adapter also bakes one point light per furnished room and adds a `LightProbeGroup` (ADR-013). Not yet shown on the headset that Onward keeps them. Optional linear fog from the export card (ADR-014); not known whether the runtime or the post-processing profile overrides `RenderSettings` fog, ambient, or the skybox |
 | `SetPhysicMaterial` on every collider. Without it, everything is impenetrable concrete | Water → Water, green → Grass, a node named `#glass` → Glass with `AISeeThrough`, the rest → Concrete |
 | `EnableReverbInjection` or `AreaReverb` does nothing on its own | Enabled only for `gameplay_layout` |
 | Library ambience, not custom clips | `Suburban Day`, `Birds Park`, `Wind Rooftop` |

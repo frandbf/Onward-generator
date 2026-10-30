@@ -93,6 +93,14 @@ namespace OnwardGenerator
             public int lightmap_max_size = 2048;
             public bool lightmap_directional = false;
             public float combine_cell_m = 0f;
+            // ADR-013: baked point lights from the interior light anchors, at most this many per map.
+            public int interior_lights_max = 24;
+            public float interior_light_intensity = 0.8f;
+            // ADR-014: linear RenderSettings fog. Off when the key is absent (older configurations).
+            public bool fog_enabled = false;
+            public float fog_start_m = 160f;
+            public float fog_end_m = 1000f;
+            public string fog_color = "#C8CDD2";
         }
 
         [Serializable] private class XY { public float x; public float y; public float yaw; }
@@ -193,7 +201,12 @@ namespace OnwardGenerator
         [Serializable] private class GAttributes { public int POSITION = -1; public int NORMAL = -1; public int TEXCOORD_0 = -1; }
         [Serializable] private class GPrimitive { public GAttributes attributes; public int indices = -1; public int material = -1; public int mode = 4; }
         [Serializable] private class GMesh { public string name; public GPrimitive[] primitives; }
-        [Serializable] private class GNode { public string name; public int mesh = -1; public float[] matrix; }
+        // Node extras the adapter reads. JsonUtility skips every other key (uv_frame, source_ids, ...).
+        // light_anchors is ADR-013: local metres (x east, y north, z up); probes_m is flat x, y, z triples.
+        [Serializable] private class GRoomAnchor { public string room_id; public float[] light_m; public float range_m; public float[] probes_m; }
+        [Serializable] private class GLightAnchors { public string attribute_origin; public GRoomAnchor[] rooms; }
+        [Serializable] private class GExtras { public GLightAnchors light_anchors; }
+        [Serializable] private class GNode { public string name; public int mesh = -1; public float[] matrix; public GExtras extras; }
         [Serializable] private class GAccessor { public int bufferView = -1; public int byteOffset; public int componentType; public int count; public string type; }
         [Serializable] private class GView { public int buffer; public int byteOffset; public int byteLength; }
         [Serializable] private class GTexInfo { public int index = -1; public int texCoord; }
@@ -592,6 +605,7 @@ namespace OnwardGenerator
                 light.intensity = 1.2f;
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                ApplyFog(opt);
 
                 float tallest = 0f;
                 foreach (MeshCollider collider in collisionRoot.GetComponentsInChildren<MeshCollider>())
@@ -599,6 +613,9 @@ namespace OnwardGenerator
                 if (IsSchema(pkg.Layout.schema, "gameplay_layout"))
                     BakeNavigation(root, collisionRoot, pkg.Layout);
                 AddGameplay(pkg.Layout, tallest);
+                var probes = new List<Vector3>();
+                AddInteriorLights(visual, opt, probes);
+                AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
                 EditorSceneManager.SaveScene(scene, scenePath);
 
                 string sharedPath = $"{root}/SharedLevelSettings.asset";
@@ -915,6 +932,24 @@ namespace OnwardGenerator
             // The suffix is the collision node, not a prop whose id happens to contain "glass".
             if (name.Contains("#glass")) return SetPhysicMaterial.EPhysicMaterialType.Glass;
             return SetPhysicMaterial.EPhysicMaterialType.Concrete;
+        }
+
+        // ADR-014. Unity fog is measured from the camera. Whether the Onward runtime or its
+        // post-processing profile overrides these RenderSettings is not known; checked on the headset.
+        private static void ApplyFog(Options opt)
+        {
+            RenderSettings.fog = opt.fog_enabled;
+            if (!opt.fog_enabled) return;
+            if (!(opt.fog_start_m >= 0f && opt.fog_end_m > opt.fog_start_m))
+                throw new InvalidDataException($"fog_end_m ({opt.fog_end_m}) must be greater than fog_start_m ({opt.fog_start_m}) >= 0");
+            Color colour;
+            if (!ColorUtility.TryParseHtmlString(opt.fog_color, out colour))
+                throw new InvalidDataException($"fog_color {opt.fog_color} is not #RRGGBB");
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogStartDistance = opt.fog_start_m;
+            RenderSettings.fogEndDistance = opt.fog_end_m;
+            RenderSettings.fogColor = colour;
+            Debug.Log($"{LogPrefix} Fog: linear {opt.fog_start_m}-{opt.fog_end_m} m, {opt.fog_color}.");
         }
 
         private static void ApplyEnvironment(SharedLevelSettings shared, Layout layout)
@@ -2021,6 +2056,92 @@ namespace OnwardGenerator
             source.AudioSourceName = clip;
         }
 
+        // ---- Interior lights and light probes (ADR-013) ------------------------------------
+        // Everything here is baked: no realtime light reaches the Quest. Warm white, below the sun (1.2).
+        private static readonly Color InteriorLightColour = new Color(1f, 0.93f, 0.82f);
+        private const float OutdoorProbeSpacingM = 12f;
+        private const int OutdoorProbeColumnsMax = 1500;
+        private static readonly float[] OutdoorProbeHeightsM = { 1f, 6f };
+
+        // One baked point light per furnished room, in node order, up to interior_lights_max.
+        // The probes of every room are collected even past the cap.
+        private static int AddInteriorLights(Glb visual, Options opt, List<Vector3> probes)
+        {
+            var root = new GameObject("InteriorLights");
+            int lights = 0, skipped = 0;
+            foreach (GNode node in visual.Doc.nodes)
+            {
+                GRoomAnchor[] rooms = node.extras?.light_anchors?.rooms;
+                if (rooms == null) continue;
+                foreach (GRoomAnchor room in rooms)
+                {
+                    if (room == null || room.light_m == null || room.light_m.Length != 3) continue;
+                    if (room.probes_m != null)
+                    {
+                        for (int i = 0; i + 2 < room.probes_m.Length; i += 3)
+                            probes.Add(Local(room.probes_m[i], room.probes_m[i + 1], room.probes_m[i + 2]));
+                    }
+                    if (lights >= opt.interior_lights_max)
+                    {
+                        skipped++;
+                        continue;
+                    }
+                    var go = new GameObject("Light_" + (room.room_id ?? lights.ToString(CultureInfo.InvariantCulture)).Replace('/', '_'));
+                    go.transform.SetParent(root.transform, false);
+                    go.transform.position = Local(room.light_m[0], room.light_m[1], room.light_m[2]);
+                    var light = go.AddComponent<Light>();
+                    light.type = LightType.Point;
+                    light.lightmapBakeType = LightmapBakeType.Baked;
+                    light.color = InteriorLightColour;
+                    light.intensity = opt.interior_light_intensity;
+                    light.range = room.range_m;
+                    // Baked shadows keep the light in its room: walls and slabs stop it.
+                    light.shadows = LightShadows.Soft;
+                    lights++;
+                }
+            }
+            if (lights == 0) UnityEngine.Object.DestroyImmediate(root);
+            Debug.Log($"{LogPrefix} Interior lights: {lights} baked, {skipped} over the cap of {opt.interior_lights_max}; {probes.Count} room probes.");
+            return lights;
+        }
+
+        // Probes light every renderer kept out of the lightmap (props, trees, metal, the
+        // backdrop) and the players. A group with only room probes would light the street
+        // from inside the buildings, so it is added only with outdoor probes on the navmesh.
+        private static int AddLightProbes(List<Vector3> roomProbes, bool hasNavMesh)
+        {
+            var points = new List<Vector3>(roomProbes);
+            int columns = 0;
+            NavMeshTriangulation tri = hasNavMesh ? NavMesh.CalculateTriangulation() : new NavMeshTriangulation();
+            if (tri.vertices != null && tri.vertices.Length > 0)
+            {
+                var bounds = new Bounds(tri.vertices[0], Vector3.zero);
+                foreach (Vector3 v in tri.vertices) bounds.Encapsulate(v);
+                float step = Mathf.Max(OutdoorProbeSpacingM, Mathf.Sqrt(bounds.size.x * bounds.size.z / OutdoorProbeColumnsMax));
+                int walkable = NavMesh.GetAreaFromName("Walkable");
+                int mask = walkable >= 0 ? 1 << walkable : NavMesh.AllAreas;
+                for (float x = bounds.min.x + step / 2f; x <= bounds.max.x; x += step)
+                {
+                    for (float z = bounds.min.z + step / 2f; z <= bounds.max.z; z += step)
+                    {
+                        NavMeshHit hit;
+                        if (!NavMesh.SamplePosition(new Vector3(x, bounds.center.y, z), out hit, step / 2f, mask)) continue;
+                        foreach (float h in OutdoorProbeHeightsM) points.Add(hit.position + Vector3.up * h);
+                        columns++;
+                    }
+                }
+            }
+            if (columns == 0)
+            {
+                Debug.Log($"{LogPrefix} Light probes: no navmesh, none added; unlit renderers keep the ambient probe.");
+                return 0;
+            }
+            var go = new GameObject("LightProbes");
+            go.AddComponent<LightProbeGroup>().probePositions = points.ToArray();
+            Debug.Log($"{LogPrefix} Light probes: {points.Count} ({roomProbes.Count} in rooms, {columns} outdoor columns).");
+            return points.Count;
+        }
+
         private static void Bake(string root, Options opt)
         {
             var settings = new LightingSettings { name = "Lighting" };
@@ -2124,6 +2245,8 @@ namespace OnwardGenerator
             sb.Append($"\"triangles\":{tris},\"vertices\":{verts},");
             sb.Append($"\"mesh_colliders\":{colliders},\"collider_triangles\":{colliderTris},\"colliders_with_renderer\":{renderersOnColliders},");
             sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},");
+            int probeCount = UnityEngine.Object.FindObjectsOfType<LightProbeGroup>().Sum(g => g.probePositions.Length);
+            sb.Append($"\"lights\":{UnityEngine.Object.FindObjectsOfType<Light>().Length},\"light_probes\":{probeCount},");
             sb.Append(string.Format(CultureInfo.InvariantCulture, "\"seconds\":{{\"scene\":{0:F1},\"bake\":{1:F1}", buildSeconds, bakeSeconds));
             sb.Append("}}");
             return sb.ToString();
@@ -2131,10 +2254,15 @@ namespace OnwardGenerator
 
         // ---- Helpers ---------------------------------------------------------------------------
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).
+        // Overgrow props (material prop_<id>, overgrow/realize.py and dressing.py) are small
+        // and often flush against a wall; air-conditioner units came out solid black on the
+        // headset. They are lit by light probes or the ambient probe instead. The horizon
+        // backdrop (ADR-014) is outside the play area and takes no lightmap either.
         private static bool ContributesGi(Material material)
         {
             string n = material != null ? material.name.ToLowerInvariant() : "";
-            return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal"));
+            return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal")
+                || n.StartsWith("m_prop_") || n.Contains("horizon_backdrop"));
         }
 
         private static StaticEditorFlags LightmapFlags(StaticEditorFlags flags, IEnumerable<Material> mats)

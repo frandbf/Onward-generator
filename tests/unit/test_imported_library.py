@@ -49,8 +49,8 @@ def test_kenney_review_describes_every_mesh_and_drops_buildings() -> None:
     assert len(rows) == 272
     installed = [row for row in rows if row["installed"] is True]
     removed = [row for row in rows if row["installed"] is False]
-    assert len(installed) == 201
-    assert len(removed) == 71
+    assert len(installed) == 177
+    assert len(removed) == 95
     catalog_ids = {row["id"] for row in catalogue["objects"]}
     assert catalog_ids == {row["id"] for row in installed}
     assert all(row["role"] != "building" for row in catalogue["objects"])
@@ -62,8 +62,10 @@ def test_kenney_review_describes_every_mesh_and_drops_buildings() -> None:
     for row in installed:
         assert (REPO / "assets" / "kenney" / row["normalized_file"]).is_file()
     for row in removed:
-        assert "Removed on 2026-10-26" in row["reason"]
-        assert not list((REPO / "assets" / "kenney").glob(f"**/{row['name']}.glb"))
+        assert "Removed on 2026-10-26" in row["reason"] or "Removed on 2026-10-29" in row["reason"]
+        assert "normalized_file" not in row
+        pack = {"City Kit Suburban": "suburban", "Modular Buildings": "modular", "Retro Urban Kit": "urban"}[row["group"]]
+        assert not (REPO / "assets" / "kenney" / pack / f"{row['name']}.glb").exists()
 
 
 def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
@@ -87,14 +89,14 @@ def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
 
 
 def test_overgrow_selection_includes_every_asset_catalogue() -> None:
-    from onward_generator.overgrow.library import load_library
+    from onward_generator.overgrow.library import load_library, read_library
     from onward_generator.overgrow.library_catalog import choose_ids, installed_rows, library_directories
 
     directories = library_directories(REPO / "assets")
     assert {path.name for path in directories} == {"kenney", "normalized"}
     rows = installed_rows(REPO / "assets")
     ids = [row["id"] for row in rows]
-    assert len(ids) == len(set(ids)) == 250
+    assert len(ids) == len(set(ids)) == 226
     assert "covered_car" in ids
     assert "kenney_suburban_driveway_long" in ids
     assert choose_ids(
@@ -102,7 +104,9 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
         ["covered_car", "kenney_suburban_driveway_long"],
         all_installed=False,
     ) == ["covered_car", "kenney_suburban_driveway_long"]
-    props = load_library(REPO / "assets")
+    props, rejects = read_library(REPO / "assets")
+    assert rejects == []
+    assert {prop.spec.id for prop in load_library(REPO / "assets")} == set(ids)
     loaded = {prop.spec.id for prop in props}
     assert loaded == set(ids)
     driveway = next(prop for prop in props if prop.spec.id == "kenney_suburban_driveway_long")

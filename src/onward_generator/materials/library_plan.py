@@ -12,8 +12,12 @@ import json
 import zlib
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+import numpy as np
+from PIL import Image, ImageFilter
 
 from onward_generator.ai.providers import Provider, ProviderError
 from onward_generator.materials.plan import SLOT_FORBIDDEN, SLOT_MODE, PlanError
@@ -138,11 +142,41 @@ def texture_family(row: Mapping[str, Any]) -> str | None:
     return None
 
 
+# Ground families repeat every few metres on large flat areas, so a visible blotch,
+# streak or centred cover turns into a grid. Only calm images join their pool.
+CALM_FAMILIES = frozenset({"asphalt", "concrete"})
+# Std of luminance (0-1) after a blur of 1/32 of the tile. Measured on the 1k library:
+# kept asphalt011 0.0055, asphalt020s 0.0066, concrete012 0.0105, concrete047a 0.0072,
+# concrete048 0.0026; dropped asphalt017 0.0204, asphalt019 0.0164, asphalt021 0.0143,
+# asphalt022 0.0138, concrete047b 0.0261 (a rusted cover in the middle).
+COARSE_CONTRAST_LIMIT = 0.012
+_MEASURE_PX = 128
+
+
+@lru_cache(maxsize=64)
+def coarse_contrast(path: Path) -> float:
+    """Large-scale luminance variation of a tile: fine grain is blurred away, patches and features stay."""
+    with Image.open(path) as image:
+        grey = image.convert("L").resize((_MEASURE_PX, _MEASURE_PX), Image.Resampling.BOX)
+    blurred = grey.filter(ImageFilter.GaussianBlur(_MEASURE_PX / 32))
+    return float(np.asarray(blurred, dtype=np.float64).std() / 255.0)
+
+
+def is_calm(row: Mapping[str, Any], limit: float = COARSE_CONTRAST_LIMIT) -> bool:
+    """A row outside the ground families is always calm. A missing file is left to texture_record to report."""
+    if texture_family(row) not in CALM_FAMILIES:
+        return True
+    path = REPO_ROOT / str(row["path"])
+    if not path.is_file():
+        return True
+    return coarse_contrast(path) <= limit
+
+
 def _pools(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     pools: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         family = texture_family(row)
-        if family is None:
+        if family is None or not is_calm(row):
             continue
         pools.setdefault(family, []).append(dict(row))
     for family in pools:

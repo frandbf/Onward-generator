@@ -305,7 +305,7 @@ def test_seed_changes_variation_but_not_validity(detail_inputs: tuple[Path, Path
     assert not other.critical
     first = [o.record["facade"]["materials"]["wall"] for o in detailed.objects if o.type == "building"]
     second = [o.record["facade"]["materials"]["wall"] for o in other.objects if o.type == "building"]
-    balconies = lambda d: [o.record["facade"]["openings"].get("balcony", 0) for o in d.objects if o.type == "building"]  # noqa: E731
+    balconies = lambda d: [o.record["facade"]["openings"].get("balcony", 0) for o in d.objects if o.type == "building"]  # noqa: E731 - a one-line helper local to this test
     assert first != second or balconies(detailed) != balconies(other)
 
 

@@ -31,6 +31,9 @@ _RADIUS_MAX_M = 1500.0
 _MARGIN_MAX_M = 500.0
 _TEXELS_DEFAULT = 10.0
 _TEXELS_MAX = 40.0
+# Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
+_FOG_BAND_M = 600.0
+_FOG_COLOR = "#C8CDD2"
 
 
 class MapError(ValueError):
@@ -84,7 +87,7 @@ def create_map(
     export_rel = "config/export.json"
     atomic_write_json(root / aoi_rel, _aoi_document(title, longitude, latitude, radius_m, margin_m, ring))
     atomic_write_json(root / project_rel, _project_document(title, latitude, longitude, margin_m, seed, aoi_rel, frame.crs))
-    atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels))
+    atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, radius_m + margin_m))
     _write_texture_plan(
         root, map_id=map_id, name=title, latitude=latitude, longitude=longitude,
         brief=brief, seed=seed, provider=texture_provider,
@@ -333,7 +336,8 @@ def _project_document(title: str, latitude: float, longitude: float, margin_m: f
     }
 
 
-def _export_document(map_id: str, title: str, description: str, texels: float) -> dict[str, Any]:
+def _export_document(map_id: str, title: str, description: str, texels: float, wall_m: float) -> dict[str, Any]:
+    """The adapter card. Fog starts at ``wall_m``, the distance from the centre to the wall along an axis."""
     return {
         "version": "0.1.0",
         "adapter": {"name": "onward_unity", "version": "0.1.0"},
@@ -346,5 +350,9 @@ def _export_document(map_id: str, title: str, description: str, texels: float) -
             "lightmap_texels_per_m": texels,
             "lightmap_max_size": 2048,
             "lightmap_directional": False,
+            "fog_enabled": True,
+            "fog_start_m": wall_m,
+            "fog_end_m": wall_m + _FOG_BAND_M,
+            "fog_color": _FOG_COLOR,
         },
     }

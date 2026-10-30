@@ -8,7 +8,6 @@ from dataclasses import dataclass
 @dataclass(frozen=True, slots=True)
 class Profile:
     years: int
-    moss: float
     grass: float
     trees: float
     wrecks: float
@@ -18,9 +17,9 @@ class Profile:
 
 
 PROFILES = {
-    10: Profile(10, 0.25, 0.20, 0.15, 0.25, 0.35, 0.15, 0.20),
-    30: Profile(30, 0.55, 0.50, 0.45, 0.55, 0.65, 0.45, 0.50),
-    100: Profile(100, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+    10: Profile(10, 0.20, 0.15, 0.25, 0.35, 0.15, 0.20),
+    30: Profile(30, 0.50, 0.45, 0.55, 0.65, 0.45, 0.50),
+    100: Profile(100, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
 }
 
 

@@ -334,7 +334,7 @@ def _category_from_template(template: str) -> str | None:
 
 
 def _num(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and value == value:  # noqa: PLR0124
+    if isinstance(value, (int, float)) and value == value:  # noqa: PLR0124 - false for NaN, which is the point
         return float(value)
     return None
 

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
-from onward_generator.cli import main
+from onward_generator.cli import build_parser, main
 from onward_generator.maps.workspace import create_map
 from onward_generator.next_step import (
     detail_command,
@@ -30,16 +32,22 @@ from onward_generator.pipeline_run import (
     _push_package,
     _stage_summary,
     _unity_summary,
+    finish_device,
     format_duration,
     map_create_argv,
+    offer_quest_upload,
     output_ready,
     plan_steps,
     prepare_from,
+    print_header,
+    print_total,
+    print_unity_command,
     run_map,
     run_steps,
     unity_editor_open,
 )
 from onward_generator.platform import resolve_host
+from onward_generator.run_log import Alert, Palette, RunLog, StageReport
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -129,6 +137,7 @@ def test_failure_is_reported_and_later_steps_do_not_start(capsys: pytest.Capture
         seen.append(argv[0])
         if argv[0] == "heights":
             print("heights: the scene is outside the area", file=sys.stderr)
+            print("finished heights")
             return 1
         print(f"finished {argv[0]}")
         return 0
@@ -140,29 +149,140 @@ def test_failure_is_reported_and_later_steps_do_not_start(capsys: pytest.Capture
     captured = capsys.readouterr()
     assert code == 1
     assert seen == ["geo", "heights"]
-    failed_at = captured.out.index("FAILED heights")
-    assert "Next: run again from heights (step 2/3). The steps before it do not need to run again." in captured.out
-    assert captured.out.index("finished geo") < failed_at
-    assert "heights: the scene is outside the area" in captured.out
-    assert "generate" not in captured.out
+    assert captured.out == (
+        " [1/3] geo        0.0 s\n"
+        "FAILED heights (exit 1, 0.0 s). Step 2/3. The following steps were not started.\n"
+        "Next: run again from heights (step 2/3). The steps before it do not need to run again.\n"
+        "heights: the scene is outside the area\n"
+        "  finished heights\n"
+    )
+
+
+def test_a_failed_setup_step_has_no_number(capsys: pytest.CaptureFixture[str]) -> None:
+    def execute(argv: list[str]) -> int:
+        print("osm: Overpass timed out", file=sys.stderr)
+        return 3
+
+    log = RunLog(palette=Palette(True))
+    code = run_steps([("osm", ["osm"]), ("geo", ["geo"])], execute=execute, log=log)
+    assert code == 3
+    assert capsys.readouterr().out == (
+        "\033[31mFAILED\033[0m osm (exit 3, 0.0 s). The following steps were not started.\n"
+        "Next: run again from osm. The steps before it do not need to run again.\n"
+        "osm: Overpass timed out\n"
+    )
+    assert [name for name, _seconds in log.times] == ["osm"]
 
 
 def test_each_stage_prints_its_duration(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    ticks = iter((10.0, 12.4, 12.4, 87.4))
+    ticks = iter((0.0, 30.0, 10.0, 12.4, 12.4, 87.4))
     monkeypatch.setattr("onward_generator.pipeline_run.time.perf_counter", lambda: next(ticks))
-    recorded: list[tuple[str, float]] = []
+    log = RunLog()
 
     code = run_steps(
-        [("geo", ["geo"]), ("heights", ["heights"])],
+        [("map", ["map"]), ("geo", ["geo"]), ("heights", ["heights"])],
         execute=lambda _argv: 0,
-        times=recorded,
+        log=log,
     )
     captured = capsys.readouterr()
     assert code == 0
-    assert "OK geo  2.4 s" in captured.out
-    assert "OK heights  1 min 15 s" in captured.out
-    assert recorded[0][0] == "geo" and recorded[1][0] == "heights"
+    assert captured.out == " [1/2] geo        2.4 s\n [2/2] heights   1 min 15 s\n"
+    assert log.times == [("map", 30.0), ("geo", pytest.approx(2.4)), ("heights", 75.0)]
     assert format_duration(3661) == "1 h 01 min"
+
+
+def _report(name: str, _argv: Sequence[str]) -> StageReport:
+    if name == "detail":
+        return StageReport(
+            "21 194 tris",
+            details=(("openings", ("window 435", "door 3")),),
+            alerts=(Alert("warning", "warning 2 (late 2)", 2),),
+        )
+    if name == "geo":
+        return StageReport("geo done", alerts=(Alert("error", "1 error", 1),))
+    return StageReport(f"{name} done")
+
+
+def test_a_stage_prints_its_report_line_breakdown_and_warnings(capsys: pytest.CaptureFixture[str]) -> None:
+    log = RunLog()
+    code = run_steps(
+        [("geo", ["geo"]), ("detail", ["detail"])],
+        execute=lambda _argv: print("raw stage text") or 0,
+        log=log,
+        summarize_stage=_report,
+    )
+    assert code == 0
+    assert log.warnings == 3
+    assert capsys.readouterr().out == (
+        " [1/2] geo        0.0 s  geo done\n"
+        "         ! 1 error\n"
+        " [2/2] detail     0.0 s  21 194 tris\n"
+        "         openings   window 435, door 3\n"
+        "         ! warning 2 (late 2)\n"
+    )
+
+
+def test_verbose_adds_each_stage_output_unfiltered(capsys: pytest.CaptureFixture[str]) -> None:
+    def execute(argv: list[str]) -> int:
+        print(f"wrote {argv[0]}/out")
+        print("next: something")
+        print(f"{argv[0]} note", file=sys.stderr)
+        return 0
+
+    code = run_steps(
+        [("map", ["map"]), ("geo", ["geo"]), ("signs", ["signs"])],
+        execute=execute,
+        log=RunLog(verbose=True),
+        summarize_stage=_report,
+    )
+    assert code == 0
+    assert capsys.readouterr().out == (
+        "wrote map/out\nnext: something\nmap note\n"
+        " [1/2] geo        0.0 s  geo done\n"
+        "         ! 1 error\n"
+        "wrote geo/out\nnext: something\ngeo note\n"
+        " [2/2] signs      0.0 s  signs done\n"
+        "wrote signs/out\nnext: something\nsigns note\n"
+    )
+
+
+def test_without_verbose_setup_and_raw_output_stay_quiet(capsys: pytest.CaptureFixture[str]) -> None:
+    def execute(argv: list[str]) -> int:
+        print("wrote x")
+        print("warn", file=sys.stderr)
+        return 0
+
+    assert run_steps([("map", ["map"]), ("osm", ["osm"])], execute=execute, summarize_stage=_report) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_total_line_counts_python_setup_and_warnings(capsys: pytest.CaptureFixture[str]) -> None:
+    log = RunLog(times=[("map", 50.0), ("osm", 6.4), ("geo", 2.5), ("export", 7.1)], warnings=1)
+    print_total(log, failed=False)
+    assert capsys.readouterr().out == "\n✓ Python 9.6 s  (map setup 56.4 s)  1 warning\n"
+    print_total(RunLog(times=[("geo", 1.0)]), failed=True)
+    assert capsys.readouterr().out == "\n✗ Python 1.0 s  0 warnings\n"
+    print_total(RunLog(), failed=False)
+    assert capsys.readouterr().out == ""
+
+
+def test_total_line_colours_its_mark_and_non_zero_warnings(capsys: pytest.CaptureFixture[str]) -> None:
+    print_total(RunLog(palette=Palette(True), times=[("geo", 1.0)], warnings=3), failed=False)
+    assert capsys.readouterr().out == "\n\033[32m✓\033[0m Python 1.0 s  \033[33m3 warnings\033[0m\n"
+    print_total(RunLog(palette=Palette(True), times=[("geo", 1.0)]), failed=True)
+    assert capsys.readouterr().out == "\n\033[31m✗\033[0m Python 1.0 s  0 warnings\n"
+
+
+def test_header_names_the_map_and_its_area(capsys: pytest.CaptureFixture[str]) -> None:
+    print_header(
+        "MadridTexturav6", Path("maps/madridtexturav6"),
+        latitude=40.40657, longitude=-3.719187, radius_m=90.0, margin_m=5.0, lightmap_texels_per_m=10.0,
+    )
+    assert capsys.readouterr().out == (
+        "MadridTexturav6  maps/madridtexturav6\n"
+        "40.40657, -3.719187  r 90 m  margin 5 m  lightmap 10 t/m\n"
+        "\n"
+    )
 
 
 def test_a_stage_summary_drops_paths_and_groups_skips() -> None:
@@ -273,19 +393,11 @@ def test_a_successful_step_prints_its_result_without_the_file_list(capsys: pytes
         print("signs: plates=2")
         print("  Calle Mayor at [1.0, 2.0, 2.55]")
         print("wrote maps/murcia/scene_signs")
-        print("next: .venv/bin/python -m onward_generator bounds")
-        print('{"schema": "onward_generator.gameplay_layout", "purpose": "playable"}')
         return 0
 
     code = run_steps([("signs", ["signs"])], execute=execute)
-    captured = capsys.readouterr()
     assert code == 0
-    assert "signs: plates=2" in captured.out
-    assert "OK signs" in captured.out
-    assert "Calle Mayor" not in captured.out
-    assert "wrote " not in captured.out
-    assert "next:" not in captured.out
-    assert "gameplay_layout" not in captured.out
+    assert capsys.readouterr().out == " [1/1] signs      0.0 s\n"
 
 
 def test_run_command_passes_the_centre(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -438,13 +550,11 @@ def test_a_yes_uploads_the_built_package(tmp_path, capsys: pytest.CaptureFixture
     )
     captured = capsys.readouterr()
     assert code == 0
-    assert "unity already has the Quest build" in captured.out
+    assert "\n→ Unity: already has the Quest build.\n" in captured.out
     assert "¿Subir al Quest?" in captured.out
     assert pushed == [str(package)]
     assert "OK quest" in captured.out
-    assert "run: time" in captured.out
-    assert "  quest" in captured.out
-    assert "  total" in captured.out
+    assert "run: time" not in captured.out
 
 
 def _write_launcher(package: Path) -> None:
@@ -480,7 +590,7 @@ def test_unity_builds_the_quest_files_before_asking(tmp_path, capsys: pytest.Cap
     captured = capsys.readouterr()
     assert code == 0
     assert built == [["tool", "scene", "launcher"]]
-    assert "OK unity" in captured.out
+    assert "\nrun: every Python stage is already present.\n→ Unity: tool, scene, launcher\nOK unity" in captured.out
     assert "¿Subir al Quest?" in captured.out
     assert pushed == []
 
@@ -750,7 +860,7 @@ def test_an_open_editor_asks_before_any_stage_starts(tmp_path, capsys: pytest.Ca
     assert "Unity tiene abierto" in captured.out
     assert "Sigue abierto" in captured.out
     assert "run: Unity está cerrado. El pipeline empieza." in captured.out
-    assert captured.out.index("El pipeline empieza.") < captured.out.index("run: 1/")
+    assert captured.out.index("El pipeline empieza.") < captured.out.index("FAILED osm")
 
 
 def test_declining_to_close_unity_does_not_start(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -775,7 +885,7 @@ def test_declining_to_close_unity_does_not_start(tmp_path, capsys: pytest.Captur
     assert code == 1
     assert seen == []
     assert "run: cancelled. El pipeline no ha empezado." in captured.out
-    assert "run: 1/" not in captured.out
+    assert "Murcia  " not in captured.out
 
 
 def test_a_closed_editor_starts_without_asking(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -942,5 +1052,206 @@ def test_a_newer_layout_exports_the_next_package(tmp_path: Path, capsys: pytest.
     assert seen[0][0] == "export"
     assert Path(seen[0][seen[0].index("--out") + 1]).name == "pkg_02"
     assert "--overwrite" not in seen[0]
-    assert "export ->" in captured.out
-    assert "pkg_02" in captured.out
+    assert " [1/1] export     0.0 s" in captured.out
+
+
+def test_no_unity_skips_the_editor_check_and_prints_the_host_command(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _ready_map(tmp_path)
+    built: list[str] = []
+
+    def export(argv: list[str]) -> int:
+        package = Path(argv[argv.index("--out") + 1])
+        (package / "build").mkdir(parents=True)
+        (package / "onward_export.json").write_text("{}", encoding="utf-8")
+        (package / "build" / "scene_report.json").write_text("{}", encoding="utf-8")
+        return 0
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        start="export",
+        execute=export,
+        interactive=True,
+        ask=lambda: "s",
+        unity_open=lambda: True,
+        build=lambda path, _steps: built.append(str(path)) or 0,
+        no_unity=True,
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert built == []
+    assert "Unity tiene abierto" not in out
+    assert "¿Subir al Quest?" not in out
+    assert "\n✓ Python 0.0 s  0 warnings\n" in out
+    assert out.endswith("→ Unity: tool, launcher. On the host, run:\n  task unity -- " + str(root / "data" / "processed" / "export" / "pkg_02") + "\n")
+
+
+def test_unity_command_for_a_package_already_built_or_missing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    package = tmp_path / "pkg_01"
+    assert print_unity_command(package) == 0
+    assert capsys.readouterr().out == "→ Unity: skipped. The export package is not on disk.\n"
+    package.mkdir()
+    (package / "onward_export.json").write_text("{}", encoding="utf-8")
+    assert print_unity_command(package) == 0
+    assert capsys.readouterr().out == f"→ Unity: tool, scene, launcher. On the host, run:\n  task unity -- {package}\n"
+    _write_launcher(package)
+    assert print_unity_command(package) == 0
+    assert capsys.readouterr().out == f"→ Unity: the Quest build is already in {package}\n"
+
+
+def test_a_new_map_prints_the_header_and_folds_setup_into_the_total(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    def execute(argv: list[str]) -> int:
+        if argv[:2] == ["map", "create"]:
+            create_map(Path("maps/murcia"), map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=90)
+            return 0
+        return 2
+
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=90,
+        margin_m=5,
+        lightmap_texels_per_m=12.5,
+        out="maps/murcia",
+        execute=execute,
+        interactive=False,
+        palette=Palette(True),
+    )
+    out = capsys.readouterr().out
+    assert code == 2
+    assert out.startswith(f"Murcia  maps/murcia\n{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 90 m  margin 5 m  lightmap 12.5 t/m\n\n\033[31mFAILED\033[0m geo")
+    assert "(map setup 0.0 s)" in out
+    assert "\033[31m✗\033[0m Python" in out
+
+
+def test_a_failed_map_setup_ends_with_the_total(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.chdir(tmp_path)
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=90,
+        margin_m=5,
+        out="maps/murcia",
+        execute=lambda _argv: 4,
+        interactive=False,
+        palette=Palette(),
+    )
+    out = capsys.readouterr().out
+    assert code == 4
+    assert "FAILED map (exit 4, 0.0 s). The following steps were not started." in out
+    assert out.endswith("\n✗ Python 0.0 s  (map setup 0.0 s)  0 warnings\n")
+
+
+def test_verbose_reaches_the_stages(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _ready_map(tmp_path)
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        start="layout",
+        execute=lambda argv: print(f"full {argv[0]} output") or 0,
+        interactive=False,
+        no_unity=True,
+        verbose=True,
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "full perf output" in out
+    assert "full export output" in out
+
+
+def test_run_passes_verbose_and_no_unity(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.run_map", lambda **kwargs: received.update(kwargs) or 0)
+    argv = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]
+    assert main(argv) == 0
+    assert received["verbose"] is False and received["no_unity"] is False
+    assert main([*argv, "--verbose", "--no-unity"]) == 0
+    assert received["verbose"] is True and received["no_unity"] is True
+
+
+def test_finish_device_says_what_unity_does(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    package = tmp_path / "pkg_01"
+    kwargs = {"interactive": False, "ask": None, "push": lambda _path: 0}
+    assert finish_device(package, build=lambda _path, _steps: 0, **kwargs) == 0
+    assert capsys.readouterr().out == "→ Unity: skipped. The export package is not on disk.\n"
+    package.mkdir()
+    (package / "onward_export.json").write_text("{}", encoding="utf-8")
+    ticks = iter((10.0, 12.5))
+    monkeypatch.setattr("onward_generator.pipeline_run.time.perf_counter", lambda: next(ticks))
+
+    def build(path: Path, _steps: list[str]) -> int:
+        _write_launcher(path)
+        return 0
+
+    assert finish_device(package, build=build, **kwargs) == 0
+    assert capsys.readouterr().out == (
+        "→ Unity: tool, scene, launcher\nOK unity  2.5 s\n"
+        "run: Quest upload skipped. Run this in a terminal to answer the question.\n"
+    )
+    assert finish_device(package, build=build, **kwargs) == 0
+    assert capsys.readouterr().out.startswith("→ Unity: already has the Quest build.\n")
+
+
+def test_quest_upload_reports_its_duration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    package = tmp_path / "pkg_01"
+    _write_launcher(package)
+    ticks = iter((5.0, 8.25))
+    monkeypatch.setattr("onward_generator.pipeline_run.time.perf_counter", lambda: next(ticks))
+    assert offer_quest_upload(package, interactive=True, ask=lambda: "s", push=lambda _path: 0) == 0
+    assert capsys.readouterr().out.endswith("run: quest\nOK quest  3.2 s\n")
+
+
+def test_run_map_colours_a_terminal_and_stays_quiet_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _ready_map(tmp_path)
+    monkeypatch.setattr("onward_generator.pipeline_run.use_color", lambda _stream: True)
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        start="layout",
+        execute=lambda argv: print(f"full {argv[0]} output") or 0,
+        interactive=False,
+        no_unity=True,
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "full perf output" not in out
+    assert "\033[32m✓\033[0m Python" in out
+
+
+def test_run_help_describes_the_new_flags() -> None:
+    parser = build_parser()
+    run = next(
+        choice
+        for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+        for name, choice in action.choices.items()
+        if name == "run"
+    )
+    helps = {action.dest: action.help for action in run._actions}
+    assert helps["verbose"] == "also print each stage's full output"
+    assert helps["no_unity"] == "stop after export and print the command for the Unity steps (task map uses this)"

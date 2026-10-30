@@ -11,8 +11,10 @@ from io import BytesIO
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from onward_generator.bounds.envelope import BACKDROP_ID
 from onward_generator.generation.gltf import nodes_from_glb
 from onward_generator.generation.preview import render_rgb
+from onward_generator.signs.plaque import plaque_font, plaque_text
 
 THUMBNAIL_WIDTH = 512
 THUMBNAIL_HEIGHT = 256
@@ -22,13 +24,15 @@ _BAR_TOP = 188
 def render_listing_thumbnail(visual_glb: bytes, title: str) -> bytes:
     """Oblique view of the visual mesh with the map title on a dark band."""
     nodes, materials = nodes_from_glb(visual_glb)
+    # The horizon ring would wall the oblique view in; the listing shows the map.
+    nodes = [node for node in nodes if node.name != BACKDROP_ID]
     rgb = render_rgb(
         nodes, materials,
         width=THUMBNAIL_WIDTH, height=THUMBNAIL_HEIGHT,
         azimuth_deg=210.0, elevation_deg=38.0, margin_px=10, splat_subpixel=True,
     )
     image = Image.fromarray((np.clip(rgb, 0.0, 1.0) * 255.0).round().astype(np.uint8)).convert("RGBA")
-    label = " ".join(title.split()) or "Map"
+    label = plaque_text(title) or "Map"
     bar = Image.new("RGBA", image.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(bar)
     draw.rectangle((0, _BAR_TOP, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT), fill=(16, 18, 20, 200))
@@ -45,11 +49,17 @@ def render_listing_thumbnail(visual_glb: bytes, title: str) -> bytes:
     return out.getvalue()
 
 
-def _fit_font(draw: ImageDraw.ImageDraw, label: str, max_width: int, size: int) -> ImageFont.ImageFont:
-    while size >= 12:
-        font = ImageFont.load_default(size)
+_MIN_SIZE = 12
+
+
+def _fit_font(draw: ImageDraw.ImageDraw, label: str, max_width: int, size: int) -> ImageFont.FreeTypeFont:
+    """The largest even size from ``size`` down to 12 that fits. A title too long for 12 still gets 12.
+
+    Same vendored font as the street plates, so accented titles render (no notdef boxes).
+    """
+    for step in range(size, _MIN_SIZE - 2, -2):
+        font = plaque_font(step)
         left, _, right, _ = draw.textbbox((0, 0), label, font=font)
         if right - left <= max_width:
             return font
-        size -= 2
-    return ImageFont.load_default(12)
+    return font

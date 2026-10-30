@@ -1,6 +1,6 @@
 """Grow an abandoned city on a copy of a dressed scene.
 
-OSM supplies the ground: building footprints and the drive lane. Grass, moss,
+OSM supplies the ground: building footprints and the drive lane. Grass,
 trees and wrecks are generated and labelled as such, except a tree that comes
 from an OSM point. Solid props also append a box to the collision mesh.
 """
@@ -34,7 +34,6 @@ from onward_generator.overgrow.constants import (
     LANE_M,
     MAX_ADDED_TRIS,
     MAX_LIBRARY_TRIS,
-    MAX_MOSS,
     MAX_TREES,
     MAX_TUFTS,
     MAX_WRECKS,
@@ -47,15 +46,13 @@ from onward_generator.overgrow.growth import (
     canopy_png,
     grass_png,
     grass_tuft,
-    moss_png,
-    moss_skirt,
     rust_png,
     tree_parts,
     trunk_png,
     vine_png,
     wreck_mesh,
 )
-from onward_generator.overgrow.library import load_library
+from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
@@ -67,6 +64,8 @@ SKIP_HIGHWAYS = frozenset({
     "platform", "raceway", "bridleway", "proposed", "construction",
     "service", "busway", "bus_guideway",
 })
+# Radius each procedural object keeps clear of a sidewalk manhole cover.
+OCCUPIED_M = {"wreck": 3.0, "tree": 1.5, "grass": 0.8}
 OUTPUT_FILES = (
     "scene_visual.glb",
     "scene_collision.glb",
@@ -123,7 +122,7 @@ def overgrow(
     years = profile_for(profile)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
-    props = load_library(library)
+    props, library_rejects = read_library(library)
     chosen: list[str] | None = None
     if selection is not None:
         chosen = read_selection(selection)
@@ -147,25 +146,12 @@ def overgrow(
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
     reject_counts: dict[str, int] = {}
-    moss_meshes: list[Mesh] = []
     tuft_meshes: list[Mesh] = []
     extra_nodes: list[Node] = []
-    moss_cap = scaled_cap(MAX_MOSS, years.moss)
     tuft_cap = scaled_cap(MAX_TUFTS, years.grass)
     tree_cap = scaled_cap(MAX_TREES, years.trees)
     wreck_cap = scaled_cap(MAX_WRECKS, years.wrecks)
 
-    for edge in edges:
-        if len(moss_meshes) >= moss_cap or not budget.take(2):
-            break
-        if not area.contains(float(edge.mid[0]), float(edge.mid[1])):
-            budget.give(2)
-            _note(rejects, reject_counts, "moss", "outside_zone", edge.mid)
-            continue
-        if not keep(seed, years.moss, edge.feature_id, edge.index, "moss"):
-            budget.give(2)
-            continue
-        moss_meshes.append(moss_skirt(edge.a, edge.b, edge.outward))
     for edge in edges:
         if len(tuft_meshes) >= tuft_cap or edge.length < 6.0:
             continue
@@ -283,6 +269,7 @@ def overgrow(
         block_streets=False if use_plan else plan.street_blocking,
         placed_roles={"wreck": wreck_count},
         floor=floor,
+        occupied=_occupied(records),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)
@@ -306,12 +293,6 @@ def overgrow(
             (Primitive(merge(planted.vines), "abandoned_vine"),),
             {"type": "overgrowth", "origin": "generated", "kind": "vine"},
         ))
-    if moss_meshes:
-        extra_nodes.insert(0, Node(
-            "overgrow/moss",
-            (Primitive(merge(moss_meshes), "abandoned_moss"),),
-            {"type": "overgrowth", "origin": "generated", "kind": "moss"},
-        ))
     if tuft_meshes:
         extra_nodes.insert(0, Node(
             "overgrow/grass",
@@ -319,14 +300,12 @@ def overgrow(
             {"type": "overgrowth", "origin": "generated", "kind": "grass"},
         ))
 
-    images.setdefault("abandoned_moss", moss_png())
     images.setdefault("abandoned_grass", grass_png())
     images.setdefault("abandoned_wreck", rust_png())
     images.setdefault("abandoned_vine", vine_png())
     images.setdefault("tree_trunk", trunk_png())
     images.setdefault("tree_canopy", canopy_png())
     images.update(planted.images)
-    materials.setdefault("abandoned_moss", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
     materials.setdefault("abandoned_vine", Material((1, 1, 1, 1), 0.9))
@@ -391,7 +370,8 @@ def overgrow(
         "profile_years": years.years,
         "seed": seed,
         "zone": {"kind": area.kind, "key": area.stable_key()},
-        "moss": len(moss_meshes),
+        # The facade moss skirt was removed; the key stays at 0 so the report keeps its shape.
+        "moss": 0,
         "grass": len(tuft_meshes),
         "vines": len(planted.vines),
         "trees": tree_count,
@@ -408,6 +388,7 @@ def overgrow(
         "props": len(planted.placed_ids),
         "placed_assets": list(dict.fromkeys(planted.placed_ids)),
         "library_assets": len(props),
+        "library_rejects": [reject.as_dict() for reject in library_rejects],
         "library_selection": chosen,
         "added_triangles": budget.used + planted.triangles,
         "procedural_triangles": budget.used,
@@ -445,6 +426,11 @@ def _layout_near(scene: Path) -> Path | None:
         return None
     candidate = root / "data" / "processed" / "layout" / "layout.json"
     return candidate if candidate.is_file() else None
+
+
+def _occupied(records: list[dict[str, Any]]) -> list[tuple[float, float, float]]:
+    """(x, y, radius) of each grass tuft, tree and wreck already placed, for the sidewalk covers."""
+    return [(float(row["position_m"][0]), float(row["position_m"][1]), OCCUPIED_M[row["kind"]]) for row in records]
 
 
 def _note(rejects: list[dict[str, Any]], counts: dict[str, int], kind: str, reason: str, point: np.ndarray) -> None:

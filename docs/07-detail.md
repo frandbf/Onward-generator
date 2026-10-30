@@ -47,6 +47,7 @@ A mismatch raises `DetailError` and writes nothing.
 6. **Materials.** OSM `building:material` or `material` wins (`origin: observed`). Brick is used only when the tag is `brick`. With no tag, the grammar assigns the template plaster, stone to about 14%, and brick to about 8%. Those last two are `estimated`. The seed and the id fix the choice.
 7. **Parts.** A polygon with `building:part` and `height` is extruded, clipped to the building it overlaps most, with its own collision. With no `height`, no volume is invented.
 8. **Wall texture frame.** Each building node in `scene_visual.glb` carries `extras.uv_frame` ([ADR-012](decisions/ADR-012-wall-uvs.md)): the exposed runs (chains of street-facing segments, broken by party walls, as `[ax, ay, bx, by]` in ring order), `storey_h`, and `storeys_origin` (a copy of `storeys.origin`). Without `estimated_levels`, or on a landmark, `storey_h` and `storeys_origin` are `null`. No coordinates are written here, and `scene_detail.json` does not change. `dress style` and `materials apply` turn the frame into UVs (`docs/08-dress.md`).
+10. **Interior light anchors.** Each `interior/<building>` node in `scene_visual.glb` carries `extras.light_anchors` ([ADR-013](decisions/ADR-013-interior-light-anchors.md)), `attribute_origin: generated`. One entry per furnished room: `room_id`, `light_m` (the room centroid, or a point clear of the stair wells, 0.3 m under the ceiling, in local metres), `range_m` (half the room diagonal plus 1 m, 4–12 m), and `probes_m` (flat x, y, z triples: a grid of at most 4 × 4 columns, 0.5 m off the walls and out of the wells, at 1 m above the floor and 0.5 m under the ceiling). `scene_detail.json` does not change. The adapter turns the anchors into baked lights and light probes (`docs/12-export.md`).
 9. **Generated furniture.** Besides lamps, benches and bins are placed along pedestrian ways at a fixed spacing, from the seed, with a cap per type. An OSM point (`amenity=bench`, `amenity=waste_basket`, `natural=tree`, and similar) still places the observed object.
 
 ### Templates
@@ -94,7 +95,7 @@ Every collider must be closed, manifold, and have positive volume (`collider_not
 
 | File | Contents |
 | --- | --- |
-| `scene_visual.glb` | The detailed scene. Shared prototype meshes. Attribution and the fidelity statement in `extras`. Each building node has a `uv_frame` in its extras. No `TEXCOORD_0` |
+| `scene_visual.glb` | The detailed scene. Shared prototype meshes. Attribution and the fidelity statement in `extras`. Each building node has a `uv_frame` in its extras, each interior node a `light_anchors`. No `TEXCOORD_0` |
 | `scene_collision.glb` | Collision, separate from the visual mesh |
 | `scene_detail.json` | `onward_generator.scene_detail` 0.1.0. Input hashes, including the phase-03 base; fidelity, prototypes, and attribution; per object: template, storeys, openings, materials, roof, evidence, interior, and checks |
 | `detail_report.json` | `onward_generator.detail_report` 0.1.0. The full configuration; opening, template, and roof counts; triangles by material and the budget; issues; `phase_04_checks` |

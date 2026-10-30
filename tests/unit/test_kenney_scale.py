@@ -96,7 +96,7 @@ def test_installed_kenney_boxes_match_the_street_and_the_files() -> None:
     review = json.loads((REPO / "assets" / "kenney_review.json").read_text(encoding="utf-8"))
     by_id = {row["id"]: row for row in manifest["assets"]}
     installed = [row for row in review["assets"] if row["installed"] is True]
-    assert len(installed) == len(by_id) == 201
+    assert len(installed) == len(by_id) == 177
     for card in installed:
         row = by_id[card["id"]]
         assert card["length_m"] == row["length_m"]
@@ -118,7 +118,6 @@ def test_installed_kenney_boxes_match_the_street_and_the_files() -> None:
         "kenney_urban_detail_dumpster_closed": ("height_m", 1.74),
         "kenney_urban_pallet": ("length_m", 1.25),
         "kenney_urban_detail_block": ("length_m", 1.30),
-        "kenney_urban_tree_large": ("height_m", 5.44),
         "kenney_suburban_fence_1x4": ("height_m", 1.89),
         "kenney_suburban_tree_large": ("height_m", 5.37),
         "kenney_modular_door_brown_glass": ("height_m", 2.05),

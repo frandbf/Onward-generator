@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +41,7 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 MUTANT_SUFFIX = re.compile(r"__mutmut_(\d+)$")
 NO_MATCH = "onward_generator.__no_mutant_matches__*"  # generates mutants and coverage, runs none
 FAILING = ("survived",)
+SHIM = Path(__file__).with_name("mutmut_only.py")
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,8 +203,21 @@ def clear_mutants(root: Path = REPO) -> None:
     shutil.rmtree(root / MUTANTS, ignore_errors=True)
 
 
-def _mutmut(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["mutmut", *args], cwd=REPO, capture_output=True, text=True)
+def only_mutate(targets: list[Function]) -> str:
+    """The files mutmut rewrites: those holding a changed function, as ``only_mutate`` globs."""
+    return ",".join(sorted({f.path for f in targets}))
+
+
+def default_jobs(env: Mapping[str, str] | None = None, cores: int | None = None) -> int:
+    """Every core on a CI runner, half of them on a workstation that runs other work too."""
+    env = os.environ if env is None else env
+    cores = cores or os.cpu_count() or 2
+    return cores if env.get("CI") else max(1, cores // 2)
+
+
+def _mutmut(*args: str, only: str = "", reuse: bool = False) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "MUTMUT_ONLY_MUTATE": only, "MUTMUT_REUSE_MUTANTS": "1" if reuse else ""}
+    return subprocess.run([sys.executable, str(SHIM), *args], cwd=REPO, capture_output=True, text=True, env=env)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base", default=os.environ.get("MUTATE_BASE", "main"), help="git ref the diff is taken against (default main)")
     parser.add_argument("--max", type=int, default=40, help="at most this many changed functions are mutated (default 40)")
     parser.add_argument("--show", type=int, default=10, help="print the diff of at most this many survivors (default 10)")
+    parser.add_argument("--jobs", type=int, default=default_jobs(), help="mutmut workers (default: every core in CI, half of them locally)")
     parser.add_argument("--whole-functions", action="store_true", help="run every mutant of the changed functions, not only those on changed lines")
     args = parser.parse_args(argv)
 
@@ -230,10 +246,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"mutate: {len(targets)} changed functions since {args.base}")
     clear_mutants()
 
+    only = only_mutate(targets)
     if args.whole_functions:
         selected = [f.pattern for f in targets]
     else:
-        generate = _mutmut("run", NO_MATCH)
+        generate = _mutmut("run", "--max-children", str(args.jobs), NO_MATCH, only=only)
         # mutmut 3.8 generates every mutant and the coverage data, then asserts that the filter matched none.
         if generate.returncode != 0 and "nothing matches" not in generate.stderr:
             print(generate.stdout[-4000:], generate.stderr[-4000:], sep="\n", file=sys.stderr)
@@ -244,7 +261,8 @@ def main(argv: list[str] | None = None) -> int:
         if not selected:
             return 0
 
-    run = _mutmut("run", *selected)
+    # The generate step above already made the mutants; this run only tests them.
+    run = _mutmut("run", "--max-children", str(args.jobs), *selected, only=only, reuse=not args.whole_functions)
     if run.returncode != 0:
         print(run.stdout[-4000:], run.stderr[-4000:], sep="\n", file=sys.stderr)
         print(f"mutate: mutmut run failed with exit {run.returncode}", file=sys.stderr)

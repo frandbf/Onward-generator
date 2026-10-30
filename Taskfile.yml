@@ -1,5 +1,6 @@
 # Same tasks locally and in CI (.github/workflows/ci.yml runs `task ci`).
 # Every task runs inside the Docker image through tools/docker/run.sh; nothing is installed on the host.
+# The exception is `task unity`: Unity and adb run on the host, and Python still comes from the image when there is no .venv.
 # https://taskfile.dev
 version: "3"
 
@@ -29,12 +30,22 @@ tasks:
   lint:shell:
     desc: Check the shell scripts with shellcheck
     cmds:
-      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh"
+      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/docker/python.sh tools/unity/lib.sh tools/unity/*/*.sh .githooks/pre-push"
 
   lint:
     desc: Check the Python code with ruff (rules in pyproject.toml)
     cmds:
       - "{{.RUN}} ruff check {{.CLI_ARGS}} src tests tools"
+
+  typecheck:
+    desc: Type-check src with mypy; fails only on errors not in mypy-baseline.txt, or when a listed one is fixed
+    cmds:
+      - "{{.RUN}} sh -c 'mypy --no-color-output | mypy-baseline filter --no-colors --baseline-path mypy-baseline.txt'"
+
+  typecheck:baseline:
+    desc: Rewrite mypy-baseline.txt from the current errors (only to drop fixed ones; review the diff)
+    cmds:
+      - "{{.RUN}} sh -c 'mypy --no-color-output | mypy-baseline sync --baseline-path mypy-baseline.txt --sort-baseline'"
 
   lint:actions:
     desc: Check the GitHub Actions workflows with actionlint (pinned image, nothing installed)
@@ -52,17 +63,38 @@ tasks:
     vars:
       BASE: '{{.BASE | default "main"}}'
       MAX: '{{.MAX | default "40"}}'
+      JOBS: '{{.JOBS | default ""}}'
     cmds:
-      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
+      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{if .JOBS}}--jobs {{.JOBS}}{{end}} {{.CLI_ARGS}}"
+
+  guard:
+    desc: Fail when the change since BASE (default main) edits both src/ and a quality gate
+    vars:
+      BASE: '{{.BASE | default "main"}}'
+    cmds:
+      - "{{.RUN}} python tools/quality/gate_guard.py --base {{.BASE}}"
 
   ci:
     desc: Everything the CI gate runs, cheapest first so a lint failure stops it early
     cmds:
       - task: lint:shell
       - task: lint
+      - task: typecheck
       - task: lint:actions
       - task: smoke
       - task: test
+
+  map:
+    desc: Run the Python stages of `onward-generator run` in the image and stop after export (task map -- --name N --lat Y --lon X)
+    interactive: true
+    cmds:
+      - "{{.RUN}} onward-generator run --no-unity {{.CLI_ARGS}}"
+
+  unity:
+    desc: On the host, build the Quest files with Unity for a map id or package, then ask before uploading (task unity -- <map id>)
+    interactive: true
+    cmds:
+      - "tools/unity/onward_adapter/build_map.sh {{.CLI_ARGS}}"
 
   shell:
     desc: Open a shell in the image

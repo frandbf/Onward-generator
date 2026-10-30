@@ -99,13 +99,13 @@ A new map's plan is `maps/<id>/config/texture_plan.json`, written by `map create
 | Kenney packs (City Kit Suburban, Modular Buildings, Retro Urban Kit, Retro Textures Fantasy), each pack's `License.txt` | CC0 1.0 | GLBs in `assets/kenney`. Texture-pack PNGs in `assets/textures/`. FBX and OBJ are not copied |
 | Poly Haven, only when an older plan still names those ids and `--download` is passed | CC0 1.0 | `Diffuse` map, `1k`, `jpg`, from `api.polyhaven.com` / `dl.polyhaven.org`. HTML is not scraped. An explicit licence other than CC0 is refused. JPEG cache: `assets/textures/` |
 
-The 71 Kenney meshes whose role was `building` (suburban houses, modular building pieces, and two cliff blocks) were removed on 2026-10-26. The installed GLBs were scaled to street metres on 2026-10-27; the factor is `street_scale` in `assets/kenney_review.json`. The removed meshes were not scaled. `assets/kenney_review.json` describes every Kenney mesh, including those. The meshes that remain are listed in `assets/kenney/manifest.json` and do not replace OpenStreetMap footprints. `overgrow` includes that manifest with every other `assets/*/manifest.json`. Each GLB references `Textures/<name>.png` beside itself. Those PNGs are in `assets/kenney/<pack>/Textures/`. The shader uses albedo only: `_BaseColor × _BaseMap`. Cobble is applied only to `surface/pedestrian_cobble`.
+The 71 Kenney meshes whose role was `building` (suburban houses, modular building pieces, and two cliff blocks) were removed on 2026-10-26. The installed GLBs were scaled to street metres on 2026-10-27; the factor is `street_scale` in `assets/kenney_review.json`. The removed meshes were not scaled. `assets/kenney_review.json` describes every Kenney mesh, including those. On 2026-10-29, 20 Retro Urban meshes whose material uses `alphaMode: BLEND` were also removed: the crossed-card trees, the balconies, scaffolding, see-through walls and fence, cables, and three barriers. The export material is opaque, so their transparent cards rendered solid. The same day the four Retro Urban grass tiles (`grass`, `grass-corner`, `grass-corner-inner`, `grass-hill`) were removed: they are 3.2 m terrain tiles, and the slopes stood in a plaza as a tilted triangle. Their review cards say why. The meshes that remain are listed in `assets/kenney/manifest.json` and do not replace OpenStreetMap footprints. `overgrow` includes that manifest with every other `assets/*/manifest.json`. Each GLB references `Textures/<name>.png` beside itself. Those PNGs are in `assets/kenney/<pack>/Textures/`. The shader uses albedo only: `_BaseColor × _BaseMap`. Cobble is applied only to `surface/pedestrian_cobble`.
 
 CC0 does not require attribution. The report still records the author the source declares.
 
 ## Abandoned-city props
 
-`overgrow place` adds moss, grass tufts, vines, and trees marked `generated`. An OSM `natural=tree` stays `observed`. Moss, rust, and boarded windows that the code builds are project-generated. They are not photographs.
+`overgrow place` adds grass tufts, vines, and trees marked `generated`. An OSM `natural=tree` stays `observed`. Rust and boarded windows that the code builds are project-generated. They are not photographs.
 
 The placeable meshes are the 49 albedo GLBs in `assets/normalized`. Each card, including author and licence, is in [docs/abandoned-assets.md](../abandoned-assets.md). The licence review is `assets/normalized_review.json`.
 
@@ -115,6 +115,23 @@ The placeable meshes are the 49 albedo GLBs in `assets/normalized`. Each card, i
 | Sketchfab | CC0 and CC BY 4.0 only, after the model page was read. The review is `assets/normalized_review.json`. CC-BY-NC, CC-BY-NC-SA, the Standard licence, a missing licence, a pack whose description says the photographs are from Textures.com, a retopology of a Standard scan, and models tagged as another game's assets are not requested, even when the page says CC BY |
 
 A withdrawn model stays in the review with `usable: false` so it is not downloaded again. `modular_chainlink_fence` and `post_apocalyptic_buildings` were removed from the library.
+
+## Street-plate font
+
+`signs place` draws the street name with a vendored TrueType font, loaded by path so the plate does not depend on the fonts of the machine that runs it.
+
+| Field | Value |
+| --- | --- |
+| Font | DejaVu Sans Bold (`DejaVuSans-Bold.ttf`), version 2.37 |
+| Files | `assets/fonts/dejavu/DejaVuSans-Bold.ttf`, with the licence text in `assets/fonts/dejavu/LICENSE` |
+| Source | `dejavu-fonts-ttf-2.37.tar.bz2` from the official release, https://github.com/dejavu-fonts/dejavu-fonts/releases/tag/version_2_37 |
+| Licence | Bitstream Vera Fonts licence, with Arev additions under the same terms; DejaVu changes are public domain. Redistribution is allowed. The font may not be sold on its own, and a modified version must change its name |
+| Archive SHA-256 | `fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7` |
+| Archive SHA-512 | `bafa39321021097432777f0825d700190c23f917d754a4504722cd8946716c22c083836294dab7f3ae7cf20af63c4d0944f3423bf4aa25dbca562d1f30e00654` |
+| `DejaVuSans-Bold.ttf` SHA-256 | `e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724` |
+| `LICENSE` SHA-256 | `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93` |
+
+GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo; the font file is not part of the exported map.
 
 ## Asset Store
 
