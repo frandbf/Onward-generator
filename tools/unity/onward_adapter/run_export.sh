@@ -41,16 +41,16 @@ run_unity() {
   local logfile="$LOG_DIR/${PACKAGE_ID}-${step}.log"
   [[ -e "$logfile" ]] && mv "$logfile" "$logfile.$(date +%Y%m%dT%H%M%S)"
   log "step '$step' -> $logfile"
-  local code=0
+  local code=0 started=$SECONDS
   "$UNITY" -batchmode -projectPath "$PROJECT" -logFile "$logfile" -buildTarget Android "$@" || code=$?
   grep -E '\[OnwardAdapter\]' "$logfile" || true
-  if grep -q 'Native Crash Reporting' "$logfile"; then log "step '$step' FAILED: native crash"; exit 1; fi
+  if grep -q 'Native Crash Reporting' "$logfile"; then log "step '$step' FAILED after $(elapsed "$started"): native crash"; exit 1; fi
   if [[ $code -ne 0 ]]; then
     grep -E 'error CS|Exception' "$logfile" | tail -20 || true
-    log "step '$step' FAILED with exit $code"; exit "$code"
+    log "step '$step' FAILED after $(elapsed "$started") with exit $code"; exit "$code"
   fi
-  grep -q '\[OnwardAdapter\] OK' "$logfile" || { log "step '$step' FAILED: no OK marker"; exit 1; }
-  log "step '$step' OK"
+  grep -q '\[OnwardAdapter\] OK' "$logfile" || { log "step '$step' FAILED after $(elapsed "$started"): no OK marker"; exit 1; }
+  log "step '$step' OK in $(elapsed "$started")"
 }
 
 step_tool() {
@@ -58,8 +58,10 @@ step_tool() {
   cp "$TOOL_DIR/Editor/OnwardMapAdapter.cs" "$PROJECT/Assets/OnwardGenerator/Editor/"
   local thumb="$TOOL_DIR/Editor/Thumbnails/apocalipsis_murciana.png"
   [[ -f "$thumb" ]] && cp "$thumb" "$PROJECT/Assets/OnwardGenerator/Editor/Thumbnails/"
-  "$PYTHON" "$TOOL_DIR/patch_content_builder.py" \
-    "$PROJECT/Assets/OnwardCustomContent/Internal/Scripts/Editor/ContentBuilder.cs"
+  local patched
+  patched="$("$PYTHON" "$TOOL_DIR/patch_content_builder.py" \
+    "$PROJECT/Assets/OnwardCustomContent/Internal/Scripts/Editor/ContentBuilder.cs")"
+  log "ContentBuilder.cs patch: $patched"
   log "copied OnwardMapAdapter.cs and listing thumbnail into the project"
 }
 

@@ -103,7 +103,7 @@ The project is `~/Unity/OnwardPhase0Project`. Open it only with 2021.3.23f1: a n
 
 ### Build and upload
 
-`task unity` picks the newest export package (of any map, or of the map named after `--`) and runs `tool scene launcher`, skipping steps already built. Then it asks `¿Subir al Quest? [s/N]`; only `s`, `si`, `y` or `yes` runs `push`, which backs up the headset map and replaces it. Without `.venv`, its Python steps run in the image (`tools/docker/python.sh`). The same steps by hand:
+`task unity` picks the newest export package (of any map, or of the map named after `--`) and runs `tool scene launcher`, skipping steps already built. Each Unity step prints its wall time (`step 'scene' OK in 4 min 05 s`) and `✓ Unity` gives the total. Then it asks `¿Subir al Quest? [s/N]`; only `s`, `si`, `y` or `yes` runs `push`, which backs up the headset map and replaces it. Without `.venv`, its Python steps run in the image (`tools/docker/python.sh`). The same steps by hand:
 
 ```bash
 tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 tool scene launcher

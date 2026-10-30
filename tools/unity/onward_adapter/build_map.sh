@@ -14,6 +14,8 @@
 set -euo pipefail
 
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib.sh
+source "$TOOL_DIR/../lib.sh"
 REPO="$(cd "$TOOL_DIR/../../.." && pwd)"
 
 usage() { echo "usage: $0 [--platform macos|linux|auto] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]" >&2; exit 2; }
@@ -79,7 +81,9 @@ else
   [[ -f "$package/build/scene_report.json" ]] || steps+=(scene)
   steps+=(launcher)
   echo "→ Unity: ${steps[*]}"
+  started=$SECONDS
   "$TOOL_DIR/run_export.sh" ${platform[@]+"${platform[@]}"} "$package" "${steps[@]}"
+  echo "✓ Unity $(elapsed "$started")"
 fi
 
 if [[ ! -t 0 ]]; then
