@@ -199,7 +199,7 @@ def test_scene_in_other_crs_is_rejected(pipeline_result: GeoResult) -> None:
         match_buildings(scene, [])
 
 
-# --- Area and split (ADR-015). ---
+# --- Area and split (ADR-016). ---
 
 
 @pytest.mark.parametrize(

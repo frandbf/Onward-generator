@@ -310,3 +310,12 @@ def test_shop_evidence_inside_a_box_but_outside_the_shape_is_not_inside() -> Non
     ell = Polygon([(0, 0), (20, 0), (20, 4), (4, 4), (4, 20), (0, 20)])
     point = {"id": "notch", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [15.0, 15.0]}}
     assert dict(_shop_evidence([point], {"ell": ell}, CFG)) == {}  # 11 m from the shape, inside its bounding box
+
+
+def test_use_evidence_and_shop_evidence_agree_on_a_point_inside_a_sub_building() -> None:
+    from onward_generator.detail.scene import _shop_evidence, _use_evidence
+
+    footprints = {"osm-way-1:A_part1": box(-15, 6, 0, 22), "osm-way-1:B_part1": box(0, 6, 14, 22)}
+    bakery = {"id": "in", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [-1.0, 7.0]}}
+    assert dict(_use_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": [("in", {"shop": "bakery"}, "poi_inside")]}
+    assert dict(_shop_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": ["in"]}

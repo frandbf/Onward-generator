@@ -63,7 +63,7 @@ class HeightRun:
     scene_ref: Mapping[str, Any]
     attribution: Mapping[str, Any] | None
     parents: Mapping[str, str] = field(default_factory=dict)
-    """Sub-building id → OSM parent id, for footprints ``cadastre split`` divided (ADR-015)."""
+    """Sub-building id → OSM parent id, for footprints ``cadastre split`` divided (ADR-016)."""
 
     def _subdivided(self) -> dict[str, Any]:
         levels = [b.estimated_levels for b in self.result.buildings if b.id in self.parents]

@@ -1,4 +1,4 @@
-"""Splitting OSM footprints by Catastro building parts (ADR-015). Synthetic parts in local metres."""
+"""Splitting OSM footprints by Catastro building parts (ADR-016). Synthetic parts in local metres."""
 
 from __future__ import annotations
 

@@ -21,7 +21,7 @@ Facades, roofs, and interiors are **generic templates** chosen by rules. They do
 - Landmarks (`landmark` in `heights.json`) get `landmark_placeholder`: a plain wall, one door, and `needs_custom_model: true`. No ornament is invented.
 - **Tower.** If a landmark contains an OSM tower point (`man_made=tower`, `bell_tower`, and similar) with an observable `height` tag, a prism clipped to the building footprint is added. The height is **observed**. The tower square is **estimated** and never leaves the footprint. With no `height`, no volume is invented.
 - Interiors use `representation: generic_simplified_interior` and `representative_of_real_interior: false`.
-- The only observed inputs are what earlier stages already had: the OSM footprint, height and storeys (Catastro or OSM), the building category, and OSM POIs. A commercial ground floor is applied only with evidence in `ground_floor_evidence`: an OSM POI (`shop`, `amenity`, `office`, or `craft`) inside the footprint, or within 2 m of it when the point is inside no footprint, or a building category that is already commercial. A point inside one building does not give its neighbour a shopfront across the party wall (ADR-015).
+- The only observed inputs are what earlier stages already had: the OSM footprint, height and storeys (Catastro or OSM), the building category, and OSM POIs. A commercial ground floor is applied only with evidence in `ground_floor_evidence`: an OSM POI (`shop`, `amenity`, `office`, or `craft`) inside the footprint, or within 2 m of it when the point is inside no footprint, or a building category that is already commercial. A point inside one building does not give its neighbour a shopfront across the party wall (ADR-016).
 
 ## Inputs
 

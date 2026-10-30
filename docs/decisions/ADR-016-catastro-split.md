@@ -1,4 +1,4 @@
-# ADR-015 — Split OSM block footprints by Catastro building parts
+# ADR-016 — Split OSM block footprints by Catastro building parts
 
 Status: accepted · 30 October 2026.
 

@@ -1272,7 +1272,7 @@ def test_run_help_describes_the_new_flags() -> None:
     assert helps["no_unity"] == "stop after export and print the command for the Unity steps (task map uses this)"
 
 
-# --- Catastro split (ADR-015). ---
+# --- Catastro split (ADR-016). ---
 
 
 def _murcia(tmp_path: Path) -> Path:

@@ -95,7 +95,7 @@ def catastro_command(scene: Path, gml: Path) -> StageCommand:
 
 
 def cadastre_split_command(scene: Path, gml: Path) -> StageCommand:
-    """``cadastre split``: sub-buildings and storey overrides (ADR-015)."""
+    """``cadastre split``: sub-buildings and storey overrides (ADR-016)."""
     return invoke(
         "cadastre", "split",
         "--scene", show(scene),

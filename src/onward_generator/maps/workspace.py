@@ -150,7 +150,7 @@ def store_panoramax(directory: str | Path, enabled: bool) -> None:
 
 
 def catastro_enabled(directory: str | Path) -> bool:
-    """True when ``run`` splits buildings with Catastro for this map (ADR-015).
+    """True when ``run`` splits buildings with Catastro for this map (ADR-016).
 
     The map must be in the Catastro area and fit one request. A map without the
     key uses it; ``"catastro": false`` (``run --no-catastro``) turns it off.

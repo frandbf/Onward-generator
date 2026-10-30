@@ -204,7 +204,7 @@ def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, Base
     ids = sorted(footprints)
     tree = STRtree([footprints[i] for i in ids])
     for pid, point in pois:
-        # A point inside a footprint belongs to that building only, not to the neighbour across a party wall (ADR-015).
+        # A point inside a footprint belongs to that building only, not to the neighbour across a party wall (ADR-016).
         hits = tree.query(point, predicate="intersects")
         if hits.size == 0:
             hits = tree.query(point, predicate="dwithin", distance=cfg.shop_evidence_distance_m)

@@ -51,7 +51,7 @@ flowchart LR
   unity --> quest[Quest]
 ```
 
-`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `catastro` and `cadastre` run by default when the map is in mainland Spain (EPSG:25830, latitude 35.85°–43.8°) and fits one Catastro request; `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-015). `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `catastro` and `cadastre` run by default when the map is in mainland Spain (EPSG:25830, latitude 35.85°–43.8°) and fits one Catastro request; `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
 
 ## 0. Unity project — once
 
@@ -190,7 +190,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | Output | `heights.json`, `heights_report.json` |
 | Classes | measured, inferred, fallback, needs_manual_review |
 
-`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-015](decisions/ADR-015-catastro-split.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
+`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
 
 ## 4. Generate
 
@@ -200,7 +200,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | --- | --- |
 | Input | `geo_scene.json` plus `heights.json` from that same scene |
 | Output | `scene_visual.glb`, `scene_collision.glb`, `scene3d.json`, `generation_report.json` |
-| Collision | `collider/walkable`, `collider/carriageway`, and `collider/walkable_crossing` (ADR-015), separate from the visual mesh |
+| Collision | `collider/walkable`, `collider/carriageway`, and `collider/walkable_crossing` (ADR-016), separate from the visual mesh |
 | Exit | `0` when there is no critical error |
 
 This directory is the base for `detail`. The wall is not added here.

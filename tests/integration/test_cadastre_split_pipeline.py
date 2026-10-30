@@ -1,4 +1,4 @@
-"""A block footprint split by Catastro parts, through geo → cadastre split → heights → generate → detail (ADR-015).
+"""A block footprint split by Catastro parts, through geo → cadastre split → heights → generate → detail (ADR-016).
 
 The OSM block and the GML are synthetic (CC0-1.0), written at test time around MURCIA_CENTER.
 """
@@ -139,3 +139,10 @@ def test_detail_puts_the_shop_on_its_own_ground_floor_and_blanks_shared_walls(sp
     assert tall["party_wall_length_m"] == pytest.approx(16.0, abs=0.01)
     for record in facades.values():
         assert record["checks"]["facade_open_edges"] == 0
+    # Sub-buildings keep the block's OSM tags, so the facade use is the parent's observed building=apartments.
+    for local_id, _, _ in PARTS:
+        bid = f"osm-way-{BLOCK}:{local_id}"
+        assert facades[bid]["facade"]["use"] == {
+            "use": "residential", "origin": "observed",
+            "evidence": [{"source_id": bid, "tag": "building=apartments", "match": "building"}],
+        }

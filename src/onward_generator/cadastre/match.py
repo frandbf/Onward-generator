@@ -187,7 +187,7 @@ def match_report(
     options: MatchOptions,
     split: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The match report. ``split`` is the ``cadastre split`` section (ADR-015), absent after ``match``."""
+    """The match report. ``split`` is the ``cadastre split`` section (ADR-016), absent after ``match``."""
     status = Counter(m.status for m in matches)
     matched = [m for m in matches if m.status == "matched"]
     compared = [m for m in matched if m.osm_levels is not None]

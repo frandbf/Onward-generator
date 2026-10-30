@@ -57,7 +57,7 @@ On the Murcia cathedral and Plaza Belluga extract, 167 of 167 buildings matched,
 
 ## Splitting blocks (`cadastre split`)
 
-Decision: [ADR-015](decisions/ADR-015-catastro-split.md). OSM often maps a whole city block as one building. `match` gives that block one median storey count. `split` makes one building per construction instead, so heights, textures, doors and shopfronts vary inside the block.
+Decision: [ADR-016](decisions/ADR-016-catastro-split.md). OSM often maps a whole city block as one building. `match` gives that block one median storey count. `split` makes one building per construction instead, so heights, textures, doors and shopfronts vary inside the block.
 
 ```bash
 .venv/bin/python -m onward_generator cadastre split \

@@ -134,7 +134,7 @@ Fetcher = Callable[[str, float], bytes]
 
 
 def catastro_area(latitude: float, crs: str, half_side_m: float) -> bool:
-    """True when a map centred here can use one Catastro request (ADR-015).
+    """True when a map centred here can use one Catastro request (ADR-016).
 
     The map must use the Catastro CRS, its centre must be in the Spanish
     latitudes, and its square plus the download margin must fit ``MAX_AREA_KM2``.

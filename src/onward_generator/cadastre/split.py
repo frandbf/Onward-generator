@@ -1,4 +1,4 @@
-"""Split OSM building footprints by Catastro building parts (ADR-015).
+"""Split OSM building footprints by Catastro building parts (ADR-016).
 
 A footprint that covers several constructions (parcels or storey counts)
 becomes one sub-building per construction: the Catastro part geometry clipped
