@@ -121,7 +121,7 @@ def library_rows(path: Path | None = None) -> list[dict[str, Any]]:
 
 def texture_family(row: Mapping[str, Any]) -> str | None:
     name = str(row.get("name") or "").lower()
-    if name.startswith("paintedplaster"):
+    if name.startswith(("paintedplaster", "painted_plaster", "plastered_wall")):
         return "plaster"
     if name.startswith("bricks"):
         return "brick"
@@ -142,14 +142,26 @@ def texture_family(row: Mapping[str, Any]) -> str | None:
     return None
 
 
-# Ground families repeat every few metres on large flat areas, so a visible blotch,
-# streak or centred cover turns into a grid. Only calm images join their pool.
-CALM_FAMILIES = frozenset({"asphalt", "concrete"})
+# A tile repeats every few metres on a large wall or floor, so a visible blotch,
+# streak or centred feature turns into a grid. Only calm images join their pool.
 # Std of luminance (0-1) after a blur of 1/32 of the tile. Measured on the 1k library:
 # kept asphalt011 0.0055, asphalt020s 0.0066, concrete012 0.0105, concrete047a 0.0072,
 # concrete048 0.0026; dropped asphalt017 0.0204, asphalt019 0.0164, asphalt021 0.0143,
 # asphalt022 0.0138, concrete047b 0.0261 (a rusted cover in the middle).
 COARSE_CONTRAST_LIMIT = 0.012
+# Walls carry mortar and plaster grain that the ground does not, so their limit is
+# looser. Kept paintedplaster006 0.0214, bricks001 0.0221, bricks059 0.0236, rock030
+# 0.0103; dropped paintedplaster010 0.0254, paintedplaster014 0.0492, paintedplaster016
+# 0.0656 (large stains), bricks003 0.0260 (pale stones), bricks100 0.0440, rock022
+# 0.0267, rock055 0.0409.
+WALL_CONTRAST_LIMIT = 0.025
+CONTRAST_LIMITS: dict[str | None, float] = {
+    "asphalt": COARSE_CONTRAST_LIMIT,
+    "concrete": COARSE_CONTRAST_LIMIT,
+    "plaster": WALL_CONTRAST_LIMIT,
+    "brick": WALL_CONTRAST_LIMIT,
+    "rock": WALL_CONTRAST_LIMIT,
+}
 _MEASURE_PX = 128
 
 
@@ -162,14 +174,18 @@ def coarse_contrast(path: Path) -> float:
     return float(np.asarray(blurred, dtype=np.float64).std() / 255.0)
 
 
-def is_calm(row: Mapping[str, Any], limit: float = COARSE_CONTRAST_LIMIT) -> bool:
-    """A row outside the ground families is always calm. A missing file is left to texture_record to report."""
-    if texture_family(row) not in CALM_FAMILIES:
+def is_calm(row: Mapping[str, Any], limit: float | None = None) -> bool:
+    """A row outside the measured families is always calm. A missing file is left to texture_record to report.
+
+    ``limit`` replaces the family limit in ``CONTRAST_LIMITS``.
+    """
+    family_limit = CONTRAST_LIMITS.get(texture_family(row))
+    if family_limit is None:
         return True
     path = REPO_ROOT / str(row["path"])
     if not path.is_file():
         return True
-    return coarse_contrast(path) <= limit
+    return coarse_contrast(path) <= (family_limit if limit is None else limit)
 
 
 def _pools(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -328,15 +344,21 @@ def select_texture_plan(
 
 def assert_library_entries(document: Mapping[str, Any], rows: Sequence[Mapping[str, Any]] | None = None) -> None:
     catalog = list(rows) if rows is not None else library_rows()
-    known = {str(row["id"]): texture_family(row) for row in catalog}
+    by_id = {str(row["id"]): row for row in catalog}
     seen: set[str] = set()
     for raw in document["entries"]:
         library_id = str(raw.get("library_id") or "")
         slot = str(raw["id"])
         if not library_id:
             raise PlanError(f"{slot} has no library texture")
-        if known.get(library_id) != SLOT_FAMILY.get(slot):
+        row = by_id.get(library_id)
+        if row is None or texture_family(row) != SLOT_FAMILY.get(slot):
             raise PlanError(f"{slot} cannot use {library_id}")
+        if not is_calm(row):
+            raise PlanError(
+                f"{slot} cannot use {library_id}: its tile repeats visibly. "
+                "Run `map create --name <map> --textures` to choose this map's textures again"
+            )
         if library_id in seen:
             raise PlanError(f"{library_id} is used more than once")
         seen.add(library_id)
