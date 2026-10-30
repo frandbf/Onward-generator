@@ -393,8 +393,10 @@ def _camera_xyz(picture: StreetPicture, frame: LocalFrame) -> tuple[float, float
 
 
 def _decode(jpeg: Path) -> Image.Image:
+    """Read the pixels and close the file. ``project_facade`` converts to RGB when it samples."""
     with Image.open(jpeg) as image:
-        return image.convert("RGB")
+        image.load()
+        return image
 
 
 def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Path, float]]:
