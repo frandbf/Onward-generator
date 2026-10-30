@@ -1246,8 +1246,11 @@ namespace OnwardGenerator
                 if (route == null || route.Points == null) continue;
                 int previous = -1;
                 bool previousIsNew = false;
+                // A dropped point shifts the rest down; logs name the point by its index in the package.
+                int removed = 0;
                 for (int i = 0; i < route.Points.Count; i++)
                 {
+                    int wp = i + removed;
                     Vector3 point = route.Points[i];
                     int nearest = NearestLinkedNode(map, point);
                     float gap = Vector3.Distance(point, NodePosition(map, nearest));
@@ -1257,17 +1260,18 @@ namespace OnwardGenerator
                     {
                         node = AppendWaypointNode(map, point, nearest);
                         if (LinkAlongNavPath(map, node) < 0)
-                            Debug.LogWarning($"{LogPrefix} {route.name} WP-{i} stays off the city grid: no navmesh path.");
+                            Debug.LogWarning($"{LogPrefix} {route.name} WP-{wp} stays off the city grid: no navmesh path.");
                         added++;
-                        Debug.Log($"{LogPrefix} {route.name} WP-{i} anchored, nearest linked node was {gap:F2} m away.");
+                        Debug.Log($"{LogPrefix} {route.name} WP-{wp} anchored, nearest linked node was {gap:F2} m away.");
                     }
                     if (previous >= 0 && (created || previousIsNew) && !LinkNodesAlongPath(map, previous, node))
                     {
-                        Debug.LogWarning($"{LogPrefix} {route.name} WP-{i} dropped: no navmesh path from the previous point.");
+                        Debug.LogWarning($"{LogPrefix} {route.name} WP-{wp} dropped: no navmesh path from the previous point.");
                         route.Points.RemoveAt(i);
                         if (PrefabUtility.IsPartOfPrefabInstance(route))
                             PrefabUtility.RecordPrefabInstancePropertyModifications(route);
                         EditorUtility.SetDirty(route);
+                        removed++;
                         i--;
                         continue;
                     }
@@ -1312,6 +1316,7 @@ namespace OnwardGenerator
                     WaypointSet route = hunt.AI_WaypointSet[r];
                     if (route == null || route.Points == null) continue;
                     int previous = -1;
+                    int removed = 0;
                     for (int i = 0; i < route.Points.Count; i++)
                     {
                         int node = previous < 0
@@ -1325,12 +1330,13 @@ namespace OnwardGenerator
                         }
                         if (node < 0)
                         {
-                            Debug.LogWarning($"{LogPrefix} {route.name} WP-{i} dropped: no return path from the previous point.");
+                            Debug.LogWarning($"{LogPrefix} {route.name} WP-{i + removed} dropped: no return path from the previous point (pass {pass + 1}).");
                             route.Points.RemoveAt(i);
                             if (PrefabUtility.IsPartOfPrefabInstance(route))
                                 PrefabUtility.RecordPrefabInstancePropertyModifications(route);
                             EditorUtility.SetDirty(route);
                             dropped = true;
+                            removed++;
                             i--;
                             continue;
                         }
