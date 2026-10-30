@@ -32,7 +32,7 @@ Returns `0` when the phase 03 → 04 check passes (no critical error) and `1` ot
 | `surface/ground` | The rest of the site | 0 | Generated |
 | `collider/walkable_crossing` | Walkable crossings (`Partition.crossings`): 4 m strips square to each vehicular segment between junctions, set back past the kerb of the widest street at each junction (half its width + 1 m + 2 m), and evenly between so no stretch exceeds 50 m. Each is clipped to the carriageway. Still part of `surface/carriageway`; only the collider is split. The adapter bakes it into the navmesh (ADR-015) | top −0.15 | Generated |
 | `surface/zebra_crossing` | White bars of a Spanish *paso de cebra* on the crossing strips that OSM marks (see "Zebra paint" below): 0.5 m wide, 0.5 m apart, parallel to the street, each as long as the 4 m strip is wide, laid from kerb to kerb 0.5 m clear of each kerb. One quad (two triangles) per bar, material `road_marking`, no collider | −0.14 (1 cm over the carriageway) | Placement observed (OSM crossing), bar layout generated |
-| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. `collider/carriageway` is the carriageway minus the crossings, snapped again to `precision_m`: the cut adds vertices a fraction of a millimetre apart, which the 0.1 mm weld would merge. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point, or two pieces of one slab that share a corner, are opened by 1 cm so the slab stays manifold | top 0 / −0.15 | Generated |
+| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. `collider/carriageway` is the carriageway minus the crossings, snapped again to `precision_m`: the cut adds vertices a fraction of a millimetre apart, which the 0.1 mm weld would merge. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point, or two pieces of one slab that share a corner, are opened by a 1 cm disk and the result is snapped again to `precision_m`, so the slab stays manifold. When the snap closes the cut again (two pieces that leave the corner almost parallel), the disk doubles until it does not | top 0 / −0.15 | Generated |
 
 The site is the area of interest plus its margin. A building that is not completely inside that polygon is omitted (`building_outside_map`) and does not extend the ground. Footprints that remain inside the site are unioned with it.
 
@@ -78,6 +78,17 @@ Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 | `building_missing_height`, `building_invalid_footprint`, `non_finite_vertices` | critical |
 | `surface_gap` above 0.5 m², `overlapping_buildings`, `duplicate_building_skipped`, `footprint_repaired` | warning |
 | `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `feature_not_generated`, `building_outside_map` | info |
+
+### Large maps with Catastro
+
+The check stays all or nothing: one critical issue fails the phase. Each failure class seen on large Catastro maps (Madrid r200 and r300) is fixed in the stage that creates it, and the one object that cannot be fixed is quarantined there, never here:
+
+| Failure | Where it is fixed |
+| --- | --- |
+| A sub-building whose hole touches its outline at a point after the 1 mm snap (`building_mesh_not_manifold` and `collider_not_closed` on the same id) | `cadastre split` notches the contact open ([05-cadastre.md](05-cadastre.md), step 7) |
+| A sub-building that still does not extrude closed | `cadastre split` keeps that OSM footprint unsplit and reports its area; above 5% of the building area the split fails (step 8) |
+| `collider/walkable_crossing` open where two crossings meet at a corner almost parallel | The ground slabs: the 1 cm cut is snapped and widened (table above) |
+| A hip roof over a footprint with a reflex jog of a few centimetres (`roof_area_mismatch` in `detail`) | `detail` keeps that roof flat ([07-detail.md](07-detail.md), Roofs) |
 
 Outputs are deterministic byte for byte and are not overwritten without `--overwrite`.
 

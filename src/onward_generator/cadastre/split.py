@@ -21,12 +21,15 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.cadastre.acquire import CadastreError, DownloadRecord
 from onward_generator.cadastre.gml import BuildingPart
 from onward_generator.cadastre.match import SOURCE_LABEL
+from onward_generator.generation.mesh import cap, merge, open_base_defects, walls
 
 SPLIT_METHOD = "catastro_split"
 GRID_M = 0.001
 """Coordinates are snapped to 1 mm, the precision ``geo`` writes."""
+NOTCH_M = 0.01
+"""Where two rings of a sub-footprint touch at one point, a notch this wide (corner to corner: 2 cm) opens them."""
 HEIGHT_ATTRIBUTES = ("height_m", "levels")
-STATUSES = ("split", "single_group", "low_coverage", "no_parts", "landmark")
+STATUSES = ("split", "single_group", "low_coverage", "no_parts", "landmark", "quarantined")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,9 +43,11 @@ class SplitOptions:
     """A sub-building whose own parts cover less than this share of it gets the lower confidence."""
     confidence_high: float = 0.85
     confidence_low: float = 0.7
+    max_quarantine_share: float = 0.05
+    """Share of the scene's building area that may fall back to the unsplit OSM footprint before the stage fails."""
 
     def __post_init__(self) -> None:
-        for name in ("min_coverage", "confident_share", "confidence_high", "confidence_low"):
+        for name in ("min_coverage", "confident_share", "confidence_high", "confidence_low", "max_quarantine_share"):
             if not 0 <= getattr(self, name) <= 1:
                 raise ValueError(f"{name} must be within [0, 1]")
         for name in ("min_piece_area_m2", "min_piece_width_m"):
@@ -86,7 +91,10 @@ class ParentSplit:
     subs: tuple[SubBuilding, ...] = ()
     courtyard_m2: float = 0.0
     dropped_m2: float = 0.0
-    """Stray pieces below the minimum area that touch their group only at a corner, left as open ground."""
+    """Stray pieces below the minimum area that touch their group only at a corner, and the notches, left as open ground."""
+    quarantined_m2: float = 0.0
+    """Area of a footprint kept whole because one of its sub-buildings would not extrude to a closed mesh."""
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -95,6 +103,8 @@ class ParentSplit:
             "coverage": round(self.coverage, 4),
             "courtyard_m2": round(self.courtyard_m2, 3),
             "dropped_m2": round(self.dropped_m2, 3),
+            "quarantined_m2": round(self.quarantined_m2, 3),
+            "reason": self.reason,
             "sub_buildings": [s.to_dict() for s in self.subs],
         }
 
@@ -107,6 +117,27 @@ def _polygons(geometry: BaseGeometry) -> list[Polygon]:
 
 def is_sliver(piece: Polygon, options: SplitOptions) -> bool:
     return piece.area < options.min_piece_area_m2 or piece.buffer(-options.min_piece_width_m / 2).is_empty
+
+
+def open_pinches(piece: Polygon) -> list[Polygon]:
+    """``piece`` with a notch wherever two of its rings touch at a single point.
+
+    Snapping to 1 mm can move a hole vertex onto the outer ring. The polygon is
+    still valid, but its walls share one vertical edge between both rings and
+    ``generate`` reports it open (Madrid r200). The notch joins the hole to the
+    outside and costs a few square centimetres, reported with ``dropped_m2``.
+    """
+    rings = [piece.exterior, *piece.interiors]
+    contacts = [ring.intersection(other) for index, ring in enumerate(rings) for other in rings[index + 1 :]]
+    contacts = [c for c in contacts if not c.is_empty]
+    if not contacts:
+        return [piece]
+    return _polygons(set_precision(piece.difference(union_all(contacts).buffer(NOTCH_M, quad_segs=1)), GRID_M))
+
+
+def footprint_defects(footprint: BaseGeometry) -> int:
+    """Open or non-manifold edges of ``footprint`` extruded with a flat roof: the test ``generate`` applies to a building."""
+    return open_base_defects(merge([walls(footprint, 0.0, 1.0), cap(footprint, 1.0)]), 0.0)
 
 
 def _nearest(piece: Polygon, groups: Mapping[str, BaseGeometry]) -> str:
@@ -167,9 +198,10 @@ def split_footprint(
     for gid in sorted(kept):
         parts = info[gid]
         # One building per connected polygon: polygons that touch at a corner would make non-manifold walls.
-        pieces = sorted(_polygons(set_precision(union_all([kept[gid], *extra[gid]]), GRID_M)), key=lambda p: (-p.area, p.bounds))
-        dropped += sum(p.area for p in pieces if p.area < options.min_piece_area_m2)
+        whole = set_precision(union_all([kept[gid], *extra[gid]]), GRID_M)
+        pieces = sorted((p for piece in _polygons(whole) for p in open_pinches(piece)), key=lambda p: (-p.area, p.bounds))
         pieces = [p for p in pieces if p.area >= options.min_piece_area_m2]
+        dropped += whole.area - sum(p.area for p in pieces)
         for index, piece in enumerate(pieces, start=1):
             subs.append(
                 SubBuilding(
@@ -182,6 +214,12 @@ def split_footprint(
                     leftover_m2=sum((e.intersection(piece).area for e in extra[gid]), 0.0),
                 )
             )
+    for sub in subs:
+        defects = footprint_defects(sub.geometry)
+        if defects:
+            # Quarantine: keep the OSM footprint whole rather than hand generate an open sub-building.
+            reason = f"{sub.id}: {defects} open or non-manifold edges"
+            return ParentSplit(parent_id, "quarantined", coverage, quarantined_m2=footprint.area, reason=reason)
     return ParentSplit(parent_id, "split", coverage, tuple(subs), courtyard.area, dropped)
 
 
@@ -250,7 +288,18 @@ def split_scene(
         else:
             features.append(dict(feature))
     results.sort(key=lambda r: r.parent_id)
+    check_quarantine(results, sum(shape(f["geometry"]).area for f in scene["features"] if f.get("kind") == "building"), options)
     return features, results
+
+
+def check_quarantine(results: Sequence[ParentSplit], building_m2: float, options: SplitOptions) -> None:
+    """Fail when more than ``max_quarantine_share`` of the building area had to stay unsplit."""
+    quarantined = sum(r.quarantined_m2 for r in results)
+    if quarantined > options.max_quarantine_share * building_m2:
+        raise CadastreError(
+            f"{quarantined:.1f} of {building_m2:.1f} m² of buildings quarantined (kept unsplit), "
+            f"above the {options.max_quarantine_share:.0%} limit"
+        )
 
 
 def split_summary(results: Sequence[ParentSplit]) -> dict[str, Any]:
@@ -264,6 +313,7 @@ def split_summary(results: Sequence[ParentSplit]) -> dict[str, Any]:
         "levels_range": [min(levels), max(levels)] if levels else None,
         "courtyard_m2": round(sum(r.courtyard_m2 for r in results), 3),
         "dropped_m2": round(sum(r.dropped_m2 for r in results), 3),
+        "quarantined_m2": round(sum(r.quarantined_m2 for r in results), 3),
         **{f"status_{name}": status[name] for name in STATUSES},
     }
 

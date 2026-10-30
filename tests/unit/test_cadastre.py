@@ -216,7 +216,7 @@ def test_cli_split_writes_scene_overrides_and_report(
     ]
     assert main(args) == 0
     printed = capsys.readouterr().out.splitlines()
-    assert printed[0] == "parts=5 buildings=5 split=2 sub_buildings=4 levels=2-5"
+    assert printed[0] == "parts=5 buildings=5 split=2 sub_buildings=4 levels=2-5 quarantined=0"
     names = ("geo_scene.json", "heights_overrides.catastro.json", "cadastre_match_report.json")
     assert printed[1:] == [f"wrote {out / name}" for name in names]
 
@@ -239,7 +239,7 @@ def test_cli_split_writes_scene_overrides_and_report(
     assert report["counts"]["status_matched"] == 3 and report["split"]["counts"]["osm_buildings_split"] == 2
     assert report["split"]["options"] == {
         "min_coverage": 0.8, "min_piece_area_m2": 6.0, "min_piece_width_m": 2.0, "confident_share": 0.8,
-        "confidence_high": 0.85, "confidence_low": 0.7,
+        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05,
     }
     assert report["options"]["min_coverage"] == 0.5
     assert [b["building_id"] for b in report["split"]["buildings"]] == [
@@ -280,7 +280,7 @@ def test_cli_split_without_parts_copies_the_scene(pipeline_result: GeoResult, tm
     download_building_parts(CENTER_BBOX, gml, fetch=fake_fetch(empty), now=NOW)
     scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
     assert main(["cadastre", "split", "--scene", str(scene_path), "--gml", str(gml), "--out", str(tmp_path / "cad")]) == 0
-    assert capsys.readouterr().out.splitlines()[0] == "parts=0 buildings=5 split=0 sub_buildings=0 levels=none"
+    assert capsys.readouterr().out.splitlines()[0] == "parts=0 buildings=5 split=0 sub_buildings=0 levels=none quarantined=0"
     original = json.loads(scene_path.read_text(encoding="utf-8"))
     split = json.loads((tmp_path / "cad" / "geo_scene.json").read_text(encoding="utf-8"))
     assert split["features"] == original["features"]

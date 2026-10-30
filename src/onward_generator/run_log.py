@@ -193,6 +193,9 @@ def _cadastre(out: Path) -> StageReport:
     levels = counts["levels_range"]
     if levels:
         parts.append(f"storeys {levels[0]}–{levels[1]}")
+    quarantined = int(counts.get("status_quarantined", 0))
+    if quarantined:
+        parts.append(f"kept whole {group(quarantined)} ({group(round(counts['quarantined_m2']))} m²)")
     return StageReport("  ".join(parts))
 
 

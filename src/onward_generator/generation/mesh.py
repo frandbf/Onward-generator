@@ -168,7 +168,7 @@ def drop_degenerate_holes(geometry: BaseGeometry, min_area: float = 1e-4) -> tup
     return (rebuilt[0] if len(rebuilt) == 1 else MultiPolygon(rebuilt)), dropped
 
 
-def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01) -> BaseGeometry:
+def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, *, precision_m: float) -> BaseGeometry:
     """Open a ring that only kisses another ring, so the extrusion stays one manifold.
 
     A carriageway that leaves the map can touch the site boundary at a single
@@ -177,9 +177,32 @@ def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01) -> BaseGeom
     1 cm disk at that point joins the hole to the outside. Two polygons of one
     slab that touch at a corner (a carriageway cut by its crossings) are
     separated the same way. A shared edge is left alone.
+
+    The cut is snapped to ``precision_m``: where an edge leaves the disk almost
+    through one of its vertices, the new crossing point lies microns from that
+    vertex, the 0.1 mm weld merges the pair and the slab stops closing. Two
+    pieces that leave their contact almost parallel are still less than the
+    grid apart on the rim, and snapping makes them touch again there; the disk
+    then doubles until the snapped result has no contact (Madrid r300). A disk
+    that would swallow the whole slab gives up and returns it unchanged.
     """
     if geometry.is_empty or gap_m <= 0:
         return geometry
+    cuts = _point_contacts(geometry, gap_m)
+    while cuts:
+        opened = shapely.set_precision(shapely.make_valid(geometry.difference(shapely.union_all(cuts).buffer(gap_m))), precision_m)
+        if opened.is_empty:
+            return geometry
+        again = _point_contacts(opened, gap_m)
+        if not again:
+            return opened
+        cuts += again
+        gap_m *= 2
+    return geometry
+
+
+def _point_contacts(geometry: BaseGeometry, gap_m: float) -> list[BaseGeometry]:
+    """Where two rings of ``geometry`` touch at a point or along less than ``gap_m``."""
     cuts = []
     parts = polygons_of(geometry)
     tree = shapely.STRtree(parts)
@@ -192,10 +215,7 @@ def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01) -> BaseGeom
                     cuts.append(touch)
         # Two polygons of a valid slab can only touch at points.
         cuts.extend(polygon.intersection(parts[int(neighbour)]) for neighbour in tree.query(polygon, predicate="touches"))
-    if not cuts:
-        return geometry
-    opened = shapely.make_valid(geometry.difference(shapely.union_all(cuts).buffer(gap_m)))
-    return geometry if opened.is_empty else opened
+    return cuts
 
 
 def _point_contact(touch: BaseGeometry, gap_m: float) -> bool:

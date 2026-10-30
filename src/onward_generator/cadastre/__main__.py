@@ -131,7 +131,7 @@ def _split(args: argparse.Namespace) -> int:
     span = f"{levels[0]}-{levels[1]}" if levels else "none"
     print(
         f"parts={len(parts)} buildings={c['osm_buildings']} split={c['osm_buildings_split']} "
-        f"sub_buildings={c['sub_buildings']} levels={span}"
+        f"sub_buildings={c['sub_buildings']} levels={span} quarantined={c['status_quarantined']}"
     )
     print(f"wrote {out_scene}")
     print(f"wrote {out_overrides}")

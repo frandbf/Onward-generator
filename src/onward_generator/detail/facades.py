@@ -415,6 +415,10 @@ def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh
     for (ax, ay), (bx, by) in zip(coords[:-1], coords[1:], strict=True):
         if math.dist((ax, ay), (bx, by)) < 1e-6:
             continue
+        if (bx - ax) * (apex2.y - ay) - (by - ay) * (apex2.x - ax) <= 0:
+            # A reflex jog the apex cannot see (a few centimetres where a Catastro
+            # split meets the street) would fold its face under the roof: keep it flat.
+            return None
         i = len(vertices)
         vertices += [(ax, ay, height), (bx, by, height), apex]
         triangles.append((i, i + 1, i + 2))

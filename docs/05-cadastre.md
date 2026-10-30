@@ -94,7 +94,7 @@ It writes three files in a new directory:
 | --- | --- |
 | `geo_scene.json` | The `onward_generator.geo_scene` contract with the split footprints replaced by sub-buildings, and a top-level `subdivision` block: the input scene (path, SHA-256), the Catastro record (provider, licence, attribution, retrieval date, SHA-256, URL), the options and the counts |
 | `heights_overrides.catastro.json` | A `levels` override per sub-building, plus the `match` overrides for footprints that were not split |
-| `cadastre_match_report.json` | The `match` report for the original footprints plus a `split` section: options, counts and one entry per OSM building |
+| `cadastre_match_report.json` | The `match` report for the original footprints plus a `split` section: options, counts (including `status_quarantined` and `quarantined_m2`) and one entry per OSM building with its status, `dropped_m2`, `quarantined_m2` and `reason` |
 
 For each OSM footprint, in the scene CRS:
 
@@ -104,7 +104,8 @@ For each OSM footprint, in the scene CRS:
 4. A clipped piece under `--min-piece-area-m2` (6 m²) or narrower than `--min-piece-width-m` (2 m) is a sliver and is dropped. Fewer than two groups left: `single_group`, the footprint is kept and `match` decides its storeys.
 5. Area covered only by parts with 0 storeys above ground, and not a sliver, is a courtyard: it is removed from the footprint and becomes open ground.
 6. Any other uncovered area (gaps, slivers, misalignment) is given to the nearest group: closest first, then the longest shared boundary, then the id. Coordinates are snapped to 1 mm.
-7. Each connected polygon of a group is its own sub-building (pieces touching only at a corner would make non-manifold walls). A polygon under `--min-piece-area-m2` left on its own is open ground, reported as `dropped_m2`. The sub-buildings, courtyards and dropped pieces together cover the OSM footprint exactly.
+7. Each connected polygon of a group is its own sub-building (pieces touching only at a corner would make non-manifold walls). Where the 1 mm snap leaves a hole touching the outline (or another hole) at a single point, a 2 cm diamond notch is cut there: the polygon is valid, but its walls would share one vertical edge between two rings. A polygon under `--min-piece-area-m2` left on its own is open ground. Both are reported as `dropped_m2`. The sub-buildings, courtyards and dropped pieces together cover the OSM footprint exactly.
+8. **Quarantine.** Every sub-building is extruded with a flat roof and checked like `generate` checks a building (no open or non-manifold edge above the base). If one fails, the whole OSM footprint is kept unsplit (`quarantined`): it gets the `match` override like a `single_group` footprint, and the report records its area (`quarantined_m2`) and the reason (the sub-building and its edge count). When the quarantined area exceeds `max_quarantine_share` (5%) of the scene's building area, `split` fails instead of writing a scene that silently lost most of its split. `run` prints `kept whole N (A m²)` on the `cadastre` line when any footprint was quarantined.
 
 A sub-building:
 

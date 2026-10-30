@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from shapely import LineString, MultiPolygon, Polygon, box, union_all
+from shapely import LineString, MultiPolygon, Point, Polygon, box, set_precision, union_all
 
 from onward_generator.generation.config import DEFAULT_CONFIG_PATH, GenerationConfigError, config_from_document, load_generation_config
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
@@ -56,7 +56,7 @@ def test_a_hole_that_kisses_the_boundary_becomes_a_closed_slab() -> None:
     hole = [(10, 5), (8, 6), (8, 4), (10, 5)]
     pinched = Polygon(shell, [hole])
     assert closed_manifold_defects(prism(pinched, -1.0, 0.0, bottom=True)) > 0
-    opened = open_point_contacts(pinched)
+    opened = open_point_contacts(pinched, precision_m=0.001)
     slab = prism(opened, -1.0, 0.0, bottom=True)
     assert closed_manifold_defects(slab) == 0
     assert signed_volume(slab) == pytest.approx(opened.area)
@@ -67,13 +67,46 @@ def test_polygons_that_touch_at_a_corner_become_closed_slabs() -> None:
     """A carriageway cut by two crossings can leave two pieces that share one corner."""
     kissing = MultiPolygon([box(0, 0, 10, 10), box(10, 10, 20, 20)])
     assert closed_manifold_defects(prism(kissing, -1.0, 0.0, bottom=True)) > 0
-    opened = open_point_contacts(kissing)
+    opened = open_point_contacts(kissing, precision_m=0.001)
     slab = prism(opened, -1.0, 0.0, bottom=True)
     assert closed_manifold_defects(slab) == 0
     assert signed_volume(slab) == pytest.approx(opened.area)
     assert 0 < kissing.area - opened.area < 0.001
     apart = MultiPolygon([box(0, 0, 10, 10), box(11, 11, 20, 20)])
-    assert open_point_contacts(apart).equals(apart)
+    assert open_point_contacts(apart, precision_m=0.001).equals(apart)
+
+
+@pytest.mark.parametrize("skew", [0.001, 0.003, 0.01])
+def test_a_corner_cut_through_a_disk_vertex_stays_closed(skew: float) -> None:
+    """Two crossings that share a corner, one edge leaving it a hair off 45°.
+
+    The 1 cm cut meets that edge microns from one of its own vertices; unsnapped,
+    the 0.1 mm weld merged the pair and the slab had 16 open edges (Madrid r300).
+    """
+    kissing = MultiPolygon([Polygon([(0, 0), (6, 0), (5, 5 + skew)]), Polygon([(0, 0), (-5, -5 - skew), (-6, 0)])])
+    opened = open_point_contacts(kissing, precision_m=0.001)
+    assert closed_manifold_defects(prism(opened, -1.0, -0.15, bottom=True)) == 0
+    assert set_precision(opened, 0.001).equals(opened)
+
+
+def test_pieces_that_leave_their_contact_almost_parallel_are_cut_wider() -> None:
+    """Two crossings whose sides leave the shared corner 0.5° apart: a 1 cm cut snaps back into a contact."""
+    kissing = MultiPolygon([
+        Polygon([(0, 0), (-1.8, -2.25), (3, -1), (2, 2.4)]),
+        Polygon([(0, 0), (-7, 5.7), (-4, 0), (-1.83, -2.23)]),
+    ])
+    once = set_precision(kissing.difference(Point(0, 0).buffer(0.01)), 0.001)
+    assert closed_manifold_defects(prism(once, -1.0, -0.15, bottom=True)) > 0
+    opened = open_point_contacts(kissing, precision_m=0.001)
+    assert closed_manifold_defects(prism(opened, -1.0, -0.15, bottom=True)) == 0
+    assert len(polygons_of(opened)) == 2 and not polygons_of(opened)[0].touches(polygons_of(opened)[1])
+    assert kissing.area - opened.area == pytest.approx(0.0249, abs=0.001)
+
+
+def test_a_contact_that_no_cut_can_open_leaves_the_slab_unchanged() -> None:
+    """Two 1 mm squares that share a corner: any disk wide enough swallows both."""
+    tiny = MultiPolygon([box(0, 0, 0.001, 0.001), box(0.001, 0.001, 0.002, 0.002)])
+    assert open_point_contacts(tiny, precision_m=0.001) is tiny
 
 
 def test_a_there_and_back_hole_is_dropped_and_the_slab_closes() -> None:
