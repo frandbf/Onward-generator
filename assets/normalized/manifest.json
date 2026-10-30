@@ -1309,7 +1309,7 @@
       "lane": "forbid",
       "clearance_m": 0.0,
       "use": "watchtower at a block edge, plaza, lot or curb",
-      "description": "Dark steel lattice watchtower with stairs and a railed lookout; the file is only 0.3 m tall.",
+      "description": "Dark steel lattice watchtower with stairs and a railed lookout; the file is 0.3 m tall with no known scale, so it is refused.",
       "placement": "open_ground",
       "grouping": "single",
       "condition": "worn",
@@ -1318,6 +1318,7 @@
         "lookout",
         "checkpoint"
       ],
+      "refused": "unknown_scale",
       "triangles": 1764,
       "length_m": 0.148,
       "depth_m": 0.148,
@@ -1446,7 +1447,7 @@
       "lane": "forbid",
       "clearance_m": 0.0,
       "use": "warning sign at the curb, across the street, on a sidewalk or in a plaza",
-      "description": "Yellow folding A-frame warning sign; the file is only 0.38 m tall.",
+      "description": "Yellow folding A-frame warning sign; the file is 0.38 m tall with no known scale, so it is refused.",
       "placement": "kerb",
       "grouping": "single",
       "condition": "worn",
@@ -1454,6 +1455,7 @@
         "sign",
         "warning"
       ],
+      "refused": "unknown_scale",
       "triangles": 1798,
       "length_m": 0.24,
       "depth_m": 0.169,

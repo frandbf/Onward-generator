@@ -61,6 +61,14 @@
             "enum": ["single", "cluster", "run", "grid"]
           },
           "condition": { "enum": ["intact", "worn", "damaged", "wrecked", "burned"] },
+          "yaw_deg": {
+            "description": "Optional. Counter-clockwise turn about the vertical, in degrees, that the library applies when it loads the GLB, so the long side of a file authored along Y lies on +X as placement expects. The GLB is not rewritten.",
+            "enum": [0, 90, 180, 270]
+          },
+          "refused": {
+            "description": "Optional. The library never loads this row and reports the value as the reject reason. unknown_scale: the file has no reliable size in metres.",
+            "enum": ["unknown_scale"]
+          },
           "tags": {
             "type": "array",
             "maxItems": 4,

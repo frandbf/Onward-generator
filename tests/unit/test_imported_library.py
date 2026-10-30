@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from onward_generator.overgrow.manifest import LOAD_FIELDS
+
 REPO = Path(__file__).resolve().parents[2]
 CATALOG = REPO / "config" / "dress" / "imported_library.json"
 
@@ -82,7 +84,7 @@ def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
     assert sorted(listed) == files
     assert len(listed) == len(set(row["id"] for row in document["assets"]))
     for row in document["assets"]:
-        assert list(row) == list(sample)
+        assert [key for key in row if key not in LOAD_FIELDS] == list(sample)
         assert row["use"]
         assert row["collider"] == "none"
         assert (REPO / "assets" / "kenney" / row["file"]).is_file()
@@ -107,12 +109,18 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     props, rejects = read_library(REPO / "assets")
     kit = {row["id"] for row in rows if row["placement"] == "kit_only"}
     assert len(kit) == 128
-    assert sorted(rejects, key=lambda item: item.asset_id) == sorted(
-        (LibraryReject(ident, "kit_only") for ident in kit), key=lambda item: item.asset_id,
-    )
-    assert {prop.spec.id for prop in load_library(REPO / "assets")} == set(ids) - kit
+    refused = {row["id"]: row["refused"] for row in rows if "refused" in row}
+    assert refused == {"watchtower": "unknown_scale", "warning_signboard": "unknown_scale"}
+    expected = [LibraryReject(ident, "kit_only") for ident in kit]
+    expected += [LibraryReject(ident, reason) for ident, reason in refused.items()]
+    assert sorted(rejects, key=lambda item: item.asset_id) == sorted(expected, key=lambda item: item.asset_id)
+    assert {prop.spec.id for prop in load_library(REPO / "assets")} == set(ids) - kit - set(refused)
     loaded = {prop.spec.id for prop in props}
-    assert loaded == set(ids) - kit
+    assert loaded == set(ids) - kit - set(refused)
+    trucks = [prop for prop in props if prop.spec.id.startswith("kenney_urban_truck_")]
+    assert len(trucks) == 5 and all(prop.length_m > prop.half_y * 2 for prop in trucks)
+    bench = next(prop for prop in props if prop.spec.id == "kenney_urban_detail_bench")
+    assert bench.triangles == 84 and len(bench.parts) == 2
     driveway = next(prop for prop in props if prop.spec.id == "kenney_suburban_driveway_long")
     texture = (REPO / "assets/kenney/suburban/Textures/colormap.png").read_bytes()
     assert driveway.albedo == texture

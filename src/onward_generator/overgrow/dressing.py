@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -357,12 +357,11 @@ def _cover_reason(
 
 def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_streets: bool = False, turn: float = 0.0, floor: RoadFloor | None = None) -> tuple[float, float]:
     matrix, x, y, z = _frame(prop, spot, block_streets, turn, floor)
-    material = f"prop_{prop.spec.id}"
     first = prop.spec.id not in seen
     seen.add(prop.spec.id)
     result.nodes.append(Node(
         f"overgrow/prop/{prop.spec.id}/{len(result.nodes)}",
-        (Primitive(prop.mesh, material, prop.uvs),) if first else (),
+        prop.primitives() if first else (),
         {
             "type": "overgrowth",
             "origin": "generated",
@@ -377,7 +376,7 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
         matrix,
         f"prop:{prop.spec.id}",
     ))
-    result.images[material] = prop.albedo
+    result.images.update(prop.images())
     result.triangles += prop.triangles
     result.placed_ids.append(prop.spec.id)
     result.records.append({
@@ -472,7 +471,7 @@ def _fitted(prop: Prop) -> Prop:
     length_m, width_m, height_m = measure(mesh)
     if size_reason(prop.spec.role, length_m, width_m, height_m) is not None:
         return prop
-    return Prop(prop.spec, mesh, prop.uvs, prop.albedo, scale)
+    return replace(prop, mesh=mesh, fit_scale=scale)
 
 
 def _final_xy(prop: Prop, spot: Spot, block_streets: bool = False, turn: float = 0.0, floor: RoadFloor | None = None) -> tuple[float, float]:

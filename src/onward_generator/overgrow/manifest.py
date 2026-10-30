@@ -22,6 +22,8 @@ MANIFEST_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "config" / "asset_m
 MANIFEST_VERSION = "0.2.0"
 LEGACY_VERSION = "0.1.0"
 SEMANTIC_FIELDS = ("description", "placement", "grouping", "condition", "tags")
+# Load corrections a person set on a row: a quarter turn, or a refusal such as unknown_scale.
+LOAD_FIELDS = ("yaw_deg", "refused")
 KIT_ONLY = "kit_only"
 
 
@@ -46,7 +48,7 @@ def check_manifest(document: object, where: str) -> None:
 
 
 def keep_semantics(document: dict[str, Any], previous: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Copy the curated fields of rows the previous manifest described into a rewritten one.
+    """Copy the curated fields and load corrections of rows the previous manifest described into a rewritten one.
 
     The fields go right after ``use``. When a row is left without them, the
     manifest is written as 0.1.0 and the semantics block is dropped.
@@ -55,7 +57,7 @@ def keep_semantics(document: dict[str, Any], previous: Mapping[str, Any] | None)
     by_id = {str(row.get("id")): row for row in old.get("assets") or [] if isinstance(row, Mapping)}
     rows = []
     for row in document["assets"]:
-        curated = {key: by_id[row["id"]][key] for key in SEMANTIC_FIELDS if key in by_id.get(row["id"], {})}
+        curated = {key: by_id[row["id"]][key] for key in (*SEMANTIC_FIELDS, *LOAD_FIELDS) if key in by_id.get(row["id"], {})}
         merged: dict[str, Any] = {}
         for key, value in row.items():
             if key not in curated:

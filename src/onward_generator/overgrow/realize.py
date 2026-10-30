@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from shapely import STRtree
@@ -84,7 +84,7 @@ def fitted_props(props: list[Prop]) -> list[Prop]:
         if scale == 1.0:
             ready.append(prop)
         else:
-            ready.append(Prop(prop.spec, mesh, prop.uvs, prop.albedo, scale))
+            ready.append(replace(prop, mesh=mesh, fit_scale=scale))
     return ready
 
 
@@ -414,10 +414,9 @@ def _accepts(prop: Prop, matrix: np.ndarray, site: Site, *, allow_lane: bool) ->
 
 def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_id: str, crosswise: bool, op_index: int) -> None:
     first = prop.spec.id not in set(result.placed_ids)
-    material = f"prop_{prop.spec.id}"
     result.nodes.append(Node(
         f"overgrow/prop/{prop.spec.id}/{len(result.nodes)}",
-        (Primitive(prop.mesh, material, prop.uvs),) if first else (),
+        prop.primitives() if first else (),
         {
             "type": "overgrowth",
             "origin": "ai_generated",
@@ -434,7 +433,7 @@ def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_i
         matrix,
         f"prop:{prop.spec.id}",
     ))
-    result.images[material] = prop.albedo
+    result.images.update(prop.images())
     result.triangles += prop.triangles
     result.placed_ids.append(prop.spec.id)
     x, y, z = float(matrix[0, 3]), float(matrix[1, 3]), float(matrix[2, 3])
