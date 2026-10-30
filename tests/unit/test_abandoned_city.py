@@ -16,7 +16,7 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_f
 from onward_generator.generation.mesh import Mesh, box
 from onward_generator.overgrow.catalog import ALL_ASSETS, CATEGORIES, PLACEMENT_RULES, WEAR_NOTE, AssetSpec, rules_for
 from onward_generator.overgrow.dressing import block_reason
-from onward_generator.overgrow.growth import moss_png
+from onward_generator.overgrow.growth import grass_png
 from onward_generator.overgrow.library import load_library
 from onward_generator.overgrow.normalize import cluster_decimate, normalize_arrays
 from onward_generator.overgrow.place import overgrow
@@ -91,7 +91,7 @@ def _prop_glb(path: Path, name: str, *, length: float = 0.5, width: float = 0.3,
     path.write_bytes(build_glb(
         [Node(name, (Primitive(mesh, name, uvs),), {"type": "prop"})],
         {name: Material((1, 1, 1, 1), 0.9)},
-        repeat_images={name: moss_png()},
+        repeat_images={name: grass_png()},
         preserve_uvs=True,
     ))
 
@@ -156,11 +156,11 @@ def test_manifest_uses_the_wider_surface_catalog() -> None:
 
 
 def test_profile_lowers_density_and_caps() -> None:
-    assert profile_for(10).moss < profile_for(100).moss
+    assert profile_for(10).grass < profile_for(100).grass
     assert scaled_cap(12, profile_for(10).props) < scaled_cap(12, profile_for(100).props)
 
 
-def test_profile_changes_how_many_moss_strips_are_kept(tmp_path: Path) -> None:
+def test_profile_changes_how_many_grass_tufts_are_kept(tmp_path: Path) -> None:
     scene = tmp_path / "geo_scene.json"
     _scene(scene, [
         _feature("highway", {"type": "LineString", "coordinates": [[-20, 0], [70, 0]]},
@@ -171,8 +171,42 @@ def test_profile_changes_how_many_moss_strips_are_kept(tmp_path: Path) -> None:
     zone = square_zone(80)
     low = overgrow(tmp_path / "base", scene, tmp_path / "low", profile=10, seed=48152, zone=zone)
     high = overgrow(tmp_path / "base", scene, tmp_path / "high", profile=100, seed=48152, zone=zone)
-    assert high["moss"] > low["moss"]
+    assert high["grass"] > low["grass"]
     assert high["profile_years"] == 100 and low["profile_years"] == 10
+
+
+def test_no_moss_skirt_is_written_but_the_report_keeps_the_key(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, [
+        _feature("highway", {"type": "LineString", "coordinates": [[-20, 0], [70, 0]]},
+                 {"highway": "residential"}, "osm-way-mayor"),
+        _zigzag(),
+    ])
+    _base(tmp_path / "base")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", profile=100, seed=48152, zone=square_zone(80))
+    assert report["moss"] == 0
+    assert all(row.get("kind") != "moss" for row in report["rejects"])
+    nodes, materials = nodes_from_glb((tmp_path / "out" / "scene_visual.glb").read_bytes())
+    assert not any(node.name == "overgrow/moss" for node in nodes)
+    assert "abandoned_moss" not in materials
+
+
+def test_overgrow_place_prints_the_summary_without_moss(tmp_path: Path, capsys) -> None:
+    from onward_generator.overgrow.__main__ import build_parser as overgrow_parser
+    from onward_generator.overgrow.__main__ import main as overgrow_main
+
+    assert overgrow_parser().description == "Add abandoned-city grass, trees and wrecks to a scene copy. Does not export."
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    out = tmp_path / "out"
+    assert overgrow_main(["place", "--base", str(tmp_path / "base"), "--scene", str(scene), "--out", str(out), "--zone-radius", "60"]) == 0
+    report = json.loads((out / "overgrow_report.json").read_text(encoding="utf-8"))
+    first = capsys.readouterr().out.splitlines()[0]
+    assert first == (
+        f"overgrow: grass={report['grass']} vines={report['vines']} trees={report['trees']} "
+        f"({report['trees_observed']} observed) wrecks={report['wrecks']} props={report['props']} tris={report['added_triangles']}"
+    )
 
 
 def test_same_seed_is_byte_stable_and_a_different_seed_is_not(tmp_path: Path) -> None:
@@ -303,7 +337,7 @@ def test_a_loaded_prop_rests_its_bottom_on_zero(tmp_path: Path) -> None:
     (root / "metal_trash_can.glb").write_bytes(build_glb(
         [Node("metal_trash_can", (Primitive(mesh, "albedo"),), {})],
         {"albedo": Material((1, 1, 1, 1), 1)},
-        repeat_images={"albedo": moss_png()},
+        repeat_images={"albedo": grass_png()},
     ))
     (root / "manifest.json").write_text(json.dumps({
         "assets": [{"id": "metal_trash_can", "file": "metal_trash_can.glb"}],

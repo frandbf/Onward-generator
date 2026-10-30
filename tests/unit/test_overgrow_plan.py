@@ -332,7 +332,7 @@ def test_replay_places_the_plan_and_fit_accepts_it(tmp_path: Path) -> None:
     assert report["ambient_origin"] == "ai_generated"
     assert report["wrecks"] == 0
     assert report["compose_actions"] == 4
-    assert report["moss"] >= 1
+    assert report["moss"] == 0
     checked, problems = check_scene(out, scene_path)
     assert problems == []
     assert checked >= 4

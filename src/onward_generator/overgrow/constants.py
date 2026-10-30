@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 LANE_M = 4.2
-MAX_MOSS = 1200
 MAX_TUFTS = 480
 MAX_TREES = 96
 MAX_WRECKS = 28

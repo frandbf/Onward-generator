@@ -114,7 +114,7 @@ def test_growth_stays_off_the_lane_and_keeps_an_osm_tree(tmp_path: Path) -> None
     assert report["geometry"]["identical"] is True
     assert report["trees_observed"] == 1
     assert report["grass"] >= 1
-    assert report["moss"] >= 1
+    assert report["moss"] == 0
     assert report["wrecks"] >= 1
     collision_nodes, _ = nodes_from_glb((tmp_path / "scene_overgrow" / "scene_collision.glb").read_bytes())
     assert sum(node.name.startswith("overgrow/collider/wreck/") for node in collision_nodes) == report["wrecks"]

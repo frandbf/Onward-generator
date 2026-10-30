@@ -187,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("materials", help="apply a texture-plan JSON to a scene copy (see: materials --help)", add_help=False)
     sub.add_parser("panoramax", help="under development: project 360 street photos onto exposed facades (see: panoramax --help)", add_help=False)
     sub.add_parser("signs", help="hang OSM street-name plates on facades (see: signs --help)", add_help=False)
-    sub.add_parser("overgrow", help="add abandoned-city moss, grass, trees and wrecks (see: overgrow --help)", add_help=False)
+    sub.add_parser("overgrow", help="add abandoned-city grass, trees and wrecks (see: overgrow --help)", add_help=False)
     sub.add_parser("map", help="create or inspect one map folder (see: map --help)", add_help=False)
     run = sub.add_parser(
         "run",

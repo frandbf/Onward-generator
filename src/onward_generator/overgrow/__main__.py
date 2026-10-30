@@ -28,7 +28,7 @@ from onward_generator.overgrow.zone import ZoneError
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="onward-generator overgrow",
-        description="Add abandoned-city moss, grass, trees and wrecks to a scene copy. Does not export.",
+        description="Add abandoned-city grass, trees and wrecks to a scene copy. Does not export.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     place = sub.add_parser("place", help="write a new directory; the drive lane stays clear")
@@ -124,7 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"overgrow: {exc}", file=sys.stderr)
         return 1
     print(
-        f"overgrow: moss={report['moss']} grass={report['grass']} vines={report['vines']} "
+        f"overgrow: grass={report['grass']} vines={report['vines']} "
         f"trees={report['trees']} ({report['trees_observed']} observed) wrecks={report['wrecks']} "
         f"props={report['props']} tris={report['added_triangles']}"
     )
