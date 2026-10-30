@@ -20,6 +20,7 @@ from onward_generator.generation.config import Material
 
 MIN_TILE_PX = 256
 MIN_MEAN_LUMA = 80  # unused / fallback tiles stay visible after shader multiply
+PNG_LEVEL = 9  # zlib level of every texture PNG; the tile cache key includes it
 # Threads that bake and encode texture PNGs at once. zlib and Pillow's resize release the GIL.
 PNG_WORKERS = 6  # pragma: no mutate: the pool size changes speed, never the bytes or their order
 
@@ -48,7 +49,7 @@ def encode_png_rgba(pixels: np.ndarray) -> bytes:
 
     image = Image.fromarray(np.ascontiguousarray(pixels))
     buffer = BytesIO()
-    image.save(buffer, format="PNG", optimize=False, compress_level=9)
+    image.save(buffer, format="PNG", optimize=False, compress_level=PNG_LEVEL)  # pragma: no mutate: Pillow reads the format case-insensitively, and optimize only forces level 9, which PNG_LEVEL is
     return buffer.getvalue()
 
 

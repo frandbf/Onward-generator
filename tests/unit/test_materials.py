@@ -446,6 +446,53 @@ def test_share_facade_photos_takes_the_first_plaster_slot_the_plan_has(tmp_path:
     assert share_facade_photos({"doors": ochre}, {"plaster_salmon"}, empty) == [] and empty == {}
 
 
+def test_a_warm_tile_cache_writes_the_bytes_of_a_cold_one_without_baking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, cobble=True, salmon=True)
+    plan = _polyhaven_plan(tmp_path / "plan.json")
+    apply_materials(base, tmp_path / "off", cache_dir=cache, download=False, plan_path=plan)
+    monkeypatch.delenv("ONWARD_GENERATOR_NO_TILE_CACHE")
+    monkeypatch.setenv("ONWARD_GENERATOR_CACHE_DIR", str(tmp_path / "tiles_home"))
+    tiles = tmp_path / "tiles_home" / "tiles"
+    apply_materials(base, tmp_path / "unused", cache_dir=cache, download=False, plan_path=plan, tile_cache=False)
+    assert not tiles.exists()
+    report = apply_materials(base, tmp_path / "cold", cache_dir=cache, download=False, plan_path=plan)
+    photos = {row["color_id"] for row in report["applied"]} | {row["color_id"] for row in report["textures"]["interior"]}
+    photos |= {row["color_id"] for row in report["textures"]["facade_shared"]}
+    # Two colours can share one photograph, mode and side, and so one entry.
+    assert 0 < len(list(tiles.iterdir())) <= len(photos)
+
+    def no_bake(*_: object) -> None:
+        raise AssertionError("a warm cache does not bake again")
+
+    monkeypatch.setattr("onward_generator.materials.apply.bake_photo_tile", no_bake)
+    apply_materials(base, tmp_path / "warm", cache_dir=cache, download=False, plan_path=plan)
+    for name in ("scene_visual.glb", "atlas.png"):
+        cold = (tmp_path / "cold" / name).read_bytes()
+        assert cold == (tmp_path / "off" / name).read_bytes() == (tmp_path / "warm" / name).read_bytes()
+
+
+def test_apply_help_names_the_tile_cache_switch(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["materials", "apply", "--help"]) == 0
+    text = " ".join(capsys.readouterr().out.split())
+    assert "--no-tile-cache bake every photo tile again instead of reading the tile cache" in text
+
+
+def test_cli_no_tile_cache_leaves_the_cache_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path)
+    plan = _polyhaven_plan(tmp_path / "plan.json")
+    monkeypatch.delenv("ONWARD_GENERATOR_NO_TILE_CACHE")
+    monkeypatch.setenv("ONWARD_GENERATOR_CACHE_DIR", str(tmp_path / "tiles_home"))
+    args = ["materials", "apply", "--base", str(base), "--cache", str(cache), "--plan", str(plan)]
+    assert main([*args, "--out", str(tmp_path / "first"), "--no-tile-cache"]) == 0
+    assert not (tmp_path / "tiles_home").exists()
+    assert main([*args, "--out", str(tmp_path / "second")]) == 0
+    assert list((tmp_path / "tiles_home" / "tiles").iterdir())
+
+
 def test_cli_refuses_protected_output(tmp_path: Path) -> None:
     cache = tmp_path / "cache"
     _cache_plan(cache)

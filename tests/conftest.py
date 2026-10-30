@@ -28,6 +28,12 @@ SYNTHETIC_LICENSE = LicenseInfo(
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_tile_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never read or write the user's tile cache. A test that wants one sets its own directory."""
+    monkeypatch.setenv("ONWARD_GENERATOR_NO_TILE_CACHE", "1")
+
+
 @pytest.fixture
 def synthetic_source() -> SourceDataset:
     return register_local_source(

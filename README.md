@@ -33,7 +33,7 @@ tools/docker/run.sh onward-generator doctor
 tools/docker/run.sh --build pytest -q
 ```
 
-`--build` rebuilds the image first; use it after a lock file changes.
+`--build` rebuilds the image first; use it after a lock file changes. The wrapper also mounts `${XDG_CACHE_HOME:-~/.cache}/onward-generator`, so the texture tile cache (`docs/08-dress.md`) is kept between runs.
 
 **Local virtual environment.**
 

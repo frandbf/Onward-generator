@@ -40,6 +40,7 @@ from onward_generator.materials.polyhaven import (
     TextureRecord,
     ensure_diffuse_1k,
 )
+from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
@@ -144,9 +145,13 @@ def share_interior_photos(
     return shared
 
 
-def _photo_png(rgb: Any, mode: str) -> bytes:
+def _photo_png(rgb: Any, mode: str, cache: TileCache | None = None) -> bytes:
     side = min(MAX_PHOTO_PX, max(int(rgb.shape[0]), int(rgb.shape[1]), 1))
-    return encode_png_rgba(bake_photo_tile(rgb, side, mode))
+
+    def bake() -> bytes:
+        return encode_png_rgba(bake_photo_tile(rgb, side, mode))
+
+    return bake() if cache is None else cache.fetch(photo_tile_key(rgb, side, mode), bake)
 
 
 def _procedural_png(color_id: str, seed: int) -> bytes:
@@ -311,7 +316,9 @@ def apply_materials(
     overwrite: bool = False,
     fetch: Fetcher | None = None,
     seed: int = 48152,
+    tile_cache: bool = True,
 ) -> dict[str, Any]:
+    """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it."""
     base = Path(base_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     if not (base / "scene_visual.glb").is_file() or not (base / "scene_detail.json").is_file():
@@ -446,6 +453,8 @@ def apply_materials(
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
         tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
+    cache_root = tile_cache_dir() if tile_cache else None
+    cache = None if cache_root is None else TileCache(cache_root)
     png_jobs: dict[str, Callable[[], bytes]] = {}
     for index, color_id in enumerate(sorted(used_ids)):
         if color_id in ("glass_dark", "glass_view"):
@@ -459,7 +468,7 @@ def apply_materials(
             continue
         if color_id in photo_tiles:
             rgb, mode = photo_tiles[color_id]
-            png_jobs[color_id] = partial(_photo_png, rgb, mode)
+            png_jobs[color_id] = partial(_photo_png, rgb, mode, cache)
             continue
         png_jobs[color_id] = partial(_procedural_png, color_id, seed + index)
     repeat_images = run_png_jobs(png_jobs)
