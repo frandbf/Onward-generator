@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from shapely import LineString, STRtree
 
 from onward_generator.cli import main
 from onward_generator.detail.config import load_detail_config
@@ -19,7 +20,7 @@ from onward_generator.detail.shops import plan_shops
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.signs.place import place_signs
+from onward_generator.signs.place import _choose, _sign_for, _streets, _walls, place_signs
 from onward_generator.signs.plaque import plaque_png
 from tests.conftest import MURCIA_CENTER
 
@@ -169,3 +170,57 @@ def test_a_boarded_shop_keeps_its_sign_and_loses_its_vinyl(tmp_path: Path, glass
     ))
     report = place_signs(base, scene, tmp_path / "out")
     assert report["shop_signs"]["kinds"] == {"fascia": 1, "blade": 0, "vinyl": vinyls}
+
+
+class _EveryWall:
+    """Stands in for the wall tree: every wall is a candidate, as before the tree."""
+
+    def __init__(self, count: int) -> None:
+        self.count = count
+
+    def query(self, _geometry: object) -> np.ndarray:
+        return np.arange(self.count)
+
+
+def _block_town() -> list[dict]:
+    """A 360 m square of blocks on two crossing streets; every ninth block is drawn twice."""
+    rng = np.random.default_rng(48152)
+    features = [
+        _feature("highway", {"type": "LineString", "coordinates": [[-180, 2], [100, 2]]},
+                 {"highway": "residential", "name": "Calle Mayor"}, "osm-way-mayor"),
+        _feature("highway", {"type": "LineString", "coordinates": [[3, -180], [3, 100]]},
+                 {"highway": "residential", "name": "Calle Nueva"}, "osm-way-nueva"),
+    ]
+    for index in range(70):
+        x0, y0 = (float(v) for v in rng.uniform(-170, 160, 2))
+        w, d = (float(v) for v in rng.uniform(6, 20, 2))
+        ring = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + d], [x0, y0 + d], [x0, y0]]
+        for twin in range(2 if index % 9 == 0 else 1):
+            features.append(_feature("building", {"type": "Polygon", "coordinates": [ring]},
+                                     {"building": "yes", "height": "12"}, f"osm-way-{index}-{twin}"))
+    return features
+
+
+def test_the_wall_tree_picks_the_same_wall_as_trying_every_wall() -> None:
+    features = _block_town()
+    streets, walls = _streets(features), _walls(features)
+    tree = STRtree([LineString([wall.a, wall.b]) for wall in walls])
+    picked = 0
+    for x in range(-170, 171, 34):
+        for y in range(-170, 171, 34):
+            for name in ("Calle Mayor", "Calle Nueva"):
+                point = np.array([float(x), float(y)])
+                fast = _sign_for(name, point, streets, walls, tree, set())
+                slow = _sign_for(name, point, streets, walls, _EveryWall(len(walls)), set())  # type: ignore[arg-type]
+                assert (fast is None) == (slow is None)
+                if fast is not None and slow is not None:
+                    picked += 1
+                    assert fast.feature_id == slow.feature_id
+                    assert np.array_equal(fast.position, slow.position)
+                    assert np.array_equal(fast.along, slow.along)
+    assert picked > 60, picked
+    # Each street's first plate is the one for the crossing at (3, 2), not for its midpoint 40 m away.
+    chosen = {sign.name: sign for sign in _choose(streets, walls, 64)}
+    for name in ("Calle Mayor", "Calle Nueva"):
+        at_crossing = _sign_for(name, np.array([3.0, 2.0]), streets, walls, tree, set())
+        assert at_crossing is not None and np.array_equal(chosen[name].position, at_crossing.position)

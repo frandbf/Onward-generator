@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import LineString, Point, Polygon, STRtree
+from shapely import LineString, Point, Polygon, STRtree, box
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
@@ -280,12 +280,13 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int) 
     if not streets or not walls:
         return []
     junctions = _junctions(streets)
+    tree = STRtree([LineString([wall.a, wall.b]) for wall in walls])
     chosen: list[Sign] = []
     used_edges: set[tuple[str, int]] = set()
     seen_names: set[str] = set()
     for point, names in junctions:
         for name in names:
-            sign = _sign_for(name, point, streets, walls, used_edges)
+            sign = _sign_for(name, point, streets, walls, tree, used_edges)
             if sign is None or _too_close(sign, chosen):
                 continue
             chosen.append(sign)
@@ -294,7 +295,7 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int) 
         if street.name in seen_names:
             continue
         mid = street.line.interpolate(0.5, normalized=True)
-        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, used_edges)
+        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges)
         if sign is None or _too_close(sign, chosen):
             continue
         chosen.append(sign)
@@ -351,11 +352,21 @@ def _sign_for(
     point: np.ndarray,
     streets: Sequence[_Street],
     walls: Sequence[_Wall],
+    tree: STRtree,
     used_edges: set[tuple[str, int]],
 ) -> Sign | None:
+    """The nearest wall within ``MAX_JUNCTION_M`` that faces ``point`` along the street.
+
+    ``tree`` holds one segment per wall, in the order of ``walls``. Only walls
+    whose box meets the square of half-side ``MAX_JUNCTION_M`` around ``point``
+    can be that close, and they are tried in the order of ``walls``.
+    """
     tangent = _tangent(name, point, streets)
     best: tuple[float, int, _Wall, np.ndarray] | None = None
-    for index, wall in enumerate(walls):
+    x, y = float(point[0]), float(point[1])
+    near = tree.query(box(x - MAX_JUNCTION_M, y - MAX_JUNCTION_M, x + MAX_JUNCTION_M, y + MAX_JUNCTION_M))
+    for index in sorted(int(k) for k in near):
+        wall = walls[index]
         if wall.height_m is not None and wall.height_m < MIN_WALL_M:
             continue
         edge = wall.b - wall.a
