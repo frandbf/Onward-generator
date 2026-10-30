@@ -21,6 +21,10 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "detail.default.json"
 SCHEMA_PATH = REPO_ROOT / "config" / "detail.schema.json"
 # Facade uses, most specific first. A building with several uses takes the first one.
 FACADE_USES = ("historic", "institutional", "office", "retail", "industrial", "residential")
+# A fascia sits FASCIA_GAP_M above the shopfront head. With 2 cm left under the storey line,
+# a fascia needs FASCIA_CLEAR_M more than its own height above the head.
+FASCIA_GAP_M = 0.05
+FASCIA_CLEAR_M = 0.07
 
 
 class DetailConfigError(ValueError):
@@ -34,6 +38,37 @@ class Opening:
     width_m: float
     height_m: float
     sill_m: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class Shopfront:
+    """A display window that fills its bay: as wide and as tall as the bay and the storey allow, within limits."""
+
+    min_width_m: float
+    max_width_m: float
+    sill_m: float
+    min_height_m: float
+    max_height_m: float
+    head_m: float
+
+
+@dataclass(frozen=True, slots=True)
+class ShopSigns:
+    fascia_share: float
+    vinyl_share: float
+    fascia_height_m: float
+    fascia_overhang_m: float
+    fascia_depth_m: float
+    blade_width_m: float
+    blade_height_m: float
+    blade_thickness_m: float
+    blade_wall_gap_m: float
+    blade_clearance_m: float
+    vinyl_height_m: float
+    vinyl_centre_m: float
+    vinyl_width_share: float
+    default_name: str
+    generic_names: Mapping[str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +190,9 @@ class DetailConfig:
     landmark_template: str
     main_door: Opening
     landmark_door: Opening
-    shopfront: Opening
+    shopfront: Shopfront
+    shop_door: Opening
+    shops: ShopSigns
     shop_evidence_keys: tuple[str, ...]
     shop_evidence_distance_m: float
     facade_palettes: Mapping[str, tuple[str, ...]]
@@ -210,6 +247,17 @@ def _opening(d: Mapping[str, Any]) -> Opening:
     return Opening(float(d["width_m"]), float(d["height_m"]), float(d.get("sill_m", 0.0)))
 
 
+def _shops(d: Mapping[str, Any]) -> ShopSigns:
+    f, b, v = d["fascia"], d["blade"], d["vinyl"]
+    return ShopSigns(
+        float(d["fascia_share"]), float(d["vinyl_share"]),
+        float(f["height_m"]), float(f["overhang_m"]), float(f["depth_m"]),
+        float(b["width_m"]), float(b["height_m"]), float(b["thickness_m"]), float(b["wall_gap_m"]), float(b["clearance_m"]),
+        float(v["height_m"]), float(v["centre_m"]), float(v["width_share"]),
+        d["default_name"], MappingProxyType(dict(sorted(d["generic_names"].items()))),
+    )
+
+
 def _template(name: str, d: Mapping[str, Any]) -> Template:
     b, roof = d["balcony"], d["roof"]
     hip = roof["hip"]
@@ -258,6 +306,17 @@ def _semantic(cfg: DetailConfig) -> list[str]:
                 problems.append(f"{where}/balcony: door wider than the balcony")
     for use, palette in cfg.facade_palettes.items():
         problems += [f"/facade_palettes/{use}: material {m!r} is not defined in /materials" for m in palette if m not in mats]
+    shop, signs = cfg.shopfront, cfg.shops
+    if shop.min_width_m > shop.max_width_m or shop.min_height_m > shop.max_height_m:
+        problems.append("/doors/shopfront: a minimum exceeds its maximum")
+    if signs.fascia_height_m + FASCIA_CLEAR_M > shop.head_m:
+        problems.append(f"/shops/fascia/height_m: plus {FASCIA_CLEAR_M} m does not fit in /doors/shopfront/head_m")
+    if 2 * signs.fascia_overhang_m > cfg.min_pier_m:
+        problems.append("/shops/fascia/overhang_m: two overhangs exceed /openings/min_pier_m")
+    if 2 * signs.blade_thickness_m > cfg.min_pier_m:
+        problems.append("/shops/blade/thickness_m: exceeds half of /openings/min_pier_m")
+    if signs.vinyl_height_m > shop.min_height_m:
+        problems.append("/shops/vinyl/height_m: taller than /doors/shopfront/min_height_m")
     rule = cfg.interiors.rule
     if cfg.interiors.max_buildings > 0 and cfg.interiors.min_buildings > cfg.interiors.max_buildings:
         problems.append("/interiors: min_buildings must be at most max_buildings")
@@ -300,7 +359,9 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         landmark_template=doc["landmark_template"],
         main_door=_opening(doc["doors"]["main"]),
         landmark_door=_opening(doc["doors"]["landmark"]),
-        shopfront=_opening(doc["doors"]["shopfront"]),
+        shopfront=Shopfront(**{k: float(v) for k, v in doc["doors"]["shopfront"].items()}),
+        shop_door=_opening(doc["doors"]["shop_door"]),
+        shops=_shops(doc["shops"]),
         shop_evidence_keys=tuple(doc["doors"]["shop_evidence_keys"]),
         shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
         facade_palettes=MappingProxyType({use: tuple(doc["facade_palettes"][use]) for use in FACADE_USES}),

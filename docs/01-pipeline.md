@@ -108,7 +108,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Asset Store instances | `props place` | the `detail` geometry |
 | Textures | `materials apply` | geometry and OSM footprints |
 | Street photos | `panoramax apply`, under development, only when `map.json` has `"panoramax": true` | collision, roofs, interiors, and buildings without a photo |
-| Street name | `signs place` on the dressed copy | the carriageway and the facades |
+| Street name, shop signs | `signs place` on the dressed copy (where a sign goes and its name come from `detail`) | the carriageway and the facades |
 | Abandoned city | `overgrow place`, then `overgrow fit` | building footprints and the drive lane |
 | Perimeter wall | `bounds` on the dressed copy, then layout and export | `generate` and `detail` |
 | Spawns, routes, modes | `perf layout --playable` and a new package | the geometry |
@@ -266,6 +266,8 @@ Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.
 ## 8b. Street plates
 
 `onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. The text uses DejaVu Sans Bold 2.37, vendored in `assets/fonts/dejavu` and loaded by path, so the plate does not depend on system fonts. The name is normalised to Unicode NFC before drawing, so a decomposed accent draws as one letter (`í`, `ñ`). The plate is not the official design of any city.
+
+The same command draws the shop signs and window vinyls that `detail` recorded in `facade.shops` (`docs/07-detail.md`): one fascia or blade sign per shop and a vinyl strip on some shop windows. All labels go into one atlas (`shop_sign_atlas_0`, a second page only when the first is full, roughly 40 shops; never more than two) plus `shop_sign_edge` for rims and brackets. A building whose glass `materials apply` boarded up keeps its sign and loses its vinyls. They are visual only. `signs_report.json` has `shop_signs` (count, kinds, pages, triangles, labels skipped because the atlas was full).
 
 | | |
 | --- | --- |

@@ -260,7 +260,9 @@ def _panoramax(out: Path) -> StageReport:
 
 
 def _signs(out: Path) -> StageReport:
-    return StageReport(plural(int(_read(out / "signs_report.json")["count"]), "plate"))
+    report = _read(out / "signs_report.json")
+    shops = int((report.get("shop_signs") or {}).get("count", 0))
+    return StageReport(f"{plural(int(report['count']), 'plate')}  {plural(shops, 'shop sign')}")
 
 
 def _overgrow(out: Path) -> StageReport:

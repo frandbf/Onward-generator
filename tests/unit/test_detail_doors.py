@@ -29,7 +29,7 @@ def _door(layout: Layout) -> Hole:
     return next(h for h in layout.holes if h.kind == "door")
 
 
-@pytest.mark.parametrize("kind", ["door", "landmark_door", "interior_door"])
+@pytest.mark.parametrize("kind", ["door", "landmark_door", "shop_door", "interior_door"])
 def test_a_layout_with_a_door_is_left_alone(kind: str) -> None:
     layout = Layout([Hole(kind, 0, 3.0, 0.0, 1.2, 2.4, 0.15, "door_wood", 1, 0), _window(0, 6.0)])
     before = list(layout.holes)
@@ -155,3 +155,13 @@ def test_door_walls_fall_back_to_short_walls_that_touch_no_neighbour() -> None:
     assert door_walls([front], box(-1, -1, 0.8, 0), CFG) == []
     # A neighbour that only meets the wall's corner leaves it free.
     assert door_walls([front], box(-1, -1, 0, 0), CFG) == [front]
+
+
+def test_a_shop_without_room_for_its_door_gets_a_low_glazed_one() -> None:
+    low = Storeys(3, 8 / 3, "heights_levels")
+    layout = Layout([Hole("shopfront", 0, 0.85, 0.25, 3.1, 1.97, 0.15, "glass_dark", 0, 0)])
+    rule = ensure_door(layout, [_wall(12.0)], low, "shop_door", CFG.shop_door, TEMPLATE, box(0, 0, 12, 10), CFG)
+    assert rule == "fallback"
+    door = next(h for h in layout.holes if h.kind == "shop_door")
+    assert (door.back, door.width) == ("glass_dark", CFG.shop_door.width_m)
+    assert door.height == pytest.approx(8 / 3 - CFG.head_clearance_m)

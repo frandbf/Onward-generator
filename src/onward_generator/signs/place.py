@@ -1,7 +1,8 @@
-"""Hang one OSM street-name plate on the wall that faces that street.
+"""Hang one OSM street-name plate on the wall that faces that street, and draw the shop signs.
 
 Names come only from the highway ``name`` tag. Unnamed ways get no plate.
-The plate is visual: it is not added to the collision mesh.
+The plate is visual: it is not added to the collision mesh. Shop signs and
+vinyls come from ``facade.shops`` in the detail manifest (``signs/shop.py``).
 """
 
 from __future__ import annotations
@@ -27,7 +28,9 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, images_
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.signs.plaque import plaque_png
+from onward_generator.signs.shop import shop_signs
 
+BUILDING_NODE = "building/"  # visual node name prefix; the rest is the building id
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 SKIP_HIGHWAYS = frozenset({
     "footway", "path", "cycleway", "steps", "corridor", "elevator",
@@ -136,11 +139,16 @@ def place_signs(
         materials.setdefault(sign.material, Material((1.0, 1.0, 1.0, 1.0), 0.6))
         images[sign.material] = plaque_png(sign.name)
     materials.setdefault("street_sign_edge", Material(EDGE_COLOR, 0.7))
+    boarded = {n.name[len(BUILDING_NODE):] for n in nodes if n.name.startswith(BUILDING_NODE)
+               and any(p.material == "glass_boarded" for p in n.primitives)}
+    shops = shop_signs(manifest, boarded)
+    materials.update(shops.materials)
+    images.update(shops.images)
 
     visual = build_glb(
-        [*nodes, *sign_nodes],
+        [*nodes, *sign_nodes, *shops.nodes],
         materials,
-        extras={"manifest": "scene_detail.json", "street_signs": len(signs)},
+        extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows)},
         repeat_images=images,
         unit_uv_materials={sign.material for sign in signs},
         preserve_uvs=True,
@@ -161,6 +169,8 @@ def place_signs(
             "wall_feature": sign.feature_id,
             "position_m": [round(float(v), 3) for v in sign.position],
         })
+    for n, row in enumerate(shops.rows):
+        objects.append({"id": f"shop_sign/{row['building']}/{n}", "type": "shop_sign", "attribute_origin": "generated", **row})
     written["objects"] = objects
     atomic_write_json(targets[2], written)
     report_src = base / "detail_report.json"
@@ -168,6 +178,7 @@ def place_signs(
     after = _geographic(written)
     compare = compare_fingerprints(before, after)
     detail_report["street_signs"] = {"count": len(signs), "geometry": compare}
+    detail_report["shop_signs"] = {"count": len(shops.rows), "skipped": shops.skipped}
     atomic_write_json(targets[3], detail_report)
     signs_report = {
         "schema": "onward_generator.street_signs",
@@ -188,6 +199,14 @@ def place_signs(
             }
             for sign in signs
         ],
+        "shop_signs": {
+            "count": len(shops.rows),
+            "skipped_atlas_full": shops.skipped,
+            "pages": len(shops.images),
+            "kinds": {kind: sum(1 for row in shops.rows if row["kind"] == kind) for kind in ("fascia", "blade", "vinyl")},
+            "triangles": sum(row["triangles"] for row in shops.rows),
+            "signs": shops.rows,
+        },
         "geometry": compare,
         "input_hashes": {
             "scene_detail.json": file_sha256(base / "scene_detail.json"),

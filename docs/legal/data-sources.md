@@ -75,6 +75,8 @@ Phase 04 does not use external models. Windows, balconies, roofs, street furnitu
 
 `signs place` paints the OSM `name` of the way on a generated plate. The name is ODbL data. The map keeps the OpenStreetMap attribution. The name is not translated and not invented. A way with no `name` gets no plate.
 
+Shop signs and window vinyls use the OSM `name` of the shop POI the same way (ODbL, `name_origin: observed`). A POI with no `name` gets a generic Spanish word for its `shop`, `amenity`, `office` or `craft` value from `config/detail.default.json` (`name_origin: estimated`), for example `Farmacia` or `Panadería`. That word is a project assumption, not a brand or a real sign. The colours and layout are generated. The text uses the same vendored DejaVu font; no other font is added.
+
 ## Panoramax
 
 Street photographs used by `panoramax apply`. The step is under development. It is off unless `map.json` has `"panoramax": true`.
@@ -132,7 +134,7 @@ A withdrawn model stays in the review with `usable: false` so it is not download
 | `DejaVuSans-Bold.ttf` SHA-256 | `e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724` |
 | `LICENSE` SHA-256 | `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93` |
 
-GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo; the font file is not part of the exported map.
+GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo and the shop-sign atlas; the font file is not part of the exported map.
 
 ## Asset Store
 

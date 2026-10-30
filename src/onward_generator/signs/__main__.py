@@ -37,7 +37,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (SignsError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:
         print(f"signs: {exc}", file=sys.stderr)
         return 1
-    print(f"signs: plates={report['count']}")
+    print(f"signs: plates={report['count']} shop_signs={report['shop_signs']['count']}")
     for row in report["signs"]:
         print(f"  {row['name']} at {row['position_m']}")
     print(f"wrote {Path(args.out).expanduser()}")

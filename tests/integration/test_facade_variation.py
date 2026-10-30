@@ -81,18 +81,20 @@ def test_osm_evidence_picks_the_palette_and_is_recorded(row: tuple[dict[str, dic
     assert church["materials"]["wall"] == "stone_warm"
 
 
-def test_every_building_gets_a_door_except_where_the_shopfront_rules_decide(
+def test_every_building_gets_a_door_and_a_low_shop_gets_a_fallback_shop_door(
     row: tuple[dict[str, dict], dict], block: tuple[dict[str, dict], dict],
 ) -> None:
     records, stats = row
     rules = {b: r["facade"]["door"] for b, r in records.items()}
     # 604's storeys are too low for the 2.4 m door; 605 has no 2.5 m street-facing wall.
-    assert rules == {"601": "template", "602": "template", "603": "template", "604": "fallback", "605": "fallback", "606": "none"}
-    assert stats["doors"] == {"fallback": 2, "none": 1, "template": 3}
-    for b, record in records.items():
-        assert _doors(record) == (0 if b == "606" else 1)
-    # 606 is a shop: its door keeps the shopfront rules, which find no room under 2.67 m storeys.
+    assert rules == {"601": "template", "602": "template", "603": "template", "604": "fallback", "605": "fallback", "606": "fallback"}
+    assert stats["doors"] == {"fallback": 3, "template": 3}
+    for record in records.values():
+        assert _doors(record) == 1
+    # 606 is a shop on 604's 2.67 m storeys: the 2.5 m shop door does not fit, the fallback shrinks it.
     assert records["606"]["facade"]["ground_floor"] == "shopfront"
+    assert records["606"]["facade"]["openings"]["shop_door"] == 1
+    assert records["606"]["door_box"] is None  # glazed: no door_wood back
     assert records["604"]["facade"]["openings"]["door"] == 1
     # 605's door is on its 2 m street front (y = 6), clear of the party walls at x = 0 and x = 2.
     low, high = records["605"]["door_box"]
@@ -116,6 +118,7 @@ def test_a_building_the_interior_budget_turns_down_still_gets_its_fallback_door(
         assert declined[b]["facade"]["door"] == "fallback"
         assert declined[b]["door_box"][1][2] == pytest.approx(3.0 - CFG.head_clearance_m)
         assert {k: v for k, v in declined[b].items() if k != "door_box"} == {k: v for k, v in plain[b].items() if k != "door_box"}
-    # 312 is a shop: turned down too, it keeps the shopfront rules and gets no fallback door.
-    assert declined["312"]["facade"]["door"] == "none" == plain["312"]["facade"]["door"]
+    # 312 is a shop: its 2.5 m shop door fits the 3 m storeys, turned down or not.
+    assert declined["312"]["facade"]["door"] == "template" == plain["312"]["facade"]["door"]
+    assert declined["312"]["facade"]["openings"]["shop_door"] == 1
     assert stats["interiors"] == []

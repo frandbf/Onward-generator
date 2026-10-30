@@ -146,12 +146,52 @@ def test_shop_evidence_turns_the_ground_floor_into_shopfronts(detailed) -> None:
     assert plain["ground_floor"] == "door_and_windows" and plain["ground_floor_evidence"] is None
 
 
+def test_shop_records_name_the_poi_and_place_one_sign(detailed) -> None:
+    [shop] = _obj(detailed, "building/osm-way-312").record["facade"]["shops"]
+    assert shop["poi_id"].startswith("osm-node-") and shop["id"] == f"shop/osm-way-312/{shop['poi_id']}"
+    assert (shop["name"], shop["name_origin"], shop["name_rule"]) == ("Panadería", "estimated", "shop=bakery")
+    assert shop["sign"]["kind"] in ("fascia", "blade") and shop["sign"]["attribute_origin"] == "generated"
+    assert shop["vinyls"] == []  # the interior made these windows see-through glass
+    assert all(o.record["facade"]["shops"] == [] for o in detailed.objects if o.type == "building" and o.id != "building/osm-way-312")
+
+
+def test_only_shops_get_a_glazed_shop_door_and_vinyls(detail_inputs: tuple[Path, Path, Path]) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["enabled"] = False
+    doc["shops"]["vinyl_share"] = 1.0
+    fresh = _detail(detail_inputs, config_from_document(doc))
+    openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
+    assert {bid for bid, found in openings.items() if "shop_door" in found} == {"osm-way-312"}
+    assert {bid for bid, found in openings.items() if "door" in found} == {"osm-way-311", "osm-way-313", "osm-way-315"}
+    assert openings["osm-way-312"]["shop_door"] == 1 and "door" not in openings["osm-way-312"]
+    assert {bid for bid, found in openings.items() if "shopfront" in found} == {"osm-way-312"}
+    [shop] = _obj(fresh, "building/osm-way-312").record["facade"]["shops"]
+    assert len(shop["vinyls"]) == openings["osm-way-312"]["shopfront"]
+    poi = _obj(fresh, "building/osm-way-312").record["facade"]["ground_floor_evidence"]["osm_poi_ids"][0]
+    assert (shop["id"], shop["poi_id"], shop["name"]) == (f"shop/osm-way-312/{poi}", poi, "Panadería")
+    assert all(o.record["facade"]["shops"] == [] for o in fresh.objects if o.type == "building" and o.id != "building/osm-way-312")
+    assert not fresh.critical
+
+
+def test_a_commercial_building_without_a_poi_is_one_shop(detail_inputs: tuple[Path, Path, Path]) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["enabled"] = False
+    doc["templates"]["generic_residential"]["applies_to"] = ["unknown"]
+    doc["templates"]["generic_commercial"]["applies_to"] = ["commercial", "residential_multi", "residential_small"]
+    fresh = _detail(detail_inputs, config_from_document(doc))
+    facade = _obj(fresh, "building/osm-way-313").record["facade"]
+    assert facade["ground_floor_evidence"]["source"] == "building_category"
+    [shop] = facade["shops"]
+    assert (shop["id"], shop["poi_id"], shop["name"], shop["name_rule"]) == ("shop/osm-way-313/building", None, "Comercio", "default")
+    assert shop["sign"] is not None
+
+
 def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(detail_inputs: tuple[Path, Path, Path]) -> None:
     # A fresh run, not the module fixture, so this test itself exercises the layout.
     fresh = _detail(detail_inputs)
     openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
     for bid, found in openings.items():
-        assert sum(found.get(k, 0) for k in ("door", "landmark_door", "interior_door")) == 1, (bid, found)
+        assert sum(found.get(k, 0) for k in ("door", "landmark_door", "shop_door", "interior_door")) == 1, (bid, found)
         assert ("landmark_door" in found) is (bid == "osm-way-314"), (bid, found)  # only the landmark has one
     assert openings["osm-way-312"].get("shopfront", 0) > 0
     assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either

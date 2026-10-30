@@ -29,6 +29,7 @@ from onward_generator.detail.facades import (
     cut_roof_deck,
     door_walls,
     ensure_door,
+    entrance,
     exposed_frontage,
     interior_storey,
     layout_segment,
@@ -49,6 +50,7 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
+from onward_generator.detail.shops import plan_shops
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -280,6 +282,15 @@ def _ground_evidence(ground: str, template: Template, category: str, poi_ids: li
     return {"source": "osm_poi", "osm_poi_ids": poi_ids}
 
 
+def _shops_of(poi_ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], building_tags: Mapping[str, Any]) -> list[
+        tuple[str | None, Mapping[str, Any], tuple[float, float] | None]]:
+    """The shops of a shopfront building: its evidence POIs, or the building itself when it has none."""
+    if not poi_ids:
+        return [(None, building_tags, None)]
+    points = {pid: shape(feature_of[pid]["geometry"]).representative_point() for pid in poi_ids}
+    return [(pid, feature_of[pid].get("tags") or {}, (points[pid].x, points[pid].y)) for pid in poi_ids]
+
+
 def interior_quota(cfg: DetailConfig) -> int:
     """How many interiors this seed builds, from ``min_buildings`` through ``max_buildings``.
 
@@ -484,8 +495,9 @@ def detail_scene(
         shell_template, roof_material, roof_origin, roof_shape = choose_roof(
             tags, template, cfg.seed, bid, geom.area, convex=convex,
         )
-        door_spec = cfg.landmark_door if landmark else cfg.main_door
-        plain_door = ("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec)
+        shop = ground == "shopfront"
+        door_kind, door_spec = entrance(landmark, shop, cfg)
+        plain_door = (door_kind, cfg.recess_depth_m, door_spec)
         previous_height = height
         plain_storeys = storeys
 
@@ -518,9 +530,8 @@ def detail_scene(
                 interior = plan
         if layout is None:
             layout = run_layout(*plain_door, storeys)
-        shop = ground == "shopfront"
         doors_on = door_walls(segments, others, cfg)
-        door_rule = ensure_door(layout, [] if shop else doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
+        door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         opened_windows = omitted_windows = 0
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
@@ -545,7 +556,7 @@ def detail_scene(
                 interior = built = None
                 height, storeys = previous_height, plain_storeys
                 layout = run_layout(*plain_door, storeys)
-                door_rule = ensure_door(layout, [] if shop else doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
+                door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget test pins the rebuilt shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
@@ -605,6 +616,7 @@ def detail_scene(
         for reason, n in sorted(layout.skipped.items()):
             counts[f"skipped:{reason}"] += n
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
+        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg) if shop else []
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
             "generation": {"method": "phase03_volume + generic facade template", "phase03": o.record.get("generation"),
@@ -622,6 +634,7 @@ def detail_scene(
                 "exposed_length_m": round(seg_exposed, 3),
                 "party_wall_length_m": round(sum(s.length for s in segments if not s.exposed), 3),
                 "openings": dict(sorted(shell.counts.items())),
+                "shops": shops,
                 "skipped": dict(sorted(layout.skipped.items())),
                 "materials": {"wall": wall_material, "wall_origin": wall_origin, "roof": shell.roof["material"], "roof_origin": roof_origin},
                 "use": use.to_record(),
