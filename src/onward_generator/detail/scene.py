@@ -601,7 +601,7 @@ def detail_scene(
             layout = run_layout(*plain_door, storeys)
         doors_on = door_walls(segments, others, cfg)
         door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
-        opened_windows = omitted_windows = 0
+        opened_windows = omitted_windows = 0  # pragma: no mutate: read only when an interior is built, and building one pierces the windows first
         budget = budgets[shop]
         shell = built = refusal = None
         if interior is not None:
