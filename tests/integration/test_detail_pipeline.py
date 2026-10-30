@@ -152,6 +152,7 @@ def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(deta
     openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
     for bid, found in openings.items():
         assert sum(found.get(k, 0) for k in ("door", "landmark_door", "interior_door")) == 1, (bid, found)
+        assert ("landmark_door" in found) is (bid == "osm-way-314"), (bid, found)  # only the landmark has one
     assert openings["osm-way-312"].get("shopfront", 0) > 0
     assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either
     # Balcony placement hashes the building id with the seed (golden values for the default seed).
