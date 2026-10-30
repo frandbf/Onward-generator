@@ -133,3 +133,9 @@ def test_only_mutate_lists_each_file_with_a_changed_function_once() -> None:
 
     targets = [fn("src/onward_generator/b.py"), fn("src/onward_generator/a.py"), fn("src/onward_generator/b.py")]
     assert mutate.only_mutate(targets) == "src/onward_generator/a.py,src/onward_generator/b.py"
+
+
+def test_default_jobs_uses_every_core_in_ci_and_half_locally() -> None:
+    assert mutate.default_jobs({"CI": "true"}, 4) == 4
+    assert mutate.default_jobs({}, 20) == 10
+    assert mutate.default_jobs({}, 1) == 1

@@ -62,8 +62,9 @@ tasks:
     vars:
       BASE: '{{.BASE | default "main"}}'
       MAX: '{{.MAX | default "40"}}'
+      JOBS: '{{.JOBS | default ""}}'
     cmds:
-      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
+      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{if .JOBS}}--jobs {{.JOBS}}{{end}} {{.CLI_ARGS}}"
 
   guard:
     desc: Fail when the change since BASE (default main) edits both src/ and a quality gate

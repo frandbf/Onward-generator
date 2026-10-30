@@ -52,6 +52,7 @@ task guard             # a change must not edit both src/ and a quality gate (AG
 ```bash
 task mutate                         # lines changed since main
 task mutate BASE=fork/main MAX=10   # another base; at most 10 functions
+task mutate JOBS=4                  # cap mutmut workers (default: all cores in CI, half locally)
 ```
 
 Exit 0 means every mutant was killed. Exit 1 lists each survivor with its diff: a behaviour no test holds. Write a test that fails on that edit, or, when the edit changes nothing a caller can see, end that line with `# pragma: no mutate: <reason>`. The reason must not start with `block`, `start` or `end`, which are mutmut keywords. Exit 2 means the tool could not run. Functions over `MAX` are listed as not mutated. mutmut works on a copy in `mutants/` (gitignored), and a second run only retests what changed. On a pull request, CI runs the same task against the target branch.
