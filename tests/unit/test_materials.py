@@ -20,7 +20,7 @@ from onward_generator.dress.atlas import (
     build_atlas,
     decode_jpeg_rgb,
     decode_png_rgba,
-    encode_png_rgba,
+    encode_opaque_png,
     tile_luminance,
 )
 from onward_generator.dress.catalog import load_catalog
@@ -385,7 +385,7 @@ def test_apply_threads_write_the_bytes_of_the_serial_path(tmp_path: Path, monkey
     images = images_by_material((tmp_path / "threaded" / "scene_visual.glb").read_bytes())
     index = sorted(images).index("tree_canopy")
     assert index > 0
-    assert images["tree_canopy"] == encode_png_rgba(_tile_pixels("tree_canopy", 256, 48152 + index))
+    assert images["tree_canopy"] == encode_opaque_png(_tile_pixels("tree_canopy", 256, 48152 + index))
 
 
 def test_apply_brick_only_when_osm_says_brick(tmp_path: Path) -> None:

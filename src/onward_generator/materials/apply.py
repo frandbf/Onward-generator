@@ -22,7 +22,7 @@ from onward_generator.dress.atlas import (
     bake_photo_tile,
     build_atlas,
     decode_jpeg_rgb,
-    encode_png_rgba,
+    encode_opaque_png,
     run_png_jobs,
 )
 from onward_generator.dress.catalog import MaterialCatalog, load_catalog
@@ -149,13 +149,13 @@ def _photo_png(rgb: Any, mode: str, cache: TileCache | None = None) -> bytes:
     side = min(MAX_PHOTO_PX, max(int(rgb.shape[0]), int(rgb.shape[1]), 1))
 
     def bake() -> bytes:
-        return encode_png_rgba(bake_photo_tile(rgb, side, mode))
+        return encode_opaque_png(bake_photo_tile(rgb, side, mode))
 
     return bake() if cache is None else cache.fetch(photo_tile_key(rgb, side, mode), bake)
 
 
 def _procedural_png(color_id: str, seed: int) -> bytes:
-    return encode_png_rgba(_tile_pixels(color_id, 256, seed))
+    return encode_opaque_png(_tile_pixels(color_id, 256, seed))
 
 
 class MaterialsError(ValueError):

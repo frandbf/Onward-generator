@@ -66,10 +66,10 @@ There are no vehicles in this step. Inventing cars on the carriageway is not OSM
 
 ### Tile cache
 
-Each photo tile is a 1024 px PNG, and the same library photographs come back in every map. `materials apply` bakes and encodes the tiles on 6 threads, and keeps each baked photo tile in a content cache (`materials/tile_cache.py`):
+Each photo tile is a 1024 px PNG, and the same library photographs come back in every map. The photo and procedural tiles of `materials apply` and the `atlas.png` contact sheet are opaque, so they are written as RGB PNGs at zlib level 3 (`encode_opaque_png`, `TILE_PNG_LEVEL`): about three times faster than level 9 and about 4 % larger, and they decode to the same RGBA. The see-through window image, the signs and the `dress style` tiles stay RGBA at level 9. Unity recompresses every texture. `materials apply` bakes and encodes the tiles on 6 threads, and keeps each baked photo tile in a content cache (`materials/tile_cache.py`):
 
 - **Place.** `$ONWARD_GENERATOR_CACHE_DIR/tiles`, else `$XDG_CACHE_HOME/onward-generator/tiles`, else `~/.cache/onward-generator/tiles`. `tools/docker/run.sh` mounts the host's `${XDG_CACHE_HOME:-~/.cache}/onward-generator` into the container and sets `ONWARD_GENERATOR_CACHE_DIR`, so the cache outlives the container.
-- **Key.** The sha256 of the decoded photograph, its shape, the tile side, the albedo mode, the Pillow version, the PNG level and `BAKE_VERSION`. A change to `bake_photo_tile` or `encode_png_rgba` that changes their bytes bumps `BAKE_VERSION`.
+- **Key.** The sha256 of the decoded photograph, its shape, the tile side, the albedo mode, the Pillow version, the PNG level and `BAKE_VERSION`. A change to `bake_photo_tile` or `encode_opaque_png` that changes their bytes bumps `BAKE_VERSION`.
 - **Entry.** The sha256 of the PNG followed by the PNG. It is written to a temporary file and renamed into place, so runs at the same time never read half an entry. An entry whose hash does not match is baked again and replaced. A cache that cannot be written is skipped.
 - **Off.** `--no-tile-cache`, or `ONWARD_GENERATOR_NO_TILE_CACHE=1`. The tests set the variable.
 

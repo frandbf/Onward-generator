@@ -24,11 +24,11 @@ from pathlib import Path
 import numpy as np
 import PIL
 
-from onward_generator.dress.atlas import PNG_LEVEL
+from onward_generator.dress.atlas import TILE_PNG_LEVEL
 from onward_generator.io import atomic_write_bytes
 
-# Bump when bake_photo_tile or encode_png_rgba changes the bytes it writes for the same input.
-BAKE_VERSION = 1
+# Bump when bake_photo_tile or encode_opaque_png changes the bytes it writes for the same input.
+BAKE_VERSION = 2
 CACHE_DIR_ENV = "ONWARD_GENERATOR_CACHE_DIR"
 NO_CACHE_ENV = "ONWARD_GENERATOR_NO_TILE_CACHE"
 DIGEST_BYTES = 32
@@ -53,7 +53,7 @@ def photo_tile_key(rgb: np.ndarray, side: int, mode: str) -> str:
     pixels = np.ascontiguousarray(rgb)
     digest = hashlib.sha256()
     header = (
-        f"bake={BAKE_VERSION};pillow={PIL.__version__};png_level={PNG_LEVEL};"
+        f"bake={BAKE_VERSION};pillow={PIL.__version__};png_level={TILE_PNG_LEVEL};"
         f"mode={mode};side={side};shape={pixels.shape};dtype={pixels.dtype}\n"
     )
     digest.update(header.encode())

@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from onward_generator.dress.atlas import bake_photo_tile, encode_png_rgba
+from onward_generator.dress.atlas import bake_photo_tile, encode_opaque_png
 from onward_generator.materials.apply import _photo_png
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
 
@@ -49,7 +49,7 @@ def test_photo_tile_key_is_pinned_and_covers_every_input(monkeypatch: pytest.Mon
     rgb = _photo()
     key = photo_tile_key(rgb, 6, "color_albedo")
     assert key == hashlib.sha256(
-        b"bake=1;pillow=12.0.0;png_level=9;mode=color_albedo;side=6;shape=(6, 5, 3);dtype=uint8\n" + rgb.tobytes()
+        b"bake=2;pillow=12.0.0;png_level=3;mode=color_albedo;side=6;shape=(6, 5, 3);dtype=uint8\n" + rgb.tobytes()
     ).hexdigest()
     # A non-contiguous view hashes the pixels it shows.
     wide = np.zeros((6, 10, 3), dtype=np.uint8)
@@ -96,7 +96,7 @@ def test_a_cache_that_cannot_be_written_still_returns_the_tile(tmp_path: Path) -
 
 def test_photo_png_is_the_same_with_a_cold_or_warm_cache(tmp_path: Path) -> None:
     rgb = np.random.default_rng(5).integers(0, 256, size=(40, 30, 3), dtype=np.uint8)
-    expected = encode_png_rgba(bake_photo_tile(rgb, 40, "greyscale_modulation"))
+    expected = encode_opaque_png(bake_photo_tile(rgb, 40, "greyscale_modulation"))
     cache = TileCache(tmp_path)
     assert _photo_png(rgb, "greyscale_modulation") == expected
     assert _photo_png(rgb, "greyscale_modulation", cache) == expected
