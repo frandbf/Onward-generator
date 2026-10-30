@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import LineString, MultiLineString, Point, offset_curve, union_all
+from shapely import LineString, MultiLineString, Point, STRtree, dwithin, offset_curve, union_all
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import nearest_points, polylabel
+from shapely.ops import linemerge, nearest_points, polylabel
 
 from onward_generator.generation.mesh import polygons_of
 from onward_generator.generation.scene import GeneratedScene
@@ -60,6 +60,16 @@ SEPARATION_STEP_M = 0.1
 # put the next bot inside it.
 PATROL_LINK_M = 5.0
 MIN_SPAWN_SEPARATION_M = 5.1
+# A route is up to ROUTE_POINTS points, ROUTE_STEP_M apart along its line.
+ROUTE_POINTS = 16
+ROUTE_STEP_M = 14.0
+# The adapter bakes the navmesh with a 0.35 m agent radius. Ground closer than
+# that to a wall or kerb is not on the mesh, and a gap narrower than twice that
+# splits it into islands.
+NAV_AGENT_RADIUS_M = 0.35
+# A second line along each sidewalk, this far past the kerb, for a street whose
+# facades leave less than the configured sidewalk width.
+KERB_OFFSET_M = 0.5
 
 SPAWN_COLUMNS = 4
 SPAWN_POINTS = 8
@@ -367,57 +377,76 @@ def _centerlines(geometry: BaseGeometry) -> list[LineString]:
     return []
 
 
-def _patrol_lines(way: LinearWay, sidewalk_width_m: float) -> list[LineString]:
-    """Pedestrian centreline, or both sidewalks of a street.
+def _patrol_lines(ways: Sequence[LinearWay], sidewalk_width_m: float) -> list[LineString]:
+    """Pedestrian centrelines, and two lines along each sidewalk of a street.
 
-    The carriageway is not walkable, so a street patrol is shifted to the
-    middle of the sidewalk on each side.
+    OSM splits a street at every junction and tag change, so an alley is often
+    a run of 10 to 15 m ways that each hold no route. Ways that continue one
+    another are merged first: every pedestrian way together, and streets of the
+    same width together. The carriageway is not walkable, so a street patrol
+    runs along the middle of the sidewalk and also ``KERB_OFFSET_M`` past the
+    kerb. That second line still lands on a narrow alley whose facades leave less
+    than the configured sidewalk.
     """
-    lines: list[LineString] = []
-    for line in _centerlines(way.geometry):
-        if way.road_class == "pedestrian":
-            if line.length >= 18:
-                lines.append(line)
-            continue
-        shift = way.width_m / 2.0 + sidewalk_width_m / 2.0
-        if shift <= 0:
-            continue
-        for signed in (shift, -shift):
-            curve = offset_curve(line, signed)
-            if curve.is_empty:
-                continue
-            lines.extend(part for part in _centerlines(curve) if part.length >= 18)
+    ordered = sorted(ways, key=lambda item: item.id)
+    pedestrian = [line for way in ordered if way.road_class == "pedestrian" for line in _centerlines(way.geometry)]
+    lines = _centerlines(linemerge(pedestrian))
+    for width in sorted({way.width_m for way in ordered if way.road_class != "pedestrian"}):
+        street = [line for way in ordered if way.road_class != "pedestrian" and way.width_m == width for line in _centerlines(way.geometry)]
+        for line in _centerlines(linemerge(street)):
+            for shift in (width / 2.0 + sidewalk_width_m / 2.0, width / 2.0 + KERB_OFFSET_M):
+                for signed in (shift, -shift):
+                    lines.extend(_centerlines(offset_curve(line, signed)))
     return lines
 
 
-def _sample_route(line: Any, free: BaseGeometry, start_m: float) -> list[dict[str, float]]:
+def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence[BaseGeometry], tree: STRtree) -> list[dict[str, float]]:
+    """Up to ``ROUTE_POINTS`` points ``ROUTE_STEP_M`` apart along ``line``.
+
+    A point on furniture is skipped. The first point fixes the walkable island,
+    the piece of ``parts`` within the agent radius. The route stops at the first
+    point off that island: the carriageway splits the navmesh, and a step to
+    another island has no return path, so the adapter drops it.
+    """
     points: list[dict[str, float]] = []
+    island: BaseGeometry | None = None
     distance = start_m
-    while distance < line.length - 2 and len(points) < 8:
+    while distance < line.length - 2 and len(points) < ROUTE_POINTS:
         point = line.interpolate(distance)
-        if free.covers(Point(point.x, point.y)):
-            points.append({"x": round(float(point.x), 2), "y": round(float(point.y), 2)})
-        distance += 14.0
+        distance += ROUTE_STEP_M
+        if not free.covers(point):
+            continue
+        if island is None:
+            hits = sorted(int(index) for index in tree.query(point, predicate="dwithin", distance=NAV_AGENT_RADIUS_M))
+            if not hits:
+                continue
+            island = parts[hits[0]]
+        elif not dwithin(island, point, NAV_AGENT_RADIUS_M):
+            break
+        points.append({"x": round(float(point.x), 2), "y": round(float(point.y), 2)})
     return points
 
 
-def _routes(base: GeneratedScene, free: BaseGeometry, separation_m: float = SPAWN_SEPARATION_M) -> list[dict[str, Any]]:
-    """Patrols on pedestrian ways and on both sidewalks of each street.
+def _routes(
+    base: GeneratedScene, free: BaseGeometry, parts: Sequence[BaseGeometry], separation_m: float = SPAWN_SEPARATION_M,
+) -> list[dict[str, Any]]:
+    """Patrols on pedestrian ways and along the sidewalks of each street.
 
-    A long way is cut into several routes whose starts are at least
-    ``separation_m`` apart. Each route begins on walkable ground and keeps the
-    points ahead of that start. A second start on the same corner is dropped.
-    The carriageway itself is not used: bots spawn on the sidewalk.
+    A long line is cut into several routes whose starts are at least
+    ``separation_m`` apart. Each route begins on walkable ground inside one of
+    ``parts`` and keeps the points ahead of that start on the same piece. A
+    second start on the same corner is dropped. The carriageway itself is not
+    used: bots spawn on the sidewalk.
     """
+    tree = STRtree(list(parts))
     candidates: list[list[dict[str, float]]] = []
-    for way in sorted(base.ways, key=lambda item: item.id):
-        for line in _patrol_lines(way, base.config.sidewalk_width_m):
-            distance = 4.0
-            while distance <= line.length - 16:
-                points = _sample_route(line, free, distance)
-                if len(points) >= 2:
-                    candidates.append(points)
-                distance += separation_m
+    for line in _patrol_lines(base.ways, base.config.sidewalk_width_m):
+        distance = 4.0
+        while distance <= line.length - 16:  # pragma: no mutate: a start on the bound holds one point, which the length check drops; test_routes_start_every_separation_until_the_last_two_points pins 16
+            points = _sample_route(line, free, distance, parts, tree)
+            if len(points) >= 2:
+                candidates.append(points)
+            distance += separation_m
     candidates.sort(key=lambda points: (points[0]["x"], points[0]["y"], points[-1]["x"], points[-1]["y"]))
     routes: list[dict[str, Any]] = []
     for points in candidates:
@@ -429,9 +458,9 @@ def _routes(base: GeneratedScene, free: BaseGeometry, separation_m: float = SPAW
 
 
 def fit_spawn_separation(
-    base: GeneratedScene, free: BaseGeometry, count: int,
+    base: GeneratedScene, free: BaseGeometry, parts: Sequence[BaseGeometry], count: int,
 ) -> tuple[list[dict[str, Any]], float]:
-    """Largest gap in ``[5.1, 8]`` m that still yields ``count`` route starts.
+    """Largest gap in ``[5.1, 8]`` m that still yields ``count`` route starts on ``parts``.
 
     The search steps down by 0.1 m from 8 m. A map that already holds the roster
     keeps 8 m. The floor stays above the 5 m patrol link.
@@ -439,12 +468,42 @@ def fit_spawn_separation(
     separation = SPAWN_SEPARATION_M
     held = 0
     while separation >= MIN_SPAWN_SEPARATION_M - 1e-9:
-        routes = _routes(base, free, separation)
+        routes = _routes(base, free, parts, separation)
         held = len(routes)
         if held >= count:
             return routes, round(separation, 2)
         separation = round(separation - SEPARATION_STEP_M, 2)
     raise LayoutError(f"route starts hold {held} spawns at {MIN_SPAWN_SEPARATION_M:g} m; {count} are required")
+
+
+def nav_islands(base: GeneratedScene) -> list[BaseGeometry]:
+    """The walkable ground the adapter bakes, shrunk by the agent radius, one piece per island.
+
+    Furniture is not a navmesh obstacle, so it does not split an island here.
+    """
+    return list(polygons_of(free_ground(base, []).buffer(-NAV_AGENT_RADIUS_M)))
+
+
+def hunt_routes(
+    base: GeneratedScene, free: BaseGeometry, islands: Sequence[BaseGeometry], home: BaseGeometry, count: int, focus: tuple[float, float],
+) -> tuple[list[dict[str, Any]], float]:
+    """``count`` patrols, on the navmesh island that holds the origin when it fits them.
+
+    ``GenerateNodes`` keeps only the nodes that reach the navigation origin, so
+    a patrol on another island has no node to walk on. When ``home`` cannot hold
+    ``count`` starts, every route on it is kept and the rest are spread over the
+    other islands, as before, so the roster still has one route per bot.
+    """
+    try:
+        routes, separation = fit_spawn_separation(base, free, [home], count)
+        return spread_routes(routes, count, focus), separation
+    except LayoutError:
+        pass
+    routes, separation = fit_spawn_separation(base, free, islands, count)
+    near = [route for route in routes if dwithin(home, Point(route["points"][0]["x"], route["points"][0]["y"]), NAV_AGENT_RADIUS_M)]  # pragma: no mutate: every point of a route lies on the island of its start, so any index finds the same island
+    chosen = spread_routes(near, count, focus)
+    rest = [route for route in routes if route not in near]
+    return chosen + spread_routes(rest, count - len(chosen), focus), separation
 
 
 def spread_routes(routes: list[dict[str, Any]], count: int, origin: tuple[float, float]) -> list[dict[str, Any]]:
@@ -454,6 +513,8 @@ def spread_routes(routes: list[dict[str, Any]], count: int, origin: tuple[float,
     the plaza empty. Farthest-point sampling keeps one patrol near the focus and
     then the starts that sit farthest from the ones already chosen.
     """
+    if count <= 0:
+        return []
     if len(routes) <= count:
         return list(routes)
 
@@ -498,8 +559,8 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     area = component_holding(parts, uplink)
     focus = _focus_xy(base, heights) or uplink
 
-    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
-    routes = spread_routes(routes, AI_COUNT, focus)
+    islands = nav_islands(base)
+    routes, separation = hunt_routes(base, free, islands, component_holding(islands, uplink), AI_COUNT, focus)
     ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
     occupied = union_all([Point(p).buffer(3.0) for p in ai])
     ammo_region = area.difference(occupied)
