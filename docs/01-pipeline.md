@@ -124,7 +124,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Output | `map.json`, `config/project.json`, `config/export.json`, `config/texture_plan.json`, `reference/aoi.geojson`, `data/raw/<id>.osm` |
 | Area | A square in local metres around the centre, converted to WGS84. Degrees are not treated as metres |
 | CRS | EPSG:25830 when the centre is in peninsular Spain. Otherwise the WGS84 UTM zone of that point (north `EPSG:326xx`, south `EPSG:327xx`). Stored in `map.json`. `map show` prints the `--crs` that `geo` must use |
-| OSM | One Overpass request for the square plus the margin. Writes `data/raw/<id>.osm` and a `.source.json`. Does not replace an extract that is already there unless `--overwrite` |
+| OSM | One Overpass request for the square plus the margin: every node and way in the box, and only the `type=multipolygon` relations, which are the only ones `geo` assembles. A route relation would bring its whole bus or tram line from outside the area. Writes `data/raw/<id>.osm` and a `.source.json` whose `relation_types` names the relation types asked for; an extract written before this filter has no `relation_types` and holds every relation, and `geo` still reads it. Does not replace an extract that is already there unless `--overwrite` |
 | Textures | One plan for this map, chosen from the imported library. See below |
 | Does not | Generate geometry. It does not pick a global "active" map |
 

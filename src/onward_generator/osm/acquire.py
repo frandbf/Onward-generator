@@ -45,6 +45,11 @@ OVERPASS_RETRIES = 3
 REMARK_RETRIES = 2
 REMARK_RETRY_DELAY_S = 30.0
 
+# ``geo`` assembles only multipolygon relations (``geo/osm_import.py``). Any
+# other relation in the box, above all a bus or tram route, made ``(._;>;)``
+# pull its whole line from outside the area: about 90 % of the extract.
+RELATION_TYPE = "multipolygon"
+
 _OSM_BASE = re.compile(br'osm_base="([^"]+)"')
 
 
@@ -68,6 +73,7 @@ class DownloadRecord:
     attribution: str
     endpoint: str
     query: str
+    relation_types: list[str]
     bbox: list[float]
     bbox_order: str
     center: dict[str, float]
@@ -138,7 +144,7 @@ def overpass_query(bbox: BBox) -> str:
         "(\n"
         f"  node({box});\n"
         f"  way({box});\n"
-        f"  relation({box});\n"
+        f'  relation["type"="{RELATION_TYPE}"]({box});\n'
         ");\n"
         "(._;>;);\n"
         "out meta;\n"
@@ -241,6 +247,7 @@ def download_map_osm(
         attribution=OPENSTREETMAP.attribution,
         endpoint=OVERPASS_URL,
         query=query,
+        relation_types=[RELATION_TYPE],
         bbox=[bbox[0], bbox[1], bbox[2], bbox[3]],
         bbox_order="south,west,north,east",
         center={"latitude": float(center["latitude"]), "longitude": float(center["longitude"])},

@@ -56,6 +56,22 @@ def test_inclusion_bbox_is_the_square_plus_margin_in_metres(tmp_path: Path) -> N
     assert f"{south:.7f},{west:.7f},{north:.7f},{east:.7f}" in query
 
 
+def test_query_asks_only_for_multipolygon_relations() -> None:
+    """A route relation would pull its whole line from outside the box; geo assembles only multipolygons."""
+    query = overpass_query((1.0, 2.0, 3.0, 4.0))
+    box_text = "1.0000000,2.0000000,3.0000000,4.0000000"
+    assert query == (
+        "[out:xml][timeout:90];\n"
+        "(\n"
+        f"  node({box_text});\n"
+        f"  way({box_text});\n"
+        f'  relation["type"="multipolygon"]({box_text});\n'
+        ");\n"
+        "(._;>;);\n"
+        "out meta;\n"
+    )
+
+
 def test_download_writes_osm_and_refuses_a_second_request(tmp_path: Path) -> None:
     root = _map(tmp_path)
     seen: list[tuple[str, str]] = []
@@ -76,6 +92,8 @@ def test_download_writes_osm_and_refuses_a_second_request(tmp_path: Path) -> Non
     sidecar = json.loads(target.with_name("obelisco.osm.source.json").read_text(encoding="utf-8"))
     assert sidecar["license"] == "ODbL-1.0"
     assert sidecar["attribution"] == "© OpenStreetMap contributors"
+    assert sidecar["relation_types"] == ["multipolygon"]
+    assert record.relation_types == ["multipolygon"]
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         download_map_osm(root, fetch=fetch)
     assert len(seen) == 1

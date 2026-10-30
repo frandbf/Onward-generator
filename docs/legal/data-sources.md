@@ -19,7 +19,7 @@ Obligations that apply to this project:
 
 The licence text is https://opendatacommons.org/licenses/odbl/1-0/.
 
-`map create` makes one Overpass request for the map square plus its margin. The area comes from latitude, longitude, and radius, measured in the map CRS and converted to WGS84. `geo` and the later stages do not download OSM again. Repeating the request is `osm download --map DIRECTORY --overwrite`. The body is `data/raw/<id>.osm`, with provider, licence, query, bounding box, and SHA-256 in the `.source.json` beside it. Limit: 32 MB, and a side of at most 4100 m. The source file is never modified.
+`map create` makes one Overpass request for the map square plus its margin. The area comes from latitude, longitude, and radius, measured in the map CRS and converted to WGS84. `geo` and the later stages do not download OSM again. Repeating the request is `osm download --map DIRECTORY --overwrite`. The request asks for every node and way in the box and only the `type=multipolygon` relations; the `.source.json` records that in `relation_types`. The body is `data/raw/<id>.osm`, with provider, licence, query, relation types, bounding box, and SHA-256 in the `.source.json` beside it. Limit: 32 MiB, and a side of at most 4100 m. In central Madrid the answer at radius 150 m went from 3.6 MB with every relation to 0.6 MB with multipolygons only, with the same `geo_scene` features. The 32 MiB cap is therefore reached at about radius 1100 m in a dense centre, up from about 880 m before the filter; both are estimates from r300 and r500, and Overpass's own `[timeout:90]` may stop a large request first. The source file is never modified.
 
 ## What the pipeline records
 
