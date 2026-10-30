@@ -103,6 +103,16 @@ class Interior:
     glass_colliders: list[Mesh] = field(default_factory=list)
     light_anchors: dict[str, Any] | None = None
 
+    @property
+    def visual_triangles(self) -> int:
+        """Triangles this interior draws: every visual mesh of the interior node. Colliders are not drawn."""
+        return sum(mesh.triangle_count for meshes in self.visual.values() for mesh in meshes)
+
+
+def fits_triangle_budget(used: int, cost: int, limit: int) -> bool:
+    """Whether one more interior of ``cost`` triangles keeps the interiors at or under ``limit``."""
+    return used + cost <= limit
+
 
 def rectangularity(geometry: BaseGeometry) -> float:
     mrr = geometry.minimum_rotated_rectangle

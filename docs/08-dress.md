@@ -64,9 +64,9 @@ There are no vehicles in this step. Inventing cars on the carriageway is not OSM
 
 `onward-generator materials apply` is the texture step. It reads `maps/<id>/config/texture_plan.json`. `map create` writes that plan from the imported library. `map create --textures` replaces it and leaves the rest of the map alone. A slot whose family has no texture in the library is named in the plan description and keeps the procedural tile. The library has no bark yet, so `trunks` is one of them. Historic plaster uses the photograph in greyscale and keeps the colour in `_BaseColor`. An older Poly Haven plan can still download Diffuse 1k with `--download`. The GLB carries one image per material, repeated on the wall plane. The 256 px atlas stays as a contact sheet. Windows and doors map to 0–1. Interior walls reuse the plain-facade photograph when the plan has one, otherwise the historic or ochre plaster. Interior floors reuse the door wood. Stairs reuse the sidewalk concrete. A colour photograph is shown with a white base colour. A greyscale photograph keeps the interior tint. These surfaces are not new plan slots. This step does not apply `dress classify`. Licences: [legal/data-sources.md](legal/data-sources.md).
 
-### Calm ground textures
+### Calm textures
 
-Asphalt and concrete cover large flat areas and repeat every few metres, so a streak, a blotch or a centred feature becomes a visible grid. The planner (`materials/library_plan.py`) measures each asphalt and concrete image before it joins a pool: the image is reduced to 128 px greyscale, blurred with a Gaussian of 4 px (1/32 of the tile), and the standard deviation of the luminance (0–1) is its coarse contrast. Fine grain is blurred away; patches, streaks and covers stay. An image joins the pool only when the coarse contrast is at most `COARSE_CONTRAST_LIMIT = 0.012`. Other families are not measured. One rule covers both families.
+A tile repeats every few metres on a large floor or facade, so a streak, a blotch or a centred feature becomes a visible grid. A headset test saw the rusted manhole cover baked into `acg_concrete047b` every 2 m along a sidewalk, and plaster stains repeating up a wall. The planner (`materials/library_plan.py`) measures each asphalt, concrete, plaster, brick and rock image before it joins a pool: the image is reduced to 128 px greyscale, blurred with a Gaussian of 4 px (1/32 of the tile), and the standard deviation of the luminance (0–1) is its coarse contrast. Fine grain is blurred away; patches, streaks and covers stay. An image joins the pool only when the coarse contrast is at most its family limit: `COARSE_CONTRAST_LIMIT = 0.012` for asphalt and concrete, `WALL_CONTRAST_LIMIT = 0.025` for plaster, brick and rock, whose mortar and grain read higher without forming a grid. Roofs, paving and doors are not measured.
 
 | Texture | Coarse contrast | Pool |
 | --- | --- | --- |
@@ -80,8 +80,20 @@ Asphalt and concrete cover large flat areas and repeat every few metres, so a st
 | `acg_concrete047a` | 0.0072 | kept |
 | `acg_concrete012` | 0.0105 | kept |
 | `acg_concrete047b` | 0.0261 | dropped: one rusted manhole cover and a pale patch in the middle |
+| `acg_paintedplaster006` | 0.0214 | kept |
+| `ph_painted_plaster_wall` | 0.0059 | kept |
+| `ph_plastered_wall` | 0.0021 | kept |
+| `acg_paintedplaster010` | 0.0254 | dropped: red patches |
+| `acg_paintedplaster014` | 0.0492 | dropped: large stains |
+| `acg_paintedplaster016` | 0.0656 | dropped: large stains |
+| `acg_bricks001`, `059`, `082b`, `105` | 0.0221, 0.0236, 0.0123, 0.0119 | kept |
+| `acg_bricks003`, `023`, `097`, `100` | 0.0260, 0.0291, 0.0315, 0.0440 | dropped: pale stones, white mortar, dark bands, large stones |
+| `acg_rock030` | 0.0103 | kept |
+| `acg_rock022`, `034`, `051`, `055`, `056` | 0.0267 to 0.0476 | dropped: streaks and patches |
 
-The rule applies when a plan is chosen: the deterministic pick and the Ollama reply both use the filtered pools, and a reply that names a dropped image is rejected. A saved `texture_plan.json` that already binds a dropped image still validates and applies. To move an existing map to the calm pool, run `map create --textures` again; it rewrites only that map's texture plan, and the next `materials apply` uses it. The one asphalt slot (`carriageway`) keeps one colour per map.
+The two Poly Haven plasters were already in `assets/textures/`; they joined the imported library so the three plaster slots (`historic_facades`, `ochre_facades`, `plain_facades`) still get three different calm photographs.
+
+The rule applies when a plan is chosen: the deterministic pick and the Ollama reply both use the filtered pools, and a reply that names a dropped image is rejected. It also applies when a plan is loaded: a saved `texture_plan.json` that binds a dropped image is refused by `materials apply`, and the message says to run `map create --name <map> --textures`, which rewrites only that map's texture plan; the next `materials apply` uses it. Before 2026-10-30 such a plan still applied, which is how a map created before the rule kept the repeated cover. The one asphalt slot (`carriageway`) keeps one colour per map.
 
 Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m, an identical grid smaller than a lane), `sidewalk_concrete` stays 2 m. A `tile_m` change reaches an existing map the next time `dress style` or `materials apply` runs.
 

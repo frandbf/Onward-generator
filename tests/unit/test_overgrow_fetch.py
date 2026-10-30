@@ -203,3 +203,19 @@ def test_default_get_raises_on_other_failures(monkeypatch: pytest.MonkeyPatch) -
 def test_default_get_refuses_other_hosts() -> None:
     with pytest.raises(FetchError, match="refusing to fetch host"):
         fetch._get("https://example.com/model.gltf")
+
+
+def test_a_second_run_keeps_the_curated_fields(tmp_path: Path, one_asset: None) -> None:
+    _run(tmp_path, FakeGet(_responses({"name": "Crate", "polycount": 12})))
+    path = tmp_path / "library" / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    curated = {"description": "A test crate.", "placement": "open_ground", "grouping": "cluster", "condition": "worn", "tags": ["wood"]}
+    manifest["assets"][0].update(curated)
+    manifest["schema_version"] = "0.2.0"
+    manifest["semantics"] = {"origin": "estimated"}
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    _run(tmp_path, FakeGet({LICENSE_URL: (200, b"CC0")}))
+    again = json.loads(path.read_text(encoding="utf-8"))
+    assert again["schema_version"] == "0.2.0"
+    assert again["semantics"] == {"origin": "estimated"}
+    assert {key: again["assets"][0][key] for key in curated} == curated

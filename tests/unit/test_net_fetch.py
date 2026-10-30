@@ -192,6 +192,82 @@ def test_fetch_bytes_does_not_retry_429_by_default() -> None:
     assert len(seen) == 1
 
 
+@pytest.mark.parametrize("code", [500, 502, 503, 504])
+def test_fetch_bytes_retries_a_server_error(code: int) -> None:
+    waits: list[float] = []
+    opener, seen = _opener(_http_error(code), b"done")
+    assert _fetch(opener, retry_transient=1, retry_delay_s=10.0, sleep=waits.append) == b"done"
+    assert len(seen) == 2
+    assert waits == [10.0]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [urllib.error.URLError("refused"), TimeoutError("slow"), ConnectionResetError("reset")],
+)
+def test_fetch_bytes_retries_a_network_error(failure: Exception) -> None:
+    waits: list[float] = []
+    opener, seen = _opener(failure, failure, b"done")
+    assert _fetch(opener, retry_transient=2, retry_delay_s=10.0, sleep=waits.append) == b"done"
+    assert len(seen) == 3
+    assert waits == [10.0, 20.0]
+
+
+def test_fetch_bytes_gives_up_after_transient_retries() -> None:
+    waits: list[float] = []
+    opener, seen = _opener(_http_error(503, b"busy"), _http_error(503, b"busy"), _http_error(503, b"busy"), b"never")
+    with pytest.raises(FetchFailed, match=r"^HTTP 503 for https://example.org/data: busy$"):
+        _fetch(opener, retry_transient=2, error_body=True, sleep=waits.append)
+    assert len(seen) == 3
+    assert waits == [8.0, 16.0]
+
+
+def test_fetch_bytes_gives_up_after_network_retries() -> None:
+    waits: list[float] = []
+    opener, seen = _opener(urllib.error.URLError("refused"), TimeoutError("slow"), b"never")
+    with pytest.raises(FetchFailed, match=r"^request to https://example.org/data failed: slow$"):
+        _fetch(opener, retry_transient=1, sleep=waits.append)
+    assert len(seen) == 2
+    assert waits == [8.0]
+
+
+def test_fetch_bytes_counts_every_network_retry() -> None:
+    waits: list[float] = []
+    failures = [TimeoutError("slow"), ConnectionResetError("reset"), TimeoutError("slow again")]
+    opener, seen = _opener(*failures, b"never")
+    with pytest.raises(FetchFailed, match="slow again"):
+        _fetch(opener, retry_transient=2, retry_delay_s=1.0, sleep=waits.append)
+    assert len(seen) == 3
+    assert waits == [1.0, 2.0]
+
+
+def test_fetch_bytes_counts_429_and_transient_retries_apart() -> None:
+    waits: list[float] = []
+    opener, seen = _opener(_http_error(429), _http_error(503), _http_error(429), b"done")
+    assert _fetch(opener, retry_429=2, retry_transient=1, retry_delay_s=1.0, sleep=waits.append) == b"done"
+    assert len(seen) == 4
+    assert waits == [1.0, 2.0, 4.0]
+
+
+@pytest.mark.parametrize("code", [400, 404, 501])
+def test_fetch_bytes_does_not_retry_a_client_or_unknown_error(code: int) -> None:
+    opener, seen = _opener(_http_error(code))
+    with pytest.raises(FetchFailed, match=f"HTTP {code}"):
+        _fetch(opener, retry_transient=3, sleep=lambda _s: pytest.fail("no retry expected"))
+    assert len(seen) == 1
+
+
+def test_fetch_bytes_does_not_retry_transient_errors_by_default() -> None:
+    opener, seen = _opener(_http_error(503), b"never")
+    with pytest.raises(FetchFailed, match="HTTP 503"):
+        _fetch(opener, sleep=lambda _s: pytest.fail("no retry expected"))
+    assert len(seen) == 1
+    opener, seen = _opener(TimeoutError("slow"), b"never")
+    with pytest.raises(FetchFailed, match="slow"):
+        _fetch(opener, sleep=lambda _s: pytest.fail("no retry expected"))
+    assert len(seen) == 1
+
+
 def test_tls_context_verifies_certificates() -> None:
     context = tls_context()
     assert context.verify_mode == ssl.CERT_REQUIRED

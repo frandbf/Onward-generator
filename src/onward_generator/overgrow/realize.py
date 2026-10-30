@@ -1,6 +1,7 @@
 """Turn a validated placement plan into copies. The model does not place meshes.
 
-A span or a cover that cannot be finished is dropped whole. Copies still have
+A span or a cover that cannot be finished is dropped whole. When the manifest
+curates a grouping, a span needs a ``run`` and a cover needs a ``grid``. Copies still have
 to leave 1.2 m of passage, stay out of buildings, and fit the triangle budget.
 The library GLB is not rewritten.
 """
@@ -232,6 +233,8 @@ def _record(digest_hash: str, prompt_hash: str, origin: str, raw: str, reason: s
 def _span(action: SpanAction, digest: Digest, prop: Prop, site: Site, result: Dressing, op_index: int) -> str | None:
     if prop.spec.anchor == "facade":
         return "wrong_anchor"
+    if not _repeats_as(prop, "run"):
+        return "wrong_grouping"
     start = digest.corner(action.from_id)
     end = digest.corner(action.to_id)
     if start is None or end is None:
@@ -272,6 +275,8 @@ def _span(action: SpanAction, digest: Digest, prop: Prop, site: Site, result: Dr
 def _cover(action: CoverAction, digest: Digest, prop: Prop, site: Site, result: Dressing, op_index: int) -> str | None:
     if prop.spec.anchor != "facade":
         return "wrong_anchor"
+    if not _repeats_as(prop, "grid"):
+        return "wrong_grouping"
     edge = digest.facade(action.edge_id)
     if edge is None:
         return "unknown_anchor"
@@ -372,6 +377,11 @@ def _place(action: PlaceAction, digest: Digest, prop: Prop, site: Site, result: 
         return reason
     _emit(prop, matrix, result, op="place", anchor_id=anchor.id, crosswise=crosswise, op_index=op_index)
     return None
+
+
+def _repeats_as(prop: Prop, grouping: str) -> bool:
+    """A curated grouping must match the gesture. A row without one (older manifest) may repeat."""
+    return prop.spec.grouping in ("", grouping)
 
 
 def _facing(digest: Digest, x: float, y: float) -> Facade | None:

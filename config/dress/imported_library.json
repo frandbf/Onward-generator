@@ -739,6 +739,36 @@
       "note": "Albedo Color 1k. Normal, roughness and displacement were not copied."
     },
     {
+      "id": "ph_painted_plaster_wall",
+      "name": "painted_plaster_wall",
+      "provider": "polyhaven",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "painted_plaster_wall by Amal Kumar from Poly Haven, licensed under CC0 1.0.",
+      "source_url": "https://polyhaven.com/a/painted_plaster_wall",
+      "surface": "wall",
+      "bound": false,
+      "path": "assets/textures/painted_plaster_wall/painted_plaster_wall_diff_1k.jpg",
+      "sha256": "440310f05af089f2c93353167573403cbc3f805948203237b5d26431eeb9e19c",
+      "bytes": 686726,
+      "note": "Diffuse 1k, already in the repository. Calm enough for a wall slot."
+    },
+    {
+      "id": "ph_plastered_wall",
+      "name": "plastered_wall",
+      "provider": "polyhaven",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "plastered_wall by Amal Kumar from Poly Haven, licensed under CC0 1.0.",
+      "source_url": "https://polyhaven.com/a/plastered_wall",
+      "surface": "wall",
+      "bound": false,
+      "path": "assets/textures/plastered_wall/plastered_wall_diff_1k.jpg",
+      "sha256": "73312ebb6eabc8e0a55addd8a82a8924bcd1e717b9488a887cc77f14b6ea554e",
+      "bytes": 617080,
+      "note": "Diffuse 1k, already in the repository. Calm enough for a wall slot."
+    },
+    {
       "id": "kenney_fantasy_door_metal_frame",
       "name": "door_metal_frame",
       "provider": "kenney",

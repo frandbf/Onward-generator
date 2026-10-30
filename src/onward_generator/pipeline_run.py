@@ -318,6 +318,9 @@ def _unity_summary(text: str, *, failed: bool, content_md5: str | None = None) -
             if failed:
                 kept.append(stripped.removeprefix("[export] "))
             continue
+        if stripped.startswith("[export] step ") and " OK in " in stripped:
+            kept.append(stripped.removeprefix("[export] step ").replace("'", ""))
+            continue
         if stripped.startswith("[export] step ") and stripped.endswith(" OK"):
             continue
         if stripped in {"[OnwardAdapter] OK"} or "files verified" in stripped or stripped.startswith("[OnwardAdapter] Combined "):

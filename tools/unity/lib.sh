@@ -15,6 +15,12 @@
 UNITY_VERSION="2021.3.23f1"
 HOST_SHIFT=0
 
+# Wall time since $1, a $SECONDS value, written as the Python run writes it: "42 s" or "4 min 05 s".
+elapsed() {
+  local s=$((SECONDS - $1))
+  if ((s < 60)); then printf '%d s' "$s"; else printf '%d min %02d s' $((s / 60)) $((s % 60)); fi
+}
+
 resolve_host() {
   local name=""
   HOST_SHIFT=0

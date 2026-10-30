@@ -38,7 +38,7 @@ Only `detail` knows where the furnished rooms are, their floor and ceiling heigh
 ## Consequences
 
 - No triangle, material or draw call is added. Lights and probes are baked: the cost is bake time and a little lightmap and probe data.
-- With 2–5 interiors of 2–3 floors, a map has 4–15 lights, under the default cap.
+- With 5–8 interiors of 2–3 floors, a map has 10–24 lights, at most the default cap. A map with more rooms than the cap leaves the rooms past it dark (they keep their probes).
 - Larger lightmaps are not needed: the lights change the lightmap contents, not their size.
-- One point light under the centre of a large room (up to 400 m²) leaves its far corners dimmer. The range is clamped at 12 m.
+- One point light under the centre of a large room (up to 500 m²) leaves its far corners dimmer. The range is clamped at 12 m.
 - Not verified in Unity or on the headset. `docs/11-onward-sdk.md` records the guide rule as a lightmap and one baked directional light. This repository has no evidence on whether the Onward runtime or its post-processing profile accepts more baked lights and a `LightProbeGroup`, or overrides them. That is checked in Unity and on the headset (`docs/12-export.md`).

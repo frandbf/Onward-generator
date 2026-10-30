@@ -24,6 +24,8 @@ import certifi
 
 CHUNK_BYTES = 256 * 1024
 MAX_RETRY_DELAY_S = 90.0
+# Server-side failures that a later attempt can clear: an overloaded or restarting host.
+TRANSIENT_HTTP = frozenset({500, 502, 503, 504})
 
 
 class Response(Protocol):
@@ -74,6 +76,7 @@ def fetch_bytes(
     headers: Mapping[str, str],
     data: bytes | None = None,
     retry_429: int = 0,
+    retry_transient: int = 0,
     error: type[Exception] = OSError,
     retry_delay_s: float = 8.0,
     error_body: bool = False,
@@ -84,7 +87,10 @@ def fetch_bytes(
 
     Only ``https`` URLs on ``allowed_hosts`` are requested. HTTP 429 is
     retried ``retry_429`` times, doubling the wait from ``retry_delay_s`` up
-    to 90 s. Every failure raises ``error`` with the cause chained. With
+    to 90 s. HTTP 500, 502, 503 and 504, a timeout, a refused or reset
+    connection and any other network error are retried ``retry_transient``
+    times with the same doubling wait. Every failure raises ``error`` with the
+    cause chained. With
     ``error_body`` the message of an HTTP error ends with up to 400 bytes
     of the response body; without it the message names only status and URL.
     """
@@ -96,6 +102,7 @@ def fetch_bytes(
     safe = redact(url)
     delay = retry_delay_s
     retries = 0
+    transient = 0
     while True:
         request = urllib.request.Request(url, data=data, headers=dict(headers), method="POST" if data is not None else "GET")  # pragma: no mutate: only dropping the method survives, urllib infers the same one from data; test_net_callers pins the rest
         try:
@@ -104,14 +111,17 @@ def fetch_bytes(
         except urllib.error.HTTPError as exc:
             if exc.code == 429 and retries < retry_429:
                 retries += 1
-                sleep(delay)
-                delay = min(delay * 2, MAX_RETRY_DELAY_S)
-                continue
-            if exc.code == 429:
+            elif exc.code in TRANSIENT_HTTP and transient < retry_transient:
+                transient += 1
+            elif exc.code == 429:
                 raise error(f"rate limited: HTTP 429 for {safe}") from exc
-            detail = exc.read(400).decode(errors="replace").strip() if error_body else ""
-            raise error(f"HTTP {exc.code} for {safe}" + (f": {detail}" if detail else "")) from exc
-        except urllib.error.URLError as exc:
-            raise error(f"request to {safe} failed: {exc.reason}") from exc
-        except (TimeoutError, ConnectionError) as exc:
-            raise error(f"request to {safe} failed: {exc}") from exc
+            else:
+                detail = exc.read(400).decode(errors="replace").strip() if error_body else ""
+                raise error(f"HTTP {exc.code} for {safe}" + (f": {detail}" if detail else "")) from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if transient >= retry_transient:
+                reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+                raise error(f"request to {safe} failed: {reason}") from exc
+            transient += 1
+        sleep(delay)
+        delay = min(delay * 2, MAX_RETRY_DELAY_S)

@@ -15,7 +15,7 @@ Status: accepted · 20 October 2026
 5. **A failure is retried once before the rules.** If Ollama does not answer or the JSON does not validate, the second call quotes that failure. Rules are used only when that attempt also fails. The raw reply, the digest hash, and the instruction hash are stored in `scene_overgrow/ambient_plan.json`. A later run with the same digest and brief reuses that reply.
 6. **`intent.schema.json` is not widened.** It remains the phase-06 contract.
 
-The installed library is every `manifest.json` in a direct child of `assets` (`assets/normalized`, `assets/kenney`, and any catalogue added later). See `docs/abandoned-assets.md`. A `prop_selection.json` limits a run to installed ids. Without it, the whole catalogue is eligible.
+The installed library is every `manifest.json` in a direct child of `assets` (`assets/normalized`, `assets/kenney`, and any catalogue added later). See `docs/abandoned-assets.md`. A `prop_selection.json` limits a run to installed ids. Without it, the whole catalogue is eligible. Since 2026-10-30 each library row in the prompt also carries the curated `description`, `placement`, `grouping`, `condition` and `tags` of a 0.2.0 manifest (prompt 0.2.0). `kit_only` rows never reach the prompt, a `span` needs a `run` and a `cover` needs a `grid`; code enforces both.
 
 ## Rejected alternatives
 

@@ -5,21 +5,30 @@ from __future__ import annotations
 import math
 
 import pytest
-from shapely import LineString, MultiLineString, Point, box
+from shapely import LineString, MultiLineString, Point, STRtree, box
+from shapely.geometry.base import BaseGeometry
 
 from onward_generator.export.package import _check_layout
-from onward_generator.generation.surfaces import LinearWay
+from onward_generator.generation.config import load_generation_config
+from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
     GAMEPLAY_VERSION,
     MIN_SPAWN_SEPARATION_M,
     MODE_CODES,
+    NAV_AGENT_RADIUS_M,
+    ROUTE_POINTS,
+    ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
     LayoutError,
+    _patrol_lines,
     _routes,
+    _sample_route,
     component_holding,
     extra_spawn_block,
     fit_spawn_separation,
+    hunt_routes,
+    nav_islands,
     patrol_seeds,
     patrol_spawns,
     scatter_points,
@@ -114,12 +123,14 @@ def test_a_street_places_hunt_starts_on_both_sidewalks() -> None:
         ways = [street, foot]
         config = Config()
 
-    routes = _routes(Base(), box(-20, -5, 50, 305))
+    ground = box(-20, -5, 50, 305)
+    routes = _routes(Base(), ground, [ground])
     starts = [(route["points"][0]["x"], route["points"][0]["y"]) for route in routes]
     assert len(starts) >= AI_COUNT
-    assert all(abs(x) >= 4 - 0.05 or abs(x - 40) < 0.05 for x, _y in starts)
-    assert any(abs(x + 4) < 0.05 for x, _y in starts)
-    assert any(abs(x - 4) < 0.05 for x, _y in starts)
+    # The middle of each 2 m sidewalk is 4 m out, and the line by the kerb 3.5 m.
+    assert all(round(abs(x), 2) in (3.5, 4.0) or abs(x - 40) < 0.05 for x, _y in starts)
+    assert any(x < 0 for x, _y in starts)
+    assert any(0 < x < 5 for x, _y in starts)
     assert any(abs(x - 40) < 0.05 for x, _y in starts)
     assert all(
         math.hypot(a[0] - b[0], a[1] - b[1]) >= SPAWN_SEPARATION_M - 1e-6
@@ -141,17 +152,17 @@ def _pedestrian(length: float):
 
 def test_spawn_separation_stays_at_8_m_on_a_long_street() -> None:
     base, free = _pedestrian(400.0)
-    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
+    routes, separation = fit_spawn_separation(base, free, [free], AI_COUNT)
     assert separation == SPAWN_SEPARATION_M
     assert len(routes) >= AI_COUNT
 
 
 def test_spawn_separation_shrinks_until_32_starts_fit() -> None:
     base, free = _pedestrian(240.0)
-    routes, separation = fit_spawn_separation(base, free, AI_COUNT)
+    routes, separation = fit_spawn_separation(base, free, [free], AI_COUNT)
     assert MIN_SPAWN_SEPARATION_M <= separation < SPAWN_SEPARATION_M
     assert len(routes) >= AI_COUNT
-    assert len(_routes(base, free, round(separation + 0.1, 2))) < AI_COUNT
+    assert len(_routes(base, free, [free], round(separation + 0.1, 2))) < AI_COUNT
     starts = [(route["points"][0]["x"], route["points"][0]["y"]) for route in routes]
     assert all(
         math.hypot(a[0] - b[0], a[1] - b[1]) >= separation - 1e-6
@@ -163,7 +174,7 @@ def test_spawn_separation_shrinks_until_32_starts_fit() -> None:
 def test_spawn_separation_stops_above_the_patrol_link() -> None:
     base, free = _pedestrian(80.0)
     with pytest.raises(LayoutError, match="5.1"):
-        fit_spawn_separation(base, free, AI_COUNT)
+        fit_spawn_separation(base, free, [free], AI_COUNT)
 
 
 def test_hunt_spawns_refuse_a_shared_start() -> None:
@@ -219,3 +230,153 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
     assert _check_layout(close) == []
     close["ai_separation_m"] = 4.0
     assert any("ai_separation_m" in problem for problem in _check_layout(close))
+
+
+def _base(*ways: LinearWay, partition: object = None) -> object:
+    class Config:
+        sidewalk_width_m = 2.0
+
+    class Base:
+        pass
+
+    base = Base()
+    base.ways = list(ways)  # type: ignore[attr-defined]
+    base.config = Config()  # type: ignore[attr-defined]
+    base.partition = partition  # type: ignore[attr-defined]
+    return base
+
+
+def _sample(line: LineString, free: BaseGeometry, start: float, parts: list[BaseGeometry]) -> list[tuple[float, float]]:
+    return [(p["x"], p["y"]) for p in _sample_route(line, free, start, parts, STRtree(parts))]
+
+
+def test_a_route_keeps_two_metres_before_the_end_of_its_line() -> None:
+    ground = box(-5, -5, 100, 5)
+    assert _sample(LineString([(0, 0), (20, 0)]), ground, 4.0, [ground]) == [(4.0, 0.0)]
+    assert _sample(LineString([(0, 0), (20.5, 0)]), ground, 4.0, [ground]) == [(4.0, 0.0), (18.0, 0.0)]
+
+
+def test_route_points_are_rounded_to_the_centimetre() -> None:
+    ground = box(-5, -5, 100, 100)
+    assert _sample(LineString([(0, 0), (50, 50)]), ground, 4.0, [ground])[0] == (2.83, 2.83)
+
+
+def test_routes_start_every_separation_until_the_last_two_points() -> None:
+    """A 36.5 m way: starts at 4, 12 and 20 m. The one at 20 m holds exactly two points (20 and 34 m)."""
+    way = LinearWay("foot", "pedestrian", LineString([(0, 0), (0, 36.5)]), 3.0, "config_default")
+    ground = box(-1.5, -1, 1.5, 40)
+    routes = _routes(_base(way), ground, [ground])  # type: ignore[arg-type]
+    assert [[point["y"] for point in route["points"]] for route in routes] == [[4.0, 18.0, 32.0], [12.0, 26.0], [20.0, 34.0]]
+
+
+def test_a_route_holds_at_most_route_points_one_step_apart() -> None:
+    ground = box(-5, -5, 1000, 5)
+    points = _sample(LineString([(0, 0), (900, 0)]), ground, 4.0, [ground])
+    assert len(points) == ROUTE_POINTS == 16
+    assert points == [(4.0 + ROUTE_STEP_M * i, 0.0) for i in range(ROUTE_POINTS)]
+
+
+def test_a_route_skips_furniture_and_keeps_going() -> None:
+    ground = box(-5, -5, 100, 5)
+    free = ground.difference(Point(18, 0).buffer(1.0))
+    assert _sample(LineString([(0, 0), (70, 0)]), free, 4.0, [ground]) == [(4.0, 0.0), (32.0, 0.0), (46.0, 0.0), (60.0, 0.0)]
+
+
+def test_a_route_starts_on_the_first_point_of_an_island() -> None:
+    ground = box(-5, -5, 100, 5)
+    island = box(10, -1, 100, 1)
+    assert _sample(LineString([(0, 0), (50, 0)]), ground, 4.0, [island]) == [(18.0, 0.0), (32.0, 0.0), (46.0, 0.0)]
+
+
+def test_a_route_does_not_start_in_the_bounding_box_of_an_island() -> None:
+    """The first point sits in the gap of a U-shaped island: inside its envelope, 9 m from its ground."""
+    ground = box(-5, -50, 110, 5)
+    island = box(-1, -30, 101, 1).difference(box(31.0, -25, 51.5, 2))
+    assert _sample(LineString([(36, 0), (100, 0)]), ground, 4.0, [island]) == [(54.0, 0.0), (68.0, 0.0), (82.0, 0.0), (96.0, 0.0)]
+
+
+def test_a_route_stops_where_it_leaves_its_island() -> None:
+    """The line crosses a street onto another island, then back onto the first; the route stops at the street."""
+    ground = box(-5, -50, 110, 5)
+    # A U: two arms on the line, joined far below it.
+    home = box(-1, -30, 101, 1).difference(box(31.0, -25, 51.5, 2))
+    other = box(44, -1, 50, 1)
+    assert _sample(LineString([(0, 0), (100, 0)]), ground, 4.0, [home, other]) == [(4.0, 0.0), (18.0, 0.0)]
+
+
+def test_short_alley_ways_are_merged_into_one_patrol_line() -> None:
+    pieces = [((0.0, 14.0 * i), (0.0, 14.0 * (i + 1))) for i in range(5)]
+    alley = [LinearWay(f"alley-{i}", "pedestrian", LineString(piece), 3.0 - i * 0.5, "inferred") for i, piece in enumerate(pieces)]
+    assert [round(line.length, 6) for line in _patrol_lines(alley, 2.0)] == [70.0]
+    ground = box(-1.5, 0, 1.5, 70)
+    routes = _routes(_base(*alley), ground, [ground])  # type: ignore[arg-type]
+    assert routes
+    assert all(len(route["points"]) >= 2 for route in routes)
+
+
+def test_street_patrols_run_mid_sidewalk_and_by_the_kerb_on_merged_ways() -> None:
+    ways = [
+        LinearWay("wide-a", "vehicular", LineString([(0, 0), (0, 30)]), 6.0, "config_default"),
+        LinearWay("wide-b", "vehicular", LineString([(0, 30), (0, 60)]), 6.0, "config_default"),
+        LinearWay("narrow-a", "vehicular", LineString([(50, 0), (50, 30)]), 4.0, "inferred"),
+        LinearWay("narrow-b", "vehicular", LineString([(50, 30), (50, 60)]), 4.0, "inferred"),
+        LinearWay("foot", "pedestrian", LineString([(90, 0), (90, 60)]), 3.0, "config_default"),
+    ]
+    found = sorted((round(line.coords[0][0], 6), round(line.length, 6)) for line in _patrol_lines(ways, 2.0))
+    assert found == [
+        (-4.0, 60.0), (-3.5, 60.0), (3.5, 60.0), (4.0, 60.0),
+        (47.0, 60.0), (47.5, 60.0), (52.5, 60.0), (53.0, 60.0),
+        (90.0, 60.0),
+    ]
+
+
+def test_a_narrow_sidewalk_holds_a_patrol_by_the_kerb() -> None:
+    """A 4 m service alley with facades 0.9 m from the kerb: the sidewalk middle is inside the wall."""
+    alley = LinearWay("alley", "vehicular", LineString([(0, 0), (120, 0)]), 4.0, "inferred")
+    strip = box(0, 2.0, 120, 2.9)
+    routes = _routes(_base(alley), strip, [strip.buffer(-NAV_AGENT_RADIUS_M)])  # type: ignore[arg-type]
+    assert routes
+    assert {point["y"] for route in routes for point in route["points"]} == {2.5}
+
+
+def test_nav_islands_split_at_the_carriageway_and_ignore_furniture() -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-50, -50, 50, 50), [], [street], [], config)
+    islands = nav_islands(_base(street, partition=partition))  # type: ignore[arg-type]
+    assert sorted(round(part.bounds[1], 6) for part in islands) == [-50 + NAV_AGENT_RADIUS_M, 3 + NAV_AGENT_RADIUS_M]
+    assert sorted(round(part.bounds[3], 6) for part in islands) == [-3 - NAV_AGENT_RADIUS_M, 50 - NAV_AGENT_RADIUS_M]
+
+
+def _two_islands(home_length: float) -> tuple[object, BaseGeometry, list[BaseGeometry], BaseGeometry]:
+    home_way = LinearWay("home", "pedestrian", LineString([(0, 0), (0, home_length)]), 3.0, "config_default")
+    far_way = LinearWay("far", "pedestrian", LineString([(100, 0), (100, 400)]), 3.0, "config_default")
+    home = box(-1.5, 0, 1.5, home_length)
+    far = box(98.5, 0, 101.5, 400)
+    return _base(home_way, far_way), home.union(far), [home, far], home
+
+
+def test_hunt_routes_stay_on_the_origin_island_when_it_holds_the_roster() -> None:
+    base, free, islands, home = _two_islands(400.0)
+    routes, separation = hunt_routes(base, free, islands, home, AI_COUNT, (0.0, 0.0))  # type: ignore[arg-type]
+    assert separation == SPAWN_SEPARATION_M
+    assert len(routes) == AI_COUNT
+    assert all(point["x"] == 0.0 for route in routes for point in route["points"])
+
+
+def test_hunt_routes_keep_every_origin_route_and_fill_from_other_islands() -> None:
+    base, free, islands, home = _two_islands(60.0)
+    on_home = _routes(base, free, [home])  # type: ignore[arg-type]
+    assert 0 < len(on_home) < AI_COUNT
+    routes, separation = hunt_routes(base, free, islands, home, AI_COUNT, (0.0, 0.0))  # type: ignore[arg-type]
+    assert separation == SPAWN_SEPARATION_M
+    assert len(routes) == AI_COUNT
+    assert routes[: len(on_home)] == on_home
+    assert all(point["x"] == 100.0 for route in routes[len(on_home):] for point in route["points"])
+    assert len({(route["points"][0]["x"], route["points"][0]["y"]) for route in routes}) == AI_COUNT
+
+
+def test_spread_routes_returns_nothing_for_no_room() -> None:
+    routes = [{"points": [{"x": x, "y": 0.0}, {"x": x, "y": 14.0}]} for x in range(0, 80, 8)]
+    assert spread_routes(routes, 0, (0.0, 0.0)) == []
+    assert spread_routes(routes, 1, (0.0, 0.0)) == [routes[0]]

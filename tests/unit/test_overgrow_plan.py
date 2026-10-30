@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -415,3 +416,40 @@ def test_a_failed_reply_is_tried_once_more_before_the_rules() -> None:
     assert fallback.ok is False
     assert fallback.origin == "rules_fallback"
     assert fallback.record["attempts"] == 2
+
+
+def _grouped(props: list[Prop], asset_id: str, grouping: str) -> list[Prop]:
+    return [
+        Prop(replace(prop.spec, grouping=grouping), prop.mesh, prop.uvs, prop.albedo) if prop.spec.id == asset_id else prop
+        for prop in props
+    ]
+
+
+def test_span_needs_a_run_when_the_grouping_is_curated() -> None:
+    features = _block_features()
+    digest = build_digest(_scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830"))
+    plan = parse_overgrow_plan(
+        '{"plan_version":"0.1.0","mood":"gap","actions":[{"op":"span","asset_id":"large_iron_gate",'
+        '"from_id":"corner:osm-way-left:0:1","to_id":"corner:osm-way-right:0:0","passage_m":1.2}]}'
+    )
+    for grouping in ("single", "cluster", "grid"):
+        refused = realize(plan, digest, _grouped(_props(), "large_iron_gate", grouping), _site(features))
+        assert refused.nodes == []
+        assert refused.rejects == [{"op_index": 0, "asset_id": "large_iron_gate", "reason": "wrong_grouping"}]
+    placed = realize(plan, digest, _grouped(_props(), "large_iron_gate", "run"), _site(features))
+    assert len([row for row in placed.records if row["op"] == "span"]) == 3
+
+
+def test_cover_needs_a_grid_when_the_grouping_is_curated() -> None:
+    features = _block_features()
+    digest = build_digest(_scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830"))
+    plan = parse_overgrow_plan(
+        '{"plan_version":"0.1.0","mood":"wall","actions":[{"op":"cover","asset_id":"modular_fire_escape",'
+        '"edge_id":"facade:osm-way-left:0:0"}]}'
+    )
+    for grouping in ("single", "cluster", "run"):
+        refused = realize(plan, digest, _grouped(_props(), "modular_fire_escape", grouping), _site(features))
+        assert refused.nodes == []
+        assert refused.rejects == [{"op_index": 0, "asset_id": "modular_fire_escape", "reason": "wrong_grouping"}]
+    placed = realize(plan, digest, _grouped(_props(), "modular_fire_escape", "grid"), _site(features))
+    assert [row for row in placed.records if row["op"] == "cover"]

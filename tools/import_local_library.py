@@ -182,8 +182,40 @@ def kenney_objects() -> list[dict]:
     return rows
 
 
+# Calm Poly Haven plasters already committed under assets/textures (CC0, each with
+# its .source.json). They widen the plaster pool after the busy ambientCG plasters
+# were dropped for repeating stains.
+REPO_PLASTERS = ("painted_plaster_wall", "plastered_wall")
+
+
+def repo_textures() -> list[dict]:
+    rows = []
+    for asset_id in REPO_PLASTERS:
+        relative = f"textures/{asset_id}/{asset_id}_diff_1k.jpg"
+        target = ASSETS / relative
+        source = json.loads(target.with_name(target.name + ".source.json").read_text(encoding="utf-8"))
+        if source.get("license") != "CC0":
+            raise SystemExit(f"{asset_id}: licence {source.get('license')!r} is not CC0")
+        rows.append({
+            "id": f"ph_{asset_id}",
+            "name": asset_id,
+            "provider": "polyhaven",
+            "license": CC0,
+            "license_url": CC0_URL,
+            "credit": f"{asset_id} by {', '.join(source['authors'])} from Poly Haven, licensed under CC0 1.0.",
+            "source_url": source["page_url"],
+            "surface": "wall",
+            "bound": False,
+            "path": f"assets/{relative}",
+            "sha256": sha256(target),
+            "bytes": target.stat().st_size,
+            "note": "Diffuse 1k, already in the repository. Calm enough for a wall slot.",
+        })
+    return rows
+
+
 def main() -> None:
-    textures = ambient_textures() + fantasy_textures()
+    textures = ambient_textures() + repo_textures() + fantasy_textures()
     objects = kenney_objects()
     ids = [row["id"] for row in textures + objects]
     if len(ids) != len(set(ids)):

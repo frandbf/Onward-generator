@@ -4,7 +4,9 @@ A GLB that reads but cannot be shown as the export draws it is rejected with a
 reason. The exported material is opaque and albedo only, so a material whose
 ``alphaMode`` is not ``OPAQUE`` loses its transparency and is refused. A
 vegetation mesh anchored ``flat`` that rises more than a few centimetres is a
-slope tile, not ground cover, and is refused too.
+slope tile, not ground cover, and is refused too. A row whose curated
+placement is ``kit_only`` is a building or road kit piece and is refused
+before its GLB is read. A 0.2.0 manifest that fails its schema is an error.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -22,6 +25,7 @@ from onward_generator.generation.mesh import Mesh, transform
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
 from onward_generator.overgrow.constants import FLAT_VEGETATION_MAX_M
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
+from onward_generator.overgrow.manifest import KIT_ONLY, check_manifest
 from onward_generator.overgrow.normalize import rest_on_ground
 
 
@@ -114,10 +118,14 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
         document = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return [], []
+    check_manifest(document, str(manifest))
     props: list[Prop] = []
     rejects: list[LibraryReject] = []
     for row in document.get("assets") or []:
         if not isinstance(row, dict) or not row.get("id") or not row.get("file"):
+            continue
+        if row.get("placement") == KIT_ONLY:
+            rejects.append(LibraryReject(str(row["id"]), KIT_ONLY))
             continue
         file = root / str(row["file"])
         if not file.is_file():
@@ -154,7 +162,16 @@ def _spec(row: dict) -> AssetSpec | None:
         use=str(row.get("use") or (known.use if known else "")),
         lane=str(row.get("lane") or (known.lane if known else "forbid")),
         clearance_m=float(row.get("clearance_m") or (known.clearance_m if known else 0.0)),
+        **_semantics(row),
     )
+
+
+def _semantics(row: dict) -> dict[str, Any]:
+    """Curated fields a 0.2.0 row carries. An older row has none."""
+    found: dict[str, Any] = {key: str(row[key]) for key in ("description", "placement", "grouping", "condition") if key in row}
+    if "tags" in row:
+        found["tags"] = tuple(str(tag) for tag in row["tags"])
+    return found
 
 
 def _read(path: Path, spec: AssetSpec) -> Prop:

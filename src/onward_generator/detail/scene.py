@@ -38,6 +38,7 @@ from onward_generator.detail.facades import (
 from onward_generator.detail.grammar import choose_roof, choose_wall
 from onward_generator.detail.interiors import (
     build_interior,
+    fits_triangle_budget,
     glass_penetrations,
     pierce_room_windows,
     plan_interior,
@@ -384,9 +385,18 @@ def detail_scene(
     templates_used: Counter[str] = Counter()
     roof_types: Counter[str] = Counter()
     interiors_built: list[str] = []
+    interior_triangles = 0
     exposed_m = party_m = 0.0
 
-    for o in building_objs:
+    # Buildings in the interior queue go first, in queue order, so the quota and the triangle budget go
+    # to the sha256 order and not to the id order. Their objects and issues are put back in building order below.
+    rank = {bid: k for k, bid in enumerate(interior_queue)}
+    order = sorted(building_objs, key=lambda b: rank.get(b.record["source_ids"][0], len(rank)))
+    leading_issues = len(issues)
+    emitted: dict[str, tuple[list[DetailObject], list[Issue]]] = {}
+
+    for o in order:
+        first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
         geom = footprints[bid]
         h = height_of[bid]
@@ -408,7 +418,9 @@ def detail_scene(
             tags, template, cfg.seed, bid, geom.area, convex=convex,
         )
         door_spec = cfg.landmark_door if landmark else cfg.main_door
+        plain_door = ("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec)
         previous_height = height
+        plain_storeys = storeys
 
         def run_layout(door_kind: str, door_depth: float, door_opening: Any, storeys_used: Storeys) -> Layout:
             layout = Layout()
@@ -438,20 +450,32 @@ def detail_scene(
                 layout = trial
                 interior = plan
         if layout is None:
-            layout = run_layout("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec, storeys)
+            layout = run_layout(*plain_door, storeys)
         opened_windows = omitted_windows = 0
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
                 layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
                 interior.floors * interior.storey_m,
             )
-            if omitted_windows:
-                issues.append(Issue(
-                    "interior_window_omitted", "info", bid,
-                    f"{omitted_windows} windows omitted; they did not meet the inner wall",
-                ))
 
         shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
+        built = None
+        if interior is not None:
+            built = build_interior(
+                interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
+                glass_penetrations(layout, segments),
+            )
+            cost = built.visual_triangles
+            if fits_triangle_budget(interior_triangles, cost, cfg.interiors.max_triangles):
+                interior_triangles += cost
+            else:
+                issues.append(Issue("interior_not_generated", "info", bid,
+                                    f"triangle_budget: needs {cost} triangles, {cfg.interiors.max_triangles - interior_triangles} left "
+                                    f"of max_triangles {cfg.interiors.max_triangles}"))
+                interior = built = None
+                height, storeys = previous_height, plain_storeys
+                layout = run_layout(*plain_door, storeys)
+                shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget test pins the rebuilt shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
         if shell.defects:
@@ -462,12 +486,12 @@ def detail_scene(
         glass_colliders: list[Mesh] = []
         base_collider = o.collider
         interior_record = None
-        if interior is not None:
-            assert layout is not None
-            built = build_interior(
-                interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
-                glass_penetrations(layout, segments),
-            )
+        if built is not None:
+            if omitted_windows:
+                issues.append(Issue(
+                    "interior_window_omitted", "info", bid,
+                    f"{omitted_windows} windows omitted; they did not meet the inner wall",
+                ))
             if built.defects:
                 issues.append(Issue("interior_collider_not_closed", "critical", bid, f"{built.defects} defects"))
             if built.roof_well is not None:
@@ -553,6 +577,10 @@ def detail_scene(
             issues.extend(tower_issues)
             for part in towers:
                 objects.append(DetailObject(part.id, "landmark_part", list(part.visual), [part.collider], part.record))
+        emitted[o.id] = (objects[first_object:], issues[first_issue:])
+
+    objects = [x for o in building_objs for x in emitted[o.id][0]]
+    issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
 
     part_objects, part_issues = _building_parts(features, footprints, cfg)
     issues.extend(part_issues)
@@ -606,6 +634,7 @@ def detail_scene(
         "detail_config": {"path": cfg.path, "sha256": cfg.sha256, "version": cfg.version},
     }
     detailed.stats = _stats(detailed, counts, templates_used, roof_types, interiors_built, exposed_m, party_m, elements)
+    detailed.stats["interior_visual_triangles"] = interior_triangles
     _budget(detailed)
     return detailed
 

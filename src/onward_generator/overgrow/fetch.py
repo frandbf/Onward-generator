@@ -12,8 +12,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from onward_generator import __version__
+from onward_generator.io import atomic_write_json
 from onward_generator.net import fetch_bytes
 from onward_generator.overgrow.catalog import ALL_ASSETS, WEAR_NOTE
+from onward_generator.overgrow.manifest import keep_semantics
 from onward_generator.overgrow.normalize import gltf_to_local, normalize_arrays, write_normalized_glb
 
 INFO_URL = "https://api.polyhaven.com/info/{id}"
@@ -95,15 +97,17 @@ def fetch_library(
     }
     inventory.parent.mkdir(parents=True, exist_ok=True)
     inventory.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    manifest = {
+    target = library / "manifest.json"
+    previous = json.loads(target.read_bytes()) if target.is_file() else None
+    manifest = keep_semantics({
         "schema": "onward_generator.abandoned_prefabs",
         "schema_version": "0.1.0",
         "unit": "m",
         "collider": "none",
         "shader": "PP_Opaque_Simple_Lit albedo only",
         "assets": manifest_assets,
-    }
-    (library / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    }, previous)
+    atomic_write_json(target, manifest)
     return document
 
 

@@ -4,6 +4,20 @@ The 49 normalized models in `assets/normalized`. Each picture is a view of the f
 
 The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth.
 
+## Curated manifest fields
+
+Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/kenney/manifest.json`, are schema `0.2.0` (`config/asset_manifest.schema.json`). Every row adds five fields, written right after `use`. They were estimated by a person from rendered views and the bounding box of each GLB as the library loads it. They are not observed in the file, and the manifest's `semantics` block says so (`origin: estimated`).
+
+| Field | Values | Read by |
+| --- | --- | --- |
+| `description` | One sentence, 10 to 140 characters: what it is, how it looks, its state | The placement model |
+| `placement` | `kit_only`, `wall_mounted`, `street`, `kerb`, `wall_foot`, `boundary`, `open_ground`, `ground_cover` | The model; the library refuses `kit_only` |
+| `grouping` | `single`, `cluster`, `run`, `grid` | The model; `realize` refuses a `span` that is not a `run` and a `cover` that is not a `grid` (`wrong_grouping`) |
+| `condition` | `intact`, `worn`, `damaged`, `wrecked`, `burned` | The model |
+| `tags` | Up to four lowercase words | The model |
+
+`kit_only` marks a building or road kit piece: the Kenney wall modules, roofs, doors, windows, road tiles, roof posts and scaffold uprights (128 rows). Placing one alone would invent a building or a second road, so the library refuses the row before it reads the GLB (`library_rejects` reason `kit_only`). Doors and windows are kit pieces too: the facades already get their openings from `detail`. `wall_mounted` goes with `anchor: facade` and nothing else does; `street` needs the `carriageway` surface. A 0.2.0 manifest that misses a field, uses another value, or breaks those two rules stops the load with a `LibraryError`. A manifest without `schema_version` 0.2.0 is read as before, with no curated fields. `overgrow fetch` and `overgrow fetch-sketchfab` keep the curated fields of rows they rewrite; a row they add without them turns the manifest back into 0.1.0.
+
 ## Vehicles
 
 ### covered car
@@ -140,8 +154,8 @@ The sizes on each card are the file's. If a model does not fit the street, `fit`
 ![Gas Tanker 14 MB](abandoned-assets/gas_tanker.png)
 
 - Id: `gas_tanker`
-- What: Fuel tanker.
-- Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
+- What: Stationary bulk gas tank on short legs, not a vehicle. Catalogued as `structures` / `tank` since 2026-10-30 (it was a `wreck`).
+- Where: block edge, yard, empty lot, plaza.
 - Size: 4.76 × 2.28 × 1.77 m, 1797 triangles.
 - Licence: CC BY 4.0, ahmagh2e.
 
@@ -462,8 +476,8 @@ The sizes on each card are the file's. If a model does not fit the street, `fit`
 ![shrub 03](abandoned-assets/shrub_03.png)
 
 - Id: `shrub_03`
-- What: Bush.
-- Where: courtyard, yard, plaza, park.
+- What: Four thin upright weed stems in a line, not a bush. Catalogued as a `plant` since 2026-10-30 (it was a `bush`).
+- Where: sidewalk, yard, empty lot.
 - Size: 1.37 × 0.14 × 0.40 m, 1780 triangles.
 - Licence: CC0, Poly Haven.
 ### Jungle Ground Roots With Leaf And Grass

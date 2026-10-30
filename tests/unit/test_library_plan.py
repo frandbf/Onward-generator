@@ -14,6 +14,7 @@ from onward_generator.maps.workspace import create_map, refresh_texture_plan
 from onward_generator.materials.library_plan import (
     COARSE_CONTRAST_LIMIT,
     REPO_ROOT,
+    WALL_CONTRAST_LIMIT,
     coarse_contrast,
     deterministic_choices,
     is_calm,
@@ -54,9 +55,9 @@ def test_refresh_replaces_only_the_texture_plan(tmp_path: Path) -> None:
     before = (root / "map.json").read_text(encoding="utf-8")
     reply = json.dumps({"choices": [
         {"slot": "historic_facades", "library_id": "acg_paintedplaster006"},
-        {"slot": "ochre_facades", "library_id": "acg_paintedplaster010"},
-        {"slot": "plain_facades", "library_id": "acg_paintedplaster014"},
-        {"slot": "stone_monuments", "library_id": "acg_rock022"},
+        {"slot": "ochre_facades", "library_id": "ph_painted_plaster_wall"},
+        {"slot": "plain_facades", "library_id": "ph_plastered_wall"},
+        {"slot": "stone_monuments", "library_id": "acg_rock030"},
         {"slot": "streets_plazas", "library_id": "acg_pavingstones007"},
         {"slot": "roofs", "library_id": "acg_roofingtiles011b"},
         {"slot": "brick", "library_id": "acg_bricks001"},
@@ -158,8 +159,8 @@ def test_the_limit_is_inclusive_and_other_families_are_never_measured() -> None:
     path = REPO_ROOT / str(busy["path"])
     assert is_calm(busy, limit=coarse_contrast(path))
     assert not is_calm(busy, limit=coarse_contrast(path) - 1e-6)
-    brick = next(row for row in rows.values() if texture_family(row) == "brick")
-    assert is_calm(brick, limit=-1.0)
+    roof = next(row for row in rows.values() if texture_family(row) == "roof")
+    assert is_calm(roof, limit=-1.0)
 
 
 def test_a_ground_row_without_a_file_is_left_to_the_record_check() -> None:
@@ -187,10 +188,72 @@ def test_a_model_reply_with_a_busy_texture_is_rejected() -> None:
     assert "acg_concrete047b is not in the concrete pool" in plan["description"]
 
 
-def test_an_existing_plan_with_a_busy_texture_still_validates() -> None:
+@pytest.mark.parametrize(("slot", "library_id"), [
+    ("sidewalks", "acg_concrete047b"),
+    ("historic_facades", "acg_paintedplaster016"),
+    ("brick", "acg_bricks100"),
+    ("stone_monuments", "acg_rock055"),
+])
+def test_an_existing_plan_with_a_busy_texture_is_refused(slot: str, library_id: str) -> None:
+    """A plan saved before the calm rule would keep the repeated cover or stain on every tile."""
     from onward_generator.materials.library_plan import assert_library_entries
 
-    document = {"entries": [{"id": "sidewalks", "library_id": "acg_concrete047b"}]}
-    assert_library_entries(document)
-    with pytest.raises(PlanError, match="cannot use"):
+    with pytest.raises(PlanError, match=rf"{slot} cannot use {library_id}: its tile repeats visibly\. Run `map create --name <map> --textures`"):
+        assert_library_entries({"entries": [{"id": slot, "library_id": library_id}]})
+
+
+def test_a_plan_with_calm_textures_validates_and_a_wrong_or_unknown_id_does_not() -> None:
+    from onward_generator.materials.library_plan import assert_library_entries
+
+    assert_library_entries({"entries": [
+        {"id": "sidewalks", "library_id": "acg_concrete012"},
+        {"id": "historic_facades", "library_id": "ph_plastered_wall"},
+        {"id": "brick", "library_id": "acg_bricks001"},
+    ]})
+    with pytest.raises(PlanError, match="sidewalks cannot use acg_asphalt017$"):
         assert_library_entries({"entries": [{"id": "sidewalks", "library_id": "acg_asphalt017"}]})
+    with pytest.raises(PlanError, match="sidewalks cannot use acg_missing$"):
+        assert_library_entries({"entries": [{"id": "sidewalks", "library_id": "acg_missing"}]})
+
+
+CALM_PLASTER = {"acg_paintedplaster006", "ph_painted_plaster_wall", "ph_plastered_wall"}
+CALM_BRICK = {"acg_bricks001", "acg_bricks059", "acg_bricks082b", "acg_bricks105"}
+CALM_ROCK = {"acg_rock030"}
+
+
+def test_only_calm_plaster_brick_and_rock_join_the_wall_pools() -> None:
+    """Large stains, pale stones or dark bands repeat every tile on a facade, so those images stay out."""
+    rows = {str(row["id"]): row for row in library_rows()}
+    walls = {"plaster": CALM_PLASTER, "brick": CALM_BRICK, "rock": CALM_ROCK}
+    for family, expected in walls.items():
+        members = {library_id for library_id, row in rows.items() if texture_family(row) == family}
+        assert {library_id for library_id in members if is_calm(rows[library_id])} == expected, family
+    assert WALL_CONTRAST_LIMIT > COARSE_CONTRAST_LIMIT
+
+
+def test_wall_contrast_matches_the_measured_library() -> None:
+    measured = {
+        "acg_paintedplaster006": 0.0214,
+        "acg_paintedplaster010": 0.0254,
+        "acg_paintedplaster016": 0.0656,
+        "acg_bricks003": 0.0260,
+        "acg_rock022": 0.0267,
+    }
+    for library_id, expected in measured.items():
+        path = REPO_ROOT / "assets" / "textures" / "ambientcg" / f"{library_id}.jpg"
+        assert coarse_contrast(path) == pytest.approx(expected, abs=2e-4), library_id
+
+
+def test_the_poly_haven_plasters_are_plaster() -> None:
+    assert texture_family({"name": "painted_plaster_wall"}) == "plaster"
+    assert texture_family({"name": "plastered_wall"}) == "plaster"
+    assert texture_family({"name": "beige_wall_001"}) is None
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_every_seed_fills_the_wall_slots_from_the_calm_pools(seed: int) -> None:
+    choices = deterministic_choices(library_rows(), seed)
+    plaster = {choices["historic_facades"], choices["ochre_facades"], choices["plain_facades"]}
+    assert plaster == CALM_PLASTER
+    assert choices["brick"] in CALM_BRICK
+    assert choices["stone_monuments"] in CALM_ROCK

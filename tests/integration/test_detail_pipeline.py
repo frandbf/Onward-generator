@@ -152,6 +152,7 @@ def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(deta
     openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
     for bid, found in openings.items():
         assert sum(found.get(k, 0) for k in ("door", "landmark_door", "interior_door")) == 1, (bid, found)
+        assert ("landmark_door" in found) is (bid == "osm-way-314"), (bid, found)  # only the landmark has one
     assert openings["osm-way-312"].get("shopfront", 0) > 0
     assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either
     # Balcony placement hashes the building id with the seed (golden values for the default seed).
@@ -201,7 +202,8 @@ def test_colliders_are_separate_closed_and_positive(detailed) -> None:
 
 def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detailed) -> None:
     interiors = [o for o in detailed.objects if o.type == "interior"]
-    assert CFG.interiors.min_buildings <= len(interiors) <= CFG.interiors.max_buildings
+    # The block has three buildings that match the rule, fewer than the quota floor: all three get one.
+    assert len(interiors) == 3 < CFG.interiors.min_buildings
     assert sorted(o.record["source_ids"][0] for o in interiors) == sorted(detailed.stats["interiors"])
     church = _obj(detailed, "building/osm-way-314").record
     assert church["interior"] is False
@@ -268,6 +270,74 @@ def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detai
                 centre = prim.mesh.vertices.mean(axis=0)
                 assert _inside(prim.mesh, centre)
                 assert not any(_inside(part.mesh, centre) for part in concrete.primitives)
+
+
+def _with_interiors(**changes: object):
+    doc = copy.deepcopy(DOC)
+    doc["interiors"].update(changes)
+    return config_from_document(doc)
+
+
+def _interior_costs(d) -> dict[str, int]:
+    return {o.record["source_ids"][0]: sum(p.mesh.triangle_count for p in o.visual) for o in d.objects if o.type == "interior"}
+
+
+def _queue_order(ids: list[str]) -> list[str]:
+    return sorted(ids, key=lambda b: hashlib.sha256(f"{CFG.seed}:interior:{b}".encode()).hexdigest())
+
+
+def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(detail_inputs: tuple[Path, Path, Path],
+                                                                           detailed) -> None:
+    built = detailed.stats["interiors"]
+    assert built == _queue_order(built) != sorted(built)
+    one = _detail(detail_inputs, _with_interiors(min_buildings=1, max_buildings=1))
+    assert one.stats["interiors"] == built[:1] != sorted(built)[:1]
+    base_ids = [o.id for o in detailed.base.objects if o.type == "building"]
+    for d in (detailed, one):
+        expected = [oid for bid in base_ids
+                    for oid in ([f"interior/{bid.split('/', 1)[1]}"] if bid.split("/", 1)[1] in d.stats["interiors"] else []) + [bid]]
+        assert [o.id for o in d.objects if o.type in ("building", "interior")] == expected
+
+
+def test_interior_triangle_budget_skips_what_does_not_fit(detail_inputs: tuple[Path, Path, Path], detailed) -> None:
+    order = detailed.stats["interiors"]
+    costs = _interior_costs(detailed)
+    assert len(order) == 3 and detailed.stats["interior_visual_triangles"] == sum(costs.values())
+    first, second, third = order
+    assert costs[second] > costs[third]
+    # The second does not fit after the first; the third still does, exactly at the budget.
+    budget = costs[first] + costs[third]
+    cut = _detail(detail_inputs, _with_interiors(max_triangles=budget, include_ids=["osm-way-nope"]))
+    assert not cut.critical
+    assert cut.stats["interiors"] == [first, third]
+    assert cut.stats["interior_visual_triangles"] == budget
+    skipped = [(i.object_id, i.severity, i.message) for i in cut.issues if i.code == "interior_not_generated"]
+    assert skipped == [(second, "info", f"triangle_budget: needs {costs[second]} triangles, {costs[third]} left of max_triangles {budget}")]
+    assert cut.issues[0].code == "interior_include_unknown"
+    assert [i.code for i in cut.issues].count("interior_include_unknown") == 1
+    # A building the budget turns down is the same building as with interiors off.
+    plain = _detail(detail_inputs, _with_interiors(enabled=False))
+    rejected, untouched = _obj(cut, f"building/{second}"), _obj(plain, f"building/{second}")
+    assert rejected.record == untouched.record
+    assert [p.mesh.triangle_count for p in rejected.visual] == [p.mesh.triangle_count for p in untouched.visual]
+    assert [m.triangle_count for m in rejected.colliders] == [m.triangle_count for m in untouched.colliders]
+    assert not rejected.glass_colliders
+    assert [i for i in cut.issues if i.object_id == second and i.code != "interior_not_generated"] == \
+        [i for i in plain.issues if i.object_id == second]
+
+    one_short = _detail(detail_inputs, _with_interiors(max_triangles=budget - 1))
+    assert one_short.stats["interiors"] == [first]
+    assert one_short.stats["interior_visual_triangles"] == costs[first]
+
+    # The landmark church only gets in through include_ids; the budget turns it down like the rest.
+    nothing = _detail(detail_inputs, _with_interiors(max_triangles=0, include_ids=["osm-way-314"]))
+    assert nothing.stats["interiors"] == [] and nothing.stats["interior_visual_triangles"] == 0
+    # Issues come back in building order, not in the order the queue tried them.
+    assert [i.object_id for i in nothing.issues if i.code == "interior_not_generated"] == sorted([*order, "osm-way-314"])
+    assert sorted(order) != order
+    for o in plain.objects:
+        if o.type == "building":
+            assert _obj(nothing, o.id).record == o.record, o.id
 
 
 # --- Urban elements -------------------------------------------------------------

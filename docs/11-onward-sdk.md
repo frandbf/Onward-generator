@@ -18,7 +18,7 @@ The local card does not instantiate every mode the layout describes. `GameModes`
 | `EnableReverbInjection` or `AreaReverb` does nothing on its own | Enabled only for `gameplay_layout` |
 | Library ambience, not custom clips | `Suburban Day`, `Birds Park`, `Wind Rooftop` |
 | Hunt: 32 Rifleman points and 32 routes | Layout. The launcher puts those bots back. `StableHuntBots` is 32. Snipers are not kept |
-| A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh. The next start is 8 m away when the streets hold 32, and otherwise the largest 0.1 m step that still does, never at or below 5 m |
+| A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh. The next start is 8 m away when the streets hold 32, and otherwise the largest 0.1 m step that still does, never at or below 5 m. Routes stay on the navmesh island of the navigation origin when it holds 32 (see [Hunt routes](#hunt-routes)) |
 | Navigation-map origin on walkable ground, near the centre, plus an outdoor area | The Uplink, after it is snapped to the navmesh |
 | Flight goes to `LevelHeight / 2` of the MapQuad. A volume that crosses it clips the aircraft | `LevelHeight` puts the ceiling 20 m above the highest collider |
 | Tent under the play space, `DamageVolume` under the map, do not edit SDK prefabs | Already the case |
@@ -51,6 +51,15 @@ The phase-03 ground is `collider/walkable`. It covers the site minus the carriag
 8. The game does not instantiate `CustomContentNavigationMap`. It reads the `AI_NavBake` JSON the Launcher writes. The baker object is removed from the scene that enters the bundle and put back in the Editor afterwards, so a second launcher still finds the asset. If the JSON has no nodes, the launcher fails.
 
 The return the rifleman walks is the neighbour list in `AI_NavBake`. It is not the Points list and it is not the Loops flag by itself.
+
+### Hunt routes
+
+`perf layout --playable` draws the patrols (`hunt_routes` in `perf/layout.py`):
+
+- Lines. Pedestrian ways (every class in `road_classes.pedestrian`, steps included) are merged where one continues another, then followed on their centreline. OSM cuts an alley into 10 to 15 m ways at every junction, and one such way is too short for a route. Streets of the same width are merged the same way. A street gives two lines on each side, because the carriageway is not baked: the middle of the sidewalk (half the width plus half `sidewalk_width_m`) and 0.5 m past the kerb. The second line is the one that still lands when the facades leave less than the configured sidewalk.
+- Points. A route is up to 16 points, 14 m apart along its line (about 210 m), with the last at least 2 m before the line ends. A start is tried every separation (8 m, or less, see above). A point on street furniture is skipped.
+- Islands. The navmesh is the walkable ground shrunk by the 0.35 m agent radius. The carriageway is not baked, so every block between streets is its own island unless a pedestrian way or a plaza joins it to the next. `GenerateNodes` keeps only the nodes that reach the origin, the Uplink. A waypoint on another island has no node to walk on: the adapter anchors it hundreds of metres away, or drops the step because there is no return path. So a route keeps only the points on the island of its first point, and stops at the first point off it.
+- Choice. When the island of the Uplink holds 32 starts, every route is on it. Otherwise every route on it is kept, and the rest of the 32 are spread over the other islands from the focus, as before. Those bots spawn on their start but have no node to patrol.
 
 Agent: radius 0.35 m, height 1.8 m, slope 30°, step 0.3 m. A bake from the visual meshes is not used. It would put nodes on the roofs.
 
@@ -121,7 +130,7 @@ A layout 0.3.0 places the prefabs the SDK v1.15 validator requires. The codes co
 
 `GameVariantTypes` does not name 15. The Launcher writes the integer on the component. It has not been shown on the Quest that the list displays it as Retrieval. On headset 2.0.4, a one-player local map offered Free Roam. Uplink, Assault, and Escort are the SDK's competitive modes, and Evac, Hunt, and Retrieval are the cooperative ones. This document does not claim the one-player menu lists them until the headset shows it.
 
-The Hunt objective has attacker spawns and an empty defender list. Otherwise the component clears it and throws. Evac is the opposite: defenders yes, attackers no. Hunt picks the spawn at random and patrols only when that point is within 5 m of a route start. There is one route per bot. The spawn is the first point of that route. The next start is 8 m away when that fits, and otherwise as close as 5.1 m, which stays outside the 5 m patrol link. Two bots on the same start appear in the same place.
+The Hunt objective has attacker spawns and an empty defender list. Otherwise the component clears it and throws. Evac is the opposite: defenders yes, attackers no. Hunt picks the spawn at random and patrols only when that point is within 5 m of a route start. There is one route per bot. The spawn is the first point of that route. The next start is 8 m away when that fits, and otherwise as close as 5.1 m, which stays outside the 5 m patrol link. Two bots on the same start appear in the same place. Route lines, length and islands are in [Hunt routes](#hunt-routes).
 
 ## Do not
 

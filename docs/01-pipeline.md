@@ -152,7 +152,7 @@ LogSample  maps/logsample
 → Unity: tool, scene, launcher
 ```
 
-`--no-unity` stops after `export`, does not check the Editor, and prints the host command for the Unity steps (`task unity -- <package>`). It is what `task map` runs inside Docker, where Unity is not installed. The editor log remains in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS, `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. See [Host platform](#host-platform). The `content3 md5` line comes from `build/content3.md5`, not from the log, so it is printed after the other Unity lines (only `routes dropped` follows it), whatever its position in the log. Without that file, no md5 line is printed. `run` executes each stage from its argument list. It does not parse the printed `next:` line, so a path with spaces or quotes runs as written. `export package` gets `--config config/export.json` only when that file exists, the same as its `next:` line.
+`--no-unity` stops after `export`, does not check the Editor, and prints the host command for the Unity steps (`task unity -- <package>`). It is what `task map` runs inside Docker, where Unity is not installed. The editor log remains in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS, `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. See [Host platform](#host-platform). Each Unity step reports its wall time (`scene OK in 4 min 05 s`); a failed step says how long it ran. The `content3 md5` line comes from `build/content3.md5`, not from the log, so it is printed after the other Unity lines (only `routes dropped` follows it), whatever its position in the log. Without that file, no md5 line is printed. `run` executes each stage from its argument list. It does not parse the printed `next:` line, so a path with spaces or quotes runs as written. `export package` gets `--config config/export.json` only when that file exists, the same as its `next:` line.
 
 If a step exits non-zero, the console says `FAILED <step>`, `Next:` names the step to resume from, and the step's error output and result follow. Earlier steps are not repeated. A second run with the same folder skips steps that already wrote their output and continues at the first one that is missing. A `map.json` without the OSM XML asks Overpass again (`osm download`) and does not repeat `map create`. When two or more steps are done and the terminal is interactive, it lists them and asks where to continue. `--from geo` answers without asking. Each step always writes the same directory (`bounds` writes `scene_playable`). If that directory already exists, the repeat passes `--overwrite`. A file older than the input it reads is pending: repeating `geo` asks for `heights` again, and so on to the end. Turning `panoramax` on after a finished run inserts `panoramax apply`. `scene_panoramax` is not there, so `signs` is no longer fresh and the repeat passes `--overwrite` to `signs` and every later directory. `export package` is not overwritten. If `pkg_01` exists, the next package is `pkg_02`.
 
@@ -162,7 +162,7 @@ After the Python steps, `unity` runs `tool scene launcher` on the package just w
 
 `map show DIRECTORY` prints the centre. At the end of each stage, `next:` prints the following command.
 
-If Overpass fails, the folder still exists and `osm download --map DIRECTORY` repeats the same request. The extract is not versioned (`maps/*/data/`). Licence: [legal/data-sources.md](legal/data-sources.md).
+Overpass is retried on its own: HTTP 429 and 5xx, a dropped connection and a timeout three times each with a doubling wait from 8 s (at most 90 s), and an answer with a runtime-error remark twice, 30 s apart. If it still fails, the folder still exists and `osm download --map DIRECTORY` repeats the same request. The extract is not versioned (`maps/*/data/`). Licence: [legal/data-sources.md](legal/data-sources.md).
 
 ## 2. Geo
 
@@ -283,7 +283,7 @@ The sidewalk and the foot of the facade receive grass tufts. There is no moss st
 | `--seed` | Seed. Default `48152` |
 | `--zone-radius` | A disc in local metres around the origin. With no zone, the default is one block: a 110 m square |
 | `--zone-polygon` | A GeoJSON polygon in local metres |
-| `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail. A GLB with a material whose `alphaMode` is not `OPAQUE` is refused on load, because the exported material is opaque and albedo only; `overgrow_report.json` lists each refusal in `library_rejects` as `{asset_id, reason}` (for example `alpha_mode_blend`). A `vegetation` mesh with `anchor: flat` taller than 0.05 m is a slope tile, not ground cover, and is refused as `flat_vegetation_not_flat` |
+| `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail. A GLB with a material whose `alphaMode` is not `OPAQUE` is refused on load, because the exported material is opaque and albedo only; `overgrow_report.json` lists each refusal in `library_rejects` as `{asset_id, reason}` (for example `alpha_mode_blend`). A `vegetation` mesh with `anchor: flat` taller than 0.05 m is a slope tile, not ground cover, and is refused as `flat_vegetation_not_flat`. A row whose curated `placement` is `kit_only` (a building or road kit piece) is refused as `kit_only` before its GLB is read. A `0.2.0` manifest that fails `config/asset_manifest.schema.json` stops the step. See `abandoned-assets.md` |
 | `--selection` | `prop_selection.json`. Only those ids, and they must be installed. Without this flag the whole library is used |
 | `--layout` | `layout.json`. Hunt and team spawns stay clear. If it is omitted and the map has a layout, that file is read |
 
@@ -330,7 +330,7 @@ Version 0.3.0 is the default for a new map:
 | Uplink | 1 | One objective and one `SpawnSystem` per team (8 points, the prefab's) |
 | Assault | 6 | A second block of 8 points per team and one boundary per team |
 | Escort | 2 | Two objective start positions |
-| Hunt | 10 | 32 AI, one route per bot on a sidewalk or a pedestrian way, starts 8 m apart when the streets hold them and otherwise the largest 0.1 m step down to 5.1 m, 4 boxes |
+| Hunt | 10 | 32 AI, one route per bot on a sidewalk or a pedestrian way, up to 16 points 14 m apart on the navmesh island of the Uplink when it holds them, starts 8 m apart when the streets hold them and otherwise the largest 0.1 m step down to 5.1 m, 4 boxes |
 | Evac | 11 | Those 32 points, defenders only, one extraction point |
 | Retrieval | 15 | The Hunt objective, the extraction point, and 3 hard drives |
 

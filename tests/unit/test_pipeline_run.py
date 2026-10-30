@@ -321,6 +321,8 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
         "[OnwardAdapter] Route_30 WP-1 dropped: no return path from the previous point.",
         "[OnwardAdapter] Scene saved: Assets/OnwardAdapter/lascondes.unity. Lightmaps: 2.",
         "[OnwardAdapter] OK",
+        "[export] step 'scene' OK in 4 min 05 s",
+        "[export] step 'tool' OK",
         "[OnwardAdapter] Launcher output OK in 21.2 s: /tmp/unity-export.local.content3 (67067253 bytes)",
         "total 131000",
         "-rw-r--r--  1 frandbf  staff  67067253 Oct 21 19:06 unity-export.local.content3",
@@ -331,6 +333,8 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
     ])
     summary = _unity_summary(text, failed=False, content_md5="76ec57e757646c7dd9c488dfdae47957")
     assert "445 nodes" in summary
+    assert "  scene OK in 4 min 05 s\n" in summary
+    assert "tool OK" not in summary
     assert "routes dropped: 1" in summary
     assert "launcher OK in 21.2 s, 64 MB" in summary
     assert "info3 MapName='Unity Export'" in summary

@@ -21,6 +21,22 @@ DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3:14b"
 DEFAULT_TIMEOUT_S = 180.0
 MAX_HTTP_BYTES = 1024 * 1024
+# Ollama's default context (2048 to 4096 tokens, by version) silently drops the start of a
+# longer prompt, and the overgrow library alone is about 11k tokens. The window is sized
+# from the prompt at 3 bytes per token, plus room for the reply, in steps of 4096.
+BYTES_PER_TOKEN = 3
+REPLY_TOKENS = 4096
+CONTEXT_STEP = 4096
+MIN_NUM_CTX = 8192
+MAX_NUM_CTX = 32768
+
+
+def context_window(*texts: str) -> int:
+    """Tokens of context for a prompt made of ``texts``; a prompt that cannot fit is an error."""
+    tokens = sum(len(text.encode()) for text in texts) // BYTES_PER_TOKEN + REPLY_TOKENS
+    if tokens > MAX_NUM_CTX:
+        raise ProviderError(f"prompt needs about {tokens} tokens of context; the limit is {MAX_NUM_CTX}")
+    return max(MIN_NUM_CTX, -(-tokens // CONTEXT_STEP) * CONTEXT_STEP)
 
 
 class ProviderError(RuntimeError):
@@ -119,10 +135,11 @@ class OllamaProvider:
                 "parameter_size": details.get("parameter_size"), "quantization": details.get("quantization_level"),
                 "family": details.get("family")}
 
-    def options(self) -> dict[str, Any]:
-        return {"temperature": 0, "seed": self.seed}
+    def options(self, num_ctx: int) -> dict[str, Any]:
+        return {"temperature": 0, "seed": self.seed, "num_ctx": num_ctx}
 
     def complete(self, system: str, instruction: str, schema: dict[str, Any]) -> ProviderResult:
+        num_ctx = context_window(system, instruction)
         info = self.describe()
         payload = {
             "model": self.model,
@@ -130,7 +147,7 @@ class OllamaProvider:
             "format": schema,
             "stream": False,
             "think": False,
-            "options": self.options(),
+            "options": self.options(num_ctx),
         }
         reply = self._request("/api/chat", payload)
         message = reply.get("message") if isinstance(reply, dict) else None
@@ -138,7 +155,8 @@ class OllamaProvider:
         if not isinstance(text, str):
             raise ProviderError("Ollama reply has no message content")
         provenance = {"provider": self.name, "host": self.host, "model": self.model, **info,
-                      "options": {**self.options(), "think": False, "stream": False, "format": "intent JSON schema"},
+                      "options": {**self.options(num_ctx), "think": False, "stream": False, "format": "intent JSON schema"},
                       "done_reason": reply.get("done_reason"), "eval_count": reply.get("eval_count"),
+                      "prompt_eval_count": reply.get("prompt_eval_count"),
                       "total_duration_ns": reply.get("total_duration")}
         return ProviderResult(text, provenance)
