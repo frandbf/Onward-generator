@@ -21,7 +21,7 @@ Phases 00 through 06 are done. Phase 07, the final export, stays open. `device_v
 
 ## Layout
 
-- One map lives in `maps/<id>/`. Its OSM extract and generated scenes are `maps/<id>/data/`, and that tree is gitignored.
+- One map lives in `maps/<id>/`. Its OSM extract and generated scenes are `maps/<id>/data/`. The whole `maps/` tree is gitignored: a map is local work, not part of the repository.
 - The example area of interest is `config/murcia_belluga_aoi.geojson`. A created map keeps its own polygon at `maps/<id>/reference/aoi.geojson`.
 - Placeable meshes are catalogues under `assets/`. Each direct child with a `manifest.json` joins the overgrow catalogue. Tileable albedo images are `assets/textures`. A texture referenced by a GLB stays beside that GLB.
 - The Unity project and the Onward SDK stay outside this repository, in `~/Unity/OnwardPhase0Project`. The editor is Unity 2021.3.23f1. Another editor rewrites that project. The export adapter is `tools/unity/onward_adapter/`.

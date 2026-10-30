@@ -150,7 +150,7 @@ Tests do not use the network. Fixtures live in `tests/fixtures/` and use one ori
 
 - OpenStreetMap data is ODbL-1.0. Derived maps keep the attribution `© OpenStreetMap contributors`.
 - Catastro INSPIRE BU is CC-BY 4.0 and is used for Spain only.
-- Raw extracts under `maps/*/data/` and Panoramax photos in `cache/panoramax/` are gitignored. Do not commit credentials, private SDK files, or large source extracts.
+- Generated maps (`maps/`, including each map's raw extract) and Panoramax photos in `cache/panoramax/` are gitignored. Do not commit credentials, private SDK files, or large source extracts.
 - Every imported texture, prop and font records its licence. See [docs/legal/data-sources.md](docs/legal/data-sources.md).
 
 ## Documentation
@@ -183,7 +183,7 @@ tools/
   docker/                 run.sh and python.sh: commands in the image
   unity/                  phase-0 room, perf harness, export adapter (C#, run_export.sh)
   mutate/ quality/        mutation testing; the gate guard
-maps/<id>/                one generated map; data/ is gitignored
+maps/<id>/                one generated map; the whole maps/ tree is gitignored
 Taskfile.yml              every task, locally and in CI
 Dockerfile compose.yaml   the development image
 requirements*.lock        pinned runtime, lint and mutation dependencies
