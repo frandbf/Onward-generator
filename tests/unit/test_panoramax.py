@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +14,8 @@ import pytest
 
 from onward_generator.maps.workspace import create_map
 from onward_generator.panoramax.__main__ import run_apply
-from onward_generator.panoramax.cache import PanoramaxError, cache_pictures
+from onward_generator.panoramax.apply import _cached_pictures
+from onward_generator.panoramax.cache import DOWNLOAD_WORKERS, PanoramaxError, cache_directory, cache_pictures
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 SPHERE_ID = "11111111-1111-1111-1111-111111111111"
@@ -292,3 +295,112 @@ def test_a_network_failure_does_not_create_the_output_directory(tmp_path: Path, 
     assert not out.exists()
     assert not (root / "data" / "raw" / "panoramax").exists()
     assert not catalogue.exists()
+
+
+def _numbered(count: int) -> list[dict[str, Any]]:
+    return [_feature(f"{index:08d}-0000-0000-0000-000000000000", sphere=True) for index in range(count)]
+
+
+def _payload(url: str) -> bytes:
+    return JPEG + url.encode("utf-8")
+
+
+class _ParallelClient(_Client):
+    """Holds each download until four are open, then lets the later pictures finish first."""
+
+    def __init__(self, features: list[dict[str, Any]]) -> None:
+        super().__init__(features)
+        self.barrier = threading.Barrier(4, timeout=5)
+        self.lock = threading.Lock()
+        self.open = 0
+        self.peak = 0
+
+    def get_bytes(self, url: str) -> bytes:
+        self.bytes_calls.append(url)
+        with self.lock:
+            self.open += 1
+            self.peak = max(self.peak, self.open)
+        self.barrier.wait()
+        position = [feature["assets"]["sd"]["href"] for feature in self.features].index(url)
+        time.sleep(0.02 * (len(self.features) - position))
+        with self.lock:
+            self.open -= 1
+        return _payload(url)
+
+
+def test_four_downloads_run_at_once_and_land_in_search_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    catalogue = tmp_path / "nested" / "catalogue"
+    monkeypatch.setattr("onward_generator.panoramax.cache.catalogue_directory", lambda: catalogue)
+    root = _map(tmp_path)
+    features = _numbered(8)
+    client = _ParallelClient(features)
+    report = cache_pictures(root, client=client)
+    assert client.peak == DOWNLOAD_WORKERS == 4
+    assert report.kept == 8
+    assert report.reused == 0
+    ids = [feature["id"] for feature in features]
+    index = root / "data" / "raw" / "panoramax"
+    assert json.loads((index / "cache_report.json").read_text(encoding="utf-8"))["kept"] == ids
+    assert [item["id"] for item in json.loads((index / "search.geojson").read_text(encoding="utf-8"))["features"]] == ids
+    for feature in features:
+        url = feature["assets"]["sd"]["href"]
+        assert (catalogue / f"{feature['id']}.jpg").read_bytes() == _payload(url)
+        sidecar = json.loads((catalogue / f"{feature['id']}.source.json").read_text(encoding="utf-8"))
+        assert sidecar["sha256"] == hashlib.sha256(_payload(url)).hexdigest()
+        assert sidecar["size_bytes"] == len(_payload(url))
+        assert sidecar["url"] == url
+        assert sidecar["picture_id"] == feature["id"]
+
+
+class _FailingClient(_Client):
+    """The second picture fails. The others answer slowly, so the failure arrives first."""
+
+    def get_bytes(self, url: str) -> bytes:
+        self.bytes_calls.append(url)
+        position = [feature["assets"]["sd"]["href"] for feature in self.features].index(url)
+        if position == 0:
+            return _payload(url)
+        if position == 1:
+            time.sleep(0.05)
+            raise OSError("connection reset")
+        time.sleep(0.3)
+        return _payload(url)
+
+
+def test_a_failed_download_stops_the_queue_and_writes_no_index(tmp_path: Path, catalogue: Path) -> None:
+    root = _map(tmp_path)
+    features = _numbered(12)
+    client = _FailingClient(features)
+    with pytest.raises(PanoramaxError, match=f"could not download {features[1]['id']}: connection reset"):
+        cache_pictures(root, client=client)
+    assert len(client.bytes_calls) < len(features)
+    assert (catalogue / f"{features[0]['id']}.jpg").is_file()
+    assert not (catalogue / f"{features[1]['id']}.jpg").exists()
+    assert not (catalogue / f"{features[2]['id']}.jpg").exists()
+    assert not (root / "data" / "raw" / "panoramax" / "search.geojson").exists()
+
+
+def test_a_later_run_downloads_only_the_new_picture_and_keeps_search_order(tmp_path: Path, catalogue: Path) -> None:
+    root = _map(tmp_path)
+    first, new, last = _numbered(3)
+    assert cache_pictures(root, client=_Client([first, last])).reused == 0
+    client = _Client([first, new, last])
+    report = cache_pictures(root, client=client)
+    assert report.reused == 2
+    assert report.kept == 3
+    assert client.bytes_calls == [new["assets"]["sd"]["href"]]
+    kept = json.loads((root / "data" / "raw" / "panoramax" / "cache_report.json").read_text(encoding="utf-8"))["kept"]
+    assert kept == [first["id"], new["id"], last["id"]]
+
+
+def test_cached_pictures_are_listed_by_path_and_azimuth_without_decoding(tmp_path: Path, catalogue: Path) -> None:
+    root = _map(tmp_path)
+    turned, plain = _numbered(2)
+    turned["properties"]["view:azimuth"] = 90
+    cache_pictures(root, client=_Client([turned, plain]))
+    listed = _cached_pictures(cache_directory(root))
+    assert [(picture.id, path, azimuth) for picture, path, azimuth in listed] == [
+        (turned["id"], catalogue / f"{turned['id']}.jpg", 90.0),
+        (plain["id"], catalogue / f"{plain['id']}.jpg", 0.0),
+    ]
+    assert listed[0][0].author == "tester"

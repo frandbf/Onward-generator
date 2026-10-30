@@ -23,6 +23,7 @@ from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 from tests.integration.test_materials_pipeline import _cache_asset, _polyhaven_plan
 
 PICTURE_ID = "33333333-3333-3333-3333-333333333333"
+FAR_ID = "44444444-4444-4444-4444-444444444444"
 
 
 def _jpeg() -> bytes:
@@ -32,15 +33,17 @@ def _jpeg() -> bytes:
 
 
 class _Client:
-    def __init__(self, feature: dict[str, Any]) -> None:
-        self.feature = feature
+    def __init__(self, *features: dict[str, Any]) -> None:
+        self.features = list(features)
 
     def get_json(self, url: str) -> dict[str, Any]:
-        return {"type": "FeatureCollection", "features": [self.feature], "links": []}
+        return {"type": "FeatureCollection", "features": self.features, "links": []}
 
     def get_bytes(self, url: str) -> bytes:
         if url.endswith(".jpg"):
             return _jpeg()
+        if url.endswith(".broken"):
+            return b"not a jpeg"
         raise PanoramaxError("offline")
 
 
@@ -158,9 +161,15 @@ def test_a_photo_replaces_only_that_building(
     camera = frame.to_wgs84(Point(midpoint[0], midpoint[1] - 8.0))
 
     out = root / "data" / "processed" / "scene_panoramax"
-    assert run_apply(materials, out, client=_Client(_feature(float(camera.x), float(camera.y)))) == 0
+    # A picture far from every facade is cached but never decoded, so its broken JPEG does not matter.
+    far = _feature(float(camera.x), float(camera.y) - 0.01)
+    far["id"] = FAR_ID
+    far["assets"] = {"sd": {"href": f"https://example.test/{FAR_ID}.broken", "type": "image/jpeg"}}
+    assert run_apply(materials, out, client=_Client(_feature(float(camera.x), float(camera.y)), far)) == 0
     report = json.loads((out / "panoramax_report.json").read_text(encoding="utf-8"))
     photo_ids = {str(row["building_id"]) for row in report["assignments"]}
+    assert FAR_ID not in {str(row["picture_id"]) for row in report["assignments"]}
+    assert FAR_ID in json.loads((root / "data" / "raw" / "panoramax" / "cache_report.json").read_text(encoding="utf-8"))["kept"]
     assert chosen_id in photo_ids
     assert photo_ids.isdisjoint(interiors)
     assert all(row["license"] == "CC-BY-SA-4.0" and row["origin"] == "observed" and row["author"] == "tester" for row in report["assignments"])

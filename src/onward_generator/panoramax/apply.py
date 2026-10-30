@@ -103,7 +103,7 @@ def _compose(
     manifest: dict[str, Any],
     geo: dict[str, Any],
     detail_report: dict[str, Any],
-    pictures: list[tuple[StreetPicture, Image.Image, float]],
+    pictures: list[tuple[StreetPicture, Path, float]],
     frame: LocalFrame,
 ) -> tuple[bytes, dict[str, Any]]:
     nodes, materials = nodes_from_glb(visual)
@@ -115,7 +115,8 @@ def _compose(
     for row in match["assignments"]:
         if isinstance(row, dict):
             by_building.setdefault(str(row["building_id"]), []).append(row)
-    blobs = {item[0].id: item[1] for item in pictures}
+    used = {str(row["picture_id"]) for rows in by_building.values() for row in rows}
+    blobs = {item[0].id: _decode(item[1]) for item in pictures if item[0].id in used}
     azimuths = {item[0].id: item[2] for item in pictures}
     cameras = {item[0].id: item[0] for item in pictures}
     replaced: list[Node] = []
@@ -391,7 +392,13 @@ def _camera_xyz(picture: StreetPicture, frame: LocalFrame) -> tuple[float, float
     return (float(local.x), float(local.y), _CAMERA_Z)
 
 
-def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Image.Image, float]]:
+def _decode(jpeg: Path) -> Image.Image:
+    with Image.open(jpeg) as image:
+        return image.convert("RGB")
+
+
+def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Path, float]]:
+    """Cached pictures with their JPEG path. A JPEG is decoded only when a facade uses it."""
     from onward_generator.panoramax.cache import catalogue_directory
 
     report_path = cache / "cache_report.json"
@@ -403,7 +410,7 @@ def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Image.Image, floa
         for feature in json.loads((cache / "search.geojson").read_text(encoding="utf-8")).get("features") or []
     }
     catalogue = catalogue_directory()
-    loaded: list[tuple[StreetPicture, Image.Image, float]] = []
+    loaded: list[tuple[StreetPicture, Path, float]] = []
     for picture_id in report.get("kept") or []:
         sidecar_path = catalogue / f"{picture_id}.source.json"
         jpeg = catalogue / f"{picture_id}.jpg"
@@ -418,8 +425,7 @@ def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Image.Image, floa
         )
         if picture is None:
             continue
-        with Image.open(jpeg) as image:
-            loaded.append((picture, image.convert("RGB"), float(sidecar.get("view_azimuth") or 0.0)))
+        loaded.append((picture, jpeg, float(sidecar.get("view_azimuth") or 0.0)))
     return loaded
 
 
