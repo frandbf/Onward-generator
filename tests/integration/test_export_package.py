@@ -18,15 +18,18 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
+from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, surface_class
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
     MANIFEST_FILE,
     SDK_SPAWN_POINTS,
     ExportError,
     build_package,
+    interior_lights,
     sha256_file,
     verify_package,
 )
+from onward_generator.generation.gltf import read_glb
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -161,6 +164,9 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
     (lambda c: c["build"].update(fog_color="grey"), "/build/fog_color"),
     (lambda c: c["build"].update(fog_end_m=0), "/build/fog_end_m"),
+    (lambda c: c["build"].update(lightmap_class_scales={"roof": 0}), "/build/lightmap_class_scales/roof"),
+    (lambda c: c["build"].update(lightmap_class_scales={"roof": 1.5}), "/build/lightmap_class_scales/roof"),
+    (lambda c: c["build"].update(lightmap_class_scales={"props": 0.5}), "/build/lightmap_class_scales"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -168,6 +174,63 @@ def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: P
     (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
     with pytest.raises(ExportError, match=match):
         package(inputs, tmp_path / "pkg", export_config=tmp_path / "cfg.json")
+
+
+def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    result = package(inputs, tmp_path / "pkg")
+    options = load(result.directory / "adapter_options.json")
+    assert "lightmap_class_scales" not in options
+    scales = {row["material"]: row["scale"] for row in options["lightmap_scales"]}
+    names = {m["name"] for m in read_glb((inputs[0] / "scene_visual.glb").read_bytes())[0]["materials"]}
+    assert set(scales) <= names
+    assert {surface_class(name) for name in scales} == {"roof", "ground", "interior"}
+    assert all(scales[name] == DEFAULT_CLASS_SCALES[surface_class(name)] for name in scales)
+    lm = result.manifest["lightmap_estimate"]
+    assert lm["texels_per_m"] == options["lightmap_texels_per_m"] and lm["max_size"] == options["lightmap_max_size"]
+    assert lm["texels"] > 0 and abs(lm["texels"] - sum(lm["texels_by_class"].values())) <= len(lm["texels_by_class"])
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"]["lightmap_class_scales"] = {"roof": 1.0, "facade": 0.5}
+    (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+    other = package(inputs, tmp_path / "other", export_config=tmp_path / "cfg.json")
+    rows = load(other.directory / "adapter_options.json")["lightmap_scales"]
+    assert {surface_class(row["material"]): row["scale"] for row in rows} == {"ground": 0.5, "interior": 0.5, "facade": 0.5}
+    assert other.manifest["lightmap_estimate"]["texels"] != lm["texels"]
+    assert other.manifest["package_id"] != result.manifest["package_id"]
+
+
+def test_more_interior_lights_than_the_adapter_bakes_warns(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    visual = (inputs[0] / "scene_visual.glb").read_bytes()
+    lights = interior_lights(visual)
+    rooms = [r for n in read_glb(visual)[0]["nodes"] for r in ((n.get("extras") or {}).get("light_anchors") or {}).get("rooms", [])]
+    assert lights == len(rooms) >= 3  # two stair interiors and the bakery
+    over = "interior lights; the adapter bakes the first"
+    assert not [w for w in package(inputs, tmp_path / "pkg").manifest["warnings"] if over in w]
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    for cap, warned in ((lights, False), (lights - 1, True)):
+        cfg["build"]["interior_lights_max"] = cap
+        (tmp_path / f"cfg{cap}.json").write_text(json.dumps(cfg), encoding="utf-8")
+        found = [w for w in package(inputs, tmp_path / f"pkg{cap}", export_config=tmp_path / f"cfg{cap}.json").manifest["warnings"]
+                 if over in w]
+        assert found == ([f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
+                          "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match."]
+                         if warned else [])
+    del cfg["build"]["interior_lights_max"]
+    (tmp_path / "nocap.json").write_text(json.dumps(cfg), encoding="utf-8")
+    assert not [w for w in package(inputs, tmp_path / "nocap", export_config=tmp_path / "nocap.json").manifest["warnings"] if over in w]
+
+
+def test_rooms_without_a_light_are_not_counted() -> None:
+    from onward_generator.generation.config import Material
+    from onward_generator.generation.gltf import Node, Primitive, build_glb
+    from onward_generator.generation.mesh import quad
+
+    face = (Primitive(quad((0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)), "m"),)
+    anchors = {"rooms": [{"room_id": "a/L0", "light_m": [0, 0, 2.7], "probes_m": []},
+                         {"room_id": "a/L1", "light": "over_cap", "probes_m": [0, 0, 1]},
+                         {"room_id": "a/L2", "light_m": [0, 0, 5.7], "probes_m": []}]}
+    nodes = [Node("interior/a", face, {"light_anchors": anchors}), Node("building/a", face, {}),
+             Node("interior/b", face, {"light_anchors": {"rooms": [{"room_id": "b/L0", "light_m": [1, 1, 2.7]}]}})]
+    assert interior_lights(build_glb(nodes, {"m": Material((1.0, 1.0, 1.0, 1.0), 0.5)})) == 3
 
 
 def test_verify_detects_tampering(inputs: tuple[Path, Path], tmp_path: Path) -> None:
@@ -181,11 +244,14 @@ def test_verify_detects_tampering(inputs: tuple[Path, Path], tmp_path: Path) -> 
     assert "../escape.glb: package paths must be plain file names" in verify_package(out)
 
 
-def test_cli_package_and_verify(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+def test_cli_package_and_verify(inputs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     detail, layout = inputs
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout),
             "--out", str(tmp_path / "pkg")]
     assert main(args) == 0
+    lm = load(tmp_path / "pkg" / MANIFEST_FILE)["lightmap_estimate"]
+    assert (f"  lightmap estimate: {lm['texels']:,} texels at 10 texels/m, "
+            f"at least {lm['pages_at_least']} pages of 2048 px\n") in capsys.readouterr().out
     assert main(args) == 1
     assert main(["export", "verify", str(tmp_path / "pkg")]) == 0
     assert main(["export", "package", "--project", str(EXAMPLE_PROJECT), "--detail", str(detail), "--layout", str(layout),
@@ -255,9 +321,15 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert 'StartsWith("m_prop_")' in source
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source
+    # A room detail left without a light past interiors.lights_max still gives its probes.
+    assert source.index("probes.Add(Local(room.probes_m[i]") < source.index("if (room.light_m == null || room.light_m.Length != 3) continue;")
     assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
+    # Lightmap scale per material from adapter_options.json, and the baked texel count in the log and report.
+    assert "public LightmapScale[] lightmap_scales" in source
+    assert "public string material; public float scale" in source
+    assert '\\"lightmap_texels\\":{LightmapTexels()}' in source
 
 
 def test_default_fog_colour_is_the_backdrop_haze() -> None:

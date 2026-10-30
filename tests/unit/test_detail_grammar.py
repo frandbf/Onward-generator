@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from onward_generator.detail.config import load_detail_config
-from onward_generator.detail.grammar import choose_roof, choose_wall
+from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
 
 CFG = load_detail_config("config/detail.default.json")
 RESIDENTIAL = CFG.templates["generic_residential"]
@@ -24,9 +26,108 @@ def test_missing_roof_tag_keeps_large_parapet() -> None:
 
 
 def test_osm_brick_is_observed_and_untagged_is_not_all_brick() -> None:
-    material, origin = choose_wall({"building:material": "brick"}, RESIDENTIAL, CFG.seed, "b")
+    palette = CFG.facade_palettes["residential"]
+    material, origin = choose_wall({"building:material": "brick"}, palette, CFG.seed, "b")
     assert material == "brick_red" and origin == "observed"
-    origins = [choose_wall({}, RESIDENTIAL, CFG.seed, f"b{i}")[1] for i in range(40)]
-    bricks = [choose_wall({}, RESIDENTIAL, CFG.seed, f"b{i}")[0] for i in range(40)]
-    assert origins.count("observed") == 0
+    assert choose_wall({"material": "limestone"}, palette, CFG.seed, "b") == ("stone_light", "observed")
+    origins = [choose_wall({}, palette, CFG.seed, f"b{i}")[1] for i in range(40)]
+    bricks = [choose_wall({}, palette, CFG.seed, f"b{i}")[0] for i in range(40)]
+    assert set(origins) == {"generated"}
     assert bricks.count("brick_red") < 40 * 0.25
+    assert set(bricks) == set(palette)
+
+
+def test_wall_ranking_is_seeded_per_building_and_skips_the_neighbours() -> None:
+    palette = ("x", "y", "z")
+    # sha256(seed, building, "wall", material) ranks seed 1 / "a" as y, z, x and seed 1 / "b" as y, x, z.
+    assert choose_wall({}, palette, 1, "a") == ("y", "generated")
+    assert choose_wall({}, palette, 2, "a") == ("x", "generated")
+    assert choose_wall({}, palette, 1, "a", {"y"}) == ("z", "generated")
+    assert choose_wall({}, palette, 1, "b", {"y"}) == ("x", "generated")
+    assert choose_wall({}, palette, 1, "a", {"y", "z"}) == ("x", "generated")
+    # Every material is taken by a neighbour: the building keeps its first choice.
+    assert choose_wall({}, palette, 1, "a", {"x", "y", "z"}) == ("y", "generated")
+    # An observed material ignores the neighbours.
+    assert choose_wall({"building:material": "brick"}, palette, 1, "a", {"brick_red"}) == ("brick_red", "observed")
+
+
+EXPECTED_USES = {
+    "building": {
+        **dict.fromkeys(("apartments", "residential", "house", "detached", "semidetached_house", "terrace",
+                         "dormitory", "bungalow"), "residential"),
+        **dict.fromkeys(("school", "kindergarten", "university", "college", "public", "civic", "government",
+                         "townhall", "hospital", "fire_station", "education"), "institutional"),
+        **dict.fromkeys(("office", "commercial", "bank"), "office"),
+        **dict.fromkeys(("retail", "supermarket", "kiosk"), "retail"),
+        **dict.fromkeys(("industrial", "warehouse", "manufacture"), "industrial"),
+    },
+    "amenity": {
+        **dict.fromkeys(("school", "kindergarten", "college", "university", "library", "townhall", "courthouse",
+                         "police", "hospital", "clinic", "fire_station", "community_centre"), "institutional"),
+        **dict.fromkeys(("bank", "bureau_de_change"), "office"),
+        **dict.fromkeys(("restaurant", "cafe", "bar", "pub", "fast_food", "pharmacy", "ice_cream"), "retail"),
+    },
+    "office": {"government": "institutional", "company": "office", "insurance": "office"},
+    "shop": {"bakery": "retail", "clothes": "retail"},
+    "tourism": {"museum": "historic", "gallery": "historic", "hotel": "office"},
+    "historic": dict.fromkeys(("building", "castle", "palace", "manor", "monastery"), "historic"),
+}
+
+
+@pytest.mark.parametrize(("key", "value", "use"), [(k, v, u) for k, values in EXPECTED_USES.items() for v, u in values.items()])
+def test_each_osm_tag_names_its_facade_use(key: str, value: str, use: str) -> None:
+    assert facade_use({key: value}) == (use, f"{key}={value}")
+
+
+def test_building_use_tag_reads_like_building() -> None:
+    assert facade_use({"building": "yes", "building:use": "education"}) == ("institutional", "building:use=education")
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [{}, {"building": "yes"}, {"shop": "no"}, {"office": "no"}, {"amenity": "bench"}, {"historic": "memorial"},
+     {"tourism": "attraction"}, {"building": "church"}],
+)
+def test_tags_without_a_use_name_none(tags: dict[str, str]) -> None:
+    assert facade_use(tags) is None
+
+
+def test_the_most_specific_use_wins_and_values_are_read_like_osm() -> None:
+    assert facade_use({"building": "apartments", "shop": "bakery"}) == ("retail", "shop=bakery")
+    assert facade_use({"office": "company", "amenity": "school"}) == ("institutional", "amenity=school")
+    assert facade_use({"historic": "building", "amenity": "school"}) == ("historic", "historic=building")
+    assert facade_use({"building": "industrial", "building:use": "residential"}) == ("industrial", "building=industrial")
+    assert facade_use({"amenity": "School;cafe"}) == ("institutional", "amenity=school")
+
+
+def test_resolve_use_prefers_the_building_then_the_closest_evidence() -> None:
+    school = ("osm-node-1", {"amenity": "school"}, "poi_inside")
+    bank_near = ("osm-node-2", {"amenity": "bank"}, "poi_near")
+    cafe = ("osm-node-3", {"amenity": "cafe"}, "poi_inside")
+    grounds = ("osm-way-9", {"amenity": "school"}, "enclosing_area")
+    own = resolve_use("osm-way-1", {"building": "office"}, [school])
+    assert own == FacadeUse("office", "observed", "osm-way-1", "building=office", "building")
+    assert resolve_use("osm-way-1", {"building": "yes"}, [bank_near, cafe, school]) == FacadeUse(
+        "institutional", "observed", "osm-node-1", "amenity=school", "poi_inside",
+    )
+    assert resolve_use("osm-way-1", {}, [bank_near, grounds]) == FacadeUse(
+        "institutional", "observed", "osm-way-9", "amenity=school", "enclosing_area",
+    )
+    # A shop inside the footprint beats a school ground around it: the closer match comes first.
+    assert resolve_use("osm-way-1", {}, [grounds, cafe]).tag == "amenity=cafe"
+    near = resolve_use("osm-way-1", {}, [bank_near, ("osm-node-0", {"natural": "tree"}, "poi_inside")])
+    assert near == FacadeUse("office", "estimated", "osm-node-2", "amenity=bank", "poi_near")
+    # Two equal matches: the lower id wins.
+    tie = resolve_use("osm-way-1", {}, [("osm-node-8", {"shop": "bakery"}, "poi_inside"), ("osm-node-7", {"shop": "books"}, "poi_inside")])
+    assert tie.source_id == "osm-node-7"
+
+
+def test_a_building_without_evidence_is_estimated_residential() -> None:
+    use = resolve_use("osm-way-1", {"building": "yes"}, [("osm-node-0", {"natural": "tree"}, "poi_inside")])
+    assert use == FacadeUse("residential", "estimated")
+    assert use.to_record() == {"use": "residential", "origin": "estimated", "evidence": []}
+    seen = FacadeUse("retail", "observed", "osm-node-4", "shop=bakery", "poi_inside").to_record()
+    assert seen == {
+        "use": "retail", "origin": "observed",
+        "evidence": [{"source_id": "osm-node-4", "tag": "shop=bakery", "match": "poi_inside"}],
+    }

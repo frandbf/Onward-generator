@@ -19,7 +19,7 @@ import numpy as np
 
 from onward_generator import __version__
 from onward_generator.generation.config import Material
-from onward_generator.generation.mesh import Mesh
+from onward_generator.generation.mesh import Mesh, transform
 
 _TO_GLTF = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]])
 _ARRAY_BUFFER = 34962
@@ -523,19 +523,7 @@ def nodes_from_glb(data: bytes) -> tuple[list[Node], dict[str, Material]]:
             continue
         mi = int(raw["mesh"])
         if meshes[mi] is None:
-            prims: list[Primitive] = []
-            for prim in (doc["meshes"][mi].get("primitives") or []):
-                attrs = prim.get("attributes") or {}
-                if "POSITION" not in attrs or "indices" not in prim:
-                    continue
-                pos = (_accessor(doc, blob, attrs["POSITION"]).astype(np.float64)) @ _TO_GLTF
-                idx = _accessor(doc, blob, int(prim["indices"])).astype(np.int64).reshape(-1, 3)
-                uvs = None
-                if "TEXCOORD_0" in attrs:
-                    uvs = _accessor(doc, blob, attrs["TEXCOORD_0"]).astype(np.float32)
-                name = mat_names[int(prim.get("material", 0))] if mat_names else "ground"
-                prims.append(Primitive(Mesh(pos, idx), name, uvs))
-            meshes[mi] = tuple(prims)
+            meshes[mi] = _mesh_primitives(doc, blob, mi, mat_names)
         key = None
         mesh_name = (doc["meshes"][mi] or {}).get("name")
         if uses.get(mi, 0) > 1 and mesh_name:
@@ -544,6 +532,79 @@ def nodes_from_glb(data: bytes) -> tuple[list[Node], dict[str, Material]]:
         extras = dict(raw.get("extras") or {})
         nodes.append(Node(str(raw.get("name") or "node"), meshes[mi] or (), extras, matrix, key))
     return nodes, materials
+
+
+def _mesh_primitives(doc: Mapping[str, Any], blob: bytes, mesh: int, mat_names: Sequence[str]) -> tuple[Primitive, ...]:
+    """The indexed triangle primitives of one glTF mesh, in local axes. Lines, points and unindexed lists are skipped."""
+    prims: list[Primitive] = []
+    for prim in doc["meshes"][mesh].get("primitives") or []:
+        attrs = prim.get("attributes") or {}
+        if "POSITION" not in attrs or "indices" not in prim or int(prim.get("mode", 4)) != 4:
+            continue
+        pos = _accessor(doc, blob, attrs["POSITION"]) @ _TO_GLTF  # float32 @ float64 is float64
+        idx = _accessor(doc, blob, int(prim["indices"])).astype(np.int64).reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the unknown dimension
+        uvs = None
+        if "TEXCOORD_0" in attrs:
+            uvs = _accessor(doc, blob, attrs["TEXCOORD_0"]).astype(np.float32)
+        name = mat_names[int(prim.get("material", 0))] if mat_names else "ground"
+        prims.append(Primitive(Mesh(pos, idx), name, uvs))
+    return tuple(prims)
+
+
+def scene_primitives(data: bytes) -> list[Primitive]:
+    """Every triangle primitive the GLB's scene draws, in local metres, under its node's world transform.
+
+    The scene graph is walked from the default scene's roots (every node no other
+    node lists as a child when the file has no scene). A child inherits its
+    parent's transform, given as ``matrix`` or as translation, rotation and
+    scale. A mesh used by two nodes is drawn twice. A node reached twice is an
+    error, since glTF forbids cycles and shared children.
+    """
+    doc, blob = read_glb(data)
+    nodes = doc.get("nodes") or []
+    mat_names = [str(m.get("name") or f"mat_{i}") for i, m in enumerate(doc.get("materials") or [])]
+    found: list[Primitive] = []
+    seen: set[int] = set()
+    stack = [(int(index), np.eye(4)) for index in reversed(_scene_roots(doc))]
+    while stack:
+        index, parent = stack.pop()
+        if index in seen:
+            raise ValueError(f"node {index}: reached twice in the scene graph")
+        seen.add(index)
+        raw = nodes[index]
+        world = parent @ _node_matrix(raw)
+        if "mesh" in raw:
+            local = _local_matrix(world.T.flatten())
+            for prim in _mesh_primitives(doc, blob, int(raw["mesh"]), mat_names):
+                found.append(Primitive(transform(prim.mesh, local), prim.material, prim.uvs))
+        stack.extend((int(child), world) for child in reversed(raw.get("children") or []))
+    return found
+
+
+def _scene_roots(doc: Mapping[str, Any]) -> list[int]:
+    scenes = doc.get("scenes") or []
+    if scenes:
+        return [int(i) for i in scenes[int(doc.get("scene", 0))].get("nodes") or []]
+    children = {int(child) for node in doc.get("nodes") or [] for child in node.get("children") or []}
+    return [index for index in range(len(doc.get("nodes") or [])) if index not in children]
+
+
+def _node_matrix(raw: Mapping[str, Any]) -> np.ndarray:
+    """A node's 4x4 transform in the glTF frame: its ``matrix``, or T·R·S."""
+    if "matrix" in raw:
+        return np.array([float(v) for v in raw["matrix"]]).reshape(4, 4).T
+    matrix = np.eye(4)
+    if "rotation" in raw:
+        x, y, z, w = (float(v) for v in raw["rotation"])
+        matrix[:3, :3] = [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    # Each column takes its axis scale: R·S.
+    matrix[:3, :3] = matrix[:3, :3] @ np.diag([float(v) for v in raw.get("scale") or (1.0, 1.0, 1.0)])
+    matrix[:3, 3] = [float(v) for v in raw.get("translation") or (0.0, 0.0, 0.0)]
+    return matrix
 
 
 def glb_append(data: bytes, nodes: Sequence[Node], materials: Mapping[str, Material]) -> bytes:

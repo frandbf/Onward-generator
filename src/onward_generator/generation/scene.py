@@ -43,6 +43,7 @@ from onward_generator.generation.surfaces import (
     Partition,
     SurfaceClass,
     build_partition,
+    carriageway_slab,
     split_pedestrian_by_paving,
 )
 from onward_generator.geo.clipping import covered_by, inclusion_zone
@@ -410,9 +411,12 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
 
     walkable = site.difference(carriageway.geometry) if carriageway is not None else site
     thickness = config.ground_thickness_m
+    # Crossings are their own slab at road level. The adapter bakes every
+    # collider named walkable, so they join the blocks on both kerbs (ADR-015).
     for cid, geom, top in (
         ("collider/walkable", walkable, 0.0),
-        ("collider/carriageway", carriageway.geometry if carriageway else Polygon(), -depth),
+        ("collider/carriageway", carriageway_slab(partition, config.precision_m), -depth),
+        ("collider/walkable_crossing", partition.crossings, -depth),
     ):
         if geom.is_empty:
             continue

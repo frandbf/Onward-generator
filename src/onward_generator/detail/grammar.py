@@ -1,14 +1,17 @@
 """Roof and wall choices from OSM tags, with an estimated grammar when the tag is absent.
 
 Observed tags win. Estimated choices are marked ``estimated`` and are not written
-back into the OSM extract. Brick is a minority estimated wall, not the default.
+back into the OSM extract. Without a material tag, the wall comes from the palette
+of the building's facade use, and differs from its neighbours where the palette allows.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass, replace
+from typing import Any
 
-from onward_generator.detail.config import HipRoof, Template
+from onward_generator.detail.config import FACADE_USES, HipRoof, Template
 from onward_generator.detail.facades import stable_choice, stable_unit
 
 HIP_SHAPES = frozenset({"hipped", "gabled", "pyramidal", "skillion", "half-hipped", "gambrel", "round"})
@@ -39,8 +42,77 @@ WALL_MATERIALS = {
 # Estimated hip only on small convex footprints. The phase-04 fixture building 311 is
 # 180 m² and must keep the template parapet.
 ESTIMATED_HIP_MAX_AREA_M2 = 160.0
-ESTIMATED_BRICK_SHARE = 0.08
-ESTIMATED_STONE_SHARE = 0.22
+
+_BUILDING_USES = {
+    **dict.fromkeys(("apartments", "residential", "house", "detached", "semidetached_house", "terrace",
+                     "dormitory", "bungalow"), "residential"),
+    **dict.fromkeys(("school", "kindergarten", "university", "college", "public", "civic", "government",
+                     "townhall", "hospital", "fire_station", "education"), "institutional"),
+    **dict.fromkeys(("office", "commercial", "bank"), "office"),
+    **dict.fromkeys(("retail", "supermarket", "kiosk"), "retail"),
+    **dict.fromkeys(("industrial", "warehouse", "manufacture"), "industrial"),
+}
+# OSM key → value → facade use. ``*`` matches any value but ``no``.
+FACADE_USE_TAGS: dict[str, dict[str, str]] = {
+    "building": _BUILDING_USES,
+    "building:use": _BUILDING_USES,
+    "amenity": {
+        **dict.fromkeys(("school", "kindergarten", "college", "university", "library", "townhall", "courthouse",
+                         "police", "hospital", "clinic", "fire_station", "community_centre"), "institutional"),
+        **dict.fromkeys(("bank", "bureau_de_change"), "office"),
+        **dict.fromkeys(("restaurant", "cafe", "bar", "pub", "fast_food", "pharmacy", "ice_cream"), "retail"),
+    },
+    "office": {"government": "institutional", "*": "office"},
+    "shop": {"*": "retail"},
+    "tourism": {"museum": "historic", "gallery": "historic", "hotel": "office"},
+    "historic": dict.fromkeys(("building", "castle", "palace", "manor", "monastery"), "historic"),
+}
+# How a tag reached the building, most direct first. A POI only near the footprint is an estimate.
+USE_MATCHES = ("building", "poi_inside", "enclosing_area", "poi_near")
+
+
+def facade_use(tags: Mapping[str, str]) -> tuple[str, str] | None:
+    """``(use, "key=value")`` for the most specific use these tags name, or ``None``."""
+    found: list[tuple[int, str, str]] = []
+    for key, values in FACADE_USE_TAGS.items():
+        raw = _first(dict(tags), key)
+        use = values.get(raw) or (values.get("*") if raw not in ("", "no") else None)
+        if use is not None:
+            found.append((FACADE_USES.index(use), use, f"{key}={raw}"))
+    return min(found)[1:] if found else None
+
+
+@dataclass(frozen=True, slots=True)
+class FacadeUse:
+    use: str
+    origin: str  # observed | estimated
+    source_id: str | None = None
+    tag: str | None = None
+    match: str | None = None
+
+    def to_record(self) -> dict[str, Any]:
+        evidence = [] if self.source_id is None else [{"source_id": self.source_id, "tag": self.tag, "match": self.match}]
+        return {"use": self.use, "origin": self.origin, "evidence": evidence}
+
+
+def resolve_use(building_id: str, tags: Mapping[str, str], related: Sequence[tuple[str, Mapping[str, str], str]]) -> FacadeUse:
+    """The building's facade use from its own tags, then from ``related`` ``(source id, tags, match)``.
+
+    The most direct match wins, then the most specific use, then the lowest id. Without
+    any evidence the use is ``residential``, marked ``estimated``.
+    """
+    own = facade_use(tags)
+    if own is not None:
+        return FacadeUse(own[0], "observed", building_id, own[1], "building")
+    ranked: list[tuple[int, int, str, str, str]] = []
+    for source_id, source_tags, match in related:
+        found = facade_use(source_tags)
+        if found is not None:
+            ranked.append((USE_MATCHES.index(match), FACADE_USES.index(found[0]), source_id, found[1], match))
+    if not ranked:
+        return FacadeUse("residential", "estimated")
+    _, rank, source_id, tag, match = min(ranked)
+    return FacadeUse(FACADE_USES[rank], "estimated" if match == "poi_near" else "observed", source_id, tag, match)
 
 
 def _first(tags: dict[str, str], key: str) -> str:
@@ -48,17 +120,24 @@ def _first(tags: dict[str, str], key: str) -> str:
     return raw.split(";")[0].strip().lower()
 
 
-def choose_wall(tags: dict[str, str], template: Template, seed: int, building_id: str) -> tuple[str, str]:
-    """Return ``(material, origin)``. Origin is ``observed``, ``estimated`` or ``generated``."""
+def choose_wall(
+    tags: dict[str, str],
+    palette: tuple[str, ...],
+    seed: int,
+    building_id: str,
+    avoid: Collection[str] = (),
+) -> tuple[str, str]:
+    """Return ``(material, origin)``. Origin is ``observed`` or ``generated``.
+
+    Without a material tag the palette is ranked by ``sha256(seed, building, material)``,
+    and the first material not in ``avoid`` (the neighbours' walls) wins. When every
+    palette material is in ``avoid``, the first one is used.
+    """
     raw = _first(tags, "building:material") or _first(tags, "material")
     if raw in WALL_MATERIALS:
         return WALL_MATERIALS[raw], "observed"
-    unit = stable_unit(seed, building_id, "wall_grammar")
-    if unit < ESTIMATED_BRICK_SHARE:
-        return "brick_red", "estimated"
-    if unit < ESTIMATED_STONE_SHARE:
-        return "stone_warm", "estimated"
-    return stable_choice(seed, template.wall_materials, building_id, "wall"), "generated"
+    ranked = sorted(palette, key=lambda material: stable_unit(seed, building_id, "wall", material))
+    return next((m for m in ranked if m not in avoid), ranked[0]), "generated"
 
 
 def choose_roof(

@@ -4,7 +4,7 @@
   "title": "Phase 04 facades, roofs, urban elements and interiors configuration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "seed", "exposure", "storey", "openings", "templates", "landmark_template", "doors", "interiors", "urban", "budget", "preview", "materials"],
+  "required": ["version", "seed", "exposure", "storey", "openings", "templates", "landmark_template", "doors", "facade_palettes", "shops", "interiors", "urban", "budget", "preview", "materials"],
   "$defs": {
     "len": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
     "len0": { "type": "number", "minimum": 0, "maximum": 50 },
@@ -102,16 +102,64 @@
     "templates": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/template" } },
     "landmark_template": { "$ref": "#/$defs/name" },
     "doors": {
-      "type": "object", "additionalProperties": false, "required": ["main", "landmark", "shopfront", "shop_evidence_keys", "shop_evidence_distance_m"],
+      "type": "object", "additionalProperties": false, "required": ["main", "landmark", "shopfront", "shop_door", "shop_evidence_keys", "shop_evidence_distance_m"],
       "properties": {
-        "main": { "$ref": "#/$defs/opening" }, "landmark": { "$ref": "#/$defs/opening" }, "shopfront": { "$ref": "#/$defs/opening" },
+        "main": { "$ref": "#/$defs/opening" }, "landmark": { "$ref": "#/$defs/opening" }, "shop_door": { "$ref": "#/$defs/opening" },
+        "shopfront": {
+          "type": "object", "additionalProperties": false,
+          "required": ["min_width_m", "max_width_m", "sill_m", "min_height_m", "max_height_m", "head_m"],
+          "properties": {
+            "min_width_m": { "$ref": "#/$defs/len" }, "max_width_m": { "$ref": "#/$defs/len" }, "sill_m": { "$ref": "#/$defs/len0" },
+            "min_height_m": { "$ref": "#/$defs/len" }, "max_height_m": { "$ref": "#/$defs/len" }, "head_m": { "$ref": "#/$defs/len0" }
+          }
+        },
         "shop_evidence_keys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "shop_evidence_distance_m": { "$ref": "#/$defs/len0" }
       }
     },
+    "shops": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fascia_share", "vinyl_share", "fascia", "blade", "vinyl", "default_name", "generic_names"],
+      "properties": {
+        "fascia_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "vinyl_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fascia": {
+          "type": "object", "additionalProperties": false, "required": ["height_m", "overhang_m", "depth_m"],
+          "properties": {
+            "height_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1.5 },
+            "overhang_m": { "type": "number", "minimum": 0, "maximum": 1 },
+            "depth_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.3 }
+          }
+        },
+        "blade": {
+          "type": "object", "additionalProperties": false, "required": ["width_m", "height_m", "thickness_m", "wall_gap_m", "clearance_m"],
+          "properties": {
+            "width_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1.5 },
+            "height_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1.5 },
+            "thickness_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.2 },
+            "wall_gap_m": { "type": "number", "minimum": 0, "maximum": 0.5 },
+            "clearance_m": { "type": "number", "minimum": 2.2, "maximum": 6 }
+          }
+        },
+        "vinyl": {
+          "type": "object", "additionalProperties": false, "required": ["height_m", "centre_m", "width_share"],
+          "properties": {
+            "height_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "centre_m": { "type": "number", "minimum": 0, "maximum": 6 },
+            "width_share": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+          }
+        },
+        "default_name": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "generic_names": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z_]+(=[a-z0-9_]+)?$" },
+          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    },
     "interiors": {
       "type": "object", "additionalProperties": false,
-      "required": ["enabled", "min_buildings", "max_buildings", "max_triangles", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m"],
+      "required": ["enabled", "min_buildings", "max_buildings", "max_triangles", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m", "lights_max", "shops"],
       "properties": {
         "enabled": { "type": "boolean" },
         "min_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
@@ -142,7 +190,32 @@
             "landing_m": { "type": "number", "minimum": 0.8, "maximum": 3 }
           }
         },
-        "door_clearance_m": { "$ref": "#/$defs/len" }
+        "door_clearance_m": { "$ref": "#/$defs/len" },
+        "lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "shops": {
+          "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_area_m2", "categories", "generic"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
+            "max_area_m2": { "type": "number", "exclusiveMinimum": 0 },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "object", "additionalProperties": false, "required": ["name", "tags", "wall", "floor"],
+                "properties": {
+                  "name": { "$ref": "#/$defs/name" },
+                  "tags": { "$ref": "#/$defs/tagList" },
+                  "wall": { "$ref": "#/$defs/name" },
+                  "floor": { "$ref": "#/$defs/name" }
+                }
+              }
+            },
+            "generic": {
+              "type": "object", "additionalProperties": false, "required": ["wall", "floor"],
+              "properties": { "wall": { "$ref": "#/$defs/name" }, "floor": { "$ref": "#/$defs/name" } }
+            }
+          }
+        }
       }
     },
     "urban": {
@@ -199,6 +272,19 @@
       }
     },
     "materials": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/material" } },
+    "facade_palettes": {
+      "description": "Wall materials per facade use. The use comes from OSM tags on the building, a POI on its footprint, or an enclosing amenity area; without one it is residential.",
+      "type": "object", "additionalProperties": false,
+      "required": ["residential", "retail", "institutional", "office", "historic", "industrial"],
+      "properties": {
+        "residential": { "$ref": "#/$defs/names" },
+        "retail": { "$ref": "#/$defs/names" },
+        "institutional": { "$ref": "#/$defs/names" },
+        "office": { "$ref": "#/$defs/names" },
+        "historic": { "$ref": "#/$defs/names" },
+        "industrial": { "$ref": "#/$defs/names" }
+      }
+    },
     "landmarks": {
       "type": "object",
       "additionalProperties": false,

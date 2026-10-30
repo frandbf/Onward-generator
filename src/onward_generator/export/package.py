@@ -24,7 +24,9 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
+from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales
 from onward_generator.export.thumbnail import render_listing_thumbnail
+from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.perf.layout import (
     GAMEPLAY_VERSION,
@@ -219,6 +221,29 @@ def _check_detail(detail_dir: Path) -> tuple[list[str], dict[str, Any], dict[str
     return problems, manifest, report
 
 
+# The adapter's cap when the export configuration leaves ``build.interior_lights_max`` out (ADR-013).
+ADAPTER_INTERIOR_LIGHTS_MAX = 24
+
+
+def interior_lights(visual: bytes) -> int:
+    """Room lights the visual GLB asks for: every ``light_anchors`` room that still has a ``light_m`` (ADR-013)."""
+    doc, _blob = read_glb(visual)
+    return sum(
+        1
+        for node in doc.get("nodes") or []
+        for room in ((node.get("extras") or {}).get("light_anchors") or {}).get("rooms") or []
+        if "light_m" in room
+    )
+
+
+def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes) -> None:
+    """Replace ``lightmap_class_scales`` in the adapter options by one scale per visual material."""
+    class_scales = {**DEFAULT_CLASS_SCALES, **options.pop("lightmap_class_scales", {})}
+    doc, _blob = read_glb(visual)
+    names = [str(m.get("name")) for m in doc.get("materials") or []]
+    options["lightmap_scales"] = material_scales(names, class_scales)
+
+
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
     return f"{config['map']['description']} Data: {credits}."
@@ -272,6 +297,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     thumbnail = render_listing_thumbnail(sources["visual"].read_bytes(), str(cfg["map"]["title"]))
     thumbnail_sha = hashlib.sha256(thumbnail).hexdigest()
     options = {"variant": "", **cfg["build"]}
+    visual_bytes = sources["visual"].read_bytes()
+    _resolve_lightmap_scales(options, visual_bytes)
+    lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
+    if lights > cap:
+        warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
+                        "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match.")
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -318,6 +349,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                                   "phase_04_checks": detail_report.get("phase_04_checks")},
                 "layout_purpose": layout_doc.get("purpose"),
             },
+            "lightmap_estimate": estimate(
+                visual_bytes, texels_per_m=float(options["lightmap_texels_per_m"]),
+                max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
+                scales=options["lightmap_scales"],
+            ),
             "warnings": warnings,
         }
         atomic_write_json(out / MANIFEST_FILE, manifest)

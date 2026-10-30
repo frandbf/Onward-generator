@@ -10,6 +10,7 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.generation import GenerationError, generate_scene, load_generation_config
 from onward_generator.generation.gltf import read_glb
+from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.geo.pipeline import GeoResult, write_outputs
 from onward_generator.heights import run_heights, write_height_outputs
 
@@ -34,7 +35,14 @@ def test_synthetic_block_generates_without_critical_errors(inputs: tuple[Path, P
     assert "building/osm-way-113" not in ids  # leaves the map; omitted whole
     assert "duplicate_building_skipped" in report["issues_by_code"]
     assert {"surface/carriageway", "surface/sidewalk", "surface/pedestrian", "surface/ground", "surface/curb"} <= ids
-    assert {"collider/walkable", "collider/carriageway"} <= ids
+    assert {"collider/walkable", "collider/carriageway", "collider/walkable_crossing"} <= ids
+    # The crossings are cut out of the carriageway slab and sit at its level (ADR-015).
+    slabs = {o.id: o.record for o in generated.objects if o.type == "ground_collider"}
+    crossing, lane = slabs["collider/walkable_crossing"], slabs["collider/carriageway"]
+    assert crossing["top_z_m"] == lane["top_z_m"] == -CFG.carriageway_depth_m
+    assert crossing["area_m2"] == pytest.approx(generated.partition.crossings.area, abs=0.01) and crossing["area_m2"] > 0
+    road_area = generated.partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry.area
+    assert crossing["area_m2"] + lane["area_m2"] == pytest.approx(road_area, abs=0.01)
 
     b101 = next(o for o in generated.objects if o.id == "building/osm-way-101")
     assert b101.record["height"]["height_m"] == 12.0 and b101.record["height"]["height_source"] == "explicit_height"
@@ -46,6 +54,21 @@ def test_synthetic_block_generates_without_critical_errors(inputs: tuple[Path, P
         if o.type == "building":
             fp = next(p for p in o.visual if p.material == "building_wall").mesh
             assert fp.vertices[:, 2].min() == 0.0 and fp.vertices[:, 2].max() == o.record["height"]["height_m"]
+
+
+def test_a_map_without_streets_has_no_carriageway_or_crossing_slab(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    scene, _ = inputs
+    doc = json.loads(scene.read_text(encoding="utf-8"))
+    doc["features"] = [f for f in doc["features"] if f.get("kind") != "highway"]
+    edited = tmp_path / "no_streets" / "geo_scene.json"
+    edited.parent.mkdir()
+    edited.write_text(json.dumps(doc), encoding="utf-8")
+    heights, _ = write_height_outputs(run_heights(edited), tmp_path / "no_streets_heights")
+    generated = generate_scene(edited, heights, CFG)
+    assert generated.report()["phase_03_exit"]["passed"]
+    slabs = {o.id for o in generated.objects if o.type == "ground_collider"}
+    assert slabs == {"collider/walkable"}
+    assert generated.partition.crossings.is_empty
 
 
 def test_heights_from_another_scene_are_rejected(inputs: tuple[Path, Path], tmp_path: Path) -> None:

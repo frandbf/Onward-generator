@@ -11,7 +11,9 @@ The module does not import `geo` and does not modify the scene. It reads `geo_sc
   [--config config/heights.default.json] [--overrides <overrides.json>] [--overwrite]
 ```
 
-`--overrides` replaces `overrides_file` in the configuration. That is how Catastro overrides from `cadastre match` are applied (`docs/05-cadastre.md`). Outside Spain there is no Catastro step. Heights stay on the OSM estimate.
+`--overrides` replaces `overrides_file` in the configuration. That is how Catastro overrides from `cadastre match` or `cadastre split` are applied (`docs/05-cadastre.md`). Outside Spain there is no Catastro step. Heights stay on the OSM estimate.
+
+After `cadastre split` the scene is `data/processed/cadastre/geo_scene.json`. A block OSM drew as one polygon arrives as several sub-buildings (`parent` names the OSM building), each with its own Catastro storey count, so each gets its own `authoritative_levels` height instead of one estimate for the whole block. `heights_report.json` counts them in `counts.subdivided`: `osm_buildings_split`, `sub_buildings`, `levels_range` (`null` when nothing was split). Override ids may be an OSM id or `<osm id>:<localId>` (`config/heights.overrides.schema.json`). ADR-016.
 
 ## Order
 

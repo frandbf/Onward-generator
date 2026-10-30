@@ -49,16 +49,14 @@ def pipeline_result(synthetic_source: SourceDataset, synthetic_aoi: AreaOfIntere
     return run_geo_pipeline(synthetic_source, synthetic_aoi, origin=ORIGIN)
 
 
-@pytest.fixture(scope="session")
-def detail_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
-    """Synthetic street block → geo → heights → validated phase 03 base: (scene, heights, base_dir)."""
+def _detail_inputs(root: Path, buildings: object = None, pois: object = None) -> tuple[Path, Path, Path]:
     from onward_generator.generation.__main__ import main as generate_main
     from onward_generator.geo.pipeline import write_outputs
     from onward_generator.heights import run_heights, write_height_outputs
     from tests.detail_fixture import write_block_osm
 
-    root = tmp_path_factory.mktemp("detail")
-    osm = write_block_osm(root / "block.osm", ORIGIN)
+    extra = {} if buildings is None else {"buildings": buildings, "pois": pois}
+    osm = write_block_osm(root / "block.osm", ORIGIN, **extra)  # type: ignore[arg-type]
     source = register_local_source(osm, license_info=SYNTHETIC_LICENSE, retrieved_at=FIXED_NOW,
                                    data_timestamp="2026-10-18T00:00:00Z", now=FIXED_NOW)
     result = run_geo_pipeline(source, load_aoi_geojson(AOI_FIXTURE), origin=ORIGIN)
@@ -67,3 +65,25 @@ def detail_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path,
     base = root / "scene3d"
     assert generate_main(["--scene", str(scene), "--heights", str(heights), "--out", str(base), "--no-preview"]) == 0
     return scene, heights, base
+
+
+@pytest.fixture(scope="session")
+def detail_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    """Synthetic street block → geo → heights → validated phase 03 base: (scene, heights, base_dir)."""
+    return _detail_inputs(tmp_path_factory.mktemp("detail"))
+
+
+@pytest.fixture(scope="session")
+def row_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    """Six touching buildings with school, bank and shop POIs (``ROW_BUILDINGS``): (scene, heights, base_dir)."""
+    from tests.detail_fixture import ROW_BUILDINGS, ROW_POIS
+
+    return _detail_inputs(tmp_path_factory.mktemp("row"), ROW_BUILDINGS, ROW_POIS)
+
+
+@pytest.fixture(scope="session")
+def residential_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    """The street block without its bakery: 311, 312 and 313 all take the stair interior. (scene, heights, base_dir)."""
+    from tests.detail_fixture import BUILDINGS, POIS
+
+    return _detail_inputs(tmp_path_factory.mktemp("residential"), BUILDINGS, {k: v for k, v in POIS.items() if k != 401})

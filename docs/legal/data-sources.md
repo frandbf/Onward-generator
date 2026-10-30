@@ -52,10 +52,10 @@ Spain only.
 
 Obligations, from the Catastro licence:
 
-- **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height.
+- **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height. Since ADR-016, `cadastre split` also divides an OSM footprint into sub-footprints: each is a cadastral part outline clipped to the OSM outline, snapped to 1 mm, merged by parcel and storey count, with slivers dropped and gaps filled. That shape is a transformation of the cadastral geometry; the GML itself is never copied into a scene or a package.
 - **No impersonation.** Derived products must not be presented as "cartografía catastral", "información catastral", or equivalent terms.
 - **No warranty.** Catastro is not responsible for derived products, and the data can be out of date.
-- **Attribution (CC BY 4.0).** `heights_overrides.catastro.json`, `heights.json`, `scene3d.json`, and the GLBs carry the source and the licence.
+- **Attribution (CC BY 4.0).** `heights_overrides.catastro.json`, `heights.json`, `scene3d.json`, and the GLBs carry the source and the licence. The split scene `data/processed/cadastre/geo_scene.json` carries it in `subdivision.cadastre` and on every sub-building (`subdivision.license`, `attribution`, `retrieved_at`).
 
 A scene that combines OSM and Catastro is a Produced Work from the OSM database. It keeps the OSM attribution and adds the Catastro attribution.
 
@@ -74,6 +74,8 @@ Phase 04 does not use external models. Windows, balconies, roofs, street furnitu
 `dress style` adds no third-party asset. Its atlas is generated in code (noise on the existing colours, 256 px tiles). It is not a photograph of a city and it is not an extract from Onward. Licence of that atlas: `project-generated`.
 
 `signs place` paints the OSM `name` of the way on a generated plate. The name is ODbL data. The map keeps the OpenStreetMap attribution. The name is not translated and not invented. A way with no `name` gets no plate.
+
+Shop signs and window vinyls use the OSM `name` of the shop POI the same way (ODbL, `name_origin: observed`). A POI with no `name` gets a generic Spanish word for its `shop`, `amenity`, `office` or `craft` value from `config/detail.default.json` (`name_origin: estimated`), for example `Farmacia` or `Panadería`. That word is a project assumption, not a brand or a real sign. The colours and layout are generated. The text uses the same vendored DejaVu font; no other font is added.
 
 ## Panoramax
 
@@ -132,7 +134,7 @@ A withdrawn model stays in the review with `usable: false` so it is not download
 | `DejaVuSans-Bold.ttf` SHA-256 | `e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724` |
 | `LICENSE` SHA-256 | `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93` |
 
-GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo; the font file is not part of the exported map.
+GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo and the shop-sign atlas; the font file is not part of the exported map.
 
 ## Asset Store
 

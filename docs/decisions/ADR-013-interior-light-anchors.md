@@ -27,6 +27,12 @@ Only `detail` knows where the furnished rooms are, their floor and ceiling heigh
    - Without a navmesh (`perf_layout`) no probe group is added: a group with only indoor probes would light the street from inside the buildings. Renderers outside the lightmap then keep the ambient probe, as before.
 4. **Export options.** `build.interior_lights_max` and `build.interior_light_intensity` are optional keys in `config/export/onward.schema.json`. When they are absent the adapter uses the defaults above.
 
+## Amendment — shop interiors and the shared cap (30 October 2026)
+
+Shops now get a one-storey interior with one room and one anchor (`docs/07-detail.md`, *Shop interiors*). With 5–8 stair interiors and every shop of a street lit, a map passes 24 rooms. `detail` therefore applies the cap itself, as `interiors.lights_max` (default 24, the adapter's default): shop rooms first, because they are seen through the glass from the street; then every room by the distance of its light from the local origin, the map centre, where the player is most of the time; then by room id. A room past the cap keeps `room_id` and `probes_m`, loses `light_m` and `range_m`, and gets `light: over_cap`. `detail_report.json` lists the dropped rooms (`counts.interior_lights`) and each is an `interior_light_dropped` issue (info).
+
+The adapter now collects the probes of a room before it checks `light_m`, so a room without a light still adds its probes. Before, a room without `light_m` was skipped whole. `export package` warns when the scene asks for more lights than `build.interior_lights_max`. Not compiled in Unity on this host.
+
 ## Rejected alternatives
 
 - Realtime or mixed lights. They cost every frame on the Quest; a baked light costs nothing at runtime.

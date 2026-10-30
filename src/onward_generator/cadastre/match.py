@@ -185,7 +185,9 @@ def match_report(
     part_count: int,
     part_issues: Sequence[PartIssue],
     options: MatchOptions,
+    split: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """The match report. ``split`` is the ``cadastre split`` section (ADR-016), absent after ``match``."""
     status = Counter(m.status for m in matches)
     matched = [m for m in matches if m.status == "matched"]
     compared = [m for m in matched if m.osm_levels is not None]
@@ -207,4 +209,5 @@ def match_report(
         "levels_distribution": dict(sorted(Counter(m.levels for m in matched).items())),
         "part_issues": [i.to_dict() for i in part_issues],
         "buildings": [m.to_dict() for m in matches],
+        **({"split": dict(split)} if split is not None else {}),
     }

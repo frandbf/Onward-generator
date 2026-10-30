@@ -18,6 +18,15 @@ Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/
 
 `kit_only` marks a building or road kit piece: the Kenney wall modules, roofs, doors, windows, road tiles, roof posts and scaffold uprights (128 rows). Placing one alone would invent a building or a second road, so the library refuses the row before it reads the GLB (`library_rejects` reason `kit_only`). Doors and windows are kit pieces too: the facades already get their openings from `detail`. `wall_mounted` goes with `anchor: facade` and nothing else does; `street` needs the `carriageway` surface. A 0.2.0 manifest that misses a field, uses another value, or breaks those two rules stops the load with a `LibraryError`. A manifest without `schema_version` 0.2.0 is read as before, with no curated fields. `overgrow fetch` and `overgrow fetch-sketchfab` keep the curated fields of rows they rewrite; a row they add without them turns the manifest back into 0.1.0.
 
+Two optional load corrections may follow `tags`. A person sets them; the GLB is not rewritten, and the fetch commands keep them too.
+
+| Field | Values | Effect |
+| --- | --- | --- |
+| `yaw_deg` | `0`, `90`, `180`, `270` | The library turns the mesh counter-clockwise about the vertical when it loads it, so the long side lies on +X like every other prop. The five Kenney trucks have their long side on the file's Y axis and carry `90`; without it they were placed across the street. |
+| `refused` | `unknown_scale` | The library refuses the row with this reason (`library_rejects`). `watchtower` (0.30 m tall) and `warning_signboard` (0.38 m) carry it: the files are not in metres, the Sketchfab fetch records no dimensions for them, and nothing in either model fixes a size reliably, so `fit` cannot scale them and a factor would be a guess. |
+
+The library reads the whole scene of each GLB: every node with its transform (matrix, or translation, rotation and scale, inherited by children) and every triangle primitive. Until 2026-10-30 it kept only the first primitive of the first node, so 73 Kenney files loaded in part: the open dumpster was one quad, the bench only its legs. Primitives that share an albedo form one part of the prop; each part is its own material, `prop_<id>` then `prop_<id>__1` and so on, still albedo only on `PP_Opaque_Simple_Lit`. The `triangles` and sizes in the manifests were already measured on the whole file.
+
 ## Vehicles
 
 ### covered car
@@ -209,6 +218,7 @@ Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/
 - Where: block edge, kerb, yard, empty lot, plaza, park.
 - Size: 0.15 × 0.15 × 0.30 m, 1764 triangles.
 - Licence: CC BY 4.0, ahmagh2e.
+- Not placed: the manifest marks it `refused: unknown_scale`.
 
 ### fence Door Metal protection-2PART 40MB
 
@@ -438,6 +448,7 @@ Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/
 - Where: kerb, carriageway, sidewalk, plaza.
 - Size: 0.24 × 0.17 × 0.38 m, 1798 triangles.
 - Licence: CC BY 4.0, chenkl.
+- Not placed: the manifest marks it `refused: unknown_scale`.
 
 ## Vegetation
 

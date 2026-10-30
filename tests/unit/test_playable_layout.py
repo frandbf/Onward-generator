@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from shapely import LineString, MultiLineString, Point, STRtree, box
+from shapely import LineString, MultiLineString, Point, Polygon, STRtree, box
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.export.package import _check_layout
@@ -27,6 +27,7 @@ from onward_generator.perf.layout import (
     component_holding,
     extra_spawn_block,
     fit_spawn_separation,
+    free_ground,
     hunt_routes,
     nav_islands,
     patrol_seeds,
@@ -343,9 +344,37 @@ def test_nav_islands_split_at_the_carriageway_and_ignore_furniture() -> None:
     config = load_generation_config()
     street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 6.0, "config_default")
     partition = build_partition(box(-50, -50, 50, 50), [], [street], [], config)
+    partition.crossings = Polygon()
     islands = nav_islands(_base(street, partition=partition))  # type: ignore[arg-type]
     assert sorted(round(part.bounds[1], 6) for part in islands) == [-50 + NAV_AGENT_RADIUS_M, 3 + NAV_AGENT_RADIUS_M]
     assert sorted(round(part.bounds[3], 6) for part in islands) == [-3 - NAV_AGENT_RADIUS_M, 50 - NAV_AGENT_RADIUS_M]
+
+
+def test_nav_islands_join_across_the_walkable_crossings() -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-50, -50, 50, 50), [], [street], [], config)
+    islands = nav_islands(_base(street, partition=partition))  # type: ignore[arg-type]
+    assert len(islands) == 1
+    (island,) = islands
+    assert [round(value, 6) for value in island.bounds] == [-50 + NAV_AGENT_RADIUS_M] * 2 + [50 - NAV_AGENT_RADIUS_M] * 2
+    # The crossings at x = -18 and 18 m stay on the mesh; the rest of the street does not.
+    assert island.covers(Point(-18, 0)) and island.covers(Point(18, 0))
+    assert not island.covers(Point(0, 0))
+
+
+def test_hunt_routes_spread_over_both_sides_of_a_crossed_street() -> None:
+    """Each side holds the roster on its own; the crossings make it one island, so patrols use both."""
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-210, 0), (210, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
+    base = _base(street, partition=partition)
+    free = free_ground(base, [])  # type: ignore[arg-type]
+    islands = nav_islands(base)  # type: ignore[arg-type]
+    routes, _ = hunt_routes(base, free, islands, component_holding(islands, (0.0, 20.0)), AI_COUNT, (0.0, 20.0))  # type: ignore[arg-type]
+    assert len(routes) == AI_COUNT
+    starts = [route["points"][0]["y"] for route in routes]
+    assert sum(y > 0 for y in starts) >= 8 and sum(y < 0 for y in starts) >= 8
 
 
 def _two_islands(home_length: float) -> tuple[object, BaseGeometry, list[BaseGeometry], BaseGeometry]:

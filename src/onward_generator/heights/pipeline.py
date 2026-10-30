@@ -7,7 +7,7 @@ import json
 import statistics
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +62,16 @@ class HeightRun:
     config: HeightConfig
     scene_ref: Mapping[str, Any]
     attribution: Mapping[str, Any] | None
+    parents: Mapping[str, str] = field(default_factory=dict)
+    """Sub-building id → OSM parent id, for footprints ``cadastre split`` divided (ADR-016)."""
+
+    def _subdivided(self) -> dict[str, Any]:
+        levels = [b.estimated_levels for b in self.result.buildings if b.id in self.parents]
+        return {
+            "osm_buildings_split": len(set(self.parents.values())),
+            "sub_buildings": len(levels),
+            "levels_range": [min(levels), max(levels)] if levels else None,
+        }
 
     def _header(self) -> dict[str, Any]:
         cfg = self.config
@@ -112,6 +122,7 @@ class HeightRun:
                 "by_category": dict(sorted(by_category.items())),
                 "landmarks": sum(b.landmark for b in buildings),
                 "needs_manual_review": len(review),
+                "subdivided": self._subdivided(),
             },
             "percent_by_class": {c.value: _percent(by_class.get(c.value, 0), total) for c in HeightClass},
             "percent_by_source": {s.value: _percent(by_source.get(s.value, 0), total) for s in HeightSource},
@@ -144,7 +155,12 @@ def run_heights(scene_path: str | Path, config: HeightConfig | None = None) -> H
         raise SceneError("scene file changed while it was being read")
     result = HeightResult(result.buildings, tuple(scene_issues) + result.issues)
     scene_ref = {"path": str(path), "sha256": before, "schema": scene["schema"], "schema_version": scene["schema_version"]}
-    return HeightRun(result, config, scene_ref, scene.get("attribution"))
+    parents = {
+        str(f["id"]): str(f["parent"]["id"])
+        for f in scene["features"]
+        if f.get("kind") == "building" and isinstance(f.get("parent"), Mapping)
+    }
+    return HeightRun(result, config, scene_ref, scene.get("attribution"), parents)
 
 
 def write_height_outputs(run: HeightRun, out_dir: str | Path, *, overwrite: bool = False) -> tuple[Path, Path]:

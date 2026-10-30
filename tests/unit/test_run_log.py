@@ -246,7 +246,9 @@ def test_panoramax_signs_fit_bounds(tmp_path: Path) -> None:
     _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [1, 2]})
     assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("2 facades")
     _write(tmp_path / "signs" / "signs_report.json", {"count": 1})
-    assert summarize("signs", ["--out", str(tmp_path / "signs")]) == StageReport("1 plate")
+    assert summarize("signs", ["--out", str(tmp_path / "signs")]) == StageReport("1 plate  0 shop signs")
+    _write(tmp_path / "signs" / "signs_report.json", {"count": 2, "shop_signs": {"count": 3}})
+    assert summarize("signs", ["--out", str(tmp_path / "signs")]) == StageReport("2 plates  3 shop signs")
     fit = _write(tmp_path / "fit.json", {"checked": 58})
     assert summarize("fit", ["--out", str(fit)]) == StageReport("checked 58")
     _write(tmp_path / "playable" / "bounds_report.json", {"wall": {"height_m": 12.0, "triangles": 1032}})
@@ -299,3 +301,19 @@ def test_an_unknown_stage_or_unreadable_report_means_no_summary(tmp_path: Path) 
     assert summarize("fit", ["--out", str(tmp_path / "fit.json")]) == StageReport()
     _write(tmp_path / "geo" / "geo_report.json", {"counts": {}})
     assert summarize("geo", ["--out", str(tmp_path / "geo")]) == StageReport()
+
+
+def test_catastro_reads_the_download_sidecar(tmp_path: Path) -> None:
+    gml = tmp_path / "raw" / "catastro.gml"
+    _write(gml.with_name("catastro.gml.source.json"), {"size_bytes": 2_100_000, "license": "CC-BY-4.0"})
+    assert summarize("catastro", ["cadastre", "download", "--out", str(gml)]) == StageReport("2 050 KiB  CC-BY-4.0")
+
+
+def test_cadastre_reports_the_split(tmp_path: Path) -> None:
+    out = tmp_path / "cadastre"
+    split: dict[str, Any] = {"osm_buildings_split": 13, "sub_buildings": 1041, "levels_range": [1, 7]}
+    _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 1203}, "split": {"counts": split}})
+    assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 1 203  split 13 → 1 041  storeys 1–7")
+    split.update(osm_buildings_split=0, sub_buildings=0, levels_range=None)
+    _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 0}, "split": {"counts": split}})
+    assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 0  split 0 → 0")

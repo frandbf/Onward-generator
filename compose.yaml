@@ -2,7 +2,8 @@
 services:
   dev:
     build: .
-    image: onward-generator:dev
+    # tools/docker/image.sh: onward-generator:dev, or dev-<folder> in a linked git worktree.
+    image: ${ONWARD_IMAGE:-onward-generator:dev}
     working_dir: /work
     volumes:
       - .:/work

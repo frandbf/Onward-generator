@@ -116,7 +116,7 @@ The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/o
 
 - **Textures.** `map create` writes one texture plan, `maps/<id>/config/texture_plan.json`, choosing one tileable albedo per slot from `config/dress/imported_library.json` with local Ollama, or a deterministic pick without it. Only calm images join the asphalt, concrete, plaster, brick and rock pools, so no stain or baked-in manhole cover repeats on every tile, and asphalt repeats every 10 m. A saved plan that still names a busy image is refused until it is rewritten. `map create --name "Map name" --textures` rewrites only that plan; then run `materials apply` again. See [docs/08-dress.md](docs/08-dress.md).
 - **Props.** `overgrow` reads every `manifest.json` in a direct child of `assets/` (`assets/normalized`, `assets/kenney`). Materials are opaque albedo only (`PP_Opaque_Simple_Lit`), so meshes with a non-opaque material and tall "flat" vegetation are refused and listed under `library_rejects`. Up to six manhole covers are placed on sidewalks. `overgrow library list` shows the catalogue; see [docs/abandoned-assets.md](docs/abandoned-assets.md).
-- **Street plates.** Drawn with the vendored DejaVu Sans Bold, so accented names render.
+- **Street plates and shop signs.** Drawn with the vendored DejaVu Sans Bold, so accented names render. Shops get a larger display window, a glazed door, a fascia or blade sign with the OSM name (or a generic Spanish word, marked estimated), and vinyl lettering on some windows. Each shop has a one-storey room behind see-through windows, coloured by kind (bakery, pharmacy, bar, other), with its own light. See [docs/07-detail.md](docs/07-detail.md).
 - **Lighting and horizon.** One baked point light per furnished room (at most 24), light probes in rooms and streets, props lit by probes, linear fog near the perimeter wall, and an optional haze ring (`bounds --backdrop`). See [ADR-013](docs/decisions/ADR-013-interior-light-anchors.md) and [ADR-014](docs/decisions/ADR-014-horizon.md). Not yet checked in Unity or on the headset.
 
 ## Development
@@ -145,7 +145,7 @@ A pull request is ready when `task ci` and `task mutate` pass. The rules are in 
 **Mutation testing.** `task mutate` changes each line a branch touched in `src/onward_generator`, such as `<` to `<=` or a constant moved by one, with [mutmut](https://mutmut.readthedocs.io) 3.8.1, and checks that some test fails. It rewrites only the files with a changed function and runs only the mutants on changed lines.
 
 - Exit `0`: every mutant was killed. Exit `1`: a survivor, printed with its diff. Write a test that fails on that edit, or, when the edit changes nothing a caller can see, end the line with `# pragma: no mutate: <reason>`. Exit `2`: the tool could not run.
-- `BASE=` sets the base (default `main`), `MAX=` the number of functions (default 40), `JOBS=` the workers (default all cores in CI, half locally). `task mutate -- --whole-functions` mutates whole functions.
+- `BASE=` sets the base (default `main`), `JOBS=` the workers (default all cores in CI, half locally). `task mutate -- --whole-functions` mutates whole functions.
 - On a pull request, CI runs it against the target branch and skips it when `src/` did not change.
 
 Tests do not use the network. Fixtures live in `tests/fixtures/` and use one origin, latitude 37.98407, longitude −1.12863.
@@ -174,7 +174,7 @@ src/onward_generator/     the generator, one package per stage
   geo/ heights/ cadastre/ geographic scene, building heights, Catastro storeys
   generation/ detail/     base meshes; facades, roofs, interiors, street elements
   dress/ materials/       dressed copy; per-map texture plan
-  panoramax/ signs/       street photos; street-name plates
+  panoramax/ signs/       street photos; street-name plates and shop signs
   overgrow/ props/        abandoned-city layer and prop library; Asset Store instances
   bounds/ perf/ export/   perimeter wall; layout and measurement; export package
   ai/                     local Ollama intent and planner

@@ -92,6 +92,9 @@ namespace OnwardGenerator
             public float lightmap_texels_per_m = 10f;
             public int lightmap_max_size = 2048;
             public bool lightmap_directional = false;
+            // scaleInLightmap per glTF material (onward_generator.export.lightmap): roofs, ground and
+            // interiors below 1. A material not listed keeps 1. Absent in older packages.
+            public LightmapScale[] lightmap_scales = new LightmapScale[0];
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -103,6 +106,7 @@ namespace OnwardGenerator
             public string fog_color = "#C8CDD2";
         }
 
+        [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
@@ -393,7 +397,7 @@ namespace OnwardGenerator
         // centre on glTF (x, z), as onward_generator.perf.measure.combine_groups. Collision
         // is not touched. Measured on the Quest in phase 05 (ADR-005).
         private static int BuildCombinedVisual(Glb visual, Mesh[] meshes, int[][] meshMaterials, Material[] materials,
-            Transform parent, string root, float cellM, StaticEditorFlags flags)
+            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt)
         {
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
             var probe = new GameObject("probe");
@@ -448,6 +452,7 @@ namespace OnwardGenerator
                 AssetDatabase.StopAssetEditing();
             }
 
+            var byScale = new SortedDictionary<float, int>();
             foreach ((string name, Mesh mesh, int mat) in built)
             {
                 var go = new GameObject(name);
@@ -457,10 +462,13 @@ namespace OnwardGenerator
                 renderer.sharedMaterial = materials[mat];
                 renderer.shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                if (!ContributesGi(renderer.sharedMaterial)) renderer.scaleInLightmap = 0f;
+                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
             }
 
             Debug.Log($"{LogPrefix} Combined visual: {built.Count} meshes from {groups.Values.Sum(l => l.Count)} primitives, cell {cellM} m");
+            Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
+                + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
         }
 
@@ -533,7 +541,7 @@ namespace OnwardGenerator
                 int visualObjects;
                 if (opt.combine_cell_m > 0)
                 {
-                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags);
+                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt);
                 }
                 else
                 {
@@ -548,7 +556,8 @@ namespace OnwardGenerator
                         renderer.sharedMaterials = visualMaterials[node.mesh].Select(k => materials[k]).ToArray();
                         renderer.shadowCastingMode = ShadowCastingMode.On;
                         GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                        if (renderer.sharedMaterials.Any(m => !ContributesGi(m))) renderer.scaleInLightmap = 0f;
+                        renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m)) ? 0f
+                            : visualMaterials[node.mesh].Select(k => ScaleInLightmap(opt, visual.Doc.materials, k)).DefaultIfEmpty(1f).Max();
                         visualObjects++;
                     }
                 }
@@ -973,6 +982,8 @@ namespace OnwardGenerator
                 || name.Contains("landmark") || name.Contains("curb") || name.Contains("water"))
                 return false;
             // Phase 03 names the ground mesh collider/walkable. It is not called pedestrian.
+            // collider/walkable_crossing, the strips across the carriageway, matches
+            // here too: it joins the blocks on both kerbs into one island (ADR-015).
             return name.Contains("walkable") || name.Contains("pedestrian") || name.Contains("sidewalk")
                 || name.Contains("ground") || name.Contains("green");
         }
@@ -1034,9 +1045,77 @@ namespace OnwardGenerator
             Vector3 origin = Snap(layout.uplink_m[0], layout.uplink_m[1], "nav origin");
             generator.NavMeshOrigin = origin;
             generator.OutDoorPoints = new List<Vector3> { origin };
+            LogNavIslands(origin);
             RequireNavigationObject(generator, map);
             BakeNodesToFit(generator, map);
             EditorUtility.SetDirty(map);
+        }
+
+        // Diagnostic only: how many separate pieces the baked mesh has, and how
+        // much of its area is on the origin's piece. GenerateNodes keeps only the
+        // nodes on that piece, so a Hunt route elsewhere has nothing to walk on.
+        // Triangles that share a vertex position (to the centimetre) are one
+        // island; the origin's island is the one whose triangle centre is nearest.
+        private static void LogNavIslands(Vector3 origin)
+        {
+            NavMeshTriangulation tri = NavMesh.CalculateTriangulation();
+            var parent = new int[tri.vertices.Length];
+            for (int i = 0; i < parent.Length; i++) parent[i] = i;
+            var welded = new Dictionary<Vector3Int, int>();
+            for (int i = 0; i < tri.vertices.Length; i++)
+            {
+                Vector3 v = tri.vertices[i];
+                var key = new Vector3Int(Mathf.RoundToInt(v.x * 100f), Mathf.RoundToInt(v.y * 100f), Mathf.RoundToInt(v.z * 100f));
+                int first;
+                if (welded.TryGetValue(key, out first)) JoinIslands(parent, i, first);
+                else welded[key] = i;
+            }
+            for (int i = 0; i + 2 < tri.indices.Length; i += 3)
+            {
+                JoinIslands(parent, tri.indices[i], tri.indices[i + 1]);
+                JoinIslands(parent, tri.indices[i], tri.indices[i + 2]);
+            }
+            var areas = new Dictionary<int, float>();
+            float total = 0f;
+            float nearest = float.MaxValue;
+            int home = -1;
+            for (int i = 0; i + 2 < tri.indices.Length; i += 3)
+            {
+                Vector3 a = tri.vertices[tri.indices[i]];
+                Vector3 b = tri.vertices[tri.indices[i + 1]];
+                Vector3 c = tri.vertices[tri.indices[i + 2]];
+                float area = Vector3.Cross(b - a, c - a).magnitude * 0.5f;
+                int root = IslandOf(parent, tri.indices[i]);
+                float sum;
+                areas.TryGetValue(root, out sum);
+                areas[root] = sum + area;
+                total += area;
+                float distance = ((a + b + c) / 3f - origin).sqrMagnitude;
+                if (distance < nearest)
+                {
+                    nearest = distance;
+                    home = root;
+                }
+            }
+            float homeArea = home >= 0 ? areas[home] : 0f;
+            Debug.Log($"{LogPrefix} Navmesh islands: {areas.Count}. The origin island holds {homeArea:F0} of {total:F0} m² ({100f * homeArea / Mathf.Max(total, 1f):F0}%); GenerateNodes keeps only that island.");
+        }
+
+        private static int IslandOf(int[] parent, int i)
+        {
+            while (parent[i] != i)
+            {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+            return i;
+        }
+
+        private static void JoinIslands(int[] parent, int a, int b)
+        {
+            int ra = IslandOf(parent, a);
+            int rb = IslandOf(parent, b);
+            if (ra != rb) parent[Math.Max(ra, rb)] = Math.Min(ra, rb);
         }
 
         // Node spacing follows the baked mesh, not a fixed city. A straight
@@ -2081,12 +2160,14 @@ namespace OnwardGenerator
                 if (rooms == null) continue;
                 foreach (GRoomAnchor room in rooms)
                 {
-                    if (room == null || room.light_m == null || room.light_m.Length != 3) continue;
+                    if (room == null) continue;
                     if (room.probes_m != null)
                     {
                         for (int i = 0; i + 2 < room.probes_m.Length; i += 3)
                             probes.Add(Local(room.probes_m[i], room.probes_m[i + 1], room.probes_m[i + 2]));
                     }
+                    // detail leaves light_m out of a room past interiors.lights_max; the room keeps its probes.
+                    if (room.light_m == null || room.light_m.Length != 3) continue;
                     if (lights >= opt.interior_lights_max)
                     {
                         skipped++;
@@ -2179,6 +2260,26 @@ namespace OnwardGenerator
                 throw new InvalidOperationException("StaticOcclusionCulling.Compute() returned false.");
             if (!Lightmapping.Bake()) throw new InvalidOperationException("Lightmapping.Bake() returned false.");
             CompressLightmapsAstc();
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} Lightmaps: {1}, {2} texels, at {3} texels/m, at most {4} px.",
+                LogPrefix, LightmapSettings.lightmaps.Length, LightmapTexels(), opt.lightmap_texels_per_m, opt.lightmap_max_size));
+        }
+
+        // Baked colour texels of every lightmap; compare with lightmap_estimate in onward_export.json.
+        private static long LightmapTexels()
+        {
+            long texels = 0;
+            foreach (LightmapData data in LightmapSettings.lightmaps)
+                if (data.lightmapColor != null) texels += (long)data.lightmapColor.width * data.lightmapColor.height;
+            return texels;
+        }
+
+        private static float ScaleInLightmap(Options opt, GMaterial[] materials, int index)
+        {
+            if (index < 0 || index >= materials.Length) return 1f;
+            foreach (LightmapScale row in opt.lightmap_scales ?? new LightmapScale[0])
+                if (row != null && row.material == materials[index].name) return row.scale;
+            return 1f;
         }
 
         // The Quest build of Onward uses Vulkan. Auto Graphics API left GLES3 first.
@@ -2250,7 +2351,7 @@ namespace OnwardGenerator
             sb.Append($"\"visual_objects\":{visualObjects},\"mesh_renderers\":{renderers.Length},\"materials\":{mats.Count},");
             sb.Append($"\"triangles\":{tris},\"vertices\":{verts},");
             sb.Append($"\"mesh_colliders\":{colliders},\"collider_triangles\":{colliderTris},\"colliders_with_renderer\":{renderersOnColliders},");
-            sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},");
+            sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},\"lightmap_texels\":{LightmapTexels()},");
             int probeCount = UnityEngine.Object.FindObjectsOfType<LightProbeGroup>().Sum(g => g.probePositions.Length);
             sb.Append($"\"lights\":{UnityEngine.Object.FindObjectsOfType<Light>().Length},\"light_probes\":{probeCount},");
             sb.Append(string.Format(CultureInfo.InvariantCulture, "\"seconds\":{{\"scene\":{0:F1},\"bake\":{1:F1}", buildSeconds, bakeSeconds));

@@ -144,7 +144,7 @@ def refine_exposure(geometry: BaseGeometry, others: BaseGeometry, cfg: DetailCon
 
 @dataclass(frozen=True, slots=True)
 class Hole:
-    kind: str  # window | narrow_window | balcony_door | door | landmark_door | shopfront | interior_door
+    kind: str  # window | narrow_window | balcony_door | door | landmark_door | shop_door | shopfront | interior_door
     segment: int
     s0: float
     v0: float
@@ -244,6 +244,29 @@ def _fits(opening: Opening, bay_w: float, storey_h: float, cfg: DetailConfig) ->
     return opening.width_m + cfg.min_pier_m <= bay_w + 1e-9 and opening.sill_m + opening.height_m + cfg.head_clearance_m <= storey_h + 1e-9
 
 
+def shopfront_opening(bay_w: float, storey_h: float, cfg: DetailConfig) -> Opening | None:
+    """The display window of one shop bay: the bay less a pier, the storey less sill and head, within the limits."""
+    s = cfg.shopfront
+    width = min(s.max_width_m, bay_w - cfg.min_pier_m)
+    height = min(s.max_height_m, storey_h - s.sill_m - s.head_m)
+    if width < s.min_width_m or height < s.min_height_m:
+        return None
+    return Opening(width, height, s.sill_m)
+
+
+# The back panel of each entrance. A shop door is glazed; ``interior_door`` has no back.
+DOOR_BACK = {"door": "door_wood", "landmark_door": "door_wood", "shop_door": "glass_dark", "interior_door": None}
+
+
+def entrance(landmark: bool, shop: bool, cfg: DetailConfig) -> tuple[str, Opening]:
+    """The main door kind and size: a landmark door, a glazed shop door on a shopfront, or a plain door."""
+    if landmark:
+        return "landmark_door", cfg.landmark_door
+    if shop:
+        return "shop_door", cfg.shop_door
+    return "door", cfg.main_door
+
+
 @dataclass(slots=True)
 class Layout:
     holes: list[Hole] = field(default_factory=list)
@@ -274,7 +297,7 @@ def layout_segment(
     bay_w = usable / bays
     centres = [cfg.edge_margin_m + bay_w * (j + 0.5) for j in range(bays)]
     main_bay = bays // 2 if main_door is not None else -1
-    shop = cfg.shopfront
+    shop = shopfront_opening(bay_w, storeys.height_m, cfg)
     d = cfg.recess_depth_m
 
     def add(kind: str, centre: float, v0: float, o: Opening, back: str | None, column: int, storey: int, depth: float = d) -> bool:
@@ -299,12 +322,11 @@ def layout_segment(
             if i == 0:
                 if j == main_bay and main_door is not None:
                     if _fits(main_door, bay_w, storeys.height_m, cfg):
-                        add(door_kind, c, 0.0, main_door, None if door_kind == "interior_door" else "door_wood", j, 0,
-                            depth=door_depth)
+                        add(door_kind, c, 0.0, main_door, DOOR_BACK[door_kind], j, 0, depth=door_depth)
                     else:
                         layout.skipped["door_does_not_fit"] += 1
-                elif ground == "shopfront" and _fits(shop, bay_w, storeys.height_m, cfg):
-                    add("shopfront", c, 0.0, shop, "glass_dark", j, 0)
+                elif ground == "shopfront" and shop is not None:
+                    add("shopfront", c, shop.sill_m, shop, "glass_dark", j, 0)
                 elif ground != "main_door_only":
                     window(c, z0, j, i)
                 continue
@@ -521,6 +543,67 @@ def cut_roof_deck(shell: Shell, well: BaseGeometry) -> None:
 def exposed_frontage(segments: list[Segment]) -> Segment | None:
     exposed = [s for s in segments if s.exposed and s.ring == 0 and s.part == 0]
     return max(exposed, key=lambda s: (round(s.length, 6), -s.index)) if exposed else None
+
+
+DOOR_KINDS = frozenset({"door", "landmark_door", "shop_door", "interior_door"})
+# The smallest door the fallback cuts: a narrow wall or a low storey shrinks the template door to this.
+MIN_DOOR_WIDTH_M = 0.9
+MIN_DOOR_HEIGHT_M = 2.0
+
+
+def door_walls(segments: list[Segment], others: BaseGeometry, cfg: DetailConfig) -> list[Segment]:
+    """Outer walls that may take a door, best first.
+
+    The street-facing walls, longest first (on a one-part building the first is the
+    main frontage), then the outer walls too short to count as street-facing whose
+    ``probe_m`` strip outside meets no neighbour. A party wall is never listed.
+    """
+    def free(seg: Segment) -> bool:
+        return not others.intersects(seg.plan_rect(0.0, seg.length, 0.0, cfg.probe_m).buffer(-SNAP_M))
+
+    outer = sorted((s for s in segments if s.ring == 0), key=lambda s: (-s.length, s.index))
+    return [s for s in outer if s.exposed] + [s for s in outer if not s.exposed and free(s)]
+
+
+def ensure_door(
+    layout: Layout,
+    walls_in_order: list[Segment],
+    storeys: Storeys,
+    door_kind: str,
+    door: Opening,
+    template: Template,
+    footprint: BaseGeometry,
+    cfg: DetailConfig,
+) -> str:
+    """Give a building without a door one on the first wall of ``walls_in_order`` that holds it.
+
+    Returns ``template`` when the layout already has a door, ``fallback`` when one was
+    added, and ``none`` when no wall holds the smallest door. The door sits in the
+    centre bay, shrinks to the wall and the storey (not below ``MIN_DOOR_WIDTH_M`` ×
+    ``MIN_DOOR_HEIGHT_M``), and replaces the openings of that wall within ``min_pier_m``
+    of it. Upper storeys start above the door, so only ground-floor openings go.
+    """
+    if any(h.kind in DOOR_KINDS for h in layout.holes):
+        return "template"
+    height = min(door.height_m, storeys.height_m - cfg.head_clearance_m)
+    if height < MIN_DOOR_HEIGHT_M:
+        return "none"
+    for seg in walls_in_order:
+        usable = seg.length - 2 * cfg.edge_margin_m
+        bays = max(1, math.floor(usable / template.bay_m))
+        centre = cfg.edge_margin_m + usable / bays * (bays // 2 + 0.5)
+        width = min(door.width_m, 2 * (min(centre, seg.length - centre) - cfg.min_pier_m))
+        s0 = centre - width / 2
+        if width >= MIN_DOOR_WIDTH_M and footprint.buffer(1e-6).contains(seg.plan_rect(s0, s0 + width, -cfg.recess_depth_m, 0.0)):
+            hole = Hole(
+                door_kind, seg.index, s0, 0.0, width, height, cfg.recess_depth_m, DOOR_BACK[door_kind],
+                -1, 0,  # pragma: no mutate: nothing reads the column or the storey of a fallback door
+            )
+            clear = rect_uv(hole.s0 - cfg.min_pier_m, hole.v0, hole.s0 + hole.width + cfg.min_pier_m, hole.v0 + hole.height)
+            layout.holes = [h for h in layout.holes if h.segment != seg.index or not clear.intersects(h.uv_rect())]
+            layout.holes.append(hole)
+            return "fallback"
+    return "none"
 
 
 def line_of(seg: Segment) -> LineString:

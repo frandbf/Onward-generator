@@ -12,6 +12,8 @@ from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, rea
 from onward_generator.maps.workspace import create_map
 from onward_generator.next_step import (
     StageCommand,
+    cadastre_split_command,
+    catastro_command,
     dress_command,
     emit,
     export_command,
@@ -103,3 +105,21 @@ def test_export_command_without_card_config_leaves_out_the_flag(tmp_path: Path) 
     command = export_command(detail, layout)
     assert command is not None
     assert "--config" not in command.argv
+
+
+def test_catastro_commands_download_then_split_beside_geo(tmp_path: Path) -> None:
+    scene = tmp_path / "geo" / "geo_scene.json"
+    scene.parent.mkdir()
+    scene.write_text("{}", encoding="utf-8")
+    gml = tmp_path / "raw" / "catastro.gml"
+    assert catastro_command(scene, gml).argv == ("cadastre", "download", "--scene", str(scene), "--out", str(gml))
+    assert cadastre_split_command(scene, gml).argv == (
+        "cadastre", "split", "--scene", str(scene), "--gml", str(gml), "--out", str(tmp_path / "cadastre"),
+    )
+    split_scene = tmp_path / "cadastre" / "geo_scene.json"
+    split_scene.parent.mkdir()
+    split_scene.write_text("{}", encoding="utf-8")
+    overrides = tmp_path / "cadastre" / "heights_overrides.catastro.json"
+    assert heights_command(split_scene, overrides).argv == (
+        "heights", "--scene", str(split_scene), "--overrides", str(overrides), "--out", str(tmp_path / "heights"),
+    )

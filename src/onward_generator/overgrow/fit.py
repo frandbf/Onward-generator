@@ -18,7 +18,7 @@ from shapely.geometry import LineString, Polygon, shape
 from shapely.geometry.polygon import orient
 
 from onward_generator.generation.gltf import nodes_from_glb
-from onward_generator.generation.mesh import Mesh, transform
+from onward_generator.generation.mesh import Mesh, merge, transform
 from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.constants import LANE_M
 
@@ -132,18 +132,15 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
         raise FitError(f"{directory}: needs scene_visual.glb")
     nodes, _materials = nodes_from_glb(visual.read_bytes())
     buildings, lanes = grounds_from_scene(geo_scene)
-    shared: dict[str, Mesh] = {}
-    for node in nodes:
-        if node.mesh_key and node.primitives:
-            shared[node.mesh_key] = node.primitives[0].mesh
     problems: list[str] = []
     checked = 0
     for node in nodes:
         role = _role(node)
         if role is None:
             continue
-        mesh = node.primitives[0].mesh if node.primitives else shared.get(node.mesh_key or "")
-        if mesh is None:
+        # nodes_from_glb gives every node that reuses a mesh that mesh's primitives.
+        mesh = merge(p.mesh for p in node.primitives)
+        if not mesh.triangle_count:
             problems.append(f"{node.name} missing_mesh")
             checked += 1
             continue

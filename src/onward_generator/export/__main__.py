@@ -51,6 +51,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"  adapter {m['adapter']['name']} {m['adapter']['version']} (device_verified: {m['adapter']['device_verified']})")
     for f in m["files"]:
         print(f"  {f['path']}: {f['bytes']} bytes, sha256 {f['sha256'][:12]}")
+    lm = m["lightmap_estimate"]
+    print(f"  lightmap estimate: {lm['texels']:,} texels at {lm['texels_per_m']:g} texels/m, "
+          f"at least {lm['pages_at_least']} pages of {lm['max_size']} px")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0
 

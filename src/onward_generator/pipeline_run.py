@@ -21,13 +21,17 @@ from pathlib import Path
 
 from onward_generator.maps.workspace import (
     MapError,
+    catastro_enabled,
     load_map,
     map_directory,
     panoramax_enabled,
     store_brief,
+    store_catastro,
     store_panoramax,
 )
 from onward_generator.next_step import (
+    cadastre_split_command,
+    catastro_command,
     detail_command,
     dress_command,
     export_invocation,
@@ -113,7 +117,15 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
     root = Path(directory)
     geo_argv = list(geo_command(root).argv)
     scene = _flag(geo_argv, "--out") / "geo_scene.json"
-    heights_argv = list(heights_command(scene).argv)
+    cadastre_steps: list[tuple[str, list[str]]] = []
+    overrides: Path | None = None
+    if catastro_enabled(root):
+        gml = root / "data" / "raw" / "catastro.gml"
+        split_argv = list(cadastre_split_command(scene, gml).argv)
+        cadastre_steps = [("catastro", list(catastro_command(scene, gml).argv)), ("cadastre", split_argv)]
+        scene = _flag(split_argv, "--out") / "geo_scene.json"
+        overrides = _flag(split_argv, "--out") / "heights_overrides.catastro.json"
+    heights_argv = list(heights_command(scene, overrides).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = list(generate_command(scene, heights).argv)
     scene3d = _flag(generate_argv, "--out")
@@ -155,6 +167,7 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
         picture_steps.append(("panoramax", panoramax_argv))
     return [
         ("geo", geo_argv),
+        *cadastre_steps,
         ("heights", heights_argv),
         ("generate", generate_argv),
         ("detail", detail_argv),
@@ -403,6 +416,8 @@ def _canon(root: Path, name: str) -> Path | None:
     processed = root / "data" / "processed"
     files = {
         "geo": processed / "geo" / "geo_scene.json",
+        "catastro": root / "data" / "raw" / "catastro.gml",
+        "cadastre": processed / "cadastre" / "geo_scene.json",
         "heights": processed / "heights" / "heights.json",
         "generate": processed / "scene3d" / "scene_visual.glb",
         "detail": processed / "scene_detail" / "scene_visual.glb",
@@ -421,7 +436,9 @@ def _canon(root: Path, name: str) -> Path | None:
 def _input_markers(root: Path, name: str) -> list[Path]:
     previous_of = {
         "geo": "osm",
-        "heights": "geo",
+        "catastro": "geo",
+        "cadastre": "catastro",
+        "heights": "cadastre" if catastro_enabled(root) else "geo",
         "generate": "heights",
         "detail": "generate",
         "dress": "detail",
@@ -471,8 +488,8 @@ def _export_is_fresh(root: Path) -> bool:
 
 
 def _occupied(name: str, argv: Sequence[str], root: Path) -> bool:
-    if name == "osm":
-        target = osm_target(root)
+    if name in ("osm", "catastro"):
+        target = osm_target(root) if name == "osm" else _flag(argv, "--out")
         return target.exists() or target.with_name(target.name + ".source.json").exists()
     return _flag(argv, "--out").exists()
 
@@ -674,6 +691,7 @@ def run_map(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
+    catastro: bool | None = None,
     lightmap_texels_per_m: float = 10.0,
     overwrite: bool = False,
     start: str | None = None,
@@ -763,6 +781,8 @@ def run_map(
         if code != 0:
             print_total(log, failed=True)
             return code
+        if catastro is not None:
+            store_catastro(root, catastro)
         try:
             steps = plan_steps(out)
         except PipelineError as exc:
@@ -778,6 +798,8 @@ def run_map(
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
             if panoramax:
                 store_panoramax(root, True)
+            if catastro is not None:
+                store_catastro(root, catastro)
             steps = resume_steps(root)
             done = [step for step, argv in steps if output_ready(step, argv, root)]
             done.insert(0, "map")

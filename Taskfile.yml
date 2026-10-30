@@ -13,10 +13,12 @@ tasks:
       - task --list
 
   image:
-    desc: Build the Docker image (onward-generator:dev)
+    desc: Build the Docker image (onward-generator:dev; dev-<folder> in a linked git worktree)
     cmds:
       - docker compose -f compose.yaml build dev
     env:
+      ONWARD_IMAGE:
+        sh: tools/docker/image.sh
       HOST_UID:
         sh: id -u
       HOST_GID:
@@ -62,10 +64,9 @@ tasks:
     desc: Mutation-test the functions changed since BASE (default main); fails when a mutant survives
     vars:
       BASE: '{{.BASE | default "main"}}'
-      MAX: '{{.MAX | default "40"}}'
       JOBS: '{{.JOBS | default ""}}'
     cmds:
-      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{if .JOBS}}--jobs {{.JOBS}}{{end}} {{.CLI_ARGS}}"
+      - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} {{if .JOBS}}--jobs {{.JOBS}}{{end}} {{.CLI_ARGS}}"
 
   guard:
     desc: Fail when the change since BASE (default main) edits both src/ and a quality gate

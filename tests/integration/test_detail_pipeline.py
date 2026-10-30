@@ -36,6 +36,12 @@ def detailed(detail_inputs: tuple[Path, Path, Path]):
     return _detail(detail_inputs)
 
 
+@pytest.fixture(scope="module")
+def residential(residential_inputs: tuple[Path, Path, Path]):
+    """The block without its bakery, so all three matching buildings take the stair interior."""
+    return _detail(residential_inputs)
+
+
 def _obj(d, oid: str):
     return next(o for o in d.objects if o.id == oid)
 
@@ -146,12 +152,52 @@ def test_shop_evidence_turns_the_ground_floor_into_shopfronts(detailed) -> None:
     assert plain["ground_floor"] == "door_and_windows" and plain["ground_floor_evidence"] is None
 
 
+def test_shop_records_name_the_poi_and_place_one_sign(detailed) -> None:
+    [shop] = _obj(detailed, "building/osm-way-312").record["facade"]["shops"]
+    assert shop["poi_id"].startswith("osm-node-") and shop["id"] == f"shop/osm-way-312/{shop['poi_id']}"
+    assert (shop["name"], shop["name_origin"], shop["name_rule"]) == ("Panadería", "estimated", "shop=bakery")
+    assert shop["sign"]["kind"] in ("fascia", "blade") and shop["sign"]["attribute_origin"] == "generated"
+    assert all(v["depth_m"] == 0.0 for v in shop["vinyls"])  # on the see-through pane of the shop interior too
+    assert all(o.record["facade"]["shops"] == [] for o in detailed.objects if o.type == "building" and o.id != "building/osm-way-312")
+
+
+def test_only_shops_get_a_glazed_shop_door_and_vinyls(detail_inputs: tuple[Path, Path, Path]) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["enabled"] = False
+    doc["shops"]["vinyl_share"] = 1.0
+    fresh = _detail(detail_inputs, config_from_document(doc))
+    openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
+    assert {bid for bid, found in openings.items() if "shop_door" in found} == {"osm-way-312"}
+    assert {bid for bid, found in openings.items() if "door" in found} == {"osm-way-311", "osm-way-313", "osm-way-315"}
+    assert openings["osm-way-312"]["shop_door"] == 1 and "door" not in openings["osm-way-312"]
+    assert {bid for bid, found in openings.items() if "shopfront" in found} == {"osm-way-312"}
+    [shop] = _obj(fresh, "building/osm-way-312").record["facade"]["shops"]
+    assert len(shop["vinyls"]) == openings["osm-way-312"]["shopfront"]
+    poi = _obj(fresh, "building/osm-way-312").record["facade"]["ground_floor_evidence"]["osm_poi_ids"][0]
+    assert (shop["id"], shop["poi_id"], shop["name"]) == (f"shop/osm-way-312/{poi}", poi, "Panadería")
+    assert all(o.record["facade"]["shops"] == [] for o in fresh.objects if o.type == "building" and o.id != "building/osm-way-312")
+    assert not fresh.critical
+
+
+def test_a_commercial_building_without_a_poi_is_one_shop(detail_inputs: tuple[Path, Path, Path]) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["enabled"] = False
+    doc["templates"]["generic_residential"]["applies_to"] = ["unknown"]
+    doc["templates"]["generic_commercial"]["applies_to"] = ["commercial", "residential_multi", "residential_small"]
+    fresh = _detail(detail_inputs, config_from_document(doc))
+    facade = _obj(fresh, "building/osm-way-313").record["facade"]
+    assert facade["ground_floor_evidence"]["source"] == "building_category"
+    [shop] = facade["shops"]
+    assert (shop["id"], shop["poi_id"], shop["name"], shop["name_rule"]) == ("shop/osm-way-313/building", None, "Comercio", "default")
+    assert shop["sign"] is not None
+
+
 def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(detail_inputs: tuple[Path, Path, Path]) -> None:
     # A fresh run, not the module fixture, so this test itself exercises the layout.
     fresh = _detail(detail_inputs)
     openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
     for bid, found in openings.items():
-        assert sum(found.get(k, 0) for k in ("door", "landmark_door", "interior_door")) == 1, (bid, found)
+        assert sum(found.get(k, 0) for k in ("door", "landmark_door", "shop_door", "interior_door")) == 1, (bid, found)
         assert ("landmark_door" in found) is (bid == "osm-way-314"), (bid, found)  # only the landmark has one
     assert openings["osm-way-312"].get("shopfront", 0) > 0
     assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either
@@ -200,7 +246,8 @@ def test_colliders_are_separate_closed_and_positive(detailed) -> None:
     assert all(p.material != "collider" for n in detailed.visual_nodes() for p in n.primitives)
 
 
-def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detailed) -> None:
+def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(residential) -> None:
+    detailed = residential
     interiors = [o for o in detailed.objects if o.type == "interior"]
     # The block has three buildings that match the rule, fewer than the quota floor: all three get one.
     assert len(interiors) == 3 < CFG.interiors.min_buildings
@@ -286,12 +333,14 @@ def _queue_order(ids: list[str]) -> list[str]:
     return sorted(ids, key=lambda b: hashlib.sha256(f"{CFG.seed}:interior:{b}".encode()).hexdigest())
 
 
-def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(detail_inputs: tuple[Path, Path, Path],
-                                                                           detailed) -> None:
+def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(residential_inputs: tuple[Path, Path, Path],
+                                                                           residential) -> None:
+    detailed = residential
     built = detailed.stats["interiors"]
     assert built == _queue_order(built) != sorted(built)
-    one = _detail(detail_inputs, _with_interiors(min_buildings=1, max_buildings=1))
+    one = _detail(residential_inputs, _with_interiors(min_buildings=1, max_buildings=1))
     assert one.stats["interiors"] == built[:1] != sorted(built)[:1]
+    assert _detail(residential_inputs, _with_interiors(min_buildings=2, max_buildings=2)).stats["interiors"] == built[:2]
     base_ids = [o.id for o in detailed.base.objects if o.type == "building"]
     for d in (detailed, one):
         expected = [oid for bid in base_ids
@@ -299,7 +348,8 @@ def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(detai
         assert [o.id for o in d.objects if o.type in ("building", "interior")] == expected
 
 
-def test_interior_triangle_budget_skips_what_does_not_fit(detail_inputs: tuple[Path, Path, Path], detailed) -> None:
+def test_interior_triangle_budget_skips_what_does_not_fit(residential_inputs: tuple[Path, Path, Path], residential) -> None:
+    detail_inputs, detailed = residential_inputs, residential
     order = detailed.stats["interiors"]
     costs = _interior_costs(detailed)
     assert len(order) == 3 and detailed.stats["interior_visual_triangles"] == sum(costs.values())

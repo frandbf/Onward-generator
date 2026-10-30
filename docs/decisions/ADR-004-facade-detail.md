@@ -27,7 +27,7 @@ OSM and Catastro provide the footprint, the height, and the storey count. They d
    - Outside interiors, a building collider is the phase-03 prism plus boxes on the balconies.
    - Interiors use closed solids: walls with a door hole, a slab, a stair ramp, and a solid above the accessible floors.
 6. **Interiors only in selected buildings.** Selection is a rule plus `include_ids`. The count is a hash of the seed from `min_buildings` (5) through `max_buildings` (8), within `max_triangles` (8 000 visual triangles for all interiors together; see `docs/07-detail.md`). An estimated height is raised so each storey is at least 2.8 m and the 2.4 m door fits under the 0.35 m lintel. A measured height is not raised. Furnished floors are 2, or 3 when the building has a spare storey and `sha256(seed, id, interior_floors) < 0.5`. A switchback stair continues to the flat roof deck. A hip roof stays closed.
-7. **Variation by hash.** Every random choice uses `sha256(seed, id, …)`, never a stateful generator. Adding or removing a building does not change the others.
+7. **Variation by hash.** Every random choice uses `sha256(seed, id, …)`, never a stateful generator. Adding or removing a building does not change the others, with one exception: a wall material skips the materials of the touching buildings that came before it in id order, so a block does not read as one texture. Adding or removing a building can change the wall of a later building that touches it, and through it the next one.
 8. **No new dependencies and no Onward assets.** Phase-04 geometry is procedural, with NumPy and Shapely. Later prop libraries (ADR-010) are a different stage and do not replace these templates.
 
 ## Consequences

@@ -12,10 +12,11 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PROJECT="${PROJECT:-$HOME/Unity/OnwardPhase0Project}"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
-export HOST_UID HOST_GID
+ONWARD_IMAGE="$("$REPO/tools/docker/image.sh")"
+export HOST_UID HOST_GID ONWARD_IMAGE
 compose=(docker compose --project-directory "$REPO" -f "$REPO/compose.yaml")
 
-if ! docker image inspect onward-generator:dev >/dev/null 2>&1; then
+if ! docker image inspect "$ONWARD_IMAGE" >/dev/null 2>&1; then
   "${compose[@]}" build dev >&2
 fi
 

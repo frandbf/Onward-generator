@@ -74,12 +74,40 @@ def test_overpass_retries_rate_limits_and_dropped_connections(monkeypatch: pytes
     assert waits == [8.0, 16.0, 32.0, 64.0, 90.0, 90.0]
 
 
+def test_catastro_retries_rate_limits_and_dropped_connections(monkeypatch: pytest.MonkeyPatch) -> None:
+    failures: list[Exception] = [
+        urllib.error.HTTPError(cadastre_acquire.WFS_BU_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        urllib.error.HTTPError(cadastre_acquire.WFS_BU_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        urllib.error.HTTPError(cadastre_acquire.WFS_BU_URL, 429, "slow down", {}, io.BytesIO(b"")),  # type: ignore[arg-type]
+        ConnectionResetError("reset"),
+        TimeoutError("slow"),
+        urllib.error.URLError("refused"),
+    ]
+
+    class Body(io.BytesIO):
+        def __enter__(self) -> Body:
+            return self
+
+    def urlopen(request: urllib.request.Request, timeout: float | None = None, context: object = None) -> Body:
+        if failures:
+            raise failures.pop(0)
+        return Body(b"<FeatureCollection/>")
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    waits: list[float] = []
+    assert cadastre_acquire._http_fetch(cadastre_acquire.WFS_BU_URL, 5.0, sleep=waits.append) == b"<FeatureCollection/>"
+    assert waits == [8.0, 16.0, 32.0, 64.0, 90.0, 90.0]
+
+
 def test_catastro_gets_the_url_and_keeps_the_error_body(http_503: Seen) -> None:
     url = cadastre_acquire.WFS_BU_URL + "?service=WFS"
+    waits: list[float] = []
     with pytest.raises(cadastre_acquire.CadastreError) as caught:
-        cadastre_acquire._http_fetch(url, 7.0)
+        cadastre_acquire._http_fetch(url, 7.0, sleep=waits.append)
     assert str(caught.value) == f"HTTP 503 for {cadastre_acquire.WFS_BU_URL}: runtime error: query timed out"
-    [(request, timeout)] = http_503
+    assert waits == [8.0, 16.0, 32.0]
+    assert len(http_503) == 4
+    (request, timeout) = http_503[0]
     assert timeout == 7.0
     assert request.get_method() == "GET"
     assert request.full_url == url

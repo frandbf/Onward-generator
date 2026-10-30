@@ -189,12 +189,18 @@ def plan_interior(
     building_id: str, refined: BaseGeometry, door: Hole, segment: Segment, height: float, storey_m: float, levels: int, cfg: DetailConfig,
     *,
     roof_access: bool = True,
+    max_floors: int | None = None,
 ) -> InteriorPlan | str:
-    """Return a plan, or the reason the building cannot host the generic interior."""
+    """Return a plan, or the reason the building cannot host the generic interior.
+
+    ``max_floors`` caps the furnished floors below ``interiors.floors``: a shop takes 1, so it has no stair.
+    The stair interior leaves the top storey solid. A shop may use every storey, so a one-storey shop
+    has its room under the roof.
+    """
     ic = cfg.interiors
     if len(polygons_of(refined)) != 1 or polygons_of(refined)[0].interiors:
         return "footprint_not_a_simple_polygon"
-    floors = min(ic.floors, levels - 1)
+    floors = min(ic.floors, levels - 1) if max_floors is None else min(max_floors, levels)
     if floors < 1:
         return "not_enough_levels"
     inner = refined.buffer(-ic.wall_thickness_m, join_style="mitre", mitre_limit=2.0)
@@ -486,6 +492,12 @@ def _pierced_walls(
     return walls_out, panes
 
 
+def room_ceiling(plan: InteriorPlan, height: float, slab_m: float) -> float:
+    """Ceiling of the top furnished room: the storey line, or the roof slab's underside when the room reaches the roof."""
+    top = plan.floors * plan.storey_m
+    return height - slab_m if top >= height - 1e-3 else top
+
+
 def build_interior(
     plan: InteriorPlan,
     height: float,
@@ -494,16 +506,22 @@ def build_interior(
     cfg: DetailConfig,
     window_cuts: Sequence[WallCut] = (),
     penetrations: Sequence[tuple[Segment, Hole]] = (),
+    *,
+    wall_material: str = "interior_wall",
+    floor_material: str = "interior_floor",
 ) -> Interior:
+    """Build the planned interior. ``wall_material`` and ``floor_material`` paint the room's walls and ground
+    floor (a shop's colours); ceilings, slabs and upper floors keep ``interior_wall`` and ``interior_floor``."""
     ic = cfg.interiors
     s, k, t = plan.storey_m, plan.floors, ic.wall_thickness_m
     seg, door = plan.door_segment, plan.door
     rim = (seg.point(door.s0, 0, t), seg.point(door.s0 + door.width, 0, t))
-    top = k * s
-    visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": []}
+    top = room_ceiling(plan, height, ic.slab_m)
+    under_roof = top < k * s
+    visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": [], wall_material: [], floor_material: []}
     roof_flights = [flight for flight in plan.flights if flight.role == "roof"]
-    visual["interior_wall"].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
-    visual["interior_floor"].append(cap(plan.inner, 0.0))
+    visual[wall_material].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
+    visual[floor_material].append(cap(plan.inner, 0.0))
     colliders: list[tuple[str, Mesh]] = []
 
     ring = refined.difference(plan.inner)
@@ -511,11 +529,12 @@ def build_interior(
     wall_parts, glass = _pierced_walls(ring, gap, penetrations, t, door.height, z_top)
     colliders.extend(wall_parts)
     if not roof_flights:
+        # A room under the roof is closed by a roof slab; otherwise the storeys above stay solid.
         visual["interior_wall"].append(cap(plan.inner, top, up=False))
-        colliders.append(("upper_solid", prism(plan.inner, top, height, bottom=True)))
+        colliders.append(("roof_slab" if under_roof else "upper_solid", prism(plan.inner, top, height, bottom=True)))
 
     rooms = [{"id": f"{plan.building_id}/L{i}", "level": i, "floor_z_m": round(i * s, 3),
-              "ceiling_z_m": round((i + 1) * s - (ic.slab_m if i + 1 < k else 0.0), 3), "area_m2": round(plan.inner.area, 3)} for i in range(k)]
+              "ceiling_z_m": round(top if i + 1 == k else (i + 1) * s - ic.slab_m, 3), "area_m2": round(plan.inner.area, 3)} for i in range(k)]
     connections: list[dict[str, Any]] = [{
         "type": "door", "from": "exterior", "to": rooms[0]["id"], "width_m": door.width, "height_m": door.height,
         "position_m": [round(float(v), 3) for v in seg.point(door.s0 + door.width / 2)[:2]],
@@ -580,3 +599,20 @@ def build_interior(
     built.glass_colliders = glass
     built.light_anchors = light_anchors(plan, rooms)
     return built
+
+
+def cap_lights(interiors: Sequence[tuple[bool, dict[str, Any]]], limit: int) -> list[str]:
+    """Keep at most ``limit`` room lights across the map; return the room ids that lost theirs.
+
+    ``interiors`` holds ``(is_shop, light_anchors)`` per interior. Shop rooms rank first, then
+    every room by the distance of its light from the local origin (the map centre), then by id.
+    A room past the cap keeps its probes and loses ``light_m`` and ``range_m``.
+    """
+    rooms = [(shop, room) for shop, anchors in interiors for room in anchors["rooms"]]
+    ranked = sorted(rooms, key=lambda pair: (not pair[0], math.hypot(*pair[1]["light_m"][:2]), pair[1]["room_id"]))
+    dropped = []
+    for _, room in ranked[limit:]:
+        del room["light_m"], room["range_m"]
+        room["light"] = "over_cap"
+        dropped.append(room["room_id"])
+    return sorted(dropped)

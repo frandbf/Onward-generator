@@ -1,6 +1,6 @@
 {
-  "version": "0.2.0",
-  "description": "Phase 04/07.2 assumptions: generic facade templates, a warmer Murcia palette, roofs, urban elements, selected interiors, and landmark towers only when OSM records an observed height. Every number that is not tagged observed is a modelling assumption.",
+  "version": "0.3.0",
+  "description": "Phase 04/07.2 assumptions: generic facade templates, a warmer Murcia palette, roofs, urban elements, selected interiors, shopfronts with signs and vinyls, and landmark towers only when OSM records an observed height. Every number that is not tagged observed is a modelling assumption.",
   "seed": 48152,
   "exposure": {
     "probe_m": 1.0,
@@ -71,9 +71,42 @@
   "doors": {
     "main": { "width_m": 1.2, "height_m": 2.4 },
     "landmark": { "width_m": 2.4, "height_m": 4.0 },
-    "shopfront": { "width_m": 2.4, "height_m": 2.5 },
+    "shopfront": { "min_width_m": 2.0, "max_width_m": 3.4, "sill_m": 0.25, "min_height_m": 1.9, "max_height_m": 3.2, "head_m": 0.45 },
+    "shop_door": { "width_m": 1.6, "height_m": 2.5 },
     "shop_evidence_keys": ["shop", "amenity", "office", "craft"],
     "shop_evidence_distance_m": 2.0
+  },
+  "facade_palettes": {
+    "residential": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white", "brick_red"],
+    "retail": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white"],
+    "institutional": ["brick_red", "plaster_white", "plaster_cream"],
+    "office": ["stone_warm", "plaster_white", "plaster_cream"],
+    "historic": ["plaster_cream", "stone_warm"],
+    "industrial": ["plaster_white", "brick_red"]
+  },
+  "shops": {
+    "fascia_share": 0.5,
+    "vinyl_share": 0.5,
+    "fascia": { "height_m": 0.36, "overhang_m": 0.15, "depth_m": 0.06 },
+    "blade": { "width_m": 0.7, "height_m": 0.5, "thickness_m": 0.04, "wall_gap_m": 0.15, "clearance_m": 2.4 },
+    "vinyl": { "height_m": 0.26, "centre_m": 1.6, "width_share": 0.8 },
+    "default_name": "Comercio",
+    "generic_names": {
+      "shop=bakery": "Panadería", "shop=pastry": "Pastelería", "shop=confectionery": "Confitería",
+      "shop=butcher": "Carnicería", "shop=greengrocer": "Frutería", "shop=seafood": "Pescadería",
+      "shop=supermarket": "Supermercado", "shop=convenience": "Alimentación", "shop=kiosk": "Quiosco",
+      "shop=tobacco": "Estanco", "shop=clothes": "Moda", "shop=shoes": "Zapatería",
+      "shop=hairdresser": "Peluquería", "shop=beauty": "Estética", "shop=optician": "Óptica",
+      "shop=jewelry": "Joyería", "shop=books": "Librería", "shop=stationery": "Papelería",
+      "shop=florist": "Floristería", "shop=hardware": "Ferretería", "shop=mobile_phone": "Telefonía",
+      "shop=electronics": "Electrónica", "shop=furniture": "Muebles", "shop=gift": "Regalos",
+      "shop=dry_cleaning": "Tintorería", "shop=laundry": "Lavandería", "shop=travel_agency": "Viajes",
+      "amenity=pharmacy": "Farmacia", "amenity=cafe": "Cafetería", "amenity=bar": "Bar",
+      "amenity=restaurant": "Restaurante", "amenity=fast_food": "Comida rápida", "amenity=pub": "Pub",
+      "amenity=ice_cream": "Heladería", "amenity=bank": "Banco", "amenity=dentist": "Clínica dental",
+      "amenity=clinic": "Clínica", "amenity=veterinary": "Veterinario",
+      "shop": "Tienda", "amenity": "Local", "office": "Oficina", "craft": "Taller"
+    }
   },
   "interiors": {
     "enabled": true,
@@ -88,7 +121,19 @@
     "slab_m": 0.2,
     "door": { "width_m": 1.2, "height_m": 2.4 },
     "stair": { "width_m": 1.1, "max_riser_m": 0.185, "tread_m": 0.28, "landing_m": 1.0 },
-    "door_clearance_m": 1.5
+    "door_clearance_m": 1.5,
+    "lights_max": 24,
+    "shops": {
+      "enabled": true,
+      "max_triangles": 6000,
+      "max_area_m2": 600.0,
+      "categories": [
+        { "name": "bakery", "tags": { "shop": ["bakery", "pastry", "confectionery"] }, "wall": "interior_shop_bakery", "floor": "interior_shop_tile" },
+        { "name": "pharmacy", "tags": { "amenity": ["pharmacy"], "shop": ["chemist"], "healthcare": ["pharmacy"] }, "wall": "interior_shop_pharmacy", "floor": "interior_shop_tile" },
+        { "name": "bar", "tags": { "amenity": ["bar", "pub", "cafe", "restaurant", "fast_food", "ice_cream"] }, "wall": "interior_shop_bar", "floor": "interior_shop_wood" }
+      ],
+      "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" }
+    }
   },
   "urban": {
     "observed": {
@@ -141,7 +186,13 @@
     "interior_wall": { "color": [0.90, 0.89, 0.86, 1.0], "roughness": 0.9 },
     "interior_floor": { "color": [0.62, 0.55, 0.47, 1.0], "roughness": 0.8 },
     "stair": { "color": [0.70, 0.67, 0.62, 1.0], "roughness": 0.85 },
-    "brick_red": { "color": [0.62, 0.28, 0.22, 1.0], "roughness": 0.9 }
+    "brick_red": { "color": [0.62, 0.28, 0.22, 1.0], "roughness": 0.9 },
+    "interior_shop_bakery": { "color": [0.94, 0.80, 0.54, 1.0], "roughness": 0.9 },
+    "interior_shop_pharmacy": { "color": [0.72, 0.88, 0.76, 1.0], "roughness": 0.9 },
+    "interior_shop_bar": { "color": [0.70, 0.38, 0.26, 1.0], "roughness": 0.9 },
+    "interior_shop_generic": { "color": [0.93, 0.78, 0.64, 1.0], "roughness": 0.9 },
+    "interior_shop_tile": { "color": [0.86, 0.82, 0.74, 1.0], "roughness": 0.6 },
+    "interior_shop_wood": { "color": [0.55, 0.37, 0.22, 1.0], "roughness": 0.7 }
   },
   "landmarks": {
     "enabled": true,

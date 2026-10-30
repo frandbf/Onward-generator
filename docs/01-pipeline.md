@@ -29,8 +29,10 @@ Each box is a new directory. Dashed boxes are optional. `detail` reads the origi
 flowchart LR
   mapCreate[map create] --> osm[Overpass from lat/lon]
   osm --> geo[geo]
+  geo -.-> catastro[catastro download]
+  catastro -.-> cadastre[cadastre split]
+  cadastre -.-> heights
   geo --> heights[heights]
-  cadastre[cadastre] -.-> heights
   heights --> generate[generate]
   generate --> detail[detail]
   detail --> dress[dress style]
@@ -49,7 +51,7 @@ flowchart LR
   unity --> quest[Quest]
 ```
 
-`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `cadastre` runs only when real storey counts are requested, and only in Spain. `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `catastro` and `cadastre` run by default when the map is in mainland Spain (EPSG:25830, latitude 35.85°–43.8°) and fits one Catastro request; `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
 
 ## 0. Unity project — once
 
@@ -98,6 +100,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | --- | --- | --- |
 | Centre, radius, or card name | `map create` and, if the area changed, everything from `geo` | the other maps |
 | OSM extract | `geo` and everything after it | the map folder |
+| Catastro split | `cadastre` (or `catastro` for a new download), then `heights` and everything after it | `geo` |
 | Heights or Catastro | `heights`, then `generate` and everything after it | `geo` |
 | Volumes | `generate` and everything after it | `geo`, `heights` |
 | Facades | `detail` and everything after it | `generate` |
@@ -105,7 +108,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Asset Store instances | `props place` | the `detail` geometry |
 | Textures | `materials apply` | geometry and OSM footprints |
 | Street photos | `panoramax apply`, under development, only when `map.json` has `"panoramax": true` | collision, roofs, interiors, and buildings without a photo |
-| Street name | `signs place` on the dressed copy | the carriageway and the facades |
+| Street name, shop signs | `signs place` on the dressed copy (where a sign goes and its name come from `detail`) | the carriageway and the facades |
 | Abandoned city | `overgrow place`, then `overgrow fit` | building footprints and the drive lane |
 | Perimeter wall | `bounds` on the dressed copy, then layout and export | `generate` and `detail` |
 | Spawns, routes, modes | `perf layout --playable` and a new package | the geometry |
@@ -187,7 +190,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | Output | `heights.json`, `heights_report.json` |
 | Classes | measured, inferred, fallback, needs_manual_review |
 
-`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. [05-cadastre.md](05-cadastre.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
+`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
 
 ## 4. Generate
 
@@ -197,7 +200,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | --- | --- |
 | Input | `geo_scene.json` plus `heights.json` from that same scene |
 | Output | `scene_visual.glb`, `scene_collision.glb`, `scene3d.json`, `generation_report.json` |
-| Collision | `collider/walkable` and `collider/carriageway`, separate from the visual mesh |
+| Collision | `collider/walkable`, `collider/carriageway`, and `collider/walkable_crossing` (ADR-016), separate from the visual mesh |
 | Exit | `0` when there is no critical error |
 
 This directory is the base for `detail`. The wall is not added here.
@@ -249,7 +252,7 @@ With the flag off, `next:` from `materials apply` is `signs place`. With the fla
 
 `onward-generator panoramax apply` is under development. It runs only when `map.json` has `"panoramax": true`. With the flag off the command prints `panoramax off`, writes nothing, and exits 0.
 
-The step searches the Panoramax metacatalogue for the map square and keeps pictures whose field of view is 360°. A flat picture is recorded as `skipped: flat` and its JPEG is not stored. The JPEG and its sidecar go to `cache/panoramax/<picture id>`, shared by every map. `data/raw/panoramax/` keeps only this map's search index. A file whose SHA-256 still matches is not downloaded again. A JPEG left in a map folder is moved into the catalogue. If the download fails, the step exits non-zero and does not create `scene_panoramax`.
+The step searches the Panoramax metacatalogue for the map square and keeps pictures whose field of view is 360°. A flat picture is recorded as `skipped: flat` and its JPEG is not stored. The JPEG and its sidecar go to `cache/panoramax/<picture id>`, shared by every map. `data/raw/panoramax/` keeps only this map's search index. A file whose SHA-256 still matches is not downloaded again, so a second map of the same area only repeats the search. A JPEG left in a map folder is moved into the catalogue. Missing JPEGs are downloaded four at a time, a modest cap for volunteer-run instances, and written in search order, so the catalogue does not depend on which download finishes first. If a download fails, the downloads not yet started are cancelled, the step exits non-zero and does not create `scene_panoramax`. Only the pictures assigned to a facade are decoded.
 
 A picture is offered to an exposed facade of a `building` that was not given an interior. `landmark_part` stays out. The camera is converted to local metres with the CRS in `map.json`. It has to stand outside the footprint, between 2 m and 30 m. Only the stretch seen at 30° or less to the wall normal is kept, and that stretch has to be at least 3 m. Several pictures can share one face; on each sample the nearest one wins. A view that only grazes the wall is not stretched across it. Horizontal accuracy worse than 8 m rejects that picture. Missing accuracy is recorded as `unknown` and the picture may be used.
 
@@ -264,6 +267,8 @@ Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.
 
 `onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. The text uses DejaVu Sans Bold 2.37, vendored in `assets/fonts/dejavu` and loaded by path, so the plate does not depend on system fonts. The name is normalised to Unicode NFC before drawing, so a decomposed accent draws as one letter (`í`, `ñ`). The plate is not the official design of any city.
 
+The same command draws the shop signs and window vinyls that `detail` recorded in `facade.shops` (`docs/07-detail.md`): one fascia or blade sign per shop and a vinyl strip on some shop windows. All labels go into one atlas (`shop_sign_atlas_0`, a second page only when the first is full, roughly 40 shops; never more than two) plus `shop_sign_edge` for rims and brackets. A building whose glass `materials apply` boarded up keeps its sign and loses its vinyls. They are visual only. `signs_report.json` has `shop_signs` (count, kinds, pages, triangles, labels skipped because the atlas was full).
+
 | | |
 | --- | --- |
 | Input | `--base` (`scene_materials`, or `scene_panoramax` when the map asked for photos; dress or detail also work) and `--scene` (`geo_scene.json`) |
@@ -275,7 +280,7 @@ Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.
 
 Before a model is rejected for size, placement copies the mesh and scales it uniformly to the street. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. The library GLB is not rewritten by that step. The scale stays on the node (`fit_scale`, `size_m`). Kenney meshes are already stored at street size: on 2026-10-27 each installed GLB was scaled once (Retro Urban Kit 3.2, debris 2.6 or 1.25, Modular Buildings 4.1, City Kit Suburban 7.0). The factor is `street_scale` in `assets/kenney_review.json`. Placement does not scale those copies again. Each site tries the next object when the scaled copy hits a building, blocks the side passage, or pulls a fire escape off the wall. `fit` reads the GLB already written and refuses to continue if any of those objects is out of size or out of place. Grass and trees are outside that measurement.
 
-The sidewalk and the foot of the facade receive grass tufts. There is no moss strip on the facade: the 0.8 m skirt read as a green plinth on the headset and was removed on 2026-10-29. `overgrow_report.json` keeps `moss` at 0 so the report keeps its shape. OSM trees (`natural=tree`) stay observed. The rest are generated off the drive lane. A few rusty cars may sit on the kerb, the carriageway, the sidewalk, a lot, or a plaza. They have no brand and they write a collision box. If the description blocks the streets, every third copy of a car, a gate, or a barrier that lands on the street turns 90° and sits across it. `fit` still requires 1.2 m of passage on one side. The same catalogue opens courtyards, streets, and plazas to barrels, barriers, and loose structures. A manhole cover whose catalogue row lists `sidewalk` (today `water_manhole_cover`, one material, 1 796 triangles) also lands on the sidewalk band, 2.2 to 6.5 m past the drive lane: at most six per map (rule `manhole_sidewalk`, scaled by the profile), at a seeded random step of 5.4 to 12.6 m along each street, on a seeded side and depth, at least 8 m from another cover, 0.6 m plus its half-width from a wall, and clear of every prop, wreck (3.0 m), tree (1.5 m), and grass tuft (0.8 m) already placed. Six covers cost 10 776 triangles of the library cap. They are placed only in rules mode; an AI plan places its own props. The two covers on the carriageway are unchanged. On load, the lowest vertex is at z = 0. If the point falls inside `surface/carriageway`, the copy drops to that carriageway's height. The sidewalk, the courtyard, and the plaza stay at z = 0. A facade does not drop. The lane (4.2 m each side of the axis) gets no grass and no trees. The cap is 80 000 triangles of procedural mesh, plus up to 60 000 from the normalized models. Each building shifts its UV. One facade in five boards its windows with generated planks.
+The sidewalk and the foot of the facade receive grass tufts. There is no moss strip on the facade: the 0.8 m skirt read as a green plinth on the headset and was removed on 2026-10-29. `overgrow_report.json` keeps `moss` at 0 so the report keeps its shape. OSM trees (`natural=tree`) stay observed. The rest are generated off the drive lane. A few rusty cars may sit on the kerb, the carriageway, the sidewalk, a lot, or a plaza. They have no brand and they write a collision box. If the description blocks the streets, every third copy of a car, a gate, or a barrier that lands on the street turns 90° and sits across it. `fit` still requires 1.2 m of passage on one side. The same catalogue opens courtyards, streets, and plazas to barrels, barriers, and loose structures. A manhole cover whose catalogue row lists `sidewalk` (today `water_manhole_cover`, one material, 1 796 triangles in the file, 1 021 after the load-time reduction below) also lands on the sidewalk band, 2.2 to 6.5 m past the drive lane: at most six per map (rule `manhole_sidewalk`, scaled by the profile), at a seeded random step of 5.4 to 12.6 m along each street, on a seeded side and depth, at least 8 m from another cover, 0.6 m plus its half-width from a wall, and clear of every prop, wreck (3.0 m), tree (1.5 m), and grass tuft (0.8 m) already placed. Six covers cost 6 126 triangles of the library cap (10 776 before the reduction). They are placed only in rules mode; an AI plan places its own props. The two covers on the carriageway are unchanged. On load, the lowest vertex is at z = 0. If the point falls inside `surface/carriageway`, the copy drops to that carriageway's height. The sidewalk, the courtyard, and the plaza stay at z = 0. A facade does not drop. The lane (4.2 m each side of the axis) gets no grass and no trees. The cap is 80 000 triangles of procedural mesh, plus up to 60 000 from the normalized models. **Level of detail on load.** A library mesh is decimated on load when it has more triangles than its size needs: 600 per square metre of its largest bounding-box face, at least 128 and at most 1 800, measured at the street size placement scales it to (a prop under 0.1 m tall, such as a cover or a ground tile, gets 128). Each albedo part is clustered apart with the same vertex clustering as `overgrow fetch`. A copy whose bounding box moves more than 2 cm (clustering can drop a thin part, such as the feet of an air-conditioner) is refused and the target doubles, while it still saves a quarter of the triangles; otherwise the file's own mesh is used. The GLB in `assets/` is not rewritten. Each reduced node carries `extras.lod` `{source_triangles, triangles}`; `overgrow_report.json` adds `library_lod` (per placed asset) and `library_source_triangles` (the library total at the files' own detail). On the Murcia centre (r 150 m, default block zone, seed 48152) the overgrow triangles drop from 49 572 to 33 645 with the same placements. Each building shifts its UV. One facade in five boards its windows with generated planks.
 
 | Flag | Effect |
 | --- | --- |
@@ -283,7 +288,7 @@ The sidewalk and the foot of the facade receive grass tufts. There is no moss st
 | `--seed` | Seed. Default `48152` |
 | `--zone-radius` | A disc in local metres around the origin. With no zone, the default is one block: a 110 m square |
 | `--zone-polygon` | A GeoJSON polygon in local metres |
-| `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail. A GLB with a material whose `alphaMode` is not `OPAQUE` is refused on load, because the exported material is opaque and albedo only; `overgrow_report.json` lists each refusal in `library_rejects` as `{asset_id, reason}` (for example `alpha_mode_blend`). A `vegetation` mesh with `anchor: flat` taller than 0.05 m is a slope tile, not ground cover, and is refused as `flat_vegetation_not_flat`. A row whose curated `placement` is `kit_only` (a building or road kit piece) is refused as `kit_only` before its GLB is read. A `0.2.0` manifest that fails `config/asset_manifest.schema.json` stops the step. See `abandoned-assets.md` |
+| `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail. A GLB with a material whose `alphaMode` is not `OPAQUE` is refused on load, because the exported material is opaque and albedo only; `overgrow_report.json` lists each refusal in `library_rejects` as `{asset_id, reason}` (for example `alpha_mode_blend`). A `vegetation` mesh with `anchor: flat` taller than 0.05 m is a slope tile, not ground cover, and is refused as `flat_vegetation_not_flat`. A row whose curated `placement` is `kit_only` (a building or road kit piece) is refused as `kit_only` before its GLB is read, and a row with `refused` (for example `unknown_scale`) is refused with that reason. The whole scene of a GLB is loaded: every node with its transform and every triangle primitive. Primitives that share an albedo form one part, exported as material `prop_<id>`, then `prop_<id>__1` and so on. A row's `yaw_deg` turns the mesh on load so its long side lies on +X. A `0.2.0` manifest that fails `config/asset_manifest.schema.json` stops the step. See `abandoned-assets.md` |
 | `--selection` | `prop_selection.json`. Only those ids, and they must be installed. Without this flag the whole library is used |
 | `--layout` | `layout.json`. Hunt and team spawns stay clear. If it is omitted and the map has a layout, that file is read |
 

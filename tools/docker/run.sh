@@ -12,13 +12,14 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
-export HOST_UID HOST_GID
+ONWARD_IMAGE="$("$REPO/tools/docker/image.sh")"
+export HOST_UID HOST_GID ONWARD_IMAGE
 compose=(docker compose --project-directory "$REPO" -f "$REPO/compose.yaml")
 
 if [[ "${1:-}" == "--build" ]]; then
   shift
   "${compose[@]}" build dev
-elif ! docker image inspect onward-generator:dev >/dev/null 2>&1; then
+elif ! docker image inspect "$ONWARD_IMAGE" >/dev/null 2>&1; then
   "${compose[@]}" build dev
 fi
 

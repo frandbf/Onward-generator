@@ -7,6 +7,8 @@ its sidecar live in the repository catalogue ``cache/panoramax/``, keyed by
 picture id. Each map keeps only the search index under ``data/raw/panoramax/``.
 A file whose SHA-256 still matches its sidecar is not downloaded again. A
 copy left inside a map is moved into the catalogue instead of fetched.
+Missing JPEGs are fetched on up to ``DOWNLOAD_WORKERS`` threads and written
+in search order.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +37,9 @@ USER_AGENT = f"onward-generator/{__version__} (local map generator)"
 PAGE_LIMIT = 100
 MAX_PAGES = 20
 LICENSE_URL = "https://spdx.org/licenses/CC-BY-SA-4.0.html"
+# Picture downloads open at the same time. Pictures sit on volunteer-run
+# instances; four stays below a browser's six connections per host.
+DOWNLOAD_WORKERS = 4
 
 
 class PanoramaxError(ValueError):
@@ -45,7 +51,10 @@ class PanoramaxTransport(Protocol):
         """Return one JSON object. Raise ``PanoramaxError`` when the request fails."""
 
     def get_bytes(self, url: str) -> bytes:
-        """Return the response body. Raise ``PanoramaxError`` when the request fails."""
+        """Return the response body. Raise ``PanoramaxError`` when the request fails.
+
+        Several threads call this at once, so it must be thread-safe.
+        """
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +143,7 @@ def cache_pictures(map_directory: str | Path, *, client: PanoramaxTransport) -> 
     features = _search(client, west=west, south=south, east=east, north=north)
     kept: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
+    missing: list[tuple[dict[str, Any], str]] = []
     reused = 0
     now = datetime.now(UTC).isoformat(timespec="seconds")
     for feature in features:
@@ -149,22 +159,12 @@ def cache_pictures(map_directory: str | Path, *, client: PanoramaxTransport) -> 
             skipped.append({"id": picture_id, "reason": "missing_asset"})
             continue
         jpeg_path, sidecar = _catalogue_paths(picture_id)
+        kept.append(feature)
         if _hash_matches(jpeg_path, sidecar) or _take_local(index, picture_id):
             reused += 1
-            kept.append(feature)
             continue
-        try:
-            payload = client.get_bytes(asset_url)
-        except PanoramaxError:
-            raise
-        except OSError as exc:
-            raise PanoramaxError(f"could not download {picture_id}: {exc}") from exc
-        jpeg_path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_bytes(jpeg_path, payload)
-        digest = sha256_file(jpeg_path)
-        record = _source_record(feature, url=asset_url, sha256=digest, retrieved_at=now, size_bytes=len(payload))
-        atomic_write_json(sidecar, record)
-        kept.append(feature)
+        missing.append((feature, asset_url))
+    _download(client, missing, retrieved_at=now)
     index.mkdir(parents=True, exist_ok=True)
     atomic_write_json(
         index / "search.geojson",
@@ -188,6 +188,44 @@ def cache_pictures(map_directory: str | Path, *, client: PanoramaxTransport) -> 
         reused=reused,
         directory=catalogue_directory(),
     )
+
+
+def _download(client: PanoramaxTransport, missing: list[tuple[dict[str, Any], str]], *, retrieved_at: str) -> None:
+    """Fetch the missing JPEGs on a few threads and store them in search order.
+
+    At most ``DOWNLOAD_WORKERS`` requests are open at once. Each file is
+    written by this thread, in the order of ``missing``, so the catalogue does
+    not depend on which download finishes first. The first failure in that
+    order is raised. Downloads not yet started are cancelled, and no file after
+    the failed one is written.
+    """
+    with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool:
+        jobs = [(feature, url, pool.submit(_fetch, client, feature, url)) for feature, url in missing]
+        try:
+            for feature, url, future in jobs:
+                _store(feature, url, future.result(), retrieved_at=retrieved_at)
+        except BaseException:
+            for _feature, _url, pending in jobs:
+                pending.cancel()
+            raise
+
+
+def _fetch(client: PanoramaxTransport, feature: Mapping[str, Any], url: str) -> bytes:
+    try:
+        return client.get_bytes(url)
+    except PanoramaxError:
+        raise
+    except OSError as exc:
+        raise PanoramaxError(f"could not download {feature.get('id')}: {exc}") from exc
+
+
+def _store(feature: Mapping[str, Any], url: str, payload: bytes, *, retrieved_at: str) -> None:
+    jpeg_path, sidecar = _catalogue_paths(str(feature.get("id")))
+    jpeg_path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(jpeg_path, payload)
+    digest = sha256_file(jpeg_path)
+    record = _source_record(feature, url=url, sha256=digest, retrieved_at=retrieved_at, size_bytes=len(payload))
+    atomic_write_json(sidecar, record)
 
 
 def _search(

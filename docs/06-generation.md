@@ -30,7 +30,8 @@ Returns `0` when the phase 03 → 04 check passes (no critical error) and `1` ot
 | `surface/sidewalk` | A 2 m band around the carriageway | 0 | **Generated.** Many extracts have no sidewalk polygons |
 | `surface/green` | `landuse=grass`, `leisure=park`, and similar | 0 | Observed |
 | `surface/ground` | The rest of the site | 0 | Generated |
-| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point is opened by 1 cm so the slab stays manifold | top 0 / −0.15 | Generated |
+| `collider/walkable_crossing` | Walkable crossings (`Partition.crossings`): 4 m strips square to each vehicular segment between junctions, set back past the kerb of the widest street at each junction (half its width + 1 m + 2 m), and evenly between so no stretch exceeds 50 m. Each is clipped to the carriageway. Still part of `surface/carriageway`; only the collider is split. The adapter bakes it into the navmesh (ADR-015) | top −0.15 | Generated |
+| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. `collider/carriageway` is the carriageway minus the crossings, snapped again to `precision_m`: the cut adds vertices a fraction of a millimetre apart, which the 0.1 mm weld would merge. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point, or two pieces of one slab that share a corner, are opened by 1 cm so the slab stays manifold | top 0 / −0.15 | Generated |
 
 The site is the area of interest plus its margin. A building that is not completely inside that polygon is omitted (`building_outside_map`) and does not extend the ground. Footprints that remain inside the site are unioned with it.
 

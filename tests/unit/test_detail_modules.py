@@ -237,6 +237,8 @@ def _mutated(path: list[str | int], value: object) -> dict:
         (["templates", "generic_residential", "bay_m"], 1.5, "exceeds bay_m"),
         (["templates", "generic_commercial", "applies_to"], ["unknown"], "already mapped"),
         (["landmark_template"], "nope", "not a template"),
+        (["facade_palettes", "office"], ["stone_warm", "missing_stone"], "/facade_palettes/office: material 'missing_stone' is not defined"),
+        (["facade_palettes", "retail"], [], "should be non-empty"),
         (["openings", "recess_depth_m"], 0.4, "thinner than"),
         (["interiors", "rule", "min_area_m2"], 500.0, "below max_area_m2"),
         (["templates", "generic_residential", "narrow_window", "height_m"], 2.0, "minimum storey"),
@@ -251,6 +253,16 @@ def _mutated(path: list[str | int], value: object) -> dict:
 def test_invalid_detail_config_is_rejected(path: list[str | int], value: object, fragment: str) -> None:
     with pytest.raises(DetailConfigError, match=fragment):
         config_from_document(_mutated(path, value))
+
+
+def test_facade_palettes_are_required_and_read_per_use() -> None:
+    doc = copy.deepcopy(DOC)
+    del doc["facade_palettes"]["industrial"]
+    with pytest.raises(DetailConfigError, match="'industrial' is a required property"):
+        config_from_document(doc)
+    cfg = config_from_document(_mutated(["facade_palettes", "historic"], ["stone_light"]))
+    assert cfg.facade_palettes["historic"] == ("stone_light",)
+    assert dict(cfg.facade_palettes) == {use: tuple(names) for use, names in DOC["facade_palettes"].items()} | {"historic": ("stone_light",)}
 
 
 def test_interior_triangle_budget_is_required_and_read_as_given() -> None:
@@ -275,3 +287,35 @@ def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:
     to_gltf = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1.0]])
     assert g @ (to_gltf @ p_local) == pytest.approx(to_gltf @ (m1 @ p_local))
     assert gltf_matrix(np.eye(4)) == np.eye(4).reshape(-1).tolist()
+
+
+def test_shop_evidence_prefers_the_footprint_that_contains_the_point() -> None:
+    from onward_generator.detail.scene import _shop_evidence
+
+    footprints = {"low": box(-15, 6, 0, 22), "tall": box(0, 6, 14, 22)}
+
+    def poi(pid: str, x: float, y: float) -> dict:
+        return {"id": pid, "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [x, y]}}
+
+    inside = _shop_evidence([poi("in", -1.0, 7.0)], footprints, CFG)
+    assert dict(inside) == {"low": ["in"]}  # 1 m from the tall neighbour, but inside the low one
+    street = _shop_evidence([poi("street", -1.0, 5.0)], footprints, CFG)
+    assert dict(street) == {"low": ["street"], "tall": ["street"]}  # outside both: the 2 m rule
+    assert dict(_shop_evidence([poi("far", -1.0, 3.0)], footprints, CFG)) == {}
+
+
+def test_shop_evidence_inside_a_box_but_outside_the_shape_is_not_inside() -> None:
+    from onward_generator.detail.scene import _shop_evidence
+
+    ell = Polygon([(0, 0), (20, 0), (20, 4), (4, 4), (4, 20), (0, 20)])
+    point = {"id": "notch", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [15.0, 15.0]}}
+    assert dict(_shop_evidence([point], {"ell": ell}, CFG)) == {}  # 11 m from the shape, inside its bounding box
+
+
+def test_use_evidence_and_shop_evidence_agree_on_a_point_inside_a_sub_building() -> None:
+    from onward_generator.detail.scene import _shop_evidence, _use_evidence
+
+    footprints = {"osm-way-1:A_part1": box(-15, 6, 0, 22), "osm-way-1:B_part1": box(0, 6, 14, 22)}
+    bakery = {"id": "in", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [-1.0, 7.0]}}
+    assert dict(_use_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": [("in", {"shop": "bakery"}, "poi_inside")]}
+    assert dict(_shop_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": ["in"]}

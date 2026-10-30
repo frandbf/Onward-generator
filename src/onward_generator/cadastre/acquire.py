@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 import urllib.parse
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
@@ -28,6 +29,12 @@ CRS = "EPSG:25830"
 USER_AGENT = f"onward-generator/{__version__} (local research tool)"
 MAX_AREA_KM2 = 1.0
 MAX_BYTES = 64 * 1024 * 1024
+DOWNLOAD_MARGIN_M = 20.0
+# Like Overpass: 429, 5xx and dropped connections are retried three times, waits doubling from 8 s.
+CATASTRO_RETRIES = 3
+SPAIN_LATITUDES = (35.85, 43.8)
+"""EPSG:25830 is used between 6° W and 0°. This band keeps mainland Spain and leaves out Britain,
+Ireland and North Africa. A strip of south-western France stays in; the service returns no parts there."""
 
 CATASTRO_BU = LicenseInfo(
     provider="catastro-inspire-bu",
@@ -126,15 +133,29 @@ def bbox_from_scene(scene: Mapping[str, Any], margin_m: float) -> BBox:
 Fetcher = Callable[[str, float], bytes]
 
 
-def _http_fetch(url: str, timeout: float) -> bytes:
+def catastro_area(latitude: float, crs: str, half_side_m: float) -> bool:
+    """True when a map centred here can use one Catastro request (ADR-016).
+
+    The map must use the Catastro CRS, its centre must be in the Spanish
+    latitudes, and its square plus the download margin must fit ``MAX_AREA_KM2``.
+    """
+    side_m = 2 * (half_side_m + DOWNLOAD_MARGIN_M)
+    south, north = SPAIN_LATITUDES
+    return crs == CRS and south <= latitude <= north and side_m * side_m / 1e6 <= MAX_AREA_KM2
+
+
+def _http_fetch(url: str, timeout: float, sleep: Callable[[float], None] = time.sleep) -> bytes:
     return fetch_bytes(
         url,
         allowed_hosts=WFS_HOSTS,
         max_bytes=MAX_BYTES,
         timeout=timeout,
         headers={"User-Agent": USER_AGENT, "Accept": "application/xml,text/xml"},  # pragma: no mutate: only key case changes survive, urllib capitalizes header names; test_net_callers pins the rest
+        retry_429=CATASTRO_RETRIES,
+        retry_transient=CATASTRO_RETRIES,
         error=CadastreError,
         error_body=True,
+        sleep=sleep,
     )
 
 

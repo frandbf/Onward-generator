@@ -4,16 +4,21 @@ Precedence (each class is cut out of the following ones): buildings →
 carriageway → water → pedestrian → sidewalk → green → ground. The
 carriageway is lowered by ``carriageway_depth_m`` and bordered by curb walls;
 every other surface lies at z = 0.
+
+Crossings are strips of the carriageway that the navmesh bakes as walkable
+(ADR-015). They stay part of the carriageway surface; only the ground collider
+is split.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 import shapely
-from shapely import MultiPolygon, Polygon, make_valid, union_all
+from shapely import LineString, MultiPolygon, Polygon, STRtree, make_valid, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.generation.config import GenerationConfig
@@ -67,6 +72,7 @@ class Partition:
     buildings: BaseGeometry
     surfaces: dict[SurfaceClass, Surface] = field(default_factory=dict)
     carriageway_raw: BaseGeometry = field(default_factory=Polygon)
+    crossings: BaseGeometry = field(default_factory=Polygon)
 
     def overlap_area(self) -> float:
         parts = [s.geometry for s in self.surfaces.values()] + [self.buildings.intersection(self.site)]
@@ -138,7 +144,90 @@ def build_partition(
         if not geometry.is_empty:
             partition.surfaces[surface] = Surface(surface, geometry, sources, dropped)
             taken = union_all([taken, geometry])
+    carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
+    if carriageway is not None:
+        partition.crossings, _ = _polygonal(crossing_strips(vehicular, carriageway.geometry), precision, min_area)
     return partition
+
+
+# A walkable strip across the carriageway, like a zebra crossing. The navmesh
+# joins it to the sidewalks on both kerbs (0.15 m is below the 0.3 m agent
+# step), so the blocks on either side become one island.
+CROSSING_WIDTH_M = 4.0
+# No stretch of street is longer than this without a crossing.
+CROSSING_SPACING_M = 50.0
+# A junction crossing sits this far past the kerb of the widest street there.
+CROSSING_CORNER_M = 1.0
+# A strip is this much longer than the widest street it touches, then clipped
+# to the carriageway, so it always reaches both kerbs.
+CROSSING_OVERHANG_M = 2.0  # pragma: no mutate: the strip is clipped to the carriageway; a longer overhang draws the same crossing
+# Ways this close to a noded junction point meet there.
+JUNCTION_TOLERANCE_M = 1e-6  # pragma: no mutate: a float tolerance; any distance well under a street width finds the same ways
+
+
+def carriageway_slab(partition: Partition, precision_m: float) -> BaseGeometry:
+    """The carriageway minus its crossings, for the ``collider/carriageway`` slab.
+
+    Both inputs are snapped to ``precision_m``, but the cut adds vertices where a
+    strip edge meets the kerb, some a fraction of a millimetre from an old one.
+    The slab welds vertices on a 0.1 mm grid, so such a pair becomes one vertex
+    and the walls stop closing. The result is snapped again, like the surfaces.
+    """
+    carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
+    if carriageway is None:
+        return Polygon()
+    return shapely.set_precision(carriageway.geometry.difference(partition.crossings), precision_m)
+
+
+def crossing_offsets(length_m: float, start_m: float, end_m: float) -> list[float]:
+    """Distances along a street segment where a crossing goes.
+
+    One at ``start_m`` and one at ``length_m - end_m`` (the junction setbacks),
+    and evenly between them so no gap exceeds ``CROSSING_SPACING_M``. A segment
+    too short for two crossings apart gets one, halfway along.
+    """
+    first, last = start_m, length_m - end_m
+    if last - first < CROSSING_WIDTH_M:
+        return [length_m / 2.0]
+    gaps = math.ceil((last - first) / CROSSING_SPACING_M)
+    return [first + (last - first) * i / gaps for i in range(gaps + 1)]
+
+
+def _crossing(line: LineString, distance_m: float, span_m: float) -> BaseGeometry:
+    """A ``CROSSING_WIDTH_M`` strip square to ``line`` at ``distance_m``, ``span_m`` long.
+
+    The direction is the chord from that point to 1 m further along the line.
+    """
+    centre = line.interpolate(distance_m)
+    ahead = line.interpolate(distance_m + 1.0)
+    dx, dy = ahead.x - centre.x, ahead.y - centre.y
+    scale = span_m / 2.0 / math.hypot(dx, dy)
+    axis = LineString([(centre.x + dy * scale, centre.y - dx * scale), (centre.x - dy * scale, centre.y + dx * scale)])
+    return axis.buffer(CROSSING_WIDTH_M / 2.0, cap_style="flat")
+
+
+def crossing_strips(vehicular: Sequence[LinearWay], carriageway: BaseGeometry) -> BaseGeometry:
+    """Walkable crossings over ``carriageway``, clipped to it.
+
+    The street centrelines are noded at every junction, so each segment runs
+    from one junction (or dead end) to the next. A segment gets a crossing on
+    each arm, set back past the kerb of the widest street at that junction, and
+    more along a long block (``crossing_offsets``). Each strip spans the widest
+    street the segment touches plus ``CROSSING_OVERHANG_M``, then is clipped to
+    the carriageway. Vehicular areas have no centreline and get none.
+    """
+    lines = [part for way in vehicular for part in shapely.get_parts(way.geometry) if isinstance(part, LineString)]
+    tree = STRtree([way.geometry for way in vehicular])
+
+    def widest(at: BaseGeometry) -> float:
+        return max(vehicular[int(i)].width_m for i in tree.query(at, predicate="dwithin", distance=JUNCTION_TOLERANCE_M))
+
+    strips: list[BaseGeometry] = []
+    for segment in shapely.get_parts(shapely.line_merge(union_all(lines))):
+        start, end = (widest(segment.interpolate(d)) / 2.0 + CROSSING_CORNER_M + CROSSING_WIDTH_M / 2.0 for d in (0.0, segment.length))
+        span = widest(segment) + CROSSING_OVERHANG_M
+        strips.extend(_crossing(segment, d, span) for d in crossing_offsets(segment.length, start, end))
+    return union_all(strips).intersection(carriageway)
 
 
 def _way_buffer(way: LinearWay) -> BaseGeometry:

@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from shapely import LineString, Polygon, box, union_all
+from shapely import LineString, MultiPolygon, Polygon, box, union_all
 
 from onward_generator.generation.config import DEFAULT_CONFIG_PATH, GenerationConfigError, config_from_document, load_generation_config
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
@@ -61,6 +61,19 @@ def test_a_hole_that_kisses_the_boundary_becomes_a_closed_slab() -> None:
     assert closed_manifold_defects(slab) == 0
     assert signed_volume(slab) == pytest.approx(opened.area)
     assert pinched.area - opened.area < 0.02
+
+
+def test_polygons_that_touch_at_a_corner_become_closed_slabs() -> None:
+    """A carriageway cut by two crossings can leave two pieces that share one corner."""
+    kissing = MultiPolygon([box(0, 0, 10, 10), box(10, 10, 20, 20)])
+    assert closed_manifold_defects(prism(kissing, -1.0, 0.0, bottom=True)) > 0
+    opened = open_point_contacts(kissing)
+    slab = prism(opened, -1.0, 0.0, bottom=True)
+    assert closed_manifold_defects(slab) == 0
+    assert signed_volume(slab) == pytest.approx(opened.area)
+    assert 0 < kissing.area - opened.area < 0.001
+    apart = MultiPolygon([box(0, 0, 10, 10), box(11, 11, 20, 20)])
+    assert open_point_contacts(apart).equals(apart)
 
 
 def test_a_there_and_back_hole_is_dropped_and_the_slab_closes() -> None:
