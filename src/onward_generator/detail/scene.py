@@ -418,6 +418,7 @@ def detail_scene(
             tags, template, cfg.seed, bid, geom.area, convex=convex,
         )
         door_spec = cfg.landmark_door if landmark else cfg.main_door
+        plain_door = ("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec)
         previous_height = height
         plain_storeys = storeys
 
@@ -449,7 +450,7 @@ def detail_scene(
                 layout = trial
                 interior = plan
         if layout is None:
-            layout = run_layout("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec, storeys)
+            layout = run_layout(*plain_door, storeys)
         opened_windows = omitted_windows = 0
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
@@ -473,14 +474,8 @@ def detail_scene(
                                     f"of max_triangles {cfg.interiors.max_triangles}"))
                 interior = built = None
                 height, storeys = previous_height, plain_storeys
-                layout = run_layout("landmark_door" if landmark else "door", cfg.recess_depth_m, door_spec, storeys)
-                opened_windows = omitted_windows = 0
+                layout = run_layout(*plain_door, storeys)
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
-        if omitted_windows:
-            issues.append(Issue(
-                "interior_window_omitted", "info", bid,
-                f"{omitted_windows} windows omitted; they did not meet the inner wall",
-            ))
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
         if shell.defects:
@@ -492,6 +487,11 @@ def detail_scene(
         base_collider = o.collider
         interior_record = None
         if built is not None:
+            if omitted_windows:
+                issues.append(Issue(
+                    "interior_window_omitted", "info", bid,
+                    f"{omitted_windows} windows omitted; they did not meet the inner wall",
+                ))
             if built.defects:
                 issues.append(Issue("interior_collider_not_closed", "critical", bid, f"{built.defects} defects"))
             if built.roof_well is not None:

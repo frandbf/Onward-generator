@@ -266,7 +266,10 @@ def test_a_ceiling_under_the_floor_lowers_the_floor(base, ceiling: int) -> None:
     assert plan.valid
     interiors = plan.documents["detail"]["interiors"]
     assert (interiors["min_buildings"], interiors["max_buildings"]) == (ceiling, ceiling)
-    assert [c.path for c in plan.changes if c.path == "/interiors/min_buildings"] == ([] if ceiling == 5 else ["/interiors/min_buildings"])
+    lowered = [c for c in plan.changes if c.path == "/interiors/min_buildings"]
+    assert [c.to_dict() for c in lowered] == ([] if ceiling == 5 else [{
+        "document": "detail", "path": "/interiors/min_buildings", "before": 5, "after": ceiling, "effect": "geometry",
+        "cost": "decrease", "reason": "interior_buildings; the floor of the draw may not exceed the ceiling"}])
 
 
 def test_cost_decrease_is_allowed_under_max_but_still_confirmed(base) -> None:  # type: ignore[no-untyped-def]
