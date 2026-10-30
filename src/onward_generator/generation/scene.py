@@ -6,11 +6,12 @@ JSON contracts. Nothing here knows about Onward or Unity.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -199,7 +200,67 @@ def _width(feature: Mapping[str, Any], default: float) -> tuple[float, str]:
     return default, "config_default"
 
 
+# The last phase 03 scene built in this process, keyed by ``_cache_key``.
+_LAST: dict[tuple[str, ...], GeneratedScene] = {}
+
+
 def generate_scene(scene_path: str | Path, heights_path: str | Path, config: GenerationConfig) -> GeneratedScene:
+    """Build phase 03 from a geo scene and its heights.
+
+    ``run`` executes every stage in one process, and ``detail``, ``dress`` and
+    ``perf layout`` rebuild phase 03 from the same two files. The last scene
+    is kept, keyed by the resolved path and SHA-256 of both inputs and the
+    configuration's SHA-256, and a later call with the same key gets a copy of
+    it instead of a new build. A caller that edits its scene does not edit the
+    next caller's. A configuration without a SHA-256 is never kept.
+    """
+    key = _cache_key(scene_path, heights_path, config)
+    if key is None:
+        return _generate_scene(scene_path, heights_path, config)
+    kept = _LAST.get(key)
+    if kept is None:
+        kept = _generate_scene(scene_path, heights_path, config)
+        _LAST.clear()
+        _LAST[key] = kept
+    shared: dict[int, Any] = {id(kept.config): kept.config}
+    _geometries(kept, shared)
+    return copy.deepcopy(kept, shared)
+
+
+def _geometries(value: Any, found: dict[int, Any]) -> None:
+    """Add every shapely geometry under ``value`` to ``found``, by id.
+
+    The copy shares them: they are immutable, and a copied geometry loses the
+    precision grid that ``set_precision`` gave it, which changes later overlays.
+    The configuration is shared too: it is frozen and holds mapping proxies,
+    which do not copy.
+    """
+    if isinstance(value, BaseGeometry):
+        found[id(value)] = value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            _geometries(item, found)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _geometries(item, found)
+    elif is_dataclass(value) and not isinstance(value, (type, GenerationConfig)):
+        for spec in fields(value):
+            _geometries(getattr(value, spec.name), found)
+
+
+def _cache_key(scene_path: str | Path, heights_path: str | Path, config: GenerationConfig) -> tuple[str, ...] | None:
+    if config.sha256 is None:
+        return None
+    key = [config.sha256]
+    for raw in (scene_path, heights_path):
+        path = Path(raw).expanduser()
+        if not path.is_file():
+            return None
+        key.extend((str(path.resolve()), hashlib.sha256(path.read_bytes()).hexdigest()))
+    return tuple(key)
+
+
+def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: GenerationConfig) -> GeneratedScene:
     scene, scene_ref = _read_json(Path(scene_path).expanduser(), SCENE_SCHEMA)
     heights, heights_ref = _read_json(Path(heights_path).expanduser(), HEIGHTS_SCHEMA)
     frame = scene.get("frame") or {}

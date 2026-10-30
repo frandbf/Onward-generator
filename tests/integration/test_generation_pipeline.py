@@ -6,9 +6,11 @@ import json
 from pathlib import Path
 
 import pytest
+import shapely
 
 from onward_generator.cli import main
 from onward_generator.generation import GenerationError, generate_scene, load_generation_config
+from onward_generator.generation.config import DEFAULT_CONFIG_PATH, config_from_document
 from onward_generator.generation.gltf import read_glb
 from onward_generator.generation.markings import ZEBRA_LIFT_M
 from onward_generator.generation.surfaces import SurfaceClass, crossing_sites
@@ -167,3 +169,84 @@ def test_cli_writes_reproducible_outputs(inputs: tuple[Path, Path], tmp_path: Pa
     assert (tmp_path / "a" / "preview_southwest.png").read_bytes()[:4] == b"\x89PNG"
     assert main([*args, "--out", str(tmp_path / "a")]) == 1
     assert "refusing to overwrite" in capsys.readouterr().err
+
+
+@pytest.fixture
+def counted(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """Each real phase 03 build, as (scene, heights); the cache starts empty."""
+    import onward_generator.generation.scene as scene_module
+
+    builds: list[tuple[str, str]] = []
+    real = scene_module._generate_scene
+
+    def build(scene_path: str | Path, heights_path: str | Path, config: object) -> object:
+        builds.append((str(scene_path), str(heights_path)))
+        return real(scene_path, heights_path, config)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(scene_module, "_generate_scene", build)
+    monkeypatch.setattr(scene_module, "_LAST", {})
+    return builds
+
+
+def test_the_same_inputs_build_phase_03_once_per_process(inputs: tuple[Path, Path], counted: list[tuple[str, str]]) -> None:
+    first = generate_scene(*inputs, CFG)
+    first.objects.clear()
+    first.stats["changed"] = True
+    second = generate_scene(*inputs, CFG)
+    assert len(counted) == 1
+    # A caller that edits its scene does not edit the next caller's.
+    assert second.objects and "changed" not in second.stats
+    assert second.config is CFG
+    third = generate_scene(*inputs, CFG)
+    assert json.dumps(second.manifest()) == json.dumps(third.manifest())
+    assert json.dumps(second.report()) == json.dumps(third.report())
+    assert len(counted) == 1
+    # Geometries are shared, not copied: a copy would lose the set_precision grid.
+    assert second.partition is not third.partition
+    assert second.partition.site is third.partition.site
+    for surface_class, surface in second.partition.surfaces.items():
+        assert surface.geometry is third.partition.surfaces[surface_class].geometry
+        assert surface is not third.partition.surfaces[surface_class]
+    assert second.ways and all(a.geometry is b.geometry for a, b in zip(second.ways, third.ways, strict=True))
+    assert max(shapely.get_precision(s.geometry) for s in second.partition.surfaces.values()) > 0
+
+
+def test_changed_inputs_or_config_build_phase_03_again(inputs: tuple[Path, Path], tmp_path: Path, counted: list[tuple[str, str]]) -> None:
+    scene, heights = inputs
+    generate_scene(scene, heights, CFG)
+    doc = json.loads(heights.read_text(encoding="utf-8"))
+    doc["note"] = "same buildings, other bytes"
+    heights.write_text(json.dumps(doc), encoding="utf-8")
+    generate_scene(scene, heights, CFG)
+    assert len(counted) == 2
+    copied = tmp_path / "copy" / "heights.json"
+    copied.parent.mkdir()
+    copied.write_bytes(heights.read_bytes())
+    # The manifest records the resolved path, so another path is another build.
+    assert generate_scene(scene, copied, CFG).inputs["heights"]["path"] == str(copied.resolve())
+    assert len(counted) == 3
+    other = load_generation_config(DEFAULT_CONFIG_PATH)
+    assert other.sha256 == CFG.sha256
+    generate_scene(scene, copied, other)
+    assert len(counted) == 3
+    edited = tmp_path / "generation.json"
+    edited.write_text(json.dumps(dict(CFG.document)) + "\n", encoding="utf-8")
+    generate_scene(scene, copied, load_generation_config(edited))
+    assert len(counted) == 4
+    # Only the last build is kept.
+    generate_scene(scene, heights, CFG)
+    assert len(counted) == 5
+
+
+def test_a_config_without_a_hash_or_a_missing_input_is_never_cached(
+    inputs: tuple[Path, Path], tmp_path: Path, counted: list[tuple[str, str]],
+) -> None:
+    scene, heights = inputs
+    unhashed = config_from_document(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+    generate_scene(scene, heights, unhashed)
+    generate_scene(scene, heights, unhashed)
+    assert len(counted) == 2
+    for missing in ((tmp_path / "none.json", heights), (scene, tmp_path / "none.json")):
+        with pytest.raises(GenerationError, match="input not found"):
+            generate_scene(*missing, CFG)
+    assert len(counted) == 4

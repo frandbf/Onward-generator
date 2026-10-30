@@ -30,7 +30,7 @@ Facades, roofs, and interiors are **generic templates** chosen by rules. They do
 
 - `generation_report.json` must have `phase_03_exit.passed`;
 - the recorded SHA-256 of `geo_scene.json`, `heights.json`, and the generation configuration must match;
-- phase 03 is rebuilt in memory and the manifest must match the file on disk.
+- phase 03 is rebuilt in memory and the manifest must match the file on disk. Inside `run`, the rebuild is the copy kept from `generate` (`docs/06-generation.md`, Inputs).
 
 A mismatch raises `DetailError` and writes nothing.
 
