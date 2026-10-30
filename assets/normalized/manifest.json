@@ -458,12 +458,13 @@
       "category": "barriers",
       "role": "manhole",
       "surfaces": [
-        "carriageway"
+        "carriageway",
+        "sidewalk"
       ],
       "anchor": "flat",
       "lane": "allow",
       "clearance_m": 0.0,
-      "use": "manhole on the carriageway",
+      "use": "manhole on the carriageway or a sidewalk",
       "triangles": 1796,
       "length_m": 0.691,
       "depth_m": 0.691,

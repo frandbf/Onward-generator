@@ -15,7 +15,7 @@ from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh, box
 from onward_generator.overgrow.catalog import ALL_ASSETS, CATEGORIES, PLACEMENT_RULES, WEAR_NOTE, AssetSpec, rules_for
-from onward_generator.overgrow.dressing import block_reason
+from onward_generator.overgrow.dressing import Dressing, block_reason
 from onward_generator.overgrow.growth import grass_png
 from onward_generator.overgrow.library import load_library, read_library
 from onward_generator.overgrow.normalize import cluster_decimate, normalize_arrays
@@ -140,7 +140,7 @@ def test_manifest_uses_the_wider_surface_catalog() -> None:
     assert set(rows["covered_car"]["surfaces"]) >= {"curb", "carriageway", "sidewalk", "empty_lot", "plaza"}
     assert set(rows["crashed_helicopter"]["surfaces"]) >= {"plaza", "park", "courtyard"}
     assert set(rows["watchtower"]["surfaces"]) >= {"block_edge", "plaza", "curb"}
-    assert rows["water_manhole_cover"]["surfaces"] == ["carriageway"]
+    assert rows["water_manhole_cover"]["surfaces"] == ["carriageway", "sidewalk"]
     assert rows["fire_escape_sf"]["surfaces"] == ["facade"]
     assert rows["jungle_ground_tile"]["surfaces"] == ["yard", "empty_lot"]
     for row in rows.values():
@@ -455,3 +455,298 @@ def test_ground_vegetation_may_stand_tall() -> None:
     assert reject_reason(tile, {"materials": [{}]}, tall) == "flat_vegetation_not_flat"
     assert reject_reason(tile, {"materials": [{}]}, edge) is None
     assert reject_reason(tile, {"materials": [{"alphaMode": "BLEND"}]}, edge) == "alpha_mode_blend"
+
+
+def _cover_library(root: Path, *, surfaces: list[str]) -> None:
+    root.mkdir()
+    _prop_glb(root / "cover.glb", "cover", length=0.7, width=0.7, height=0.06)
+    (root / "manifest.json").write_text(json.dumps({"assets": [{
+        "id": "cover", "file": "cover.glb", "category": "barriers", "role": "manhole",
+        "surfaces": surfaces, "anchor": "flat", "lane": "allow", "use": "test",
+    }]}), encoding="utf-8")
+
+
+def _street() -> tuple[STRtree, list[LineString], STRtree]:
+    buildings = STRtree([Polygon([(12, 10), (32, 10), (32, 28), (12, 28)])])
+    lanes = [LineString([(-60, 0), (60, 0)])]
+    return buildings, lanes, STRtree(lanes)
+
+
+def _covers(tmp_path: Path, **kwargs: object) -> tuple[int, Dressing]:
+    from onward_generator.overgrow.dressing import sidewalk_covers
+
+    if not (tmp_path / "covers").exists():
+        _cover_library(tmp_path / "covers", surfaces=["carriageway", "sidewalk"])
+    buildings, lanes, lane_tree = _street()
+    options: dict = {
+        "props": load_library(tmp_path / "covers"), "profile": profile_for(100), "seed": 48152,
+        "budget": 60_000, "used": [], "zone": square_zone(80),
+    }
+    options.update(kwargs)
+    result = Dressing()
+    placed = sidewalk_covers(
+        options["props"], lanes, buildings, lane_tree, options["zone"], options["profile"], options["seed"], [],
+        options["budget"], result, used=options["used"], seen=set(),
+    )
+    return placed, result
+
+
+def test_sidewalk_covers_land_on_the_sidewalk_band_at_irregular_spacing(tmp_path: Path) -> None:
+    placed, result = _covers(tmp_path)
+    assert placed == len(result.records) == 6
+    points = [row["position_m"] for row in result.records]
+    for row in result.records:
+        assert row["surface"] == "sidewalk"
+        assert row["origin"] == "generated"
+        assert row["asset_id"] == "cover"
+        assert row["role"] == "manhole"
+        assert 4.2 + 2.2 <= abs(row["position_m"][1]) < 4.2 + 6.5
+        assert not (12 - 0.95 <= row["position_m"][0] <= 32 + 0.95 and row["position_m"][1] > 10 - 0.95)
+    for index, first in enumerate(points):
+        for second in points[index + 1:]:
+            assert float(np.hypot(first[0] - second[0], first[1] - second[1])) >= 8.0
+    along = sorted(point[0] for point in points)
+    steps = {round(b - a, 1) for a, b in zip(along, along[1:], strict=False)}
+    assert len(steps) > 1
+    assert len({round(abs(point[1]), 2) for point in points}) == len(points)
+    assert result.nodes[0].primitives and not any(node.primitives for node in result.nodes[1:])
+    assert [node.extras["surface"] for node in result.nodes] == ["sidewalk"] * 6
+
+
+def test_sidewalk_covers_are_seeded(tmp_path: Path) -> None:
+    _placed, first = _covers(tmp_path)
+    _placed, again = _covers(tmp_path)
+    _placed, other = _covers(tmp_path, seed=7)
+    assert [row["position_m"] for row in first.records] == [row["position_m"] for row in again.records]
+    assert [row["position_m"] for row in first.records] != [row["position_m"] for row in other.records]
+
+
+def test_sidewalk_covers_follow_the_cap_budget_and_the_catalogue(tmp_path: Path) -> None:
+    assert _covers(tmp_path, profile=profile_for(10))[0] == scaled_cap(6, profile_for(10).props) == 2
+    placed, result = _covers(tmp_path, budget=12 * 3)
+    assert placed == 3
+    assert result.triangles == 36
+    assert result.reject_counts["budget"] == 1
+    assert {(row["asset_id"], row["kind"]) for row in result.rejects if row["reason"] == "budget"} == {("cover", "barriers")}
+    assert _covers(tmp_path, props=[])[0] == 0
+    _cover_library(tmp_path / "lane_only", surfaces=["carriageway"])
+    assert _covers(tmp_path, props=load_library(tmp_path / "lane_only"))[0] == 0
+    assert _covers(tmp_path, zone=radius_zone(1.0))[1].reject_counts["outside_zone"] > 0
+
+
+def test_sidewalk_covers_keep_clear_of_props_already_placed(tmp_path: Path) -> None:
+    _placed, free = _covers(tmp_path)
+    taken = [(row["position_m"][0], row["position_m"][1], 3.0) for row in free.records]
+    _placed, result = _covers(tmp_path, used=list(taken))
+    assert result.reject_counts["too_close"] >= 6
+    for row in result.records:
+        for x, y, radius in taken:
+            assert float(np.hypot(row["position_m"][0] - x, row["position_m"][1] - y)) >= radius
+
+
+def test_a_cover_is_refused_off_the_sidewalk_and_near_a_wall(tmp_path: Path) -> None:
+    from onward_generator.overgrow.dressing import Spot, _cover_reason
+
+    _cover_library(tmp_path / "covers", surfaces=["carriageway", "sidewalk"])
+    cover = load_library(tmp_path / "covers")[0]
+    buildings, lanes, lane_tree = _street()
+    zone = square_zone(40)
+
+    def reason(x: float, y: float, clearance: float = 20.0) -> str | None:
+        spot = Spot("sidewalk", x, y, 0.0, "k", "lane-0", clearance)
+        return _cover_reason(cover, spot, zone, lane_tree, lanes, [], [])
+
+    assert reason(0.0, 8.0) is None
+    assert reason(0.0, 4.2 + 2.2) is None
+    assert reason(0.0, 4.2 + 2.19) == "not_sidewalk"
+    assert reason(0.0, 4.2 + 6.5) == "not_sidewalk"
+    assert reason(0.0, 4.2 + 6.49) is None
+    assert reason(0.0, -8.0) is None
+    assert reason(0.0, 8.0, clearance=0.6 + 0.35 + 0.01) is None
+    assert reason(0.0, 8.0, clearance=0.6 + 0.35 - 0.01) == "too_close_to_building"
+    assert reason(50.0, 8.0) == "outside_zone"
+
+
+def test_overgrow_places_sidewalk_covers_away_from_wrecks_and_trees(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    library = tmp_path / "library"
+    _library(library)
+    manifest = json.loads((library / "manifest.json").read_text(encoding="utf-8"))
+    for row in manifest["assets"]:
+        if row["id"] == "synth_hole":
+            row["surfaces"] = ["carriageway", "sidewalk"]
+    (library / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", zone=square_zone(80), library=library, seed=48152)
+    objects = json.loads((tmp_path / "out" / "scene_detail.json").read_text())["objects"]
+    covers = [row for row in objects if row.get("asset_id") == "synth_hole" and row.get("surface") == "sidewalk"]
+    assert 1 <= len(covers) <= 6
+    others = [row for row in objects if row.get("type") == "overgrowth" and row.get("kind") in {"wreck", "tree"}]
+    assert others
+    for cover in covers:
+        assert cover["origin"] == "generated"
+        assert cover["source_ids"] == ["synth_hole"]
+        for row in others:
+            gap = float(np.hypot(cover["position_m"][0] - row["position_m"][0], cover["position_m"][1] - row["position_m"][1]))
+            assert gap >= (3.0 if row["kind"] == "wreck" else 1.5)
+    assert "synth_hole" in report["placed_assets"]
+
+
+def test_sidewalk_covers_are_pinned_for_the_default_seed(tmp_path: Path) -> None:
+    _placed, result = _covers(tmp_path)
+    assert [row["position_m"] for row in result.records] == [
+        [-14.832, -8.543, 0.0], [-5.936, 9.413, 0.0], [19.788, -9.112, 0.0],
+        [-35.346, -8.571, 0.0], [-25.824, 7.359, 0.0], [44.303, 7.746, 0.0],
+    ]
+    cosines = [round(float(node.matrix[0][0]), 4) for node in result.nodes if node.matrix is not None]
+    assert cosines == [0.7782, 0.1043, -0.9159, 0.9702, -0.941, 0.6077]
+
+
+def _two_covers(root: Path) -> list:
+    """Two cover models, listed out of name order, of different sizes."""
+    root.mkdir(parents=True)
+    _prop_glb(root / "cover_b.glb", "cover_b", length=0.9, width=0.9, height=0.05)
+    _prop_glb(root / "cover_a.glb", "cover_a", length=0.6, width=0.6, height=0.05)
+    rows = [
+        {"id": asset_id, "file": f"{asset_id}.glb", "category": "barriers", "role": "manhole",
+         "surfaces": ["sidewalk"], "anchor": "flat", "lane": "allow", "use": "test"}
+        for asset_id in ("cover_b", "cover_a")
+    ]
+    (root / "manifest.json").write_text(json.dumps({"assets": rows}), encoding="utf-8")
+    return load_library(root)
+
+
+def _diagonal(tmp_path: Path, *, spawns: list | None = None, used: list | None = None) -> Dressing:
+    from onward_generator.overgrow.dressing import sidewalk_covers
+    from onward_generator.overgrow.ground import RoadFloor
+
+    props = _two_covers(tmp_path / "two")
+    lanes = [LineString([(-40, -30), (40, 30)])]
+    buildings = STRtree([Polygon([(-10, 8), (0, 8), (0, 18), (-10, 18)])])
+    floor = RoadFloor(STRtree([Polygon([(-60, -60), (0, -60), (0, 60), (-60, 60)])]), -0.25)
+    result = Dressing()
+    sidewalk_covers(
+        props, lanes, buildings, STRtree(lanes), square_zone(80), profile_for(100), 48152, spawns or [],
+        60_000, result, used=used if used is not None else [], seen=set(), floor=floor,
+    )
+    return result
+
+
+def test_covers_on_a_diagonal_street_are_pinned_for_the_default_seed(tmp_path: Path) -> None:
+    result = _diagonal(tmp_path)
+    assert [(row["asset_id"], row["position_m"]) for row in result.records] == [
+        ("cover_a", [1.26, -9.734, 0.0]),
+        ("cover_a", [29.298, 10.584, 0.0]),
+        ("cover_b", [-15.135, -22.065, -0.25]),
+        ("cover_b", [-17.075, -3.607, -0.25]),
+        ("cover_b", [20.395, 5.481, 0.0]),
+        ("cover_b", [6.899, 14.148, 0.0]),
+    ]
+    assert [round(float(node.matrix[0][0]), 4) for node in result.nodes if node.matrix is not None] == [
+        0.7782, -0.9159, 0.9702, -0.941, 0.0882, -0.597,
+    ]
+    assert result.rejects == [{
+        "asset_id": "cover_b", "reason": "too_close_to_building", "kind": "barriers",
+        "position_m": [-2.396, 9.968, 0.0],
+    }]
+    assert result.reject_counts == {"too_close_to_building": 1}
+
+
+def test_a_spawn_point_moves_a_cover_to_the_next_candidate(tmp_path: Path) -> None:
+    result = _diagonal(tmp_path, spawns=[(1.26, -9.734)])
+    assert [row["position_m"] for row in result.records][0] == [29.298, 10.584, 0.0]
+    assert [row["position_m"] for row in result.records][-1] == [24.679, 28.093, 0.0]
+    assert result.reject_counts == {"spawn_point": 1, "too_close_to_building": 1}
+
+
+def test_cover_reason_boundaries(tmp_path: Path) -> None:
+    from onward_generator.overgrow.constants import COVER_CLEAR_M, LANE_M
+    from onward_generator.overgrow.dressing import Spot, _cover_reason
+
+    root = tmp_path / "wide"
+    root.mkdir()
+    _prop_glb(root / "wide.glb", "wide", length=0.4, width=0.9, height=0.05)
+    (root / "manifest.json").write_text(json.dumps({"assets": [{
+        "id": "wide", "file": "wide.glb", "category": "barriers", "role": "manhole",
+        "surfaces": ["sidewalk"], "anchor": "flat", "lane": "allow", "use": "test",
+    }]}), encoding="utf-8")
+    wide = load_library(root)[0]
+    buildings, lanes, lane_tree = _street()
+    zone = square_zone(40)
+
+    def reason(x: float, y: float, clearance: float = 20.0, used: list | None = None, spawns: list | None = None) -> str | None:
+        spot = Spot("sidewalk", x, y, 0.0, "k", "", clearance)
+        return _cover_reason(wide, spot, zone, lane_tree, lanes, spawns or [], used or [])
+
+    assert reason(0.0, LANE_M + 6.5) == "not_sidewalk"
+    assert reason(0.0, -(LANE_M + 6.5)) == "not_sidewalk"
+    assert reason(0.0, LANE_M + 2.2) is None
+    edge = COVER_CLEAR_M + max(wide.length_m, wide.half_y * 2) * 0.5
+    assert reason(0.0, 8.0, clearance=edge) is None
+    assert reason(0.0, 8.0, clearance=0.9) == "too_close_to_building"
+    assert reason(0.0, 8.0, used=[(3.0, 8.0, 3.0)]) is None
+    assert reason(0.0, 8.0, used=[(2.6, 8.0, 3.0)]) == "too_close"
+    assert reason(0.0, 8.0, used=[(0.0, 9.0, 1.2)]) == "too_close"
+    assert reason(0.0, 8.0, used=[(0.0, 7.0, 1.2)]) == "too_close"
+    assert reason(0.0, 8.0, spawns=[(0.0, 8.0)]) == "spawn_point"
+    assert reason(0.0, 8.0, spawns=[(0.0, 13.1)]) is None
+    assert reason(-50.0, 8.0) == "outside_zone"
+    # A one-metre lane makes GEOS return the band edges exactly.
+    short = [LineString([(-0.5, 0.0), (0.5, 0.0)])]
+    for y, expected in ((LANE_M + 6.5, "not_sidewalk"), (LANE_M + 2.2, None)):
+        spot = Spot("sidewalk", 0.0, y, 0.0, "k", "", 20.0)
+        assert _cover_reason(wide, spot, zone, STRtree(short), short, [], []) == expected
+
+
+def test_occupied_lists_each_placed_object_with_its_radius() -> None:
+    from onward_generator.overgrow.place import _occupied
+
+    rows = [
+        {"kind": "grass", "position_m": [1.0, 2.0, 0.0]},
+        {"kind": "tree", "position_m": [3.5, -4.0, 0.1]},
+        {"kind": "wreck", "position_m": [-6.0, 7.25, -0.2]},
+    ]
+    assert _occupied(rows) == [(1.0, 2.0, 0.8), (3.5, -4.0, 1.5), (-6.0, 7.25, 3.0)]
+    assert _occupied([]) == []
+
+
+def _cover_run(tmp_path: Path, name: str, features: list[dict], *, layout: Path | None = None, road: tuple | None = None) -> list[list[float]]:
+    scene = tmp_path / f"{name}.json"
+    _scene(scene, features)
+    base = tmp_path / f"{name}_base"
+    _base(base)
+    if road is not None:
+        x, y = road
+        cap = Mesh(
+            np.array([[x - 2.0, y - 2.0, -0.2], [x + 2.0, y - 2.0, -0.2], [x, y + 2.0, -0.2]], dtype=np.float64),
+            np.array([[0, 1, 2]]),
+        )
+        (base / "scene_visual.glb").write_bytes(build_glb(
+            [Node("surface/carriageway", (Primitive(cap, "asphalt"),), {"type": "surface"})],
+            {"asphalt": Material((0.2, 0.2, 0.2, 1), 1)},
+        ))
+    library = tmp_path / "covers"
+    if not library.exists():
+        _cover_library(library, surfaces=["sidewalk"])
+    overgrow(base, scene, tmp_path / f"{name}_out", zone=square_zone(80), library=library, seed=48152, layout=layout)
+    objects = json.loads((tmp_path / f"{name}_out" / "scene_detail.json").read_text())["objects"]
+    return [row["position_m"] for row in objects if row.get("asset_id") == "cover"]
+
+
+def test_overgrow_covers_avoid_trees_and_spawns_and_sit_on_the_floor(tmp_path: Path) -> None:
+    features = [row for row in _city_features() if row["kind"] != "poi"]
+    plain = _cover_run(tmp_path, "plain", features)
+    assert plain == [
+        [-4.832, -8.543, 0.0], [4.064, 9.413, 0.0], [29.788, -9.112, 0.0],
+        [-25.346, -8.571, 0.0], [-15.824, 7.359, 0.0], [19.605, -7.852, 0.0],
+    ]
+    tree = _feature("poi", {"type": "Point", "coordinates": plain[0][:2]}, {"natural": "tree"}, "osm-node-cover-tree")
+    layout = tmp_path / "layout.json"
+    layout.write_text(json.dumps({"ai_m": [{"x": plain[1][0], "y": plain[1][1]}]}), encoding="utf-8")
+    moved = _cover_run(tmp_path, "moved", [*features, tree], layout=layout, road=tuple(plain[2][:2]))
+    assert len(moved) == 6
+    for point in moved:
+        assert float(np.hypot(point[0] - plain[0][0], point[1] - plain[0][1])) >= 1.5
+        assert float(np.hypot(point[0] - plain[1][0], point[1] - plain[1][1])) >= 5.0
+    assert [plain[2][0], plain[2][1], -0.2] in moved

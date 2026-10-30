@@ -18,3 +18,9 @@ TARGET_ASSET_TRIS = 1800
 ALBEDO_PX = 512
 # A flat-anchored vegetation mesh taller than this is a slope tile, not ground cover.
 FLAT_VEGETATION_MAX_M = 0.05
+# Sidewalk manhole covers: candidates every COVER_STEP_M × [0.6, 1.4) along a
+# street, never closer than COVER_SPACING_M to another cover nor within
+# COVER_CLEAR_M of a wall.
+COVER_STEP_M = 9.0
+COVER_SPACING_M = 8.0
+COVER_CLEAR_M = 0.6

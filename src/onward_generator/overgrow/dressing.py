@@ -20,8 +20,11 @@ from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, box, quad, transform
 from onward_generator.overgrow.ambient import blocks_street, cross_yaw, is_solid
-from onward_generator.overgrow.catalog import FACADE_Z_M, rules_for
+from onward_generator.overgrow.catalog import FACADE_Z_M, RULES_BY_ID, SIDEWALK_COVER_RULE, PlacementRule, rules_for
 from onward_generator.overgrow.constants import (
+    COVER_CLEAR_M,
+    COVER_SPACING_M,
+    COVER_STEP_M,
     LANE_M,
     MAX_VINES,
     SPAWN_CLEAR_M,
@@ -120,15 +123,27 @@ def dress(
     block_streets: bool = False,
     placed_roles: dict[str, int] | None = None,
     floor: RoadFloor | None = None,
+    occupied: list[tuple[float, float, float]] | None = None,
 ) -> Dressing:
+    """``occupied`` lists (x, y, radius) already taken by wrecks, trees and grass.
+
+    Only the sidewalk covers read it, so the other props keep their places.
+    """
     result = Dressing()
     ground = floor if floor is not None else RoadFloor.empty()
     parks = _parks(features)
     heights = _heights(features)
     spots = _spots(edges, lanes, buildings, lane_tree, parks, heights, zone, result)
+    used: list[tuple[float, float, float]] = []
+    seen: set[str] = set()
     _place_props(
         props, spots, buildings, lane_tree, lanes, zone, profile, seed, spawns, triangle_budget, result,
         block_streets=block_streets, placed_roles=Counter(placed_roles or {}), floor=ground,
+        used=used, seen=seen,
+    )
+    sidewalk_covers(
+        props, lanes, buildings, lane_tree, zone, profile, seed, spawns, triangle_budget, result,
+        used=[*used, *(occupied or [])], seen=seen, floor=ground,
     )
     _vines(edges, buildings, lane_tree, lanes, zone, profile, seed, spawns, result)
     if grass_mesh is not None and grass_left > 0:
@@ -151,14 +166,15 @@ def _place_props(
     block_streets: bool = False,
     placed_roles: Counter[str] | None = None,
     floor: RoadFloor | None = None,
+    *,
+    used: list[tuple[float, float, float]],
+    seen: set[str],
 ) -> None:
-    used: list[tuple[float, float, float]] = []
     counts: Counter[str] = Counter()
-    seen: set[str] = set()
     role_placed = placed_roles if placed_roles is not None else Counter()
     props = [_fitted(prop) for prop in props]
     for prop in props:
-        rules = rules_for(prop.spec)
+        rules = _spot_rules(prop)
         if not rules:
             _reject(result, prop.spec.id, "no_rule", prop.spec.category, 0.0, 0.0)
             continue
@@ -234,6 +250,109 @@ def _repeats(props, spots, buildings, lane_tree, lanes, zone, profile, seed, spa
             counts[rule.id] += 1
             role_placed[prop.spec.role] += 1
             used.append((placed_x, placed_y, 2.2))
+
+
+def _spot_rules(prop: Prop) -> tuple[PlacementRule, ...]:
+    """Rules served by the shared spots. Sidewalk covers have their own placer."""
+    return tuple(rule for rule in rules_for(prop.spec) if rule.id != SIDEWALK_COVER_RULE)
+
+
+def sidewalk_covers(
+    props: list[Prop],
+    lanes: list[LineString],
+    buildings: STRtree,
+    lane_tree: STRtree | None,
+    zone: Zone,
+    profile: Profile,
+    seed: int,
+    spawns: list[tuple[float, float]],
+    budget: int,
+    result: Dressing,
+    *,
+    used: list[tuple[float, float, float]],
+    seen: set[str],
+    floor: RoadFloor | None = None,
+) -> int:
+    """A few manhole covers on the sidewalk band, at seeded random spacing.
+
+    Candidates walk each street at an irregular step, on a random side and at a
+    random depth inside the sidewalk band. A seeded order picks among them across
+    the whole zone. Covers are flat and have no size band, so they are not refitted.
+    Returns how many were placed.
+    """
+    rule = RULES_BY_ID[SIDEWALK_COVER_RULE]
+    covers = [prop for prop in props if rule in rules_for(prop.spec)]
+    if not covers:
+        return 0
+    # Covers are barriers, so the profile's prop density scales the cap.
+    cap = scaled_cap(rule.cap, profile.props)
+    candidates = _cover_candidates(lanes, buildings, seed)
+    candidates.sort(key=lambda spot: stable_unit(seed, spot.key, "cover-order"))
+    placed = 0
+    for spot in candidates:
+        if placed >= cap:
+            break
+        prop = covers[int(stable_unit(seed, spot.key, "cover-asset") * len(covers))]
+        if result.triangles + prop.triangles > budget:
+            _reject(result, prop.spec.id, "budget", prop.spec.category, spot.x, spot.y)
+            break
+        reason = _cover_reason(prop, spot, zone, lane_tree, lanes, spawns, used)
+        if reason:
+            _reject(result, prop.spec.id, reason, prop.spec.category, spot.x, spot.y)
+            continue
+        placed_x, placed_y = _emit(prop, spot, result, seen, floor=floor)
+        used.append((placed_x, placed_y, COVER_SPACING_M))
+        placed += 1
+    return placed
+
+
+def _cover_candidates(lanes: list[LineString], buildings: STRtree, seed: int) -> list[Spot]:
+    spots: list[Spot] = []
+    for index, line in enumerate(lanes):
+        length = float(line.length)
+        distance = stable_unit(seed, index, "cover-start") * COVER_STEP_M
+        while distance < length:  # pragma: no mutate: distance is a seeded float and never equals the street length
+            key = f"cover:{index}:{distance:.2f}"
+            tangent = _tangent(line, distance)
+            sides = ((tangent[1], -tangent[0]), (-tangent[1], tangent[0]))
+            normal = sides[int(stable_unit(seed, key, "cover-side") * 2)]
+            # Sidewalk band is [LANE_M + 2.2, LANE_M + 6.5); keep the cover inside it.
+            offset = LANE_M + 2.8 + stable_unit(seed, key, "cover-depth") * 3.1
+            point = line.interpolate(distance)
+            x = float(point.x + normal[0] * offset)
+            y = float(point.y + normal[1] * offset)
+            yaw = stable_unit(seed, key, "cover-yaw") * 6.28
+            spots.append(Spot(
+                "sidewalk", x, y, yaw, key,
+                "",  # pragma: no mutate: covers never read feature_id; _emit records the asset id
+                _clearance(Point(x, y), buildings),
+            ))
+            distance += COVER_STEP_M * (0.6 + 0.8 * stable_unit(seed, key, "cover-step"))
+    return spots
+
+
+def _cover_reason(
+    prop: Prop,
+    spot: Spot,
+    zone: Zone,
+    lane_tree: STRtree | None,
+    lanes: list[LineString],
+    spawns: list[tuple[float, float]],
+    used: list[tuple[float, float, float]],
+) -> str | None:
+    """Why a cover cannot sit here. The band keeps it off the lane, the clearance off the walls."""
+    lane_distance = _lane_distance(Point(spot.x, spot.y), lane_tree, lanes)
+    if not LANE_M + 2.2 <= lane_distance < LANE_M + 6.5:
+        return "not_sidewalk"
+    if spot.clearance < COVER_CLEAR_M + max(prop.length_m, prop.half_y * 2) * 0.5:
+        return "too_close_to_building"
+    if any((spot.x - px) ** 2 + (spot.y - py) ** 2 < radius ** 2 for px, py, radius in used):
+        return "too_close"
+    if not zone.contains(spot.x, spot.y):
+        return "outside_zone"
+    if _near_spawn(spot.x, spot.y, spawns):
+        return "spawn_point"
+    return None
 
 
 def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_streets: bool = False, turn: float = 0.0, floor: RoadFloor | None = None) -> tuple[float, float]:

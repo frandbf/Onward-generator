@@ -64,6 +64,8 @@ SKIP_HIGHWAYS = frozenset({
     "platform", "raceway", "bridleway", "proposed", "construction",
     "service", "busway", "bus_guideway",
 })
+# Radius each procedural object keeps clear of a sidewalk manhole cover.
+OCCUPIED_M = {"wreck": 3.0, "tree": 1.5, "grass": 0.8}
 OUTPUT_FILES = (
     "scene_visual.glb",
     "scene_collision.glb",
@@ -267,6 +269,7 @@ def overgrow(
         block_streets=False if use_plan else plan.street_blocking,
         placed_roles={"wreck": wreck_count},
         floor=floor,
+        occupied=_occupied(records),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)
@@ -423,6 +426,11 @@ def _layout_near(scene: Path) -> Path | None:
         return None
     candidate = root / "data" / "processed" / "layout" / "layout.json"
     return candidate if candidate.is_file() else None
+
+
+def _occupied(records: list[dict[str, Any]]) -> list[tuple[float, float, float]]:
+    """(x, y, radius) of each grass tuft, tree and wreck already placed, for the sidewalk covers."""
+    return [(float(row["position_m"][0]), float(row["position_m"][1]), OCCUPIED_M[row["kind"]]) for row in records]
 
 
 def _note(rejects: list[dict[str, Any]], counts: dict[str, int], kind: str, reason: str, point: np.ndarray) -> None:
