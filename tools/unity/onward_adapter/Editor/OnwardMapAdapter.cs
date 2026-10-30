@@ -96,6 +96,11 @@ namespace OnwardGenerator
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
             public float interior_light_intensity = 0.8f;
+            // ADR-014: linear RenderSettings fog. Off when the key is absent (older configurations).
+            public bool fog_enabled = false;
+            public float fog_start_m = 160f;
+            public float fog_end_m = 1000f;
+            public string fog_color = "#C8CDD2";
         }
 
         [Serializable] private class XY { public float x; public float y; public float yaw; }
@@ -600,6 +605,7 @@ namespace OnwardGenerator
                 light.intensity = 1.2f;
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                ApplyFog(opt);
 
                 float tallest = 0f;
                 foreach (MeshCollider collider in collisionRoot.GetComponentsInChildren<MeshCollider>())
@@ -926,6 +932,24 @@ namespace OnwardGenerator
             // The suffix is the collision node, not a prop whose id happens to contain "glass".
             if (name.Contains("#glass")) return SetPhysicMaterial.EPhysicMaterialType.Glass;
             return SetPhysicMaterial.EPhysicMaterialType.Concrete;
+        }
+
+        // ADR-014. Unity fog is measured from the camera. Whether the Onward runtime or its
+        // post-processing profile overrides these RenderSettings is not known; checked on the headset.
+        private static void ApplyFog(Options opt)
+        {
+            RenderSettings.fog = opt.fog_enabled;
+            if (!opt.fog_enabled) return;
+            if (!(opt.fog_start_m >= 0f && opt.fog_end_m > opt.fog_start_m))
+                throw new InvalidDataException($"fog_end_m ({opt.fog_end_m}) must be greater than fog_start_m ({opt.fog_start_m}) >= 0");
+            Color colour;
+            if (!ColorUtility.TryParseHtmlString(opt.fog_color, out colour))
+                throw new InvalidDataException($"fog_color {opt.fog_color} is not #RRGGBB");
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogStartDistance = opt.fog_start_m;
+            RenderSettings.fogEndDistance = opt.fog_end_m;
+            RenderSettings.fogColor = colour;
+            Debug.Log($"{LogPrefix} Fog: linear {opt.fog_start_m}-{opt.fog_end_m} m, {opt.fog_color}.");
         }
 
         private static void ApplyEnvironment(SharedLevelSettings shared, Layout layout)
@@ -2232,12 +2256,13 @@ namespace OnwardGenerator
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).
         // Overgrow props (material prop_<id>, overgrow/realize.py and dressing.py) are small
         // and often flush against a wall; air-conditioner units came out solid black on the
-        // headset. They are lit by light probes or the ambient probe instead.
+        // headset. They are lit by light probes or the ambient probe instead. The horizon
+        // backdrop (ADR-014) is outside the play area and takes no lightmap either.
         private static bool ContributesGi(Material material)
         {
             string n = material != null ? material.name.ToLowerInvariant() : "";
             return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal")
-                || n.StartsWith("m_prop_"));
+                || n.StartsWith("m_prop_") || n.Contains("horizon_backdrop"));
         }
 
         private static StaticEditorFlags LightmapFlags(StaticEditorFlags flags, IEnumerable<Material> mats)

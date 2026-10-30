@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from onward_generator.bounds.envelope import (
+    DEFAULT_BACKDROP_HEIGHT_M,
+    DEFAULT_BACKDROP_OFFSET_M,
     DEFAULT_HEIGHT_M,
     DEFAULT_THICKNESS_M,
     BoundsError,
@@ -24,6 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", required=True, help="new directory (never overwrites without --overwrite)")
     parser.add_argument("--height-m", type=float, default=DEFAULT_HEIGHT_M)
     parser.add_argument("--thickness-m", type=float, default=DEFAULT_THICKNESS_M)
+    # The visual horizon ring outside the wall, off by default (ADR-014).
+    parser.add_argument("--backdrop", action="store_true")
+    parser.add_argument("--backdrop-offset-m", type=float, default=DEFAULT_BACKDROP_OFFSET_M)
+    parser.add_argument("--backdrop-height-m", type=float, default=DEFAULT_BACKDROP_HEIGHT_M)
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -37,6 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = apply_bounds(
             args.base, args.out,
             height_m=args.height_m, thickness_m=args.thickness_m, overwrite=args.overwrite,
+            backdrop=args.backdrop, backdrop_offset_m=args.backdrop_offset_m, backdrop_height_m=args.backdrop_height_m,
         )
     except (BoundsError, FileExistsError, ValueError) as exc:
         print(f"bounds: {exc}", file=sys.stderr)
@@ -46,6 +53,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"bounds: wall {wall['id']} h={wall['height_m']} m t={wall['thickness_m']} m "
         f"triangles={wall['triangles']} site={wall['site_area_m2']} m²"
     )
+    ring = report["backdrop"]
+    if ring is not None:
+        print(f"bounds: backdrop {ring['id']} {ring['quads']} quads, {ring['visual']['triangles']} triangles")
     print(f"wrote {args.out}")
     from onward_generator.next_step import emit, layout_command
 

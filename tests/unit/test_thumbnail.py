@@ -54,3 +54,12 @@ def test_titles_shrink_by_two_down_to_twelve() -> None:
 
 def test_an_empty_title_is_drawn_as_map() -> None:
     assert render_listing_thumbnail(_scene(), "   ") == render_listing_thumbnail(_scene(), "Map")
+
+
+def test_thumbnail_leaves_the_horizon_backdrop_out() -> None:
+    from shapely import box
+
+    from onward_generator.bounds.envelope import backdrop_node, with_backdrop
+
+    ringed = with_backdrop(_scene(), backdrop_node(box(0.0, 0.0, 8.0, 8.0), offset_m=2.0, height_m=30.0))
+    assert render_listing_thumbnail(ringed, "Obelisco") == render_listing_thumbnail(_scene(), "Obelisco")

@@ -308,6 +308,7 @@ The sidewalk and the foot of the facade receive moss and grass tufts. OSM trees 
 | Output | A copy with `envelope/perimeter_wall` |
 | Size | 12 m high, 0.4 m thick, unless `--height-m` and `--thickness-m` |
 | Purpose | Closes the edge with a 12 m collider. It is not drawn. There is no concrete wall mesh |
+| Optional | `--backdrop`: a visual haze ring just outside the wall, no collider (ADR-014, `docs/12-export.md`). Off by default; `run` does not pass it |
 
 An export of a `gameplay_layout` refuses a `--detail` directory that does not contain that wall.
 

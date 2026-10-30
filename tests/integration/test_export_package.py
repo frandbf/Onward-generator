@@ -159,6 +159,8 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(lightmap_max_size=3000), "/build/lightmap_max_size"),
     (lambda c: c["build"].update(interior_lights_max=65), "/build/interior_lights_max"),
     (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
+    (lambda c: c["build"].update(fog_color="grey"), "/build/fog_color"),
+    (lambda c: c["build"].update(fog_end_m=0), "/build/fog_end_m"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -254,3 +256,13 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source
     assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source
+    # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
+    assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
+
+
+def test_default_fog_colour_is_the_backdrop_haze() -> None:
+    from onward_generator.bounds.envelope import HAZE_HEX
+
+    build = load(EXPORT_CONFIG_DEFAULT)["build"]
+    assert build["fog_enabled"] is True and build["fog_end_m"] > build["fog_start_m"]
+    assert build["fog_color"] == HAZE_HEX

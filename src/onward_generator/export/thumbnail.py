@@ -11,6 +11,7 @@ from io import BytesIO
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from onward_generator.bounds.envelope import BACKDROP_ID
 from onward_generator.generation.gltf import nodes_from_glb
 from onward_generator.generation.preview import render_rgb
 from onward_generator.signs.plaque import plaque_font, plaque_text
@@ -23,6 +24,8 @@ _BAR_TOP = 188
 def render_listing_thumbnail(visual_glb: bytes, title: str) -> bytes:
     """Oblique view of the visual mesh with the map title on a dark band."""
     nodes, materials = nodes_from_glb(visual_glb)
+    # The horizon ring would wall the oblique view in; the listing shows the map.
+    nodes = [node for node in nodes if node.name != BACKDROP_ID]
     rgb = render_rgb(
         nodes, materials,
         width=THUMBNAIL_WIDTH, height=THUMBNAIL_HEIGHT,
