@@ -142,8 +142,11 @@ def test_a_node_takes_translation_rotation_and_scale_in_that_order() -> None:
     angle = 1.1
     quaternion = [*(axis / np.linalg.norm(axis) * math.sin(angle / 2)), math.cos(angle / 2)]
     node = {"mesh": 0, "translation": [5.0, -2.0, 0.5], "rotation": quaternion, "scale": [2.0, 3.0, 0.5]}
-    [prim] = scene_primitives(_glb([[_tri()]], [node], scenes=[{"nodes": [0]}]))
-    expected = TRIANGLE.astype(np.float64) * [2.0, 3.0, 0.5] @ _rodrigues(axis, angle).T + [5.0, -2.0, 0.5]
+    # Every vertex has a component on every axis, so each entry of R·S shows.
+    solid = np.array([[1.0, 2.0, 3.0], [-2.0, 0.5, 1.0], [0.3, -1.0, 2.0]], dtype=np.float32)
+    data = _glb([[{"positions": solid, "indices": [0, 1, 2]}]], [node], scenes=[{"nodes": [0]}])
+    [prim] = scene_primitives(data)
+    expected = solid.astype(np.float64) * [2.0, 3.0, 0.5] @ _rodrigues(axis, angle).T + [5.0, -2.0, 0.5]
     assert np.allclose(prim.mesh.vertices, _local(expected))
     assert prim.mesh.triangles.tolist() == [[0, 1, 2]]
 
@@ -161,6 +164,7 @@ def test_a_child_inherits_its_parent_and_every_primitive_is_read() -> None:
     )
     prims = scene_primitives(data)
     assert [p.material for p in prims] == ["metal", "mat_1", "metal"]
+    assert all(p.uvs is None for p in prims)
     turned = TRIANGLE.astype(np.float64) @ _rodrigues(np.array([0.0, 1.0, 0.0]), math.pi / 2).T + [10.0, 0.0, 0.0]
     assert np.allclose(prims[0].mesh.vertices, _local(turned))
     assert np.allclose(prims[1].mesh.vertices, _local(turned))

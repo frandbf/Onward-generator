@@ -542,7 +542,7 @@ def _mesh_primitives(doc: Mapping[str, Any], blob: bytes, mesh: int, mat_names: 
         if "POSITION" not in attrs or "indices" not in prim or int(prim.get("mode", 4)) != 4:
             continue
         pos = _accessor(doc, blob, attrs["POSITION"]) @ _TO_GLTF  # float32 @ float64 is float64
-        idx = _accessor(doc, blob, int(prim["indices"])).astype(np.int64).reshape(-1, 3)
+        idx = _accessor(doc, blob, int(prim["indices"])).astype(np.int64).reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the unknown dimension
         uvs = None
         if "TEXCOORD_0" in attrs:
             uvs = _accessor(doc, blob, attrs["TEXCOORD_0"]).astype(np.float32)
@@ -593,14 +593,16 @@ def _node_matrix(raw: Mapping[str, Any]) -> np.ndarray:
     """A node's 4x4 transform in the glTF frame: its ``matrix``, or T·R·S."""
     if "matrix" in raw:
         return np.array([float(v) for v in raw["matrix"]]).reshape(4, 4).T
-    x, y, z, w = (float(v) for v in raw.get("rotation") or (0.0, 0.0, 0.0, 1.0))
-    rotation = np.array([
-        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
-    ])
     matrix = np.eye(4)
-    matrix[:3, :3] = rotation * np.array([float(v) for v in raw.get("scale") or (1.0, 1.0, 1.0)])
+    if "rotation" in raw:
+        x, y, z, w = (float(v) for v in raw["rotation"])
+        matrix[:3, :3] = [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    # Each column takes its axis scale: R·S.
+    matrix[:3, :3] *= [float(v) for v in raw.get("scale") or (1.0, 1.0, 1.0)]
     matrix[:3, 3] = [float(v) for v in raw.get("translation") or (0.0, 0.0, 0.0)]
     return matrix
 
