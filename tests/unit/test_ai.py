@@ -428,7 +428,8 @@ def fake_ollama() -> Iterator[tuple[str, type[FakeOllama]]]:
         "requests": [],
     })
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    # shutdown() waits for serve_forever to poll again; the default 0.5 s poll cost each test half a second.
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
     thread.start()
     try:
         yield f"http://127.0.0.1:{server.server_address[1]}", handler
