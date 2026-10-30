@@ -37,13 +37,19 @@ To keep the machine clean, the Python pipeline and its checks can run in a conta
 The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
 
 ```bash
-task --list            # test, lint, typecheck, guard, lint:shell, lint:actions, smoke, ci, mutate, image, shell
+task --list            # test, lint, typecheck, guard, lint:shell, lint:actions, smoke, ci, mutate, map, unity, image, shell
 task ci                # everything the CI gate runs
 task test -- -k cadastre
 task lint -- --fix     # ruff (rules in pyproject.toml); --fix applies the safe fixes
 task typecheck         # mypy on src; only errors missing from mypy-baseline.txt fail
 task guard             # a change must not edit both src/ and a quality gate (AGENTS.md)
+task map -- --name "Map name" --lat 37.98407 --lon -1.12863   # run's Python stages in the image
+task unity -- map_name # Unity steps and the Quest question, on the host
 ```
+
+`task map -- <run arguments>` is `onward-generator run --no-unity` in the image: the same arguments as `run` (`--radius-m`, `--brief`, `--from`, `--verbose` and the rest), and it stops after `export` because the image has no Unity. It does not check whether the Editor is open. Its last line is the next command, `task unity -- maps/<id>/data/processed/export/pkg_NN`.
+
+`task unity -- <map id | maps/<id> | package>` runs on the host what `run` does after `export`: `tools/unity/onward_adapter/build_map.sh` picks the newest package of that map, runs `run_export.sh` for `tool scene launcher` (no `scene` when `build/scene_report.json` exists, nothing when the launcher pair exists), and then asks `¿Subir al Quest? [s/N]`. Only `s`, `si`, `y` or `yes` runs `push`, which backs up the headset map and replaces it. It needs Unity 2021.3.23f1, `adb`, and the stage-0 project (`PROJECT`, default `~/Unity/OnwardPhase0Project`) closed in the Editor. `run_export.sh` also calls Python (package checks, the `info3` listing and the ContentBuilder patch). Without `.venv/bin/python` or `PYTHON`, that Python comes from the image through `tools/docker/python.sh`, which mounts the repository and `PROJECT` at their host paths. `--platform macos|linux` goes before the map: `task unity -- --platform linux map_name`.
 
 ### Mutation testing
 

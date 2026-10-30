@@ -1,5 +1,6 @@
 # Same tasks locally and in CI (.github/workflows/ci.yml runs `task ci`).
 # Every task runs inside the Docker image through tools/docker/run.sh; nothing is installed on the host.
+# The exception is `task unity`: Unity and adb run on the host, and Python still comes from the image when there is no .venv.
 # https://taskfile.dev
 version: "3"
 
@@ -29,7 +30,7 @@ tasks:
   lint:shell:
     desc: Check the shell scripts with shellcheck
     cmds:
-      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh .githooks/pre-push"
+      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/docker/python.sh tools/unity/lib.sh tools/unity/*/*.sh .githooks/pre-push"
 
   lint:
     desc: Check the Python code with ruff (rules in pyproject.toml)
@@ -82,6 +83,18 @@ tasks:
       - task: lint:actions
       - task: smoke
       - task: test
+
+  map:
+    desc: Run the Python stages of `onward-generator run` in the image and stop after export (task map -- --name N --lat Y --lon X)
+    interactive: true
+    cmds:
+      - "{{.RUN}} onward-generator run --no-unity {{.CLI_ARGS}}"
+
+  unity:
+    desc: On the host, build the Quest files with Unity for a map id or package, then ask before uploading (task unity -- <map id>)
+    interactive: true
+    cmds:
+      - "tools/unity/onward_adapter/build_map.sh {{.CLI_ARGS}}"
 
   shell:
     desc: Open a shell in the image
