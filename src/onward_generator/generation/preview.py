@@ -61,6 +61,33 @@ def side_by_side(images: Sequence[np.ndarray], gap_px: int = 8) -> bytes:
     return _png((np.concatenate(parts, axis=1) * 255).round().astype(np.uint8))
 
 
+def _splat(
+    index: np.ndarray, px: np.ndarray, py: np.ndarray, depth: np.ndarray, c: np.ndarray,
+    zbuf: np.ndarray, canvas: np.ndarray,
+) -> None:
+    """Draw triangles ``index`` as one sample each, at the pixel their centroid truncates to.
+
+    They are drawn first, into an empty depth buffer. A pixel keeps the nearest
+    sample; between equal depths, the first triangle in submission order. That
+    is what drawing them one by one with a strict depth test gives, without the
+    Python loop.
+    """
+    height, width = zbuf.shape
+    x = px[index].mean(axis=1).astype(np.int64)
+    y = py[index].mean(axis=1).astype(np.int64)
+    z = depth[index].mean(axis=1)
+    inside = (x >= 0) & (x < width) & (y >= 0) & (y < height)
+    index, x, y, z = index[inside], x[inside], y[inside], z[inside]
+    pixel = np.ravel_multi_index((y, x), zbuf.shape)
+    # Sort by pixel, then depth, then submission order; the first row of each pixel wins.
+    order = np.lexsort((index, z, pixel))
+    first = np.ones(order.size, dtype=bool)
+    first[1:] = pixel[order][1:] != pixel[order][:-1]
+    win = order[first]
+    zbuf[y[win], x[win]] = z[win]
+    canvas[y[win], x[win]] = c[index[win]]
+
+
 def render_rgb(
     nodes: Sequence[Node],
     materials: Mapping[str, Material],
@@ -118,13 +145,7 @@ def render_rgb(
     visible = (hi_px >= 0) & (lo_px < width) & (hi_py >= 0) & (lo_py < height)
     # Sub-pixel triangles become one depth-tested sample at their centroid, in submission order.
     tiny = splat_subpixel & visible & ((hi_px - lo_px) < 1.0) & ((hi_py - lo_py) < 1.0)
-    for i in np.flatnonzero(tiny):
-        x, y = int(px[i].mean()), int(py[i].mean())
-        if 0 <= x < width and 0 <= y < height:
-            z = depth[i].mean()
-            if z < zbuf[y, x]:
-                zbuf[y, x] = z
-                canvas[y, x] = c[i]
+    _splat(np.flatnonzero(tiny), px, py, depth, c, zbuf, canvas)
     for i in np.flatnonzero(visible & ~tiny):
         x0, x1, x2 = px[i]
         y0, y1, y2 = py[i]

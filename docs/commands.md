@@ -32,4 +32,4 @@ Every command is `onward-generator <command>`, the same as `python -m onward_gen
 | `export package` / `verify` | Write an export package for the Unity adapter (`--project` with `export.enabled`, `--detail`, `--layout`, `--out`, `[--config]`). Never overwrites. The build and the headset copy are `tools/unity/onward_adapter/run_export.sh`. See `12-export.md`. | `0` / `1` |
 | `ai plan` | Instruction to a validated configuration. `--instruction` or `--instruction-file`. `--provider ollama` (local, `--model`, default `qwen3:14b`), `none` (no model, `--intent FILE`), or `replay` (`--replay FILE`). `--out`, `[--confirm]`, `[--overwrite]`. See `10-ai.md`. | `0` written, `1` rejected, `3` needs confirmation |
 
-Usage errors return `2`. `run --verbose` prints each stage's full output; `run --no-unity` stops after `export` and prints the `task unity` command for the host.
+Usage errors return `2`. `run --verbose` prints each stage's full output; `run --preview` also draws the diagnostic PNGs of `generate` and `detail`; `run --no-unity` stops after `export` and prints the `task unity` command for the host.

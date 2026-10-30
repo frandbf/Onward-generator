@@ -65,7 +65,7 @@ On the Madrid test extract (141 strips, 32 OSM crossings): 26 strips observed, 1
 | `scene_collision.glb` | One `<id>#collider` node per collider, one material |
 | `scene3d.json` | `onward_generator.scene3d` 0.1.0: inputs with SHA-256, attributions (OSM and Catastro), the frame and glTF axes, and one record per object |
 | `generation_report.json` | `onward_generator.generation_report` 0.1.0: triangle, vertex, material, and collider counts; area by class; checks; issues; `phase_03_exit` |
-| `preview_southwest.png`, `preview_northeast.png` | Axonometric views rendered with no extra dependencies |
+| `preview_southwest.png`, `preview_northeast.png` | Axonometric views rendered with no extra dependencies. Not written with `--no-preview`, which `run` passes unless given `--preview` |
 
 Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 

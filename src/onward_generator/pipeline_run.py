@@ -112,9 +112,14 @@ def map_create_argv(
     return argv
 
 
-def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
-    """Stages after ``map create``, in pipeline order. Stops before Unity."""
+def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[str, list[str]]]:
+    """Stages after ``map create``, in pipeline order. Stops before Unity.
+
+    ``generate`` and ``detail`` skip their diagnostic PNGs unless ``preview``
+    is set. The export thumbnail is drawn either way.
+    """
     root = Path(directory)
+    no_preview = () if preview else ("--no-preview",)
     geo_argv = list(geo_command(root).argv)
     scene = _flag(geo_argv, "--out") / "geo_scene.json"
     cadastre_steps: list[tuple[str, list[str]]] = []
@@ -127,9 +132,9 @@ def plan_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
         overrides = _flag(split_argv, "--out") / "heights_overrides.catastro.json"
     heights_argv = list(heights_command(scene, overrides).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
-    generate_argv = list(generate_command(scene, heights).argv)
+    generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = list(detail_command(scene, heights, scene3d).argv)
+    detail_argv = [*detail_command(scene, heights, scene3d).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -516,10 +521,10 @@ def package_for_quest(root: Path, ran: Sequence[tuple[str, Sequence[str]]]) -> P
     return export_root / "pkg_01"
 
 
-def resume_steps(directory: str | Path) -> list[tuple[str, list[str]]]:
+def resume_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[str, list[str]]]:
     """``osm download`` plus every stage after ``map create``."""
     root = Path(directory)
-    return [("osm", ["osm", "download", "--map", str(root)]), *plan_steps(root)]
+    return [("osm", ["osm", "download", "--map", str(root)]), *plan_steps(root, preview=preview)]
 
 
 def choose_start(
@@ -704,6 +709,7 @@ def run_map(
     host: HostProfile | None = None,
     verbose: bool = False,
     no_unity: bool = False,
+    preview: bool = False,
     palette: Palette | None = None,
 ) -> int:
     """Create the map folder, then run every Python stage through ``export package``.
@@ -719,6 +725,7 @@ def run_map(
     ``no_unity`` stops after ``export`` and prints the command for the Unity
     steps, so the Python stages can run where Unity is not installed. It does
     not check the Editor either. ``verbose`` adds each stage's own output.
+    ``preview`` keeps the diagnostic PNGs of ``generate`` and ``detail``.
     """
     runner = execute if execute is not None else _execute_cli
     root = Path(out)
@@ -784,7 +791,7 @@ def run_map(
         if catastro is not None:
             store_catastro(root, catastro)
         try:
-            steps = plan_steps(out)
+            steps = plan_steps(out, preview=preview)
         except PipelineError as exc:
             print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
             return 1
@@ -800,7 +807,7 @@ def run_map(
                 store_panoramax(root, True)
             if catastro is not None:
                 store_catastro(root, catastro)
-            steps = resume_steps(root)
+            steps = resume_steps(root, preview=preview)
             done = [step for step, argv in steps if output_ready(step, argv, root)]
             done.insert(0, "map")
             pending = [step for step, _argv in steps if step not in done]

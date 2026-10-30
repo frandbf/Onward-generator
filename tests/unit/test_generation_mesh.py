@@ -27,7 +27,7 @@ from onward_generator.generation.mesh import (
     upward_area,
     walls,
 )
-from onward_generator.generation.preview import render
+from onward_generator.generation.preview import _splat, render, render_rgb
 from onward_generator.generation.surfaces import AreaFeature, LinearWay, SurfaceClass, build_partition
 
 COURTYARD = Polygon([(0, 0), (20, 0), (20, 12), (0, 12)], [[(5, 4), (5, 8), (9, 8), (9, 4)]])
@@ -206,6 +206,72 @@ def test_read_glb_rejects_other_files() -> None:
 def test_preview_is_a_png() -> None:
     png = render([Node("b", (Primitive(prism(L_SHAPE, 0, 6, bottom=False), "building_wall"),))], CFG.materials, width=120, height=90)
     assert png[:8] == b"\x89PNG\r\n\x1a\n" and struct.unpack(">II", png[16:24]) == (120, 90)
+
+
+def _splat_one_by_one(index, px, py, depth, c, zbuf, canvas) -> None:
+    """The loop ``_splat`` replaced: one centroid sample per triangle, strict depth test."""
+    height, width = zbuf.shape
+    for i in index:
+        x, y = int(px[i].mean()), int(py[i].mean())
+        if 0 <= x < width and 0 <= y < height:
+            z = depth[i].mean()
+            if z < zbuf[y, x]:
+                zbuf[y, x] = z
+                canvas[y, x] = c[i]
+
+
+def _splat_both(px: np.ndarray, py: np.ndarray, depth: np.ndarray, index: np.ndarray) -> tuple[np.ndarray, ...]:
+    width, height = 6, 4
+    c = np.linspace(0.0, 1.0, len(px) * 3).reshape(len(px), 3)
+    out = []
+    for draw in (_splat, _splat_one_by_one):
+        zbuf = np.full((height, width), np.inf)
+        canvas = np.zeros((height, width, 3))
+        draw(index, px, py, depth, c, zbuf, canvas)
+        out.extend([zbuf, canvas])
+    return tuple(out)
+
+
+def test_splat_matches_drawing_each_triangle_in_turn() -> None:
+    # Centroids at every edge of a 6x4 canvas, outside it, and just left of 0 (truncates to 0).
+    cx = np.array([0.2, 5.9, 6.0, -0.5, -1.5, 2.5, 2.5, 2.2, 2.9, 1.0, 1.0])
+    cy = np.array([0.0, 3.9, 1.0, 1.0, 1.0, 4.0, -0.4, 2.0, 2.0, 2.0, 2.0])
+    z = np.array([5.0, 4.0, 1.0, 3.0, 1.0, 1.0, 2.0, 7.0, 6.0, 9.0, 9.0])
+    spread = np.array([-0.1, 0.0, 0.1])
+    px, py = cx[:, None] + spread, cy[:, None] - spread
+    depth = z[:, None] + spread
+    zbuf, canvas, want_z, want_canvas = _splat_both(px, py, depth, np.arange(len(cx)))
+    assert np.array_equal(zbuf, want_z) and np.array_equal(canvas, want_canvas)
+    # (2.2, 2.0) and (2.9, 2.0) share a pixel: the nearer one wins although it comes later.
+    assert zbuf[2, 2] == 6.0
+    # Equal depths on one pixel: the first triangle in submission order keeps its colour.
+    assert np.array_equal(canvas[2, 1], np.linspace(0.0, 1.0, 33).reshape(11, 3)[9])
+    assert zbuf[1, 0] == 3.0 and np.isinf(zbuf[1, 5])
+
+
+def test_splat_matches_drawing_each_triangle_in_turn_on_a_random_crowd() -> None:
+    rng = np.random.default_rng(48152)
+    count = 400
+    px = rng.uniform(-2.0, 8.0, (count, 3))
+    py = rng.uniform(-2.0, 6.0, (count, 3))
+    depth = rng.integers(0, 4, (count, 3)).astype(float)
+    index = np.sort(rng.choice(count, 300, replace=False))
+    zbuf, canvas, want_z, want_canvas = _splat_both(px, py, depth, index)
+    assert np.array_equal(zbuf, want_z) and np.array_equal(canvas, want_canvas)
+
+
+def test_sub_pixel_triangles_are_splatted_only_when_asked() -> None:
+    # A field of 0.1 m triangles seen from 400 m: each one is far below a pixel.
+    tiny = Mesh(
+        np.array([corner for x in range(0, 400, 20) for y in range(0, 400, 20) for corner in ((x, y, 0.0), (x + 0.1, y, 0.0), (x, y + 0.1, 0.0))]),
+        np.arange(1200).reshape(400, 3),
+    )
+    nodes = [Node("t", (Primitive(tiny, "building_wall"),))]
+    background = np.array([0.93, 0.95, 0.97])
+    drawn = render_rgb(nodes, CFG.materials, width=80, height=60, margin_px=2, splat_subpixel=True)
+    skipped = render_rgb(nodes, CFG.materials, width=80, height=60, margin_px=2, splat_subpixel=False)
+    assert (np.abs(drawn - background).sum(axis=2) > 1e-9).sum() > 100
+    assert (np.abs(skipped - background).sum(axis=2) > 1e-9).sum() < (np.abs(drawn - background).sum(axis=2) > 1e-9).sum()
 
 
 # --- Ground partition. ---

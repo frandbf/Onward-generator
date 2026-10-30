@@ -181,7 +181,7 @@ Every collider must be closed, manifold, and have positive volume (`collider_not
 | `scene_collision.glb` | Collision, separate from the visual mesh |
 | `scene_detail.json` | `onward_generator.scene_detail` 0.1.0. Input hashes, including the phase-03 base; fidelity, prototypes, and attribution; per object: template, storeys, openings, shops, materials, facade use and its evidence, how the door was placed, roof, evidence, interior, and checks |
 | `detail_report.json` | `onward_generator.detail_report` 0.1.0. The full configuration; opening, template, roof, door (`counts.doors`), facade use, and wall material counts; triangles by material and the budget; issues; `phase_04_checks` |
-| `compare_overview.png`, `compare_closeup.png` | Before and after, phase 03 on the left and phase 04 on the right, same camera |
+| `compare_overview.png`, `compare_closeup.png` | Before and after, phase 03 on the left and phase 04 on the right, same camera. Not written with `--no-preview`, which `run` passes unless given `--preview` |
 
 Material names that collide with the generation configuration are refused. Input files and the base are never overwritten, even with `--overwrite`.
 

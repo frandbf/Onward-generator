@@ -64,7 +64,7 @@ onward-generator run \
 
 - `--radius-m` is half the side of the square, in metres (50–1500, default 400). `--margin-m` defaults to 30. `--lightmap-texels-per-m` defaults to 10 and cannot exceed 40.
 - `--brief` is stored on the map and read by overgrow. `--ai` asks local Ollama for a placement plan; a rejected reply falls back to the rules. `--panoramax` (under development) projects street photos onto facades.
-- `--verbose` prints each stage's full output. `--no-unity` stops after `export` and prints the Unity command for the host; `task map` always uses it.
+- `--verbose` prints each stage's full output. `--preview` also draws the diagnostic PNGs of `generate` and `detail`, which `run` skips by default. `--no-unity` stops after `export` and prints the Unity command for the host; `task map` always uses it.
 
 `run` creates `maps/<id>/` from the name, downloads that square from Overpass, and runs:
 

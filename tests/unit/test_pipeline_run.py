@@ -44,6 +44,7 @@ from onward_generator.pipeline_run import (
     print_header,
     print_total,
     print_unity_command,
+    resume_steps,
     run_map,
     run_steps,
     unity_editor_open,
@@ -91,6 +92,27 @@ def test_plan_runs_python_stages_and_stops_before_unity(tmp_path) -> None:
     assert "push" not in joined
     assert f"--origin {MURCIA_CENTER_LON} {MURCIA_CENTER_LAT}" in joined
     assert "panoramax" not in names
+
+
+def test_run_skips_the_diagnostic_previews_unless_asked(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    quiet = dict(plan_steps(root))
+    assert [name for name, argv in quiet.items() if "--no-preview" in argv] == ["generate", "detail"]
+    assert quiet["generate"][-1] == "--no-preview" and quiet["detail"][-1] == "--no-preview"
+    assert "--out" in quiet["generate"] and "--base" in quiet["detail"]
+    drawn = dict(resume_steps(root, preview=True))
+    assert not any("--no-preview" in argv for argv in drawn.values())
+    assert drawn["generate"] + ["--no-preview"] == quiet["generate"]
+    assert drawn["detail"] + ["--no-preview"] == quiet["detail"]
+    assert "--no-preview" in dict(resume_steps(root))["generate"]
+    assert resume_steps(root, preview=True)[0] == ("osm", ["osm", "download", "--map", str(root)])
+
+
+def test_run_help_names_the_preview_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["run", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--preview also draw the diagnostic PNGs of generate and detail (off by default; the export thumbnail is always drawn)" in help_text
 
 
 def test_a_map_without_the_panoramax_key_keeps_the_current_graph(tmp_path: Path) -> None:
@@ -370,7 +392,8 @@ def test_unity_summary_keeps_timings_and_lightmapper_lines() -> None:
 def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
-    steps = dict(plan_steps(root))
+    # With previews on, each step is exactly the ``next:`` line its stage prints.
+    steps = dict(plan_steps(root, preview=True))
 
     def out(name: str) -> Path:
         return Path(steps[name][steps[name].index("--out") + 1])
@@ -446,6 +469,9 @@ def test_run_command_passes_the_centre(monkeypatch: pytest.MonkeyPatch) -> None:
     assert received["map_id"] == "apocalipsis_murciana"
     assert received["out"] == "maps/apocalipsis_murciana"
     assert received["name"] == "Apocalipsis Murciana"
+    assert received["preview"] is False
+    main(["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON), "--preview"])
+    assert received["preview"] is True
 
 
 def test_rerun_after_a_failed_osm_fetch_continues_at_osm(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -1445,3 +1471,35 @@ def test_cadastre_help_lists_split() -> None:
     subparsers = next(action for action in cadastre_parser()._actions if isinstance(action, argparse._SubParsersAction))
     listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
     assert listed["split"] == "split OSM footprints by Catastro parts; write a new geo scene and overrides (offline)"
+
+
+@pytest.mark.parametrize("preview", [None, False, True])
+def test_run_passes_the_preview_choice_to_a_new_and_a_resumed_map(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, preview: bool | None,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    seen: dict[str, list[str]] = {}
+
+    def execute(argv: list[str]) -> int:
+        if argv[:2] == ["map", "create"]:
+            create_map(Path("maps/murcia"), map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=90)
+            return 0
+        seen[argv[0]] = list(argv)
+        return 0 if argv[0] != "detail" else 3
+
+    def run(start: str | None) -> int:
+        # ``None`` leaves the argument out: the default draws no previews.
+        chosen = {} if preview is None else {"preview": preview}
+        return run_map(
+            map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+            radius_m=90, margin_m=30, out="maps/murcia", execute=execute, interactive=False,
+            catastro=False, start=start, **chosen,
+        )
+
+    assert run(None) == 3
+    first = dict(seen)
+    seen.clear()
+    assert run("generate") == 3
+    for argvs in (first, seen):
+        assert ("--no-preview" in argvs["generate"]) is not bool(preview)
+        assert ("--no-preview" in argvs["detail"]) is not bool(preview)
