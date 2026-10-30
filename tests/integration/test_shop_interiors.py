@@ -205,3 +205,50 @@ def test_the_shop_budget_goes_to_the_shop_nearest_the_map_centre(row_inputs: tup
     one = _detail(row_inputs, _cfg(interiors__shops__max_triangles=costs["osm-way-603"]))
     assert one.stats["shop_interiors"] == ["osm-way-603"]
     assert [i.object_id for i in one.issues if i.code == "interior_not_generated" and "triangle_budget" in i.message] == ["osm-way-602"]
+
+
+# A one-storey bakery with a flat roof and a one-storey pharmacy with a hipped roof, apart on one street.
+ONE_STOREY = {
+    801: ([(-22, 6), (-8, 6), (-8, 19), (-22, 19)], {"building": "retail", "building:levels": "1"}),
+    802: ([(4, 6), (12, 6), (12, 14), (4, 14)], {"building": "yes", "building:levels": "1", "roof:shape": "hipped"}),
+}
+ONE_STOREY_POIS = {901: ((-14, 7), {"shop": "bakery"}), 902: ((8, 7), {"amenity": "pharmacy"})}
+
+
+@pytest.fixture(scope="module")
+def one_storey_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    from tests.conftest import _detail_inputs
+
+    return _detail_inputs(tmp_path_factory.mktemp("one_storey"), ONE_STOREY, ONE_STOREY_POIS)
+
+
+@pytest.mark.parametrize(("bid", "category", "roof"), [("osm-way-801", "bakery", "flat_parapet"), ("osm-way-802", "pharmacy", "hip")])
+def test_a_one_storey_shop_has_its_room_under_a_closed_roof(one_storey_inputs: tuple[Path, Path, Path], bid: str,
+                                                           category: str, roof: str) -> None:
+    d = _detail(one_storey_inputs)
+    assert not d.critical
+    assert sorted(d.stats["shop_interiors"]) == ["osm-way-801", "osm-way-802"]
+    building = _obj(d, f"building/{bid}")
+    interior = _obj(d, f"interior/{bid}").record
+    height = building.record["height"]["height_m"]
+    assert building.record["facade"]["storeys"]["count"] == 1 and building.record["roof"]["type"] == roof
+    assert interior["kind"] == "shop" and interior["shop"]["category"] == category and interior["accessible_floors"] == 1
+    assert interior["collider_parts"][-1] == "roof_slab" and "upper_solid" not in interior["collider_parts"]
+    [room] = interior["rooms"]
+    assert room["ceiling_z_m"] == pytest.approx(height - CFG.interiors.slab_m)
+    # The roof stays closed and watertight; every collider is closed.
+    assert building.record["checks"]["facade_open_edges"] == 0 and interior["checks"]["collider_defects"] == 0
+    # Walk in through the door to the middle of the room; the roof slab above it is solid.
+    [anchor] = _obj(d, f"interior/{bid}").light_anchors["rooms"]
+    door = np.array(interior["connections"][0]["position_m"])
+    centre = np.array(anchor["light_m"][:2])
+    inward = (centre - door) / np.linalg.norm(centre - door)
+    t = CFG.interiors.wall_thickness_m
+    for step in (t / 2, t + 1.0):
+        assert not any(_inside(m, np.array([*(door + inward * step), 1.0])) for m in building.colliders)
+    assert not any(_inside(m, np.array([*centre, 1.0])) for m in building.colliders)
+    assert any(_inside(m, np.array([*centre, height - 0.1])) for m in building.colliders)
+    # See-through shop windows, and a light under the roof slab.
+    assert interior["through_windows"] > 0
+    assert [p.mesh.triangle_count for p in building.visual if p.material == "glass_view"] == [2 * interior["through_windows"]]
+    assert anchor["light_m"][2] == pytest.approx(room["ceiling_z_m"] - LIGHT_BELOW_CEILING_M)

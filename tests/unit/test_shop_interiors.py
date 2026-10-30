@@ -15,7 +15,7 @@ from shapely import Polygon
 
 from onward_generator.detail.config import DEFAULT_CONFIG_PATH, DetailConfigError, config_from_document, load_detail_config
 from onward_generator.detail.facades import Hole, Segment
-from onward_generator.detail.interiors import build_interior, cap_lights, plan_interior
+from onward_generator.detail.interiors import build_interior, cap_lights, plan_interior, room_ceiling
 from onward_generator.detail.shops import VINYL_BACKS, plan_shops, shop_category
 from onward_generator.export.lightmap import surface_class
 from tests.conftest import MURCIA_CENTER
@@ -148,7 +148,57 @@ def test_a_shop_plan_has_one_floor_and_no_stair() -> None:
     assert not isinstance(tall, str) and tall.floors > 1 and tall.flights
     two = plan_interior("block", FOOTPRINT, DOOR, SEG, 18.0, 3.0, 6, CFG, max_floors=2)
     assert not isinstance(two, str) and (two.floors, len(two.flights)) == (2, 1 + sum(f.role == "roof" for f in two.flights))
-    assert plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, max_floors=1) == "not_enough_levels"
+    # A shop may use its only storey; the stair interior always leaves the top storey solid.
+    low = plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, max_floors=1)
+    assert not isinstance(low, str) and (low.floors, low.flights) == (1, ())
+    assert plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG) == "not_enough_levels"
+    assert plan_interior("none", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 0, CFG, max_floors=1) == "not_enough_levels"
+    four = plan_interior("block", FOOTPRINT, DOOR, SEG, 12.0, 3.0, 4, CFG, max_floors=3)
+    assert not isinstance(four, str) and four.floors >= 2
+
+
+def test_a_one_storey_shop_room_reaches_the_roof_slab() -> None:
+    plan = plan_interior("kiosk", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, roof_access=False, max_floors=1)
+    assert not isinstance(plan, str)
+    slab = CFG.interiors.slab_m
+    assert room_ceiling(plan, 3.0, slab) == pytest.approx(3.0 - slab)
+    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, CFG, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
+    assert built.defects == 0
+    names = [n for n, _ in built.colliders]
+    assert names[-1] == "roof_slab" and "upper_solid" not in names
+    roof = dict(built.colliders)["roof_slab"]
+    assert (roof.vertices[:, 2].min(), roof.vertices[:, 2].max()) == pytest.approx((3.0 - slab, 3.0))
+    [room] = built.spec["rooms"]
+    assert room["ceiling_z_m"] == pytest.approx(3.0 - slab)
+    [ceiling] = built.visual["interior_wall"]
+    assert set(ceiling.vertices[:, 2].round(9)) == {round(3.0 - slab, 9)}
+    [walls] = built.visual["interior_shop_bar"]
+    assert walls.vertices[:, 2].max() == pytest.approx(3.0 - slab)
+    assert built.light_anchors["rooms"][0]["light_m"][2] == pytest.approx(3.0 - slab - 0.3)
+
+
+def test_rooms_of_a_stair_interior_keep_their_slabs_and_area() -> None:
+    odd = Polygon([(0.0, 0.0), (24.0007, 0.0), (24.0007, 18.0003), (0.0, 18.0003)])
+    s = 3.0007  # a storey whose slab line has more than three decimals
+    plan = plan_interior("block", odd, DOOR, SEG, 6 * s, s, 6, CFG)
+    assert not isinstance(plan, str) and plan.floors >= 2
+    built = build_interior(plan, 6 * s, 6 * s, odd, CFG)
+    area = plan.inner.area
+    assert round(area, 3) != round(area, 4)
+    slab = CFG.interiors.slab_m
+    assert built.spec["rooms"] == [
+        {"id": f"block/L{i}", "level": i, "floor_z_m": round(i * s, 3),
+         "ceiling_z_m": round(s * plan.floors if i + 1 == plan.floors else (i + 1) * s - slab, 3), "area_m2": round(area, 3)}
+        for i in range(plan.floors)
+    ]
+    assert built.spec["rooms"][0]["ceiling_z_m"] == 2.801
+
+
+@pytest.mark.parametrize(("height", "ceiling"), [(9.0, 3.0), (3.0, 2.8), (3.0005, 2.8005), (3.001, 2.801), (3.002, 3.0)])
+def test_room_ceiling_is_the_storey_line_or_the_roof_slab(height: float, ceiling: float) -> None:
+    plan = plan_interior("shop", FOOTPRINT, DOOR, SEG, 9.0, 3.0, 3, CFG, max_floors=1)
+    assert not isinstance(plan, str)
+    assert room_ceiling(plan, height, 0.2) == pytest.approx(ceiling)
 
 
 def test_a_shop_room_paints_its_walls_and_floor_and_keeps_a_white_ceiling() -> None:

@@ -47,6 +47,7 @@ from onward_generator.detail.interiors import (
     pierce_room_windows,
     plan_interior,
     rectangularity,
+    room_ceiling,
     room_window_cuts,
 )
 from onward_generator.detail.landmarks import attach_towers
@@ -553,7 +554,7 @@ def detail_scene(
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
                 layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
-                interior.floors * interior.storey_m,
+                room_ceiling(interior, height, cfg.interiors.slab_m),
             )
 
         shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
