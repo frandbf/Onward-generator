@@ -112,8 +112,9 @@ def test_sizes_step_down_two_at_a_time() -> None:
     assert _plate_ink_size(name) == _ink_size(name, 60)
 
 
-def test_font_uses_basic_layout() -> None:
-    # Basic layout gives the same glyph positions whether or not libraqm is installed.
+def test_font_uses_basic_layout_even_where_raqm_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pillow picks Raqm by default when it is present; the plate must not change with the host.
+    monkeypatch.setattr(ImageFont.core, "HAVE_RAQM", True)
     assert plaque_font(32).layout_engine == ImageFont.Layout.BASIC
 
 
