@@ -113,6 +113,7 @@
     "min_buildings": 5,
     "max_buildings": 8,
     "max_triangles": 8000,
+    "max_collision_triangles": 24000,
     "include_ids": [],
     "exclude_ids": [],
     "rule": { "categories": ["residential_multi", "unknown"], "min_levels": 3, "min_area_m2": 80.0, "max_area_m2": 500.0, "min_rectangularity": 0.8 },
@@ -126,6 +127,7 @@
     "shops": {
       "enabled": true,
       "max_triangles": 6000,
+      "max_collision_triangles": 72000,
       "max_area_m2": 600.0,
       "categories": [
         { "name": "bakery", "tags": { "shop": ["bakery", "pastry", "confectionery"] }, "wall": "interior_shop_bakery", "floor": "interior_shop_tile" },

@@ -116,7 +116,7 @@ A sub-building:
 
 Its override has the group's storey count, confidence 0.85, or 0.7 when more than a fifth of its area came from step 6. `heights` turns it into `authoritative_levels` as above. `heights_report.json` has `counts.subdivided`: `osm_buildings_split`, `sub_buildings` and `levels_range`.
 
-Downstream nothing else changes. `generate` extrudes every edge of every footprint, so where a taller sub-building meets a lower one its side wall stays closed above the lower roof. `detail` marks shared edges as party walls: no doors, windows or shopfronts there. A shop or amenity point inside a footprint gives that footprint the shopfront; only a point inside no footprint uses the 2 m distance.
+Downstream nothing else changes. `generate` extrudes every edge of every footprint, so where a taller sub-building meets a lower one its side wall stays closed above the lower roof. `detail` marks shared edges as party walls: no doors, windows or shopfronts there. A shop or amenity point inside a footprint gives that footprint the shopfront; only a point inside no footprint uses the 2 m distance, and then only the nearest footprint (the lowest id on a tie), so a point in front of a party wall gives one building the shopfront (`docs/07-detail.md`, *One building per POI*).
 
 ### In `run`
 

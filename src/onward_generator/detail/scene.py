@@ -40,15 +40,18 @@ from onward_generator.detail.facades import (
 )
 from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
-    build_interior,
+    Interior,
+    assemble_interior,
     cap_lights,
     fits_triangle_budget,
     glass_penetrations,
+    interior_visual,
     pierce_room_windows,
     plan_interior,
     rectangularity,
     room_ceiling,
     room_window_cuts,
+    visual_triangles,
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
@@ -169,6 +172,39 @@ class DetailedScene:
         }
 
 
+@dataclass(slots=True)
+class InteriorBudget:
+    """Triangles one kind of interior (stair or shop) has used of its limits: ``triangles`` (drawn) and ``collision_triangles``.
+
+    ``prefix`` names the limits in ``interiors`` for the issue: ``""`` or ``"shops."``.
+    """
+
+    prefix: str
+    limits: dict[str, int]
+    used: dict[str, int] = field(default_factory=lambda: {"triangles": 0, "collision_triangles": 0})
+
+    @classmethod
+    def of_stairs(cls, cfg: DetailConfig) -> InteriorBudget:
+        ic = cfg.interiors
+        return cls("", {"triangles": ic.max_triangles, "collision_triangles": ic.max_collision_triangles})
+
+    @classmethod
+    def of_shops(cls, cfg: DetailConfig) -> InteriorBudget:
+        sc = cfg.interiors.shops
+        return cls("shops.", {"triangles": sc.max_triangles, "collision_triangles": sc.max_collision_triangles})
+
+    def refuse(self, kind: str, cost: int) -> str | None:
+        """``None`` when ``cost`` more ``kind`` triangles fit, else the ``triangle_budget`` reason."""
+        used, limit = self.used[kind], self.limits[kind]
+        if fits_triangle_budget(used, cost, limit):
+            return None
+        return f"triangle_budget: needs {cost} {kind.replace('_', ' ')}, {limit - used} left of {self.prefix}max_{kind} {limit}"
+
+    def spend(self, built: Interior) -> None:
+        self.used["triangles"] += built.visual_triangles
+        self.used["collision_triangles"] += built.collision_triangles
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -199,7 +235,24 @@ def load_base(base_dir: str | Path, scene_path: str | Path, heights_path: str | 
     return generated, ref
 
 
+def _poi_building(point: BaseGeometry, ids: list[str], tree: STRtree, footprints: Mapping[str, BaseGeometry], cfg: DetailConfig) -> tuple[str, bool] | None:
+    """The one building a POI belongs to, and whether the point is inside its footprint.
+
+    A point inside a footprint belongs to that building only (ADR-016). A point outside every footprint
+    goes to the nearest one within ``shop_evidence_distance_m``. A tie (a point on a party line, or as far
+    from two footprints) goes to the footprint that contains it, then to the lowest id, so a POI never
+    gives two buildings a shopfront.
+    """
+    hits = tree.query(point, predicate="dwithin", distance=cfg.shop_evidence_distance_m)
+    if hits.size == 0:
+        return None
+    ranked = sorted((footprints[ids[k]].distance(point), not footprints[ids[k]].contains(point), ids[k]) for k in hits)
+    distance, _, bid = ranked[0]
+    return bid, distance == 0.0
+
+
 def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, BaseGeometry], cfg: DetailConfig) -> dict[str, list[str]]:
+    """The shop POIs of each building (``_poi_building``): a ``shop_evidence_keys`` POI that is not street furniture."""
     pois = [(f["id"], shape(f["geometry"])) for f in features if f.get("kind") == "poi"
             and any(k in (f.get("tags") or {}) for k in cfg.shop_evidence_keys) and classify_poi(f.get("tags") or {}, cfg) is None]
     evidence: dict[str, list[str]] = defaultdict(list)
@@ -208,12 +261,9 @@ def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, Base
     ids = sorted(footprints)
     tree = STRtree([footprints[i] for i in ids])
     for pid, point in pois:
-        # A point inside a footprint belongs to that building only, not to the neighbour across a party wall (ADR-016).
-        hits = tree.query(point, predicate="intersects")
-        if hits.size == 0:
-            hits = tree.query(point, predicate="dwithin", distance=cfg.shop_evidence_distance_m)
-        for k in sorted(int(x) for x in hits):
-            evidence[ids[k]].append(pid)
+        owner = _poi_building(point, ids, tree, footprints, cfg)
+        if owner is not None:
+            evidence[owner[0]].append(pid)
     return evidence
 
 
@@ -222,8 +272,8 @@ def _use_evidence(
 ) -> dict[str, list[tuple[str, Mapping[str, str], str]]]:
     """OSM features that may name a building's use: ``(source id, tags, match)`` per building.
 
-    A POI inside a footprint is ``poi_inside``. A POI outside every footprint goes to the
-    nearest ones (every footprint at that distance) within ``shop_evidence_distance_m`` as ``poi_near``. An area whose
+    A POI goes to one building (``_poi_building``): ``poi_inside`` when the point is in its footprint,
+    ``poi_near`` when it is outside every footprint. An area whose
     tags name a use (an ``amenity=school`` ground) is ``enclosing_area`` for every
     building whose representative point it contains. Street furniture is not evidence.
     """
@@ -240,11 +290,9 @@ def _use_evidence(
                 if geom.contains(footprints[ids[k]].representative_point()):
                     related[ids[k]].append((f["id"], tags, "enclosing_area"))
             continue
-        inside = sorted(int(x) for x in tree.query(geom, predicate="intersects"))
-        match = "poi_inside" if inside else "poi_near"
-        hits = inside or sorted(int(x) for x in tree.query_nearest(geom, max_distance=cfg.shop_evidence_distance_m))
-        for k in hits:
-            related[ids[k]].append((f["id"], tags, match))
+        owner = _poi_building(geom, ids, tree, footprints, cfg)
+        if owner is not None:
+            related[owner[0]].append((f["id"], tags, "poi_inside" if owner[1] else "poi_near"))
     return related
 
 
@@ -466,8 +514,7 @@ def detail_scene(
     door_rules: Counter[str] = Counter()
     interiors_built: list[str] = []
     shop_interiors: list[str] = []
-    interior_triangles = 0
-    shop_triangles = 0
+    budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
     lit: list[tuple[bool, dict[str, Any]]] = []
     exposed_m = party_m = 0.0
 
@@ -551,37 +598,35 @@ def detail_scene(
         doors_on = door_walls(segments, others, cfg)
         door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         opened_windows = omitted_windows = 0
+        category = shop_category([t for _, t, _ in _shops_of(evidence[bid], feature_of, tags)], cfg) if shop else None
+        budget = budgets[shop]
+        shell = built = refusal = None
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
                 layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
                 room_ceiling(interior, height, cfg.interiors.slab_m),
             )
-
-        shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
-        built = None
-        category = shop_category([t for _, t, _ in _shops_of(evidence[bid], feature_of, tags)], cfg) if shop else None
-        if interior is not None:
-            built = build_interior(
-                interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
-                glass_penetrations(layout, segments),
+            # The drawn triangles are counted before the shell and the colliders are built, so an
+            # interior over the budget costs its plan and its visual meshes, not a whole building.
+            drawn = interior_visual(
+                interior, height, cfg, room_window_cuts(layout, segments),
                 **({"wall_material": category.wall, "floor_material": category.floor} if category else {}),
             )
-            cost = built.visual_triangles
-            used, limit, key = (shop_triangles, ic.shops.max_triangles, "shops.max_triangles") if shop else (
-                interior_triangles, ic.max_triangles, "max_triangles")
-            if fits_triangle_budget(used, cost, limit):
-                if shop:
-                    shop_triangles += cost
-                else:
-                    interior_triangles += cost
-            else:
-                issues.append(Issue("interior_not_generated", "info", bid,
-                                    f"triangle_budget: needs {cost} triangles, {limit - used} left of {key} {limit}"))
-                interior = built = None
-                height, storeys = previous_height, plain_storeys
-                layout = run_layout(*plain_door, storeys)
-                door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
-                shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget test pins the rebuilt shell
+            refusal = budget.refuse("triangles", visual_triangles(drawn))
+            if refusal is None:
+                shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
+                built = assemble_interior(interior, drawn, height, shell.z_top, refined, cfg, glass_penetrations(layout, segments))
+                refusal = budget.refuse("collision_triangles", built.collision_triangles)
+        if refusal is not None:
+            issues.append(Issue("interior_not_generated", "info", bid, refusal))
+            interior = built = shell = None
+            height, storeys = previous_height, plain_storeys
+            layout = run_layout(*plain_door, storeys)
+            door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
+        if built is not None:
+            budget.spend(built)
+        if shell is None:
+            shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
         if shell.defects:
@@ -613,6 +658,7 @@ def detail_scene(
                 "through_windows": opened_windows,
                 "omitted_windows": omitted_windows,
                 "visual_triangles": built.visual_triangles,
+                "collision_triangles": built.collision_triangles,
             }
             if category:
                 interior_record["shop"] = {"category": category.name, "wall_material": category.wall,
@@ -758,9 +804,11 @@ def detail_scene(
         "detail_config": {"path": cfg.path, "sha256": cfg.sha256, "version": cfg.version},
     }
     detailed.stats = _stats(detailed, counts, templates_used, roof_types, interiors_built, exposed_m, party_m, elements)
-    detailed.stats["interior_visual_triangles"] = interior_triangles
+    detailed.stats["interior_visual_triangles"] = budgets[False].used["triangles"]
+    detailed.stats["interior_collision_triangles"] = budgets[False].used["collision_triangles"]
     detailed.stats["shop_interiors"] = sorted(shop_interiors)
-    detailed.stats["shop_interior_visual_triangles"] = shop_triangles
+    detailed.stats["shop_interior_visual_triangles"] = budgets[True].used["triangles"]
+    detailed.stats["shop_interior_collision_triangles"] = budgets[True].used["collision_triangles"]
     detailed.stats["interior_lights"] = {
         "max": cfg.interiors.lights_max,
         "placed": sum(len(anchors["rooms"]) for _, anchors in lit) - len(dropped_lights),

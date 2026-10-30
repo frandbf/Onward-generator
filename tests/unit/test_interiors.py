@@ -16,16 +16,19 @@ from onward_generator.detail.interiors import (
     Interior,
     InteriorPlan,
     _inner_walls,
+    assemble_interior,
     build_interior,
     fits_triangle_budget,
     glass_penetrations,
+    interior_visual,
     light_anchors,
     pierce_room_windows,
     plan_interior,
     room_window_cuts,
+    visual_triangles,
 )
 from onward_generator.detail.modules import recess
-from onward_generator.detail.scene import interior_quota
+from onward_generator.detail.scene import InteriorBudget, interior_quota
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects
 from onward_generator.materials.openings import GLASS_ALPHA, boarded_rgba, window_png, window_rgba
@@ -343,3 +346,57 @@ def test_light_uses_the_centroid_of_an_l_shaped_room() -> None:
     room = light_anchors(replace(plan, inner=inner), _rooms(2.8))["rooms"][0]
     assert inner.centroid.distance(inner.representative_point()) > 0.5
     assert room["light_m"][:2] == [round(inner.centroid.x, 3), round(inner.centroid.y, 3)]
+
+
+def test_the_visual_pass_is_what_the_built_interior_draws_and_its_colliders_are_counted() -> None:
+    """``interior_visual`` alone gives the drawn triangles the scene budgets before it builds the shell."""
+    cfg = load_detail_config()
+    footprint = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    plan = plan_interior("block-split", footprint, door, segment, 18.0, 3.0, 6, cfg)
+    assert not isinstance(plan, str) and any(f.role == "roof" for f in plan.flights)
+    layout = Layout(holes=[_window(4.0, 0.9), _window(16.0, 0.9)])
+    assert pierce_room_windows(layout, [segment], plan.inner, footprint, cfg.interiors.wall_thickness_m, 6.0) == (2, 0)
+    cuts, panes = room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment])
+
+    built = build_interior(plan, 18.0, 18.0, footprint, cfg, cuts, panes, wall_material="interior_shop_bar")
+    visual = interior_visual(plan, 18.0, cfg, cuts, wall_material="interior_shop_bar")
+    drawn = {name: [m.triangle_count for m in meshes] for name, meshes in visual.items()}
+    assert drawn == {name: [m.triangle_count for m in meshes] for name, meshes in built.visual.items()}
+    assert visual_triangles(visual) == built.visual_triangles == sum(sum(counts) for counts in drawn.values())
+    # Without the window cuts the inner walls are plain quads: fewer triangles than with them.
+    assert visual_triangles(interior_visual(plan, 18.0, cfg, wall_material="interior_shop_bar")) < built.visual_triangles
+    assert visual_triangles({"a": [], "b": []}) == 0
+
+    assembled = assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg, panes)
+    assert assembled.visual is visual
+    assert [(n, m.triangle_count) for n, m in assembled.colliders] == [(n, m.triangle_count) for n, m in built.colliders]
+    assert assembled.spec == built.spec and assembled.roof_well is not None
+    assert len(built.glass_colliders) == 2 and all(m.triangle_count == 12 for m in built.glass_colliders)
+    walls_and_slabs = sum(m.triangle_count for _, m in built.colliders)
+    assert built.collision_triangles == walls_and_slabs + 24
+    assert assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg).collision_triangles < built.collision_triangles
+
+
+def test_interior_budgets_name_the_limit_they_refuse_on() -> None:
+    cfg = load_detail_config()
+    stairs, shops = InteriorBudget.of_stairs(cfg), InteriorBudget.of_shops(cfg)
+    assert (stairs.prefix, stairs.limits) == ("", {"triangles": 8000, "collision_triangles": 24000})
+    assert (shops.prefix, shops.limits) == ("shops.", {"triangles": 6000, "collision_triangles": 72000})
+    assert stairs.used == shops.used == {"triangles": 0, "collision_triangles": 0}
+    assert stairs.refuse("triangles", 8000) is None and stairs.refuse("collision_triangles", 24000) is None
+    assert stairs.refuse("triangles", 8001) == "triangle_budget: needs 8001 triangles, 8000 left of max_triangles 8000"
+    assert shops.refuse("collision_triangles", 72001) == (
+        "triangle_budget: needs 72001 collision triangles, 72000 left of shops.max_collision_triangles 72000")
+    built = Interior(InteriorPlan("b", Polygon(), 1, 3.0, _window(0, 0), Segment(0, 0, 0, (0.0, 0.0), (1.0, 0.0), True), ()),
+                     {"interior_wall": [Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 5))]},
+                     [("walls_0", Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 7)))], {},
+                     glass_colliders=[Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 3))])
+    assert (built.visual_triangles, built.collision_triangles) == (5, 10)
+    stairs.spend(built)
+    stairs.spend(built)
+    assert stairs.used == {"triangles": 10, "collision_triangles": 20} and shops.used["triangles"] == 0
+    assert stairs.refuse("triangles", 7991) == "triangle_budget: needs 7991 triangles, 7990 left of max_triangles 8000"
+    assert stairs.refuse("collision_triangles", 23981) == (
+        "triangle_budget: needs 23981 collision triangles, 23980 left of max_collision_triangles 24000")

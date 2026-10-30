@@ -11,7 +11,7 @@ flat roof. Slabs and colliders leave the doorway and the stairs walkable.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -106,7 +106,12 @@ class Interior:
     @property
     def visual_triangles(self) -> int:
         """Triangles this interior draws: every visual mesh of the interior node. Colliders are not drawn."""
-        return sum(mesh.triangle_count for meshes in self.visual.values() for mesh in meshes)
+        return visual_triangles(self.visual)
+
+    @property
+    def collision_triangles(self) -> int:
+        """Triangles of the interior's colliders: its walls, slabs, stairs and solids, and the glass panes."""
+        return sum(mesh.triangle_count for _, mesh in self.colliders) + sum(mesh.triangle_count for mesh in self.glass_colliders)
 
 
 def fits_triangle_budget(used: int, cost: int, limit: int) -> bool:
@@ -498,6 +503,65 @@ def room_ceiling(plan: InteriorPlan, height: float, slab_m: float) -> float:
     return height - slab_m if top >= height - 1e-3 else top
 
 
+def interior_visual(
+    plan: InteriorPlan,
+    height: float,
+    cfg: DetailConfig,
+    window_cuts: Sequence[WallCut] = (),
+    *,
+    wall_material: str = "interior_wall",
+    floor_material: str = "interior_floor",
+) -> dict[str, list[Mesh]]:
+    """The meshes the planned interior draws, by material. No collider.
+
+    ``wall_material`` and ``floor_material`` paint the room's walls and ground floor (a shop's colours);
+    ceilings, slabs and upper floors keep ``interior_wall`` and ``interior_floor``. The scene counts these
+    triangles against the interior budget before it builds the shell and the colliders (``assemble_interior``).
+    """
+    ic = cfg.interiors
+    s, t = plan.storey_m, ic.wall_thickness_m
+    seg, door = plan.door_segment, plan.door
+    rim = (seg.point(door.s0, 0, t), seg.point(door.s0 + door.width, 0, t))
+    top = room_ceiling(plan, height, ic.slab_m)
+    visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": [], wall_material: [], floor_material: []}
+    visual[wall_material].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
+    visual[floor_material].append(cap(plan.inner, 0.0))
+    if not _climbs_to_roof(plan):
+        visual["interior_wall"].append(cap(plan.inner, top, up=False))
+    for flight in plan.flights:
+        z_floor = (flight.level + 1) * s
+        plate = plan.inner.difference(flight.well)
+        if _lands_on_roof(flight, z_floor, height):
+            visual["interior_wall"].append(cap(plate, height - ic.slab_m, up=False))
+            visual["interior_wall"].append(walls(flight.well, height - ic.slab_m, height, inward=True))
+        else:
+            visual["interior_floor"].append(cap(plate, z_floor))
+            visual["interior_wall"].append(cap(plate, z_floor - ic.slab_m, up=False))
+            visual["interior_wall"].append(walls(flight.well, z_floor - ic.slab_m, z_floor, inward=True))
+        for material, mesh in stair(flight.geometry).parts:
+            visual[material].append(transform(mesh, _lifted(flight, s)))
+    return visual
+
+
+def visual_triangles(visual: Mapping[str, Sequence[Mesh]]) -> int:
+    """Triangles drawn by ``visual``, every material."""
+    return sum(mesh.triangle_count for meshes in visual.values() for mesh in meshes)
+
+
+def _climbs_to_roof(plan: InteriorPlan) -> bool:
+    return any(flight.role == "roof" for flight in plan.flights)
+
+
+def _lands_on_roof(flight: Flight, z_floor: float, height: float) -> bool:
+    return flight.role == "roof" and abs(z_floor - height) <= 0.15
+
+
+def _lifted(flight: Flight, storey_m: float) -> np.ndarray:
+    lifted = np.array(flight.matrix, copy=True)
+    lifted[2, 3] += flight.level * storey_m
+    return lifted
+
+
 def build_interior(
     plan: InteriorPlan,
     height: float,
@@ -510,27 +574,34 @@ def build_interior(
     wall_material: str = "interior_wall",
     floor_material: str = "interior_floor",
 ) -> Interior:
-    """Build the planned interior. ``wall_material`` and ``floor_material`` paint the room's walls and ground
-    floor (a shop's colours); ceilings, slabs and upper floors keep ``interior_wall`` and ``interior_floor``."""
+    """Build the planned interior: ``interior_visual``, then ``assemble_interior``."""
+    visual = interior_visual(plan, height, cfg, window_cuts, wall_material=wall_material, floor_material=floor_material)
+    return assemble_interior(plan, visual, height, z_top, refined, cfg, penetrations)
+
+
+def assemble_interior(
+    plan: InteriorPlan,
+    visual: dict[str, list[Mesh]],
+    height: float,
+    z_top: float,
+    refined: BaseGeometry,
+    cfg: DetailConfig,
+    penetrations: Sequence[tuple[Segment, Hole]] = (),
+) -> Interior:
+    """The interior that draws ``visual`` (``interior_visual``): its colliders and panes, rooms, connections and checks."""
     ic = cfg.interiors
     s, k, t = plan.storey_m, plan.floors, ic.wall_thickness_m
     seg, door = plan.door_segment, plan.door
-    rim = (seg.point(door.s0, 0, t), seg.point(door.s0 + door.width, 0, t))
     top = room_ceiling(plan, height, ic.slab_m)
     under_roof = top < k * s
-    visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": [], wall_material: [], floor_material: []}
-    roof_flights = [flight for flight in plan.flights if flight.role == "roof"]
-    visual[wall_material].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
-    visual[floor_material].append(cap(plan.inner, 0.0))
     colliders: list[tuple[str, Mesh]] = []
 
     ring = refined.difference(plan.inner)
     gap = seg.plan_rect(door.s0, door.s0 + door.width, -(t + CUT_OVERLAP_M), CUT_OVERLAP_M)
     wall_parts, glass = _pierced_walls(ring, gap, penetrations, t, door.height, z_top)
     colliders.extend(wall_parts)
-    if not roof_flights:
+    if not _climbs_to_roof(plan):
         # A room under the roof is closed by a roof slab; otherwise the storeys above stay solid.
-        visual["interior_wall"].append(cap(plan.inner, top, up=False))
         colliders.append(("roof_slab" if under_roof else "upper_solid", prism(plan.inner, top, height, bottom=True)))
 
     rooms = [{"id": f"{plan.building_id}/L{i}", "level": i, "floor_z_m": round(i * s, 3),
@@ -543,25 +614,16 @@ def build_interior(
     for flight in plan.flights:
         g = flight.geometry
         z_floor = (flight.level + 1) * s
-        on_roof = flight.role == "roof" and abs(z_floor - height) <= 0.15
         plate = plan.inner.difference(flight.well)
-        if on_roof:
-            visual["interior_wall"].append(cap(plate, height - ic.slab_m, up=False))
-            visual["interior_wall"].append(walls(flight.well, height - ic.slab_m, height, inward=True))
+        if _lands_on_roof(flight, z_floor, height):
             colliders.append(("roof_deck", prism(plate, height - ic.slab_m, height, bottom=True)))
             roof_well = flight.well
             destination = "roof"
         else:
-            visual["interior_floor"].append(cap(plate, z_floor))
-            visual["interior_wall"].append(cap(plate, z_floor - ic.slab_m, up=False))
-            visual["interior_wall"].append(walls(flight.well, z_floor - ic.slab_m, z_floor, inward=True))
             colliders.append((f"slab_L{flight.level + 1}", prism(plate, z_floor - ic.slab_m, z_floor, bottom=True)))
             destination = rooms[flight.level + 1]["id"] if flight.level + 1 < k else f"{plan.building_id}/L{flight.level + 1}"
         proto = stair(g)
-        lifted = np.array(flight.matrix, copy=True)
-        lifted[2, 3] += flight.level * s
-        for material, mesh in proto.parts:
-            visual[material].append(transform(mesh, lifted))
+        lifted = _lifted(flight, s)
         assert proto.collider is not None
         colliders.append((f"stair_L{flight.level}", transform(proto.collider, lifted)))
         start = lifted @ np.array([0.0, g.width_m / 2, 0.0, 1.0])
