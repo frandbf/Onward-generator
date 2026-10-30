@@ -15,6 +15,14 @@ SPAWN_CLEAR_M = 5.0
 VINE_WIDTH_M = 0.35
 VINE_HEIGHT_M = 3.2
 TARGET_ASSET_TRIS = 1800
+# Load-time level of detail of a library prop (library.level_of_detail): triangles
+# per square metre of its largest bounding-box face, at least LOD_MIN_TRIS. A prop
+# lower than FLAT_PROP_M lies flat on the ground and takes LOD_MIN_TRIS.
+LOD_TRIS_PER_M2 = 600
+LOD_MIN_TRIS = 128
+FLAT_PROP_M = 0.1
+# A reduced copy whose bounding box moved more than this (street metres) lost a part; the target doubles.
+LOD_BOX_TOLERANCE_M = 0.02
 ALBEDO_PX = 512
 # A flat-anchored vegetation mesh taller than this is a slope tile, not ground cover.
 FLAT_VEGETATION_MAX_M = 0.05

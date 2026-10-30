@@ -372,6 +372,7 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
             "fit_scale": round(prop.fit_scale, 4),
             "size_m": [round(prop.length_m, 3), round(prop.half_y * 2, 3), round(prop.height_m, 3)],
             "crosswise": turn != 0.0,
+            **({"lod": prop.lod()} if prop.source_triangles else {}),
         },
         matrix,
         f"prop:{prop.spec.id}",

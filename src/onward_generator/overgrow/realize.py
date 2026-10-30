@@ -429,6 +429,7 @@ def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_i
             "size_m": [round(prop.length_m, 3), round(prop.half_y * 2, 3), round(prop.height_m, 3)],
             "crosswise": crosswise,
             "op_index": op_index,
+            **({"lod": prop.lod()} if prop.source_triangles else {}),
         },
         matrix,
         f"prop:{prop.spec.id}",

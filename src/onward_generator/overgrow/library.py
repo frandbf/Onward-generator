@@ -15,6 +15,15 @@ triangle primitive. Primitives that share an albedo become one part of the
 prop; each part is exported as its own ``prop_<id>`` material. A row's
 ``yaw_deg`` turns the mesh about the vertical on load, so a file whose long
 side is not on +X is placed like the others. The GLB is not rewritten.
+
+A mesh with more triangles than its size needs is decimated on load
+(``level_of_detail``): the budget is ``LOD_TRIS_PER_M2`` per square metre of
+its largest bounding-box face, between ``LOD_MIN_TRIS`` and
+``TARGET_ASSET_TRIS``, and a prop lower than ``FLAT_PROP_M`` (a manhole cover,
+a ground tile) takes ``LOD_MIN_TRIS``. The size is the street size placement
+scales the prop to. Each albedo part is clustered apart, and a copy whose
+bounding box moves more than ``LOD_BOX_TOLERANCE_M`` is refused for a larger
+target. The copy keeps ``source_triangles``; the GLB is not rewritten.
 """
 
 from __future__ import annotations
@@ -22,9 +31,9 @@ from __future__ import annotations
 import io
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from PIL import Image
@@ -32,10 +41,18 @@ from PIL import Image
 from onward_generator.generation.gltf import Primitive, images_by_material, read_glb, scene_primitives
 from onward_generator.generation.mesh import Mesh, merge
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
-from onward_generator.overgrow.constants import FLAT_VEGETATION_MAX_M
+from onward_generator.overgrow.constants import (
+    FLAT_PROP_M,
+    FLAT_VEGETATION_MAX_M,
+    LOD_BOX_TOLERANCE_M,
+    LOD_MIN_TRIS,
+    LOD_TRIS_PER_M2,
+    TARGET_ASSET_TRIS,
+)
+from onward_generator.overgrow.fit import apply_fit_scale
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
 from onward_generator.overgrow.manifest import KIT_ONLY, check_manifest
-from onward_generator.overgrow.normalize import rest_on_ground
+from onward_generator.overgrow.normalize import cluster_decimate, rest_on_ground
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +84,8 @@ class Prop:
     albedo: bytes
     fit_scale: float = 1.0
     parts: tuple[PropPart, ...] = ()
+    # Triangles of the file when ``level_of_detail`` reduced the mesh on load; 0 when it did not.
+    source_triangles: int = 0
 
     def material(self, index: int) -> str:
         """``prop_<id>`` for the first part, ``prop_<id>__<index>`` for the others."""
@@ -91,6 +110,10 @@ class Prop:
 
     def _parts(self) -> tuple[PropPart, ...]:
         return self.parts or (PropPart(self.mesh.triangle_count, self.albedo),)
+
+    def lod(self) -> dict[str, int]:
+        """``{"source_triangles", "triangles"}`` of a mesh reduced on load; empty for the file's own mesh."""
+        return {"source_triangles": self.source_triangles, "triangles": self.triangles} if self.source_triangles else {}
 
     @property
     def triangles(self) -> int:
@@ -187,8 +210,69 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
         if reason is not None:
             rejects.append(LibraryReject(spec.id, reason))
             continue
-        props.append(prop)
+        props.append(level_of_detail(prop))
     return props, rejects
+
+
+def lod_target(mesh: Mesh, scale: float = 1.0) -> int:
+    """Triangles a prop needs at ``scale`` times its size: per square metre of its largest box face, within the bounds."""
+    length, depth, height = (_span(mesh, axis) * scale for axis in range(3))
+    if height < FLAT_PROP_M:
+        return LOD_MIN_TRIS
+    face = max(length * depth, length * height, depth * height)
+    return int(min(TARGET_ASSET_TRIS, max(LOD_MIN_TRIS, LOD_TRIS_PER_M2 * face)))
+
+
+def level_of_detail(prop: Prop) -> Prop:
+    """A copy with about ``lod_target`` triangles at street size, or ``prop`` itself.
+
+    The target is measured at the size placement will scale the prop to. Clustering
+    can drop a thin part (the feet of an air-conditioner), so a copy whose bounding
+    box moved more than ``LOD_BOX_TOLERANCE_M`` at street size is refused and the
+    target doubles, while it still saves a quarter of the file's triangles.
+    """
+    _street, scale = apply_fit_scale(prop.mesh, prop.spec.role)
+    target = lod_target(prop.mesh, scale)
+    # A copy that saves less than a quarter of the triangles is not worth the lost detail.
+    while 4 * target <= 3 * prop.triangles:
+        reduced = _decimated(prop, target)
+        if box_shift(prop.mesh, reduced.mesh) * scale <= LOD_BOX_TOLERANCE_M:
+            return reduced
+        target *= 2
+    return prop
+
+
+def box_shift(a: Mesh, b: Mesh) -> float:
+    """Largest move of any face of the bounding box between two meshes."""
+    low = np.abs(a.vertices.min(axis=0) - b.vertices.min(axis=0))
+    high = np.abs(a.vertices.max(axis=0) - b.vertices.max(axis=0))
+    return float(max(low.max(), high.max()))
+
+
+def _decimated(prop: Prop, target: int) -> Prop:
+    """Each albedo part clustered to its share of ``target``; a part that would vanish keeps its triangles.
+
+    The copy rests on the ground again, since clustering moves the lowest vertex.
+    """
+    meshes: list[Mesh] = []
+    uvs: list[np.ndarray] = []
+    parts: list[PropPart] = []
+    end = 0
+    for primitive, part in zip(prop.primitives(), prop._parts(), strict=True):
+        source = primitive.mesh
+        source_uvs = cast(np.ndarray, primitive.uvs)  # Prop.primitives always sets the UVs.
+        share = round(target * source.triangle_count / prop.triangles)
+        vertices, triangles, coords = cluster_decimate(source.vertices, source.triangles, source_uvs, share)
+        if not len(triangles):
+            vertices, triangles, coords = source.vertices, source.triangles, source_uvs
+        meshes.append(Mesh(vertices, triangles))
+        uvs.append(np.asarray(coords, dtype=np.float32))
+        end += len(triangles)
+        parts.append(PropPart(end, part.albedo))
+    return replace(
+        prop, mesh=rest_on_ground(merge(meshes)), uvs=np.concatenate(uvs), parts=tuple(parts),
+        source_triangles=prop.triangles,
+    )
 
 
 def _spec(row: dict) -> AssetSpec | None:

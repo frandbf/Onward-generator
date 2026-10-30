@@ -282,6 +282,7 @@ def overgrow(
         for key, count in composed.dressing.reject_counts.items():
             planted.reject_counts[key] = planted.reject_counts.get(key, 0) + count
     tuft_meshes.extend(planted.grass)
+    by_id = {prop.spec.id: prop for prop in props}
     records.extend(planted.records)
     rejects.extend(planted.rejects)
     for key, count in planted.reject_counts.items():
@@ -393,6 +394,11 @@ def overgrow(
         "added_triangles": budget.used + planted.triangles,
         "procedural_triangles": budget.used,
         "library_triangles": planted.triangles,
+        # Triangles the placed copies would have had at the files' own detail, and each reduced asset.
+        "library_source_triangles": planted.triangles + sum(
+            by_id[item].source_triangles - by_id[item].triangles for item in planted.placed_ids if by_id[item].source_triangles
+        ),
+        "library_lod": {item: by_id[item].lod() for item in dict.fromkeys(planted.placed_ids) if by_id[item].source_triangles},
         "max_added_triangles": MAX_ADDED_TRIS,
         "rejects": rejects[:80],
         "reject_counts": reject_counts,
