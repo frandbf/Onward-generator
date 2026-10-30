@@ -21,6 +21,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -139,7 +140,7 @@ def split_bbox(bbox: BBox) -> list[BBox]:
     if columns * rows > MAX_TILES:
         raise CadastreError(f"bbox {bbox} needs {columns * rows} tiles; limit is {MAX_TILES}")
     xs, ys = _cuts(x0, x1, columns), _cuts(y0, y1, rows)
-    return [(xs[i], ys[j], xs[i + 1], ys[j + 1]) for j in range(rows) for i in range(columns)]
+    return [(west, south, east, north) for south, north in pairwise(ys) for west, east in pairwise(xs)]
 
 
 def bbox_from_scene(scene: Mapping[str, Any], margin_m: float) -> BBox:
