@@ -24,7 +24,7 @@ from onward_generator.ai.planner import (
     load_base,
     output_documents,
 )
-from onward_generator.ai.providers import OllamaProvider, ProviderError, check_loopback
+from onward_generator.ai.providers import OllamaProvider, ProviderError, check_loopback, context_window
 from onward_generator.config.models import GeneratorConfig
 from tests.conftest import MURCIA_CENTER
 
@@ -408,7 +408,7 @@ def fake_ollama() -> Iterator[tuple[str, type[FakeOllama]]]:
         "tags": {"models": [{"name": "qwen3:14b", "model": "qwen3:14b", "digest": "abc123",
                              "details": {"parameter_size": "14.8B", "quantization_level": "Q4_K_M", "family": "qwen3"}}]},
         "chat": {"message": {"role": "assistant", "content": text(intent_doc(residential_levels=4))},
-                 "done_reason": "stop", "eval_count": 42, "total_duration": 123},
+                 "done_reason": "stop", "eval_count": 42, "prompt_eval_count": 17, "total_duration": 123},
         "chat_status": 200,
         "requests": [],
     })
@@ -431,12 +431,44 @@ def test_ollama_provider_sends_schema_and_records_provenance(fake_ollama) -> Non
     body = req["body"]
     assert body["model"] == "qwen3:14b" and body["format"] == intent_schema()
     assert body["stream"] is False and body["think"] is False
-    assert body["options"] == {"temperature": 0, "seed": 7}
+    assert body["options"] == {"temperature": 0, "seed": 7, "num_ctx": 8192}
     assert body["messages"] == [{"role": "system", "content": "SYSTEM"}, {"role": "user", "content": EXAMPLE}]
     p = result.provenance
     assert (p["model"], p["model_digest"], p["server_version"], p["quantization"]) == ("qwen3:14b", "abc123",
                                                                                       "0.0.test", "Q4_K_M")
-    assert (p["eval_count"], p["done_reason"]) == (42, "stop")
+    assert (p["eval_count"], p["prompt_eval_count"], p["done_reason"]) == (42, 17, "stop")
+    assert p["options"]["num_ctx"] == 8192
+
+
+def test_ollama_context_fits_a_long_prompt(fake_ollama) -> None:  # type: ignore[no-untyped-def]
+    host, handler = fake_ollama
+    OllamaProvider(host=host, seed=7, timeout_s=5).complete("S" * 43_000, EXAMPLE, intent_schema())
+    (req,) = handler.requests
+    assert req["body"]["options"]["num_ctx"] == 20480
+
+
+@pytest.mark.parametrize(
+    ("texts", "expected"),
+    [
+        (("",), 8192),
+        (("a" * 12_288,), 8192),
+        (("a" * 12_291,), 12288),
+        (("a" * 6_000, "b" * 6_291), 12288),
+        (("é" * 6_146,), 12288),
+        (("a" * 86_016,), 32768),
+    ],
+)
+def test_context_window_rounds_the_prompt_up(texts: tuple[str, ...], expected: int) -> None:
+    assert context_window(*texts) == expected
+
+
+def test_context_window_refuses_a_prompt_that_cannot_fit(fake_ollama) -> None:  # type: ignore[no-untyped-def]
+    with pytest.raises(ProviderError, match=r"^prompt needs about 32769 tokens of context; the limit is 32768$"):
+        context_window("a" * 86_019)
+    host, handler = fake_ollama
+    with pytest.raises(ProviderError, match="limit is 32768"):
+        OllamaProvider(host=host, timeout_s=5).complete("a" * 86_019, "", intent_schema())
+    assert handler.requests == []
 
 
 def test_missing_model_is_explained_and_not_downloaded(fake_ollama) -> None:  # type: ignore[no-untyped-def]
