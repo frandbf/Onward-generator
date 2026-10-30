@@ -247,3 +247,5 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "LoadListingThumbnail" in source
     assert "ContributesGi" in source
     assert "tree_" in source
+    # Overgrow props (material prop_<id>) are lit by probes, not lightmaps: small ones baked black.
+    assert 'StartsWith("m_prop_")' in source

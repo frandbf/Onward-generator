@@ -2131,10 +2131,14 @@ namespace OnwardGenerator
 
         // ---- Helpers ---------------------------------------------------------------------------
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).
+        // Overgrow props (material prop_<id>, overgrow/realize.py and dressing.py) are small
+        // and often flush against a wall; air-conditioner units came out solid black on the
+        // headset. They are lit by light probes or the ambient probe instead.
         private static bool ContributesGi(Material material)
         {
             string n = material != null ? material.name.ToLowerInvariant() : "";
-            return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal"));
+            return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal")
+                || n.StartsWith("m_prop_"));
         }
 
         private static StaticEditorFlags LightmapFlags(StaticEditorFlags flags, IEnumerable<Material> mats)

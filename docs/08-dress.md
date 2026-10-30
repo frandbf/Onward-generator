@@ -56,7 +56,7 @@ If the detail manifest stores the paths, `--scene`, `--heights`, and `--base` ar
 
 The tiles are generated in code: **greyscale modulation** (cobble, tile, asphalt, bark, foliage) so `PP_Opaque_Simple_Lit` can do `_BaseColor × _BaseMap` without darkening the tint. Each tile is 256 px. The GLB embeds one tile per material as its own image, repeated in metres of the catalogue `tile_m` (2 m when the catalogue has none), the same way as `materials apply`. Historic plaster uses a 2 m `tile_m`. `atlas.png` puts the same tiles on one grid (8×8, up to 2048²) as a contact sheet for review. No material samples it, and the GLB extras mark it `"role": "contact_sheet"`. Before this change the GLB embedded that grid and wrapped each vertex into its slot, which smeared every triangle that crossed a tile edge. Scenes already written keep the old atlas. Licence: `project-generated`.
 
-The adapter does not bake lightmaps on trees or urban metal. At a low texel density, poles and canopies came out black.
+The adapter does not bake lightmaps on trees, urban metal, railings, or overgrow props (material `prop_<id>`). At a low texel density, poles and canopies came out black, and on the headset air-conditioner units flush against a wall came out solid black. Those renderers neither contribute GI nor receive a lightmap; they are lit by light probes, or by the ambient probe where the scene has none (`docs/12-export.md`).
 
 There are no vehicles in this step. Inventing cars on the carriageway is not OSM data. Wrecks, when the brief asks for them, are placed later by `overgrow`.
 
