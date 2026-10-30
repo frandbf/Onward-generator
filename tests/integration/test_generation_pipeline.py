@@ -56,6 +56,21 @@ def test_synthetic_block_generates_without_critical_errors(inputs: tuple[Path, P
             assert fp.vertices[:, 2].min() == 0.0 and fp.vertices[:, 2].max() == o.record["height"]["height_m"]
 
 
+def test_a_map_without_streets_has_no_carriageway_or_crossing_slab(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    scene, _ = inputs
+    doc = json.loads(scene.read_text(encoding="utf-8"))
+    doc["features"] = [f for f in doc["features"] if f.get("kind") != "highway"]
+    edited = tmp_path / "no_streets" / "geo_scene.json"
+    edited.parent.mkdir()
+    edited.write_text(json.dumps(doc), encoding="utf-8")
+    heights, _ = write_height_outputs(run_heights(edited), tmp_path / "no_streets_heights")
+    generated = generate_scene(edited, heights, CFG)
+    assert generated.report()["phase_03_exit"]["passed"]
+    slabs = {o.id for o in generated.objects if o.type == "ground_collider"}
+    assert slabs == {"collider/walkable"}
+    assert generated.partition.crossings.is_empty
+
+
 def test_heights_from_another_scene_are_rejected(inputs: tuple[Path, Path], tmp_path: Path) -> None:
     scene, heights = inputs
     doc = json.loads(heights.read_text(encoding="utf-8"))
