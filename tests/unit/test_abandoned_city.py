@@ -12,12 +12,12 @@ import numpy as np
 from shapely import LineString, Point, Polygon, STRtree
 
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh, box
 from onward_generator.overgrow.catalog import ALL_ASSETS, CATEGORIES, PLACEMENT_RULES, WEAR_NOTE, AssetSpec, rules_for
 from onward_generator.overgrow.dressing import block_reason
 from onward_generator.overgrow.growth import grass_png
-from onward_generator.overgrow.library import load_library
+from onward_generator.overgrow.library import load_library, read_library
 from onward_generator.overgrow.normalize import cluster_decimate, normalize_arrays
 from onward_generator.overgrow.place import overgrow
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
@@ -286,6 +286,7 @@ def test_missing_library_does_not_crash(tmp_path: Path) -> None:
     report = overgrow(tmp_path / "base", scene, tmp_path / "out", library=tmp_path / "missing-library")
     assert report["props"] == 0
     assert report["library_assets"] == 0
+    assert report["library_rejects"] == []
     assert report["geometry"]["identical"] is True
 
 
@@ -346,3 +347,65 @@ def test_a_loaded_prop_rests_its_bottom_on_zero(tmp_path: Path) -> None:
     assert len(props) == 1
     assert abs(float(props[0].mesh.vertices[:, 2].min())) < 1e-6
     assert abs(props[0].height_m - 0.77) < 1e-6
+
+
+def _with_alpha(data: bytes, mode: str) -> bytes:
+    """The same GLB with every material set to ``mode``, repacked."""
+    import struct
+
+    doc, blob = read_glb(data)
+    for material in doc["materials"]:
+        material["alphaMode"] = mode
+    chunk = json.dumps(doc, separators=(",", ":")).encode("utf-8")
+    chunk += b" " * (-len(chunk) % 4)
+    return b"".join((
+        struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(chunk) + 8 + len(blob)),
+        struct.pack("<I4s", len(chunk), b"JSON"),
+        chunk,
+        struct.pack("<I4s", len(blob), b"BIN\x00"),
+        blob,
+    ))
+
+
+def _alpha_library(root: Path) -> None:
+    root.mkdir()
+    mesh = box(-0.3, 0.3, -0.3, 0.3, 0.0, 0.6)
+    plain = build_glb(
+        [Node("albedo", (Primitive(mesh, "albedo"),), {})],
+        {"albedo": Material((1, 1, 1, 1), 1)},
+        repeat_images={"albedo": grass_png()},
+    )
+    rows = []
+    for asset_id, mode in (("plain", None), ("opaque", "OPAQUE"), ("card", "BLEND"), ("cutout", "MASK")):
+        (root / f"{asset_id}.glb").write_bytes(plain if mode is None else _with_alpha(plain, mode))
+        rows.append({
+            "id": asset_id, "file": f"{asset_id}.glb", "category": "waste", "role": "trash",
+            "surfaces": ["sidewalk"], "anchor": "ground", "use": "test",
+        })
+    (root / "manifest.json").write_text(json.dumps({"assets": rows}), encoding="utf-8")
+
+
+def test_a_transparent_material_is_rejected_with_a_reason(tmp_path: Path) -> None:
+    _alpha_library(tmp_path / "library")
+    props, rejects = read_library(tmp_path / "library")
+    assert [prop.spec.id for prop in props] == ["plain", "opaque"]
+    assert [reject.as_dict() for reject in rejects] == [
+        {"asset_id": "card", "reason": "alpha_mode_blend"},
+        {"asset_id": "cutout", "reason": "alpha_mode_mask"},
+    ]
+    assert [prop.spec.id for prop in load_library(tmp_path / "library")] == ["plain", "opaque"]
+    assert read_library(None) == ([], [])
+
+
+def test_the_overgrow_report_lists_library_rejections(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    _alpha_library(tmp_path / "library")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", zone=square_zone(80), library=tmp_path / "library")
+    assert report["library_assets"] == 2
+    assert report["library_rejects"] == [
+        {"asset_id": "card", "reason": "alpha_mode_blend"},
+        {"asset_id": "cutout", "reason": "alpha_mode_mask"},
+    ]
+    assert not {"card", "cutout"} & set(report["placed_assets"])

@@ -52,7 +52,7 @@ from onward_generator.overgrow.growth import (
     vine_png,
     wreck_mesh,
 )
-from onward_generator.overgrow.library import load_library
+from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
@@ -120,7 +120,7 @@ def overgrow(
     years = profile_for(profile)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
-    props = load_library(library)
+    props, library_rejects = read_library(library)
     chosen: list[str] | None = None
     if selection is not None:
         chosen = read_selection(selection)
@@ -385,6 +385,7 @@ def overgrow(
         "props": len(planted.placed_ids),
         "placed_assets": list(dict.fromkeys(planted.placed_ids)),
         "library_assets": len(props),
+        "library_rejects": [reject.as_dict() for reject in library_rejects],
         "library_selection": chosen,
         "added_triangles": budget.used + planted.triangles,
         "procedural_triangles": budget.used,

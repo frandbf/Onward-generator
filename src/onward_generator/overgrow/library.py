@@ -1,4 +1,9 @@
-"""Load prop GLBs named by every catalogue manifest. A missing folder is an empty library."""
+"""Load prop GLBs named by every catalogue manifest. A missing folder is an empty library.
+
+A GLB that reads but cannot be shown as the export draws it is rejected with a
+reason. The exported material is opaque and albedo only, so a material whose
+``alphaMode`` is not ``OPAQUE`` loses its transparency and is refused.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,17 @@ from onward_generator.generation.mesh import Mesh, transform
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
 from onward_generator.overgrow.normalize import rest_on_ground
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryReject:
+    """A manifest row that names a readable GLB the library refused."""
+
+    asset_id: str
+    reason: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {"asset_id": self.asset_id, "reason": self.reason}
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,33 +66,51 @@ def _span(mesh: Mesh, axis: int) -> float:
 
 
 def load_library(path: str | Path | None) -> list[Prop]:
-    """Read every catalogue under ``path``. Absent path → no props.
+    """Read every catalogue under ``path``. Absent path → no props. Rejections are dropped."""
+    return read_library(path)[0]
+
+
+def read_library(path: str | Path | None) -> tuple[list[Prop], list[LibraryReject]]:
+    """Read every catalogue under ``path`` and say which readable GLBs were refused.
 
     A directory with its own ``manifest.json`` is one catalogue. A parent such as
     ``assets`` contributes each child catalogue. A GLB that cannot be read is skipped.
     The same id in two catalogues is an error.
     """
     if path is None:
-        return []
+        return [], []
     props: list[Prop] = []
+    rejects: list[LibraryReject] = []
     seen: dict[str, Path] = {}
     for directory in library_directories(path):
-        for prop in _load_directory(directory):
+        loaded, refused = _load_directory(directory)
+        rejects.extend(refused)
+        for prop in loaded:
             previous = seen.get(prop.spec.id)
             if previous is not None and previous != directory:
                 raise LibraryError(f"{prop.spec.id}: declared in {previous.name} and {directory.name}")
             seen[prop.spec.id] = directory
             props.append(prop)
-    return props
+    return props, rejects
 
 
-def _load_directory(root: Path) -> list[Prop]:
+def reject_reason(spec: AssetSpec, doc: dict, mesh: Mesh) -> str | None:
+    """Why a readable GLB cannot join the library. ``None`` means it can."""
+    for material in doc.get("materials") or []:
+        mode = str(material.get("alphaMode") or "OPAQUE")
+        if mode != "OPAQUE":
+            return f"alpha_mode_{mode.lower()}"
+    return None
+
+
+def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
     manifest = root / "manifest.json"
     try:
         document = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return []
+        return [], []
     props: list[Prop] = []
+    rejects: list[LibraryReject] = []
     for row in document.get("assets") or []:
         if not isinstance(row, dict) or not row.get("id") or not row.get("file"):
             continue
@@ -87,10 +121,16 @@ def _load_directory(root: Path) -> list[Prop]:
         if spec is None:
             continue
         try:
-            props.append(_read(file, spec))
+            prop = _read(file, spec)
+            doc, _blob = read_glb(file.read_bytes())
         except (OSError, ValueError, KeyError):
             continue
-    return props
+        reason = reject_reason(spec, doc, prop.mesh)
+        if reason is not None:
+            rejects.append(LibraryReject(spec.id, reason))
+            continue
+        props.append(prop)
+    return props, rejects
 
 
 def _spec(row: dict) -> AssetSpec | None:
