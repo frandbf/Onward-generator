@@ -13,10 +13,12 @@ tasks:
       - task --list
 
   image:
-    desc: Build the Docker image (onward-generator:dev)
+    desc: Build the Docker image (onward-generator:dev; dev-<folder> in a linked git worktree)
     cmds:
       - docker compose -f compose.yaml build dev
     env:
+      ONWARD_IMAGE:
+        sh: tools/docker/image.sh
       HOST_UID:
         sh: id -u
       HOST_GID:
