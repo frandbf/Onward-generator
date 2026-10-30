@@ -18,7 +18,7 @@ from shapely import Polygon, STRtree, affinity, set_precision, union_all
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
-from onward_generator.cadastre.acquire import CRS, CadastreError, DownloadRecord
+from onward_generator.cadastre.acquire import CadastreError, DownloadRecord
 from onward_generator.cadastre.gml import BuildingPart
 from onward_generator.cadastre.match import SOURCE_LABEL
 
@@ -220,10 +220,13 @@ def split_scene(
     *,
     is_landmark: Callable[[Mapping[str, str]], bool],
 ) -> tuple[list[dict[str, Any]], list[ParentSplit]]:
-    """The scene features with split footprints replaced, and one result per OSM building."""
+    """The scene features with split footprints replaced, and one result per OSM building.
+
+    ``parts`` are in the scene CRS (``gml.reproject_parts``).
+    """
     frame = scene.get("frame") or {}
-    if frame.get("crs") != CRS or frame.get("coordinate_system") != "local_grid" or frame.get("unit") != "m":
-        raise CadastreError(f"scene must be a local grid in {CRS} metres")
+    if frame.get("coordinate_system") != "local_grid" or frame.get("unit") != "m":
+        raise CadastreError("scene must be a local grid in metres")
     e0, n0 = frame["origin_projected"]
     local_parts = [affinity.translate(p.geometry, -e0, -n0) for p in parts]
     tree = STRtree(local_parts)

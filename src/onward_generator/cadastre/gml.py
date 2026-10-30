@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 
+import numpy as np
+import shapely
+from pyproj import Transformer
 from shapely import MultiPolygon, Polygon
 from shapely.geometry.base import BaseGeometry
 
-from onward_generator.cadastre.acquire import CadastreError
+from onward_generator.cadastre.acquire import CRS, CadastreError
 
 NS = {
     "gml": "http://www.opengis.net/gml/3.2",
@@ -19,7 +23,6 @@ NS = {
 _GML = "{http://www.opengis.net/gml/3.2}"
 _EXT = "{http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0}"
 _BASE = "{urn:x-inspire:specification:gmlas:BaseTypes:3.2}"
-_ACCEPTED_SRS = ("EPSG::25830", "EPSG:25830")
 _PROLOG_SCAN = 64 * 1024
 
 
@@ -29,7 +32,7 @@ class BuildingPart:
     refcat: str
     floors_above: int
     floors_below: int
-    geometry: BaseGeometry  # EPSG:25830 metres
+    geometry: BaseGeometry  # metres in the download CRS, or the scene CRS after reproject_parts
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +54,17 @@ def _ring(pos_list: ET.Element) -> list[tuple[float, float]]:
     return list(zip(values[0::2], values[1::2], strict=True))
 
 
-def _geometry(part: ET.Element) -> BaseGeometry:
+def _accepted_srs(crs: str) -> tuple[str, str]:
+    """``srsName`` endings for ``EPSG:nnnn``: the URN form ``EPSG::nnnn`` and the short form."""
+    code = crs.removeprefix("EPSG:")
+    return (f"EPSG::{code}", f"EPSG:{code}")
+
+
+def _geometry(part: ET.Element, accepted: tuple[str, str]) -> BaseGeometry:
     polygons = []
     for surface in part.iter(f"{_GML}Surface"):
         srs = surface.get("srsName", "")
-        if not srs.endswith(_ACCEPTED_SRS):
+        if not srs.endswith(accepted):
             raise ValueError(f"unsupported srsName {srs!r}")
         for patch in surface.iter(f"{_GML}PolygonPatch"):
             exterior = patch.find(f"{_GML}exterior/{_GML}LinearRing/{_GML}posList")
@@ -78,9 +87,10 @@ def _int(part: ET.Element, tag: str) -> int:
     return value
 
 
-def parse_building_parts(path: str | Path) -> tuple[list[BuildingPart], list[PartIssue]]:
-    """Read every BuildingPart. Malformed parts are reported and skipped."""
+def parse_building_parts(path: str | Path, crs: str = CRS) -> tuple[list[BuildingPart], list[PartIssue]]:
+    """Read every BuildingPart in ``crs``, the download CRS. Malformed parts (another CRS among them) are reported and skipped."""
     source = Path(path)
+    accepted = _accepted_srs(crs)
     with source.open("rb") as handle:
         head = handle.read(_PROLOG_SCAN)
     root_at = head.find(b"FeatureCollection")
@@ -105,7 +115,7 @@ def parse_building_parts(path: str | Path) -> tuple[list[BuildingPart], list[Par
                 if local_id in seen:
                     issues.append(PartIssue("duplicate_part", local_id, "repeated localId; later copy ignored"))
                     continue
-                geometry = _geometry(elem)
+                geometry = _geometry(elem, accepted)
                 if not geometry.is_valid or geometry.is_empty:
                     issues.append(PartIssue("invalid_part_geometry", local_id, "invalid polygon; part skipped"))
                     continue
@@ -127,3 +137,21 @@ def parse_building_parts(path: str | Path) -> tuple[list[BuildingPart], list[Par
         raise CadastreError(f"{source}: XML parse error: {exc}") from exc
     parts.sort(key=lambda p: p.local_id)
     return parts, issues
+
+
+def reproject_parts(parts: Sequence[BuildingPart], source_crs: str, target_crs: str) -> list[BuildingPart]:
+    """Parts with their geometry moved from the download CRS to the scene CRS (pyproj, x east, y north).
+
+    Same CRS: unchanged. Catastro answers in ETRS89 (or WGS 84 UTM for the
+    Canaries); a map outside EPSG:25830 is on a WGS 84 UTM zone, and pyproj
+    relates the two datums without a shift, as the OSM data is drawn.
+    """
+    if source_crs == target_crs:
+        return list(parts)
+    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+
+    def move(xy: np.ndarray) -> np.ndarray:
+        x, y = transformer.transform(xy[:, 0], xy[:, 1])
+        return np.column_stack([x, y])
+
+    return [replace(part, geometry=shapely.transform(part.geometry, move)) for part in parts]

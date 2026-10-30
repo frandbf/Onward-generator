@@ -2,7 +2,7 @@
 
 Local tool that turns legal geographic data into 3D scenes for custom Onward maps on Meta Quest. The command is `onward-generator` (`python -m onward_generator`), version 0.1.0.
 
-OpenStreetMap supplies the streets and building footprints. The generator extrudes footprints the extract actually contains. Heights can come from a deterministic estimate or, in peninsular Spain, from Catastro floor counts. A later dressing pass adds facades, materials, street names, and an optional abandoned-city layer. Unity 2021.3 and the Onward custom-content SDK build the headset package. A GLB is not a playable map. The headset checklist in `quest_acceptance.md` is still open, so `device_verified` stays false. See [docs/12-export.md](docs/12-export.md).
+OpenStreetMap supplies the streets and building footprints. The generator extrudes footprints the extract actually contains. Heights can come from a deterministic estimate or, in Spain outside Navarre and the Basque Country, from Catastro floor counts. A later dressing pass adds facades, materials, street names, and an optional abandoned-city layer. Unity 2021.3 and the Onward custom-content SDK build the headset package. A GLB is not a playable map. The headset checklist in `quest_acceptance.md` is still open, so `device_verified` stays false. See [docs/12-export.md](docs/12-export.md).
 
 Documentation is in English. Working rules for changes are in [AGENTS.md](AGENTS.md). The operational contract is [docs/01-pipeline.md](docs/01-pipeline.md).
 

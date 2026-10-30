@@ -156,11 +156,21 @@ def test_catastro_is_on_by_default_in_spain_and_follows_the_stored_switch(tmp_pa
     assert catastro_enabled(root) is True
 
 
-def test_catastro_is_off_outside_spain_for_large_maps_and_without_a_map(tmp_path: Path) -> None:
+def test_catastro_is_off_outside_spain_in_navarre_and_without_a_map(tmp_path: Path) -> None:
     abroad = tmp_path / "obelisco"
     create_map(abroad, map_id="obelisco", name="Obelisco", latitude=-34.6037, longitude=-58.3816, radius_m=400)
     assert catastro_enabled(abroad) is False
-    large = tmp_path / "grande"
-    create_map(large, map_id="grande", name="Grande", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=460)
-    assert catastro_enabled(large) is False  # 2 × (460 + 30 + 20) m > 1 km
+    pamplona = tmp_path / "pamplona"
+    create_map(pamplona, map_id="pamplona", name="Pamplona", latitude=42.8125, longitude=-1.6432, radius_m=400)
+    assert catastro_enabled(pamplona) is False  # foral cadastre: the DG Catastro WFS has nothing there
     assert catastro_enabled(tmp_path / "missing") is False
+
+
+def test_catastro_is_on_for_large_maps_and_other_utm_zones(tmp_path: Path) -> None:
+    large = tmp_path / "grande"
+    create_map(large, map_id="grande", name="Grande", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=1500)
+    assert catastro_enabled(large) is True  # tiled download
+    santiago = tmp_path / "santiago"
+    create_map(santiago, map_id="santiago", name="Santiago", latitude=42.8806, longitude=-8.5446, radius_m=400)
+    document = json.loads((santiago / "map.json").read_text(encoding="utf-8"))
+    assert document["crs"] == "EPSG:32629" and catastro_enabled(santiago) is True

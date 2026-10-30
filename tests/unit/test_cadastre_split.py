@@ -333,7 +333,7 @@ def test_landmarks_are_split_when_not_flagged() -> None:
     assert dict((r.parent_id, r.status) for r in results)["osm-way-1"] == "split"
 
 
-@pytest.mark.parametrize(("key", "value"), [("crs", "EPSG:4326"), ("coordinate_system", "wgs84"), ("unit", "deg")])
+@pytest.mark.parametrize(("key", "value"), [("coordinate_system", "wgs84"), ("unit", "deg")])
 def test_scene_must_be_a_local_metric_grid(key: str, value: str) -> None:
     scene = _scene()
     scene["frame"][key] = value

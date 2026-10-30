@@ -2,7 +2,7 @@
 
 Module `onward_generator.cadastre`. Licence obligations are in `docs/legal/data-sources.md`.
 
-Download and processing are separate. Only `download` uses the network. The service covers Spain. A map outside Spain skips this step. `run` downloads and splits by default in mainland Spain ([In `run`](#in-run)).
+Download and processing are separate. Only `download` uses the network. The service covers Spain except Navarre and the Basque Country ([Coverage](#coverage)). A map elsewhere skips this step. `run` downloads and splits by default wherever the service has data ([In `run`](#in-run)).
 
 ```bash
 .venv/bin/python -m onward_generator cadastre download \
@@ -20,12 +20,34 @@ Download and processing are separate. Only `download` uses the network. The serv
   --out       maps/<id>/data/processed/heights
 ```
 
+## Coverage
+
+The Dirección General del Catastro (DG Catastro) serves all of Spain except Navarre and the Basque Country (Álava, Bizkaia, Gipuzkoa), which keep their own foral cadastres: there the WFS returns no parts. `config/catastro_zones.json` is the table, validated when it is read (`cadastre/zones.py`):
+
+| Territory | UTM zone of the map centre | Request CRS |
+| --- | --- | --- |
+| `peninsula` | 29 (west of 6° W: Galicia, western Asturias, Castilla y León and Extremadura, Huelva, Cádiz) | EPSG:25829 |
+| `peninsula` | 30 (6° W–0°) | EPSG:25830 |
+| `peninsula` | 31 (east of 0°: Catalonia, eastern Aragón, Castellón, Dénia) | EPSG:25831 |
+| `balearic-islands` | 31 | EPSG:25831 |
+| `canary-islands` | 28 (west of 18° W, the tip of El Hierro: 27) | EPSG:32628 (EPSG:32627) |
+| `ceuta`, `melilla` | 30 | EPSG:25830 |
+| `navarre`, `basque-country` (excluded; the Condado de Treviño, Burgos, is a hole and stays covered) | — | — |
+
+The territory of a map is the one whose polygon holds the map centre (WGS84 longitude, latitude), unless an excluded polygon holds it. The request CRS is the territory's CRS for the UTM zone of the centre longitude, computed as `map create` does. Every CRS must be in the service's list and be the UTM CRS of its zone, so tiles and margins stay in metres. The polygons are coarse: generous over the sea and across the borders with Portugal, France, Andorra and Gibraltar, where the service returns nothing and the split scene equals the `geo` scene; drawn inside Navarre and the Basque Country, so a map in La Rioja, Burgos, Cantabria or Aragón next to them keeps Catastro. A map centred within a few kilometres of the inside of those two borders still sends the request and gets no parts. `tests/unit/test_cadastre_zones.py` checks about 75 places, many on both sides of those borders.
+
+The service's CRS list comes from its `GetCapabilities` (checked 30 October 2026, recorded in the table): default EPSG:25830; others EPSG:25829, EPSG:25831, EPSG:32627, EPSG:32628, EPSG:3035, EPSG:3785, EPSG:3857, EPSG:4258, EPSG:4326 and CRS:84. ETRS89 / REGCAN95 UTM 28N (EPSG:4083) is not offered, so the Canaries are requested in WGS 84 / UTM 28N. One 100 m request each in Santiago de Compostela (EPSG:25829), Palma (EPSG:25831) and Las Palmas de Gran Canaria (EPSG:32628) returned parts (32, 364 and 155) whose `srsName` is the requested CRS.
+
+The map's own CRS (`map.json` `crs`) is EPSG:25830 inside 6° W–0° and the WGS 84 UTM zone of the centre elsewhere (ADR-002). The scene box is converted to the request CRS with pyproj (`transform_bounds`, edges densified), and `match` and `split` convert every part from the request CRS to the scene CRS before they compare it with a footprint. pyproj relates ETRS89 and WGS 84 without a shift, as OSM in Spain is drawn over ETRS89 imagery; the same-zone conversion moves a vertex by less than a millimetre. When the two CRS are the same (Murcia) nothing is converted.
+
 ## Download
 
-- The bounding box is in the scene CRS (metres). Values that look like degrees are refused, and so is a box over 1 km².
-- The request is HTTPS, a `GetFeature` of `bu:BuildingPart`. The generator identifies itself as `onward-generator/<version>`. The default curl user agent is refused by the service.
-- The response must be a `FeatureCollection` with no DTD and no entities, and it must be at most 64 MB.
-- The write is atomic and never overwrites without `--overwrite`. The sidecar `<file>.gml.source.json` stores the URL, the box, the date, the SHA-256, the size, the licence, and notes. `match` checks that SHA-256 before and after the read.
+- The bounding box is in the request CRS (metres). Values that look like degrees are refused.
+- A box over 1 km² is split into tiles of at most 1 km × 1 km, the service limit. The box is first grown outwards to whole centimetres (the precision of the request); each axis is cut into the fewest equal parts no longer than 1 km, on the centimetre grid, so neighbouring tiles share their edges and together are exactly the box. Tiles run from the south-west, row by row. At most 25 tiles (5 km × 5 km, the largest map plus margins) are requested; a larger box is refused.
+- The request is HTTPS, a `GetFeature` of `bu:BuildingPart` per tile. The generator identifies itself as `onward-generator/<version>`. The default curl user agent is refused by the service. Each tile is retried like Overpass (see [In `run`](#in-run)).
+- Each response must be a `FeatureCollection` with no DTD and no entities, and it must be at most 64 MB.
+- Tiles are merged into one `FeatureCollection`. A part that crosses a tile edge comes back from both tiles; a member of a later tile whose `localId` an earlier tile already had is dropped. A single tile is written byte for byte as received.
+- The write is atomic and never overwrites without `--overwrite`. If any tile fails, nothing is written. The sidecar `<file>.gml.source.json` stores the URL (the request itself for one tile, the service endpoint for several), the whole box, the request CRS, the date, the SHA-256, the size, the licence, notes, and `tiles`: per tile the URL, box, SHA-256 and size of the response, its `members` and the `repeats_dropped`. A sidecar written before tiles existed loads with `tiles: []`. `match` checks the file's SHA-256 before and after the read.
 
 The downloaded GML stays out of git (`maps/*/data/`).
 
@@ -33,7 +55,7 @@ The downloaded GML stays out of git (`maps/*/data/`).
 
 From each `BuildingPart`: `localId` (and the parcel reference `refcat`), `numberOfFloorsAboveGround`, `numberOfFloorsBelowGround`, and the geometry (`Surface` / `PolygonPatch`, including inner rings, 2D).
 
-Parts are dropped with an issue when they are `malformed_part` (missing storeys, or another CRS), `invalid_part_geometry`, or `duplicate_part` (the same `localId` twice).
+Parts are dropped with an issue when they are `malformed_part` (missing storeys, or a `srsName` other than the request CRS recorded in the sidecar), `invalid_part_geometry`, or `duplicate_part` (the same `localId` twice).
 
 ## Matching
 
@@ -98,9 +120,9 @@ Downstream nothing else changes. `generate` extrudes every edge of every footpri
 
 ### In `run`
 
-`run` adds two stages after `geo` when the map uses EPSG:25830, its centre is between latitudes 35.85° and 43.8°, and its square plus the 20 m download margin fits 1 km² (radius plus margin up to 480 m):
+`run` adds two stages after `geo` when the map centre is in a [covered territory](#coverage). Any map size works: a map wider than 960 m is downloaded in tiles.
 
-- `catastro`: `cadastre download` into `data/raw/catastro.gml`. HTTP 429, 5xx, a timeout or a dropped connection are retried three times, the wait doubling from 8 s, as for Overpass. If it still fails, `run` stops there and the next run continues at `catastro`.
+- `catastro`: `cadastre download` into `data/raw/catastro.gml`. HTTP 429, 5xx, a timeout or a dropped connection are retried three times per tile, the wait doubling from 8 s, as for Overpass. If a tile still fails, `run` stops there, nothing is written, and the next run continues at `catastro` from the first tile.
 - `cadastre`: `cadastre split` into `data/processed/cadastre/`.
 
-`heights` then reads that scene with `--overrides`, and every later stage follows it. `run --no-catastro` stores `"catastro": false` in `map.json` and keeps the OSM chain; `run --catastro` turns it back on. Where the service has no data (Navarre, the Basque Country, the French strip of the latitude band) the split scene equals the `geo` scene.
+`heights` then reads that scene with `--overrides`, and every later stage follows it. `run --no-catastro` stores `"catastro": false` in `map.json` and keeps the OSM chain; `run --catastro` turns it back on. Navarre, the Basque Country and places outside Spain have no Catastro stages; where a covered map reaches across a border, the parts stop at the border.

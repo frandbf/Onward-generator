@@ -1414,7 +1414,8 @@ def test_run_help_describes_the_catastro_switch() -> None:
     run = subparsers.choices["run"]
     helps = {action.dest: action.help for action in run._actions}
     assert helps["catastro"] == (
-        "split OSM blocks into Catastro constructions (default on in mainland Spain); --no-catastro turns it off for this map"
+        "split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country); "
+        "--no-catastro turns it off for this map"
     )
     listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
     assert listed["cadastre"] == "Catastro INSPIRE floors: download | match | split (see: cadastre --help)"

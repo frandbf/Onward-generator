@@ -15,7 +15,7 @@ from typing import Any
 from shapely import box
 
 from onward_generator.ai.providers import Provider
-from onward_generator.cadastre.acquire import catastro_area
+from onward_generator.cadastre.zones import catastro_zone
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
 from onward_generator.export.package import ExportError, load_export_config
@@ -152,16 +152,16 @@ def store_panoramax(directory: str | Path, enabled: bool) -> None:
 def catastro_enabled(directory: str | Path) -> bool:
     """True when ``run`` splits buildings with Catastro for this map (ADR-016).
 
-    The map must be in the Catastro area and fit one request. A map without the
-    key uses it; ``"catastro": false`` (``run --no-catastro``) turns it off.
+    The map centre must be in a territory the DG Catastro WFS serves
+    (``config/catastro_zones.json``). A map without the key uses it;
+    ``"catastro": false`` (``run --no-catastro``) turns it off.
     """
     try:
         document = load_map(directory)
     except MapError:
         return False
     center = document["center"]
-    half_side = float(document["radius_m"]) + float(document["margin_m"])
-    inside = catastro_area(float(center["latitude"]), str(document["crs"]), half_side)
+    inside = catastro_zone(float(center["longitude"]), float(center["latitude"])) is not None
     return inside and document.get("catastro") is not False
 
 
