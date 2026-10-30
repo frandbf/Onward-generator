@@ -1,6 +1,6 @@
 """Mutation-test the lines a change touched, with mutmut.
 
-    python tools/mutate/run.py [--base REF] [--max N] [--whole-functions]
+    python tools/mutate/run.py [--base REF] [--whole-functions]
 
 The diff is taken from the merge base of REF and HEAD to the working tree, so
 uncommitted edits count. mutmut generates mutants for every function in
@@ -223,7 +223,6 @@ def _mutmut(*args: str, only: str = "", reuse: bool = False) -> subprocess.Compl
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base", default=os.environ.get("MUTATE_BASE", "main"), help="git ref the diff is taken against (default main)")
-    parser.add_argument("--max", type=int, default=40, help="at most this many changed functions are mutated (default 40)")
     parser.add_argument("--show", type=int, default=10, help="print the diff of at most this many survivors (default 10)")
     parser.add_argument("--jobs", type=int, default=default_jobs(), help="mutmut workers (default: every core in CI, half of them locally)")
     parser.add_argument("--whole-functions", action="store_true", help="run every mutant of the changed functions, not only those on changed lines")
@@ -237,12 +236,6 @@ def main(argv: list[str] | None = None) -> int:
     if not targets:
         print(f"mutate: no function in {PACKAGE} changed since {args.base}")
         return 0
-    if len(targets) > args.max:
-        dropped = targets[args.max :]
-        targets = targets[: args.max]
-        print(f"mutate: {len(dropped)} changed functions over --max {args.max} are NOT mutated:")
-        for f in dropped:
-            print(f"  skipped {f.module}.{f.mangled}")
     print(f"mutate: {len(targets)} changed functions since {args.base}")
     clear_mutants()
 

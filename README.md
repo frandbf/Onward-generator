@@ -145,7 +145,7 @@ A pull request is ready when `task ci` and `task mutate` pass. The rules are in 
 **Mutation testing.** `task mutate` changes each line a branch touched in `src/onward_generator`, such as `<` to `<=` or a constant moved by one, with [mutmut](https://mutmut.readthedocs.io) 3.8.1, and checks that some test fails. It rewrites only the files with a changed function and runs only the mutants on changed lines.
 
 - Exit `0`: every mutant was killed. Exit `1`: a survivor, printed with its diff. Write a test that fails on that edit, or, when the edit changes nothing a caller can see, end the line with `# pragma: no mutate: <reason>`. Exit `2`: the tool could not run.
-- `BASE=` sets the base (default `main`), `MAX=` the number of functions (default 40), `JOBS=` the workers (default all cores in CI, half locally). `task mutate -- --whole-functions` mutates whole functions.
+- `BASE=` sets the base (default `main`), `JOBS=` the workers (default all cores in CI, half locally). `task mutate -- --whole-functions` mutates whole functions.
 - On a pull request, CI runs it against the target branch and skips it when `src/` did not change.
 
 Tests do not use the network. Fixtures live in `tests/fixtures/` and use one origin, latitude 37.98407, longitude −1.12863.
