@@ -165,6 +165,20 @@ CROSSING_OVERHANG_M = 2.0  # pragma: no mutate: the strip is clipped to the carr
 JUNCTION_TOLERANCE_M = 1e-6  # pragma: no mutate: a float tolerance; any distance well under a street width finds the same ways
 
 
+def carriageway_slab(partition: Partition, precision_m: float) -> BaseGeometry:
+    """The carriageway minus its crossings, for the ``collider/carriageway`` slab.
+
+    Both inputs are snapped to ``precision_m``, but the cut adds vertices where a
+    strip edge meets the kerb, some a fraction of a millimetre from an old one.
+    The slab welds vertices on a 0.1 mm grid, so such a pair becomes one vertex
+    and the walls stop closing. The result is snapped again, like the surfaces.
+    """
+    carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
+    if carriageway is None:
+        return Polygon()
+    return shapely.set_precision(carriageway.geometry.difference(partition.crossings), precision_m)
+
+
 def crossing_offsets(length_m: float, start_m: float, end_m: float) -> list[float]:
     """Distances along a street segment where a crossing goes.
 

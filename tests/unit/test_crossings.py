@@ -9,12 +9,14 @@ from shapely import LineString, MultiLineString, Polygon, box, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.generation.config import load_generation_config
+from onward_generator.generation.mesh import closed_manifold_defects, drop_degenerate_holes, open_point_contacts, prism
 from onward_generator.generation.surfaces import (
     CROSSING_WIDTH_M,
     LinearWay,
     SurfaceClass,
     _crossing,
     build_partition,
+    carriageway_slab,
     crossing_offsets,
     crossing_strips,
 )
@@ -112,3 +114,29 @@ def test_a_dead_end_inside_another_street_bounding_box_keeps_its_own_setback() -
     strips = crossing_strips([diagonal, narrow], _carriageway(diagonal, narrow))
     near = strips.intersection(box(80, -50, 100, 20))
     assert _same(near, union_all([box(87, -36, 93, -32), box(87, 2, 93, 6)]))
+
+
+def _slab_defects(geometry: BaseGeometry) -> int:
+    """The steps scene.py runs before it extrudes a ground slab."""
+    cleaned, _ = drop_degenerate_holes(geometry)
+    return closed_manifold_defects(prism(open_point_contacts(cleaned), -1.0, -0.15, bottom=True))
+
+
+def test_the_carriageway_slab_closes_around_its_crossings() -> None:
+    """Three streets at odd angles: the raw cut leaves vertices closer than the 0.1 mm weld (a Madrid run did too)."""
+    ways = [
+        _street("a", [(-2.3, 19.9), (14.4, 23.9)], 6.0),
+        _street("b", [(30.2, -40.5), (-33.5, -5.4)], 6.0),
+        _street("c", [(11.4, -31.7), (-5.3, -28.5)], 4.0),
+    ]
+    partition = build_partition(box(-50, -50, 50, 50), [], ways, [], CFG)
+    carriageway = partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
+    assert _slab_defects(carriageway.difference(partition.crossings)) > 0
+    slab = carriageway_slab(partition, CFG.precision_m)
+    assert _slab_defects(slab) == 0
+    assert slab.area + partition.crossings.area == pytest.approx(carriageway.area, abs=0.01)
+    assert slab.intersection(partition.crossings).area < 1e-6
+
+
+def test_a_map_without_a_carriageway_has_no_carriageway_slab() -> None:
+    assert carriageway_slab(build_partition(box(-50, -50, 50, 50), [], [], [], CFG), CFG.precision_m).is_empty

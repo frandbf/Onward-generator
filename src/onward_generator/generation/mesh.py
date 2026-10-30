@@ -169,24 +169,29 @@ def drop_degenerate_holes(geometry: BaseGeometry, min_area: float = 1e-4) -> tup
 
 
 def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01) -> BaseGeometry:
-    """Open a hole that only kisses another ring, so the extrusion stays one manifold.
+    """Open a ring that only kisses another ring, so the extrusion stays one manifold.
 
     A carriageway that leaves the map can touch the site boundary at a single
     point. The hole and the outer ring then share that vertex. Welding the slab
     on the 0.1 mm grid makes one vertical edge belong to both rings. Cutting a
-    1 cm disk at that point joins the hole to the outside. A shared edge is left
-    alone.
+    1 cm disk at that point joins the hole to the outside. Two polygons of one
+    slab that touch at a corner (a carriageway cut by its crossings) are
+    separated the same way. A shared edge is left alone.
     """
     if geometry.is_empty or gap_m <= 0:
         return geometry
     cuts = []
-    for polygon in polygons_of(geometry):
+    parts = polygons_of(geometry)
+    tree = shapely.STRtree(parts)
+    for polygon in parts:
         rings = [polygon.exterior, *polygon.interiors]
         for index, ring in enumerate(rings):
             for other in rings[index + 1 :]:
                 touch = ring.intersection(other)
                 if _point_contact(touch, gap_m):
                     cuts.append(touch)
+        # Two polygons of a valid slab can only touch at points.
+        cuts.extend(polygon.intersection(parts[int(neighbour)]) for neighbour in tree.query(polygon, predicate="touches"))
     if not cuts:
         return geometry
     opened = shapely.make_valid(geometry.difference(shapely.union_all(cuts).buffer(gap_m)))
