@@ -598,13 +598,10 @@ def cap_lights(interiors: Sequence[tuple[bool, dict[str, Any]]], limit: int) -> 
     every room by the distance of its light from the local origin (the map centre), then by id.
     A room past the cap keeps its probes and loses ``light_m`` and ``range_m``.
     """
-    ranked = sorted(
-        ((not shop, math.hypot(room["light_m"][0], room["light_m"][1]), room["room_id"], room)
-         for shop, anchors in interiors for room in anchors["rooms"]),
-        key=lambda row: row[:3],
-    )
+    rooms = [(shop, room) for shop, anchors in interiors for room in anchors["rooms"]]
+    ranked = sorted(rooms, key=lambda pair: (not pair[0], math.hypot(*pair[1]["light_m"][:2]), pair[1]["room_id"]))
     dropped = []
-    for *_, room in ranked[limit:]:
+    for _, room in ranked[limit:]:
         del room["light_m"], room["range_m"]
         room["light"] = "over_cap"
         dropped.append(room["room_id"])

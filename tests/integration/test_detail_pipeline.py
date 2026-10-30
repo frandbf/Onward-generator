@@ -340,6 +340,7 @@ def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(resid
     assert built == _queue_order(built) != sorted(built)
     one = _detail(residential_inputs, _with_interiors(min_buildings=1, max_buildings=1))
     assert one.stats["interiors"] == built[:1] != sorted(built)[:1]
+    assert _detail(residential_inputs, _with_interiors(min_buildings=2, max_buildings=2)).stats["interiors"] == built[:2]
     base_ids = [o.id for o in detailed.base.objects if o.type == "building"]
     for d in (detailed, one):
         expected = [oid for bid in base_ids

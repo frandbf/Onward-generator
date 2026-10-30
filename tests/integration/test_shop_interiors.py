@@ -54,7 +54,7 @@ def _footprint(inputs: tuple[Path, Path, Path], bid: str):
     return shape(next(f for f in scene["features"] if f["id"] == bid)["geometry"])
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def shops(detail_inputs: tuple[Path, Path, Path]):
     return _detail(detail_inputs)
 
@@ -178,8 +178,9 @@ def test_a_shop_too_large_or_with_shop_interiors_off_gets_no_interior(detail_inp
     assert edge.stats["shop_interiors"] == [SHOP]
     large = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=area - 0.5))
     assert large.stats["shop_interiors"] == []
-    assert [(i.object_id, i.message) for i in large.issues if i.code == "interior_not_generated"] == [
-        (SHOP, f"shop_too_large: {area:.1f} m² > max_area_m2 {area - 0.5}")]
+    assert [(i.object_id, i.severity, i.message) for i in large.issues if i.code == "interior_not_generated"] == [
+        (SHOP, "info", f"shop_too_large: {area:.1f} m² > max_area_m2 {area - 0.5}")]
+    assert _obj(large, f"building/{SHOP}").record["facade"]["openings"]["shop_door"] == 1
     for cfg in (_cfg(interiors__shops__enabled=False), _cfg(interiors__enabled=False)):
         off = _detail(detail_inputs, cfg)
         assert off.stats["shop_interiors"] == [] and SHOP not in off.stats["interiors"]
@@ -192,3 +193,15 @@ def test_a_shop_whose_storey_is_too_low_for_the_door_keeps_its_shop_door(row_inp
     assert "osm-way-606" not in row.stats["shop_interiors"]
     assert ("osm-way-606", "no_door_position") in [(i.object_id, i.message) for i in row.issues if i.code == "interior_not_generated"]
     assert _obj(row, "building/osm-way-606").record["facade"]["openings"]["shop_door"] == 1
+
+
+def test_the_shop_budget_goes_to_the_shop_nearest_the_map_centre(row_inputs: tuple[Path, Path, Path]) -> None:
+    # 602 (centre x = -25) and 603 (x = -15) are shops of the same size; 603 is nearer the origin.
+    row = _detail(row_inputs)
+    assert row.stats["shop_interiors"] == ["osm-way-602", "osm-way-603"]
+    costs = {b: _obj(row, f"interior/{b}").record["visual_triangles"] for b in row.stats["shop_interiors"]}
+    assert costs["osm-way-602"] == costs["osm-way-603"]
+    assert row.stats["shop_interior_visual_triangles"] == sum(costs.values())
+    one = _detail(row_inputs, _cfg(interiors__shops__max_triangles=costs["osm-way-603"]))
+    assert one.stats["shop_interiors"] == ["osm-way-603"]
+    assert [i.object_id for i in one.issues if i.code == "interior_not_generated" and "triangle_budget" in i.message] == ["osm-way-602"]

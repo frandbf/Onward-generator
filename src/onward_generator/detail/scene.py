@@ -472,13 +472,13 @@ def detail_scene(
 
     # Buildings in the interior queue go first, in queue order, so the quota and the triangle budget go
     # to the sha256 order and not to the id order. The others follow nearest the map centre first, so the
-    # shop budget goes to the shops a player meets first. Objects and issues are put back in building order below.
+    # shop budget goes to the shops a player meets first (a shop never takes the queue). Objects and issues are put back in building order below.
     rank = {bid: k for k, bid in enumerate(interior_queue)}
 
     def queue_key(b: Any) -> tuple[int, float]:
         bid = b.record["source_ids"][0]
         centre = footprints[bid].centroid
-        return rank.get(bid, len(rank)), float(np.hypot(centre.x, centre.y))
+        return (len(rank) if evidence.get(bid) else rank.get(bid, len(rank))), float(np.hypot(centre.x, centre.y))
 
     order = sorted(building_objs, key=queue_key)
     leading_issues = len(issues)
@@ -525,17 +525,18 @@ def detail_scene(
         ic = cfg.interiors
         # A shop gets a one-storey room behind its shopfront and never the stair interior. Neither uses the other's budget.
         sells = shop and ic.enabled and ic.shops.enabled
-        if sells and geom.area > ic.shops.max_area_m2:
+        too_large = sells and geom.area > ic.shops.max_area_m2
+        if too_large:
             issues.append(Issue("interior_not_generated", "info", bid, f"shop_too_large: {geom.area:.1f} m² > max_area_m2 {ic.shops.max_area_m2}"))
-            sells = False
-        if main is not None and (sells or (not shop and bid in interior_queue and interiors_left > 0)):
+        if main is not None and ((sells and not too_large) or (not shop and bid in interior_queue and interiors_left > 0)):
             raised = interior_storey(height, storeys, h.get("height_source") or o.record["height"].get("height_source"))
             attempt_height, attempt_storeys = raised if raised is not None else (height, storeys)
             trial = run_layout("interior_door", ic.wall_thickness_m, ic.door, attempt_storeys)
             door = next((x for x in trial.holes if x.kind == "interior_door"), None)
             plan = plan_interior(
                 bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
-                roof_access=not shop and shell_template.parapet_m > 0, max_floors=1 if shop else None,
+                roof_access=shell_template.parapet_m > 0,
+                max_floors=1 if shop else None,
             ) if door else "no_door_position"
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))

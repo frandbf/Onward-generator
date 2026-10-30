@@ -9,6 +9,7 @@ import copy
 import json
 import math
 
+import numpy as np
 import pytest
 from shapely import Polygon
 
@@ -24,6 +25,11 @@ DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
 SEG = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
 FOOTPRINT = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
 DOOR = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, CFG.interiors.wall_thickness_m, None, 0, 0)
+
+
+def _area(mesh) -> float:
+    triangles = mesh.vertices[mesh.triangles]
+    return float(0.5 * np.linalg.norm(np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]), axis=1).sum())
 
 
 def _doc(**changes: object) -> dict:
@@ -42,8 +48,9 @@ def _doc(**changes: object) -> dict:
 
 def test_shop_interior_config_is_read_as_given() -> None:
     assert MURCIA_CENTER == (-1.12863, 37.98407)
-    rooms = CFG.interiors.shops
-    assert (rooms.enabled, rooms.max_triangles, rooms.max_area_m2, CFG.interiors.lights_max) == (True, 6000, 600.0, 24)
+    cfg = config_from_document(_doc())
+    rooms = cfg.interiors.shops
+    assert (rooms.enabled, rooms.max_triangles, rooms.max_area_m2, cfg.interiors.lights_max) == (True, 6000, 600.0, 24)
     assert [(c.name, c.wall, c.floor) for c in rooms.categories] == [
         ("bakery", "interior_shop_bakery", "interior_shop_tile"),
         ("pharmacy", "interior_shop_pharmacy", "interior_shop_tile"),
@@ -55,7 +62,8 @@ def test_shop_interior_config_is_read_as_given() -> None:
         "generic", "interior_shop_generic", "interior_shop_wood", {})
     # Six shared materials for every shop, all albedo-only and in the interior lightmap class.
     names = {m for c in (*rooms.categories, rooms.generic) for m in (c.wall, c.floor)}
-    assert len(names) == 6 and all(name in CFG.materials and surface_class(name) == "interior" for name in names)
+    assert len(names) == 6 and all(name in cfg.materials and surface_class(name) == "interior" for name in names)
+    assert not rooms.generic.matches({"shop": "bakery"}) and rooms.generic.tags == {}
 
 
 @pytest.mark.parametrize(
@@ -154,6 +162,12 @@ def test_a_shop_room_paints_its_walls_and_floor_and_keeps_a_white_ceiling() -> N
     assert used["interior_shop_wood"] == default["interior_floor"] == 2
     assert used["interior_shop_bar"] + used["interior_wall"] == default["interior_wall"]
     assert used["interior_wall"] == 2  # the ceiling under the solid upper storeys
+    [floor] = built.visual["interior_shop_wood"]
+    assert set(floor.vertices[:, 2]) == {0.0}
+    # The walls are the inner ring, storey high, less the whole doorway from the floor up.
+    inner = FOOTPRINT.buffer(-CFG.interiors.wall_thickness_m, join_style="mitre")
+    [walls] = built.visual["interior_shop_bar"]
+    assert _area(walls) == pytest.approx(inner.length * 3.0 - DOOR.width * DOOR.height)
     assert built.visual_triangles == plain.visual_triangles
     assert [c["type"] for c in built.spec["connections"]] == ["door"]
     assert [n for n, _ in built.colliders][-1] == "upper_solid" and built.defects == 0
@@ -201,6 +215,12 @@ def test_cap_keeps_shops_first_then_the_rooms_nearest_the_centre() -> None:
 def test_cap_drops_every_room_past_the_limit(limit: int, dropped: list[str]) -> None:
     rooms = [(False, _anchors(("c/L0", 0.0, 3.0))), (False, _anchors(("a/L0", 1.0, 0.0))), (False, _anchors(("b/L0", 0.0, 2.0)))]
     assert cap_lights(rooms, limit) == dropped
+
+
+@pytest.mark.parametrize(("near", "far"), [((5.0, 0.0), (0.0, 10.0)), ((0.0, 5.0), (10.0, 0.0)), ((3.0, 3.0), (0.0, 4.5))])
+def test_cap_measures_both_plane_axes(near: tuple[float, float], far: tuple[float, float]) -> None:
+    rooms = [(False, _anchors(("a/L0", *far))), (False, _anchors(("b/L0", *near)))]
+    assert cap_lights(rooms, 1) == ["a/L0"]
 
 
 def test_cap_breaks_distance_ties_by_room_id_and_measures_in_the_plane() -> None:

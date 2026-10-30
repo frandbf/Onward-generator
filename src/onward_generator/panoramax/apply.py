@@ -109,9 +109,7 @@ def _compose(
     nodes, materials = nodes_from_glb(visual)
     images = images_by_material(visual)
     footprints = _footprints(geo, manifest)
-    counts = detail_report.get("counts") or {}
-    # A shop interior's display windows are see-through too: no photo goes over them.
-    interiors = _interior_object_ids(manifest, [*(counts.get("interiors") or []), *(counts.get("shop_interiors") or [])])
+    interiors = _interior_object_ids(manifest, listed_interiors(detail_report.get("counts") or {}))
     match = match_facades(footprints, [item[0] for item in pictures], frame=frame, interior_ids=interiors)
     by_building: dict[str, list[dict[str, Any]]] = {}
     for row in match["assignments"]:
@@ -337,6 +335,11 @@ def _ring_segments(building_id: str, footprints: list[BuildingFootprint]) -> lis
     others = union_all(neighbours) if neighbours else Polygon()
     _, segments = refine_exposure(own.polygon, others, load_detail_config())
     return [segment for segment in segments if segment.ring == 0]
+
+
+def listed_interiors(counts: dict[str, Any]) -> list[Any]:
+    """Buildings ``detail`` gave an interior: the stair interiors, then the shops, whose display windows are see-through too."""
+    return [*(counts.get("interiors") or []), *(counts.get("shop_interiors") or [])]
 
 
 def _interior_object_ids(manifest: dict[str, Any], listed: object) -> list[str]:

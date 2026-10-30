@@ -14,7 +14,7 @@ import pytest
 
 from onward_generator.maps.workspace import create_map
 from onward_generator.panoramax.__main__ import run_apply
-from onward_generator.panoramax.apply import _cached_pictures
+from onward_generator.panoramax.apply import _cached_pictures, listed_interiors
 from onward_generator.panoramax.cache import DOWNLOAD_WORKERS, PanoramaxError, cache_directory, cache_pictures
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
@@ -404,3 +404,10 @@ def test_cached_pictures_are_listed_by_path_and_azimuth_without_decoding(tmp_pat
         (plain["id"], catalogue / f"{plain['id']}.jpg", 0.0),
     ]
     assert listed[0][0].author == "tester"
+
+
+def test_shop_interiors_are_listed_with_the_stair_interiors() -> None:
+    assert listed_interiors({"interiors": ["a", "b"], "shop_interiors": ["s"]}) == ["a", "b", "s"]
+    assert listed_interiors({"shop_interiors": ["s"]}) == ["s"]
+    assert listed_interiors({"interiors": ["a"], "shop_interiors": None}) == ["a"]
+    assert listed_interiors({}) == []
