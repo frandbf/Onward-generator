@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import LineString, MultiLineString, Point, STRtree, dwithin, offset_curve, union_all
+from shapely import LineString, MultiLineString, Point, STRtree, contains_xy, dwithin, offset_curve, prepare, union_all
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge, nearest_points, polylabel
 
@@ -118,7 +118,8 @@ def _block(cx: float, cy: float) -> list[tuple[float, float]]:
 
 
 def _fits(region: BaseGeometry, pts: list[tuple[float, float]]) -> bool:
-    return all(region.contains(Point(p)) for p in pts)
+    xy = np.asarray(pts)
+    return bool(contains_xy(region, xy[:, 0], xy[:, 1]).all())
 
 
 def extra_spawn_block(
@@ -132,23 +133,22 @@ def extra_spawn_block(
     Each component is the SDK prefab, so the block is the same 8-point grid.
     """
     minx, miny, maxx, maxy = area.bounds
-    best: tuple[float, float] | None = None
-    best_key: tuple[float, float, float] | None = None
+    slots: list[tuple[float, float, float]] = []
     y = math.floor(miny / GRID_M) * GRID_M
     while y <= maxy + 1e-6:
         x = math.floor(minx / GRID_M) * GRID_M
         while x <= maxx + 1e-6:
-            clear = all(math.hypot(x - ax, y - ay) >= BLOCK_GAP_M - 1e-6 for ax, ay in avoid)
-            if clear and _fits(area, _block(x, y)):
-                key = (math.hypot(x - near[0], y - near[1]), y, x)
-                if best_key is None or key < best_key:
-                    best_key = key
-                    best = (round(x, 2), round(y, 2))
+            slots.append((math.hypot(x - near[0], y - near[1]), y, x))
             x += GRID_M
         y += GRID_M
-    if best is None:
-        raise LayoutError("no second spawn block fits for Assault")
-    return best
+    prepare(area)  # pragma: no mutate: only makes the containment tests faster
+    # Nearest first, then south to north, then west to east: the first slot that fits wins.
+    for _, y, x in sorted(slots):
+        clear = all(math.hypot(x - ax, y - ay) >= BLOCK_GAP_M - 1e-6 for ax, ay in avoid)
+        if clear and _fits(area, _block(x, y)):
+            # Grid slots are whole multiples of GRID_M, exact in floating point.
+            return (x, y)
+    raise LayoutError("no second spawn block fits for Assault")
 
 
 def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -159,6 +159,7 @@ def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) ->
     if not parts:
         raise LayoutError(f"no free walkable area with {CLEARANCE_M} m clearance")
     area = max(parts, key=lambda p: (p.area, p.centroid.x, p.centroid.y))
+    prepare(area)  # pragma: no mutate: only makes the containment tests faster
     centre = polylabel(area, tolerance=0.1)
     a = (round(centre.x, 2), round(centre.y, 2))
     if not _fits(area, _block(*a)):

@@ -13,7 +13,9 @@ from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
+    BLOCK_GAP_M,
     GAMEPLAY_VERSION,
+    GRID_M,
     MIN_SPAWN_SEPARATION_M,
     MODE_CODES,
     NAV_AGENT_RADIUS_M,
@@ -21,6 +23,7 @@ from onward_generator.perf.layout import (
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
     LayoutError,
+    _block,
     _patrol_lines,
     _routes,
     _sample_route,
@@ -45,8 +48,42 @@ def test_assault_second_block_stays_clear_of_both_teams() -> None:
     centre = extra_spawn_block(PLAZA, (0.0, 0.0), [(0.0, 0.0), (30.0, 0.0)])
     assert math.hypot(centre[0], centre[1]) >= 10 - 1e-6
     assert math.hypot(centre[0] - 30, centre[1]) >= 10 - 1e-6
-    with pytest.raises(LayoutError, match="second spawn block"):
+    with pytest.raises(LayoutError, match="^no second spawn block fits for Assault$"):
         extra_spawn_block(box(0, 0, 6, 6), (3.0, 3.0), [(3.0, 3.0)])
+
+
+def _first_block_by_scanning(area: BaseGeometry, near: tuple[float, float], avoid: list[tuple[float, float]]) -> tuple[float, float] | None:
+    """The scan ``extra_spawn_block`` replaced: every grid slot, smallest (dist, y, x) wins."""
+    minx, miny, maxx, maxy = area.bounds
+    best, best_key = None, None
+    y = math.floor(miny / GRID_M) * GRID_M
+    while y <= maxy + 1e-6:
+        x = math.floor(minx / GRID_M) * GRID_M
+        while x <= maxx + 1e-6:
+            clear = all(math.hypot(x - ax, y - ay) >= BLOCK_GAP_M - 1e-6 for ax, ay in avoid)
+            if clear and all(area.contains(Point(p)) for p in _block(x, y)):
+                key = (math.hypot(x - near[0], y - near[1]), y, x)
+                if best_key is None or key < best_key:
+                    best_key, best = key, (round(x, 2), round(y, 2))
+            x += GRID_M
+        y += GRID_M
+    return best
+
+
+def test_assault_second_block_is_the_nearest_slot_south_then_west_first() -> None:
+    # Twelve slots lie exactly 10 m from the team; the southernmost, then westernmost, wins.
+    first = extra_spawn_block(PLAZA, (0.0, 0.0), [(0.0, 0.0)])
+    assert first == (0.0, -10.0) and all(type(v) is float for v in first)
+    # The gap is measured from each team, not from the origin.
+    assert extra_spawn_block(PLAZA, (20.0, 0.0), [(20.0, 0.0)]) == (20.0, -10.0)
+    assert extra_spawn_block(PLAZA, (0.0, 20.0), [(0.0, 20.0)]) == (0.0, 10.0)
+    # 9.5 m is too close; exactly the gap less the 1e-6 m tolerance is not.
+    assert extra_spawn_block(PLAZA, (0.0, 0.5), [(0.0, 0.5)]) == (-10.0, 0.0)
+    assert extra_spawn_block(PLAZA, (0.0, 10.0), [(0.0, 1e-6)]) == (0.0, 10.0)
+    assert extra_spawn_block(box(-80, -9, 80, 80), (0.0, 0.0), [(0.0, 0.0)]) == (-6.0, -8.0)
+    yard = Polygon([(-41, -37), (53, -37), (53, 3), (13, 3), (13, 47), (-41, 47)], [[(-5, -9), (7, -9), (7, 9), (-5, 9)]])
+    for near, avoid in (((0.0, 0.0), [(0.0, 0.0)]), ((40.0, -20.0), [(0.0, 0.0), (30.0, -30.0)]), ((-30.0, 40.0), [])):
+        assert extra_spawn_block(yard, near, avoid) == _first_block_by_scanning(yard, near, avoid)
 
 
 def test_uplink_stays_on_its_own_sidewalk_when_another_is_larger() -> None:
