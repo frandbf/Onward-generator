@@ -9,7 +9,7 @@ from onward_generator.overgrow.digest import Digest
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.plan import PLAN_VERSION
 
-PROMPT_VERSION = "0.1.0"
+PROMPT_VERSION = "0.2.0"
 
 SYSTEM_PROMPT = f"""You compose a handful of gestures for a 3D map. Reply with one JSON object and nothing else. No prose, no markdown, no code.
 
@@ -27,6 +27,8 @@ Fields:
     count is an integer from 1 to 3. Put that facade asset on the wall that faces the point.
   - {{"op":"place","asset_id":"...","anchor_id":"...","crosswise":false}}
     One copy on a lane anchor. crosswise true turns it 90 degrees only for a wreck, a gate, or a barrier that sits on a lane anchor.
+
+Library rows may carry curated hints. description says what the object is and its state. placement says where it belongs: street (may stand in the carriageway), kerb (sidewalk edge by the road), wall_foot (on the ground against a wall), wall_mounted (on a facade), boundary (along a lot or block edge), open_ground (yards, lots, plazas, parks), ground_cover (flat on the ground). grouping says how copies sit: run (end to end in a line), grid (along and up a wall), cluster (a few loose copies), single (one copy). The code refuses a span whose asset is not a run and a cover whose asset is not a grid. condition (intact, worn, damaged, wrecked, burned) and tags help match the brief.
 
 Prefer a span, a cover, or a watch before scattering place actions. If the brief does not ask for chaos, do not span across a carriageway. Do not invent ids. Do not send matrices or metres except passage_m.
 
@@ -49,9 +51,22 @@ def library_rows(props: list[Prop]) -> list[dict[str, object]]:
             "length_m": round(prop.length_m, 3),
             "width_m": round(prop.half_y * 2, 3),
             "height_m": round(prop.height_m, 3),
+            **_hints(prop),
         })
     rows.sort(key=lambda row: str(row["id"]))
     return rows
+
+
+def _hints(prop: Prop) -> dict[str, object]:
+    """Curated fields of a 0.2.0 manifest row. An older row sends none."""
+    found: dict[str, object] = {}
+    for key in ("description", "placement", "grouping", "condition"):
+        value = getattr(prop.spec, key)
+        if value:
+            found[key] = value
+    if prop.spec.tags:
+        found["tags"] = list(prop.spec.tags)
+    return found
 
 
 def instruction(brief: str, digest: Digest, props: list[Prop]) -> str:

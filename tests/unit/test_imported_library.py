@@ -89,7 +89,7 @@ def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
 
 
 def test_overgrow_selection_includes_every_asset_catalogue() -> None:
-    from onward_generator.overgrow.library import load_library, read_library
+    from onward_generator.overgrow.library import LibraryReject, load_library, read_library
     from onward_generator.overgrow.library_catalog import choose_ids, installed_rows, library_directories
 
     directories = library_directories(REPO / "assets")
@@ -105,10 +105,14 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
         all_installed=False,
     ) == ["covered_car", "kenney_suburban_driveway_long"]
     props, rejects = read_library(REPO / "assets")
-    assert rejects == []
-    assert {prop.spec.id for prop in load_library(REPO / "assets")} == set(ids)
+    kit = {row["id"] for row in rows if row["placement"] == "kit_only"}
+    assert len(kit) == 128
+    assert sorted(rejects, key=lambda item: item.asset_id) == sorted(
+        (LibraryReject(ident, "kit_only") for ident in kit), key=lambda item: item.asset_id,
+    )
+    assert {prop.spec.id for prop in load_library(REPO / "assets")} == set(ids) - kit
     loaded = {prop.spec.id for prop in props}
-    assert loaded == set(ids)
+    assert loaded == set(ids) - kit
     driveway = next(prop for prop in props if prop.spec.id == "kenney_suburban_driveway_long")
     texture = (REPO / "assets/kenney/suburban/Textures/colormap.png").read_bytes()
     assert driveway.albedo == texture

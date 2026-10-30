@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/asset_manifest.schema.json",
+  "title": "Prop catalogue manifest 0.2.0",
+  "description": "One assets/<catalogue>/manifest.json. Version 0.2.0 adds curated placement semantics to every row. The semantics block says those fields are estimated by a person, not observed in the file. A manifest without schema_version 0.2.0 is read as before and is not checked here.",
+  "type": "object",
+  "required": ["schema", "schema_version", "semantics", "assets"],
+  "properties": {
+    "schema": { "const": "onward_generator.abandoned_prefabs" },
+    "schema_version": { "const": "0.2.0" },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "basis", "reviewed_on", "fields"],
+      "properties": {
+        "origin": { "const": "estimated" },
+        "basis": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "reviewed_on": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "fields": {
+          "const": ["description", "placement", "grouping", "condition", "tags"]
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "file", "category", "role", "surfaces", "anchor", "lane", "clearance_m", "use",
+          "description", "placement", "grouping", "condition", "tags"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" },
+          "file": { "type": "string", "minLength": 1 },
+          "category": {
+            "enum": ["vegetation", "vehicles", "barriers", "waste", "furniture", "structures", "facade"]
+          },
+          "role": { "type": "string", "pattern": "^[a-z_]+$" },
+          "surfaces": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": ["facade", "block_edge", "curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"]
+            }
+          },
+          "anchor": { "enum": ["ground", "facade", "flat"] },
+          "lane": { "enum": ["allow", "forbid"] },
+          "clearance_m": { "type": "number", "minimum": 0 },
+          "use": { "type": "string", "minLength": 1 },
+          "description": {
+            "description": "What the object is, how it looks and its state, in one sentence for the placement model.",
+            "type": "string", "minLength": 10, "maxLength": 140
+          },
+          "placement": {
+            "description": "Where it belongs. kit_only: a building or road kit piece that overgrow never places. wall_mounted: on a facade (anchor facade). street: may stand in the carriageway. kerb: sidewalk edge by the road. wall_foot: on the ground against a wall. boundary: along a lot or block edge. open_ground: yards, lots, plazas, parks. ground_cover: flat on the ground.",
+            "enum": ["kit_only", "wall_mounted", "street", "kerb", "wall_foot", "boundary", "open_ground", "ground_cover"]
+          },
+          "grouping": {
+            "description": "How copies sit together. run: end to end in a line (span may repeat it). grid: along and up a wall (cover may repeat it). cluster: a few loose copies. single: one copy.",
+            "enum": ["single", "cluster", "run", "grid"]
+          },
+          "condition": { "enum": ["intact", "worn", "damaged", "wrecked", "burned"] },
+          "tags": {
+            "type": "array",
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z_]{1,23}$" }
+          }
+        }
+      }
+    }
+  }
+}

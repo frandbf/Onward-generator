@@ -37,6 +37,12 @@ class AssetSpec:
     use: str
     lane: str = "forbid"
     clearance_m: float = 0.0
+    # Curated in a 0.2.0 manifest (estimated, not observed). Empty for older rows.
+    description: str = ""
+    placement: str = ""
+    grouping: str = ""
+    condition: str = ""
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +105,7 @@ VEGETATION_ASSETS: tuple[AssetSpec, ...] = (
     _spec("fern_02", "vegetation", "plant", ("sidewalk", "yard", "empty_lot"), "ground", "fern at sidewalk edges and yards"),
     _spec("flower_empodium", "vegetation", "plant", ("sidewalk", "yard", "empty_lot"), "ground", "small flower in cracks and yards"),
     _spec("weed_plant_02", "vegetation", "plant", ("sidewalk", "yard", "empty_lot"), "ground", "weed at edges and empty lots"),
-    _spec("shrub_03", "vegetation", "bush", ("courtyard", "yard", "plaza", "park"), "ground", "bush in a yard, park or plaza"),
+    _spec("shrub_03", "vegetation", "plant", ("sidewalk", "yard", "empty_lot"), "ground", "weed stems at sidewalk edges and yards"),
 )
 
 ALL_ASSETS: tuple[AssetSpec, ...] = NAMED_ASSETS + VEGETATION_ASSETS
