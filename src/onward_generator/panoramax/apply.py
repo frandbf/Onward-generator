@@ -17,8 +17,8 @@ from typing import Any
 
 import numpy as np
 from PIL import Image
-from shapely.geometry import Polygon, shape
 from shapely import union_all
+from shapely.geometry import Polygon, shape
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Segment, refine_exposure

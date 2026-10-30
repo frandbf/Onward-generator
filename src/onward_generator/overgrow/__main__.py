@@ -11,15 +11,15 @@ from onward_generator.config.loader import ConfigLoadError
 from onward_generator.next_step import bounds_command, emit, fit_command
 from onward_generator.overgrow.constants import SEED
 from onward_generator.overgrow.fetch import FetchError, fetch_library
+from onward_generator.overgrow.fit import FitError, check_scene, write_report
 from onward_generator.overgrow.library_catalog import (
-    LibraryError,
     REVIEW_FILE,
+    LibraryError,
     choose_ids,
     installed_rows,
     review_rows,
     write_selection,
 )
-from onward_generator.overgrow.fit import FitError, check_scene, write_report
 from onward_generator.overgrow.place import OvergrowError, overgrow
 from onward_generator.overgrow.sketchfab_fetch import SketchfabError, fetch_sketchfab
 from onward_generator.overgrow.zone import ZoneError

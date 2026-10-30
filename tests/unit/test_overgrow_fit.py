@@ -12,7 +12,9 @@ from shapely import LineString, STRtree, box
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
-from onward_generator.generation.mesh import Mesh, box as mesh_box
+from onward_generator.generation.mesh import Mesh
+from onward_generator.generation.mesh import box as mesh_box
+from onward_generator.overgrow.ambient import cross_yaw
 from onward_generator.overgrow.catalog import AssetSpec
 from onward_generator.overgrow.dressing import dress
 from onward_generator.overgrow.fit import (
@@ -23,7 +25,6 @@ from onward_generator.overgrow.fit import (
     object_reason,
     size_reason,
 )
-from onward_generator.overgrow.ambient import cross_yaw
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import profile_for
 from onward_generator.overgrow.zone import square_zone

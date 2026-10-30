@@ -13,8 +13,8 @@ import numpy as np
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.signs.plaque import plaque_png
 from onward_generator.signs.place import place_signs
+from onward_generator.signs.plaque import plaque_png
 from tests.conftest import MURCIA_CENTER
 
 

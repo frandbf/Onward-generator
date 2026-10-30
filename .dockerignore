@@ -7,3 +7,4 @@ cache
 output
 mutants
 .claude
+.ruff_cache/

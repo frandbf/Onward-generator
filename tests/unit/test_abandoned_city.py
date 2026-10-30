@@ -14,8 +14,7 @@ from shapely import LineString, Point, Polygon, STRtree
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, box
-from onward_generator.overgrow.catalog import ALL_ASSETS, CATEGORIES, PLACEMENT_RULES, WEAR_NOTE, rules_for
-from onward_generator.overgrow.catalog import AssetSpec
+from onward_generator.overgrow.catalog import ALL_ASSETS, CATEGORIES, PLACEMENT_RULES, WEAR_NOTE, AssetSpec, rules_for
 from onward_generator.overgrow.dressing import block_reason
 from onward_generator.overgrow.growth import moss_png
 from onward_generator.overgrow.library import load_library

@@ -276,18 +276,33 @@ def _faces(lines: list[LineString]) -> tuple[list[Polygon], int]:
     return faces, len(cuts.geoms) + len(dangles.geoms) + len(invalid.geoms)
 
 
-def _nesting_depth(face: Polygon, shells: list[Polygon]) -> int:
-    """How many face outlines enclose ``face``, itself included."""
+def _role_rings(lines: list[LineString]) -> list[Polygon]:
+    """Rings that the member ways of one role close among themselves, filled.
+
+    Each role is polygonized on its own, so an inner ring that runs along its
+    outer is still a ring of its own, and two outer rings that share one way
+    are two rings although the way is listed once.
+    """
+    faces, _ = _faces(lines)
+    return [Polygon(face.exterior) for face in faces]
+
+
+def _nesting_depth(face: Polygon, rings: list[Polygon]) -> int:
+    """How many rings enclose ``face``."""
     probe = face.representative_point()
-    return sum(1 for shell in shells if shell.contains(probe))
+    return sum(1 for ring in rings if ring.contains(probe))
 
 
 def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssue]) -> BaseGeometry | None:
-    """Assemble a multipolygon by even-odd nesting of the closed member rings.
+    """Assemble a multipolygon by even-odd nesting of the member rings.
 
-    Member roles are advisory. A face nested an odd number of times is filled
-    and an even number of times is a hole. A role that disagrees with the
-    nesting is reported, and the nesting wins. Exteriors run counter-clockwise
+    The faces come from all member ways noded together. The rings come from
+    the outer ways and the inner ways polygonized per role. A face enclosed
+    by an odd number of rings is filled and an even number is a hole, so a
+    courtyard that shares an edge or a vertex with its outer ring is a hole
+    and two outer rings that share a way are both filled. Member roles are
+    otherwise advisory: a role that disagrees with the nesting is reported,
+    and the nesting wins. Exteriors run counter-clockwise
     and holes clockwise, as in RFC 7946.
     """
     ref = OsmRef("relation", rel.id)
@@ -317,13 +332,13 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
             )
         )
         return None
-    shells = [Polygon(face.exterior) for face in faces]
+    rings = _role_rings(outer) + _role_rings(inner)
     outer_lines = unary_union(outer)
-    inner_lines = unary_union(inner) if inner else None
+    inner_lines = unary_union(inner)
     filled: list[Polygon] = []
     for face in faces:
-        from_inner = inner_lines is not None and inner_lines.covers(face.exterior)
-        if _nesting_depth(face, shells) % 2 == 1:
+        from_inner = inner_lines.covers(face.exterior)
+        if _nesting_depth(face, rings) % 2 == 1:
             filled.append(face)
             if from_inner:
                 issues.append(
@@ -344,7 +359,7 @@ def _build_multipolygon(rel: OsmRelation, doc: OsmDocument, issues: list[GeoIssu
                 )
             )
     merged = unary_union(filled)
-    return MultiPolygon([orient(part, sign=1.0) for part in getattr(merged, "geoms", [merged])])
+    return MultiPolygon([orient(part, sign=1.0) for part in getattr(merged, "geoms", [merged])])  # pragma: no mutate: orient reads only the sign, and 1.0 is its default
 
 
 def build_source_features(doc: OsmDocument) -> tuple[list[SourceFeature], list[GeoIssue], dict[str, int]]:

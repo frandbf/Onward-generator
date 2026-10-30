@@ -21,8 +21,6 @@ from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, box, quad, transform
 from onward_generator.overgrow.ambient import blocks_street, cross_yaw, is_solid
 from onward_generator.overgrow.catalog import FACADE_Z_M, rules_for
-from onward_generator.overgrow.ground import RoadFloor
-from onward_generator.overgrow.fit import apply_fit_scale, measure, object_reason, size_reason
 from onward_generator.overgrow.constants import (
     LANE_M,
     MAX_VINES,
@@ -30,6 +28,8 @@ from onward_generator.overgrow.constants import (
     VINE_HEIGHT_M,
     VINE_WIDTH_M,
 )
+from onward_generator.overgrow.fit import apply_fit_scale, measure, object_reason, size_reason
+from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
 from onward_generator.overgrow.zone import Zone

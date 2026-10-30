@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, _TO_GLTF, build_glb
+from onward_generator.generation.gltf import _TO_GLTF, Node, Primitive, build_glb
 from onward_generator.generation.mesh import Mesh
 from onward_generator.overgrow.constants import ALBEDO_PX, TARGET_ASSET_TRIS
 

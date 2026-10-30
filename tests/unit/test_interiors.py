@@ -9,16 +9,21 @@ import pytest
 from shapely import Polygon
 
 from onward_generator.detail.config import load_detail_config
-from onward_generator.detail.scene import interior_quota
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
 from onward_generator.detail.interiors import (
-    GLASS_VIEW, _inner_walls, build_interior, glass_penetrations, pierce_room_windows, plan_interior, room_window_cuts,
+    GLASS_VIEW,
+    _inner_walls,
+    build_interior,
+    glass_penetrations,
+    pierce_room_windows,
+    plan_interior,
+    room_window_cuts,
 )
-from onward_generator.generation.mesh import Mesh
 from onward_generator.detail.modules import recess
+from onward_generator.detail.scene import interior_quota
 from onward_generator.dress.atlas import decode_png_rgba
+from onward_generator.generation.mesh import Mesh, closed_manifold_defects
 from onward_generator.materials.openings import GLASS_ALPHA, boarded_rgba, window_png, window_rgba
-from onward_generator.generation.mesh import closed_manifold_defects
 from tests.conftest import MURCIA_CENTER
 
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -96,7 +95,7 @@ class OllamaProvider:
         except urllib.error.HTTPError as exc:
             detail = exc.read(2000).decode("utf-8", "replace")
             raise ProviderError(f"Ollama returned HTTP {exc.code} for {path}: {detail}") from exc
-        except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as exc:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             reason = getattr(exc, "reason", exc)
             raise ProviderError(f"cannot reach Ollama at {self.host} ({reason}); is it running? "
                                 "Without a model, use --provider none --intent FILE") from exc

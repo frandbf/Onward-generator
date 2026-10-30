@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from onward_generator import __version__
-from onward_generator.contracts import is_schema
 from onward_generator.ai.intent import (
     INTENT_SCHEMA_PATH,
     MAX_RESPONSE_BYTES,
@@ -45,6 +44,7 @@ from onward_generator.ai.providers import (
 )
 from onward_generator.config.diagnostics import Diagnostic
 from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.contracts import is_schema
 from onward_generator.io import atomic_write_json, prepare_outputs
 
 RUN_SCHEMA = "onward_generator.ai_run"

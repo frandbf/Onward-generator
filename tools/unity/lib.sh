@@ -63,9 +63,9 @@ resolve_host() {
   export ONWARD_PLATFORM UNITY ADB LOG_ROOT ASSET_STORE_CACHE UNITY_RESOURCES
 }
 
-# MD5 of one file as 32 hex characters. macOS keeps `md5 -q`.
+# MD5 of one file as 32 hex characters: `md5 -q` where installed (macOS), else md5sum.
 file_md5() {
-  if [[ "${ONWARD_PLATFORM:-}" == "macos" ]]; then
+  if command -v md5 >/dev/null 2>&1; then
     md5 -q "$1"
   else
     md5sum "$1" | cut -d' ' -f1

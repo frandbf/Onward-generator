@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from onward_generator.ai.providers import OllamaProvider, ProviderError
+from onward_generator.ai.providers import OllamaProvider
 from onward_generator.cli import main
 from onward_generator.dress.atlas import build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import CatalogError, load_catalog
@@ -173,6 +173,23 @@ def test_groups_and_osm_overrides(tmp_path: Path) -> None:
     assert {"wall", "street"} <= {g.role for g in sample.groups}
 
 
+def test_groups_are_ordered_by_role_then_first_surface_id(tmp_path: Path) -> None:
+    detail, scene = write_sample(tmp_path)
+    # Renamed so id order (osm-way-0 first) disagrees with context order (historic before unknown).
+    for path in (detail / "scene_detail.json", scene):
+        path.write_text(path.read_text(encoding="utf-8").replace("osm-way-3", "osm-way-0"), encoding="utf-8")
+    groups = collect_surfaces(detail, scene_path=scene).groups
+    assert [(g.role, g.surface_ids[0]) for g in groups] == [
+        ("opening", "building/osm-way-1#door_wood"),
+        ("plaza", "surface/pedestrian"),
+        ("roof", "building/osm-way-0#roof"),
+        ("roof", "building/osm-way-1#roof"),
+        ("street", "surface/carriageway"),
+        ("wall", "building/osm-way-0#wall"),
+        ("wall", "building/osm-way-1#wall"),
+    ]
+
+
 def test_rules_do_not_need_ollama(tmp_path: Path) -> None:
     detail, scene = write_sample(tmp_path)
     catalog = load_catalog()
@@ -252,7 +269,7 @@ def test_disconnected_ollama_is_reported(tmp_path: Path) -> None:
     assert report["applied"] is False
 
 
-def test_fake_ollama_response_is_validated(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]
+def test_fake_ollama_response_is_validated(tmp_path: Path, fake_ollama) -> None:  # type: ignore[no-untyped-def]  # noqa: F811 - pytest injects the fixture imported above
     host, handler = fake_ollama
     detail, scene = write_sample(tmp_path)
     groups = collect_surfaces(detail, scene_path=scene, limit=1)

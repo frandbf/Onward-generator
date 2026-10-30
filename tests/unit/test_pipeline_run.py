@@ -12,7 +12,18 @@ import pytest
 
 from onward_generator.cli import main
 from onward_generator.maps.workspace import create_map
-from onward_generator.next_step import export_command, geo_command
+from onward_generator.next_step import (
+    detail_command,
+    dress_command,
+    export_command,
+    fit_command,
+    generate_command,
+    geo_command,
+    heights_command,
+    materials_command,
+    overgrow_command,
+    signs_command,
+)
 from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import (
     _build_package,
@@ -29,9 +40,7 @@ from onward_generator.pipeline_run import (
     unity_editor_open,
 )
 from onward_generator.platform import resolve_host
-from tests.conftest import MURCIA_CENTER
-
-LON, LAT = MURCIA_CENTER
+from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
 @pytest.fixture(autouse=True)
@@ -43,8 +52,8 @@ def _unity_editor_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_map_create_keeps_latitude_then_longitude() -> None:
     argv = map_create_argv(
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         brief="ciudad abandonada",
@@ -52,16 +61,16 @@ def test_map_create_keeps_latitude_then_longitude() -> None:
     )
     assert "--id" not in argv and "--out" not in argv
     assert "--brief" in argv and "ciudad abandonada" in argv and "--ai" in argv
-    assert argv[argv.index("--lat") + 1] == str(LAT)
-    assert argv[argv.index("--lon") + 1] == str(LON)
+    assert argv[argv.index("--lat") + 1] == str(MURCIA_CENTER_LAT)
+    assert argv[argv.index("--lon") + 1] == str(MURCIA_CENTER_LON)
     assert argv[argv.index("--lightmap-texels-per-m") + 1] == "10.0"
-    assert LAT == 37.98407
-    assert LON == -1.12863
+    assert MURCIA_CENTER_LAT == 37.98407
+    assert MURCIA_CENTER_LON == -1.12863
 
 
 def test_plan_runs_python_stages_and_stops_before_unity(tmp_path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     names = [name for name, _argv in plan_steps(root)]
     assert names == [
         "geo", "heights", "generate", "detail", "dress", "materials",
@@ -70,13 +79,13 @@ def test_plan_runs_python_stages_and_stops_before_unity(tmp_path) -> None:
     joined = " ".join(" ".join(argv) for _name, argv in plan_steps(root))
     assert "unity" not in joined
     assert "push" not in joined
-    assert f"--origin {LON} {LAT}" in joined
+    assert f"--origin {MURCIA_CENTER_LON} {MURCIA_CENTER_LAT}" in joined
     assert "panoramax" not in names
 
 
 def test_a_map_without_the_panoramax_key_keeps_the_current_graph(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     document = json.loads((root / "map.json").read_text(encoding="utf-8"))
     document.pop("panoramax")
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
@@ -89,7 +98,7 @@ def test_a_map_without_the_panoramax_key_keeps_the_current_graph(tmp_path: Path)
 def test_panoramax_true_inserts_the_step_before_signs(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
     create_map(
-        root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400, panoramax=True,
+        root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400, panoramax=True,
     )
     names = [name for name, _argv in plan_steps(root)]
     assert names[names.index("materials") + 1] == "panoramax"
@@ -102,7 +111,7 @@ def test_panoramax_true_inserts_the_step_before_signs(tmp_path: Path) -> None:
 
 def test_panoramax_off_writes_nothing(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     out = tmp_path / "scene_panoramax"
     code = main([
         "panoramax", "apply",
@@ -216,9 +225,23 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
 
 def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     steps = dict(plan_steps(root))
+
+    def out(name: str) -> Path:
+        return Path(steps[name][steps[name].index("--out") + 1])
+
+    scene = out("geo") / "geo_scene.json"
+    heights = out("heights") / "heights.json"
     assert steps["geo"] == list(geo_command(root).argv)
+    assert steps["heights"] == list(heights_command(scene).argv)
+    assert steps["generate"] == list(generate_command(scene, heights).argv)
+    assert steps["detail"] == list(detail_command(scene, heights, out("generate")).argv)
+    assert steps["dress"] == list(dress_command(out("detail"), scene, heights).argv)
+    assert steps["materials"] == list(materials_command(out("dress")).argv)
+    assert steps["signs"] == list(signs_command(out("materials")).argv)
+    assert steps["overgrow"] == list(overgrow_command(out("signs")).argv)
+    assert steps["fit"] == list(fit_command(scene, out("overgrow")).argv)
     playable = root / "data" / "processed" / "scene_playable"
     layout = root / "data" / "processed" / "layout" / "layout.json"
     exported = export_command(playable, layout)
@@ -275,11 +298,11 @@ def test_run_command_passes_the_centre(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("onward_generator.pipeline_run.run_map", fake_run_map)
     code = main([
         "run", "--name", "Apocalipsis Murciana",
-        "--lat", str(LAT), "--lon", str(LON),
+        "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON),
     ])
     assert code == 0
-    assert received["latitude"] == LAT
-    assert received["longitude"] == LON
+    assert received["latitude"] == MURCIA_CENTER_LAT
+    assert received["longitude"] == MURCIA_CENTER_LON
     assert received["map_id"] == "apocalipsis_murciana"
     assert received["out"] == "maps/apocalipsis_murciana"
     assert received["name"] == "Apocalipsis Murciana"
@@ -287,7 +310,7 @@ def test_run_command_passes_the_centre(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_rerun_after_a_failed_osm_fetch_continues_at_osm(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murciav2"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=250, margin_m=30)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=250, margin_m=30)
     seen: list[str] = []
 
     def execute(argv: list[str]) -> int:
@@ -297,8 +320,8 @@ def test_rerun_after_a_failed_osm_fetch_continues_at_osm(tmp_path, capsys: pytes
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=250,
         margin_m=30,
         out=str(root),
@@ -314,7 +337,7 @@ def test_rerun_after_a_failed_osm_fetch_continues_at_osm(tmp_path, capsys: pytes
 
 def test_several_finished_steps_are_listed_and_the_answer_is_used(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     osm = root / "data" / "raw" / "murcia.osm"
     osm.write_text("<osm/>", encoding="utf-8")
     geo = root / "data" / "processed" / "geo"
@@ -329,8 +352,8 @@ def test_several_finished_steps_are_listed_and_the_answer_is_used(tmp_path, caps
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -385,7 +408,7 @@ def _finish_python_stages(root: Path) -> None:
 
 def _ready_map(tmp_path):
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     _finish_python_stages(root)
     return root
 
@@ -402,8 +425,8 @@ def test_a_yes_uploads_the_built_package(tmp_path, capsys: pytest.CaptureFixture
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -433,7 +456,6 @@ def _write_launcher(package: Path) -> None:
 
 def test_unity_builds_the_quest_files_before_asking(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _ready_map(tmp_path)
-    package = root / "data" / "processed" / "export" / "pkg_01"
     built: list[list[str]] = []
     pushed: list[str] = []
 
@@ -445,8 +467,8 @@ def test_unity_builds_the_quest_files_before_asking(tmp_path, capsys: pytest.Cap
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -479,8 +501,8 @@ def test_unity_skips_a_scene_that_already_exists(tmp_path) -> None:
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -504,8 +526,8 @@ def test_any_other_answer_does_not_upload(tmp_path, capsys: pytest.CaptureFixtur
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -531,8 +553,8 @@ def test_a_failed_unity_build_does_not_ask_to_upload(tmp_path, capsys: pytest.Ca
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -550,7 +572,7 @@ def test_a_failed_unity_build_does_not_ask_to_upload(tmp_path, capsys: pytest.Ca
 
 def test_a_failed_step_does_not_ask_to_upload(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     asked = {"n": 0}
 
     def ask() -> str:
@@ -560,8 +582,8 @@ def test_a_failed_step_does_not_ask_to_upload(tmp_path, capsys: pytest.CaptureFi
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -628,6 +650,42 @@ def test_push_keeps_confirm_and_host(monkeypatch: pytest.MonkeyPatch, tmp_path) 
     assert env["UNITY"] == "/Applications/Unity/Hub/Editor/2021.3.23f1/Unity.app/Contents/MacOS/Unity"
 
 
+def test_run_map_passes_an_explicit_host_to_build_and_push(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    root = _ready_map(tmp_path)
+    package = root / "data" / "processed" / "export" / "pkg_01"
+    calls: list[tuple[str, dict[str, str]]] = []
+
+    def fake_run(args, *, env, check, capture_output, text):
+        calls.append((args[-1], dict(env)))
+        if args[-1] == "launcher":
+            _write_launcher(package)
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", fake_run)
+    monkeypatch.setenv("ONWARD_PLATFORM", "macos")
+    monkeypatch.delenv("UNITY", raising=False)
+    host = resolve_host("linux", env={"HOME": "/home/tester"})
+    code = run_map(
+        map_id="murcia",
+        name="Murcia",
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
+        radius_m=400,
+        margin_m=30,
+        out=str(root),
+        execute=lambda _argv: 1,
+        interactive=True,
+        ask=lambda: "s",
+        host=host,
+    )
+    assert code == 0
+    assert [step for step, _env in calls] == ["launcher", "push"]
+    for _step, env in calls:
+        assert env["ONWARD_PLATFORM"] == "linux"
+        assert env["UNITY"] == str(host.unity_editor)
+    assert calls[1][1]["CONFIRM_PUSH"] == "yes"
+
+
 def test_an_unknown_platform_does_not_start_unity(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setattr("onward_generator.pipeline_run.subprocess.run", lambda *a, **k: pytest.fail("Unity started"))
     monkeypatch.setenv("ONWARD_PLATFORM", "windows")
@@ -637,7 +695,7 @@ def test_an_unknown_platform_does_not_start_unity(monkeypatch: pytest.MonkeyPatc
 
 def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     signs = dict(plan_steps(root))["signs"]
     scene = signs[signs.index("--scene") + 1]
     assert scene.endswith("data/processed/geo/geo_scene.json")
@@ -647,7 +705,7 @@ def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> Non
 
 def test_bounds_stays_on_scene_playable_when_later_copies_exist(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     for name in ("scene_playable", "scene_playable_compact", "scene_playable_next"):
         directory = root / "data" / "processed" / name
         directory.mkdir(parents=True)
@@ -658,7 +716,7 @@ def test_bounds_stays_on_scene_playable_when_later_copies_exist(tmp_path: Path) 
 
 def test_an_open_editor_asks_before_any_stage_starts(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     seen: list[str] = []
     state = {"open": True, "asks": 0}
 
@@ -675,8 +733,8 @@ def test_an_open_editor_asks_before_any_stage_starts(tmp_path, capsys: pytest.Ca
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -697,14 +755,14 @@ def test_an_open_editor_asks_before_any_stage_starts(tmp_path, capsys: pytest.Ca
 
 def test_declining_to_close_unity_does_not_start(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     seen: list[str] = []
 
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -722,14 +780,14 @@ def test_declining_to_close_unity_does_not_start(tmp_path, capsys: pytest.Captur
 
 def test_a_closed_editor_starts_without_asking(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     asked = {"n": 0}
 
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -747,14 +805,14 @@ def test_a_closed_editor_starts_without_asking(tmp_path, capsys: pytest.CaptureF
 
 def test_a_non_interactive_run_stops_when_unity_is_open(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = tmp_path / "murcia"
-    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     seen: list[str] = []
 
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -824,8 +882,8 @@ def test_turning_panoramax_on_rewrites_signs_and_keeps_the_package(tmp_path: Pat
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),
@@ -870,8 +928,8 @@ def test_a_newer_layout_exports_the_next_package(tmp_path: Path, capsys: pytest.
     code = run_map(
         map_id="murcia",
         name="Murcia",
-        latitude=LAT,
-        longitude=LON,
+        latitude=MURCIA_CENTER_LAT,
+        longitude=MURCIA_CENTER_LON,
         radius_m=400,
         margin_m=30,
         out=str(root),

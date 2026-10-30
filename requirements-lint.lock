@@ -1,0 +1,2 @@
+# Linters (task lint) only; installed in the Docker image, not needed to run the pipeline.
+ruff==0.17.3

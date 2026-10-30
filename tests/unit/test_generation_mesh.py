@@ -12,7 +12,7 @@ import pytest
 from shapely import LineString, Polygon, box, union_all
 
 from onward_generator.generation.config import DEFAULT_CONFIG_PATH, GenerationConfigError, config_from_document, load_generation_config
-from onward_generator.generation.gltf import Node, Primitive, build_glb, read_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import (
     Mesh,
     cap,
@@ -128,6 +128,19 @@ def test_glb_roundtrip_axes_and_alignment() -> None:
     normal = np.frombuffer(blob, np.float32, 3, doc["bufferViews"][doc["accessors"][1]["bufferView"]]["byteOffset"])
     assert np.allclose(normal, [0, 1, 0])  # local +z (up) is glTF +Y
     assert build_glb([Node("a", (Primitive(mesh, "ground"),))], CFG.materials) == build_glb([Node("a", (Primitive(mesh, "ground"),))], CFG.materials)
+
+
+def test_read_back_keeps_instancing_and_names_unnamed_nodes() -> None:
+    mesh = Mesh(np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]), np.array([[0, 1, 2]]))
+    prims = (Primitive(mesh, "ground"),)
+    data = build_glb(
+        [Node("lamp/1", prims, mesh_key="lamp"), Node("lamp/2", prims, mesh_key="lamp"), Node("", prims)], CFG.materials,
+    )
+    nodes, _ = nodes_from_glb(data)
+    assert [(n.name, n.mesh_key) for n in nodes] == [("lamp/1", "lamp"), ("lamp/2", "lamp"), ("node", None)]
+    # Written again, the instanced pair still shares one glTF mesh.
+    doc, _ = read_glb(build_glb(nodes, CFG.materials))
+    assert len(doc["meshes"]) == 2 and doc["nodes"][0]["mesh"] == doc["nodes"][1]["mesh"]
 
 
 def test_read_glb_rejects_other_files() -> None:

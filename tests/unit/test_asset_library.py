@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from onward_generator.overgrow.sketchfab_fetch import SPECS, _pick
 from onward_generator.overgrow.library_catalog import (
     REVIEW_FILE,
     LibraryError,
@@ -16,6 +15,7 @@ from onward_generator.overgrow.library_catalog import (
     review_rows,
     write_selection,
 )
+from onward_generator.overgrow.sketchfab_fetch import SPECS, _pick
 
 LIBRARY = Path(__file__).resolve().parents[2] / "assets" / "normalized"
 

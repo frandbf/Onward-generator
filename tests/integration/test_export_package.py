@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from onward_generator.cli import main
+from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
@@ -26,7 +27,6 @@ from onward_generator.export.package import (
     sha256_file,
     verify_package,
 )
-from onward_generator.config.loader import read_json_document
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -86,6 +86,7 @@ def test_package_is_complete_and_verifiable(inputs: tuple[Path, Path], tmp_path:
     assert any("export_adapter_unverified" in w for w in m["warnings"])
     checklist = (out / "quest_acceptance.md").read_text(encoding="utf-8")
     assert "Uplink" in checklist and "Free Roam" in checklist and m["package_id"] in checklist
+    assert "docs/12-export.md" in checklist and "este `quest_acceptance.md` esté completo" in checklist
 
 
 def test_package_id_depends_only_on_content(inputs: tuple[Path, Path], tmp_path: Path) -> None:

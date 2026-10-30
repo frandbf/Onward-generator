@@ -14,7 +14,7 @@ Documentation is in English. Working rules for changes are in `AGENTS.md`. The o
   - `shapely==2.2.0` (GEOS 3.14.1): geometry.
   - `pyproj==3.8.0` (PROJ 9.8.1): projections. The EPSG database is included and works offline.
   - `jsonschema==4.26.0`: configuration checks against JSON Schema 2020-12.
-  - `pillow==11.3.0`: JPEG albedo decode in `materials apply`. The generator's own atlas stays PNG filter-0.
+  - `pillow==11.3.0`: image decode and encode. Every PNG the generator writes or reads (atlases, thumbnails, previews, plaques), JPEG inputs (albedo textures in `materials apply`, Panoramax street photos), and the decode and resize of imported overgrow textures.
   - `pytest==9.1.1`: tests.
 - The locked environment, including transitive dependencies, is `requirements.lock`.
 - Optional, for phase 06, texture selection, and overgrow plans: [Ollama](https://ollama.com) on loopback with a model already installed (tested with Ollama 0.33.2 and `qwen3:14b`). There is no extra Python dependency. The client uses the standard-library `urllib`. Without Ollama, placement and texture selection use the deterministic fallback.
@@ -37,17 +37,18 @@ To keep the machine clean, the Python pipeline and its checks can run in a conta
 The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
 
 ```bash
-task --list            # test, lint:shell, smoke, ci, mutate, image, shell
+task --list            # test, lint, lint:shell, lint:actions, smoke, ci, mutate, image, shell
 task ci                # everything the CI gate runs
 task test -- -k cadastre
+task lint -- --fix     # ruff (rules in pyproject.toml); --fix applies the safe fixes
 ```
 
 ### Mutation testing
 
-`task mutate` changes the code a branch touched and checks that some test notices. Only functions in `src/onward_generator` that contain an added or changed line since `BASE` (default `main`, uncommitted edits included) are mutated, with [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock`. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one.
+`task mutate` changes the lines a branch touched and checks that some test notices. It takes the lines in `src/onward_generator` added or changed since `BASE` (default `main`, uncommitted edits included), lets [mutmut](https://mutmut.readthedocs.io) 3.8.1 from `requirements-mutate.lock` generate the mutants of the functions that contain them, and runs only the mutants whose edit falls on one of those lines. A mutant is a small edit such as `<` to `<=`, `+` to `-`, or a constant moved by one. `task mutate -- --whole-functions` runs every mutant of those functions instead, which also measures the old code around the change.
 
 ```bash
-task mutate                         # functions changed since main
+task mutate                         # lines changed since main
 task mutate BASE=fork/main MAX=10   # another base; at most 10 functions
 ```
 

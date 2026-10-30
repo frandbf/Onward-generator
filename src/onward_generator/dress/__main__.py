@@ -23,14 +23,13 @@ from onward_generator.ai.providers import (
     OllamaProvider,
     Provider,
     ProviderError,
-    StaticProvider,
 )
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.dress.catalog import CatalogError, load_catalog
 from onward_generator.dress.classify import (
+    SYSTEM_PROMPT,
     ClassifyError,
     ClassifyResult,
-    SYSTEM_PROMPT,
     classify_groups,
     parse_recommendations,
 )

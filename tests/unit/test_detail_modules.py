@@ -13,11 +13,11 @@ from onward_generator.detail.config import DEFAULT_CONFIG_PATH, DetailConfigErro
 from onward_generator.detail.facades import (
     WELD_M,
     face_with_openings,
+    interior_storey,
     parapet_strip,
     refine_exposure,
     stable_choice,
     stable_unit,
-    interior_storey,
     storeys_for,
 )
 from onward_generator.detail.modules import (

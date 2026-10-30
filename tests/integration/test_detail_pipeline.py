@@ -146,6 +146,20 @@ def test_shop_evidence_turns_the_ground_floor_into_shopfronts(detailed) -> None:
     assert plain["ground_floor"] == "door_and_windows" and plain["ground_floor_evidence"] is None
 
 
+def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(detail_inputs: tuple[Path, Path, Path]) -> None:
+    # A fresh run, not the module fixture, so this test itself exercises the layout.
+    fresh = _detail(detail_inputs)
+    openings = {o.record["source_ids"][0]: o.record["facade"]["openings"] for o in fresh.objects if o.type == "building"}
+    for bid, found in openings.items():
+        assert sum(found.get(k, 0) for k in ("door", "landmark_door", "interior_door")) == 1, (bid, found)
+    assert openings["osm-way-312"].get("shopfront", 0) > 0
+    assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either
+    # Balcony placement hashes the building id with the seed (golden values for the default seed).
+    assert {bid: found.get("balcony", 0) for bid, found in openings.items()} == {
+        "osm-way-311": 12, "osm-way-312": 8, "osm-way-313": 10, "osm-way-314": 0, "osm-way-315": 0,
+    }
+
+
 def test_opening_dimensions_stay_inside_the_facade(detailed) -> None:
     for o in (x for x in detailed.objects if x.type == "building"):
         h = o.record["height"]["height_m"]

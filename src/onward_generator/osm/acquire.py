@@ -141,12 +141,13 @@ def _http_fetch(endpoint: str, query: str, timeout: float) -> bytes:
         max_bytes=MAX_BYTES,
         timeout=timeout,
         headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "application/xml, text/xml",
-            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": USER_AGENT,  # pragma: no mutate: only key case changes survive, urllib capitalizes header names; test_net_callers pins the rest
+            "Accept": "application/xml, text/xml",  # pragma: no mutate: only key case changes survive, urllib capitalizes header names; test_net_callers pins the rest
+            "Content-Type": "application/x-www-form-urlencoded",  # pragma: no mutate: only key case changes survive, urllib capitalizes header names; test_net_callers pins the rest
         },
-        data=urllib.parse.urlencode({"data": query}).encode("utf-8"),
+        data=urllib.parse.urlencode({"data": query}).encode(),
         error=OsmDownloadError,
+        error_body=True,
     )
 
 

@@ -21,11 +21,11 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from onward_generator import __version__
-from onward_generator.contracts import is_schema
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
-from onward_generator.io import atomic_write_bytes, atomic_write_json
+from onward_generator.contracts import is_schema
 from onward_generator.export.thumbnail import render_listing_thumbnail
+from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.perf.layout import (
     GAMEPLAY_VERSION,
     MIN_SPAWN_SEPARATION_M,
@@ -334,13 +334,14 @@ def checklist(manifest: Mapping[str, Any]) -> str:
         "",
         f"Paquete `{manifest['package_id']}`, adaptador {manifest['adapter']['name']} {manifest['adapter']['version']}, "
         f"Unity {manifest['target']['unity']}, SDK {manifest['target']['sdk']}.",
-        "Anota para cada punto: sí / no / no probado, y qué se observó. Ver docs/12-export.md.",
+        "Anota para cada punto: sí / no / no probado, y qué se observó. Ver docs/12-export.md (sección «Export package»).",
+        f"`device_verified` sigue en false hasta que este `{CHECKLIST_FILE}` esté completo en el visor.",
         "",
         "| # | Comprobación | Resultado | Observación |",
         "| --- | --- | --- | --- |",
     ]
     lines += [f"| {i} | {item} | | |" for i, item in enumerate(QUEST_CHECKLIST, 1)]
-    lines += ["", f"MD5 del `.content3` probado: (ver `build/content3.md5`)", ""]
+    lines += ["", "MD5 del `.content3` probado: (ver `build/content3.md5`)", ""]
     return "\n".join(lines)
 
 

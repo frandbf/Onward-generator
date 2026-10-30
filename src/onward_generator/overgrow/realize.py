@@ -23,7 +23,6 @@ from onward_generator.overgrow.catalog import FACADE_Z_M
 from onward_generator.overgrow.constants import MAX_LIBRARY_TRIS
 from onward_generator.overgrow.digest import Digest, Facade, build_digest
 from onward_generator.overgrow.dressing import Dressing, block_reason, collider_mesh
-from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.fit import (
     FIRE_ESCAPE_DEPTH_M,
     apply_fit_scale,
@@ -31,6 +30,7 @@ from onward_generator.overgrow.fit import (
     object_reason,
     size_reason,
 )
+from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.plan import (
     PLAN_VERSION,

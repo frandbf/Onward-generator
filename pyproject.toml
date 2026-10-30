@@ -36,5 +36,23 @@ addopts = "-ra"
 [tool.mutmut]
 # task mutate (tools/mutate/run.py) passes the changed functions; this is the copy mutmut tests against.
 source_paths = ["src/"]
-also_copy = ["config/", "assets/", "tests/", "tools/", "docs/", "requirements.lock", "requirements-mutate.lock", "README.md"]
+also_copy = ["config/", "assets/", "tests/", "tools/", "docs/", "requirements.lock", "requirements-mutate.lock", "requirements-lint.lock", "README.md"]
 mutate_only_covered_lines = true
+
+[tool.ruff]
+# task lint. Line length is not enforced: the code was never formatted to one, and reformatting it all would bury real changes.
+target-version = "py312"
+line-length = 140  # only how isort wraps imports; E501 is off
+src = ["src", "."]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "PGH004", "RUF100"]
+ignore = [
+    "E501",  # see above
+    "B905",  # zip(strict=) changes behaviour; add it where a length mismatch is a bug, with a test
+]
+# Codes from rules this config does not enable, kept on lines that document why the pattern is deliberate.
+external = ["BLE001", "N802", "PLR0124", "S310"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["onward_generator", "tests"]

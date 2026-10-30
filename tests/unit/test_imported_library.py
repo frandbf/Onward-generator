@@ -88,7 +88,7 @@ def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
 
 def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     from onward_generator.overgrow.library import load_library
-    from onward_generator.overgrow.library_catalog import LibraryError, choose_ids, installed_rows, library_directories
+    from onward_generator.overgrow.library_catalog import choose_ids, installed_rows, library_directories
 
     directories = library_directories(REPO / "assets")
     assert {path.name for path in directories} == {"kenney", "normalized"}
