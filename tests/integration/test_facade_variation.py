@@ -104,8 +104,8 @@ def test_every_building_gets_a_door_except_where_the_shopfront_rules_decide(
 
 
 def test_a_building_the_interior_budget_turns_down_still_gets_its_fallback_door(detail_inputs: tuple[Path, Path, Path]) -> None:
-    # A 2.7 m main door does not fit 3 m storeys; the 2.4 m interior door does, so 311 and 313
-    # plan an interior that a zero triangle budget then turns down.
+    # A 2.7 m main door does not fit 3 m storeys; the 2.4 m interior door does, so 311, 312 and
+    # 313 plan an interior that a zero triangle budget then turns down.
     doc = copy.deepcopy(DOC)
     doc["doors"]["main"]["height_m"] = 2.7
     doc["interiors"]["max_triangles"] = 0
@@ -116,4 +116,6 @@ def test_a_building_the_interior_budget_turns_down_still_gets_its_fallback_door(
         assert declined[b]["facade"]["door"] == "fallback"
         assert declined[b]["door_box"][1][2] == pytest.approx(3.0 - CFG.head_clearance_m)
         assert {k: v for k, v in declined[b].items() if k != "door_box"} == {k: v for k, v in plain[b].items() if k != "door_box"}
+    # 312 is a shop: turned down too, it keeps the shopfront rules and gets no fallback door.
+    assert declined["312"]["facade"]["door"] == "none" == plain["312"]["facade"]["door"]
     assert stats["interiors"] == []
