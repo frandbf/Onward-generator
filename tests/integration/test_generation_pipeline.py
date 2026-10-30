@@ -98,7 +98,15 @@ def test_only_osm_crossings_get_zebra_paint(inputs: tuple[Path, Path], tmp_path:
 
     paint = next(o for o in generated.objects if o.id == "surface/zebra_crossing")
     (primitive,) = paint.visual
-    assert primitive.material == "road_marking" and paint.collider is None
+    assert primitive.material == "road_marking" and paint.collider is None and paint.type == "surface"
+    record = paint.record
+    assert (record["id"], record["type"], record["surface_class"], record["materials"]) == (
+        "surface/zebra_crossing", "surface", "road_marking", ["road_marking"])
+    assert record["generation"] == {"method": "zebra_bars_on_osm_crossings", "attribute_origin": "observed",
+                                    "bar_layout": "generated", "bar_m": 0.5, "gap_m": 0.5, "lift_m": ZEBRA_LIFT_M}
+    first = record["crossings"][0]
+    assert first["centre_m"] == [round(zebra.centre[0], 3), round(zebra.centre[1], 3)]
+    assert first["bars"] == generated.stats["crossings"]["bars"] > 0
     counts = generated.stats["crossings"]
     assert counts["observed"] == counts["observed_painted"] + counts["observed_unpainted"] == 2
     assert counts["observed_painted"] == 1 and counts["generated_unpainted"] == plain.stats["crossings"]["strips"] - 2

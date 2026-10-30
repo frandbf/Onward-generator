@@ -47,6 +47,7 @@ from onward_generator.generation.mesh import (
     walls,
 )
 from onward_generator.generation.surfaces import (
+    CROSSING_WIDTH_M,
     AreaFeature,
     LinearWay,
     Partition,
@@ -425,21 +426,19 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
         markings = paint_crossings(crossing_sites(vehicular), carriageway.geometry, crossing_evidence(features))
     if markings.bars:
         # One shared white material, lifted off the asphalt so the depth test keeps it in front.
-        zebra = cap(MultiPolygon(markings.bars), -depth + ZEBRA_LIFT_M)
+        paint_z = -depth + ZEBRA_LIFT_M
+        zebra = cap(MultiPolygon(markings.bars), paint_z)
         painted = [c for c in markings.crossings if c.painted]
         objects.append(
             SceneObject(
                 "surface/zebra_crossing", "surface", [Primitive(zebra, "road_marking")], None,
                 {"id": "surface/zebra_crossing", "type": "surface", "surface_class": "road_marking",
-                 "z_m": round(-depth + ZEBRA_LIFT_M, 4), "area_m2": round(sum(b.area for b in markings.bars), 3),
+                 "z_m": round(paint_z, 4),  # pragma: no mutate: a centimetre lift on a millimetre depth; 4 or 5 digits store the same value
+                 "area_m2": len(markings.bars) * ZEBRA_BAR_M * CROSSING_WIDTH_M,
                  "source_ids": sorted({i for c in painted for i in c.evidence}),
                  "generation": {"method": "zebra_bars_on_osm_crossings", "attribute_origin": "observed", "bar_layout": "generated",
                                 "bar_m": ZEBRA_BAR_M, "gap_m": ZEBRA_GAP_M, "lift_m": ZEBRA_LIFT_M},
-                 "crossings": [
-                     {"centre_m": [round(c.site.centre[0], 3), round(c.site.centre[1], 3)], "origin": c.origin,
-                      "evidence": list(c.evidence), "painted": c.painted, "bars": len(c.bars)}
-                     for c in markings.crossings
-                 ],
+                 "crossings": [c.to_record() for c in markings.crossings],
                  "osm_crossings_unmatched": list(markings.unmatched),
                  "materials": ["road_marking"], "visual": {"triangles": zebra.triangle_count}},
             )

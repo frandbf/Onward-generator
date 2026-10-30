@@ -117,6 +117,23 @@ def test_the_bars_stop_at_the_kerb_of_the_piece_that_holds_the_centre() -> None:
     assert zebra_bars(CrossingSite((10.0, 20.0), (1.0, 0.0), 8.0), carriageway) == []
 
 
+def test_the_bars_stay_within_the_strip_span() -> None:
+    """On a carriageway wider than the 8 m span, the run is the span: 7 bars between -3.5 and 3.5."""
+    bars = zebra_bars(_site(), box(-50, -10, 50, 10))
+    assert _same(union_all(bars), _boxes(-3.25, -2.25, -1.25, -0.25, 0.75, 1.75, 2.75))
+
+
+def test_the_bars_are_centred_between_the_kerbs_not_on_the_centreline() -> None:
+    """Kerbs at -2 and 4 on a street turned 30 degrees: 5 bars centred on y = 1."""
+    angle = 30.0
+    street = rotate(box(-50, -2, 50, 4), angle, origin=(0, 0))
+    along = (math.cos(math.radians(angle)), math.sin(math.radians(angle)))
+    centre = rotate(Point(10, 0), angle, origin=(0, 0))
+    bars = zebra_bars(CrossingSite((centre.x, centre.y), along, 10.0), street)
+    expected = rotate(_boxes(-1.25, -0.25, 0.75, 1.75, 2.75), angle, origin=(0, 0))
+    assert len(bars) == 5 and union_all(bars).symmetric_difference(expected).area < 1e-6
+
+
 def test_a_bar_cut_by_the_kerb_is_left_out() -> None:
     notch = box(11.9, 2.0, 13, 3)
     bars = zebra_bars(_site(), STREET.difference(notch))
@@ -165,8 +182,8 @@ def test_overlapping_strips_are_painted_once() -> None:
 
 
 def test_a_strip_off_the_carriageway_is_not_counted() -> None:
-    markings = paint_crossings([_site(10.0), _site(80.0)], STREET, [_node("osm-node-1", 80.0)])
-    assert len(markings.crossings) == 1 and markings.unmatched == ("osm-node-1",)
+    markings = paint_crossings([_site(80.0), _site(10.0)], STREET, [_node("osm-node-1", 80.0)])
+    assert [c.site.centre for c in markings.crossings] == [(10.0, 0.0)] and markings.unmatched == ("osm-node-1",)
 
 
 def test_the_summary_counts_strips_by_origin_and_paint() -> None:
@@ -174,13 +191,14 @@ def test_the_summary_counts_strips_by_origin_and_paint() -> None:
     bar = box(0, 0, 1, 1)
     markings = Markings((
         PaintedCrossing(site, ("a",), True, (bar, bar)),
+        PaintedCrossing(site, ("d",), True, (bar,)),
         PaintedCrossing(site, ("b",), False),
         PaintedCrossing(site, (), False),
         PaintedCrossing(site, (), False),
     ), ("c",))
     assert summary(markings) == {
-        "strips": 4, "observed": 2, "observed_painted": 1, "observed_unpainted": 1,
-        "generated_unpainted": 2, "bars": 2, "osm_crossings_unmatched": 1,
+        "strips": 5, "observed": 3, "observed_painted": 2, "observed_unpainted": 1,
+        "generated_unpainted": 2, "bars": 3, "osm_crossings_unmatched": 1,
     }
     assert summary(Markings()) == dict.fromkeys(summary(markings), 0)
 
@@ -201,3 +219,12 @@ def test_paint_is_lifted_and_baked_with_the_ground() -> None:
 def test_an_empty_street_has_no_paint() -> None:
     markings = paint_crossings([], Polygon(), [])
     assert markings == Markings() and markings.bars == []
+
+
+def test_a_crossing_record_keeps_its_centre_to_the_millimetre() -> None:
+    site = CrossingSite((1.23456, -7.89012), (1.0, 0.0), 8.0)
+    bar = box(0, 0, 1, 1)
+    assert PaintedCrossing(site, ("osm-node-1",), True, (bar, bar)).to_record() == {
+        "centre_m": [1.235, -7.89], "origin": "observed", "evidence": ["osm-node-1"], "painted": True, "bars": 2,
+    }
+    assert PaintedCrossing(site, (), False).to_record()["origin"] == "generated"

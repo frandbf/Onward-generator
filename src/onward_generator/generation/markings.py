@@ -27,10 +27,12 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.generation.surfaces import CROSSING_WIDTH_M, JUNCTION_TOLERANCE_M, CrossingSite
+from onward_generator.geo.clipping import covered_by
 
 # Bar and gap of a Spanish zebra crossing (Norma 8.2-IC: 0.5 m bars, 0.5 m apart).
 ZEBRA_BAR_M = 0.5
 ZEBRA_GAP_M = 0.5
+PITCH_M = ZEBRA_BAR_M + ZEBRA_GAP_M
 # The first and last bar stay this far from the kerb, over the gutter.
 ZEBRA_KERB_M = 0.5
 # Height of the paint over the asphalt. At 1 cm a 24-bit depth buffer still
@@ -44,6 +46,8 @@ ZEBRA_MATCH_M = CROSSING_WIDTH_M
 UNPAINTED = frozenset({"no", "unmarked", "informal"})
 # The ``footway``, ``cycleway`` or ``path`` value of a way that crosses a road.
 CROSSING_WAY_KEYS = ("footway", "cycleway", "path")
+# DE-9IM: the interiors of two strips share an area.
+INTERIORS_OVERLAP = "2********"
 # A covered-by test with a floating-point margin, in square metres.
 OUTSIDE_TOLERANCE_M2 = 1e-6  # pragma: no mutate: a float tolerance; any area well under a bar finds the same bars
 
@@ -69,6 +73,12 @@ class PaintedCrossing:
     @property
     def origin(self) -> str:
         return "observed" if self.evidence else "generated"
+
+    def to_record(self) -> dict[str, Any]:
+        """The manifest row: centre to the millimetre, origin, OSM evidence, paint and bar count."""
+        x, y = self.site.centre
+        return {"centre_m": [round(x, 3), round(y, 3)], "origin": self.origin,
+                "evidence": list(self.evidence), "painted": self.painted, "bars": len(self.bars)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,25 +133,28 @@ def zebra_bars(site: CrossingSite, carriageway: BaseGeometry) -> list[Polygon]:
     half = site.span_m / 2.0
     axis = LineString([(x - vx * half, y - vy * half), (x + vx * half, y + vy * half)])
     run = next((part for part in shapely.get_parts(axis.intersection(carriageway))
-                if isinstance(part, LineString) and part.distance(Point(x, y)) <= JUNCTION_TOLERANCE_M), None)
+                if isinstance(part, LineString) and part.dwithin(Point(x, y), JUNCTION_TOLERANCE_M)), None)
     if run is None:
         return []
     ends = [(px - x) * vx + (py - y) * vy for px, py in run.coords]
-    low, high = min(ends) + ZEBRA_KERB_M, max(ends) - ZEBRA_KERB_M
-    pitch = ZEBRA_BAR_M + ZEBRA_GAP_M
-    count = math.floor((high - low + ZEBRA_GAP_M) / pitch)
-    first = (low + high) / 2.0 - (count * pitch - ZEBRA_GAP_M) / 2.0
+    middle = (min(ends) + max(ends)) / 2.0
+    # The margin only sets how many bars fit. Flipping its sign adds a whole bar
+    # pitch at a kerb, and that bar crosses the kerb and is dropped below.
+    room = max(ends) - min(ends) - 2.0 * ZEBRA_KERB_M  # pragma: no mutate: a sign flip adds bars that cross the kerb and are dropped
+    count = math.floor((room + ZEBRA_GAP_M) / PITCH_M)  # pragma: no mutate: the pitch is 1 m, so dividing and multiplying by it agree
+    first = middle - (count * PITCH_M - ZEBRA_GAP_M) / 2.0  # pragma: no mutate: the pitch is 1 m, so dividing and multiplying by it agree
     width = CROSSING_WIDTH_M / 2.0
     bars = []
     for i in range(count):
-        a, b = first + i * pitch, first + i * pitch + ZEBRA_BAR_M
+        a = first + i * PITCH_M  # pragma: no mutate: the pitch is 1 m, so dividing and multiplying by it agree
+        b = a + ZEBRA_BAR_M
         bar = Polygon([
             (x + vx * a - ux * width, y + vy * a - uy * width),
             (x + vx * b - ux * width, y + vy * b - uy * width),
             (x + vx * b + ux * width, y + vy * b + uy * width),
             (x + vx * a + ux * width, y + vy * a + uy * width),
         ])
-        if bar.difference(carriageway).area <= OUTSIDE_TOLERANCE_M2:
+        if covered_by(carriageway, bar, OUTSIDE_TOLERANCE_M2):
             bars.append(bar)
     return bars
 
@@ -165,7 +178,7 @@ def paint_crossings(sites: Sequence[CrossingSite], carriageway: BaseGeometry, ev
         matched.update(e.id for e in near)
         painted = any(e.painted for e in near)
         bars: list[Polygon] = []
-        if painted and not any(strip.intersection(other).area > OUTSIDE_TOLERANCE_M2 for other in painted_area):
+        if painted and not any(strip.relate_pattern(other, INTERIORS_OVERLAP) for other in painted_area):
             bars = zebra_bars(site, carriageway)
             painted_area.append(strip)
         crossings.append(PaintedCrossing(site, tuple(e.id for e in near), painted and bool(bars), tuple(bars)))
