@@ -12,10 +12,10 @@ With Docker and [go-task](https://taskfile.dev), nothing is installed on the hos
 
 ```bash
 task map -- --name "Map name" --lat 37.98407 --lon -1.12863 --radius-m 400
-task unity -- map_name      # on the host: Unity build, then asks before uploading to the Quest
+task unity
 ```
 
-`task map` runs every Python stage in the container and stops after `export`. Its last line is the exact `task unity` command. Unity must be [prepared once](#prepare-unity-once).
+`task map` runs every Python stage in the container and stops after `export`. `task unity` runs on the host: it builds the newest export package with Unity, then asks before uploading to the Quest. To build another map, pass its name as given to `task map` (`task unity -- "Map name"`), its folder id (`map_name`) or a package path. The folder id is the name in lower case, without accents, with `_` between words. Unity must be [prepared once](#prepare-unity-once).
 
 ## Requirements
 
@@ -30,8 +30,10 @@ task unity -- map_name      # on the host: Unity build, then asks before uploadi
 
 ```bash
 tools/docker/run.sh onward-generator doctor
-tools/docker/run.sh --build pytest -q   # rebuild after a lock file changes
+tools/docker/run.sh --build pytest -q
 ```
+
+`--build` rebuilds the image first; use it after a lock file changes.
 
 **Local virtual environment.**
 
@@ -101,7 +103,7 @@ The project is `~/Unity/OnwardPhase0Project`. Open it only with 2021.3.23f1: a n
 
 ### Build and upload
 
-`task unity -- <map id | maps/<id> | package>` picks the newest package of the map and runs `tool scene launcher`, skipping steps already built. Then it asks `¿Subir al Quest? [s/N]`; only `s`, `si`, `y` or `yes` runs `push`, which backs up the headset map and replaces it. Without `.venv`, its Python steps run in the image (`tools/docker/python.sh`). The same steps by hand:
+`task unity` picks the newest export package (of any map, or of the map named after `--`) and runs `tool scene launcher`, skipping steps already built. Then it asks `¿Subir al Quest? [s/N]`; only `s`, `si`, `y` or `yes` runs `push`, which backs up the headset map and replaces it. Without `.venv`, its Python steps run in the image (`tools/docker/python.sh`). The same steps by hand:
 
 ```bash
 tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 tool scene launcher
@@ -121,15 +123,17 @@ The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/o
 
 The checks have the same names locally and in CI, which runs on Linux:
 
-```bash
-task --list            # all tasks
-task ci                # shellcheck, ruff, mypy, actionlint, smoke, tests
-task test -- -k cadastre
-task lint -- --fix     # ruff; --fix applies the safe fixes
-task typecheck         # mypy on src; only errors missing from mypy-baseline.txt fail
-task mutate            # mutation testing of the lines changed since main
-task guard             # a change must not edit both src/ and a quality gate
-```
+| Task | What it does |
+| --- | --- |
+| `task --list` | All tasks. |
+| `task ci` | Everything CI runs: shellcheck, ruff, mypy, actionlint, smoke, tests. |
+| `task test -- -k cadastre` | The tests, with pytest arguments after `--`. |
+| `task lint -- --fix` | ruff; `--fix` applies the safe fixes. |
+| `task typecheck` | mypy on `src`; only errors missing from `mypy-baseline.txt` fail. |
+| `task mutate` | Mutation testing of the lines changed since `main`. |
+| `task guard` | Fails when a change edits both `src/` and a quality gate. |
+
+Command lines in this README carry no trailing comments, so they paste as they are.
 
 A pull request is ready when `task ci` and `task mutate` pass. The rules are in the *Quality gates* section of [AGENTS.md](AGENTS.md):
 

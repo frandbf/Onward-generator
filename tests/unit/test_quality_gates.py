@@ -116,3 +116,19 @@ def test_guard_flags_new_baseline_entries_but_not_removed_ones() -> None:
     base = _reader({"mypy-baseline.txt": old})
     assert guard.gates_touched(["mypy-baseline.txt"], base, _reader({"mypy-baseline.txt": grown})) == ["mypy-baseline.txt (new entries)"]
     assert guard.gates_touched(["mypy-baseline.txt"], base, _reader({"mypy-baseline.txt": shrunk})) == []
+
+
+SHELL_EMPTY_ARRAY = re.compile(r"^\s*(?:local\s+)?([A-Za-z_][A-Za-z0-9_]*)=\(\)", re.MULTILINE)
+
+
+def test_shell_scripts_guard_arrays_that_may_be_empty() -> None:
+    """macOS ships bash 3.2, where "${a[@]}" of an empty array fails under set -u. Use ${a[@]+"${a[@]}"}."""
+    scripts = sorted({*ROOT.joinpath("tools").rglob("*.sh"), ROOT / ".githooks" / "pre-push"})
+    bad: list[str] = []
+    for script in scripts:
+        text = script.read_text(encoding="utf-8")
+        for name in sorted(set(SHELL_EMPTY_ARRAY.findall(text))):
+            guarded = text.replace(f'${{{name}[@]+"${{{name}[@]}}"}}', "")
+            if f'"${{{name}[@]}}"' in guarded:
+                bad.append(f"{script.relative_to(ROOT)}: {name}")
+    assert bad == [], "expand with ${a[@]+\"${a[@]}\"}:\n" + "\n".join(bad)
