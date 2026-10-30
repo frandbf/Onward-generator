@@ -25,6 +25,7 @@ from onward_generator.export.package import (
     SDK_SPAWN_POINTS,
     ExportError,
     build_package,
+    interior_lights,
     sha256_file,
     verify_package,
 )
@@ -197,6 +198,41 @@ def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Pa
     assert other.manifest["package_id"] != result.manifest["package_id"]
 
 
+def test_more_interior_lights_than_the_adapter_bakes_warns(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    visual = (inputs[0] / "scene_visual.glb").read_bytes()
+    lights = interior_lights(visual)
+    rooms = [r for n in read_glb(visual)[0]["nodes"] for r in ((n.get("extras") or {}).get("light_anchors") or {}).get("rooms", [])]
+    assert lights == len(rooms) >= 3  # two stair interiors and the bakery
+    over = "interior lights; the adapter bakes the first"
+    assert not [w for w in package(inputs, tmp_path / "pkg").manifest["warnings"] if over in w]
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    for cap, warned in ((lights, False), (lights - 1, True)):
+        cfg["build"]["interior_lights_max"] = cap
+        (tmp_path / f"cfg{cap}.json").write_text(json.dumps(cfg), encoding="utf-8")
+        found = [w for w in package(inputs, tmp_path / f"pkg{cap}", export_config=tmp_path / f"cfg{cap}.json").manifest["warnings"]
+                 if over in w]
+        assert found == ([f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
+                          "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match."]
+                         if warned else [])
+    del cfg["build"]["interior_lights_max"]
+    (tmp_path / "nocap.json").write_text(json.dumps(cfg), encoding="utf-8")
+    assert not [w for w in package(inputs, tmp_path / "nocap", export_config=tmp_path / "nocap.json").manifest["warnings"] if over in w]
+
+
+def test_rooms_without_a_light_are_not_counted() -> None:
+    from onward_generator.generation.config import Material
+    from onward_generator.generation.gltf import Node, Primitive, build_glb
+    from onward_generator.generation.mesh import quad
+
+    face = (Primitive(quad((0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)), "m"),)
+    anchors = {"rooms": [{"room_id": "a/L0", "light_m": [0, 0, 2.7], "probes_m": []},
+                         {"room_id": "a/L1", "light": "over_cap", "probes_m": [0, 0, 1]},
+                         {"room_id": "a/L2", "light_m": [0, 0, 5.7], "probes_m": []}]}
+    nodes = [Node("interior/a", face, {"light_anchors": anchors}), Node("building/a", face, {}),
+             Node("interior/b", face, {"light_anchors": {"rooms": [{"room_id": "b/L0", "light_m": [1, 1, 2.7]}]}})]
+    assert interior_lights(build_glb(nodes, {"m": Material((1.0, 1.0, 1.0, 1.0), 0.5)})) == 3
+
+
 def test_verify_detects_tampering(inputs: tuple[Path, Path], tmp_path: Path) -> None:
     out = package(inputs, tmp_path / "pkg").directory
     with (out / "layout.json").open("ab") as f:
@@ -285,6 +321,8 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert 'StartsWith("m_prop_")' in source
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source
+    # A room detail left without a light past interiors.lights_max still gives its probes.
+    assert source.index("probes.Add(Local(room.probes_m[i]") < source.index("if (room.light_m == null || room.light_m.Length != 3) continue;")
     assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source

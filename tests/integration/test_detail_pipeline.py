@@ -36,6 +36,12 @@ def detailed(detail_inputs: tuple[Path, Path, Path]):
     return _detail(detail_inputs)
 
 
+@pytest.fixture(scope="module")
+def residential(residential_inputs: tuple[Path, Path, Path]):
+    """The block without its bakery, so all three matching buildings take the stair interior."""
+    return _detail(residential_inputs)
+
+
 def _obj(d, oid: str):
     return next(o for o in d.objects if o.id == oid)
 
@@ -151,7 +157,7 @@ def test_shop_records_name_the_poi_and_place_one_sign(detailed) -> None:
     assert shop["poi_id"].startswith("osm-node-") and shop["id"] == f"shop/osm-way-312/{shop['poi_id']}"
     assert (shop["name"], shop["name_origin"], shop["name_rule"]) == ("Panadería", "estimated", "shop=bakery")
     assert shop["sign"]["kind"] in ("fascia", "blade") and shop["sign"]["attribute_origin"] == "generated"
-    assert shop["vinyls"] == []  # the interior made these windows see-through glass
+    assert all(v["depth_m"] == 0.0 for v in shop["vinyls"])  # on the see-through pane of the shop interior too
     assert all(o.record["facade"]["shops"] == [] for o in detailed.objects if o.type == "building" and o.id != "building/osm-way-312")
 
 
@@ -240,7 +246,8 @@ def test_colliders_are_separate_closed_and_positive(detailed) -> None:
     assert all(p.material != "collider" for n in detailed.visual_nodes() for p in n.primitives)
 
 
-def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(detailed) -> None:
+def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(residential) -> None:
+    detailed = residential
     interiors = [o for o in detailed.objects if o.type == "interior"]
     # The block has three buildings that match the rule, fewer than the quota floor: all three get one.
     assert len(interiors) == 3 < CFG.interiors.min_buildings
@@ -326,11 +333,12 @@ def _queue_order(ids: list[str]) -> list[str]:
     return sorted(ids, key=lambda b: hashlib.sha256(f"{CFG.seed}:interior:{b}".encode()).hexdigest())
 
 
-def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(detail_inputs: tuple[Path, Path, Path],
-                                                                           detailed) -> None:
+def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(residential_inputs: tuple[Path, Path, Path],
+                                                                           residential) -> None:
+    detailed = residential
     built = detailed.stats["interiors"]
     assert built == _queue_order(built) != sorted(built)
-    one = _detail(detail_inputs, _with_interiors(min_buildings=1, max_buildings=1))
+    one = _detail(residential_inputs, _with_interiors(min_buildings=1, max_buildings=1))
     assert one.stats["interiors"] == built[:1] != sorted(built)[:1]
     base_ids = [o.id for o in detailed.base.objects if o.type == "building"]
     for d in (detailed, one):
@@ -339,7 +347,8 @@ def test_interiors_go_to_the_hash_order_and_objects_stay_in_building_order(detai
         assert [o.id for o in d.objects if o.type in ("building", "interior")] == expected
 
 
-def test_interior_triangle_budget_skips_what_does_not_fit(detail_inputs: tuple[Path, Path, Path], detailed) -> None:
+def test_interior_triangle_budget_skips_what_does_not_fit(residential_inputs: tuple[Path, Path, Path], residential) -> None:
+    detail_inputs, detailed = residential_inputs, residential
     order = detailed.stats["interiors"]
     costs = _interior_costs(detailed)
     assert len(order) == 3 and detailed.stats["interior_visual_triangles"] == sum(costs.values())

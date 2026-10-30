@@ -121,7 +121,19 @@
     "slab_m": 0.2,
     "door": { "width_m": 1.2, "height_m": 2.4 },
     "stair": { "width_m": 1.1, "max_riser_m": 0.185, "tread_m": 0.28, "landing_m": 1.0 },
-    "door_clearance_m": 1.5
+    "door_clearance_m": 1.5,
+    "lights_max": 24,
+    "shops": {
+      "enabled": true,
+      "max_triangles": 6000,
+      "max_area_m2": 600.0,
+      "categories": [
+        { "name": "bakery", "tags": { "shop": ["bakery", "pastry", "confectionery"] }, "wall": "interior_shop_bakery", "floor": "interior_shop_tile" },
+        { "name": "pharmacy", "tags": { "amenity": ["pharmacy"], "shop": ["chemist"], "healthcare": ["pharmacy"] }, "wall": "interior_shop_pharmacy", "floor": "interior_shop_tile" },
+        { "name": "bar", "tags": { "amenity": ["bar", "pub", "cafe", "restaurant", "fast_food", "ice_cream"] }, "wall": "interior_shop_bar", "floor": "interior_shop_wood" }
+      ],
+      "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" }
+    }
   },
   "urban": {
     "observed": {
@@ -174,7 +186,13 @@
     "interior_wall": { "color": [0.90, 0.89, 0.86, 1.0], "roughness": 0.9 },
     "interior_floor": { "color": [0.62, 0.55, 0.47, 1.0], "roughness": 0.8 },
     "stair": { "color": [0.70, 0.67, 0.62, 1.0], "roughness": 0.85 },
-    "brick_red": { "color": [0.62, 0.28, 0.22, 1.0], "roughness": 0.9 }
+    "brick_red": { "color": [0.62, 0.28, 0.22, 1.0], "roughness": 0.9 },
+    "interior_shop_bakery": { "color": [0.94, 0.80, 0.54, 1.0], "roughness": 0.9 },
+    "interior_shop_pharmacy": { "color": [0.72, 0.88, 0.76, 1.0], "roughness": 0.9 },
+    "interior_shop_bar": { "color": [0.70, 0.38, 0.26, 1.0], "roughness": 0.9 },
+    "interior_shop_generic": { "color": [0.93, 0.78, 0.64, 1.0], "roughness": 0.9 },
+    "interior_shop_tile": { "color": [0.86, 0.82, 0.74, 1.0], "roughness": 0.6 },
+    "interior_shop_wood": { "color": [0.55, 0.37, 0.22, 1.0], "roughness": 0.7 }
   },
   "landmarks": {
     "enabled": true,

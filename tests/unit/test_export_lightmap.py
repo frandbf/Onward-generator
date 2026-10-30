@@ -45,6 +45,9 @@ def _glb(*parts: tuple[str, Mesh]) -> bytes:
     ("interior_wall", "interior"),
     ("interior_floor", "interior"),
     ("stair", "interior"),
+    ("interior_shop_bakery", "interior"),
+    ("interior_shop_wood", "interior"),
+    ("shop_interior", "facade"),
     ("plaster_cream", "facade"),
     ("glass_dark", "facade"),
 ])

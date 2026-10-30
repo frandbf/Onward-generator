@@ -123,6 +123,30 @@ class Stair:
 
 
 @dataclass(frozen=True, slots=True)
+class ShopCategory:
+    """Interior colours of one kind of shop. ``generic`` has no tags and takes every other shop."""
+
+    name: str
+    tags: Mapping[str, frozenset[str]]
+    wall: str
+    floor: str
+
+    def matches(self, tags: Mapping[str, Any]) -> bool:
+        return any(str(tags.get(key)) in values for key, values in self.tags.items())
+
+
+@dataclass(frozen=True, slots=True)
+class ShopInteriors:
+    """One-storey interiors behind shopfronts, with their own triangle budget and a small fixed palette."""
+
+    enabled: bool
+    max_triangles: int
+    max_area_m2: float
+    categories: tuple[ShopCategory, ...]
+    generic: ShopCategory
+
+
+@dataclass(frozen=True, slots=True)
 class Interiors:
     enabled: bool
     min_buildings: int
@@ -137,6 +161,8 @@ class Interiors:
     door: Opening
     stair: Stair
     door_clearance_m: float
+    lights_max: int
+    shops: ShopInteriors
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +284,15 @@ def _shops(d: Mapping[str, Any]) -> ShopSigns:
     )
 
 
+def _shop_interiors(d: Mapping[str, Any]) -> ShopInteriors:
+    categories = tuple(
+        ShopCategory(c["name"], MappingProxyType({k: frozenset(v) for k, v in sorted(c["tags"].items())}), c["wall"], c["floor"])
+        for c in d["categories"]
+    )
+    generic = ShopCategory("generic", MappingProxyType({}), d["generic"]["wall"], d["generic"]["floor"])
+    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), float(d["max_area_m2"]), categories, generic)
+
+
 def _template(name: str, d: Mapping[str, Any]) -> Template:
     b, roof = d["balcony"], d["roof"]
     hip = roof["hip"]
@@ -322,6 +357,14 @@ def _semantic(cfg: DetailConfig) -> list[str]:
         problems.append("/interiors: min_buildings must be at most max_buildings")
     if rule.min_area_m2 >= rule.max_area_m2:
         problems.append("/interiors/rule: min_area_m2 must be below max_area_m2")
+    shop_rooms = cfg.interiors.shops
+    names = [c.name for c in shop_rooms.categories]
+    if len(set(names)) != len(names) or "generic" in names:
+        problems.append("/interiors/shops/categories: names must be unique and not 'generic'")
+    for c in (*shop_rooms.categories, shop_rooms.generic):
+        for m in (c.wall, c.floor):
+            if m not in mats or not m.startswith("interior_"):
+                problems.append(f"/interiors/shops/{c.name}: material {m!r} must be defined in /materials and start with 'interior_'")
     if cfg.recess_depth_m >= cfg.interiors.wall_thickness_m:
         problems.append("/openings/recess_depth_m must be thinner than /interiors/wall_thickness_m")
     for name in ("frame_stone", "glass_dark", "glass_view", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
@@ -380,6 +423,8 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
             door=_opening(i["door"]),
             stair=Stair(float(i["stair"]["width_m"]), float(i["stair"]["max_riser_m"]), float(i["stair"]["tread_m"]), float(i["stair"]["landing_m"])),
             door_clearance_m=float(i["door_clearance_m"]),
+            lights_max=int(i["lights_max"]),
+            shops=_shop_interiors(i["shops"]),
         ),
         urban_observed=MappingProxyType(
             {kind: MappingProxyType({k: frozenset(v) for k, v in tags.items()}) for kind, tags in sorted(doc["urban"]["observed"].items())}

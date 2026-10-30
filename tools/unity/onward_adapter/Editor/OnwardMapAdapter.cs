@@ -2160,12 +2160,14 @@ namespace OnwardGenerator
                 if (rooms == null) continue;
                 foreach (GRoomAnchor room in rooms)
                 {
-                    if (room == null || room.light_m == null || room.light_m.Length != 3) continue;
+                    if (room == null) continue;
                     if (room.probes_m != null)
                     {
                         for (int i = 0; i + 2 < room.probes_m.Length; i += 3)
                             probes.Add(Local(room.probes_m[i], room.probes_m[i + 1], room.probes_m[i + 2]));
                     }
+                    // detail leaves light_m out of a room past interiors.lights_max; the room keeps its probes.
+                    if (room.light_m == null || room.light_m.Length != 3) continue;
                     if (lights >= opt.interior_lights_max)
                     {
                         skipped++;

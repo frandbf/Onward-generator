@@ -132,7 +132,8 @@ def test_a_photo_replaces_only_that_building(
 
     manifest = json.loads((materials / "scene_detail.json").read_text(encoding="utf-8"))
     detail_report = json.loads((materials / "detail_report.json").read_text(encoding="utf-8"))
-    listed_interiors = {str(item) for item in detail_report["counts"]["interiors"]}
+    listed_interiors = {str(item) for item in detail_report["counts"]["interiors"] + detail_report["counts"]["shop_interiors"]}
+    assert detail_report["counts"]["shop_interiors"]  # the bakery: its see-through shopfront gets no photo
     interiors = {
         str(obj["id"])
         for obj in manifest["objects"]

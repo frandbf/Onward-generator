@@ -107,10 +107,11 @@ def test_every_building_gets_a_door_and_a_low_shop_gets_a_fallback_shop_door(
 
 def test_a_building_the_interior_budget_turns_down_still_gets_its_fallback_door(detail_inputs: tuple[Path, Path, Path]) -> None:
     # A 2.7 m main door does not fit 3 m storeys; the 2.4 m interior door does, so 311, 312 and
-    # 313 plan an interior that a zero triangle budget then turns down.
+    # 313 plan an interior (312 a shop interior) that zero triangle budgets then turn down.
     doc = copy.deepcopy(DOC)
     doc["doors"]["main"]["height_m"] = 2.7
     doc["interiors"]["max_triangles"] = 0
+    doc["interiors"]["shops"]["max_triangles"] = 0
     declined, stats = _buildings(detail_inputs, config_from_document(doc))
     doc["interiors"]["enabled"] = False
     plain, _ = _buildings(detail_inputs, config_from_document(doc))
@@ -121,4 +122,4 @@ def test_a_building_the_interior_budget_turns_down_still_gets_its_fallback_door(
     # 312 is a shop: its 2.5 m shop door fits the 3 m storeys, turned down or not.
     assert declined["312"]["facade"]["door"] == "template" == plain["312"]["facade"]["door"]
     assert declined["312"]["facade"]["openings"]["shop_door"] == 1
-    assert stats["interiors"] == []
+    assert stats["interiors"] == [] == stats["shop_interiors"]

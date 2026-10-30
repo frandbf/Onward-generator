@@ -4,9 +4,9 @@ Each shop is an OSM POI with shop evidence (or the building itself when its
 category is commercial). It gets the shopfront bay nearest to its POI, and on that
 bay one sign: a fascia board over the window or a blade sign on a bracket beside
 it. The choice is ``sha256(seed, building, shop, shop_sign) < fascia_share``. A
-shopfront with a ``glass_dark`` back carries a vinyl strip with the name of the
-nearest shop when ``sha256(seed, building, segment, column, vinyl) < vinyl_share``.
-See-through ``glass_view`` panes get none.
+shopfront carries a vinyl strip with the name of the nearest shop when
+``sha256(seed, building, segment, column, vinyl) < vinyl_share``, on a ``glass_dark``
+back or on the see-through ``glass_view`` pane of a shop interior.
 
 The name is the OSM ``name`` tag (observed). Without it, a generic Spanish word
 for the ``shop``/``amenity``/``office``/``craft`` value is used (estimated). The
@@ -22,10 +22,11 @@ from typing import Any
 
 import numpy as np
 
-from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig
+from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCategory
 from onward_generator.detail.facades import Hole, Segment, stable_unit
 
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
+VINYL_BACKS = frozenset({"glass_dark", "glass_view"})
 
 
 def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
@@ -41,6 +42,16 @@ def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
             if rule in names:
                 return {"name": names[rule], "name_origin": "estimated", "name_rule": rule}
     return {"name": cfg.shops.default_name, "name_origin": "estimated", "name_rule": "default"}
+
+
+def shop_category(shops: Sequence[Mapping[str, Any]], cfg: DetailConfig) -> ShopCategory:
+    """The interior colours of a shop building: the first shop, in order, that a category's tags match; else ``generic``."""
+    rooms = cfg.interiors.shops
+    for tags in shops:
+        for category in rooms.categories:
+            if category.matches(tags):
+                return category
+    return rooms.generic
 
 
 def _board(seg: Segment, s: float, z: float, out: float, normal: np.ndarray, width: float, height: float, depth: float) -> dict[str, Any]:
@@ -104,7 +115,7 @@ def plan_shops(
         record["sign"] = {**_sign(kind, segments[bay.segment], bay, cfg), "attribute_origin": "generated"}
         bays.append((bay, record))
     for hole in fronts:
-        if hole.back != "glass_dark" or stable_unit(cfg.seed, building_id, hole.segment, hole.column, "vinyl") >= cfg.shops.vinyl_share:
+        if hole.back not in VINYL_BACKS or stable_unit(cfg.seed, building_id, hole.segment, hole.column, "vinyl") >= cfg.shops.vinyl_share:
             continue
         owner = _nearest(centre[hole], [b for b, _ in bays], centre)
         next(r for b, r in bays if b == owner)["vinyls"].append(_vinyl(segments[hole.segment], hole, cfg))

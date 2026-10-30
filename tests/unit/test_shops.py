@@ -201,7 +201,7 @@ def test_each_shop_takes_the_nearest_free_window_and_owns_the_nearest_vinyls() -
     assert [r["poi_id"] for r in records] == ["far", "near", "extra", "none", "last"]
     assert [r["sign"]["centre_m"][0] if r["sign"] else None for r in records[:4]] == pytest.approx([10.5, 2.5, 6.5, None])
     assert records[4]["sign"] is None
-    assert [len(r["vinyls"]) for r in records] == [0, 1, 1, 0, 0]  # the glass_view window gets none
+    assert [len(r["vinyls"]) for r in records] == [1, 1, 1, 0, 0]  # the glass_view window of a shop interior gets one too
     vinyl = records[1]["vinyls"][0]
     assert vinyl["centre_m"] == pytest.approx([2.5, 0.14, 1.6])
     assert vinyl["normal"] == pytest.approx([0.0, -1.0])

@@ -79,3 +79,11 @@ def row_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Pa
     from tests.detail_fixture import ROW_BUILDINGS, ROW_POIS
 
     return _detail_inputs(tmp_path_factory.mktemp("row"), ROW_BUILDINGS, ROW_POIS)
+
+
+@pytest.fixture(scope="session")
+def residential_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    """The street block without its bakery: 311, 312 and 313 all take the stair interior. (scene, heights, base_dir)."""
+    from tests.detail_fixture import BUILDINGS, POIS
+
+    return _detail_inputs(tmp_path_factory.mktemp("residential"), BUILDINGS, {k: v for k, v in POIS.items() if k != 401})

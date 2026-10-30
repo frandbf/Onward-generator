@@ -30,6 +30,8 @@ GROUND_MATERIALS = frozenset({
     "ground", "pedestrian", "sidewalk", "carriageway", "curb", "green", "water", "cobblestone_paving",
 })
 INTERIOR_MATERIALS = frozenset({"interior_wall", "interior_floor", "stair"})
+# Shop interiors paint their walls and floors with ``interior_shop_*`` (docs/07-detail.md).
+INTERIOR_PREFIX = "interior_"
 # Substrings and prefix of ContributesGi in the adapter, on the lower-case glTF material name.
 NO_GI_PARTS = ("tree_", "urban_metal", "railing_metal", "horizon_backdrop")
 NO_GI_PREFIX = "prop_"
@@ -41,7 +43,7 @@ def surface_class(material: str) -> str:
         return "roof"
     if material in GROUND_MATERIALS:
         return "ground"
-    if material in INTERIOR_MATERIALS:
+    if material in INTERIOR_MATERIALS or material.startswith(INTERIOR_PREFIX):
         return "interior"
     return "facade"
 

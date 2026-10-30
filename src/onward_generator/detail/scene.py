@@ -41,6 +41,7 @@ from onward_generator.detail.facades import (
 from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
     build_interior,
+    cap_lights,
     fits_triangle_budget,
     glass_penetrations,
     pierce_room_windows,
@@ -50,7 +51,7 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
-from onward_generator.detail.shops import plan_shops
+from onward_generator.detail.shops import plan_shops, shop_category
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -463,13 +464,23 @@ def detail_scene(
     roof_types: Counter[str] = Counter()
     door_rules: Counter[str] = Counter()
     interiors_built: list[str] = []
+    shop_interiors: list[str] = []
     interior_triangles = 0
+    shop_triangles = 0
+    lit: list[tuple[bool, dict[str, Any]]] = []
     exposed_m = party_m = 0.0
 
     # Buildings in the interior queue go first, in queue order, so the quota and the triangle budget go
-    # to the sha256 order and not to the id order. Their objects and issues are put back in building order below.
+    # to the sha256 order and not to the id order. The others follow nearest the map centre first, so the
+    # shop budget goes to the shops a player meets first. Objects and issues are put back in building order below.
     rank = {bid: k for k, bid in enumerate(interior_queue)}
-    order = sorted(building_objs, key=lambda b: rank.get(b.record["source_ids"][0], len(rank)))
+
+    def queue_key(b: Any) -> tuple[int, float]:
+        bid = b.record["source_ids"][0]
+        centre = footprints[bid].centroid
+        return rank.get(bid, len(rank)), float(np.hypot(centre.x, centre.y))
+
+    order = sorted(building_objs, key=queue_key)
     leading_issues = len(issues)
     emitted: dict[str, tuple[list[DetailObject], list[Issue]]] = {}
 
@@ -511,15 +522,20 @@ def detail_scene(
 
         interior = None
         layout = None
-        if bid in interior_queue and interiors_left > 0 and main is not None:
-            ic = cfg.interiors
+        ic = cfg.interiors
+        # A shop gets a one-storey room behind its shopfront and never the stair interior. Neither uses the other's budget.
+        sells = shop and ic.enabled and ic.shops.enabled
+        if sells and geom.area > ic.shops.max_area_m2:
+            issues.append(Issue("interior_not_generated", "info", bid, f"shop_too_large: {geom.area:.1f} m² > max_area_m2 {ic.shops.max_area_m2}"))
+            sells = False
+        if main is not None and (sells or (not shop and bid in interior_queue and interiors_left > 0)):
             raised = interior_storey(height, storeys, h.get("height_source") or o.record["height"].get("height_source"))
             attempt_height, attempt_storeys = raised if raised is not None else (height, storeys)
             trial = run_layout("interior_door", ic.wall_thickness_m, ic.door, attempt_storeys)
             door = next((x for x in trial.holes if x.kind == "interior_door"), None)
             plan = plan_interior(
                 bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
-                roof_access=shell_template.parapet_m > 0,
+                roof_access=not shop and shell_template.parapet_m > 0, max_floors=1 if shop else None,
             ) if door else "no_door_position"
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))
@@ -541,18 +557,24 @@ def detail_scene(
 
         shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)
         built = None
+        category = shop_category([t for _, t, _ in _shops_of(evidence[bid], feature_of, tags)], cfg) if shop else None
         if interior is not None:
             built = build_interior(
                 interior, height, shell.z_top, refined, cfg, room_window_cuts(layout, segments),
                 glass_penetrations(layout, segments),
+                **({"wall_material": category.wall, "floor_material": category.floor} if category else {}),
             )
             cost = built.visual_triangles
-            if fits_triangle_budget(interior_triangles, cost, cfg.interiors.max_triangles):
-                interior_triangles += cost
+            used, limit, key = (shop_triangles, ic.shops.max_triangles, "shops.max_triangles") if shop else (
+                interior_triangles, ic.max_triangles, "max_triangles")
+            if fits_triangle_budget(used, cost, limit):
+                if shop:
+                    shop_triangles += cost
+                else:
+                    interior_triangles += cost
             else:
                 issues.append(Issue("interior_not_generated", "info", bid,
-                                    f"triangle_budget: needs {cost} triangles, {cfg.interiors.max_triangles - interior_triangles} left "
-                                    f"of max_triangles {cfg.interiors.max_triangles}"))
+                                    f"triangle_budget: needs {cost} triangles, {limit - used} left of {key} {limit}"))
                 interior = built = None
                 height, storeys = previous_height, plain_storeys
                 layout = run_layout(*plain_door, storeys)
@@ -583,11 +605,16 @@ def detail_scene(
             if shell.parapet_collider is not None and built.roof_well is not None:
                 colliders.append(shell.parapet_collider)
             interior_record = built.spec | {
+                "kind": "shop" if category else "residential",
                 "checks": built.checks,
                 "collider_parts": [n for n, _ in built.colliders],
                 "through_windows": opened_windows,
                 "omitted_windows": omitted_windows,
+                "visual_triangles": built.visual_triangles,
             }
+            if category:
+                interior_record["shop"] = {"category": category.name, "wall_material": category.wall,
+                                           "floor_material": category.floor, "attribute_origin": "generated"}
             objects.append(DetailObject(
                 f"interior/{bid}", "interior",
                 [Primitive(merge(ms), mat) for mat, ms in sorted(built.visual.items()) if ms],
@@ -595,8 +622,13 @@ def detail_scene(
                      "generation": {"method": "generic_simplified_interior", "attribute_origin": "generated"}},
                 light_anchors=built.light_anchors,
             ))
-            interiors_built.append(bid)
-            interiors_left -= 1
+            assert built.light_anchors is not None
+            lit.append((category is not None, built.light_anchors))
+            if category:
+                shop_interiors.append(bid)
+            else:
+                interiors_built.append(bid)
+                interiors_left -= 1
         elif base_collider is not None:
             colliders = [base_collider]
         balcony_collider = merge(shell.balcony_colliders)
@@ -668,6 +700,9 @@ def detail_scene(
 
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
+    dropped_lights = cap_lights(lit, cfg.interiors.lights_max)
+    issues.extend(Issue("interior_light_dropped", "info", room, f"over interiors.lights_max {cfg.interiors.lights_max}")
+                  for room in dropped_lights)
 
     part_objects, part_issues = _building_parts(features, footprints, cfg)
     issues.extend(part_issues)
@@ -722,6 +757,13 @@ def detail_scene(
     }
     detailed.stats = _stats(detailed, counts, templates_used, roof_types, interiors_built, exposed_m, party_m, elements)
     detailed.stats["interior_visual_triangles"] = interior_triangles
+    detailed.stats["shop_interiors"] = sorted(shop_interiors)
+    detailed.stats["shop_interior_visual_triangles"] = shop_triangles
+    detailed.stats["interior_lights"] = {
+        "max": cfg.interiors.lights_max,
+        "placed": sum(len(anchors["rooms"]) for _, anchors in lit) - len(dropped_lights),
+        "dropped": dropped_lights,
+    }
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in facade_walls.values()).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in facade_walls.values()).items()))
