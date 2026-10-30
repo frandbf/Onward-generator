@@ -91,7 +91,7 @@ tasks:
       - "{{.RUN}} onward-generator run --no-unity {{.CLI_ARGS}}"
 
   unity:
-    desc: On the host, build the Quest files with Unity for a map id or package, then ask before uploading (task unity -- <map id>)
+    desc: On the host, build the Quest files with Unity, then ask before uploading. No argument uses the newest package; or pass the map name, id or package
     interactive: true
     cmds:
       - "tools/unity/onward_adapter/build_map.sh {{.CLI_ARGS}}"

@@ -30,4 +30,5 @@ common="$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir 2>/de
 if [[ -n "$common" && "$common" != "$REPO/.git" ]]; then
   mounts=(-v "$common:$common")
 fi
-exec "${compose[@]}" run --rm "${tty[@]}" "${mounts[@]}" dev "$@"
+# ${a[@]+"${a[@]}"} expands an empty array under set -u on macOS bash 3.2 too.
+exec "${compose[@]}" run --rm ${tty[@]+"${tty[@]}"} ${mounts[@]+"${mounts[@]}"} dev "$@"
