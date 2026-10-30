@@ -148,7 +148,7 @@ def reproject_parts(parts: Sequence[BuildingPart], source_crs: str, target_crs: 
     """
     if source_crs == target_crs:
         return list(parts)
-    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
+    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)  # pragma: no mutate: download and scene CRS are UTM, whose axes are already east, north
 
     def move(xy: np.ndarray) -> np.ndarray:
         x, y = transformer.transform(xy[:, 0], xy[:, 1])

@@ -337,7 +337,7 @@ def test_landmarks_are_split_when_not_flagged() -> None:
 def test_scene_must_be_a_local_metric_grid(key: str, value: str) -> None:
     scene = _scene()
     scene["frame"][key] = value
-    with pytest.raises(CadastreError, match="local grid"):
+    with pytest.raises(CadastreError, match="^scene must be a local grid in metres$"):
         split_scene(scene, PARTS, RECORD, OPTIONS, is_landmark=_is_church)
 
 

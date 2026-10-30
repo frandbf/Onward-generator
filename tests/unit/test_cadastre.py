@@ -194,7 +194,7 @@ def test_cli_match_writes_overrides_and_report(pipeline_result: GeoResult, downl
 def test_scene_must_be_a_local_metric_grid(pipeline_result: GeoResult, key: str, value: str) -> None:
     scene = pipeline_result.scene_dict()
     scene["frame"] = {**scene["frame"], key: value}
-    with pytest.raises(CadastreError, match="scene must be a local grid in metres"):
+    with pytest.raises(CadastreError, match="^scene must be a local grid in metres$"):
         match_buildings(scene, [])
 
 

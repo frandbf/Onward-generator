@@ -117,8 +117,8 @@ def reproject_bbox(bbox: BBox, source_crs: str, target_crs: str) -> BBox:
     """The box in ``target_crs`` that holds ``bbox``; unchanged when both CRS are the same."""
     if source_crs == target_crs:
         return bbox
-    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)
-    xmin, ymin, xmax, ymax = transformer.transform_bounds(*bbox, densify_pts=21)
+    transformer = Transformer.from_crs(source_crs, target_crs, always_xy=True)  # pragma: no mutate: both CRS are UTM (zone_table checks it), whose axes are already east, north
+    xmin, ymin, xmax, ymax = transformer.transform_bounds(*bbox)  # 21 points per edge (pyproj default)
     return (xmin, ymin, xmax, ymax)
 
 

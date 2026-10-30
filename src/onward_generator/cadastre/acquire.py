@@ -114,9 +114,17 @@ def building_parts_url(bbox: BBox, crs: str = CRS) -> str:
     return f"{WFS_BU_URL}?{urllib.parse.urlencode(query, safe=',:')}"
 
 
-def _cuts(low_cm: int, high_cm: int) -> list[int]:
-    count = math.ceil((high_cm - low_cm) / TILE_SIDE_CM)
-    return [low_cm + (high_cm - low_cm) * i // count for i in range(count + 1)]
+def _cm(low: float, high: float) -> tuple[int, int, int]:
+    """``low`` down and ``high`` up to whole centimetres, and the number of tiles between them.
+
+    round() first: 664243.98 * 100 is 66424397.99999999, which must stay 66424398 cm.
+    """
+    low_cm, high_cm = math.floor(round(low * 100, 3)), math.ceil(round(high * 100, 3))
+    return low_cm, high_cm, math.ceil((high_cm - low_cm) / TILE_SIDE_CM)
+
+
+def _cuts(low_cm: int, high_cm: int, count: int) -> list[float]:
+    return [(low_cm + (high_cm - low_cm) * i // count) / 100 for i in range(count + 1)]
 
 
 def split_bbox(bbox: BBox) -> list[BBox]:
@@ -126,13 +134,12 @@ def split_bbox(bbox: BBox) -> list[BBox]:
     request URL. Neighbouring tiles share their edge, so nothing falls between them.
     """
     xmin, ymin, xmax, ymax = validate_bbox(bbox, max_area_km2=math.inf)
-    # round() first: 664243.98 * 100 is 66424397.99999999, which must stay 66424398 cm.
-    xs = _cuts(math.floor(round(xmin * 100, 3)), math.ceil(round(xmax * 100, 3)))
-    ys = _cuts(math.floor(round(ymin * 100, 3)), math.ceil(round(ymax * 100, 3)))
-    tiles = (len(xs) - 1) * (len(ys) - 1)
-    if tiles > MAX_TILES:
-        raise CadastreError(f"bbox {bbox} needs {tiles} tiles; limit is {MAX_TILES}")
-    return [(x0 / 100, y0 / 100, x1 / 100, y1 / 100) for y0, y1 in zip(ys, ys[1:]) for x0, x1 in zip(xs, xs[1:])]
+    x0, x1, columns = _cm(xmin, xmax)
+    y0, y1, rows = _cm(ymin, ymax)
+    if columns * rows > MAX_TILES:
+        raise CadastreError(f"bbox {bbox} needs {columns * rows} tiles; limit is {MAX_TILES}")
+    xs, ys = _cuts(x0, x1, columns), _cuts(y0, y1, rows)
+    return [(xs[i], ys[j], xs[i + 1], ys[j + 1]) for j in range(rows) for i in range(columns)]
 
 
 def bbox_from_scene(scene: Mapping[str, Any], margin_m: float) -> BBox:
@@ -289,8 +296,11 @@ def download_building_parts(
         size_bytes=target.stat().st_size,
         user_agent=USER_AGENT,
         tiles=[
-            {"url": url, "bbox": list(tile), "sha256": hashlib.sha256(payload).hexdigest(), "size_bytes": len(payload), **count}
-            for url, tile, payload, count in zip(urls, tiles, payloads, counts, strict=True)
+            {
+                "url": urls[i], "bbox": list(tiles[i]), "sha256": hashlib.sha256(payloads[i]).hexdigest(),
+                "size_bytes": len(payloads[i]), **counts[i],
+            }
+            for i in range(len(tiles))
         ],
     )
     side.write_text(json.dumps(record.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

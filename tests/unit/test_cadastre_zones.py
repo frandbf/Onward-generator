@@ -136,10 +136,14 @@ def test_foral_cadastres_and_places_outside_spain_have_no_zone(name: str) -> Non
 
 
 def test_the_table_lists_the_territories_and_the_service_crs() -> None:
-    table = load_zones()
+    table = zone_table(_document())
+    assert load_zones() == table
     assert [t.name for t in table.territories] == ["peninsula", "balearic-islands", "canary-islands", "ceuta", "melilla"]
     assert [name for name, _ in table.excluded] == ["navarre", "basque-country"]
-    assert {"EPSG:25829", "EPSG:25830", "EPSG:25831", "EPSG:32627", "EPSG:32628"} <= set(table.service_crs)
+    assert table.service_crs == (
+        "EPSG:25829", "EPSG:25830", "EPSG:25831", "EPSG:32627", "EPSG:32628", "EPSG:3035", "EPSG:3785", "EPSG:3857",
+        "EPSG:4258", "EPSG:4326", "CRS:84",
+    )
     assert dict(table.territories[2].crs_by_utm_zone) == {27: "EPSG:32627", 28: "EPSG:32628"}
 
 
@@ -209,8 +213,9 @@ def test_a_polygon_on_the_degree_limits_is_accepted() -> None:
 
 
 def test_holes_are_read() -> None:
-    basque = load_zones().excluded[1][1]
-    assert len(basque.interiors) == 1
+    table = zone_table(_document())  # not the cached load_zones(): the polygons are rebuilt here
+    assert len(table.excluded[1][1].interiors) == 1
+    assert catastro_zone(-2.7458, 42.7339, table) == PENINSULA_30  # Treviño, in the hole
 
 
 # --- Request box. ---
@@ -267,7 +272,13 @@ def test_scene_request_outside_the_zones_is_refused() -> None:
 
 def test_a_box_within_the_limit_is_one_tile_on_whole_centimetres() -> None:
     assert split_bbox((664243.98, 4205599.65, 664443.98, 4205799.65)) == [(664243.98, 4205599.65, 664443.98, 4205799.65)]
-    assert split_bbox((500000.004, 4000000.006, 500999.996, 4000999.991)) == [(500000.0, 4000000.0, 501000.0, 4001000.0)]
+    assert split_bbox((500000.006, 4000000.006, 500999.994, 4000999.994)) == [(500000.0, 4000000.0, 501000.0, 4001000.0)]
+
+
+def test_a_thousandth_of_a_centimetre_from_a_whole_centimetre_is_that_centimetre() -> None:
+    assert split_bbox((500000.0099994, 4000000.0099994, 500999.9900006, 4000999.9900006)) == [
+        (500000.01, 4000000.01, 500999.99, 4000999.99),
+    ]
 
 
 def test_exactly_one_kilometre_is_one_tile_and_one_centimetre_more_is_two() -> None:
@@ -358,6 +369,13 @@ def test_merge_keeps_a_single_tile_byte_for_byte_and_a_repeat_inside_one_tile() 
     assert merged.count(b"<base:localId>A_part1<") == 2 and merged.count(b"<base:localId>B_part1<") == 1
 
 
+def test_merge_remembers_every_earlier_tile() -> None:
+    _, counts = merge_tiles([WEST, EAST, WEST])
+    assert counts == [
+        {"members": 2, "repeats_dropped": 0}, {"members": 2, "repeats_dropped": 1}, {"members": 2, "repeats_dropped": 2},
+    ]
+
+
 def test_merge_keeps_later_members_without_a_local_id() -> None:
     nameless = _collection(_member("", 500700.0, 4000100.0))
     merged, counts = merge_tiles([WEST, nameless, nameless])
@@ -369,9 +387,11 @@ class FakeTransport:
     def __init__(self, *payloads: bytes) -> None:
         self.payloads = list(payloads)
         self.urls: list[str] = []
+        self.timeouts: list[float] = []
 
     def __call__(self, url: str, timeout: float) -> bytes:
         self.urls.append(url)
+        self.timeouts.append(timeout)
         return self.payloads.pop(0)
 
 
@@ -382,7 +402,7 @@ def test_a_wide_box_is_downloaded_tile_by_tile_and_merged(tmp_path: Path) -> Non
     assert [re.search(r"bbox=([^&]+)", u).group(1) for u in transport.urls] == [  # type: ignore[union-attr]
         "500000.00,4000000.00,500500.00,4001000.00", "500500.00,4000000.00,501000.01,4001000.00",
     ]
-    assert all("srsName=EPSG:25829" in u for u in transport.urls)
+    assert all("srsName=EPSG:25829" in u for u in transport.urls) and transport.timeouts == [180.0, 180.0]
     assert record.url == WFS_BU_URL and record.crs == "EPSG:25829" and record.bbox == [500000.0, 4000000.0, 501000.01, 4001000.0]
     assert record.tiles == [
         {"url": transport.urls[0], "bbox": [500000.0, 4000000.0, 500500.0, 4001000.0], "sha256": hashlib.sha256(WEST).hexdigest(),
@@ -414,6 +434,31 @@ def test_a_failed_tile_writes_nothing_and_an_existing_file_is_never_overwritten(
     with pytest.raises(FileExistsError):
         download_building_parts(TWO_TILES, target, fetch=again, now=NOW)
     assert again.urls == []
+
+
+def test_cli_download_asks_in_the_zone_crs_prints_the_tiles_and_overwrites_only_when_told(
+    pipeline_result: GeoResult, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    from onward_generator.cadastre import __main__ as cadastre_cli
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+
+    def offline(bbox, out, **kwargs):  # type: ignore[no-untyped-def]
+        return download_building_parts(bbox, out, fetch=FakeTransport(FIXTURE.read_bytes()), now=NOW, **kwargs)
+
+    monkeypatch.setattr(cadastre_cli, "download_building_parts", offline)
+    out = tmp_path / "raw" / "c.gml"
+    args = ["download", "--scene", str(scene_path), "--out", str(out)]
+    assert cadastre_cli.main(args) == 0
+    record = load_download_record(out)
+    assert capsys.readouterr().out.splitlines() == [
+        f"downloaded {record.size_bytes} bytes in 1 tile(s), sha256 {record.sha256}",
+        f"bbox {record.bbox} (EPSG:25830, peninsula); licence CC-BY-4.0",
+        f"wrote {out} and its .source.json sidecar",
+    ]
+    assert cadastre_cli.main(args) == 1
+    assert cadastre_cli.main([*args, "--overwrite"]) == 0
 
 
 def test_a_sidecar_written_before_tiles_still_loads(tmp_path: Path) -> None:
