@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from onward_generator import __version__
+from onward_generator.io import atomic_write_json
 from onward_generator.net import fetch_bytes
 from onward_generator.overgrow.catalog import ALL_ASSETS, WEAR_NOTE
 from onward_generator.overgrow.manifest import keep_semantics
@@ -97,7 +98,7 @@ def fetch_library(
     inventory.parent.mkdir(parents=True, exist_ok=True)
     inventory.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     target = library / "manifest.json"
-    previous = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
+    previous = json.loads(target.read_bytes()) if target.is_file() else None
     manifest = keep_semantics({
         "schema": "onward_generator.abandoned_prefabs",
         "schema_version": "0.1.0",
@@ -106,7 +107,7 @@ def fetch_library(
         "shader": "PP_Opaque_Simple_Lit albedo only",
         "assets": manifest_assets,
     }, previous)
-    target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    atomic_write_json(target, manifest)
     return document
 
 
