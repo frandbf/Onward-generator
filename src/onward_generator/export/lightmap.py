@@ -2,8 +2,8 @@
 
 Unity bakes every static renderer at ``lightmap_texels_per_m`` times its
 ``scaleInLightmap``. The adapter combines the visual GLB by (cell, material), so a
-scale is chosen per material: roofs, ground and interiors take fewer texels than
-the facades a player walks past. Renderers kept out of the lightmap (trees,
+scale is chosen per material: roofs, ground, interiors and blank party walls
+(``party_*``, docs/07-detail.md) take fewer texels than the facades a player walks past. Renderers kept out of the lightmap (trees,
 urban metal, railings, overgrow props, the horizon backdrop) mirror
 ``ContributesGi`` in ``tools/unity/onward_adapter/Editor/OnwardMapAdapter.cs``.
 
@@ -22,12 +22,13 @@ from typing import Any
 
 import numpy as np
 
+from onward_generator.detail.config import PARTY_PREFIX
 from onward_generator.generation.gltf import nodes_from_glb
 from onward_generator.tiers import SCENIC_PREFIX
 
 # Scale in the lightmap by surface class. Facades and everything else stay at 1.
 # The scenic shells outside the playable core (ADR-017) bake at the roof scale.
-DEFAULT_CLASS_SCALES: Mapping[str, float] = {"roof": 0.25, "ground": 0.5, "interior": 0.5, "scenic": 0.25}
+DEFAULT_CLASS_SCALES: Mapping[str, float] = {"roof": 0.25, "ground": 0.5, "interior": 0.5, "scenic": 0.25, "party": 0.5}
 GROUND_MATERIALS = frozenset({
     "ground", "pedestrian", "sidewalk", "carriageway", "curb", "green", "water", "cobblestone_paving",
     "road_marking",
@@ -41,11 +42,13 @@ NO_GI_PREFIX = "prop_"
 
 
 def surface_class(material: str) -> str:
-    """``roof``, ``ground``, ``interior``, ``scenic`` or ``facade`` (every other lit surface)."""
+    """``roof``, ``ground``, ``interior``, ``scenic``, ``party`` or ``facade`` (every other lit surface)."""
     if material.startswith("roof_") or material == "building_roof":
         return "roof"
     if material.startswith(SCENIC_PREFIX):
         return "scenic"
+    if material.startswith(PARTY_PREFIX):
+        return "party"
     if material in GROUND_MATERIALS:
         return "ground"
     if material in INTERIOR_MATERIALS or material.startswith(INTERIOR_PREFIX):

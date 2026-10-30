@@ -120,6 +120,8 @@ Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m,
 - **Per-building phase:** `materials apply` adds the hashed `uv_phase` of each building before the next step. On a street facade whose V follows storeys, only U takes the phase, so the storey lines stay whole.
 - **Recentring:** for every connected island of triangles (vertices shared through triangles), `floor(min)` is subtracted from U and V. The fraction of every UV is unchanged, so the texture looks identical with Repeat wrapping, but the values stay within the island's extent plus one repeat instead of reaching hundreds or thousands far from the origin. That keeps the fraction exact if the shader works in half precision. Openings already fit 0–1 and are not shifted. The faces of one street-facade run count as one island, so recentring does not open a seam at its corners.
 
+- **Party walls** (`party_<wall>`, `docs/07-detail.md`): the wall's own image, `tile_m` and colour. Both steps draw the tiles per wall and point the party material at the same texture, so the GLB holds one image for the two; `build_glb` shares a texture between any materials whose images are byte for byte the same. `materials apply` binds the plan to the wall, so a party wall whose wall appears nowhere else still gets the photograph, and an OSM brick building's party walls become `party_brick_red`.
+
 UVs already stored on a primitive (overgrow meshes, Panoramax facades) are copied as they are.
 
 Phase 07 stays open. `device_verified` stays false until the headset checklist is filled in.

@@ -23,8 +23,12 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator import __version__
 from onward_generator.detail.config import DetailConfig, Template
 from onward_generator.detail.facades import (
+    HIDDEN_GAP_M,
     Layout,
+    Segment,
+    Shell,
     Storeys,
+    WallAreas,
     build_shell,
     cut_roof_deck,
     door_walls,
@@ -34,6 +38,7 @@ from onward_generator.detail.facades import (
     interior_storey,
     layout_segment,
     refine_exposure,
+    split_blank_walls,
     stable_unit,
     storeys_for,
     wall_uv_frame,
@@ -592,6 +597,7 @@ def detail_scene(
     order = sorted(building_objs, key=queue_key)
     leading_issues = len(issues)
     emitted: dict[str, tuple[list[DetailObject], list[Issue]]] = {}
+    core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]] = {}
 
     for o in order:
         first_object, first_issue = len(objects), len(issues)
@@ -801,6 +807,7 @@ def detail_scene(
             }
         frame = wall_uv_frame(segments, storeys, h.get("estimated_levels"))
         objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders, uv_frame=frame))
+        core_shells[bid] = (shell, segments, objects[-1])
         if landmark:
             towers, tower_issues = attach_towers(bid, geom, features, cfg)
             issues.extend(tower_issues)
@@ -811,6 +818,7 @@ def detail_scene(
                 x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
+    wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
     dropped_lights = cap_lights(lit, cfg.interiors.lights_max)
@@ -893,6 +901,7 @@ def detail_scene(
         "dropped": dropped_lights,
     }
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
+    detailed.stats["wall_area_m2"] = wall_areas.to_record()
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))
@@ -902,6 +911,29 @@ def detail_scene(
         detailed.stats["tiers"] = _tier_counts(objects, placed - len(elements))
     _budget(detailed)
     return detailed
+
+
+def _split_party_walls(shells: Mapping[str, tuple[Shell, list[Segment], DetailObject]], footprints: Mapping[str, Any],
+                       tree: STRtree, ids: list[str]) -> WallAreas:
+    """Drop the party walls hidden by a neighbour's wall and give the visible ones the party material.
+
+    Runs once every shell is built, since a neighbour's wall top is only known then
+    (an interior can raise it). Updates each building's visual and its record.
+    """
+    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items()}
+    total = WallAreas()
+    for bid, (shell, segments, obj) in shells.items():
+        found = tree.query(footprints[bid].buffer(HIDDEN_GAP_M))  # pragma: no mutate: a wider query only adds candidates that wall_cover finds nothing in
+        # Only core shells hide a wall: a scenic shell (ADR-017) is not in ``shells``.
+        near = [(footprints[ids[k]], tops[ids[k]]) for k in found if ids[k] in tops and ids[k] != bid]
+        areas = split_blank_walls(shell, near)
+        areas += WallAreas(street=sum(s.length for s in segments) * shell.z_top - areas.party - areas.hidden)
+        total += areas
+        obj.visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
+        obj.record["materials"] = [p.material for p in obj.visual]
+        obj.record["visual"] = {"triangles": sum(p.mesh.triangle_count for p in obj.visual)}
+        obj.record["facade"]["wall_area_m2"] = areas.to_record()
+    return total
 
 
 def _stats(d: DetailedScene, counts: Counter[str], templates: Counter[str], roofs: Counter[str], interiors: list[str],

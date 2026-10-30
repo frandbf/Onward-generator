@@ -16,6 +16,7 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.detail.facades import party_base, party_material
 from onward_generator.dress.atlas import (
     MIN_MEAN_LUMA,
     _tile_pixels,
@@ -232,7 +233,7 @@ def rematerialize_brick_walls(
     nodes: Sequence[Node],
     features: Mapping[str, Mapping[str, Any]],
 ) -> tuple[list[Node], list[str]]:
-    """Reassign wall primitives of OSM-brick buildings to ``brick_red``."""
+    """Reassign wall primitives of OSM-brick buildings to ``brick_red``, and their party walls to ``party_brick_red``."""
     out: list[Node] = []
     changed: list[str] = []
     for node in nodes:
@@ -244,8 +245,9 @@ def rematerialize_brick_walls(
         prims: list[Primitive] = []
         touched = False
         for prim in node.primitives:
-            if prim.material in WALL_COLOR_IDS:
-                prims.append(Primitive(prim.mesh, "brick_red", prim.uvs))
+            if party_base(prim.material) in WALL_COLOR_IDS:
+                brick = "brick_red" if party_base(prim.material) == prim.material else party_material("brick_red")
+                prims.append(Primitive(prim.mesh, brick, prim.uvs))
                 touched = True
             else:
                 prims.append(prim)
@@ -365,7 +367,8 @@ def apply_materials(
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
-    used = set(_used_materials(visual_nodes))
+    # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall.
+    used = {party_base(name) for name in _used_materials(visual_nodes)}
     cobble_ok = bool(cobble_nodes)
 
     materials = dict(vis_mats)
@@ -437,7 +440,8 @@ def apply_materials(
     )
     targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite, protected=protected)
     used_ids = _used_materials(visual_nodes)
-    atlas_ids = [color_id for color_id in used_ids if color_id not in ATLAS_SKIP]
+    bases = sorted({party_base(color_id) for color_id in used_ids})
+    atlas_ids = [color_id for color_id in bases if color_id not in ATLAS_SKIP]
     built = build_atlas(catalog, materials, used_color_ids=atlas_ids, seed=seed, photo_tiles=photo_tiles)
     extras: dict[str, Any] = {
         "attribution": manifest.get("attribution"),
@@ -459,7 +463,7 @@ def apply_materials(
     cache_root = tile_cache_dir() if tile_cache else None
     cache = None if cache_root is None else TileCache(cache_root)
     png_jobs: dict[str, Callable[[], bytes]] = {}
-    for index, color_id in enumerate(sorted(used_ids)):
+    for index, color_id in enumerate(bases):
         if color_id in ("glass_dark", "glass_view"):
             png_jobs[color_id] = window_png
             prev = materials.get(color_id) or Material(WHITE, 0.15)
@@ -475,6 +479,13 @@ def apply_materials(
             continue
         png_jobs[color_id] = partial(_procedural_png, color_id, seed + index)
     repeat_images = run_png_jobs(png_jobs)
+    for color_id in used_ids:
+        base_id = party_base(color_id)
+        repeat_images[color_id] = repeat_images[base_id]
+        if base_id in tile_m:
+            tile_m[color_id] = tile_m[base_id]
+        if base_id in materials:
+            materials[color_id] = materials[base_id]
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,

@@ -14,6 +14,7 @@ import hashlib
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import groupby, pairwise
 
 import numpy as np
 from shapely import LineString, MultiPolygon, Polygon, union_all
@@ -21,11 +22,13 @@ from shapely import box as rect_uv
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
-from onward_generator.detail.config import DetailConfig, Opening, Template
+from onward_generator.detail.config import PARTY_PREFIX, DetailConfig, Opening, Template
 from onward_generator.detail.modules import Prototype, balcony, frame_matrix, recess, recess_rim
 from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
 
 SNAP_M = 0.05
+# A neighbour footprint within this gap outside a party wall hides the wall up to the lower of the two tops.
+HIDDEN_GAP_M = 0.05
 WELD_M = 1e-6  # vertex identity for watertightness checks (modules and faces agree to ~1e-14 m)
 UP = np.array([0.0, 0.0, 1.0])
 
@@ -396,6 +399,9 @@ class Shell:
     roof_deck: BaseGeometry | None = None
     roof_z: float | None = None
     parapet_collider: Mesh | None = None
+    # Party walls with no opening: segment and its quad in ``parts[wall_material]``, for :func:`split_blank_walls`.
+    blank_walls: list[tuple[Segment, Mesh]] = field(default_factory=list)
+    wall_material: str = ""
 
 
 def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh, float] | None:
@@ -490,11 +496,15 @@ def build_shell(
 
     rims: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
     counts: dict[str, int] = defaultdict(int)
+    blank_walls: list[tuple[Segment, Mesh]] = []
     for seg in segments:
         holes = holes_by_seg.get(seg.index, [])
         a0, b0, b1, a1 = seg.point(0, 0), seg.point(seg.length, 0), seg.point(seg.length, z_top), seg.point(0, z_top)
         if not holes:
-            parts[wall_material].append(quad(a0, b0, b1, a1))
+            wall = quad(a0, b0, b1, a1)
+            parts[wall_material].append(wall)
+            if not seg.exposed:
+                blank_walls.append((seg, wall))
             continue
         face = face_with_openings(seg.length, 0.0, z_top, [(h.s0, h.v0, h.s0 + h.width, h.v0 + h.height) for h in holes])
         face_mesh = cap(face, 0.0)
@@ -529,6 +539,7 @@ def build_shell(
     return Shell(
         dict(parts), roof_info, z_top, defects, abs(roof_area - footprint_area), rims, balcony_colliders, dict(counts),
         roof_deck, height, parapet_collider,
+        blank_walls, wall_material,
     )
 
 
@@ -542,6 +553,100 @@ def cut_roof_deck(shell: Shell, well: BaseGeometry) -> None:
         return
     material = str(shell.roof.get("material") or "")
     shell.parts[material] = [cap(holed, shell.roof_z)]
+
+
+def party_material(wall_material: str) -> str:
+    """The material of a blank party wall: the wall's own albedo, its own lightmap class (``docs/12-export.md``)."""
+    return PARTY_PREFIX + wall_material
+
+
+def party_base(material: str) -> str:
+    """The wall material a party material copies; any other material is its own base."""
+    return material.removeprefix(PARTY_PREFIX)
+
+
+@dataclass(frozen=True, slots=True)
+class WallAreas:
+    """Gross wall area of one shell by class, in m²: openings are not subtracted."""
+
+    street: float = 0.0  # exposed walls, and party walls with an opening
+    party: float = 0.0  # blank walls that stay visible
+    hidden: float = 0.0  # blank walls against a neighbour's wall, left out of the visual mesh
+
+    def __add__(self, other: WallAreas) -> WallAreas:
+        return WallAreas(self.street + other.street, self.party + other.party, self.hidden + other.hidden)
+
+    def to_record(self) -> dict[str, float]:
+        return {"street": round(self.street, 1), "party": round(self.party, 1), "hidden": round(self.hidden, 1)}
+
+
+def wall_cover(seg: Segment, neighbours: list[tuple[BaseGeometry, float]]) -> list[tuple[float, float, float]]:
+    """``(s0, s1, top)``: where a neighbour footprint lies within ``HIDDEN_GAP_M`` outside the segment, and its wall top."""
+    probe = seg.plan_rect(0.0, seg.length, 0.0, HIDDEN_GAP_M)
+    cover: list[tuple[float, float, float]] = []
+    for footprint, top in neighbours:
+        for piece in polygons_of(probe.intersection(footprint)):
+            proj = [float(np.subtract((x, y), seg.a) @ seg.u[:2]) for x, y in piece.exterior.coords]
+            lo, hi = max(0.0, min(proj)), min(seg.length, max(proj))
+            if hi - lo >= SNAP_M:
+                cover.append((0.0 if lo < SNAP_M else lo, seg.length if seg.length - hi < SNAP_M else hi, top))
+    return cover
+
+
+def cover_steps(length: float, z_top: float, cover: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
+    """The hidden height along a wall as steps ``(s0, s1, h)`` over ``[0, length]``, with ``0 ≤ h ≤ z_top``.
+
+    A step shorter than ``SNAP_M`` between two higher ones takes the lower of the two,
+    so a seam between two neighbours does not leave a sliver of wall.
+    """
+    cuts = sorted({0.0, length, *(t for s0, s1, _ in cover for t in (s0, s1))})
+    steps: list[tuple[float, float, float]] = []
+    for t0, t1 in pairwise(cuts):
+        steps.append((t0, t1, min(z_top, max((top for s0, s1, top in cover if s0 <= t0 and t1 <= s1), default=0.0))))
+    for k in range(1, len(steps) - 1):
+        t0, t1, h = steps[k]
+        if t1 - t0 < SNAP_M:
+            steps[k] = (t0, t1, max(h, min(steps[k - 1][2], steps[k + 1][2])))
+    merged: list[tuple[float, float, float]] = []
+    for t0, t1, h in steps:
+        if merged and merged[-1][2] == h:
+            merged[-1] = (merged[-1][0], t1, h)
+        else:
+            merged.append((t0, t1, h))
+    return merged
+
+
+def visible_face(z_top: float, steps: list[tuple[float, float, float]]) -> list[Polygon]:
+    """The wall above the hidden steps, from exact coordinates: one polygon per run of steps below ``z_top``."""
+    faces: list[Polygon] = []
+    for below, group in groupby(steps, key=lambda step: step[2] < z_top):
+        run = list(group)
+        if below:
+            ring = [p for t0, t1, h in run for p in ((t0, h), (t1, h))]
+            faces.append(Polygon([*ring, (run[-1][1], z_top), (run[0][0], z_top)]))
+    return faces
+
+
+def split_blank_walls(shell: Shell, neighbours: list[tuple[BaseGeometry, float]]) -> WallAreas:
+    """Take the blank party walls out of ``parts[wall_material]``.
+
+    The part against a neighbour's wall, up to the lower of the two tops, is never seen
+    and is dropped; the rest goes to ``party_material(wall_material)``. The collider is not touched.
+    Call it after the shell's open-edge check, which counts the full walls.
+    """
+    blank = {id(mesh) for _, mesh in shell.blank_walls}
+    shell.parts[shell.wall_material] = [m for m in shell.parts[shell.wall_material] if id(m) not in blank]
+    hidden = party = 0.0
+    for seg, _ in shell.blank_walls:
+        steps = cover_steps(seg.length, shell.z_top, wall_cover(seg, neighbours))
+        covered = sum((t1 - t0) * h for t0, t1, h in steps)
+        hidden += covered
+        party += seg.length * shell.z_top - covered
+        to_world = np.eye(4)  # pragma: no mutate: transform reads only the top 3x4 block, which every size above 3 fills alike
+        to_world[:3, 0], to_world[:3, 1], to_world[:3, 2], to_world[:3, 3] = seg.u, UP, seg.n_out, seg.point(0)
+        for face in visible_face(shell.z_top, steps):
+            shell.parts.setdefault(party_material(shell.wall_material), []).append(transform(cap(face, 0.0), to_world))
+    return WallAreas(0.0, party, hidden)
 
 
 def exposed_frontage(segments: list[Segment]) -> Segment | None:

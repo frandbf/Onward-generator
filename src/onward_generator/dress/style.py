@@ -14,7 +14,7 @@ from shapely import Point, STRtree, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.detail.config import DetailConfig
-from onward_generator.detail.facades import stable_unit
+from onward_generator.detail.facades import party_base, stable_unit
 from onward_generator.detail.modules import Prototype, urban_prototypes, yaw_matrix
 from onward_generator.detail.urban import Element, Rejected, _footprint
 from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
@@ -263,12 +263,16 @@ def write_styled(
     atlas_note = None
     if atlas:
         # The GLB repeats one tile per material on the face plane. atlas.png is only the contact sheet.
-        built = build_atlas(catalog, materials, used_color_ids=used, seed=seed)
-        repeat_images = {
+        # A party wall (``party_<wall>``) shows its wall's tile, so the tiles are drawn per wall.
+        bases = sorted({party_base(color_id) for color_id in used})
+        built = build_atlas(catalog, materials, used_color_ids=bases, seed=seed)  # pragma: no mutate: build_atlas ignores materials; bases and seed are pinned by the party test
+        tiles = {
             color_id: encode_png_rgba(_tile_pixels(color_id, MIN_TILE_PX, seed + index))
-            for index, color_id in enumerate(used)
+            for index, color_id in enumerate(bases)
         }
-        tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
+        repeat_images = {color_id: tiles[party_base(color_id)] for color_id in used}
+        catalog_tile = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
+        tile_m = {color_id: catalog_tile[party_base(color_id)] for color_id in used if party_base(color_id) in catalog_tile}
         roofs = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
         extras["atlas"] = {
             "size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note,

@@ -26,9 +26,9 @@ from onward_generator.dress.atlas import (
 from onward_generator.dress.catalog import load_catalog
 from onward_generator.dress.surfaces import osm_material_override
 from onward_generator.generation.config import Material, load_generation_config
-from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, read_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.materials.apply import apply_materials, share_facade_photos
+from onward_generator.materials.apply import apply_materials, rematerialize_brick_walls, share_facade_photos
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.materials.plan import PlanError, load_texture_plan
 from onward_generator.materials.polyhaven import DownloadError, TextureRecord, ensure_diffuse_1k, resolve_polyhaven_id
@@ -138,7 +138,7 @@ def _node(name: str, material: str, extras: dict[str, Any]) -> Node:
     return Node(name, (Primitive(_mesh(), material),), extras)
 
 
-def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False) -> Path:
+def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False, party: bool = False) -> Path:
     _ = MURCIA_CENTER
     detail = root / "base"
     detail.mkdir()
@@ -191,6 +191,14 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon:
             "building/osm-way-brick", "plaster_ochre",
             {"type": "building", "source_ids": ["osm-way-brick"], "object_id": "building/osm-way-brick"},
         ))
+    if party:
+        # A party wall beside its wall on the same mesh, so both get the same UV phase. Salmon is used only as a party wall.
+        extra = {"building/osm-way-1": "party_plaster_ochre", "building/osm-way-white": "party_plaster_white",
+                 "building/osm-way-stone": "party_plaster_salmon", "building/osm-way-brick": "party_plaster_ochre"}
+        for name in set(extra.values()):
+            materials[name] = materials.get(name.removeprefix("party_"), Material((0.88, 0.68, 0.58, 1.0), 0.9))
+        nodes = [Node(n.name, (*n.primitives, Primitive(_mesh(), extra[n.name])), n.extras) if n.name in extra else n
+                 for n in nodes]
     (detail / "scene_visual.glb").write_bytes(build_glb(nodes, materials))
     (detail / "scene_collision.glb").write_bytes(build_glb(nodes, materials))
     objects = [
@@ -421,6 +429,46 @@ def test_salmon_walls_borrow_a_plaster_photo_in_greyscale_under_their_own_tint(t
     assert (tile[..., 0] == tile[..., 1]).all() and (tile[..., 1] == tile[..., 2]).all()
     # The photograph is concrete_wall_001 (180, 178, 170), not the procedural tile.
     assert abs(int(tile.mean()) - 178) <= 2
+
+
+def test_brick_walls_keep_their_uvs_and_their_party_walls() -> None:
+    uvs = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.5]])
+    node = Node("building/b", (Primitive(_mesh(), "plaster_ochre", uvs), Primitive(_mesh(), "party_plaster_white", uvs),
+                               Primitive(_mesh(), "glass_dark", uvs)), {"type": "building", "source_ids": ["b"]})
+    [out], changed = rematerialize_brick_walls([node], {"b": {"tags": {"building:material": "brick"}}})
+    assert changed == ["building/b"]
+    assert [p.material for p in out.primitives] == ["brick_red", "party_brick_red", "glass_dark"]
+    assert all(p.uvs is uvs for p in out.primitives)
+
+
+def test_party_walls_take_their_wall_albedo_colour_and_repeat(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, brick=True, party=True)
+    out = tmp_path / "with_party"
+    report = apply_materials(base, out, cache_dir=cache, download=False, plan_path=_polyhaven_plan(tmp_path / "plan.json"))
+    data = (out / "scene_visual.glb").read_bytes()
+    doc, _ = read_glb(data)
+    factor = {m["name"]: m["pbrMetallicRoughness"]["baseColorFactor"] for m in doc["materials"]}
+    texture = {m["name"]: m["pbrMetallicRoughness"]["baseColorTexture"]["index"] for m in doc["materials"]}
+    # The contact sheet has one tile per wall, not one per party copy.
+    assert doc["extras"]["atlas"]["tiles"] == len({name.removeprefix("party_") for name in factor} - {"glass_view"})
+    # The OSM brick building's party wall becomes a brick party wall.
+    assert "party_plaster_ochre" in factor and "party_brick_red" in factor
+    for party, wall in (("party_plaster_ochre", "plaster_ochre"), ("party_plaster_white", "plaster_white"),
+                        ("party_brick_red", "brick_red")):
+        assert factor[party] == factor[wall] == [1.0, 1.0, 1.0, 1.0]
+        assert texture[party] == texture[wall]
+    # Salmon appears only as a party wall: it still borrows the plaster photograph under its own tint.
+    assert [row["color_id"] for row in report["textures"]["facade_shared"]] == ["plaster_salmon"]
+    assert factor["party_plaster_salmon"] == pytest.approx([0.88, 0.68, 0.58, 1.0])
+    tile = decode_png_rgba(images_by_material(data)["party_plaster_salmon"])[..., :3].astype(int)
+    assert (tile[..., 0] == tile[..., 1]).all() and abs(int(tile.mean()) - 178) <= 2
+    # Same mesh, same building: a party wall repeats exactly like its wall (plaster_white 4 m, brick 1.2 m).
+    uvs = {(n.name, p.material): p.uvs for n in nodes_from_glb(data)[0] for p in n.primitives}
+    assert np.array_equal(uvs[("building/osm-way-white", "party_plaster_white")], uvs[("building/osm-way-white", "plaster_white")])
+    assert np.array_equal(uvs[("building/osm-way-brick", "party_brick_red")], uvs[("building/osm-way-brick", "brick_red")])
+    assert not np.array_equal(uvs[("building/osm-way-white", "plaster_white")], uvs[("building/osm-way-brick", "brick_red")])
 
 
 def _record(tmp_path: Path, name: str, color: tuple[int, int, int]) -> TextureRecord:

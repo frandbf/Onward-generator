@@ -296,3 +296,15 @@ def test_the_scenic_wall_follows_the_seed(ring_inputs: tuple[Path, Path, Path]) 
     generated, ref = load_base(base, scene, heights, GEN)
     seeded = detail_scene(generated, ref, heights, scene, replace(CFG, seed=3), core_half_side_m=CORE_M)
     assert _record(seeded, "building/osm-way-315")["materials"][0] == scenic_wall(3, "osm-way-315") == "scenic_wall_warm"
+
+
+def test_a_scenic_neighbour_hides_no_core_wall(tmp_path: Path) -> None:
+    # 316 is stretched east to touch the scenic church at x = 60: its east wall stays a whole party wall.
+    touching = {**RING_BUILDINGS, 316: ([(45, 6), (60, 6), (60, 18), (45, 18)], RING_BUILDINGS[316][1])}
+    scene, heights, base = _detail_inputs(tmp_path, touching, RING_POIS)
+    generated, ref = load_base(base, scene, heights, GEN)
+    detailed = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=CORE_M)
+    house = _record(detailed, "building/osm-way-316")
+    assert house["tier"] == "core" and _record(detailed, "building/osm-way-314")["tier"] == "scenic"
+    areas = house["facade"]["wall_area_m2"]
+    assert areas["hidden"] == 0.0 and areas["party"] > 0.0

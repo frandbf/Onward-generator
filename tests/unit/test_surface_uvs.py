@@ -15,6 +15,7 @@ from onward_generator.generation.gltf import (
     Node,
     Primitive,
     build_glb,
+    images_by_material,
     nodes_from_glb,
     read_glb,
     recentre_uvs,
@@ -58,29 +59,45 @@ def test_each_opening_fits_unit_square() -> None:
     assert float(uvs[4:].max() - uvs[4:].min()) == pytest.approx(1.0, abs=1e-4)
 
 
-def test_repeat_images_are_separate_textures() -> None:
+def test_an_atlas_is_the_one_image_of_every_material() -> None:
+    wall = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 6.0]], dtype=np.float64), np.array([[0, 1, 2]]))
+    png = window_png(32)
+    names = ("plaster_ochre", "glass_dark")
+    data = build_glb([Node("wall", tuple(Primitive(wall, name) for name in names))],
+                     {name: Material((1.0, 1.0, 1.0, 1.0), 0.9) for name in names}, atlas_png=png)
+    doc, _ = read_glb(data)
+    assert len(doc["images"]) == 1 and images_by_material(data) == {"plaster_ochre": png, "glass_dark": png}
+    plain, _ = read_glb(build_glb([Node("wall", (Primitive(wall, "plaster_ochre"),))],
+                                  {"plaster_ochre": Material((1.0, 1.0, 1.0, 1.0), 0.9)}))
+    assert "images" not in plain
+
+
+def test_repeat_images_are_separate_textures_unless_identical() -> None:
     wall = Mesh(
         np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 6.0], [0.0, 0.0, 6.0]], dtype=np.float64),
         np.array([[0, 1, 2], [0, 2, 3]]),
     )
-    png = window_png(32)
+    png, other = window_png(32), window_png(16)
+    names = ("plaster_ochre", "party_plaster_ochre", "glass_dark")
     data = build_glb(
-        [Node("wall", (Primitive(wall, "plaster_ochre"), Primitive(wall, "glass_dark")))],
-        {
-            "plaster_ochre": Material((1.0, 1.0, 1.0, 1.0), 0.9),
-            "glass_dark": Material((1.0, 1.0, 1.0, 1.0), 0.2),
-        },
-        repeat_images={"plaster_ochre": png, "glass_dark": png},
-        repeat_tile_m={"plaster_ochre": 2.0, "glass_dark": 1.0},
+        [Node("wall", tuple(Primitive(wall, name) for name in names))],
+        {name: Material((1.0, 1.0, 1.0, 1.0), 0.9) for name in names},
+        repeat_images={"plaster_ochre": png, "party_plaster_ochre": png, "glass_dark": other},
+        repeat_tile_m={"plaster_ochre": 2.0, "party_plaster_ochre": 2.0, "glass_dark": 1.0},
         unit_uv_materials={"glass_dark"},
     )
     doc, _ = read_glb(data)
-    assert len(doc["images"]) == 2
+    assert len(doc["images"]) == len(doc["textures"]) == 2
     assert doc["samplers"][0]["wrapS"] == 10497
-    by_name = {m["name"]: m for m in doc["materials"]}
-    assert by_name["plaster_ochre"]["pbrMetallicRoughness"]["baseColorTexture"]["index"] != (
-        by_name["glass_dark"]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
-    )
+    assert {m["name"]: m["pbrMetallicRoughness"]["baseColorTexture"] for m in doc["materials"]} == {
+        "glass_dark": {"index": 0, "texCoord": 0},
+        "party_plaster_ochre": {"index": 1, "texCoord": 0},
+        "plaster_ochre": {"index": 1, "texCoord": 0},
+    }
+    index = {m["name"]: m["pbrMetallicRoughness"]["baseColorTexture"]["index"] for m in doc["materials"]}
+    # A party wall shares its wall's texture; a different image keeps its own.
+    assert index["plaster_ochre"] == index["party_plaster_ochre"] != index["glass_dark"]
+    assert images_by_material(data) == {"plaster_ochre": png, "party_plaster_ochre": png, "glass_dark": other}
 
 
 def test_library_plan_colours_the_plaster_slots(tmp_path: Path) -> None:

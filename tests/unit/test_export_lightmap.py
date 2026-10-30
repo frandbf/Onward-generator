@@ -53,6 +53,9 @@ def _glb(*parts: tuple[str, Mesh]) -> bytes:
     ("scenic_wall_light", "scenic"),
     ("scenic_wall_ochre", "scenic"),
     ("wall_scenic_x", "facade"),
+    ("party_plaster_cream", "party"),
+    ("party_brick_red", "party"),
+    ("counterparty_wall", "facade"),
 ])
 def test_surface_class(material: str, expected: str) -> None:
     assert surface_class(material) == expected
@@ -74,10 +77,11 @@ def test_contributes_gi_mirrors_the_adapter(material: str, lit: bool) -> None:
 
 
 def test_material_scales_default_classes() -> None:
-    names = ["roof_tile", "ground", "interior_wall", "plaster_cream", "prop_x", "tree_trunk", "ground"]
+    names = ["roof_tile", "ground", "interior_wall", "plaster_cream", "party_plaster_cream", "prop_x", "tree_trunk", "ground"]
     assert material_scales(names, DEFAULT_CLASS_SCALES) == [
         {"material": "ground", "scale": 0.5},
         {"material": "interior_wall", "scale": 0.5},
+        {"material": "party_plaster_cream", "scale": 0.5},
         {"material": "roof_tile", "scale": 0.25},
     ]
 

@@ -304,6 +304,9 @@ def build_glb(
     unit_uv = frozenset(unit_uv_materials or ())
     roof_uv = frozenset(roof_uv_materials or ())
     imaged = [name for name in material_names if name in repeat]
+    # Materials with the same image share one texture (a party wall and its wall, docs/07-detail.md).
+    payloads = list(dict.fromkeys(repeat[name] for name in imaged)) if using_repeat else [png for png in (atlas_png,) if png is not None]
+    texture_of = {name: payloads.index(repeat[name]) for name in imaged}
     gltf_meshes: list[dict[str, Any]] = []
     gltf_nodes: list[dict[str, Any]] = []
     shared: dict[str, int] = {}
@@ -381,7 +384,7 @@ def build_glb(
                     "metallicFactor": 0.0,
                     "roughnessFactor": materials[name].roughness,
                     **(
-                        {"baseColorTexture": {"index": imaged.index(name), "texCoord": 0}}
+                        {"baseColorTexture": {"index": texture_of[name], "texCoord": 0}}
                         if using_repeat and name in repeat
                         else {"baseColorTexture": {"index": 0, "texCoord": 0}}
                         if textured
@@ -398,7 +401,6 @@ def build_glb(
     }
     if using_repeat or textured:
         images_out: list[dict[str, Any]] = []
-        payloads = [repeat[name] for name in imaged] if using_repeat else [atlas_png or b""]
         for png in payloads:
             while len(builder.blob) % 4:
                 builder.blob.append(0)

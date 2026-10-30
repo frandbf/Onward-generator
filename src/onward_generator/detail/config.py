@@ -16,6 +16,9 @@ from jsonschema import Draft202012Validator
 from onward_generator.config.loader import ConfigLoadError, read_json_document
 from onward_generator.generation.config import Material
 
+# A blank party wall keeps its wall's albedo under this prefix, so the export can give it its own lightmap scale.
+PARTY_PREFIX = "party_"
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "detail.default.json"
 SCHEMA_PATH = REPO_ROOT / "config" / "detail.schema.json"
@@ -439,9 +442,9 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         budget=MappingProxyType({k: int(v) for k, v in doc["budget"].items() if k != "note"}),
         closeup_focus=tuple(float(v) for v in doc["preview"]["closeup_focus_m"]),  # type: ignore[arg-type]
         closeup_elevation_deg=float(doc["preview"]["closeup_elevation_deg"]),
-        materials=MappingProxyType(
+        materials=MappingProxyType(_with_party(
             {name: Material(tuple(m["color"]), float(m["roughness"])) for name, m in sorted(doc["materials"].items())}  # type: ignore[arg-type]
-        ),
+        )),
         landmarks=_landmarks(doc.get("landmarks")),
         document=MappingProxyType(json.loads(json.dumps(doc))),
         path=path,
@@ -451,6 +454,11 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
     if problems:
         raise DetailConfigError(path or "<document>", problems)
     return cfg
+
+
+def _with_party(materials: dict[str, Material]) -> dict[str, Material]:
+    """Each material and its ``party_<name>`` copy, which a blank party wall takes (docs/07-detail.md)."""
+    return materials | {PARTY_PREFIX + name: material for name, material in materials.items()}
 
 
 def load_detail_config(path: str | Path | None = None) -> DetailConfig:

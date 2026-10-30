@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, encode_png_rgba
+from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import load_catalog
 from onward_generator.dress.style import write_styled
 from onward_generator.generation.config import Material
@@ -112,3 +112,32 @@ def test_style_output_is_deterministic(tmp_path: Path) -> None:
     _style(tmp_path / "b", atlas=True)
     for name in ("scene_visual.glb", "scene_collision.glb", "atlas.png"):
         assert (tmp_path / "a" / name).read_bytes() == (tmp_path / "b" / name).read_bytes()
+
+
+def test_style_gives_a_party_wall_its_wall_tile_and_repeat(tmp_path: Path) -> None:
+    wall = quad((0.0, 0.0, 0.0), (12.0, 0.0, 0.0), (12.0, 0.0, 9.0), (0.0, 0.0, 9.0))
+    names = ("plaster_white", "party_plaster_white", "party_brick_red")
+    materials = {name: Material((0.9, 0.9, 0.9, 1.0), 0.9) for name in names}
+    nodes = [Node("building/1", tuple(Primitive(wall, name) for name in names), {"type": "building"})]
+    out = tmp_path / "party"
+    out.mkdir()
+    targets = {name: out / f"{name}.bin" for name in ("visual", "collision", "manifest", "report", "atlas")}
+    write_styled(nodes, nodes, [], [], materials, load_catalog(), targets, atlas=True,
+                 attribution="© OpenStreetMap contributors", seed=SEED + 7, source_manifest={},
+                 source_detail_sha256=None, generated_accessories={})
+    data = targets["visual"].read_bytes()
+    images = images_by_material(data)
+    # Tiles are drawn per wall (brick_red, plaster_white), also for a wall only its party copy uses.
+    assert images["party_plaster_white"] == images["plaster_white"]
+    assert images["plaster_white"] == encode_png_rgba(_tile_pixels("plaster_white", MIN_TILE_PX, SEED + 8))
+    assert images["party_brick_red"] == encode_png_rgba(_tile_pixels("brick_red", MIN_TILE_PX, SEED + 7))
+    assert len(read_glb(data)[0]["images"]) == 2
+    # The contact sheet shows the two walls once, with the map's seed.
+    sheet = build_atlas(load_catalog(), materials, used_color_ids=["brick_red", "plaster_white"], seed=SEED + 7)
+    assert targets["atlas"].read_bytes() == sheet.png
+    uvs = _uvs(targets["visual"])
+    tile = {e.color_id: float(e.technical["tile_m"]) for e in load_catalog().entries}
+    assert tile["plaster_white"] != 2.0 and tile["brick_red"] != 2.0  # neither is build_glb's default repeat
+    assert np.array_equal(uvs["party_plaster_white"], uvs["plaster_white"])
+    span = uvs["party_brick_red"].max(axis=0) - uvs["party_brick_red"].min(axis=0)
+    assert np.allclose(span, [12.0 / tile["brick_red"], 9.0 / tile["brick_red"]], rtol=1e-4)

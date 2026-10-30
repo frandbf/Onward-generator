@@ -92,8 +92,9 @@ namespace OnwardGenerator
             public float lightmap_texels_per_m = 10f;
             public int lightmap_max_size = 2048;
             public bool lightmap_directional = false;
-            // scaleInLightmap per glTF material (onward_generator.export.lightmap): roofs, ground and
-            // interiors below 1. A material not listed keeps 1. Absent in older packages.
+            // scaleInLightmap per glTF material (onward_generator.export.lightmap): roofs, ground,
+            // interiors and blank party walls (party_<wall>) below 1. A material not listed keeps 1.
+            // Absent in older packages.
             public LightmapScale[] lightmap_scales = new LightmapScale[0];
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
