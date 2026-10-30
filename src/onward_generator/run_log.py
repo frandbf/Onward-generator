@@ -180,6 +180,22 @@ def _geo(out: Path) -> StageReport:
     return StageReport("  ".join(parts), alerts=tuple(alerts))
 
 
+def _catastro(out: Path) -> StageReport:
+    record = _read(out.with_name(out.name + ".source.json"))
+    return StageReport(f"{group(int(record['size_bytes']) // 1024)} KiB  {record['license']}")
+
+
+def _cadastre(out: Path) -> StageReport:
+    report = _read(out / "cadastre_match_report.json")
+    counts = report["split"]["counts"]
+    parts = [f"parts {group(int(report['counts']['cadastre_parts']))}"]
+    parts.append(f"split {group(int(counts['osm_buildings_split']))} → {group(int(counts['sub_buildings']))}")
+    levels = counts["levels_range"]
+    if levels:
+        parts.append(f"storeys {levels[0]}–{levels[1]}")
+    return StageReport("  ".join(parts))
+
+
 def _heights(out: Path) -> StageReport:
     report = _read(out / "heights_report.json")
     counts = report["counts"]
@@ -290,6 +306,8 @@ def _export(out: Path) -> StageReport:
 
 _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "geo": _geo,
+    "catastro": _catastro,
+    "cadastre": _cadastre,
     "heights": _heights,
     "generate": _generate,
     "detail": _detail,

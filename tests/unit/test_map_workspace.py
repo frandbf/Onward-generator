@@ -11,7 +11,7 @@ from shapely import Point
 from onward_generator.cli import main
 from onward_generator.geo.aoi import load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame
-from onward_generator.maps.workspace import MapError, create_map
+from onward_generator.maps.workspace import MapError, catastro_enabled, create_map, store_catastro
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -143,3 +143,24 @@ def _polygon(ring: tuple[tuple[float, float], ...]):
     from shapely import Polygon
 
     return Polygon(ring)
+
+
+def test_catastro_is_on_by_default_in_spain_and_follows_the_stored_switch(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    assert catastro_enabled(root) is True
+    store_catastro(root, False)
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is False
+    assert catastro_enabled(root) is False
+    store_catastro(root, True)
+    assert catastro_enabled(root) is True
+
+
+def test_catastro_is_off_outside_spain_for_large_maps_and_without_a_map(tmp_path: Path) -> None:
+    abroad = tmp_path / "obelisco"
+    create_map(abroad, map_id="obelisco", name="Obelisco", latitude=-34.6037, longitude=-58.3816, radius_m=400)
+    assert catastro_enabled(abroad) is False
+    large = tmp_path / "grande"
+    create_map(large, map_id="grande", name="Grande", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=460)
+    assert catastro_enabled(large) is False  # 2 × (460 + 30 + 20) m > 1 km
+    assert catastro_enabled(tmp_path / "missing") is False

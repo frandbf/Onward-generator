@@ -287,3 +287,18 @@ def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:
     to_gltf = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1.0]])
     assert g @ (to_gltf @ p_local) == pytest.approx(to_gltf @ (m1 @ p_local))
     assert gltf_matrix(np.eye(4)) == np.eye(4).reshape(-1).tolist()
+
+
+def test_shop_evidence_prefers_the_footprint_that_contains_the_point() -> None:
+    from onward_generator.detail.scene import _shop_evidence
+
+    footprints = {"low": box(-15, 6, 0, 22), "tall": box(0, 6, 14, 22)}
+
+    def poi(pid: str, x: float, y: float) -> dict:
+        return {"id": pid, "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [x, y]}}
+
+    inside = _shop_evidence([poi("in", -1.0, 7.0)], footprints, CFG)
+    assert dict(inside) == {"low": ["in"]}  # 1 m from the tall neighbour, but inside the low one
+    street = _shop_evidence([poi("street", -1.0, 5.0)], footprints, CFG)
+    assert dict(street) == {"low": ["street"], "tall": ["street"]}  # outside both: the 2 m rule
+    assert dict(_shop_evidence([poi("far", -1.0, 3.0)], footprints, CFG)) == {}

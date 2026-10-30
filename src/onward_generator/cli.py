@@ -106,6 +106,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         brief=args.brief,
         ambient_ai=args.ai,
         panoramax=args.panoramax,
+        catastro=args.catastro,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         overwrite=args.overwrite,
         start=args.start,
@@ -175,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     heights.set_defaults(handler=_cmd_heights)
 
     sub.add_parser("geo", help="run the geographic pipeline (see: geo --help)", add_help=False)
-    sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match (see: cadastre --help)", add_help=False)
+    sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match | split (see: cadastre --help)", add_help=False)
     sub.add_parser("generate", help="phase 03 geometry: ground, streets, buildings (see: generate --help)", add_help=False)
     sub.add_parser("detail", help="phase 04: facades, roofs, urban elements, interiors (see: detail --help)", add_help=False)
     sub.add_parser("perf", help="phase 05: measure | layout | device | drawcalls (see: perf --help)", add_help=False)
@@ -204,6 +205,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
+    run.add_argument(
+        "--catastro", action=argparse.BooleanOptionalAction, default=None,
+        help="split OSM blocks into Catastro constructions (default on in mainland Spain); --no-catastro turns it off for this map",
+    )
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")
     run.add_argument("--platform", choices=PLATFORM_CHOICES, default=None, help="host for the Unity steps; same as the global --platform")

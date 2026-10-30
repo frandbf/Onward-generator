@@ -19,10 +19,12 @@ from onward_generator.cadastre import (
     overrides_document,
     parse_building_parts,
 )
+from onward_generator.cadastre.acquire import catastro_area
 from onward_generator.cadastre.match import weighted_median
 from onward_generator.geo.pipeline import GeoResult
 from onward_generator.heights import HeightSource, estimate_heights, load_height_config
 from onward_generator.heights.estimator import buildings_from_scene
+from tests.conftest import MURCIA_CENTER_LAT
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "cadastre" / "synthetic_bu.gml"
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
@@ -195,3 +197,122 @@ def test_scene_in_other_crs_is_rejected(pipeline_result: GeoResult) -> None:
     scene["frame"] = {**scene["frame"], "crs": "EPSG:4326"}
     with pytest.raises(CadastreError):
         match_buildings(scene, [])
+
+
+# --- Area and split (ADR-015). ---
+
+
+@pytest.mark.parametrize(
+    ("latitude", "crs", "half_side_m", "expected"),
+    [
+        (MURCIA_CENTER_LAT, "EPSG:25830", 400.0, True),
+        (MURCIA_CENTER_LAT, "EPSG:32630", 400.0, False),  # same zone, not the Catastro CRS
+        (35.85, "EPSG:25830", 400.0, True),
+        (35.84, "EPSG:25830", 400.0, False),  # North Africa
+        (43.8, "EPSG:25830", 400.0, True),
+        (43.81, "EPSG:25830", 400.0, False),  # Bay of Biscay and north
+        (MURCIA_CENTER_LAT, "EPSG:25830", 480.0, True),  # 2 × (480 + 20) m = 1 km: exactly 1 km²
+        (MURCIA_CENTER_LAT, "EPSG:25830", 480.5, False),
+        (MURCIA_CENTER_LAT, "EPSG:25830", 480.0002, False),  # 1.0000008 km²
+    ],
+)
+def test_catastro_area(latitude: float, crs: str, half_side_m: float, expected: bool) -> None:
+    assert catastro_area(latitude, crs, half_side_m) is expected
+
+
+def test_cli_split_writes_scene_overrides_and_report(
+    pipeline_result: GeoResult, downloaded: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+    from onward_generator.heights import run_heights
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    out = tmp_path / "cad"
+    args = [
+        "cadastre", "split", "--scene", str(scene_path), "--gml", str(downloaded), "--out", str(out),
+        "--min-coverage", "0.5", "--split-min-coverage", "0.8", "--min-piece-area-m2", "6", "--min-piece-width-m", "2",
+    ]
+    assert main(args) == 0
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[0] == "parts=5 buildings=5 split=2 sub_buildings=4 levels=2-5"
+    names = ("geo_scene.json", "heights_overrides.catastro.json", "cadastre_match_report.json")
+    assert printed[1:] == [f"wrote {out / name}" for name in names]
+
+    scene = json.loads((out / "geo_scene.json").read_text(encoding="utf-8"))
+    buildings = [f["id"] for f in scene["features"] if f["kind"] == "building"]
+    assert sorted(buildings) == [
+        "osm-relation-201", "osm-way-101:0000001AA0000A_part1", "osm-way-101:0000001AA0000A_part2",
+        "osm-way-102", "osm-way-104", "osm-way-108:0000001AA0000A_part1", "osm-way-108:0000001AA0000A_part2",
+    ]
+    assert scene["schema"] == "onward_generator.geo_scene" and scene["subdivision"]["counts"]["sub_buildings"] == 4
+    assert scene["subdivision"]["geo_scene"]["path"] == str(scene_path.resolve())
+
+    overrides = json.loads((out / "heights_overrides.catastro.json").read_text(encoding="utf-8"))
+    assert [(e["id"], e["levels"]) for e in overrides["overrides"]] == [
+        ("osm-relation-201", 7),
+        ("osm-way-101:0000001AA0000A_part1", 5), ("osm-way-101:0000001AA0000A_part2", 2),
+        ("osm-way-108:0000001AA0000A_part1", 5), ("osm-way-108:0000001AA0000A_part2", 2),
+    ]
+    report = json.loads((out / "cadastre_match_report.json").read_text(encoding="utf-8"))
+    assert report["counts"]["status_matched"] == 3 and report["split"]["counts"]["osm_buildings_split"] == 2
+    assert report["split"]["options"] == {
+        "min_coverage": 0.8, "min_piece_area_m2": 6.0, "min_piece_width_m": 2.0, "confident_share": 0.8,
+        "confidence_high": 0.85, "confidence_low": 0.7,
+    }
+    assert report["options"]["min_coverage"] == 0.5
+    assert [b["building_id"] for b in report["split"]["buildings"]] == [
+        "osm-relation-201", "osm-way-101", "osm-way-102", "osm-way-104", "osm-way-108",
+    ]
+
+    run = run_heights(out / "geo_scene.json", load_height_config(overrides_path=out / "heights_overrides.catastro.json"))
+    heights = {b.id: b for b in run.result.buildings}
+    low = heights["osm-way-101:0000001AA0000A_part2"]
+    assert low.height_source is HeightSource.AUTHORITATIVE_LEVELS and low.estimated_levels == 2
+    assert heights["osm-way-101:0000001AA0000A_part1"].estimated_levels == 5
+    assert run.report_dict()["counts"]["subdivided"] == {"osm_buildings_split": 2, "sub_buildings": 4, "levels_range": [2, 5]}
+    assert main(args) == 1  # refuses to overwrite
+
+
+def test_cli_split_options_reach_the_split(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    out = tmp_path / "cad"
+    args = ["cadastre", "split", "--scene", str(scene_path), "--gml", str(downloaded), "--out", str(out),
+            "--split-min-coverage", "0.9", "--min-piece-area-m2", "7", "--min-piece-width-m", "1.5"]
+    assert main(args) == 0
+    report = json.loads((out / "cadastre_match_report.json").read_text(encoding="utf-8"))
+    assert report["split"]["options"]["min_coverage"] == 0.9
+    assert report["split"]["options"]["min_piece_area_m2"] == 7.0
+    assert report["split"]["options"]["min_piece_width_m"] == 1.5
+
+
+def test_cli_split_without_parts_copies_the_scene(pipeline_result: GeoResult, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+    from onward_generator.heights import run_heights
+
+    empty = FIXTURE.read_bytes().split(b"<gml:featureMember>")[0] + b"</gml:FeatureCollection>\n"
+    gml = tmp_path / "raw" / "empty.gml"
+    download_building_parts(CENTER_BBOX, gml, fetch=fake_fetch(empty), now=NOW)
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    assert main(["cadastre", "split", "--scene", str(scene_path), "--gml", str(gml), "--out", str(tmp_path / "cad")]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "parts=0 buildings=5 split=0 sub_buildings=0 levels=none"
+    original = json.loads(scene_path.read_text(encoding="utf-8"))
+    split = json.loads((tmp_path / "cad" / "geo_scene.json").read_text(encoding="utf-8"))
+    assert split["features"] == original["features"]
+    overrides = json.loads((tmp_path / "cad" / "heights_overrides.catastro.json").read_text(encoding="utf-8"))
+    assert overrides["overrides"] == []
+    report = run_heights(tmp_path / "cad" / "geo_scene.json").report_dict()
+    assert report["counts"]["subdivided"] == {"osm_buildings_split": 0, "sub_buildings": 0, "levels_range": None}
+
+
+def test_match_report_has_no_split_section(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    assert main(["cadastre", "match", "--scene", str(scene), "--gml", str(downloaded), "--out", str(tmp_path / "m")]) == 0
+    assert "split" not in json.loads((tmp_path / "m" / "cadastre_match_report.json").read_text(encoding="utf-8"))

@@ -16,7 +16,7 @@
         "required": ["id", "source", "license"],
         "anyOf": [{ "required": ["height_m"] }, { "required": ["levels"] }],
         "properties": {
-          "id": { "type": "string", "pattern": "^osm-(node|way|relation)-[0-9]+$" },
+          "id": { "type": "string", "pattern": "^osm-(node|way|relation)-[0-9]+(:[A-Za-z0-9_.-]+)?$", "description": "An OSM building, or a Catastro sub-building <osm id>:<localId> written by cadastre split (ADR-015)" },
           "height_m": { "type": "number", "exclusiveMinimum": 0 },
           "levels": { "type": "integer", "minimum": 1 },
           "source": { "type": "string", "minLength": 3 },

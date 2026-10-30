@@ -13,8 +13,10 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import build_parser, main
-from onward_generator.maps.workspace import create_map
+from onward_generator.maps.workspace import create_map, store_catastro
 from onward_generator.next_step import (
+    cadastre_split_command,
+    catastro_command,
     detail_command,
     dress_command,
     export_command,
@@ -81,7 +83,7 @@ def test_plan_runs_python_stages_and_stops_before_unity(tmp_path) -> None:
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     names = [name for name, _argv in plan_steps(root)]
     assert names == [
-        "geo", "heights", "generate", "detail", "dress", "materials",
+        "geo", "catastro", "cadastre", "heights", "generate", "detail", "dress", "materials",
         "signs", "overgrow", "fit", "bounds", "layout", "export",
     ]
     joined = " ".join(" ".join(argv) for _name, argv in plan_steps(root))
@@ -355,10 +357,14 @@ def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
     def out(name: str) -> Path:
         return Path(steps[name][steps[name].index("--out") + 1])
 
-    scene = out("geo") / "geo_scene.json"
+    geo_scene = out("geo") / "geo_scene.json"
+    gml = root / "data" / "raw" / "catastro.gml"
+    scene = out("cadastre") / "geo_scene.json"
     heights = out("heights") / "heights.json"
     assert steps["geo"] == list(geo_command(root).argv)
-    assert steps["heights"] == list(heights_command(scene).argv)
+    assert steps["catastro"] == list(catastro_command(geo_scene, gml).argv)
+    assert steps["cadastre"] == list(cadastre_split_command(geo_scene, gml).argv)
+    assert steps["heights"] == list(heights_command(scene, out("cadastre") / "heights_overrides.catastro.json").argv)
     assert steps["generate"] == list(generate_command(scene, heights).argv)
     assert steps["detail"] == list(detail_command(scene, heights, out("generate")).argv)
     assert steps["dress"] == list(dress_command(out("detail"), scene, heights).argv)
@@ -485,7 +491,9 @@ def test_several_finished_steps_are_listed_and_the_answer_is_used(tmp_path, caps
     assert "3 geo" in captured.out
     assert seen[0][0] == "geo"
     assert "--overwrite" in seen[0]
-    assert seen[1][0] == "heights"
+    assert seen[1][:2] == ["cadastre", "download"]
+    assert seen[2][:2] == ["cadastre", "split"]
+    assert seen[3][0] == "heights"
 
 
 def _finish_python_stages(root: Path) -> None:
@@ -499,9 +507,12 @@ def _finish_python_stages(root: Path) -> None:
                 continue
             pending = True
             destination = Path(argv[argv.index("--out") + 1])
-            if name == "geo":
+            if name in ("geo", "cadastre"):
                 destination.mkdir(parents=True, exist_ok=True)
                 (destination / "geo_scene.json").write_text("{}", encoding="utf-8")
+            elif name == "catastro":
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text("<gml/>", encoding="utf-8")
             elif name == "heights":
                 destination.mkdir(parents=True, exist_ok=True)
                 (destination / "heights.json").write_text("{}", encoding="utf-8")
@@ -1259,3 +1270,143 @@ def test_run_help_describes_the_new_flags() -> None:
     helps = {action.dest: action.help for action in run._actions}
     assert helps["verbose"] == "also print each stage's full output"
     assert helps["no_unity"] == "stop after export and print the command for the Unity steps (task map uses this)"
+
+
+# --- Catastro split (ADR-015). ---
+
+
+def _murcia(tmp_path: Path) -> Path:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    return root
+
+
+def test_catastro_off_keeps_the_osm_scene_for_heights(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    store_catastro(root, False)
+    steps = dict(plan_steps(root))
+    assert "catastro" not in steps and "cadastre" not in steps
+    scene = Path(steps["geo"][steps["geo"].index("--out") + 1]) / "geo_scene.json"
+    assert steps["heights"] == list(heights_command(scene).argv)
+    assert "--overrides" not in steps["heights"]
+
+
+def test_catastro_steps_read_the_geo_scene_and_write_the_split_scene(tmp_path: Path) -> None:
+    root = _murcia(tmp_path).resolve()
+    steps = dict(plan_steps(root))
+    processed = root / "data" / "processed"
+    assert steps["catastro"][-2:] == ["--out", str(root / "data" / "raw" / "catastro.gml")]
+    assert steps["cadastre"][steps["cadastre"].index("--out") + 1] == str(processed / "cadastre")
+    for name in ("generate", "detail", "fit"):
+        assert steps[name][steps[name].index("--scene") + 1] == str(processed / "cadastre" / "geo_scene.json")
+
+
+def _touch(path: Path, when: float) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}", encoding="utf-8")
+    os.utime(path, (when, when))
+
+
+def test_catastro_and_cadastre_are_stale_after_their_input(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    processed = root / "data" / "processed"
+    now = (root / "map.json").stat().st_mtime
+    _touch(processed / "geo" / "geo_scene.json", now)
+    _touch(root / "data" / "raw" / "catastro.gml", now + 1)
+    _touch(processed / "cadastre" / "geo_scene.json", now + 2)
+    _touch(processed / "heights" / "heights.json", now + 3)
+    assert all(output_ready(name, [], root) for name in ("catastro", "cadastre", "heights"))
+    _touch(processed / "cadastre" / "geo_scene.json", now + 4)
+    assert not output_ready("heights", [], root)
+    _touch(root / "data" / "raw" / "catastro.gml", now + 5)
+    assert not output_ready("cadastre", [], root)
+    _touch(processed / "geo" / "geo_scene.json", now + 6)
+    assert not output_ready("catastro", [], root)
+    store_catastro(root, False)
+    assert output_ready("heights", [], root) is False  # heights now follows geo, which is newer
+    _touch(processed / "heights" / "heights.json", now + 7)
+    assert output_ready("heights", [], root)
+
+
+def test_a_catastro_sidecar_alone_is_downloaded_again_with_overwrite(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    steps = plan_steps(root)
+    gml = root / "data" / "raw" / "catastro.gml"
+    assert "--overwrite" not in dict(prepare_from(steps, "catastro", root))["catastro"]
+    gml.parent.mkdir(parents=True, exist_ok=True)
+    gml.with_name("catastro.gml.source.json").write_text("{}", encoding="utf-8")
+    assert "--overwrite" in dict(prepare_from(steps, "catastro", root))["catastro"]
+
+
+def test_run_stores_the_catastro_switch(tmp_path: Path) -> None:
+    root = _ready_map(tmp_path)
+
+    def run(catastro: bool | None) -> None:
+        code = run_map(
+            map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+            radius_m=400, margin_m=30, out=str(root), catastro=catastro,
+            execute=lambda argv: 0, interactive=False, no_unity=True,
+        )
+        assert code == 0
+
+    run(None)
+    assert "catastro" not in json.loads((root / "map.json").read_text(encoding="utf-8"))
+    run(False)
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is False
+    run(True)
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is True
+
+
+def test_a_new_map_stores_the_catastro_switch_before_planning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    seen: list[list[str]] = []
+
+    def execute(argv: list[str]) -> int:
+        seen.append(list(argv))
+        if argv[:2] == ["map", "create"]:
+            create_map(Path("maps/murcia"), map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=90)
+            return 0
+        return 2 if argv[0] == "heights" else 0
+
+    code = run_map(
+        map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+        radius_m=90, margin_m=5, out="maps/murcia", catastro=False, execute=execute, interactive=False,
+        no_unity=True,
+    )
+    assert code == 2
+    assert json.loads(Path("maps/murcia/map.json").read_text(encoding="utf-8"))["catastro"] is False
+    assert [argv[0] for argv in seen] == ["map", "geo", "heights"]
+
+
+def test_run_passes_the_catastro_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: dict[str, object] = {}
+    monkeypatch.setattr("onward_generator.pipeline_run.run_map", lambda **kwargs: received.update(kwargs) or 0)
+    argv = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]
+    assert main(argv) == 0
+    assert received["catastro"] is None
+    assert main([*argv, "--no-catastro"]) == 0
+    assert received["catastro"] is False
+    assert main([*argv, "--catastro"]) == 0
+    assert received["catastro"] is True
+
+
+def test_run_help_describes_the_catastro_switch() -> None:
+    parser = build_parser()
+    subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
+    run = subparsers.choices["run"]
+    helps = {action.dest: action.help for action in run._actions}
+    assert helps["catastro"] == (
+        "split OSM blocks into Catastro constructions (default on in mainland Spain); --no-catastro turns it off for this map"
+    )
+    listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
+    assert listed["cadastre"] == "Catastro INSPIRE floors: download | match | split (see: cadastre --help)"
+
+
+def test_cadastre_help_lists_split() -> None:
+    from onward_generator.cadastre.__main__ import build_parser as cadastre_parser
+
+    subparsers = next(action for action in cadastre_parser()._actions if isinstance(action, argparse._SubParsersAction))
+    listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
+    assert listed["split"] == "split OSM footprints by Catastro parts; write a new geo scene and overrides (offline)"

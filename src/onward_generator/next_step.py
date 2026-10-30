@@ -84,8 +84,24 @@ def geo_command(directory: str | Path, retrieved_at: str | None = None) -> Stage
     return invoke(*parts)
 
 
-def heights_command(scene: Path) -> StageCommand:
-    return invoke("heights", "--scene", show(scene), "--out", show(stage_path(scene, "heights")))
+def heights_command(scene: Path, overrides: Path | None = None) -> StageCommand:
+    extra = ("--overrides", show(overrides)) if overrides is not None else ()
+    return invoke("heights", "--scene", show(scene), *extra, "--out", show(stage_path(scene, "heights")))
+
+
+def catastro_command(scene: Path, gml: Path) -> StageCommand:
+    """``cadastre download``: the one Catastro request (network)."""
+    return invoke("cadastre", "download", "--scene", show(scene), "--out", show(gml))
+
+
+def cadastre_split_command(scene: Path, gml: Path) -> StageCommand:
+    """``cadastre split``: sub-buildings and storey overrides (ADR-015)."""
+    return invoke(
+        "cadastre", "split",
+        "--scene", show(scene),
+        "--gml", show(gml),
+        "--out", show(stage_path(scene, "cadastre")),
+    )
 
 
 def generate_command(scene: Path, heights: Path) -> StageCommand:

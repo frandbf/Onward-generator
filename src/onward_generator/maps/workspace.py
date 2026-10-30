@@ -15,6 +15,7 @@ from typing import Any
 from shapely import box
 
 from onward_generator.ai.providers import Provider
+from onward_generator.cadastre.acquire import catastro_area
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
 from onward_generator.export.package import ExportError, load_export_config
@@ -145,6 +146,30 @@ def store_panoramax(directory: str | Path, enabled: bool) -> None:
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
     document["panoramax"] = bool(enabled)
+    atomic_write_json(root / "map.json", document)
+
+
+def catastro_enabled(directory: str | Path) -> bool:
+    """True when ``run`` splits buildings with Catastro for this map (ADR-015).
+
+    The map must be in the Catastro area and fit one request. A map without the
+    key uses it; ``"catastro": false`` (``run --no-catastro``) turns it off.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    center = document["center"]
+    half_side = float(document["radius_m"]) + float(document["margin_m"])
+    inside = catastro_area(float(center["latitude"]), str(document["crs"]), half_side)
+    return inside and document.get("catastro", True) is not False
+
+
+def store_catastro(directory: str | Path, enabled: bool) -> None:
+    """Record ``run --catastro`` or ``--no-catastro`` on an existing map. Does not rewrite scenes."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["catastro"] = bool(enabled)
     atomic_write_json(root / "map.json", document)
 
 
