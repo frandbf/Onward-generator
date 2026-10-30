@@ -461,7 +461,7 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
         geom, dropped_holes = drop_degenerate_holes(geom)
         if dropped_holes:
             issues.append(Issue("degenerate_hole_dropped", "info", cid, f"{dropped_holes} holes below 0.0001 m² removed before the slab"))
-        geom = open_point_contacts(geom, precision_m=config.precision_m)
+        geom = open_point_contacts(geom)
         mesh = prism(geom, -thickness, top, bottom=True)
         defects = closed_manifold_defects(mesh)
         expected = geom.area * (top + thickness)

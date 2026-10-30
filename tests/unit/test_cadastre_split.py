@@ -555,6 +555,7 @@ def test_a_sub_building_that_will_not_close_quarantines_its_block(monkeypatch: p
     assert result.to_dict()["reason"] == result.reason
     summary = split_summary([result])
     assert summary["status_quarantined"] == 1 and summary["quarantined_m2"] == 200.0 and summary["sub_buildings"] == 0
+    assert split_summary([ParentSplit("osm-way-2", "quarantined", 1.0, quarantined_m2=12.34567)])["quarantined_m2"] == 12.346
 
 
 def test_a_quarantined_block_keeps_its_osm_footprint_in_the_scene(monkeypatch: pytest.MonkeyPatch) -> None:

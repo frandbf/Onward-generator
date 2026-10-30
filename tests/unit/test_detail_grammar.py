@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from shapely import Polygon, box
+from shapely import Polygon, affinity, box
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import _hip_roof
@@ -144,6 +144,7 @@ def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
     jog = Polygon([(0.04, 0), (5, 0), (5, 3.6), (0, 3.6), (0, 3.4), (0.04, 3.4)])  # the west wall steps in under its top
     assert jog.area >= 0.995 * jog.convex_hull.area
     assert _hip_roof(jog, 30.0, template) is None
+    assert _hip_roof(affinity.rotate(jog, 45, origin=(0, 0)), 30.0, template) is None  # a slanted step too
     chamfer = Polygon([(0.1, 0), (5, 0), (5, 3.6), (0, 3.6), (0, 0.1)])  # a short eave still faces the apex
     assert _hip_roof(chamfer, 30.0, template) is not None
     # Two 2 cm steps on the centroid's own line: their faces would be edge-on, so the roof stays flat too.

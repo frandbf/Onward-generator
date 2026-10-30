@@ -168,7 +168,7 @@ def drop_degenerate_holes(geometry: BaseGeometry, min_area: float = 1e-4) -> tup
     return (rebuilt[0] if len(rebuilt) == 1 else MultiPolygon(rebuilt)), dropped
 
 
-def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, *, precision_m: float) -> BaseGeometry:
+def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, precision_m: float = 0.001) -> BaseGeometry:
     """Open a ring that only kisses another ring, so the extrusion stays one manifold.
 
     A carriageway that leaves the map can touch the site boundary at a single
@@ -178,7 +178,7 @@ def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, *, precisio
     slab that touch at a corner (a carriageway cut by its crossings) are
     separated the same way. A shared edge is left alone.
 
-    The cut is snapped to ``precision_m``: where an edge leaves the disk almost
+    The cut is snapped to ``precision_m`` (the 1 mm grid of ``geo``): where an edge leaves the disk almost
     through one of its vertices, the new crossing point lies microns from that
     vertex, the 0.1 mm weld merges the pair and the slab stops closing. Two
     pieces that leave their contact almost parallel are still less than the
@@ -188,12 +188,16 @@ def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, *, precisio
     """
     if geometry.is_empty or gap_m <= 0:
         return geometry
-    cuts = _point_contacts(geometry, gap_m)
+
+    def contacts(of: BaseGeometry) -> list[BaseGeometry]:
+        return _point_contacts(of, gap_m)
+
+    cuts = contacts(geometry)
     while cuts:
         opened = shapely.set_precision(shapely.make_valid(geometry.difference(shapely.union_all(cuts).buffer(gap_m))), precision_m)
         if opened.is_empty:
             return geometry
-        again = _point_contacts(opened, gap_m)
+        again = contacts(opened)
         if not again:
             return opened
         cuts += again
