@@ -96,7 +96,7 @@ def test_installed_kenney_boxes_match_the_street_and_the_files() -> None:
     review = json.loads((REPO / "assets" / "kenney_review.json").read_text(encoding="utf-8"))
     by_id = {row["id"]: row for row in manifest["assets"]}
     installed = [row for row in review["assets"] if row["installed"] is True]
-    assert len(installed) == len(by_id) == 181
+    assert len(installed) == len(by_id) == 177
     for card in installed:
         row = by_id[card["id"]]
         assert card["length_m"] == row["length_m"]

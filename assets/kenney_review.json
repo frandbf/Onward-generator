@@ -3695,9 +3695,9 @@
       "api_url": "https://kenney.nl/assets/retro-urban-kit",
       "license": "CC0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "usable": true,
-      "installed": true,
-      "reason": "Grass tile, inner corner. Retro Urban Kit.",
+      "usable": false,
+      "installed": false,
+      "reason": "Grass tile, inner corner. Retro Urban Kit. Removed on 2026-10-29: a 3.2 m terrain tile, not a plant. The slope versions are 1.6 m tall with tilted normals and stood in a plaza as a large tilted triangle; the flat tile was removed with them.",
       "id": "kenney_urban_grass_corner_inner",
       "triangles_before": 2,
       "triangles_after": 2,
@@ -3705,7 +3705,6 @@
       "depth_m": 3.2,
       "height_m": 1.6,
       "error": null,
-      "normalized_file": "urban/grass-corner-inner.glb",
       "street_scale": 3.2
     },
     {
@@ -3717,9 +3716,9 @@
       "api_url": "https://kenney.nl/assets/retro-urban-kit",
       "license": "CC0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "usable": true,
-      "installed": true,
-      "reason": "Grass tile, corner. Retro Urban Kit.",
+      "usable": false,
+      "installed": false,
+      "reason": "Grass tile, corner. Retro Urban Kit. Removed on 2026-10-29: a 3.2 m terrain tile, not a plant. The slope versions are 1.6 m tall with tilted normals and stood in a plaza as a large tilted triangle; the flat tile was removed with them.",
       "id": "kenney_urban_grass_corner",
       "triangles_before": 2,
       "triangles_after": 2,
@@ -3727,7 +3726,6 @@
       "depth_m": 3.2,
       "height_m": 1.6,
       "error": null,
-      "normalized_file": "urban/grass-corner.glb",
       "street_scale": 3.2
     },
     {
@@ -3739,9 +3737,9 @@
       "api_url": "https://kenney.nl/assets/retro-urban-kit",
       "license": "CC0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "usable": true,
-      "installed": true,
-      "reason": "Grass tile on a rise. Retro Urban Kit.",
+      "usable": false,
+      "installed": false,
+      "reason": "Grass tile on a rise. Retro Urban Kit. Removed on 2026-10-29: a 3.2 m terrain tile, not a plant. The slope versions are 1.6 m tall with tilted normals and stood in a plaza as a large tilted triangle; the flat tile was removed with them.",
       "id": "kenney_urban_grass_hill",
       "triangles_before": 2,
       "triangles_after": 2,
@@ -3749,7 +3747,6 @@
       "depth_m": 3.2,
       "height_m": 1.6,
       "error": null,
-      "normalized_file": "urban/grass-hill.glb",
       "street_scale": 3.2
     },
     {
@@ -3761,9 +3758,9 @@
       "api_url": "https://kenney.nl/assets/retro-urban-kit",
       "license": "CC0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "usable": true,
-      "installed": true,
-      "reason": "Flat grass tile. Retro Urban Kit.",
+      "usable": false,
+      "installed": false,
+      "reason": "Flat grass tile. Retro Urban Kit. Removed on 2026-10-29: a 3.2 m terrain tile, not a plant. The slope versions are 1.6 m tall with tilted normals and stood in a plaza as a large tilted triangle; the flat tile was removed with them.",
       "id": "kenney_urban_grass",
       "triangles_before": 2,
       "triangles_after": 2,
@@ -3771,7 +3768,6 @@
       "depth_m": 3.2,
       "height_m": 0.0,
       "error": null,
-      "normalized_file": "urban/grass.glb",
       "street_scale": 3.2
     },
     {

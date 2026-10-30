@@ -2,7 +2,9 @@
 
 A GLB that reads but cannot be shown as the export draws it is rejected with a
 reason. The exported material is opaque and albedo only, so a material whose
-``alphaMode`` is not ``OPAQUE`` loses its transparency and is refused.
+``alphaMode`` is not ``OPAQUE`` loses its transparency and is refused. A
+vegetation mesh anchored ``flat`` that rises more than a few centimetres is a
+slope tile, not ground cover, and is refused too.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from PIL import Image
 from onward_generator.generation.gltf import images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh, transform
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
+from onward_generator.overgrow.constants import FLAT_VEGETATION_MAX_M
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
 from onward_generator.overgrow.normalize import rest_on_ground
 
@@ -100,6 +103,8 @@ def reject_reason(spec: AssetSpec, doc: dict, mesh: Mesh) -> str | None:
         mode = str(material.get("alphaMode") or "OPAQUE")
         if mode != "OPAQUE":
             return f"alpha_mode_{mode.lower()}"
+    if spec.category == "vegetation" and spec.anchor == "flat" and _span(mesh, 2) > FLAT_VEGETATION_MAX_M:
+        return "flat_vegetation_not_flat"
     return None
 
 

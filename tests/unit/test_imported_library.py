@@ -49,8 +49,8 @@ def test_kenney_review_describes_every_mesh_and_drops_buildings() -> None:
     assert len(rows) == 272
     installed = [row for row in rows if row["installed"] is True]
     removed = [row for row in rows if row["installed"] is False]
-    assert len(installed) == 181
-    assert len(removed) == 91
+    assert len(installed) == 177
+    assert len(removed) == 95
     catalog_ids = {row["id"] for row in catalogue["objects"]}
     assert catalog_ids == {row["id"] for row in installed}
     assert all(row["role"] != "building" for row in catalogue["objects"])
@@ -96,7 +96,7 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     assert {path.name for path in directories} == {"kenney", "normalized"}
     rows = installed_rows(REPO / "assets")
     ids = [row["id"] for row in rows]
-    assert len(ids) == len(set(ids)) == 230
+    assert len(ids) == len(set(ids)) == 226
     assert "covered_car" in ids
     assert "kenney_suburban_driveway_long" in ids
     assert choose_ids(

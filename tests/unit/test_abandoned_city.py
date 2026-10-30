@@ -409,3 +409,49 @@ def test_the_overgrow_report_lists_library_rejections(tmp_path: Path) -> None:
         {"asset_id": "cutout", "reason": "alpha_mode_mask"},
     ]
     assert not {"card", "cutout"} & set(report["placed_assets"])
+
+
+def _flat_vegetation_library(root: Path) -> None:
+    root.mkdir()
+    rows = []
+    for asset_id, height, category in (
+        ("moss_patch", 0.04, "vegetation"),
+        ("grass_slope", 1.6, "vegetation"),
+        ("just_over", 0.06, "vegetation"),
+        ("drain_plate", 0.3, "barriers"),
+    ):
+        mesh = box(-1.0, 1.0, -1.0, 1.0, 0.0, height)
+        (root / f"{asset_id}.glb").write_bytes(build_glb(
+            [Node("albedo", (Primitive(mesh, "albedo"),), {})],
+            {"albedo": Material((1, 1, 1, 1), 1)},
+            repeat_images={"albedo": grass_png()},
+        ))
+        rows.append({
+            "id": asset_id, "file": f"{asset_id}.glb", "category": category, "role": "plant",
+            "surfaces": ["sidewalk"], "anchor": "flat", "use": "test",
+        })
+    (root / "manifest.json").write_text(json.dumps({"assets": rows}), encoding="utf-8")
+
+
+def test_flat_vegetation_taller_than_five_centimetres_is_rejected(tmp_path: Path) -> None:
+    _flat_vegetation_library(tmp_path / "library")
+    props, rejects = read_library(tmp_path / "library")
+    assert [prop.spec.id for prop in props] == ["moss_patch", "drain_plate"]
+    assert [reject.as_dict() for reject in rejects] == [
+        {"asset_id": "grass_slope", "reason": "flat_vegetation_not_flat"},
+        {"asset_id": "just_over", "reason": "flat_vegetation_not_flat"},
+    ]
+
+
+def test_ground_vegetation_may_stand_tall() -> None:
+    from onward_generator.overgrow.catalog import AssetSpec as Spec
+    from onward_generator.overgrow.library import reject_reason
+
+    tall = box(-0.5, 0.5, -0.5, 0.5, 0.0, 2.0)
+    shrub = Spec("shrub", "vegetation", "bush", ("yard",), "ground", "test")
+    tile = Spec("tile", "vegetation", "plant", ("yard",), "flat", "test")
+    edge = box(-0.5, 0.5, -0.5, 0.5, 0.0, 0.05)
+    assert reject_reason(shrub, {"materials": [{}]}, tall) is None
+    assert reject_reason(tile, {"materials": [{}]}, tall) == "flat_vegetation_not_flat"
+    assert reject_reason(tile, {"materials": [{}]}, edge) is None
+    assert reject_reason(tile, {"materials": [{"alphaMode": "BLEND"}]}, edge) == "alpha_mode_blend"

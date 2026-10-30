@@ -16,3 +16,5 @@ VINE_WIDTH_M = 0.35
 VINE_HEIGHT_M = 3.2
 TARGET_ASSET_TRIS = 1800
 ALBEDO_PX = 512
+# A flat-anchored vegetation mesh taller than this is a slope tile, not ground cover.
+FLAT_VEGETATION_MAX_M = 0.05
