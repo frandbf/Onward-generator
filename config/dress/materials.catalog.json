@@ -127,7 +127,7 @@
       "compatible_surfaces": ["street"],
       "color_id": "carriageway",
       "textures": { "kind": "procedural", "paths": [], "note": "Bound in texture_plan.murcia_0.1 to asphalt_02. File paths appear only after materials apply." },
-      "technical": { "shader_hint": "opaque_lit", "tile_m": 4.0, "notes": "OSM surface=asphalt wins over inference. Not cobble." },
+      "technical": { "shader_hint": "opaque_lit", "tile_m": 10.0, "notes": "OSM surface=asphalt wins over inference. Not cobble. 10 m so one repeat is wider than a lane." },
       "performance_cost": "low",
       "source": "config/generation.default.json carriageway",
       "license": "project-generated",
