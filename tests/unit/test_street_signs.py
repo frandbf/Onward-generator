@@ -224,3 +224,29 @@ def test_the_wall_tree_picks_the_same_wall_as_trying_every_wall() -> None:
     for name in ("Calle Mayor", "Calle Nueva"):
         at_crossing = _sign_for(name, np.array([3.0, 2.0]), streets, walls, tree, set())
         assert at_crossing is not None and np.array_equal(chosen[name].position, at_crossing.position)
+
+
+def test_no_plate_goes_outside_the_playable_core(tmp_path: Path) -> None:
+    """The block moved 40 m east: with a 50 m core the east building (x 54–70 m) is past the edge."""
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    document = json.loads(scene.read_text(encoding="utf-8"))
+
+    def shift(coords: list) -> list:  # type: ignore[type-arg]
+        if isinstance(coords[0], (int, float)):
+            return [coords[0] + 40, *coords[1:]]
+        return [shift(part) for part in coords]
+
+    for feature in document["features"]:
+        feature["geometry"]["coordinates"] = shift(feature["geometry"]["coordinates"])
+    scene.write_text(json.dumps(document), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    every = place_signs(base, scene, tmp_path / "all")["signs"]
+    assert {row["wall_feature"] for row in every} >= {"osm-way-east"}
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    (base / "scene_detail.json").write_text(json.dumps({**manifest, "core": {"half_side_m": 50.0}}), encoding="utf-8")
+    kept = place_signs(base, scene, tmp_path / "core")["signs"]
+    assert kept and all(row["position_m"][0] <= 50.0 for row in kept)
+    assert "osm-way-east" not in {row["wall_feature"] for row in kept}
+    assert any(row["position_m"][0] > 50.0 for row in every)

@@ -234,8 +234,17 @@ def _detail(out: Path) -> StageReport:
     details = (
         ("openings", count_items(counts["openings"])),
         ("urban", count_items(counts["urban_elements"], rename=_urban)),
+        ("tiers", _tiers(counts.get("tiers") or {})),
     )
     return StageReport(summary, details=details, alerts=_severity(report))
+
+
+def _tiers(tiers: Mapping[str, Any]) -> tuple[str, ...]:
+    """``core 120 bldg 180 000 tris``, then the scenic ring (ADR-017). Empty without a core."""
+    return tuple(
+        f"{name} {group(tiers[name]['buildings'])} bldg {group(tiers[name]['visual_triangles'])} tris"
+        for name in ("core", "scenic") if name in tiers
+    )
 
 
 def _dress(out: Path) -> StageReport:
@@ -284,7 +293,8 @@ def _fit(out: Path) -> StageReport:
 
 def _bounds(out: Path) -> StageReport:
     wall = _read(out / "bounds_report.json")["wall"]
-    return StageReport(f"wall {wall['height_m']:g} m  {group(wall['triangles'])} tris")
+    core = f"  core {wall['core_half_side_m']:g} m" if wall.get("core_half_side_m") else ""
+    return StageReport(f"wall {wall['height_m']:g} m  {group(wall['triangles'])} tris{core}")
 
 
 def _layout(out: Path) -> StageReport:
@@ -306,7 +316,9 @@ def _export(out: Path) -> StageReport:
     # Every package carries the unverified-adapter warning until the headset checklist passes.
     warnings = [text for text in manifest.get("warnings") or [] if "[export_adapter_unverified]" not in text]
     alerts = tuple(Alert("warning", str(text), 1) for text in warnings)
-    return StageReport(str(manifest["package_id"]), alerts=alerts)
+    tiers = manifest.get("tiers")
+    draws = f"  draws {group(tiers['draws'])} at {tiers['cell_m']:g} m" if tiers else ""
+    return StageReport(f"{manifest['package_id']}{draws}", alerts=alerts)
 
 
 _STAGES: dict[str, Callable[[Path], StageReport]] = {

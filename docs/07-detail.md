@@ -162,6 +162,19 @@ Windows, shopfronts, and balcony doors below the accessible ceiling keep a hole 
 - An element is placed only when its footprint fits on free walkable ground and does not touch another element. A missed observed element warns `urban_element_not_placed`. A missed generated lamp records the same code as info.
 - Each type is one shared prototype mesh, instanced with a glTF `matrix`, plus a collision box.
 
+### Playable core and scenic ring
+
+`--core-radius-m` (ADR-017; `run` and the `next:` line from `generate` read `core_radius_m` from `map.json`) sets a square of that half-side around the map centre. Without it every building is detailed as above.
+
+- **Tier.** A building whose footprint shares area with the core is `core`; the rest are `scenic`. A footprint that only touches the edge is scenic. Each building record gets `tier`; so do its interior, its landmark towers and its `building:part` volumes, which take the tier of their building.
+- **Core.** Everything in this document applies, with two differences: the interior queue holds core buildings only, so the quota and the triangle budgets go to buildings a player can reach, and `counts.facade_uses` and `counts.wall_materials` count core buildings only.
+- **Scenic shell.** The footprint extruded from 0 to the building height: one wall per edge and a flat roof cap, no base. No openings, doors, balconies, parapets, hip roofs, towers, interiors or shops, so `signs` draws no shop sign or vinyl for it; `signs` also hangs no street plate on a wall whose midpoint is outside the core. No collider (`collider.source: none_scenic`). The wall is one of `scenic_wall_light`, `scenic_wall_warm` and `scenic_wall_ochre`, by `sha256(seed, building, "scenic")`; the roof is `roof_flat_grey`. The record keeps the facade use and says `facade.template: scenic_shell`, `ground_floor: none`, `door: none`. A landmark keeps `needs_custom_model: true`. A scenic `building:part` keeps its visual and loses its collider.
+- **Street elements** whose position is outside the core are dropped, observed or generated; `counts.tiers.scenic.urban_elements_dropped` counts them.
+- **Ground colliders** (`collider/walkable`, `collider/carriageway`, `collider/walkable_crossing`) are rebuilt as closed slabs over the part of their polygon inside the core, with `clipped_to_core: true`. The visual ground, curbs and markings stay over the whole site.
+- **Report.** `scene_detail.json` gets `core: {half_side_m, buildings: {core, scenic}}` (`null` without a core). `counts.tiers` gives, per tier, `buildings`, `visual_triangles` and `collision_triangles` of the building objects (shells, interiors, towers, parts). `run` prints them on the `detail` line.
+
+Measured on Madrid (40.40657, −3.719187) with Catastro: see [09-perf.md](09-perf.md#playable-core).
+
 ### Collision
 
 `scene_collision.glb` is a separate file, one material `collider`:

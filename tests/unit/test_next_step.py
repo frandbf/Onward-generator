@@ -14,6 +14,8 @@ from onward_generator.next_step import (
     StageCommand,
     cadastre_split_command,
     catastro_command,
+    core_radius,
+    detail_command,
     dress_command,
     emit,
     export_command,
@@ -123,3 +125,27 @@ def test_catastro_commands_download_then_split_beside_geo(tmp_path: Path) -> Non
     assert heights_command(split_scene, overrides).argv == (
         "heights", "--scene", str(split_scene), "--overrides", str(overrides), "--out", str(tmp_path / "heights"),
     )
+
+
+def test_detail_command_carries_the_maps_playable_core(tmp_path: Path) -> None:
+    root = tmp_path / "madrid"
+    create_map(root, map_id="madrid", name="Madrid", latitude=40.40657, longitude=-3.719187, radius_m=300, core_radius_m=120)
+    scene = root / "data" / "processed" / "cadastre" / "geo_scene.json"
+    heights = root / "data" / "processed" / "heights" / "heights.json"
+    argv = list(detail_command(scene, heights, root / "data" / "processed" / "scene3d").argv)
+    assert argv[-2:] == ["--core-radius-m", "120"]
+    assert core_radius(scene) == 120.0
+
+
+def test_detail_command_without_a_core_has_no_core_flag(tmp_path: Path) -> None:
+    root = tmp_path / "small"
+    create_map(root, map_id="small", name="Small", latitude=40.40657, longitude=-3.719187, radius_m=120)
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    assert core_radius(scene) is None
+    assert "--core-radius-m" not in detail_command(scene, scene, root).argv
+    # An older map.json without the key, and a scene outside any map, have no core either.
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    del document["core_radius_m"]
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert core_radius(scene) is None
+    assert core_radius(tmp_path / "elsewhere" / "geo_scene.json") is None

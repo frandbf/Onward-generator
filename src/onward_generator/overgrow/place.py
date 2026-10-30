@@ -56,7 +56,8 @@ from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
-from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, zone_from_file
+from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
+from onward_generator.tiers import core_of
 
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 SKIP_HIGHWAYS = frozenset({
@@ -121,6 +122,7 @@ def overgrow(
 
     years = profile_for(profile)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
+    area = within_core(area, core_of(manifest))
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
     props, library_rejects = read_library(library)
     chosen: list[str] | None = None

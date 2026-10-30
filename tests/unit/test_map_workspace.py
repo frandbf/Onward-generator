@@ -25,7 +25,9 @@ def test_create_writes_an_isolated_square_around_the_centre(tmp_path: Path) -> N
         longitude=MURCIA_CENTER_LON,
         radius_m=200,
         seed=7,
+        core_radius_m=0,
     )
+    assert document["core_radius_m"] is None
     assert document["name"] == "Plaza de prueba"
     assert document["seed"] == 7
     assert document["panoramax"] is False
@@ -137,6 +139,15 @@ def test_cli_create_and_show(tmp_path: Path, capsys: pytest.CaptureFixture[str],
     assert "--crs EPSG:25830" in shown
     assert "sha256 abc" in shown
     assert "next: .venv/bin/python -m onward_generator geo " in shown
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["core_radius_m"] == 150.0
+    assert main(["map", "create", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", "--radius-m", "300",
+                 "--core-radius-m", "120"]) == 0
+    assert json.loads((tmp_path / "maps" / "lorca" / "map.json").read_text(encoding="utf-8"))["core_radius_m"] == 120.0
+    capsys.readouterr()
+    with pytest.raises(SystemExit):
+        main(["map", "create", "--help"])
+    assert ("--core-radius-m CORE_RADIUS_M half-side of the playable core square, metres (default 150; 0 or at least "
+            "the radius plays the whole map; ADR-017)") in " ".join(capsys.readouterr().out.split())
 
 
 def _polygon(ring: tuple[tuple[float, float], ...]):
@@ -174,3 +185,35 @@ def test_catastro_is_on_for_large_maps_and_other_utm_zones(tmp_path: Path) -> No
     create_map(santiago, map_id="santiago", name="Santiago", latitude=42.8806, longitude=-8.5446, radius_m=400)
     document = json.loads((santiago / "map.json").read_text(encoding="utf-8"))
     assert document["crs"] == "EPSG:32629" and catastro_enabled(santiago) is True
+
+
+def test_a_larger_map_gets_a_playable_core_and_fog_from_its_wall(tmp_path: Path) -> None:
+    document = create_map(tmp_path / "grande", map_id="grande", name="Grande", latitude=MURCIA_CENTER_LAT,
+                          longitude=MURCIA_CENTER_LON, radius_m=300)
+    assert document["core_radius_m"] == 150.0
+    build = json.loads((tmp_path / "grande" / "config" / "export.json").read_text(encoding="utf-8"))["build"]
+    # The wall stands on the core edge (ADR-017), so the fog starts there.
+    assert (build["fog_start_m"], build["fog_end_m"]) == (150.0, 750.0)
+
+
+@pytest.mark.parametrize(("radius", "core", "stored"), [
+    (300, 50, 50.0),
+    (300, 299.5, 299.5),
+    (300, 300, None),     # a core at the radius is the whole map
+    (300, 400, None),
+    (150, 150, None),     # the default core on a 150 m map
+    (300, 0, None),
+])
+def test_core_radius_is_stored_only_inside_the_map(tmp_path: Path, radius: float, core: float, stored: float | None) -> None:
+    document = create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                          radius_m=radius, core_radius_m=core)
+    assert document["core_radius_m"] == stored
+
+
+@pytest.mark.parametrize(("core", "message"), [(49.9, "^core_radius_m must be 0 or at least 50$"), (-10, "0 or at least 50"),
+                                               (True, "^core_radius_m must be a number$"), ("150", "must be a number")])
+def test_core_radius_refuses_a_bad_value(tmp_path: Path, core: object, message: str) -> None:
+    with pytest.raises(MapError, match=message):
+        create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   radius_m=300, core_radius_m=core)  # type: ignore[arg-type]
+    assert not (tmp_path / "m").exists()

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from shapely import Point, box
 from shapely.geometry import Polygon, shape
+from shapely.geometry.base import BaseGeometry
 
 from onward_generator.overgrow.constants import BLOCK_HALF_M
 
@@ -69,3 +70,13 @@ def zone_from_file(path: str | Path) -> Zone:
     if isinstance(raw, dict) and raw.get("type") == "Polygon":
         return zone_from_polygon(shape(raw))
     raise ZoneError(f"{path}: expected a Polygon in local metres")
+
+
+def within_core(zone: Zone, core: BaseGeometry | None) -> Zone:
+    """The zone cut to the playable core (ADR-017). A zone already inside it, or a map without one, is kept as is."""
+    if core is None or core.covers(zone.polygon):
+        return zone
+    clipped = zone.polygon.intersection(core)
+    if not isinstance(clipped, Polygon) or clipped.is_empty:
+        raise ZoneError("the zone does not overlap the playable core in one piece")
+    return Zone(zone.kind, clipped)

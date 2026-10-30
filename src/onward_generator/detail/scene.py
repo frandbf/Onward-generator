@@ -61,8 +61,9 @@ from onward_generator.detail.urban import Element, Rejected, classify_poi, place
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
-from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene
+from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
@@ -99,6 +100,7 @@ class DetailedScene:
     config: DetailConfig
     inputs: dict[str, Any]
     stats: dict[str, Any] = field(default_factory=dict)
+    core: dict[str, Any] | None = None  # ADR-017: half-side and building counts, None without a core
 
     @property
     def critical(self) -> list[Issue]:
@@ -148,6 +150,7 @@ class DetailedScene:
             "attribution": self.base.attribution,
             "frame": self.base.manifest()["frame"],
             "files": {"visual": "scene_visual.glb", "collision": "scene_collision.glb"},
+            "core": self.core,
             "prototypes": {k: {"triangles": p.triangle_count, "materials": [m for m, _ in p.parts],
                                "collider_triangles": p.collider.triangle_count if p.collider is not None else 0}
                            for k, p in sorted(self.prototypes.items())},
@@ -474,6 +477,58 @@ def _building_parts(
     return objects, issues
 
 
+def _scenic_building(o: Any, geom: BaseGeometry, landmark: bool, use: FacadeUse, cfg: DetailConfig) -> DetailObject:
+    """A scenic-tier building (ADR-017): its footprint extruded to its height, walls and a flat roof cap, no collider.
+
+    No openings, doors, parapets, hip roofs, towers, interiors or shops. The wall is one of
+    the shared scenic materials and the roof is ``SCENIC_ROOF``, so a ring cell is a few draws.
+    """
+    bid = o.record["source_ids"][0]
+    height = float(o.record["height"]["height_m"])
+    wall = scenic_wall(cfg.seed, bid)
+    visual = [Primitive(walls(geom, 0.0, height), wall), Primitive(cap(geom, height), SCENIC_ROOF)]
+    roof = {"type": "flat", "material": SCENIC_ROOF, "origin": "generated", "roof_shape": "flat"}
+    record = {
+        # The phase-03 checks describe the phase-03 mesh; every other key below replaces its phase-03 value.
+        **{k: v for k, v in o.record.items() if k != "checks"},
+        "tier": SCENIC,
+        "generation": {"method": "phase03_volume + scenic shell", "phase03": o.record.get("generation"),
+                       "template_config_version": cfg.version, "seed": cfg.seed},
+        "facade": {
+            "template": "scenic_shell",
+            "representation": "scenic_shell",
+            "representative_of_real_facade": False,
+            "attribute_origin": "generated",
+            "note": FIDELITY_NOTE,
+            "needs_custom_model": landmark,
+            "ground_floor": "none",
+            "openings": {},
+            "shops": [],
+            "materials": {"wall": wall, "wall_origin": "generated", "roof": SCENIC_ROOF, "roof_origin": "generated"},
+            "use": use.to_record(),
+            "door": "none",
+        },
+        "roof": roof,
+        "interior": False,
+        "materials": [p.material for p in visual],
+        "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
+        "collider": {"source": "none_scenic", "parts": 0, "triangles": 0, "balconies": 0, "glass_panes": 0},
+    }
+    return DetailObject(o.id, "building", visual, [], record)
+
+
+def _tier_counts(objects: list[DetailObject], dropped_elements: int) -> dict[str, Any]:
+    """Buildings, visual and collision triangles of the objects that carry a tier (ADR-017)."""
+    counts: dict[str, Any] = {t: {"buildings": 0, "visual_triangles": 0, "collision_triangles": 0} for t in (CORE, SCENIC)}
+    for x in (o for o in objects if "tier" in o.record):
+        entry = counts[x.record["tier"]]
+        entry["buildings"] += x.type == "building"
+        entry["visual_triangles"] += sum(p.mesh.triangle_count for p in x.visual)
+        entry["collision_triangles"] += sum(m.triangle_count for m in (*x.colliders, *x.glass_colliders))
+    counts[SCENIC]["urban_elements_dropped"] = dropped_elements
+    return counts
+
+
 ExtraUrban = Callable[
     [BaseGeometry, BaseGeometry, Mapping[str, Prototype], DetailConfig, list[Element]],
     tuple[list[Element], list[Rejected]],
@@ -489,7 +544,11 @@ def detail_scene(
     *,
     prototypes: Mapping[str, Prototype] | None = None,
     extra_urban: ExtraUrban | None = None,
+    core_half_side_m: float | None = None,
 ) -> DetailedScene:
+    """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
+    outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge."""
+    core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
     scene = json.loads(Path(scene_path).expanduser().read_text(encoding="utf-8"))
     height_of = {b["building_id"]: b for b in heights.get("buildings", [])}
@@ -504,7 +563,8 @@ def detail_scene(
     evidence = _shop_evidence(features, footprints, cfg)
     facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
 
-    candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids]
+    tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
+    candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids if tier_of[bid] == CORE]
     interior_queue = _select_interiors(candidates, cfg, issues)
     interiors_left = interior_quota(cfg)
 
@@ -538,6 +598,10 @@ def detail_scene(
         bid = o.record["source_ids"][0]
         geom = footprints[bid]
         h = height_of[bid]
+        if tier_of[bid] == SCENIC:
+            objects.append(_scenic_building(o, geom, bool(h.get("landmark")), facade_walls[bid][0], cfg))
+            emitted[o.id] = (objects[first_object:], issues[first_issue:])
+            continue
         height = float(o.record["height"]["height_m"])
         landmark = bool(h.get("landmark"))
         template = cfg.template_for(str(h.get("category")), landmark)
@@ -742,6 +806,9 @@ def detail_scene(
             issues.extend(tower_issues)
             for part in towers:
                 objects.append(DetailObject(part.id, "landmark_part", list(part.visual), [part.collider], part.record))
+        if core is not None:
+            for x in objects[first_object:]:
+                x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
     objects = [x for o in building_objs for x in emitted[o.id][0]]
@@ -752,13 +819,23 @@ def detail_scene(
 
     part_objects, part_issues = _building_parts(features, footprints, cfg)
     issues.extend(part_issues)
+    if core is not None:
+        for piece in part_objects:
+            piece.record["tier"] = tier_of[piece.record["source_ids"][0]]
+            if piece.record["tier"] == SCENIC:
+                piece.colliders = []
     objects.extend(part_objects)
 
-    # Surfaces, curbs and ground slabs are reused from phase 03 unchanged.
+    # Surfaces, curbs and ground slabs are reused from phase 03 unchanged. With a core,
+    # the ground slabs are rebuilt over the part of the ground inside it (ADR-017).
     for o in base.objects:
-        if o.type == "building":
+        if o.type == "building" or (core is not None and o.type == "ground_collider"):
             continue
         objects.append(DetailObject(o.id, o.type, list(o.visual), [o.collider] if o.collider is not None else [], dict(o.record)))
+    if core is not None:
+        slabs, slab_issues = ground_slabs(base.partition, base.config, clip=core)
+        issues.extend(slab_issues)
+        objects.extend(DetailObject(o.id, o.type, [], [o.collider], dict(o.record)) for o in slabs if o.collider is not None)
 
     prototypes = dict(prototypes or urban_prototypes())
     walkable = [s.geometry for c, s in base.partition.surfaces.items() if c not in (SurfaceClass.CARRIAGEWAY, SurfaceClass.WATER)]
@@ -769,6 +846,9 @@ def detail_scene(
         extra, extra_rejected = extra_urban(free, buildings_union, prototypes, cfg, elements)
         elements.extend(extra)
         rejected.extend(extra_rejected)
+    placed = len(elements)
+    if core is not None:
+        elements = [e for e in elements if core.covers(Point(float(e.matrix[0, 3]), float(e.matrix[1, 3])))]
     for r in rejected:
         severity = "info" if "#lamp" in r.id else "warning"
         issues.append(Issue("urban_element_not_placed", severity, r.id, f"{r.kind}: {r.reason}"))
@@ -813,8 +893,13 @@ def detail_scene(
         "dropped": dropped_lights,
     }
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
-    detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in facade_walls.values()).items()))
-    detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in facade_walls.values()).items()))
+    shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
+    detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
+    detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))
+    if core is not None:
+        tiers = Counter(tier_of.values())
+        detailed.core = {"half_side_m": core_half_side_m, "buildings": {CORE: tiers[CORE], SCENIC: tiers[SCENIC]}}
+        detailed.stats["tiers"] = _tier_counts(objects, placed - len(elements))
     _budget(detailed)
     return detailed
 

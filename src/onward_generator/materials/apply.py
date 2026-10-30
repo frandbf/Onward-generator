@@ -41,6 +41,7 @@ from onward_generator.materials.polyhaven import (
     ensure_diffuse_1k,
 )
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
+from onward_generator.tiers import SCENIC_WALLS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
@@ -83,6 +84,8 @@ INTERIOR_PHOTO_SLOTS: dict[str, tuple[str, ...]] = {
 # like the slot it borrows from.
 SHARED_FACADE_SLOTS: dict[str, tuple[str, ...]] = {
     "plaster_salmon": ("plain_facades", "ochre_facades", "historic_facades"),
+    # The scenic shells outside the playable core (ADR-017).
+    **{name: ("plain_facades", "historic_facades", "ochre_facades") for name in sorted(SCENIC_WALLS)},
 }
 
 

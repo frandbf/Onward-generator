@@ -214,6 +214,7 @@ def test_detail_breaks_down_openings_and_urban_elements(tmp_path: Path) -> None:
     assert report.details == (
         ("openings", ("window 435", "balcony 231", "door 3")),
         ("urban", ("street lamp 26", "tree 24 obs", "bench 9", "kiosk 1")),
+        ("tiers", ()),
     )
     assert report.alerts == (Alert("warning", "warning 1 (late 1)", 1),)
 
@@ -253,6 +254,12 @@ def test_panoramax_signs_fit_bounds(tmp_path: Path) -> None:
     assert summarize("fit", ["--out", str(fit)]) == StageReport("checked 58")
     _write(tmp_path / "playable" / "bounds_report.json", {"wall": {"height_m": 12.0, "triangles": 1032}})
     assert summarize("bounds", ["--out", str(tmp_path / "playable")]) == StageReport("wall 12 m  1 032 tris")
+    _write(tmp_path / "playable" / "bounds_report.json",
+           {"wall": {"height_m": 12.0, "triangles": 32, "core_half_side_m": 150.0}})
+    assert summarize("bounds", ["--out", str(tmp_path / "playable")]) == StageReport("wall 12 m  32 tris  core 150 m")
+    _write(tmp_path / "playable" / "bounds_report.json",
+           {"wall": {"height_m": 12.0, "triangles": 32, "core_half_side_m": None}})
+    assert summarize("bounds", ["--out", str(tmp_path / "playable")]) == StageReport("wall 12 m  32 tris")
 
 
 def test_overgrow(tmp_path: Path) -> None:
@@ -287,6 +294,23 @@ def test_export_hides_the_standing_unverified_adapter_warning(tmp_path: Path) ->
     )
     _write(out / "onward_export.json", {"package_id": "p"})
     assert summarize("export", ["--out", str(out)]) == StageReport("p")
+    _write(out / "onward_export.json", {"package_id": "p", "tiers": None})
+    assert summarize("export", ["--out", str(out)]) == StageReport("p")
+    _write(out / "onward_export.json", {"package_id": "p", "tiers": {"draws": 1482, "cell_m": 100.0}})
+    assert summarize("export", ["--out", str(out)]) == StageReport("p  draws 1 482 at 100 m")
+
+
+def test_detail_prints_the_tiers_of_a_map_with_a_core(tmp_path: Path) -> None:
+    out = tmp_path / "scene_detail"
+    _write(out / "detail_report.json", {
+        "counts": {
+            "visual_triangles": 166694, "materials": 30, "visual_nodes": 678, "openings": {}, "urban_elements": {},
+            "tiers": {"core": {"buildings": 108, "visual_triangles": 127033},
+                      "scenic": {"buildings": 446, "visual_triangles": 19641, "urban_elements_dropped": 3}},
+        },
+    } | _severity(0, 0))
+    report = summarize("detail", ["--out", str(out)])
+    assert report.details[-1] == ("tiers", ("core 108 bldg 127 033 tris", "scenic 446 bldg 19 641 tris"))
 
 
 @pytest.mark.parametrize("argv", [["geo"], ["geo", "--out"]])

@@ -52,6 +52,10 @@ The phase-03 ground is `collider/walkable`. It covers the site minus the carriag
 
 The return the rifleman walks is the neighbour list in `AI_NavBake`. It is not the Points list and it is not the Loops flag by itself.
 
+### Playable core
+
+On a map with a playable core (ADR-017) the ground colliders (`collider/walkable`, `collider/carriageway`, `collider/walkable_crossing`) end at the core edge and the perimeter wall stands on it. The navmesh, its nodes and the outdoor light probes (laid on the navmesh bounds) therefore cover the core only, with no change in the adapter. `perf layout` keeps every spawn, objective, route and pickup inside the core within its wall. `layout.json` gets `navigation: {walkable_area_m2, span_m, node_spacing_estimate_m}`: the adapter's first spacing, `max(1, span / 400, sqrt(area / 320))`, computed on the 2D navmesh islands. It is an estimate; the adapter measures the baked mesh and raises the spacing while the walk is deeper than 400.
+
 ### Hunt routes
 
 `perf layout --playable` draws the patrols (`hunt_routes` in `perf/layout.py`):

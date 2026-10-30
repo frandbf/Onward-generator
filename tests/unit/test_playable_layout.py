@@ -33,8 +33,10 @@ from onward_generator.perf.layout import (
     free_ground,
     hunt_routes,
     nav_islands,
+    navigation_estimate,
     patrol_seeds,
     patrol_spawns,
+    playable_area,
     scatter_points,
     spread_routes,
     yaw_toward,
@@ -446,3 +448,55 @@ def test_spread_routes_returns_nothing_for_no_room() -> None:
     routes = [{"points": [{"x": x, "y": 0.0}, {"x": x, "y": 14.0}]} for x in range(0, 80, 8)]
     assert spread_routes(routes, 0, (0.0, 0.0)) == []
     assert spread_routes(routes, 1, (0.0, 0.0)) == [routes[0]]
+
+
+def test_the_playable_area_is_the_core_inside_its_wall() -> None:
+    assert playable_area({"core": None}) is None
+    assert playable_area({}) is None
+    assert playable_area({"core": {"half_side_m": 60.0}}).bounds == (-59.6, -59.6, 59.6, 59.6)
+    thick = playable_area({"core": {"half_side_m": 60.0}, "envelope": {"thickness_m": 1.0}})
+    assert thick.bounds == (-59.0, -59.0, 59.0, 59.0)
+    assert thick.area == pytest.approx(118.0 ** 2)  # mitred corners: still a square
+
+
+def test_free_ground_and_islands_stay_inside_the_core() -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-210, 0), (210, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
+    base = _base(street, partition=partition)
+    inside = box(-60, -60, 60, 60)
+    islands = nav_islands(base, inside)  # type: ignore[arg-type]
+    assert len(islands) == 1
+    assert [round(v, 6) for v in islands[0].bounds] == [-60 + NAV_AGENT_RADIUS_M] * 2 + [60 - NAV_AGENT_RADIUS_M] * 2
+
+
+def test_navigation_estimate_follows_the_adapter_rule() -> None:
+    # 320.37 x 30.03 m away from the origin: sqrt(9620.71 / 320) = 5.483 beats the span over 400 (0.8).
+    assert navigation_estimate([box(100, 200, 420.37, 230.03)]) == {
+        "walkable_area_m2": 9620.7, "span_m": 320.4, "node_spacing_estimate_m": 5.48}
+    assert navigation_estimate([box(200, 100, 230.03, 420.37)])["span_m"] == 320.4
+    # A 2 400 m strip, 2 m wide: span / 400 = 6 beats sqrt(4800 / 320) = 3.87.
+    assert navigation_estimate([box(0, 0, 2400, 2)])["node_spacing_estimate_m"] == 6.0
+    # Two islands: their areas add, their span is the union's.
+    two = navigation_estimate([box(0, 0, 10, 10), box(90, 0, 100, 10)])
+    assert two == {"walkable_area_m2": 200.0, "span_m": 100.0, "node_spacing_estimate_m": 1.0}
+    assert navigation_estimate([box(0, 0, 300, 300)])["node_spacing_estimate_m"] == pytest.approx(16.77, abs=0.01)
+    # The span is the longer side.
+    assert navigation_estimate([box(0, 0, 2, 2400)])["span_m"] == 2400.0
+    # Never below 1 m, even for a tiny island.
+    assert navigation_estimate([box(0, 0, 0.5, 0.5)])["node_spacing_estimate_m"] == 1.0
+
+
+def test_spawns_stay_in_the_core_of_a_larger_site() -> None:
+    """The plaza runs from the core to 400 m east; without the core the teams would stand near its middle."""
+    from onward_generator.perf.layout import gameplay_layout
+
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, -200), (-60, -190)]), 2.0, "config_default")
+    partition = build_partition(box(-60, -60, 400, 60), [], [street], [], config)
+    base = _base(street, partition=partition)
+    doc = gameplay_layout(base, {"objects": [], "core": {"half_side_m": 60.0}})  # type: ignore[arg-type]
+    for team in ("attackers", "defenders"):
+        assert all(abs(p["x"]) < 60 and abs(p["y"]) < 60 for p in doc[team]["points_m"])
+    wide = gameplay_layout(base, {"objects": []})  # type: ignore[arg-type]
+    assert wide["attackers"]["centre_m"][0] > 60

@@ -505,38 +505,9 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
             )
         )
 
-    walkable = site.difference(carriageway.geometry) if carriageway is not None else site
-    thickness = config.ground_thickness_m
-    # Crossings are their own slab at road level. The adapter bakes every
-    # collider named walkable, so they join the blocks on both kerbs (ADR-015).
-    for cid, geom, top in (
-        ("collider/walkable", walkable, 0.0),
-        ("collider/carriageway", carriageway_slab(partition, config.precision_m), -depth),
-        ("collider/walkable_crossing", partition.crossings, -depth),
-    ):
-        if geom.is_empty:
-            continue
-        # A zero-area spike is stored as a hole and would be extruded twice.
-        # A hole that only touches the outer ring shares one vertex; open that
-        # point so the slab weld does not count the corner twice.
-        geom, dropped_holes = drop_degenerate_holes(geom)
-        if dropped_holes:
-            issues.append(Issue("degenerate_hole_dropped", "info", cid, f"{dropped_holes} holes below 0.0001 m² removed before the slab"))
-        geom = open_point_contacts(geom)
-        mesh = prism(geom, -thickness, top, bottom=True)
-        defects = closed_manifold_defects(mesh)
-        expected = geom.area * (top + thickness)
-        volume = signed_volume(mesh)
-        if defects or abs(volume - expected) > 0.01 * expected:
-            issues.append(Issue("collider_not_closed", "critical", cid, f"{defects} defects; volume {volume:.1f} vs {expected:.1f} m³"))
-        objects.append(
-            SceneObject(
-                cid, "ground_collider", [], mesh,
-                {"id": cid, "type": "ground_collider", "top_z_m": top, "bottom_z_m": -thickness, "area_m2": round(geom.area, 3),
-                 "generation": {"method": "closed_slab"}, "collider": {"triangles": mesh.triangle_count, "closed": defects == 0},
-                 "checks": {"manifold_defects": defects}},
-            )
-        )
+    slabs, slab_issues = ground_slabs(partition, config)
+    objects.extend(slabs)
+    issues.extend(slab_issues)
 
     overlap = partition.overlap_area()
     gap = partition.gap_area()
@@ -585,3 +556,49 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
         "frame": dict(frame),
     }
     return GeneratedScene(objects, issues, partition, inputs, attribution, config, stats, ways)
+
+
+def ground_slabs(partition: Partition, config: GenerationConfig, clip: BaseGeometry | None = None) -> tuple[list[SceneObject], list[Issue]]:
+    """The closed ground colliders: walkable ground, carriageway and crossings.
+
+    Crossings are their own slab at road level. The adapter bakes every
+    collider named walkable, so they join the blocks on both kerbs (ADR-015).
+    ``clip`` keeps only the part of each slab inside it, the playable core
+    (ADR-017); its record then says ``clipped_to_core``.
+    """
+    depth = config.carriageway_depth_m
+    carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
+    site = partition.site
+    walkable = site.difference(carriageway.geometry) if carriageway is not None else site
+    thickness = config.ground_thickness_m
+    objects: list[SceneObject] = []
+    issues: list[Issue] = []
+    for cid, geom, top in (
+        ("collider/walkable", walkable, 0.0),
+        ("collider/carriageway", carriageway_slab(partition, config.precision_m), -depth),
+        ("collider/walkable_crossing", partition.crossings, -depth),
+    ):
+        if clip is not None:
+            geom = MultiPolygon(polygons_of(geom.intersection(clip)))
+        if geom.is_empty:
+            continue
+        # A zero-area spike is stored as a hole and would be extruded twice.
+        # A hole that only touches the outer ring shares one vertex; open that
+        # point so the slab weld does not count the corner twice.
+        geom, dropped_holes = drop_degenerate_holes(geom)
+        if dropped_holes:
+            issues.append(Issue("degenerate_hole_dropped", "info", cid, f"{dropped_holes} holes below 0.0001 m² removed before the slab"))
+        geom = open_point_contacts(geom)
+        mesh = prism(geom, -thickness, top, bottom=True)
+        defects = closed_manifold_defects(mesh)
+        expected = geom.area * (top + thickness)
+        volume = signed_volume(mesh)
+        if defects or abs(volume - expected) > 0.01 * expected:
+            issues.append(Issue("collider_not_closed", "critical", cid, f"{defects} defects; volume {volume:.1f} vs {expected:.1f} m³"))
+        record = {"id": cid, "type": "ground_collider", "top_z_m": top, "bottom_z_m": -thickness, "area_m2": round(geom.area, 3),
+                  "generation": {"method": "closed_slab"}, "collider": {"triangles": mesh.triangle_count, "closed": defects == 0},
+                  "checks": {"manifold_defects": defects}}
+        if clip is not None:
+            record["clipped_to_core"] = True
+        objects.append(SceneObject(cid, "ground_collider", [], mesh, record))
+    return objects, issues

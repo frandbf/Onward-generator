@@ -533,3 +533,14 @@ def test_plaster_tile_m_is_two_metres() -> None:
     catalog = load_catalog()
     assert catalog.get("historic_plaster_cream").technical["tile_m"] == 2.0
     assert catalog.get("plaster_ochre_wall").technical["tile_m"] == 2.0
+
+
+def test_scenic_walls_share_a_plaster_photograph(tmp_path: Path) -> None:
+    plain, ochre = _record(tmp_path, "plain", (180, 178, 170)), _record(tmp_path, "ochre", (200, 150, 60))
+    tiles: dict[str, tuple[Any, str]] = {}
+    shared = share_facade_photos({"plain_facades": plain, "ochre_facades": ochre}, {"scenic_wall_ochre", "scenic_wall_light"}, tiles)
+    assert [row["color_id"] for row in shared] == ["scenic_wall_light", "scenic_wall_ochre"]
+    assert {row["slot"] for row in shared} == {"plain_facades"}
+    assert {mode for _rgb, mode in tiles.values()} == {"greyscale_modulation"}
+    only_ochre: dict[str, tuple[Any, str]] = {}
+    assert share_facade_photos({"ochre_facades": ochre}, {"scenic_wall_warm"}, only_ochre)[0]["slot"] == "ochre_facades"

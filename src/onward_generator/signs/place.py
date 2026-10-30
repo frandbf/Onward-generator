@@ -29,6 +29,7 @@ from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.signs.plaque import plaque_png
 from onward_generator.signs.shop import shop_signs
+from onward_generator.tiers import core_of
 
 BUILDING_NODE = "building/"  # visual node name prefix; the rest is the building id
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
@@ -117,7 +118,10 @@ def place_signs(
         raise SignsError(str(exc)) from exc
 
     streets = _streets(geo.get("features") or [])
-    walls = _walls(geo.get("features") or [])
+    # No street plate outside the playable core (ADR-017): each plate is a material, so a draw, of its own.
+    # The walls come from the OSM scene, before any Catastro split, so they are kept by position.
+    core = core_of(manifest)
+    walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
     signs = _choose(streets, walls, max_signs)
     visual_bytes = (base / "scene_visual.glb").read_bytes()
     nodes, materials = nodes_from_glb(visual_bytes)

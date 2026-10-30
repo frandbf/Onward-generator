@@ -49,13 +49,14 @@
         "lightmap_max_size": { "enum": [512, 1024, 2048, 4096] },
         "lightmap_directional": { "type": "boolean" },
         "lightmap_class_scales": {
-          "description": "scaleInLightmap by surface class; a class left out keeps the default (roof 0.25, ground 0.5, interior 0.5, facade 1)",
+          "description": "scaleInLightmap by surface class; a class left out keeps the default (roof 0.25, ground 0.5, interior 0.5, scenic 0.25, facade 1)",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "roof": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
             "ground": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
             "interior": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "scenic": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
             "facade": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
           }
         },

@@ -23,6 +23,7 @@ from onward_generator.geo.aoi import AoiError, load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_for_origin
 from onward_generator.io import atomic_write_json
 from onward_generator.materials.library_plan import select_texture_plan
+from onward_generator.tiers import MIN_CORE_HALF_SIDE_M
 
 MAP_SCHEMA = "onward_generator.map"
 MAP_VERSION = "0.1.0"
@@ -31,6 +32,8 @@ _RADIUS_MIN_M = 50.0
 _RADIUS_MAX_M = 1500.0
 _MARGIN_MAX_M = 500.0
 _TEXELS_DEFAULT = 10.0
+# The playable core (ADR-017): a square of this half-side around the centre keeps full detail.
+CORE_RADIUS_DEFAULT_M = 150.0
 _TEXELS_MAX = 40.0
 # Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
 _FOG_BAND_M = 600.0
@@ -56,6 +59,7 @@ def create_map(
     ambient_ai: bool = False,
     panoramax: bool = False,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
+    core_radius_m: float = CORE_RADIUS_DEFAULT_M,
     overwrite: bool = False,
     texture_provider: Provider | None = None,
 ) -> dict[str, Any]:
@@ -69,6 +73,7 @@ def create_map(
     description = _description(title, latitude, longitude, description)
     brief = _brief(brief)
     texels = _texels(lightmap_texels_per_m)
+    core = _core(core_radius_m, radius_m)
     _guard_directory(root, overwrite=overwrite)
 
     try:
@@ -88,7 +93,7 @@ def create_map(
     export_rel = "config/export.json"
     atomic_write_json(root / aoi_rel, _aoi_document(title, longitude, latitude, radius_m, margin_m, ring))
     atomic_write_json(root / project_rel, _project_document(title, latitude, longitude, margin_m, seed, aoi_rel, frame.crs))
-    atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, radius_m + margin_m))
+    atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, core or radius_m + margin_m))
     _write_texture_plan(
         root, map_id=map_id, name=title, latitude=latitude, longitude=longitude,
         brief=brief, seed=seed, provider=texture_provider,
@@ -115,6 +120,7 @@ def create_map(
         "center": {"latitude": latitude, "longitude": longitude},
         "radius_m": radius_m,
         "margin_m": margin_m,
+        "core_radius_m": core,
         "crs": frame.crs,
         "seed": seed,
         "paths": {
@@ -284,6 +290,17 @@ def _margin(margin_m: float) -> float:
     if not 0 <= margin_m <= _MARGIN_MAX_M:
         raise MapError(f"margin_m must be between 0 and {_MARGIN_MAX_M:g}")
     return float(margin_m)
+
+
+def _core(core_radius_m: float, radius_m: float) -> float | None:
+    """The playable core half-side, or None: 0, or a core at or past the radius, plays the whole map."""
+    if isinstance(core_radius_m, bool) or not isinstance(core_radius_m, (int, float)):
+        raise MapError("core_radius_m must be a number")
+    if core_radius_m == 0 or core_radius_m >= radius_m:
+        return None
+    if not MIN_CORE_HALF_SIDE_M <= core_radius_m:
+        raise MapError(f"core_radius_m must be 0 or at least {MIN_CORE_HALF_SIDE_M:g}")
+    return float(core_radius_m)
 
 
 def _texels(value: float) -> float:

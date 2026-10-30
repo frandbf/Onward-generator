@@ -24,6 +24,7 @@ from onward_generator.generation.config import GenerationConfig, Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.generation.scene import generate_scene
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.tiers import core_of
 
 TREE_SIDES = 16
 TREE_VARIANTS = 3
@@ -205,6 +206,10 @@ def style_copy(
         if c not in (SurfaceClass.CARRIAGEWAY, SurfaceClass.WATER)
     ]
     free = union_all(walkable) if walkable else Point(0, 0).buffer(0)
+    core = core_of(manifest)
+    if core is not None:
+        # Generated benches and bins stay in the playable core (ADR-017).
+        free = free.intersection(core)
     extra: list[Element] = []
     rejected: list[Rejected] = []
     if not any(e.origin == "generated" and e.kind in {"bench", "waste_basket"} for e in existing):

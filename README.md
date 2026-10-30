@@ -63,6 +63,7 @@ onward-generator run \
 ```
 
 - `--radius-m` is half the side of the square, in metres (50–1500, default 400). `--margin-m` defaults to 30. `--lightmap-texels-per-m` defaults to 10 and cannot exceed 40.
+- `--core-radius-m` (default 150) is half the side of the playable core. Past it, buildings are plain scenic shells with no openings, interiors, signs or colliders, and the wall stands on the core edge, so a larger map stays near the Quest triangle budget. `0`, or a value at or above the radius, plays the whole map ([ADR-017](docs/decisions/ADR-017-playable-core.md)).
 - `--brief` is stored on the map and read by overgrow. `--ai` asks local Ollama for a placement plan; a rejected reply falls back to the rules. `--panoramax` (under development) projects street photos onto facades.
 - `--verbose` prints each stage's full output. `--preview` also draws the diagnostic PNGs of `generate` and `detail`, which `run` skips by default. `--no-unity` stops after `export` and prints the Unity command for the host; `task map` always uses it.
 

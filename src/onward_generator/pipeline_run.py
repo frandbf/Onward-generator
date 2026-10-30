@@ -86,6 +86,7 @@ def map_create_argv(
     ambient_ai: bool = False,
     panoramax: bool = False,
     lightmap_texels_per_m: float = 10.0,
+    core_radius_m: float = 150.0,
     overwrite: bool = False,
 ) -> list[str]:
     argv = [
@@ -96,6 +97,7 @@ def map_create_argv(
         "--radius-m", str(radius_m),
         "--margin-m", str(margin_m),
         "--lightmap-texels-per-m", str(lightmap_texels_per_m),
+        "--core-radius-m", str(core_radius_m),
     ]
     if seed is not None:
         argv.extend(["--seed", str(seed)])
@@ -698,6 +700,7 @@ def run_map(
     panoramax: bool = False,
     catastro: bool | None = None,
     lightmap_texels_per_m: float = 10.0,
+    core_radius_m: float = 150.0,
     overwrite: bool = False,
     start: str | None = None,
     execute: Execute | None = None,
@@ -779,6 +782,7 @@ def run_map(
                     ambient_ai=ambient_ai,
                     panoramax=panoramax,
                     lightmap_texels_per_m=lightmap_texels_per_m,
+                    core_radius_m=core_radius_m,
                     overwrite=overwrite,
                 ),
             )],

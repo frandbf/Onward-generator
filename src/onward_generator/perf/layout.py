@@ -27,6 +27,7 @@ from shapely.ops import linemerge, nearest_points, polylabel
 from onward_generator.generation.mesh import polygons_of
 from onward_generator.generation.scene import GeneratedScene
 from onward_generator.generation.surfaces import LinearWay, SurfaceClass
+from onward_generator.tiers import core_of
 
 LAYOUT_SCHEMA = "onward_generator.perf_layout"
 LAYOUT_VERSION = "0.1.0"
@@ -79,6 +80,12 @@ TEAM_SEPARATION_M = 30.0
 GRID_M = 2.0
 TENT_DEPTH_M = -30.0
 DAMAGE_DEPTH_M = -80.0
+# The adapter's first navigation spacing (docs/11-onward-sdk.md): the larger of the
+# navmesh span over the walk depth limit and sqrt(area / node budget), at least 1 m.
+NAV_WALK_DEPTH = 400
+NAV_NODE_BUDGET = 320
+# The perimeter wall's default thickness (bounds), when the manifest does not record one.
+WALL_THICKNESS_M = 0.4
 
 
 class LayoutError(ValueError):
@@ -96,6 +103,16 @@ def component_holding(parts: Sequence[BaseGeometry], point: tuple[float, float])
     if not here:
         raise LayoutError("the Uplink is not on walkable ground")
     return max(here, key=lambda part: (part.area, part.centroid.x, part.centroid.y))
+
+
+def playable_area(detail_manifest: Mapping[str, Any]) -> BaseGeometry | None:
+    """The playable core inside its wall (ADR-017), or None for a map without a core."""
+    core = core_of(detail_manifest)
+    if core is None:
+        return None
+    thickness = float((detail_manifest.get("envelope") or {}).get("thickness_m") or WALL_THICKNESS_M)
+    # An inward buffer of a square keeps its corners square.
+    return core.buffer(-thickness)
 
 
 def free_ground(base: GeneratedScene, urban_positions: list[tuple[float, float]], *, element_radius_m: float = 1.0) -> BaseGeometry:
@@ -154,6 +171,9 @@ def extra_spawn_block(
 def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> dict[str, Any]:
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
+    inside = playable_area(detail_manifest)
+    if inside is not None:
+        free = free.intersection(inside)
     region = free.buffer(-CLEARANCE_M)
     parts = [p for p in polygons_of(region) if p.area > 0]
     if not parts:
@@ -478,15 +498,32 @@ def fit_spawn_separation(
     raise LayoutError(f"route starts hold {held} spawns at {MIN_SPAWN_SEPARATION_M:g} m; {count} are required")
 
 
-def nav_islands(base: GeneratedScene) -> list[BaseGeometry]:
+def nav_islands(base: GeneratedScene, inside: BaseGeometry | None = None) -> list[BaseGeometry]:
     """The walkable ground the adapter bakes, shrunk by the agent radius, one piece per island.
 
     Furniture is not a navmesh obstacle, so it does not split an island here.
     The walkable crossings over the carriageway are baked too (ADR-015), so
-    the blocks on both sides of a street are one island.
+    the blocks on both sides of a street are one island. ``inside`` is the
+    playable core: the ground colliders end at its wall (ADR-017).
     """
     free = free_ground(base, [])  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
-    return list(polygons_of(union_all([free, base.partition.crossings]).buffer(-NAV_AGENT_RADIUS_M)))
+    ground = union_all([free, base.partition.crossings])
+    if inside is not None:
+        ground = ground.intersection(inside)
+    return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
+
+
+def navigation_estimate(islands: Sequence[BaseGeometry]) -> dict[str, float]:
+    """The adapter's first node spacing for this navmesh: ``max(1, span / 400, sqrt(area / 320))``.
+
+    An estimate from the 2D islands; the adapter measures the baked mesh and
+    raises the spacing while the walk is deeper than 400.
+    """
+    area = sum(part.area for part in islands)
+    minx, miny, maxx, maxy = union_all(list(islands)).bounds
+    span = max(maxx - minx, maxy - miny)
+    spacing = max(1.0, span / NAV_WALK_DEPTH, math.sqrt(area / NAV_NODE_BUDGET))
+    return {"walkable_area_m2": round(area, 1), "span_m": round(span, 1), "node_spacing_estimate_m": round(spacing, 2)}
 
 
 def hunt_routes(
@@ -556,6 +593,9 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     doc = gameplay_layout(base, detail_manifest)
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
+    inside = playable_area(detail_manifest)
+    if inside is not None:
+        free = free.intersection(inside)
     region = free.buffer(-1.0)
     parts = [p for p in polygons_of(region) if p.area > 0]
     if not parts:
@@ -564,7 +604,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     area = component_holding(parts, uplink)
     focus = _focus_xy(base, heights) or uplink
 
-    islands = nav_islands(base)
+    islands = nav_islands(base, inside)
     routes, separation = hunt_routes(base, free, islands, component_holding(islands, uplink), AI_COUNT, focus)
     ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
     occupied = union_all([Point(p).buffer(3.0) for p in ai])
@@ -620,6 +660,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "ai_m": [_xy(*p, focus) for p in ai],
         "ai_separation_m": separation,
         "routes": routes,
+        "navigation": navigation_estimate(islands),
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": "Suburban Day",
         "audio_birds_m": [round(uplink[0], 2), round(uplink[1], 2)],
