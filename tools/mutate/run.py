@@ -40,6 +40,7 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 MUTANT_SUFFIX = re.compile(r"__mutmut_(\d+)$")
 NO_MATCH = "onward_generator.__no_mutant_matches__*"  # generates mutants and coverage, runs none
 FAILING = ("survived",)
+SHIM = Path(__file__).with_name("mutmut_only.py")
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,8 +202,14 @@ def clear_mutants(root: Path = REPO) -> None:
     shutil.rmtree(root / MUTANTS, ignore_errors=True)
 
 
-def _mutmut(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["mutmut", *args], cwd=REPO, capture_output=True, text=True)
+def only_mutate(targets: list[Function]) -> str:
+    """The files mutmut rewrites: those holding a changed function, as ``only_mutate`` globs."""
+    return ",".join(sorted({f.path for f in targets}))
+
+
+def _mutmut(*args: str, only: str = "", reuse: bool = False) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "MUTMUT_ONLY_MUTATE": only, "MUTMUT_REUSE_MUTANTS": "1" if reuse else ""}
+    return subprocess.run([sys.executable, str(SHIM), *args], cwd=REPO, capture_output=True, text=True, env=env)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -230,10 +237,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"mutate: {len(targets)} changed functions since {args.base}")
     clear_mutants()
 
+    only = only_mutate(targets)
     if args.whole_functions:
         selected = [f.pattern for f in targets]
     else:
-        generate = _mutmut("run", NO_MATCH)
+        generate = _mutmut("run", NO_MATCH, only=only)
         # mutmut 3.8 generates every mutant and the coverage data, then asserts that the filter matched none.
         if generate.returncode != 0 and "nothing matches" not in generate.stderr:
             print(generate.stdout[-4000:], generate.stderr[-4000:], sep="\n", file=sys.stderr)
@@ -244,7 +252,8 @@ def main(argv: list[str] | None = None) -> int:
         if not selected:
             return 0
 
-    run = _mutmut("run", *selected)
+    # The generate step above already made the mutants; this run only tests them.
+    run = _mutmut("run", *selected, only=only, reuse=not args.whole_functions)
     if run.returncode != 0:
         print(run.stdout[-4000:], run.stderr[-4000:], sep="\n", file=sys.stderr)
         print(f"mutate: mutmut run failed with exit {run.returncode}", file=sys.stderr)

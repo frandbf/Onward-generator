@@ -125,3 +125,11 @@ def test_clear_mutants_removes_a_stale_tree_and_accepts_none(tmp_path: Path) -> 
     assert not (tmp_path / "mutants").exists()
     mutate.clear_mutants(tmp_path)
     assert tmp_path.exists()
+
+
+def test_only_mutate_lists_each_file_with_a_changed_function_once() -> None:
+    def fn(path: str) -> object:
+        return mutate.Function(path, mutate.module_name(path), "x_f", 1, 2, 1)
+
+    targets = [fn("src/onward_generator/b.py"), fn("src/onward_generator/a.py"), fn("src/onward_generator/b.py")]
+    assert mutate.only_mutate(targets) == "src/onward_generator/a.py,src/onward_generator/b.py"
