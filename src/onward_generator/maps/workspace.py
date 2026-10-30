@@ -162,7 +162,7 @@ def catastro_enabled(directory: str | Path) -> bool:
     center = document["center"]
     half_side = float(document["radius_m"]) + float(document["margin_m"])
     inside = catastro_area(float(center["latitude"]), str(document["crs"]), half_side)
-    return inside and document.get("catastro", True) is not False
+    return inside and document.get("catastro") is not False
 
 
 def store_catastro(directory: str | Path, enabled: bool) -> None:

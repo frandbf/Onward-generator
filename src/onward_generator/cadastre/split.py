@@ -230,7 +230,7 @@ def split_scene(
 
     features: list[dict[str, Any]] = []
     results: list[ParentSplit] = []
-    for feature in scene.get("features", []):
+    for feature in scene["features"]:
         if feature.get("kind") != "building":
             features.append(dict(feature))
             continue

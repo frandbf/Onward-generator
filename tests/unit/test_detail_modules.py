@@ -302,3 +302,11 @@ def test_shop_evidence_prefers_the_footprint_that_contains_the_point() -> None:
     street = _shop_evidence([poi("street", -1.0, 5.0)], footprints, CFG)
     assert dict(street) == {"low": ["street"], "tall": ["street"]}  # outside both: the 2 m rule
     assert dict(_shop_evidence([poi("far", -1.0, 3.0)], footprints, CFG)) == {}
+
+
+def test_shop_evidence_inside_a_box_but_outside_the_shape_is_not_inside() -> None:
+    from onward_generator.detail.scene import _shop_evidence
+
+    ell = Polygon([(0, 0), (20, 0), (20, 4), (4, 4), (4, 20), (0, 20)])
+    point = {"id": "notch", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [15.0, 15.0]}}
+    assert dict(_shop_evidence([point], {"ell": ell}, CFG)) == {}  # 11 m from the shape, inside its bounding box

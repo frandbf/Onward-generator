@@ -176,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     heights.set_defaults(handler=_cmd_heights)
 
     sub.add_parser("geo", help="run the geographic pipeline (see: geo --help)", add_help=False)
-    sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match | split (see: cadastre --help)", add_help=False)
+    sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match | split (see: cadastre --help)", add_help=False)  # pragma: no mutate: main dispatches cadastre before this stub is parsed, so add_help is never read
     sub.add_parser("generate", help="phase 03 geometry: ground, streets, buildings (see: generate --help)", add_help=False)
     sub.add_parser("detail", help="phase 04: facades, roofs, urban elements, interiors (see: detail --help)", add_help=False)
     sub.add_parser("perf", help="phase 05: measure | layout | device | drawcalls (see: perf --help)", add_help=False)
@@ -206,7 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
-        "--catastro", action=argparse.BooleanOptionalAction, default=None,
+        "--catastro", action=argparse.BooleanOptionalAction,
         help="split OSM blocks into Catastro constructions (default on in mainland Spain); --no-catastro turns it off for this map",
     )
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")

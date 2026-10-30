@@ -157,7 +157,7 @@ def run_heights(scene_path: str | Path, config: HeightConfig | None = None) -> H
     scene_ref = {"path": str(path), "sha256": before, "schema": scene["schema"], "schema_version": scene["schema_version"]}
     parents = {
         str(f["id"]): str(f["parent"]["id"])
-        for f in scene.get("features", [])
+        for f in scene["features"]
         if f.get("kind") == "building" and isinstance(f.get("parent"), Mapping)
     }
     return HeightRun(result, config, scene_ref, scene.get("attribution"), parents)

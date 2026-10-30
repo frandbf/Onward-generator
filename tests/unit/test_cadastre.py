@@ -316,3 +316,78 @@ def test_match_report_has_no_split_section(pipeline_result: GeoResult, downloade
     scene, _ = write_outputs(pipeline_result, tmp_path / "geo")
     assert main(["cadastre", "match", "--scene", str(scene), "--gml", str(downloaded), "--out", str(tmp_path / "m")]) == 0
     assert "split" not in json.loads((tmp_path / "m" / "cadastre_match_report.json").read_text(encoding="utf-8"))
+
+
+def _split_args(scene: Path, gml: Path, out: Path, *extra: str) -> list[str]:
+    return ["cadastre", "split", "--scene", str(scene), "--gml", str(gml), "--out", str(out), *extra]
+
+
+def test_cli_split_report_match_options_and_overwrite(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    out = tmp_path / "cad"
+    assert main(_split_args(scene_path, downloaded, out, "--min-coverage", "0.3")) == 0
+    report = json.loads((out / "cadastre_match_report.json").read_text(encoding="utf-8"))
+    assert report["counts"]["cadastre_parts"] == 5
+    assert report["cadastre"]["path"] == str(downloaded.resolve())
+    assert report["counts"]["status_matched"] == 4  # way 104, a third covered, now matches
+    overrides = json.loads((out / "heights_overrides.catastro.json").read_text(encoding="utf-8"))
+    assert "osm-way-104" in [e["id"] for e in overrides["overrides"]]
+    assert main(_split_args(scene_path, downloaded, out, "--overwrite")) == 0
+    report = json.loads((out / "cadastre_match_report.json").read_text(encoding="utf-8"))
+    assert report["counts"]["status_matched"] == 3
+
+
+def test_cli_split_refuses_to_write_over_its_input_scene(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    before = scene_path.read_bytes()
+    assert main(_split_args(scene_path, downloaded, scene_path.parent, "--overwrite")) == 1
+    assert scene_path.read_bytes() == before
+
+
+def test_cli_split_keeps_landmarks_whole(pipeline_result: GeoResult, downloaded: Path, tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    scene = json.loads(scene_path.read_text(encoding="utf-8"))
+    for feature in scene["features"]:
+        if feature["id"] == "osm-way-101":
+            feature["tags"]["building"] = "cathedral"
+    scene_path.write_text(json.dumps(scene), encoding="utf-8")
+    assert main(_split_args(scene_path, downloaded, tmp_path / "cad")) == 0
+    ids = [f["id"] for f in json.loads((tmp_path / "cad" / "geo_scene.json").read_text(encoding="utf-8"))["features"]]
+    assert "osm-way-101" in ids and "osm-way-108:0000001AA0000A_part1" in ids
+
+
+@pytest.mark.parametrize("missing", ["--scene", "--gml", "--out"])
+def test_cli_split_requires_every_path(missing: str, tmp_path: Path) -> None:
+    from onward_generator.cadastre.__main__ import main as cadastre_main
+
+    args = ["split", "--scene", str(tmp_path / "s.json"), "--gml", str(tmp_path / "x.gml"), "--out", str(tmp_path / "o")]
+    at = args.index(missing)
+    assert cadastre_main(args[:at] + args[at + 2:]) == 2
+
+
+@pytest.mark.parametrize(("extra", "margin"), [([], 20.0), (["--margin-m", "5"], 5.0)])
+def test_cli_download_passes_the_margin(
+    extra: list[str], margin: float, pipeline_result: GeoResult, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from onward_generator.cadastre import __main__ as cadastre_cli
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    seen: list[tuple[float, ...]] = []
+
+    def fake_download(bbox, out, *, overwrite):
+        seen.append(tuple(bbox))
+        return download_building_parts(CENTER_BBOX, out, fetch=fake_fetch(FIXTURE.read_bytes()), now=NOW)
+
+    monkeypatch.setattr(cadastre_cli, "download_building_parts", fake_download)
+    assert cadastre_cli.main(["download", "--scene", str(scene_path), "--out", str(tmp_path / "c.gml"), *extra]) == 0
+    assert seen == [bbox_from_scene(json.loads(scene_path.read_text(encoding="utf-8")), margin)]

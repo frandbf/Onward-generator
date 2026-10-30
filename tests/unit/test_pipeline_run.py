@@ -1357,8 +1357,12 @@ def test_run_stores_the_catastro_switch(tmp_path: Path) -> None:
     assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is True
 
 
+@pytest.mark.parametrize(
+    ("catastro", "steps"),
+    [(False, ["map", "geo", "heights"]), (True, ["map", "geo", "cadastre", "cadastre", "heights"])],
+)
 def test_a_new_map_stores_the_catastro_switch_before_planning(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catastro: bool, steps: list[str],
 ) -> None:
     monkeypatch.chdir(tmp_path)
     seen: list[list[str]] = []
@@ -1372,12 +1376,24 @@ def test_a_new_map_stores_the_catastro_switch_before_planning(
 
     code = run_map(
         map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
-        radius_m=90, margin_m=5, out="maps/murcia", catastro=False, execute=execute, interactive=False,
+        radius_m=90, margin_m=5, out="maps/murcia", catastro=catastro, execute=execute, interactive=False,
         no_unity=True,
     )
     assert code == 2
-    assert json.loads(Path("maps/murcia/map.json").read_text(encoding="utf-8"))["catastro"] is False
-    assert [argv[0] for argv in seen] == ["map", "geo", "heights"]
+    assert json.loads(Path("maps/murcia/map.json").read_text(encoding="utf-8"))["catastro"] is catastro
+    assert [argv[0] for argv in seen] == steps
+
+
+def test_heights_without_catastro_ignores_a_newer_split_scene(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    processed = root / "data" / "processed"
+    now = (root / "map.json").stat().st_mtime
+    _touch(processed / "geo" / "geo_scene.json", now)
+    _touch(processed / "heights" / "heights.json", now + 1)
+    _touch(processed / "cadastre" / "geo_scene.json", now + 2)
+    assert not output_ready("heights", [], root)
+    store_catastro(root, False)
+    assert output_ready("heights", [], root)
 
 
 def test_run_passes_the_catastro_flag(monkeypatch: pytest.MonkeyPatch) -> None:

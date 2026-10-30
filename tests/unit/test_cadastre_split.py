@@ -475,3 +475,40 @@ def test_records_round_areas_and_coverage() -> None:
     feature = _sub_feature(_scene()["features"][0], sub, RECORD)
     assert feature["subdivision"]["leftover_m2"] == 1.235
     assert feature["geometry"]["coordinates"] == (((1.0, 0.0), (1.0, 12.34567), (0.0, 12.34567), (0.0, 0.0), (1.0, 0.0)),)
+
+
+def test_polygons_skip_empty_and_non_polygon_parts() -> None:
+    from shapely import GeometryCollection, Point, Polygon
+
+    from onward_generator.cadastre.split import _polygons
+
+    square = box(0, 0, 1, 1)
+    assert _polygons(Polygon()) == []
+    assert _polygons(GeometryCollection([Point(5, 5), square])) == [square]
+    assert _polygons(Point(0, 0)) == []
+
+
+def test_crumbs_of_several_groups_add_up() -> None:
+    result = split(
+        box(0, 0, 30, 10),
+        part("A_part1", 4, box(0, 4, 10, 10)),
+        part("B_part1", 2, box(10, 4, 30, 10)),
+        part("C_part1", 0, box(0, 0, 30, 4).difference(box(14, 0, 16, 2)).difference(box(4, 0, 6, 2))),
+    )
+    assert result.dropped_m2 == pytest.approx(8.0)
+
+
+def test_leftover_without_extra_area_is_a_float() -> None:
+    result = split(box(0, 0, 20, 10), part("A_part1", 3, box(0, 0, 10, 10)), part("B_part1", 4, box(10, 0, 20, 10)))
+    assert repr(result.subs[0].leftover_m2) == "0.0"
+
+
+def test_a_part_whose_box_overlaps_but_whose_shape_does_not_is_ignored() -> None:
+    from shapely import Polygon
+
+    scene = _scene()
+    ell = Polygon([(40, 0), (50, 0), (50, 2), (42, 2), (42, 10), (40, 10)])  # L-shaped, inside osm-way-2's box
+    scene["features"][3]["geometry"]["coordinates"] = [list(ell.exterior.coords)]
+    near = _projected("E_part1", 4, box(45, 5, 49, 9))  # in the notch: the boxes overlap, the shapes do not
+    _, results = split_scene(scene, [*PARTS, near], RECORD, OPTIONS, is_landmark=_is_church)
+    assert dict((r.parent_id, r.status) for r in results)["osm-way-2"] == "no_parts"
