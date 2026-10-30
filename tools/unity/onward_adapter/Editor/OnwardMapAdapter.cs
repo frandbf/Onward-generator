@@ -973,6 +973,8 @@ namespace OnwardGenerator
                 || name.Contains("landmark") || name.Contains("curb") || name.Contains("water"))
                 return false;
             // Phase 03 names the ground mesh collider/walkable. It is not called pedestrian.
+            // collider/walkable_crossing, the strips across the carriageway, matches
+            // here too: it joins the blocks on both kerbs into one island (ADR-015).
             return name.Contains("walkable") || name.Contains("pedestrian") || name.Contains("sidewalk")
                 || name.Contains("ground") || name.Contains("green");
         }
@@ -1034,9 +1036,77 @@ namespace OnwardGenerator
             Vector3 origin = Snap(layout.uplink_m[0], layout.uplink_m[1], "nav origin");
             generator.NavMeshOrigin = origin;
             generator.OutDoorPoints = new List<Vector3> { origin };
+            LogNavIslands(origin);
             RequireNavigationObject(generator, map);
             BakeNodesToFit(generator, map);
             EditorUtility.SetDirty(map);
+        }
+
+        // Diagnostic only: how many separate pieces the baked mesh has, and how
+        // much of its area is on the origin's piece. GenerateNodes keeps only the
+        // nodes on that piece, so a Hunt route elsewhere has nothing to walk on.
+        // Triangles that share a vertex position (to the centimetre) are one
+        // island; the origin's island is the one whose triangle centre is nearest.
+        private static void LogNavIslands(Vector3 origin)
+        {
+            NavMeshTriangulation tri = NavMesh.CalculateTriangulation();
+            var parent = new int[tri.vertices.Length];
+            for (int i = 0; i < parent.Length; i++) parent[i] = i;
+            var welded = new Dictionary<Vector3Int, int>();
+            for (int i = 0; i < tri.vertices.Length; i++)
+            {
+                Vector3 v = tri.vertices[i];
+                var key = new Vector3Int(Mathf.RoundToInt(v.x * 100f), Mathf.RoundToInt(v.y * 100f), Mathf.RoundToInt(v.z * 100f));
+                int first;
+                if (welded.TryGetValue(key, out first)) JoinIslands(parent, i, first);
+                else welded[key] = i;
+            }
+            for (int i = 0; i + 2 < tri.indices.Length; i += 3)
+            {
+                JoinIslands(parent, tri.indices[i], tri.indices[i + 1]);
+                JoinIslands(parent, tri.indices[i], tri.indices[i + 2]);
+            }
+            var areas = new Dictionary<int, float>();
+            float total = 0f;
+            float nearest = float.MaxValue;
+            int home = -1;
+            for (int i = 0; i + 2 < tri.indices.Length; i += 3)
+            {
+                Vector3 a = tri.vertices[tri.indices[i]];
+                Vector3 b = tri.vertices[tri.indices[i + 1]];
+                Vector3 c = tri.vertices[tri.indices[i + 2]];
+                float area = Vector3.Cross(b - a, c - a).magnitude * 0.5f;
+                int root = IslandOf(parent, tri.indices[i]);
+                float sum;
+                areas.TryGetValue(root, out sum);
+                areas[root] = sum + area;
+                total += area;
+                float distance = ((a + b + c) / 3f - origin).sqrMagnitude;
+                if (distance < nearest)
+                {
+                    nearest = distance;
+                    home = root;
+                }
+            }
+            float homeArea = home >= 0 ? areas[home] : 0f;
+            Debug.Log($"{LogPrefix} Navmesh islands: {areas.Count}. The origin island holds {homeArea:F0} of {total:F0} m² ({100f * homeArea / Mathf.Max(total, 1f):F0}%); GenerateNodes keeps only that island.");
+        }
+
+        private static int IslandOf(int[] parent, int i)
+        {
+            while (parent[i] != i)
+            {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+            return i;
+        }
+
+        private static void JoinIslands(int[] parent, int a, int b)
+        {
+            int ra = IslandOf(parent, a);
+            int rb = IslandOf(parent, b);
+            if (ra != rb) parent[Math.Max(ra, rb)] = Math.Min(ra, rb);
         }
 
         // Node spacing follows the baked mesh, not a fixed city. A straight

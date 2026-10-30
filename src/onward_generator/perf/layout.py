@@ -481,8 +481,11 @@ def nav_islands(base: GeneratedScene) -> list[BaseGeometry]:
     """The walkable ground the adapter bakes, shrunk by the agent radius, one piece per island.
 
     Furniture is not a navmesh obstacle, so it does not split an island here.
+    The walkable crossings over the carriageway are baked too (ADR-015), so
+    the blocks on both sides of a street are one island.
     """
-    return list(polygons_of(free_ground(base, []).buffer(-NAV_AGENT_RADIUS_M)))  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
+    free = free_ground(base, [])  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
+    return list(polygons_of(union_all([free, base.partition.crossings]).buffer(-NAV_AGENT_RADIUS_M)))
 
 
 def hunt_routes(

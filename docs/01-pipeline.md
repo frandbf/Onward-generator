@@ -197,7 +197,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | --- | --- |
 | Input | `geo_scene.json` plus `heights.json` from that same scene |
 | Output | `scene_visual.glb`, `scene_collision.glb`, `scene3d.json`, `generation_report.json` |
-| Collision | `collider/walkable` and `collider/carriageway`, separate from the visual mesh |
+| Collision | `collider/walkable`, `collider/carriageway`, and `collider/walkable_crossing` (ADR-015), separate from the visual mesh |
 | Exit | `0` when there is no critical error |
 
 This directory is the base for `detail`. The wall is not added here.

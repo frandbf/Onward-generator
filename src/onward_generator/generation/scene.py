@@ -410,9 +410,12 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
 
     walkable = site.difference(carriageway.geometry) if carriageway is not None else site
     thickness = config.ground_thickness_m
+    # Crossings are their own slab at road level. The adapter bakes every
+    # collider named walkable, so they join the blocks on both kerbs (ADR-015).
     for cid, geom, top in (
         ("collider/walkable", walkable, 0.0),
-        ("collider/carriageway", carriageway.geometry if carriageway else Polygon(), -depth),
+        ("collider/carriageway", carriageway.geometry.difference(partition.crossings) if carriageway else Polygon(), -depth),
+        ("collider/walkable_crossing", partition.crossings, -depth),
     ):
         if geom.is_empty:
             continue

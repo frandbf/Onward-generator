@@ -78,5 +78,15 @@ def test_adapter_refuses_a_navigation_map_the_quest_cannot_use() -> None:
         "Hunt navigation checked",
         "Hunt roster restored",
         "StableHuntBots = 32",
+        "LogNavIslands(origin);",
+        "Navmesh islands: {areas.Count}",
     ):
         assert needle in source
+
+
+def test_the_adapter_bakes_the_walkable_crossings() -> None:
+    """ADR-015: the crossing slab's Unity name passes WalkableGround, which bakes "walkable" and refuses "carriageway"."""
+    source = _ADAPTER.read_text(encoding="utf-8")
+    assert 'name.Contains("carriageway")' in source and 'return name.Contains("walkable")' in source
+    unity_name = "collider/walkable_crossing#collider".replace("/", "_")
+    assert "walkable" in unity_name and "carriageway" not in unity_name
