@@ -56,6 +56,22 @@ def test_the_fallback_door_sits_in_the_centre_bay(length: float, s0: float, widt
     assert any(h.kind == "balcony_door" for h in layout.holes)
 
 
+def test_a_door_near_the_wall_end_narrows_to_keep_its_pier() -> None:
+    # 0.9 m bays on a 3 m wall: two bays, the door centre at 1.95 m is 1.05 m from the end.
+    layout = Layout()
+    narrow_bays = replace(TEMPLATE, bay_m=0.9)
+    assert ensure_door(layout, [_wall(3.0)], STOREY, "door", DOOR, narrow_bays, box(0, 0, 3, 10), CFG) == "fallback"
+    assert (_door(layout).s0, _door(layout).width) == pytest.approx((1.4, 1.1))
+
+
+def test_the_door_recess_is_checked_where_the_door_is() -> None:
+    # A notch in the footprint just left of the door (s 3.0–5.0) does not stop the door at s 5.1–6.3.
+    notched = box(0, 0, 8, 10).difference(box(3.0, 0, 5.0, 0.5))
+    layout = Layout()
+    assert ensure_door(layout, [_wall(8.0)], STOREY, "door", DOOR, TEMPLATE, notched, CFG) == "fallback"
+    assert _door(layout).s0 == pytest.approx(5.1)
+
+
 def test_the_door_kind_is_the_callers() -> None:
     layout = Layout()
     assert ensure_door(layout, [_wall(10.0)], STOREY, "landmark_door", CFG.landmark_door, TEMPLATE, box(0, 0, 10, 10), CFG) == "fallback"
@@ -112,18 +128,18 @@ def test_no_wall_means_no_door() -> None:
     assert ensure_door(Layout(), [], STOREY, "door", DOOR, TEMPLATE, box(0, 0, 8, 10), CFG) == "none"
 
 
-def test_door_walls_put_the_main_frontage_first_and_skip_party_walls() -> None:
+def test_door_walls_put_the_longest_street_wall_first_and_skip_party_walls() -> None:
     # A 10 × 12 building: x = 10 is a party wall, the other three are street-facing.
     south = Segment(0, 0, 0, (0.0, 0.0), (10.0, 0.0), True)
     party = Segment(0, 0, 1, (10.0, 0.0), (10.0, 12.0), False)
     north = Segment(0, 0, 2, (10.0, 12.0), (0.0, 12.0), True)
     west = Segment(0, 0, 3, (0.0, 12.0), (0.0, 0.0), True)
     court = Segment(0, 1, 4, (2.0, 2.0), (2.0, 9.0), True)
-    neighbour = box(10, 0, 20, 12)
-    segments = [south, party, north, west, court]
-    assert door_walls(segments, west, neighbour, CFG) == [west, south, north]
-    assert door_walls(segments, None, neighbour, CFG) == [west, south, north]
-    assert door_walls(segments, north, neighbour, CFG) == [north, west, south]
+    assert door_walls([south, party, north, west, court], box(10, 0, 20, 12), CFG) == [west, south, north]
+    # Street-facing walls come before blind ones, however long.
+    short_street = Segment(0, 0, 5, (0.0, 0.0), (3.0, 0.0), True)
+    long_blind = Segment(0, 0, 6, (0.0, 0.0), (9.0, 0.0), False)
+    assert door_walls([long_blind, short_street], box(50, 50, 60, 60), CFG) == [short_street, long_blind]
 
 
 def test_door_walls_fall_back_to_short_walls_that_touch_no_neighbour() -> None:
@@ -134,8 +150,8 @@ def test_door_walls_fall_back_to_short_walls_that_touch_no_neighbour() -> None:
     back = Segment(0, 0, 2, (2.0, 12.0), (0.0, 12.0), False)
     west = Segment(0, 0, 3, (0.0, 12.0), (0.0, 0.0), False)
     others = box(-10, 0, 0, 12).union(box(2, 0, 12, 12))
-    assert door_walls([back, west, front, east], None, others, CFG) == [front, back]
+    assert door_walls([back, west, front, east], others, CFG) == [front, back]
     # A wall with a neighbour against its first 0.8 m only is still a party wall.
-    assert door_walls([front], None, box(-1, -1, 0.8, 0), CFG) == []
+    assert door_walls([front], box(-1, -1, 0.8, 0), CFG) == []
     # A neighbour that only meets the wall's corner leaves it free.
-    assert door_walls([front], None, box(-1, -1, 0, 0), CFG) == [front]
+    assert door_walls([front], box(-1, -1, 0, 0), CFG) == [front]

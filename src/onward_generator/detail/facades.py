@@ -529,20 +529,18 @@ MIN_DOOR_WIDTH_M = 0.9
 MIN_DOOR_HEIGHT_M = 2.0
 
 
-def door_walls(segments: list[Segment], main: Segment | None, others: BaseGeometry, cfg: DetailConfig) -> list[Segment]:
+def door_walls(segments: list[Segment], others: BaseGeometry, cfg: DetailConfig) -> list[Segment]:
     """Outer walls that may take a door, best first.
 
-    The main frontage, then the other street-facing walls, longest first, then the
-    outer walls too short to count as street-facing whose ``probe_m`` strip outside
-    meets no neighbour. A party wall is never listed.
+    The street-facing walls, longest first (on a one-part building the first is the
+    main frontage), then the outer walls too short to count as street-facing whose
+    ``probe_m`` strip outside meets no neighbour. A party wall is never listed.
     """
     def free(seg: Segment) -> bool:
         return not others.intersects(seg.plan_rect(0.0, seg.length, 0.0, cfg.probe_m).buffer(-SNAP_M))
 
-    outer = sorted((s for s in segments if s.ring == 0 and s is not main), key=lambda s: (-s.length, s.index))
-    exposed = [s for s in outer if s.exposed]
-    blind = [s for s in outer if not s.exposed and free(s)]
-    return [*([main] if main is not None else []), *exposed, *blind]
+    outer = sorted((s for s in segments if s.ring == 0), key=lambda s: (-s.length, s.index))
+    return [s for s in outer if s.exposed] + [s for s in outer if not s.exposed and free(s)]
 
 
 def ensure_door(

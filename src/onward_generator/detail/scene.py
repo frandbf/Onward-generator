@@ -515,7 +515,7 @@ def detail_scene(
         if layout is None:
             layout = run_layout(*plain_door, storeys)
         shop = ground == "shopfront"
-        doors_on = door_walls(segments, main, others, cfg)
+        doors_on = door_walls(segments, others, cfg)
         door_rule = ensure_door(layout, [] if shop else doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         opened_windows = omitted_windows = 0
         if interior is not None:
