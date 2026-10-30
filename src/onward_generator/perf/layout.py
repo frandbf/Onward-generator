@@ -391,8 +391,9 @@ def _patrol_lines(ways: Sequence[LinearWay], sidewalk_width_m: float) -> list[Li
     ordered = sorted(ways, key=lambda item: item.id)
     pedestrian = [line for way in ordered if way.road_class == "pedestrian" for line in _centerlines(way.geometry)]
     lines = _centerlines(linemerge(pedestrian))
-    for width in sorted({way.width_m for way in ordered if way.road_class != "pedestrian"}):
-        street = [line for way in ordered if way.road_class != "pedestrian" and way.width_m == width for line in _centerlines(way.geometry)]
+    streets = [way for way in ordered if way.road_class != "pedestrian"]
+    for width in sorted({way.width_m for way in streets}):
+        street = [line for way in streets if way.width_m == width for line in _centerlines(way.geometry)]
         for line in _centerlines(linemerge(street)):
             for shift in (width / 2.0 + sidewalk_width_m / 2.0, width / 2.0 + KERB_OFFSET_M):
                 for signed in (shift, -shift):
@@ -481,7 +482,7 @@ def nav_islands(base: GeneratedScene) -> list[BaseGeometry]:
 
     Furniture is not a navmesh obstacle, so it does not split an island here.
     """
-    return list(polygons_of(free_ground(base, []).buffer(-NAV_AGENT_RADIUS_M)))
+    return list(polygons_of(free_ground(base, []).buffer(-NAV_AGENT_RADIUS_M)))  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
 
 
 def hunt_routes(
@@ -501,7 +502,7 @@ def hunt_routes(
         pass
     routes, separation = fit_spawn_separation(base, free, islands, count)
     near = [route for route in routes if dwithin(home, Point(route["points"][0]["x"], route["points"][0]["y"]), NAV_AGENT_RADIUS_M)]  # pragma: no mutate: every point of a route lies on the island of its start, so any index finds the same island
-    chosen = spread_routes(near, count, focus)
+    chosen = near[:count]
     rest = [route for route in routes if route not in near]
     return chosen + spread_routes(rest, count - len(chosen), focus), separation
 

@@ -288,6 +288,13 @@ def test_a_route_starts_on_the_first_point_of_an_island() -> None:
     assert _sample(LineString([(0, 0), (50, 0)]), ground, 4.0, [island]) == [(18.0, 0.0), (32.0, 0.0), (46.0, 0.0)]
 
 
+def test_a_route_does_not_start_in_the_bounding_box_of_an_island() -> None:
+    """The first point sits in the gap of a U-shaped island: inside its envelope, 9 m from its ground."""
+    ground = box(-5, -50, 110, 5)
+    island = box(-1, -30, 101, 1).difference(box(31.0, -25, 51.5, 2))
+    assert _sample(LineString([(36, 0), (100, 0)]), ground, 4.0, [island]) == [(54.0, 0.0), (68.0, 0.0), (82.0, 0.0), (96.0, 0.0)]
+
+
 def test_a_route_stops_where_it_leaves_its_island() -> None:
     """The line crosses a street onto another island, then back onto the first; the route stops at the street."""
     ground = box(-5, -50, 110, 5)
