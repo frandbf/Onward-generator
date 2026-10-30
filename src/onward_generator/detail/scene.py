@@ -215,7 +215,7 @@ def _use_evidence(
     """OSM features that may name a building's use: ``(source id, tags, match)`` per building.
 
     A POI inside a footprint is ``poi_inside``. A POI outside every footprint goes to the
-    nearest one within ``shop_evidence_distance_m`` as ``poi_near``. An area whose
+    nearest ones (every footprint at that distance) within ``shop_evidence_distance_m`` as ``poi_near``. An area whose
     tags name a use (an ``amenity=school`` ground) is ``enclosing_area`` for every
     building whose representative point it contains. Street furniture is not evidence.
     """
@@ -228,13 +228,13 @@ def _use_evidence(
             continue
         geom = shape(f["geometry"])
         if f["kind"] == "area":
-            for k in sorted(int(x) for x in tree.query(geom, predicate="intersects")):
+            for k in sorted(int(x) for x in tree.query(geom)):
                 if geom.contains(footprints[ids[k]].representative_point()):
                     related[ids[k]].append((f["id"], tags, "enclosing_area"))
             continue
         inside = sorted(int(x) for x in tree.query(geom, predicate="intersects"))
         match = "poi_inside" if inside else "poi_near"
-        hits = inside or sorted(int(x) for x in tree.query_nearest(geom, max_distance=cfg.shop_evidence_distance_m, all_matches=True))
+        hits = inside or sorted(int(x) for x in tree.query_nearest(geom, max_distance=cfg.shop_evidence_distance_m))
         for k in hits:
             related[ids[k]].append((f["id"], tags, match))
     return related

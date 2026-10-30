@@ -48,6 +48,16 @@ def test_use_evidence_matches_pois_and_areas_to_footprints() -> None:
     }
 
 
+def test_a_poi_in_the_notch_of_an_l_shaped_footprint_is_not_inside_it() -> None:
+    ell = {"ell": box(0, 0, 10, 10).difference(box(5, 5, 10, 10))}
+    # (8, 8) is inside the bounding box but 3 m from the footprint, beyond the 2 m reach.
+    assert dict(_use_evidence([_poi("poi-notch", 8, 8, {"shop": "books"})], ell, CFG)) == {}
+    # (6, 6) is 1 m from it: near, not inside.
+    assert dict(_use_evidence([_poi("poi-near", 6, 6, {"shop": "books"})], ell, CFG)) == {
+        "ell": [("poi-near", {"shop": "books"}, "poi_near")],
+    }
+
+
 def test_use_evidence_skips_pois_the_config_places_as_street_furniture() -> None:
     cfg = replace(CFG, urban_observed=MappingProxyType({"kiosk": MappingProxyType({"shop": frozenset({"kiosk"})})}))
     features = [_poi("poi-kiosk", 5, 5, {"shop": "kiosk"}), _poi("poi-books", 6, 5, {"shop": "books"})]
@@ -70,6 +80,10 @@ def test_touching_neighbours_never_share_a_wall_when_the_palette_allows() -> Non
     ordered = [walls[f"b{i}"][1] for i in range(8)]
     assert all(left != right for left, right in zip(ordered, ordered[1:], strict=False))
     assert set(ordered) == {"plaster_ochre", "plaster_cream"}
+    # A gap narrower than probe_m still makes them neighbours.
+    gapped = {f"g{i}": box(10.5 * i, 0, 10.5 * i + 10, 10) for i in range(8)}
+    spaced = [_walls(two, gapped, {}, [])[f"g{i}"][1] for i in range(8)]
+    assert all(left != right for left, right in zip(spaced, spaced[1:], strict=False))
     # A gap wider than probe_m is not a neighbour: both may draw the same wall.
     apart = {"x": box(0, 0, 10, 10), "y": box(10 + CFG.probe_m + 0.5, 0, 30, 10)}
     one = replace(CFG, facade_palettes=MappingProxyType({**CFG.facade_palettes, "residential": ("plaster_ochre",)}))

@@ -31,12 +31,13 @@ def _buildings(inputs: tuple[Path, Path, Path], cfg=CFG) -> tuple[dict[str, dict
     return records, detailed.stats
 
 
-@pytest.fixture(scope="module")
+# Function scope: each test runs detail itself, so mutation testing sees every test call it.
+@pytest.fixture
 def row(row_inputs: tuple[Path, Path, Path]) -> tuple[dict[str, dict], dict]:
     return _buildings(row_inputs)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def block(detail_inputs: tuple[Path, Path, Path]) -> tuple[dict[str, dict], dict]:
     return _buildings(detail_inputs)
 
