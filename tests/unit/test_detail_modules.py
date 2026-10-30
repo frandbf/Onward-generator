@@ -242,11 +242,24 @@ def _mutated(path: list[str | int], value: object) -> dict:
         (["templates", "generic_residential", "narrow_window", "height_m"], 2.0, "minimum storey"),
         (["seed"], -1, "minimum"),
         (["interiors", "stair", "max_riser_m"], 0.3, "maximum"),
+        (["interiors", "max_triangles"], -1, "minimum"),
+        (["interiors", "max_triangles"], 100001, "maximum"),
+        (["interiors", "max_triangles"], 8000.5, "integer"),
+        (["interiors", "max_triangles"], "8000", "integer"),
     ],
 )
 def test_invalid_detail_config_is_rejected(path: list[str | int], value: object, fragment: str) -> None:
     with pytest.raises(DetailConfigError, match=fragment):
         config_from_document(_mutated(path, value))
+
+
+def test_interior_triangle_budget_is_required_and_read_as_given() -> None:
+    doc = copy.deepcopy(DOC)
+    del doc["interiors"]["max_triangles"]
+    with pytest.raises(DetailConfigError, match="'max_triangles' is a required property"):
+        config_from_document(doc)
+    for value in (0, 1234, 100000):
+        assert config_from_document(_mutated(["interiors", "max_triangles"], value)).interiors.max_triangles == value
 
 
 def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:

@@ -37,7 +37,7 @@ DocName = Literal["project", "heights", "detail"]
 ALLOWED_CHANGES: dict[DocName, frozenset[str]] = {
     "project": frozenset({"/quality/detail_level", "/generation/interiors"}),
     "heights": frozenset({"/typical_levels/residential_multi"}),
-    "detail": frozenset({"/interiors/max_buildings", "/interiors/enabled"}),
+    "detail": frozenset({"/interiors/max_buildings", "/interiors/min_buildings", "/interiors/enabled"}),
 }
 
 # Documented for people and checked by tests; the allowlist above is what enforces it.
@@ -276,6 +276,9 @@ def build_plan(intent: Intent, base: BaseConfigs, instruction: str = "") -> Plan
     if intent.interior_buildings is not None:
         n = intent.interior_buildings
         change("detail", "/interiors/max_buildings", n, "geometry", "interior_buildings", more_is_costlier=True)
+        if n > 0:  # a ceiling of 0 turns interiors off and leaves the floor alone
+            change("detail", "/interiors/min_buildings", min(n, _get(docs["detail"], "/interiors/min_buildings")), "geometry",
+                   "interior_buildings; the floor of the draw may not exceed the ceiling", more_is_costlier=True)
         change("detail", "/interiors/enabled", n > 0, "geometry", "interior_buildings")
         change("project", "/generation/interiors", n > 0, "recorded_only",
                "interior_buildings; the detail stage reads its own interiors settings")

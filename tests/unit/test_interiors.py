@@ -13,9 +13,11 @@ from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
 from onward_generator.detail.interiors import (
     GLASS_VIEW,
+    Interior,
     InteriorPlan,
     _inner_walls,
     build_interior,
+    fits_triangle_budget,
     glass_penetrations,
     light_anchors,
     pierce_room_windows,
@@ -161,9 +163,42 @@ def test_window_off_the_inner_wall_is_omitted() -> None:
     assert layout.holes == []
 
 
+def test_default_interiors_are_five_to_eight_within_eight_thousand_triangles() -> None:
+    cfg = load_detail_config()
+    assert (cfg.interiors.min_buildings, cfg.interiors.max_buildings, cfg.interiors.max_triangles) == (5, 8, 8000)
+    rule = cfg.interiors.rule
+    assert (rule.min_levels, rule.min_area_m2, rule.max_area_m2, rule.min_rectangularity) == (3, 80.0, 500.0, 0.8)
+    assert {interior_quota(replace(cfg, seed=seed)) for seed in range(40)} == {5, 6, 7, 8}
+
+
+@pytest.mark.parametrize(
+    ("used", "cost", "limit", "fits"),
+    [
+        (0, 8000, 8000, True),  # exactly at the budget is inside it
+        (1, 8000, 8000, False),
+        (0, 8001, 8000, False),
+        (7000, 1000, 8000, True),
+        (7000, 1001, 8000, False),
+        (3000, 2000, 4999, False),  # the sum counts, not the larger term
+        (0, 0, 0, True),
+        (0, 1, 0, False),
+    ],
+)
+def test_triangle_budget_admits_up_to_the_limit(used: int, cost: int, limit: int, fits: bool) -> None:
+    assert fits_triangle_budget(used, cost, limit) is fits
+
+
+def test_interior_visual_triangles_count_every_material_and_no_collider() -> None:
+    tri = Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]]))
+    quad = Mesh(np.zeros((4, 3)), np.array([[0, 1, 2], [0, 2, 3]]))
+    plan = _room_plan(6.0, 4.0)
+    built = Interior(plan, {"interior_wall": [quad, tri], "interior_floor": [], "stair": [quad]}, [("walls_0", quad)], {})
+    assert built.visual_triangles == 5
+    assert Interior(plan, {}, [("walls_0", quad)], {}).visual_triangles == 0
+
+
 def test_interior_quota_is_between_two_and_five() -> None:
     cfg = load_detail_config()
-    assert (cfg.interiors.min_buildings, cfg.interiors.max_buildings) == (2, 5)
     assert interior_quota(cfg) == interior_quota(cfg)
     seen = {interior_quota(replace_seed(cfg, seed)) for seed in range(40)}
     assert seen == {2, 3, 4, 5}

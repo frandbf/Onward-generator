@@ -90,6 +90,7 @@ class Interiors:
     enabled: bool
     min_buildings: int
     max_buildings: int
+    max_triangles: int
     include_ids: tuple[str, ...]
     exclude_ids: frozenset[str]
     rule: InteriorRule
@@ -301,6 +302,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
             enabled=bool(i["enabled"]),
             min_buildings=int(i["min_buildings"]),
             max_buildings=int(i["max_buildings"]),
+            max_triangles=int(i["max_triangles"]),
             include_ids=tuple(i["include_ids"]),
             exclude_ids=frozenset(i["exclude_ids"]),
             rule=InteriorRule(frozenset(i["rule"]["categories"]), int(i["rule"]["min_levels"]), float(i["rule"]["min_area_m2"]),

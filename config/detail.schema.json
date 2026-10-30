@@ -111,11 +111,12 @@
     },
     "interiors": {
       "type": "object", "additionalProperties": false,
-      "required": ["enabled", "min_buildings", "max_buildings", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m"],
+      "required": ["enabled", "min_buildings", "max_buildings", "max_triangles", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m"],
       "properties": {
         "enabled": { "type": "boolean" },
         "min_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
         "max_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
+        "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
         "include_ids": { "$ref": "#/$defs/ids" },
         "exclude_ids": { "$ref": "#/$defs/ids" },
         "rule": {

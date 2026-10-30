@@ -62,10 +62,27 @@ A mismatch raises `DetailError` and writes nothing.
 
 ### Simplified interiors
 
-Generated only in **selected buildings**. The count is `sha256(seed, interiors, quota)` from `min_buildings` (2) through `max_buildings` (5). A map with fewer matches builds only those:
+Generated only in **selected buildings**. The count is `sha256(seed, interiors, quota)` from `min_buildings` (5) through `max_buildings` (8). A map with fewer matches builds only those:
 
 - `include_ids` first, except `exclude_ids`;
-- then buildings that match the rule: `residential_multi` or `unknown`, at least 3 storeys, 80–400 m², rectangularity ≥ 0.85, not a landmark, no courtyards. Ordered by `sha256(seed:interior:id)`.
+- then buildings that match the rule: `residential_multi` or `unknown`, at least 3 storeys, 80–500 m², rectangularity ≥ 0.8, not a landmark, no courtyards. Ordered by `sha256(seed:interior:id)`.
+
+Buildings are tried in that order until the count is reached. A building whose plan fails (`no_room_for_stair`, `no_door_position`) does not use up the count. The objects and issues are still written in building order.
+
+**Triangle budget.** `max_triangles` (default 8 000) caps the visual triangles of all `interior/<building>` nodes together: walls, floors, slab soffits and stairs. An interior that would take the total over it is not built. The building keeps the facade it has with interiors off, and `interior_not_generated` (info) records `triangle_budget` with the cost and what was left. Later buildings in the queue are still tried, so a smaller interior can fit after a larger one was turned down. The total is `counts.interior_visual_triangles` in `detail_report.json`. Colliders are not in this budget; an interior adds about 1.3 k collision triangles (Madrid sample below).
+
+Measured on central Madrid (40.4168, −3.7038, 150 m half-side, 172 buildings, 39 match the rule) and on the test block:
+
+| Scene | Interiors | Interior triangles (each) | Scene visual triangles |
+| --- | --- | --- | --- |
+| Madrid, interiors off | 0 | 0 | 162 848 |
+| Madrid, previous defaults (2–5, id order) | 2 | 472 (236 each) | 163 344 |
+| Madrid, these defaults (seed 48152 draws 5) | 5 | 2 640 (236–808, 11 rooms) | 165 524 |
+| Madrid, every match, 8 000 budget | 15 | 7 830 | 170 766 |
+| Madrid, every match, no budget | 39 | 21 118 (230–1 162, median 484) | 184 094 |
+| Test block, 3 matches | 3 | 2 242 (612–874) | 5 595 |
+
+Stairs are most of an interior: a flight is a closed stepped solid of about 130 triangles. Eight interiors of 2–3 floors give 16–24 furnished rooms, within the adapter's 24 baked lights (ADR-013).
 
 Each interior has a through-door on the main facade, a straight stair (tread 0.28 m, riser ≤ 0.185 m) between accessible floors, and partitions with a passage. The manifest describes rooms and connections (`door`, `stair`). If there is no room, `interior_not_generated` (info) records the reason, for example `no_room_for_stair`.
 
@@ -108,6 +125,7 @@ Material names that collide with the generation configuration are refused. Input
 | Limit | Value | Measured scene |
 | --- | --- | --- |
 | Visual triangles | 600 000 | 235 327 |
+| Interior visual triangles (`interiors.max_triangles`) | 8 000 | 2 640 (Madrid sample) |
 | Collision triangles | 120 000 | 42 896 |
 | Materials | 32 | 24 |
 | Nodes | 2 500 | 383 |

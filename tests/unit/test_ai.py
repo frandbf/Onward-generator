@@ -224,8 +224,10 @@ def test_example_instruction_maps_without_geometry_changes(base) -> None:  # typ
     assert plan.valid
     assert {(c.document, c.path) for c in plan.changes} == {("project", "/quality/detail_level"),
                                                            ("project", "/generation/interiors"),
-                                                           ("detail", "/interiors/max_buildings")}
+                                                           ("detail", "/interiors/max_buildings"),
+                                                           ("detail", "/interiors/min_buildings")}
     assert all(c.effect == "recorded_only" or c.cost == "decrease" for c in plan.changes)
+    assert (plan.documents["detail"]["interiors"]["min_buildings"], plan.documents["detail"]["interiors"]["max_buildings"]) == (2, 2)
     assert "instruction_mentions_unsupported" in codes(plan.diagnostics)
     assert plan.needs_confirmation
 
@@ -250,11 +252,21 @@ def test_cost_increase_is_refused_under_max_priority(base) -> None:  # type: ign
 
 @pytest.mark.parametrize("priority", ["balanced", None])
 def test_cost_increase_is_a_warning_otherwise(base, priority: str | None) -> None:  # type: ignore[no-untyped-def]
-    plan = plan_for(base, residential_levels=5, interior_buildings=6, performance_priority=priority)
+    plan = plan_for(base, residential_levels=5, interior_buildings=10, performance_priority=priority)
     assert plan.valid and plan.needs_confirmation
     assert codes(plan.diagnostics).count("not_measured_on_device") == 2
     assert plan.documents["heights"]["typical_levels"]["residential_multi"] == 5
-    assert plan.documents["detail"]["interiors"]["max_buildings"] == 6
+    assert plan.documents["detail"]["interiors"]["max_buildings"] == 10
+    assert plan.documents["detail"]["interiors"]["min_buildings"] == base.detail.document["interiors"]["min_buildings"] == 5
+
+
+@pytest.mark.parametrize("ceiling", [1, 4, 5])
+def test_a_ceiling_under_the_floor_lowers_the_floor(base, ceiling: int) -> None:  # type: ignore[no-untyped-def]
+    plan = plan_for(base, interior_buildings=ceiling)
+    assert plan.valid
+    interiors = plan.documents["detail"]["interiors"]
+    assert (interiors["min_buildings"], interiors["max_buildings"]) == (ceiling, ceiling)
+    assert [c.path for c in plan.changes if c.path == "/interiors/min_buildings"] == ([] if ceiling == 5 else ["/interiors/min_buildings"])
 
 
 def test_cost_decrease_is_allowed_under_max_but_still_confirmed(base) -> None:  # type: ignore[no-untyped-def]
@@ -267,7 +279,7 @@ def test_cost_decrease_is_allowed_under_max_but_still_confirmed(base) -> None:  
 
 
 def test_unchanged_values_are_not_changes(base) -> None:  # type: ignore[no-untyped-def]
-    plan = plan_for(base, residential_levels=4, interior_buildings=5, facade_detail="low")
+    plan = plan_for(base, residential_levels=4, interior_buildings=8, facade_detail="low")
     assert [c.path for c in plan.changes] == ["/generation/interiors"]
     assert not plan.needs_confirmation
 
