@@ -18,12 +18,13 @@ import hashlib
 from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 import numpy as np
 from PIL import Image, ImageDraw
 
-from onward_generator.dress.atlas import encode_png_rgba
+from onward_generator.dress.atlas import encode_png_rgba, run_png_jobs
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh
@@ -241,5 +242,5 @@ def shop_signs(manifest: Mapping[str, Any], boarded: Collection[str] = ()) -> Sh
         nodes.append(Node(f"shop_signs/{building}", tuple(prims), {"building": building, "attribute_origin": "generated"}))
     materials = {ATLAS_MATERIAL.format(page): Material((1.0, 1.0, 1.0, 1.0), 0.6) for page in pages}
     materials[EDGE_MATERIAL] = Material(EDGE_COLOR, 0.6)
-    images = {ATLAS_MATERIAL.format(page): encode_png_rgba(pixels) for page, pixels in pages.items()}
+    images = run_png_jobs({ATLAS_MATERIAL.format(page): partial(encode_png_rgba, pixels) for page, pixels in pages.items()})
     return ShopSigns(nodes, materials, images, rows, len(items) - len(rows))

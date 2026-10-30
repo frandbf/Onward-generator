@@ -8,7 +8,8 @@ slot and is supplied by the ``materials`` stage, not invented here.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -19,6 +20,8 @@ from onward_generator.generation.config import Material
 
 MIN_TILE_PX = 256
 MIN_MEAN_LUMA = 80  # unused / fallback tiles stay visible after shader multiply
+# Threads that bake and encode texture PNGs at once. zlib and Pillow's resize release the GIL.
+PNG_WORKERS = 6  # pragma: no mutate: the pool size changes speed, never the bytes or their order
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +50,20 @@ def encode_png_rgba(pixels: np.ndarray) -> bytes:
     buffer = BytesIO()
     image.save(buffer, format="PNG", optimize=False, compress_level=9)
     return buffer.getvalue()
+
+
+def run_png_jobs[K, T](jobs: Mapping[K, Callable[[], T]]) -> dict[K, T]:
+    """Run each job on a pool of ``PNG_WORKERS`` threads and return its result under the same key, in key order.
+
+    A job bakes and encodes one image. Each job is pure, so the bytes are the
+    same as running the jobs one after the other. The first exception is raised.
+    """
+    with ThreadPoolExecutor(max_workers=PNG_WORKERS) as pool:  # pragma: no mutate: the pool size changes speed, never the bytes or their order
+        return dict(zip(jobs, pool.map(_call, jobs.values())))
+
+
+def _call[T](job: Callable[[], T]) -> T:
+    return job()
 
 
 def decode_png_rgba(data: bytes) -> np.ndarray:
