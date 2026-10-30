@@ -15,6 +15,21 @@
 UNITY_VERSION="2021.3.23f1"
 HOST_SHIFT=0
 
+# How push installs the map on the Quest (ONWARD_QUEST_LISTING or --listing).
+# "local" is today's install. The others are unverified candidates (ADR-007,
+# amendment 1). Same list as CANDIDATE_LISTINGS in src/onward_generator/export/info3.py.
+QUEST_LISTINGS="local local-thumb named named-thumb"
+
+# Exit 2 with the list when $1 is not a listing mode.
+check_quest_listing() {
+  local mode
+  for mode in $QUEST_LISTINGS; do
+    [[ "$1" == "$mode" ]] && return 0
+  done
+  echo "unknown Quest listing '$1'; use one of: $QUEST_LISTINGS" >&2
+  exit 2
+}
+
 # Wall time since $1, a $SECONDS value, written as the Python run writes it: "42 s" or "4 min 05 s".
 elapsed() {
   local s=$((SECONDS - $1))

@@ -63,9 +63,39 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 | `tool` | Copies `OnwardMapAdapter.cs` into the Unity 2021.3.23f1 project that holds SDK v1.15 and the Launcher path patch |
 | `scene` | Verifies the package in Python and in C# (SHA-256, adapter name and version, Unity version). Builds the scene under `Assets/OnwardAdapter/<package_id>/`: visuals combined by cell and material, collision as `MeshCollider` with no renderer, a baked directional light, spawns, Uplink, Free Roam, map quad, tent, damage volume, and a `LevelDescriptor` with the title and attribution. Writes `build/scene_report.json`. Refuses if that folder already exists |
 | `launcher` | Calls the Onward Launcher for Quest. Writes `build/launcher/unity-export.local.{content3,info3}`, `build/content3.md5`, and `build/launcher.sha256`. Never overwrites |
-| `push` | **Only with `CONFIRM_PUSH=yes`.** Backs up the local map already on the headset (`build/device_backup/`), copies the new one, checks the MD5 on the device, and records it in `build/push.log` |
+| `push` | **Only with `CONFIRM_PUSH=yes`.** Backs up the headset files it will replace (`build/device_backup/<time>-XXXX/`), copies the bundle, the `.info3` and the thumbnail, checks the MD5 of each on the device, and records it in `build/push.log`. The listing mode (below) is `local` unless `--listing` or `ONWARD_QUEST_LISTING` says otherwise |
+| `inspect` | Read-only. Writes `build/device_inspect/<time>/files_tree.txt` (`ls -laR` of the game's `files/` folder) and copies every `.info3` in `CustomContent`. Never copies a bundle and never writes to the headset |
 
 Unity logs stay in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS and `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. `LOG_DIR` replaces the whole folder. The host comes from `--platform` as the script's first argument, then `ONWARD_PLATFORM`, then `uname -s` ([01-pipeline.md](01-pipeline.md#host-platform)). The Editor must be closed before `scene` starts. `run` detects that from the exclusive lock on `Temp/UnityLockfile`, or from `Library/EditorInstance.json` when the lock file is absent and its process is still alive. A newer Unity editor rewrites the project and 2021.3.23f1 can no longer open it.
+
+## Quest listing modes (experimental)
+
+Decision: [ADR-007, amendment 1](decisions/ADR-007-onward-export-adapter.md#amendment-1-quest-listing-modes-experimental). **None of these modes is verified on the headset.** The default, `local`, is the install that loaded Hunt, and it does not change.
+
+One switch picks the mode: `ONWARD_QUEST_LISTING=<mode>` for `task unity`, `build_map.sh` or `run_export.sh`, or `--listing <mode>` on either script (`task unity -- --listing <mode>`). The flag wins over the variable; an empty variable means `local`. An unknown mode stops with exit 2 and the list, before Unity or the headset is touched. The list lives in `tools/unity/lib.sh` (`QUEST_LISTINGS`) and in `CANDIDATE_LISTINGS` of `src/onward_generator/export/info3.py`; a test keeps them equal.
+
+| Mode | Device files written | `ID` | `MapName` | `ThumbnailUrl` |
+| --- | --- | --- | --- | --- |
+| `local` | `unity-export.local.{content3,info3,png}` | `unity-export.local` | `Unity Export` | empty |
+| `local-thumb` | same three | `unity-export.local` | `Unity Export` | `file:///sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent/unity-export.local.png` |
+| `named` | `onwardgen.<map id>.{content3,info3,png}`; the local slot is not touched | `onwardgen.<map id>` | the map title | empty |
+| `named-thumb` | same as `named` | `onwardgen.<map id>` | the map title | `file://…/CustomContent/onwardgen.<map id>.png` |
+
+For a mode other than `local`, `push` first writes a new listing under `build/listings/<mode>/<ID>.info3`, derived from the Launcher's `unity-export.local.info3`, which is read and never changed. The writer (`write_candidate_listing`) refuses when the source `ID` is not `unity-export.local`, when `BundleHash` is not the MD5 of the bundle that will be copied, when the title is empty or longer than 80 characters, when the map id does not match `[A-Za-z0-9_]{1,40}`, or when a different file already sits at the target (the same bytes are accepted, so a second push reuses it). The thumbnail must be a PNG of 512×256, the size the Custom Content Guide requires. `GameModes`, `EnvironmentType`, `BundleHash`, `Description` and `IsSanitized` stay as the local listing has them. The bundle bytes are the same in every mode; only the name of the copy changes.
+
+Every mode backs up the files of both ids it may replace (`unity-export.local.*` and, for `named*`, `onwardgen.<map id>.*`) before copying, and deletes nothing. To go back, run `push` again with `local`, or copy the backup folder's files to `CustomContent` with `adb push`. A `named*` pair stays on the headset next to the local one until removed by hand (`adb shell rm …/CustomContent/onwardgen.<map id>.*`).
+
+### Headset test
+
+Nothing here is marked as passed. Write each result in the package's `quest_acceptance.md` observations or in the pull request.
+
+1. Before changing anything: `tools/unity/onward_adapter/run_export.sh <package> inspect`. If a Workshop map was ever downloaded on the headset, its files show how the game names a downloaded map and its picture (look for a `.png`, `.jpg` or a thumbnail folder next to its `.info3`, and at its `ID` and `ThumbnailUrl`). Keep that folder; it is the best evidence for the next step.
+2. `ONWARD_QUEST_LISTING=local-thumb task unity -- "<map>"`, answer `s`. Start Onward. In the custom map list: does `Unity Export` show the map's thumbnail instead of the generic picture? Does Free Roam load? Does Hunt appear and load?
+3. `ONWARD_QUEST_LISTING=named task unity -- "<map>"`, answer `s`. Is a second card listed with the map's title? Does it load in Free Roam, and is Hunt listed? Is its picture the map's or the generic one? Is `Unity Export` still listed and still loadable? Then `adb shell ls …/CustomContent`: are both `onwardgen.<map id>.*` files still there after the game started (the game might remove an id it does not know)?
+4. Only if 3 lists the card: `ONWARD_QUEST_LISTING=named-thumb task unity -- "<map>"` and the same questions about the picture.
+5. `ONWARD_QUEST_LISTING=local task unity -- "<map>"` (or plain `task unity`) restores today's install of the local slot.
+
+A mode that hides the map or breaks Hunt is reverted by step 5; nothing else needs to be undone except removing a `named*` pair by hand.
 
 ## Lighting
 
@@ -91,7 +121,7 @@ Unknown, to check on the headset: whether the Onward runtime or the `UrbanDay1` 
 
 ## Known limits
 
-- The local pair is always `unity-export.local.*`. The adapter passes the package title to `ContentBuilder.BuildScene`. The launcher script sets `MapName` to `Unity Export` and confirms the description. It sets `GameModes` to Free Roam (4), Hunt (10), and Uplink (1). When the layout is `gameplay_layout`, it sets `EnvironmentType` to Urban (2). It does not change `ID` or `BundleHash`. `ThumbnailUrl` in the local `.info3` stays empty: Onward fills it only when a map is published to the Workshop. The thumbnail is assigned to `SharedSettings.Thumbnail` and copied to the headset as `unity-export.local.png`.
+- The local pair is always `unity-export.local.*`. The adapter passes the package title to `ContentBuilder.BuildScene`. The launcher script sets `MapName` to `Unity Export` and confirms the description. It sets `GameModes` to Free Roam (4), Hunt (10), and Uplink (1). When the layout is `gameplay_layout`, it sets `EnvironmentType` to Urban (2). It does not change `ID` or `BundleHash`. `ThumbnailUrl` in the local `.info3` stays empty: Onward fills it only when a map is published to the Workshop. The thumbnail is assigned to `SharedSettings.Thumbnail` and copied to the headset as `unity-export.local.png`. On the headset the card still shows a generic picture, so the game does not appear to read that file; the [listing modes](#quest-listing-modes-experimental) are the opt-in attempts to fix the name and the picture.
 - The headset has one local slot. Two maps on disk are built separately. The headset holds the last one that was uploaded.
 - A new map's layout is `onward_generator.gameplay_layout` 0.3.0. It describes Free Roam, Uplink, Assault, Escort, Hunt, Evac, and Retrieval. The phase-05 measurement fixture stays `perf_layout` and does not carry those modes. How the SDK guide is applied is in [11-onward-sdk.md](11-onward-sdk.md).
 - On macOS and Linux, `OnwardLauncher.cs` must not rewrite the bundle path to backslashes. The patch removes only `.Replace('/', '\\')`. The original is `~/Unity/OnwardPhase0Project/OnwardLauncher.cs.sdk-v1.15.orig`, outside `Assets`. Reimporting the `.unitypackage` undoes the patch.

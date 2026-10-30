@@ -41,6 +41,8 @@ Those numbers are one scene, one route, one player, no bots. A match with player
 
 The SDK always writes the local map as `unity-export.local.*`, titled `Unity Export`. `push` backs up whatever is on the headset before replacing it and checks the md5 on the device.
 
+Measure with the default listing mode (`local`). The experimental modes for the map's name and thumbnail, and their headset test, are in [12-export.md](12-export.md#quest-listing-modes-experimental).
+
 ### Route session (frame time)
 
 1. Launch Onward, open `Unity Export`, Free Roam.
