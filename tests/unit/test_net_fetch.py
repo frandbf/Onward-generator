@@ -231,6 +231,16 @@ def test_fetch_bytes_gives_up_after_network_retries() -> None:
     assert waits == [8.0]
 
 
+def test_fetch_bytes_counts_every_network_retry() -> None:
+    waits: list[float] = []
+    failures = [TimeoutError("slow"), ConnectionResetError("reset"), TimeoutError("slow again")]
+    opener, seen = _opener(*failures, b"never")
+    with pytest.raises(FetchFailed, match="slow again"):
+        _fetch(opener, retry_transient=2, retry_delay_s=1.0, sleep=waits.append)
+    assert len(seen) == 3
+    assert waits == [1.0, 2.0]
+
+
 def test_fetch_bytes_counts_429_and_transient_retries_apart() -> None:
     waits: list[float] = []
     opener, seen = _opener(_http_error(429), _http_error(503), _http_error(429), b"done")

@@ -109,14 +109,29 @@ def test_download_retries_an_overpass_runtime_error(tmp_path: Path) -> None:
     root = _map(tmp_path)
     answers = [b'<osm version="0.6"><remark>runtime error: Query run out of memory</remark></osm>', _XML]
     waits: list[float] = []
+    queries: list[str] = []
 
-    def fetch(_endpoint: str, _query: str, _timeout: float) -> bytes:
+    def fetch(_endpoint: str, query: str, _timeout: float) -> bytes:
+        queries.append(query)
         return answers.pop(0)
 
     record = download_map_osm(root, fetch=fetch, sleep=waits.append)
     assert waits == [30.0]
+    assert queries == [overpass_query(inclusion_bbox(root))] * 2
     assert record.osm_base == "2026-10-19T18:00:00Z"
     assert (root / "data" / "raw" / "obelisco.osm").read_bytes() == _XML
+
+
+def test_download_cuts_a_long_overpass_remark(tmp_path: Path) -> None:
+    root = _map(tmp_path)
+    remark = "runtime error: " + "x" * 400
+
+    def fetch(_endpoint: str, _query: str, _timeout: float) -> bytes:
+        return f'<osm version="0.6"><remark>{remark}</remark></osm>'.encode()
+
+    with pytest.raises(OsmDownloadError) as caught:
+        download_map_osm(root, fetch=fetch, sleep=lambda _s: None)
+    assert str(caught.value) == f"Overpass refused the query: {remark[:300]}"
 
 
 def test_download_does_not_retry_a_page_that_is_not_osm(tmp_path: Path) -> None:
