@@ -92,6 +92,8 @@ else
   started=$SECONDS
   "$TOOL_DIR/run_export.sh" ${platform[@]+"${platform[@]}"} "$package" "${steps[@]}"
   echo "✓ Unity $(elapsed "$started")"
+  # Seconds per Unity phase, from build/scene_report.json and build/launcher_report.json.
+  "${PYTHON:-$REPO/.venv/bin/python}" "$REPO/tools/unity/report_timings.py" "$package" || true
 fi
 
 if [[ ! -t 0 ]]; then

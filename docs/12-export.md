@@ -60,13 +60,26 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 
 | Step | Effect |
 | --- | --- |
-| `tool` | Copies `OnwardMapAdapter.cs` into the Unity 2021.3.23f1 project that holds SDK v1.15 and the Launcher path patch |
+| `tool` | Copies `OnwardMapAdapter.cs` and the listing thumbnail into the Unity 2021.3.23f1 project that holds SDK v1.15 and the Launcher path patch. A file whose bytes already match (`cmp -s`) is not copied, so an unchanged adapter does not make Unity recompile |
 | `scene` | Verifies the package in Python and in C# (SHA-256, adapter name and version, Unity version). Builds the scene under `Assets/OnwardAdapter/<package_id>/`: visuals combined by cell and material, collision as `MeshCollider` with no renderer, a baked directional light, spawns, Uplink, Free Roam, map quad, tent, damage volume, and a `LevelDescriptor` with the title and attribution. Writes `build/scene_report.json`. Refuses if that folder already exists |
-| `launcher` | Calls the Onward Launcher for Quest. Writes `build/launcher/unity-export.local.{content3,info3}`, `build/content3.md5`, and `build/launcher.sha256`. Never overwrites |
+| `launcher` | Calls the Onward Launcher for Quest. Writes `build/launcher/unity-export.local.{content3,info3}`, `build/content3.md5`, `build/launcher.sha256`, and the step's timings in `build/launcher_report.json` (an older one is renamed with a time suffix). Never overwrites the launcher output |
 | `push` | **Only with `CONFIRM_PUSH=yes`.** Backs up the headset files it will replace (`build/device_backup/<time>-XXXX/`), copies the bundle, the `.info3` and the thumbnail, checks the MD5 of each on the device, and records it in `build/push.log`. The listing mode (below) is `local` unless `--listing` or `ONWARD_QUEST_LISTING` says otherwise |
 | `inspect` | Read-only. Writes `build/device_inspect/<time>/files_tree.txt` (`ls -laR` of the game's `files/` folder) and copies every `.info3` in `CustomContent`. Never copies a bundle and never writes to the headset |
 
 Unity logs stay in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS and `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. `LOG_DIR` replaces the whole folder. The host comes from `--platform` as the script's first argument, then `ONWARD_PLATFORM`, then `uname -s` ([01-pipeline.md](01-pipeline.md#host-platform)). The Editor must be closed before `scene` starts. `run` detects that from the exclusive lock on `Temp/UnityLockfile`, or from `Library/EditorInstance.json` when the lock file is absent and its process is still alive. A newer Unity editor rewrites the project and 2021.3.23f1 can no longer open it.
+
+### Unity timings
+
+Each Unity step charges its time to named phases and logs them in one line, `[OnwardAdapter] Timings: <phase> <s> s, ..., total <s> s`. `run` keeps that line in its Unity summary.
+
+| Step | Phases, in order | Written to |
+| --- | --- | --- |
+| `scene` | `import` (package, GLB, textures, meshes, collision), `combine`, `navmesh`, `nav_nodes` (every `GenerateNodes` attempt; each `Navigation spacing` line also gives its own seconds), `gameplay` (gameplay objects, lights, probes, first scene save, level settings), `gi_bake` (`Lightmapping.Bake`), `astc` (lightmap reimport), `save` | `seconds.<phase>` and `seconds.total` in `build/scene_report.json`, beside the older `seconds.scene` (everything before the bake) and `seconds.bake` (`gi_bake` plus `astc`) |
+| `launcher` | `open` (package check and scene open), `hunt` (Hunt roster and patrol, save), `bundle` (`ContentBuilder.BuildScene`), `copy` (bundle copy, MD5, `.info3`) | `seconds.<phase>` and `seconds.total` in `build/launcher_report.json` (schema `onward_generator.onward_adapter_launcher_report`). `scene_report.json` belongs to the scene step and is not rewritten |
+
+A phase without its step (no gameplay layout: no `navmesh`) is left out. After the bake the scene step also logs `[OnwardAdapter] Lightmapper: <used> (requested ProgressiveGPU, fallback yes|no[: first warning]). Lightmaps: N (<width>x<height> xK, ...)`, and `scene_report.json` adds `lightmap_bake`: `lightmapper_requested`, `lightmapper`, `fallback`, `fallback_warning` and `sizes`. `fallback` is true when the lightmapper in the settings after the bake is not `ProgressiveGPU`, or when Unity logged a message about falling back to the CPU during the bake. `run_export.sh` also prints any such line from the scene log as `[export] lightmapper: ...`, because a native warning may not reach the C# log hook. The message text is Unity's and was not seen on this project's hosts, so the match is loose (`fall back` together with `CPU`, `lightmapper` or `OpenCL`).
+
+`python tools/unity/report_timings.py PATH...` prints the timings of one or more packages as a Markdown table, one column per package and one row per phase (`scene.<phase>`, `launcher.<phase>`, `lightmapper`, `lightmaps`). PATH is a package folder, its `build/` folder or a `scene_report.json`; a missing value is `-`. `build_map.sh` (`task unity`) prints the table after the Unity steps. These are Editor timings, not device measurements.
 
 ## Quest listing modes (experimental)
 
@@ -107,7 +120,8 @@ Everything is baked. No realtime light reaches the Quest.
 - **Lightmap estimate.** `onward_export.json` carries `lightmap_estimate`: per combined renderer (100 m cell and material, as the adapter groups them) its area times the squared texel density, capped at one page as Unity scales down a renderer that does not fit; `texels`, `texels_by_class`, `renderers_capped` and `pages_at_least`. Packing and padding are left out, so the page count is a lower bound. `export package` prints it. After the bake the Unity log prints `Lightmaps: N, T texels`, and `build/scene_report.json` adds `lightmap_texels`, so the two can be compared.
 - **Interior lights** ([ADR-013](decisions/ADR-013-interior-light-anchors.md)). For each room in the visual GLB's `light_anchors`, one `Point` light, `Baked`, soft baked shadows, warm white, intensity `build.interior_light_intensity` (default 0.8), range from the anchor. At most `build.interior_lights_max` (default 24) per map. Both keys are optional in the export configuration. `detail` already keeps at most `interiors.lights_max` (24) rooms lit, shops first and then nearest the map centre (`docs/07-detail.md`, *Shop interiors*); a room past it has probes and no `light_m`, and the adapter adds its probes and no light. When the visual GLB asks for more lights than `build.interior_lights_max`, `export package` warns (`the scene asks for N interior lights`), because the adapter would then cut in node order. Keep the two numbers equal.
 - **Light probes.** One `LightProbeGroup`: the room probes from the anchors plus outdoor columns on the walkable navmesh every 12 m (wider on a large map, at most 1500 columns), at 1 m and 6 m. Without a navmesh (`perf_layout`) no group is added and unlit renderers keep the ambient probe.
-- `build/scene_report.json` counts `lights`, `light_probes`, `lightmaps` and `lightmap_texels`.
+- `build/scene_report.json` counts `lights`, `light_probes`, `lightmaps` and `lightmap_texels`, and records the lightmapper and page sizes in `lightmap_bake` ([Unity timings](#unity-timings)).
+- **Lightmaps after the scene opens.** When `LightmapSettings.lightmaps` is empty after the launcher opens the scene, the adapter assigns every `Lightmap-N_comp_light.exr` beside the scene, with no fixed limit, and each `Lightmap-N_comp_dir.png` as its direction map in directional mode. When only some pages have a direction map it warns and assigns them all non-directional.
 
 ## Horizon
 

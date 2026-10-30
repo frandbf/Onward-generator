@@ -1,8 +1,9 @@
-"""run_export.sh push listing modes and inspect against a fake adb. Runs bash only, never Unity or a headset."""
+"""run_export.sh push listing modes, inspect and tool against a fake adb. Runs bash only, never Unity or a headset."""
 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -185,3 +186,34 @@ def test_shell_and_python_list_the_same_modes() -> None:
     line = next(row for row in (REPO_ROOT / "tools" / "unity" / "lib.sh").read_text(encoding="utf-8").splitlines()
                 if row.startswith("QUEST_LISTINGS="))
     assert line.split("=", 1)[1].strip('"').split() == ["local", *CANDIDATE_LISTINGS]
+
+
+def test_tool_step_copies_only_changed_files(setup: tuple[Path, Path, dict[str, str]], tmp_path: Path) -> None:
+    package, _, env = setup
+    project = tmp_path / "project"
+    builder = project / "Assets" / "OnwardCustomContent" / "Internal" / "Scripts" / "Editor" / "ContentBuilder.cs"
+    builder.parent.mkdir(parents=True)
+    tools = REPO_ROOT / "tools" / "unity" / "onward_adapter"
+    spec = importlib.util.spec_from_file_location("patch_content_builder", tools / "patch_content_builder.py")
+    assert spec is not None and spec.loader is not None
+    patch = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(patch)
+    builder.write_text(patch.NEW_ASSIGN + patch.NEW_BUILD, encoding="utf-8")
+    env = {**env, "PROJECT": str(project)}
+    adapter = project / "Assets" / "OnwardGenerator" / "Editor" / "OnwardMapAdapter.cs"
+
+    first = _run(package, env, "tool")
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert "copied 2 changed file(s) into the project: OnwardMapAdapter.cs apocalipsis_murciana.png" in first.stdout
+    assert adapter.read_bytes() == (tools / "Editor" / "OnwardMapAdapter.cs").read_bytes()
+    os.utime(adapter, (1, 1))
+
+    second = _run(package, env, "tool")
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert "copied 0 changed file(s) into the project: none, all unchanged" in second.stdout
+    assert adapter.stat().st_mtime == 1
+
+    adapter.write_text("stale", encoding="utf-8")
+    third = _run(package, env, "tool")
+    assert "copied 1 changed file(s) into the project: OnwardMapAdapter.cs\n" in third.stdout
+    assert adapter.read_bytes() == (tools / "Editor" / "OnwardMapAdapter.cs").read_bytes()

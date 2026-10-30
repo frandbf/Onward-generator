@@ -349,6 +349,24 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
     assert "onward-export" not in summary
 
 
+def test_unity_summary_keeps_timings_and_lightmapper_lines() -> None:
+    text = "\n".join([
+        "[OnwardAdapter] Hunt routes 4: loops on, changed 0.",
+        "[OnwardAdapter] Lightmaps: 3, 9000000 texels, at 10 texels/m, at most 2048 px.",
+        "[OnwardAdapter] Lightmapper: ProgressiveCPU (requested ProgressiveGPU, fallback yes). Lightmaps: 3 (2048x2048 x3).",
+        "[OnwardAdapter] Timings: import 12.3 s, combine 4.0 s, gi_bake 200.1 s, total 240.0 s",
+        "[export] lightmapper: Falling back to CPU lightmapper.",
+        "[OnwardAdapter] Timings: open 9.0 s, bundle 30.2 s, copy 0.4 s, total 41.0 s",
+    ])
+    assert _unity_summary(text, failed=False).splitlines() == [
+        "  Hunt routes 4: loops on, changed 0.",
+        "  Lightmapper: ProgressiveCPU (requested ProgressiveGPU, fallback yes). Lightmaps: 3 (2048x2048 x3).",
+        "  Timings: import 12.3 s, combine 4.0 s, gi_bake 200.1 s, total 240.0 s",
+        "  lightmapper: Falling back to CPU lightmapper.",
+        "  Timings: open 9.0 s, bundle 30.2 s, copy 0.4 s, total 41.0 s",
+    ]
+
+
 def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)

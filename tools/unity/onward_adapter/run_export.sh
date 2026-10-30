@@ -69,16 +69,27 @@ run_unity() {
   log "step '$step' OK in $(elapsed "$started")"
 }
 
+# Copy only a file that differs: an unchanged script keeps Unity from recompiling and reloading.
+copy_if_changed() {
+  local src="$1" dst="$2"
+  if cmp -s "$src" "$dst"; then return 0; fi
+  cp "$src" "$dst"
+  COPIED+=("$(basename "$src")")
+}
+
 step_tool() {
   mkdir -p "$PROJECT/Assets/OnwardGenerator/Editor/Thumbnails"
-  cp "$TOOL_DIR/Editor/OnwardMapAdapter.cs" "$PROJECT/Assets/OnwardGenerator/Editor/"
+  COPIED=()
+  copy_if_changed "$TOOL_DIR/Editor/OnwardMapAdapter.cs" "$PROJECT/Assets/OnwardGenerator/Editor/OnwardMapAdapter.cs"
   local thumb="$TOOL_DIR/Editor/Thumbnails/apocalipsis_murciana.png"
-  [[ -f "$thumb" ]] && cp "$thumb" "$PROJECT/Assets/OnwardGenerator/Editor/Thumbnails/"
+  if [[ -f "$thumb" ]]; then
+    copy_if_changed "$thumb" "$PROJECT/Assets/OnwardGenerator/Editor/Thumbnails/apocalipsis_murciana.png"
+  fi
   local patched
   patched="$("$PYTHON" "$TOOL_DIR/patch_content_builder.py" \
     "$PROJECT/Assets/OnwardCustomContent/Internal/Scripts/Editor/ContentBuilder.cs")"
   log "ContentBuilder.cs patch: $patched"
-  log "copied OnwardMapAdapter.cs and listing thumbnail into the project"
+  log "copied ${#COPIED[@]} changed file(s) into the project: ${COPIED[*]:-none, all unchanged}"
 }
 
 step_scene() {
@@ -87,13 +98,19 @@ step_scene() {
   mkdir -p "$BUILD"
   run_unity scene -executeMethod OnwardGenerator.OnwardMapAdapter.BuildScene \
     -exportPackage "$PACKAGE" -exportReport "$BUILD/scene_report.json"
+  # A GPU lightmapper without a usable OpenCL device bakes on the CPU; Unity says so in its own log.
+  # The adapter's own "Lightmapper: ... fallback no" line is left out.
+  grep -iE 'fall(ing)? ?back' "$LOG_DIR/${PACKAGE_ID}-scene.log" | grep -v '\[OnwardAdapter\]' | grep -iE 'cpu|lightmapper|opencl' \
+    | head -3 | sed 's/^/[export] lightmapper: /' || true
 }
 
 step_launcher() {
   verify
   [[ -e "$BUILD/launcher" ]] && { log "$BUILD/launcher exists; launcher output is never overwritten"; exit 1; }
+  local report="$BUILD/launcher_report.json"
+  [[ -e "$report" ]] && mv "$report" "$report.$(date +%Y%m%dT%H%M%S)"
   run_unity launcher -executeMethod OnwardGenerator.OnwardMapAdapter.BuildQuestViaLauncher \
-    -exportPackage "$PACKAGE" -exportOut "$BUILD/launcher"
+    -exportPackage "$PACKAGE" -exportOut "$BUILD/launcher" -exportReport "$report"
   ls -l "$BUILD/launcher"
   PYTHONPATH="$REPO/src" "$PYTHON" - "$PACKAGE/onward_export.json" "$PACKAGE/layout.json" "$BUILD/launcher/unity-export.local.info3" <<'PY'
 import json, sys
