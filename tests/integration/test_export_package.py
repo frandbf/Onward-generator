@@ -18,6 +18,7 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
+from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, surface_class
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
     MANIFEST_FILE,
@@ -27,6 +28,7 @@ from onward_generator.export.package import (
     sha256_file,
     verify_package,
 )
+from onward_generator.generation.gltf import read_glb
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -161,6 +163,9 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
     (lambda c: c["build"].update(fog_color="grey"), "/build/fog_color"),
     (lambda c: c["build"].update(fog_end_m=0), "/build/fog_end_m"),
+    (lambda c: c["build"].update(lightmap_class_scales={"roof": 0}), "/build/lightmap_class_scales/roof"),
+    (lambda c: c["build"].update(lightmap_class_scales={"roof": 1.5}), "/build/lightmap_class_scales/roof"),
+    (lambda c: c["build"].update(lightmap_class_scales={"props": 0.5}), "/build/lightmap_class_scales"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -168,6 +173,28 @@ def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: P
     (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
     with pytest.raises(ExportError, match=match):
         package(inputs, tmp_path / "pkg", export_config=tmp_path / "cfg.json")
+
+
+def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    result = package(inputs, tmp_path / "pkg")
+    options = load(result.directory / "adapter_options.json")
+    assert "lightmap_class_scales" not in options
+    scales = {row["material"]: row["scale"] for row in options["lightmap_scales"]}
+    names = {m["name"] for m in read_glb((inputs[0] / "scene_visual.glb").read_bytes())[0]["materials"]}
+    assert set(scales) <= names
+    assert {surface_class(name) for name in scales} == {"roof", "ground", "interior"}
+    assert all(scales[name] == DEFAULT_CLASS_SCALES[surface_class(name)] for name in scales)
+    lm = result.manifest["lightmap_estimate"]
+    assert lm["texels_per_m"] == options["lightmap_texels_per_m"] and lm["max_size"] == options["lightmap_max_size"]
+    assert lm["texels"] > 0 and abs(lm["texels"] - sum(lm["texels_by_class"].values())) <= len(lm["texels_by_class"])
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"]["lightmap_class_scales"] = {"roof": 1.0, "facade": 0.5}
+    (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+    other = package(inputs, tmp_path / "other", export_config=tmp_path / "cfg.json")
+    rows = load(other.directory / "adapter_options.json")["lightmap_scales"]
+    assert {surface_class(row["material"]): row["scale"] for row in rows} == {"ground": 0.5, "interior": 0.5, "facade": 0.5}
+    assert other.manifest["lightmap_estimate"]["texels"] != lm["texels"]
+    assert other.manifest["package_id"] != result.manifest["package_id"]
 
 
 def test_verify_detects_tampering(inputs: tuple[Path, Path], tmp_path: Path) -> None:
@@ -181,11 +208,14 @@ def test_verify_detects_tampering(inputs: tuple[Path, Path], tmp_path: Path) -> 
     assert "../escape.glb: package paths must be plain file names" in verify_package(out)
 
 
-def test_cli_package_and_verify(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+def test_cli_package_and_verify(inputs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     detail, layout = inputs
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout),
             "--out", str(tmp_path / "pkg")]
     assert main(args) == 0
+    lm = load(tmp_path / "pkg" / MANIFEST_FILE)["lightmap_estimate"]
+    assert (f"  lightmap estimate: {lm['texels'] / 1e6:.1f} M texels at 10 texels/m, "
+            f"at least {lm['pages_at_least']} pages of 2048 px\n") in capsys.readouterr().out
     assert main(args) == 1
     assert main(["export", "verify", str(tmp_path / "pkg")]) == 0
     assert main(["export", "package", "--project", str(EXAMPLE_PROJECT), "--detail", str(detail), "--layout", str(layout),
@@ -258,6 +288,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
+    # Lightmap scale per material from adapter_options.json, and the baked texel count in the log and report.
+    assert "public LightmapScale[] lightmap_scales" in source
+    assert "public string material; public float scale" in source
+    assert '\\"lightmap_texels\\":{LightmapTexels()}' in source
 
 
 def test_default_fog_colour_is_the_backdrop_haze() -> None:

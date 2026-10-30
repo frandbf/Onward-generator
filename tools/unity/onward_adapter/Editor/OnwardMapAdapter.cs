@@ -92,6 +92,9 @@ namespace OnwardGenerator
             public float lightmap_texels_per_m = 10f;
             public int lightmap_max_size = 2048;
             public bool lightmap_directional = false;
+            // scaleInLightmap per glTF material (onward_generator.export.lightmap): roofs, ground and
+            // interiors below 1. A material not listed keeps 1. Absent in older packages.
+            public LightmapScale[] lightmap_scales = new LightmapScale[0];
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -103,6 +106,7 @@ namespace OnwardGenerator
             public string fog_color = "#C8CDD2";
         }
 
+        [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
@@ -393,7 +397,7 @@ namespace OnwardGenerator
         // centre on glTF (x, z), as onward_generator.perf.measure.combine_groups. Collision
         // is not touched. Measured on the Quest in phase 05 (ADR-005).
         private static int BuildCombinedVisual(Glb visual, Mesh[] meshes, int[][] meshMaterials, Material[] materials,
-            Transform parent, string root, float cellM, StaticEditorFlags flags)
+            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt)
         {
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
             var probe = new GameObject("probe");
@@ -448,6 +452,7 @@ namespace OnwardGenerator
                 AssetDatabase.StopAssetEditing();
             }
 
+            var byScale = new SortedDictionary<float, int>();
             foreach ((string name, Mesh mesh, int mat) in built)
             {
                 var go = new GameObject(name);
@@ -457,10 +462,13 @@ namespace OnwardGenerator
                 renderer.sharedMaterial = materials[mat];
                 renderer.shadowCastingMode = ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                if (!ContributesGi(renderer.sharedMaterial)) renderer.scaleInLightmap = 0f;
+                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
             }
 
             Debug.Log($"{LogPrefix} Combined visual: {built.Count} meshes from {groups.Values.Sum(l => l.Count)} primitives, cell {cellM} m");
+            Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
+                + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
         }
 
@@ -533,7 +541,7 @@ namespace OnwardGenerator
                 int visualObjects;
                 if (opt.combine_cell_m > 0)
                 {
-                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags);
+                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt);
                 }
                 else
                 {
@@ -548,7 +556,8 @@ namespace OnwardGenerator
                         renderer.sharedMaterials = visualMaterials[node.mesh].Select(k => materials[k]).ToArray();
                         renderer.shadowCastingMode = ShadowCastingMode.On;
                         GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                        if (renderer.sharedMaterials.Any(m => !ContributesGi(m))) renderer.scaleInLightmap = 0f;
+                        renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m)) ? 0f
+                            : visualMaterials[node.mesh].Select(k => ScaleInLightmap(opt, visual.Doc.materials, k)).DefaultIfEmpty(1f).Max();
                         visualObjects++;
                     }
                 }
@@ -2249,6 +2258,26 @@ namespace OnwardGenerator
                 throw new InvalidOperationException("StaticOcclusionCulling.Compute() returned false.");
             if (!Lightmapping.Bake()) throw new InvalidOperationException("Lightmapping.Bake() returned false.");
             CompressLightmapsAstc();
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} Lightmaps: {1}, {2} texels, at {3} texels/m, at most {4} px.",
+                LogPrefix, LightmapSettings.lightmaps.Length, LightmapTexels(), opt.lightmap_texels_per_m, opt.lightmap_max_size));
+        }
+
+        // Baked colour texels of every lightmap; compare with lightmap_estimate in onward_export.json.
+        private static long LightmapTexels()
+        {
+            long texels = 0;
+            foreach (LightmapData data in LightmapSettings.lightmaps)
+                if (data.lightmapColor != null) texels += (long)data.lightmapColor.width * data.lightmapColor.height;
+            return texels;
+        }
+
+        private static float ScaleInLightmap(Options opt, GMaterial[] materials, int index)
+        {
+            if (index < 0 || index >= materials.Length) return 1f;
+            foreach (LightmapScale row in opt.lightmap_scales ?? new LightmapScale[0])
+                if (row != null && row.material == materials[index].name) return row.scale;
+            return 1f;
         }
 
         // The Quest build of Onward uses Vulkan. Auto Graphics API left GLES3 first.
@@ -2320,7 +2349,7 @@ namespace OnwardGenerator
             sb.Append($"\"visual_objects\":{visualObjects},\"mesh_renderers\":{renderers.Length},\"materials\":{mats.Count},");
             sb.Append($"\"triangles\":{tris},\"vertices\":{verts},");
             sb.Append($"\"mesh_colliders\":{colliders},\"collider_triangles\":{colliderTris},\"colliders_with_renderer\":{renderersOnColliders},");
-            sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},");
+            sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},\"lightmap_texels\":{LightmapTexels()},");
             int probeCount = UnityEngine.Object.FindObjectsOfType<LightProbeGroup>().Sum(g => g.probePositions.Length);
             sb.Append($"\"lights\":{UnityEngine.Object.FindObjectsOfType<Light>().Length},\"light_probes\":{probeCount},");
             sb.Append(string.Format(CultureInfo.InvariantCulture, "\"seconds\":{{\"scene\":{0:F1},\"bake\":{1:F1}", buildSeconds, bakeSeconds));

@@ -38,10 +38,10 @@ The command writes nothing when:
 
 | File | Contents |
 | --- | --- |
-| `onward_export.json` | Manifest `onward_generator.onward_export_package` 0.1.0: `package_id`, adapter and target (Unity 2021.3.23f1, SDK 1.15, Quest), title and description with attribution, the declared fidelity, SHA-256 and origin of every file, input hashes, and warnings |
+| `onward_export.json` | Manifest `onward_generator.onward_export_package` 0.1.0: `package_id`, adapter and target (Unity 2021.3.23f1, SDK 1.15, Quest), title and description with attribution, the declared fidelity, SHA-256 and origin of every file, input hashes, `lightmap_estimate` (below), and warnings |
 | `scene_visual.glb`, `scene_collision.glb` | Exact copies of the scene directory |
 | `layout.json` | A copy of the gameplay layout |
-| `adapter_options.json` | Combine by a 100 m cell, no static batching, no occlusion culling (variant v02, ADR-005). Onward lightmap guide: texels per metre from the map (default 10, at most 40), 2048 px, non-directional. The bake uses 256/512/512 samples, 2–4 bounces, and ASTC 8×8 on Android |
+| `adapter_options.json` | Combine by a 100 m cell, no static batching, no occlusion culling (variant v02, ADR-005). Onward lightmap guide: texels per metre from the map (default 10, at most 40), 2048 px, non-directional, and `lightmap_scales`: one `scaleInLightmap` per visual material (below). The bake uses 256/512/512 samples, 2–4 bounces, and ASTC 8×8 on Android |
 | `thumbnail.png` | 512×256, a view of the mesh and that map's title |
 | `quest_acceptance.md` | The headset checklist: Free Roam, Uplink, Hunt, ambience, impact, flyover, and the urban card |
 
@@ -73,9 +73,11 @@ Everything is baked. No realtime light reaches the Quest.
 
 - **Sun.** One directional light, `Baked`, intensity 1.2, soft shadows.
 - **Out of the lightmap.** Renderers whose material is a tree, urban metal, a railing, or an overgrow prop (`M_prop_*`) neither contribute GI nor take lightmap space (`scaleInLightmap = 0`). Thin or small meshes baked black at the map's texel density. They are lit by light probes.
+- **Lightmap scale by surface class.** Every other renderer bakes at the map's texels per metre times its class scale: roofs 0.25, ground (`ground`, `pedestrian`, `sidewalk`, `carriageway`, `curb`, `green`, `water`, `cobblestone_paving`) 0.5, interiors (`interior_wall`, `interior_floor`, `stair`) 0.5, facades and everything else 1. Roofs are rarely seen from the street; the ground and the interiors take soft baked light, and the facades a player walks past keep the full density. `export package` resolves the classes to `lightmap_scales` in `adapter_options.json` (`[{material, scale}]`, scale 1 left out), and the adapter sets `scaleInLightmap` on each combined renderer from its glTF material. `build.lightmap_class_scales` in the export configuration replaces any of the four (`roof`, `ground`, `interior`, `facade`, each above 0 and at most 1). A package written before this change has no `lightmap_scales` and bakes everything at 1, as before. The classes live in `src/onward_generator/export/lightmap.py`.
+- **Lightmap estimate.** `onward_export.json` carries `lightmap_estimate`: per combined renderer (100 m cell and material, as the adapter groups them) its area times the squared texel density, capped at one page as Unity scales down a renderer that does not fit; `texels`, `texels_by_class`, `renderers_capped` and `pages_at_least`. Packing and padding are left out, so the page count is a lower bound. `export package` prints it. After the bake the Unity log prints `Lightmaps: N, T texels`, and `build/scene_report.json` adds `lightmap_texels`, so the two can be compared.
 - **Interior lights** ([ADR-013](decisions/ADR-013-interior-light-anchors.md)). For each room in the visual GLB's `light_anchors`, one `Point` light, `Baked`, soft baked shadows, warm white, intensity `build.interior_light_intensity` (default 0.8), range from the anchor. At most `build.interior_lights_max` (default 24) per map. Both keys are optional in the export configuration.
 - **Light probes.** One `LightProbeGroup`: the room probes from the anchors plus outdoor columns on the walkable navmesh every 12 m (wider on a large map, at most 1500 columns), at 1 m and 6 m. Without a navmesh (`perf_layout`) no group is added and unlit renderers keep the ambient probe.
-- `build/scene_report.json` counts `lights` and `light_probes`.
+- `build/scene_report.json` counts `lights`, `light_probes`, `lightmaps` and `lightmap_texels`.
 
 ## Horizon
 
