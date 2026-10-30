@@ -33,7 +33,7 @@ import json
 import math
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -258,15 +258,16 @@ def _decimated(prop: Prop, target: int) -> Prop:
     uvs: list[np.ndarray] = []
     parts: list[PropPart] = []
     end = 0
-    for primitive, part in zip(prop.primitives(), prop._parts(), strict=True):
+    for primitive, part in zip(prop.primitives(), prop._parts()):
         source = primitive.mesh
-        source_uvs = cast(np.ndarray, primitive.uvs)  # Prop.primitives always sets the UVs.
+        source_uvs = primitive.uvs
+        assert source_uvs is not None  # Prop.primitives always sets the UVs.
         share = round(target * source.triangle_count / prop.triangles)
         vertices, triangles, coords = cluster_decimate(source.vertices, source.triangles, source_uvs, share)
         if not len(triangles):
             vertices, triangles, coords = source.vertices, source.triangles, source_uvs
         meshes.append(Mesh(vertices, triangles))
-        uvs.append(np.asarray(coords, dtype=np.float32))
+        uvs.append(coords)
         end += len(triangles)
         parts.append(PropPart(end, part.albedo))
     return replace(

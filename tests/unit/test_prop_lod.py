@@ -72,6 +72,7 @@ def _prop(mesh: Mesh, spec: AssetSpec = BARREL, parts: tuple[PropPart, ...] = ()
     ((0.7, 0.7, 0.068), LOD_MIN_TRIS),       # flat: a manhole cover
     ((2.0, 2.0, 0.099), LOD_MIN_TRIS),       # flat however wide
     ((0.3, 0.3, 0.1), LOD_MIN_TRIS),         # 0.09 m² × 600 = 54, raised to the minimum
+    ((2.0, 2.0, 0.1), TARGET_ASSET_TRIS),    # exactly 0.1 m tall is not flat
     ((0.6, 0.6, 0.9), 324),                  # largest face 0.6 × 0.9
     ((1.0, 0.5, 0.4), 300),                  # largest face 1.0 × 0.5
     ((0.3, 1.0, 0.8), 480),                  # largest face 1.0 × 0.8 (depth × height)
