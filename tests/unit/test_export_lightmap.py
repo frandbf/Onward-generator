@@ -132,3 +132,28 @@ def test_estimate_cells_follow_floor_on_negative_coordinates() -> None:
     glb = _glb(("ground", _floor(-10, 0, 0, 1)), ("ground", _floor(0, 10, 0, 1)))
     found = estimate(glb, texels_per_m=10.0, max_size=30, cell_m=20.0)
     assert (found["renderers"], found["texels"], found["texels_by_class"]) == (2, 1_800, {"ground": 1_800})
+    assert found["renderers_capped"] == 2
+
+
+def test_estimate_area_away_from_the_origin() -> None:
+    found = estimate(_glb(("ground", _floor(5, 15, 3, 4))), texels_per_m=10.0, max_size=2048, cell_m=100.0)
+    assert found["texels"] == 1_000
+
+
+def test_estimate_skips_only_the_unlit_primitive_of_a_node() -> None:
+    node = Node("n", (Primitive(_floor(0, 1, 0, 1), "prop_x"), Primitive(_floor(0, 2, 0, 1), "ground")))
+    glb = build_glb([node], {"prop_x": Material((1, 1, 1, 1), 0.9), "ground": Material((1, 1, 1, 1), 0.9)})
+    assert estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=100.0)["texels"] == 200
+
+
+def test_estimate_cells_use_the_centre_of_each_bounding_box() -> None:
+    # A and B lie in cells y = 1 and y = 0 of 20 m; A and C share cell (0, 1).
+    a, b, c = _floor(0, 1, 30, 31), _floor(0, 1, 0, 1), _floor(10, 11, 34, 35)
+    assert estimate(_glb(("ground", a), ("ground", b)), texels_per_m=10.0, max_size=2048, cell_m=20.0)["renderers"] == 2
+    assert estimate(_glb(("ground", a), ("ground", c)), texels_per_m=10.0, max_size=2048, cell_m=20.0)["renderers"] == 1
+
+
+def test_estimate_groups_by_cell_below_one_metre() -> None:
+    node = Node("n", (Primitive(_floor(0, 0.2, 0, 0.2), "ground"), Primitive(_floor(5, 5.2, 0, 0.2), "ground")))
+    glb = build_glb([node], {"ground": Material((1, 1, 1, 1), 0.9)})
+    assert estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=0.5)["renderers"] == 2

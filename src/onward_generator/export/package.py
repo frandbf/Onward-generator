@@ -221,14 +221,12 @@ def _check_detail(detail_dir: Path) -> tuple[list[str], dict[str, Any], dict[str
     return problems, manifest, report
 
 
-def _adapter_options(build: Mapping[str, Any], visual: bytes) -> dict[str, Any]:
-    """The build block for the adapter, with the class scales resolved to one scale per visual material."""
-    options = {"variant": "", **build}
+def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes) -> None:
+    """Replace ``lightmap_class_scales`` in the adapter options by one scale per visual material."""
     class_scales = {**DEFAULT_CLASS_SCALES, **options.pop("lightmap_class_scales", {})}
     doc, _blob = read_glb(visual)
     names = [str(m.get("name")) for m in doc.get("materials") or []]
     options["lightmap_scales"] = material_scales(names, class_scales)
-    return options
 
 
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
@@ -281,10 +279,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
 
     sources = {"visual": detail / "scene_visual.glb", "collision": detail / "scene_collision.glb", "layout": layout_path}
     source_sha = {role: sha256_file(p) for role, p in sources.items()}
-    visual_bytes = sources["visual"].read_bytes()
-    thumbnail = render_listing_thumbnail(visual_bytes, str(cfg["map"]["title"]))
+    thumbnail = render_listing_thumbnail(sources["visual"].read_bytes(), str(cfg["map"]["title"]))
     thumbnail_sha = hashlib.sha256(thumbnail).hexdigest()
-    options = _adapter_options(cfg["build"], visual_bytes)
+    options = {"variant": "", **cfg["build"]}
+    visual_bytes = sources["visual"].read_bytes()
+    _resolve_lightmap_scales(options, visual_bytes)
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,

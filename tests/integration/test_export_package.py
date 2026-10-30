@@ -214,7 +214,7 @@ def test_cli_package_and_verify(inputs: tuple[Path, Path], tmp_path: Path, capsy
             "--out", str(tmp_path / "pkg")]
     assert main(args) == 0
     lm = load(tmp_path / "pkg" / MANIFEST_FILE)["lightmap_estimate"]
-    assert (f"  lightmap estimate: {lm['texels'] / 1e6:.1f} M texels at 10 texels/m, "
+    assert (f"  lightmap estimate: {lm['texels']:,} texels at 10 texels/m, "
             f"at least {lm['pages_at_least']} pages of 2048 px\n") in capsys.readouterr().out
     assert main(args) == 1
     assert main(["export", "verify", str(tmp_path / "pkg")]) == 0
