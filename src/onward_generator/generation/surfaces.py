@@ -193,28 +193,48 @@ def crossing_offsets(length_m: float, start_m: float, end_m: float) -> list[floa
     return [first + (last - first) * i / gaps for i in range(gaps + 1)]
 
 
-def _crossing(line: LineString, distance_m: float, span_m: float) -> BaseGeometry:
-    """A ``CROSSING_WIDTH_M`` strip square to ``line`` at ``distance_m``, ``span_m`` long.
+@dataclass(frozen=True, slots=True)
+class CrossingSite:
+    """Where one walkable crossing goes: its centre on the street, the street direction, and its length.
 
-    The direction is the chord from that point to 1 m further along the line.
+    ``along`` is the unit chord of the street at the centre. The strip runs
+    square to it, ``span_m`` long and ``CROSSING_WIDTH_M`` wide.
     """
+
+    centre: tuple[float, float]
+    along: tuple[float, float]
+    span_m: float
+
+    def strip(self) -> BaseGeometry:
+        (x, y), (ux, uy) = self.centre, self.along
+        half = self.span_m / 2.0
+        axis = LineString([(x + uy * half, y - ux * half), (x - uy * half, y + ux * half)])
+        return axis.buffer(CROSSING_WIDTH_M / 2.0, cap_style="flat")
+
+
+def _site(line: LineString, distance_m: float, span_m: float) -> CrossingSite:
+    """The crossing at ``distance_m`` along ``line``; the direction is the chord to 1 m further on."""
     centre = line.interpolate(distance_m)
     ahead = line.interpolate(distance_m + 1.0)
     dx, dy = ahead.x - centre.x, ahead.y - centre.y
-    scale = span_m / 2.0 / math.hypot(dx, dy)
-    axis = LineString([(centre.x + dy * scale, centre.y - dx * scale), (centre.x - dy * scale, centre.y + dx * scale)])
-    return axis.buffer(CROSSING_WIDTH_M / 2.0, cap_style="flat")
+    length = math.hypot(dx, dy)
+    return CrossingSite((centre.x, centre.y), (dx / length, dy / length), span_m)
 
 
-def crossing_strips(vehicular: Sequence[LinearWay], carriageway: BaseGeometry) -> BaseGeometry:
-    """Walkable crossings over ``carriageway``, clipped to it.
+def _crossing(line: LineString, distance_m: float, span_m: float) -> BaseGeometry:
+    """A ``CROSSING_WIDTH_M`` strip square to ``line`` at ``distance_m``, ``span_m`` long."""
+    return _site(line, distance_m, span_m).strip()
+
+
+def crossing_sites(vehicular: Sequence[LinearWay]) -> list[CrossingSite]:
+    """Every crossing over the vehicular ways, in a fixed order.
 
     The street centrelines are noded at every junction, so each segment runs
     from one junction (or dead end) to the next. A segment gets a crossing on
     each arm, set back past the kerb of the widest street at that junction, and
     more along a long block (``crossing_offsets``). Each strip spans the widest
-    street the segment touches plus ``CROSSING_OVERHANG_M``, then is clipped to
-    the carriageway. Vehicular areas have no centreline and get none.
+    street the segment touches plus ``CROSSING_OVERHANG_M``. Vehicular areas
+    have no centreline and get none.
     """
     lines = [part for way in vehicular for part in shapely.get_parts(way.geometry) if isinstance(part, LineString)]
     tree = STRtree([way.geometry for way in vehicular])
@@ -222,12 +242,17 @@ def crossing_strips(vehicular: Sequence[LinearWay], carriageway: BaseGeometry) -
     def widest(at: BaseGeometry) -> float:
         return max(vehicular[int(i)].width_m for i in tree.query(at, predicate="dwithin", distance=JUNCTION_TOLERANCE_M))
 
-    strips: list[BaseGeometry] = []
+    sites: list[CrossingSite] = []
     for segment in shapely.get_parts(shapely.line_merge(union_all(lines))):
         start, end = (widest(segment.interpolate(d)) / 2.0 + CROSSING_CORNER_M + CROSSING_WIDTH_M / 2.0 for d in (0.0, segment.length))
         span = widest(segment) + CROSSING_OVERHANG_M
-        strips.extend(_crossing(segment, d, span) for d in crossing_offsets(segment.length, start, end))
-    return union_all(strips).intersection(carriageway)
+        sites.extend(_site(segment, d, span) for d in crossing_offsets(segment.length, start, end))
+    return sites
+
+
+def crossing_strips(vehicular: Sequence[LinearWay], carriageway: BaseGeometry) -> BaseGeometry:
+    """Walkable crossings over ``carriageway`` (``crossing_sites``), clipped to it."""
+    return union_all([site.strip() for site in crossing_sites(vehicular)]).intersection(carriageway)
 
 
 def _way_buffer(way: LinearWay) -> BaseGeometry:

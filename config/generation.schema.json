@@ -67,13 +67,14 @@
     "materials": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ground", "pedestrian", "sidewalk", "carriageway", "curb", "green", "water", "building_wall", "building_roof"],
+      "required": ["ground", "pedestrian", "sidewalk", "carriageway", "curb", "road_marking", "green", "water", "building_wall", "building_roof"],
       "properties": {
         "ground": { "$ref": "#/$defs/material" },
         "pedestrian": { "$ref": "#/$defs/material" },
         "sidewalk": { "$ref": "#/$defs/material" },
         "carriageway": { "$ref": "#/$defs/material" },
         "curb": { "$ref": "#/$defs/material" },
+        "road_marking": { "$ref": "#/$defs/material" },
         "green": { "$ref": "#/$defs/material" },
         "water": { "$ref": "#/$defs/material" },
         "building_wall": { "$ref": "#/$defs/material" },

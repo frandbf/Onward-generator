@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import Polygon, STRtree, make_valid, union_all
+from shapely import MultiPolygon, Polygon, STRtree, make_valid, union_all
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
@@ -23,6 +23,15 @@ from onward_generator import __version__
 from onward_generator.contracts import is_schema
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
+from onward_generator.generation.markings import (
+    ZEBRA_BAR_M,
+    ZEBRA_GAP_M,
+    ZEBRA_LIFT_M,
+    Markings,
+    crossing_evidence,
+    paint_crossings,
+)
+from onward_generator.generation.markings import summary as crossing_summary
 from onward_generator.generation.mesh import (
     Mesh,
     cap,
@@ -44,6 +53,7 @@ from onward_generator.generation.surfaces import (
     SurfaceClass,
     build_partition,
     carriageway_slab,
+    crossing_sites,
     split_pedestrian_by_paving,
 )
 from onward_generator.geo.clipping import covered_by, inclusion_zone
@@ -409,6 +419,32 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
             )
         )
 
+    markings = Markings()
+    if carriageway is not None:
+        vehicular = [w for w in ways if w.road_class == "vehicular"]
+        markings = paint_crossings(crossing_sites(vehicular), carriageway.geometry, crossing_evidence(features))
+    if markings.bars:
+        # One shared white material, lifted off the asphalt so the depth test keeps it in front.
+        zebra = cap(MultiPolygon(markings.bars), -depth + ZEBRA_LIFT_M)
+        painted = [c for c in markings.crossings if c.painted]
+        objects.append(
+            SceneObject(
+                "surface/zebra_crossing", "surface", [Primitive(zebra, "road_marking")], None,
+                {"id": "surface/zebra_crossing", "type": "surface", "surface_class": "road_marking",
+                 "z_m": round(-depth + ZEBRA_LIFT_M, 4), "area_m2": round(sum(b.area for b in markings.bars), 3),
+                 "source_ids": sorted({i for c in painted for i in c.evidence}),
+                 "generation": {"method": "zebra_bars_on_osm_crossings", "attribute_origin": "observed", "bar_layout": "generated",
+                                "bar_m": ZEBRA_BAR_M, "gap_m": ZEBRA_GAP_M, "lift_m": ZEBRA_LIFT_M},
+                 "crossings": [
+                     {"centre_m": [round(c.site.centre[0], 3), round(c.site.centre[1], 3)], "origin": c.origin,
+                      "evidence": list(c.evidence), "painted": c.painted, "bars": len(c.bars)}
+                     for c in markings.crossings
+                 ],
+                 "osm_crossings_unmatched": list(markings.unmatched),
+                 "materials": ["road_marking"], "visual": {"triangles": zebra.triangle_count}},
+            )
+        )
+
     walkable = site.difference(carriageway.geometry) if carriageway is not None else site
     thickness = config.ground_thickness_m
     # Crossings are their own slab at road level. The adapter bakes every
@@ -475,6 +511,7 @@ def generate_scene(scene_path: str | Path, heights_path: str | Path, config: Gen
         "building_footprint_area_m2": round(partition.buildings.intersection(site).area, 3),
         "streets": {"vehicular_ways": sum(w.road_class == "vehicular" for w in ways), "pedestrian_ways": sum(w.road_class == "pedestrian" for w in ways),
                     "width_origin": dict(sorted(Counter(w.width_origin for w in ways).items()))},
+        "crossings": crossing_summary(markings),
         "height_sources": dict(sorted(Counter(o.record["height"]["height_source"] for o in objects if o.type == "building").items())),
     }
 

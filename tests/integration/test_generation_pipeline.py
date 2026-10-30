@@ -10,7 +10,8 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.generation import GenerationError, generate_scene, load_generation_config
 from onward_generator.generation.gltf import read_glb
-from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.generation.markings import ZEBRA_LIFT_M
+from onward_generator.generation.surfaces import SurfaceClass, crossing_sites
 from onward_generator.geo.pipeline import GeoResult, write_outputs
 from onward_generator.heights import run_heights, write_height_outputs
 
@@ -69,6 +70,49 @@ def test_a_map_without_streets_has_no_carriageway_or_crossing_slab(inputs: tuple
     slabs = {o.id for o in generated.objects if o.type == "ground_collider"}
     assert slabs == {"collider/walkable"}
     assert generated.partition.crossings.is_empty
+
+
+def test_only_osm_crossings_get_zebra_paint(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    """A zebra node and an unmarked node on way 105: one strip painted, one observed bare, the rest generated."""
+    scene, heights = inputs
+    plain = generate_scene(scene, heights, CFG)
+    assert "surface/zebra_crossing" not in {o.id for o in plain.objects}
+    assert plain.stats["crossings"]["observed"] == 0 and plain.stats["crossings"]["strips"] > 2
+    vehicular = [w for w in plain.ways if w.road_class == "vehicular"]
+    carriageway = plain.partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
+    zebra, bare = [s for s in crossing_sites(vehicular) if not s.strip().intersection(carriageway).is_empty][:2]
+
+    doc = json.loads(scene.read_text(encoding="utf-8"))
+    doc["features"] += [
+        {"id": "osm-node-9001", "kind": "poi", "tags": {"highway": "crossing", "crossing": "zebra"},
+         "geometry": {"type": "Point", "coordinates": list(zebra.centre)}},
+        {"id": "osm-node-9002", "kind": "poi", "tags": {"highway": "crossing", "crossing": "unmarked"},
+         "geometry": {"type": "Point", "coordinates": list(bare.centre)}},
+    ]
+    edited = tmp_path / "crossings" / "geo_scene.json"
+    edited.parent.mkdir()
+    edited.write_text(json.dumps(doc), encoding="utf-8")
+    edited_heights, _ = write_height_outputs(run_heights(edited), tmp_path / "crossings_heights")
+    generated = generate_scene(edited, edited_heights, CFG)
+    assert generated.report()["phase_03_exit"]["passed"]
+
+    paint = next(o for o in generated.objects if o.id == "surface/zebra_crossing")
+    (primitive,) = paint.visual
+    assert primitive.material == "road_marking" and paint.collider is None
+    counts = generated.stats["crossings"]
+    assert counts["observed"] == counts["observed_painted"] + counts["observed_unpainted"] == 2
+    assert counts["observed_painted"] == 1 and counts["generated_unpainted"] == plain.stats["crossings"]["strips"] - 2
+    assert primitive.mesh.triangle_count == 2 * counts["bars"] == paint.record["visual"]["triangles"]
+    z = -CFG.carriageway_depth_m + ZEBRA_LIFT_M
+    assert (primitive.mesh.vertices[:, 2] == z).all() and paint.record["z_m"] == pytest.approx(z)
+    assert paint.record["source_ids"] == ["osm-node-9001"]
+    assert paint.record["generation"]["attribute_origin"] == "observed"
+    origins = [(c["origin"], c["painted"], c["evidence"]) for c in paint.record["crossings"][:2]]
+    assert origins == [("observed", True, ["osm-node-9001"]), ("observed", False, ["osm-node-9002"])]
+    assert all(c["origin"] == "generated" and not c["painted"] for c in paint.record["crossings"][2:])
+    assert paint.record["area_m2"] == pytest.approx(counts["bars"] * 0.5 * 4.0, abs=1e-3)
+    assert paint.record["osm_crossings_unmatched"] == []
+    assert "road_marking" in generated.stats["visual_triangles_by_material"]
 
 
 def test_heights_from_another_scene_are_rejected(inputs: tuple[Path, Path], tmp_path: Path) -> None:

@@ -33,6 +33,8 @@ The SDK constraints that any fix has to keep (`docs/11-onward-sdk.md`):
 3. **Adapter.** `collider_walkable_crossing#collider` already passes `WalkableGround` (`walkable`, no `carriageway`), so the bake needs no new rule. The physics material stays Concrete. A new diagnostic line, `Navmesh islands: N. The origin island holds A of T m² (P%)`, is logged before `GenerateNodes`, from `NavMesh.CalculateTriangulation`.
 4. **Python mirrors it.** `nav_islands` is the free ground plus `partition.crossings`, shrunk by the 0.35 m agent radius. When the crossings join the city, the Uplink's island is the whole network, so `hunt_routes` takes its first branch and `spread_routes` spreads the 32 starts over all of it. Routes still stop at the first point off their island, so a block that no crossing reaches (water, a closed courtyard) keeps the previous behaviour.
 
+5. **Paint only where OSM has a crossing.** The strips stay where the rule puts them. A strip within 4 m of an OSM crossing node or `footway=crossing` way gets zebra bars, a visual mesh with no collider (`surface/zebra_crossing`, `docs/06-generation.md`). The other strips are walkable but unpainted, and the manifest records each strip as `observed` or `generated`.
+
 ## Cost
 
 - Collision: one more closed slab, a few triangles per crossing.
