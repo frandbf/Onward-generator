@@ -138,6 +138,9 @@ def test_a_bar_cut_by_the_kerb_is_left_out() -> None:
     notch = box(11.9, 2.0, 13, 3)
     bars = zebra_bars(_site(), STREET.difference(notch))
     assert _same(union_all(bars), _boxes(-2.25, -1.25, -0.25, 0.75))
+    # Even a 5 cm² bite drops the bar: a bar stays a whole quad or goes.
+    sliver = box(11.95, 2.0, 12.05, 2.01)
+    assert _same(union_all(zebra_bars(_site(), STREET.difference(sliver))), _boxes(-2.25, -1.25, -0.25, 0.75))
 
 
 def test_a_street_too_narrow_for_one_bar_gets_none() -> None:
