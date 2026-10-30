@@ -35,7 +35,7 @@ def test_use_evidence_matches_pois_and_areas_to_footprints() -> None:
         _poi("poi-bank", 5, 5, {"amenity": "bank"}),  # inside a
         _poi("poi-cafe", 25, -1.5, {"amenity": "cafe"}),  # 1.5 m outside c
         _poi("poi-gap", 40, 5, {"shop": "bakery"}),  # 10 m from both c and far: nobody's
-        _poi("poi-edge", 20, -1, {"office": "company"}),  # 1 m from b and from c
+        _poi("poi-edge", 20, -1, {"office": "company"}),  # 1 m from b and from c: the lower id, b
         _poi("poi-bench", 15, 5, {"amenity": "bench"}),  # street furniture, no use
         {"id": "road", "kind": "highway", "tags": {"amenity": "school"},
          "geometry": {"type": "LineString", "coordinates": [[0, 5], [30, 5]]}},
@@ -43,7 +43,7 @@ def test_use_evidence_matches_pois_and_areas_to_footprints() -> None:
     related = _use_evidence(features, FOOTPRINTS, CFG)
     assert dict(related) == {
         "a": [("area-school", {"amenity": "school"}, "enclosing_area"), ("poi-bank", {"amenity": "bank"}, "poi_inside")],
-        "c": [("poi-cafe", {"amenity": "cafe"}, "poi_near"), ("poi-edge", {"office": "company"}, "poi_near")],
+        "c": [("poi-cafe", {"amenity": "cafe"}, "poi_near")],
         "b": [("poi-edge", {"office": "company"}, "poi_near")],
     }
 

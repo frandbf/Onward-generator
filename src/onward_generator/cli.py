@@ -207,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
         "--catastro", action=argparse.BooleanOptionalAction,
-        help="split OSM blocks into Catastro constructions (default on in mainland Spain); --no-catastro turns it off for this map",
+        help="split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country); --no-catastro turns it off for this map",
     )
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")

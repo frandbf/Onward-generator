@@ -7,15 +7,24 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
-from onward_generator.dress.atlas import MIN_MEAN_LUMA, _tile_pixels, bake_photo_tile, build_atlas, decode_jpeg_rgb, encode_png_rgba
+from onward_generator.dress.atlas import (
+    MIN_MEAN_LUMA,
+    _tile_pixels,
+    bake_photo_tile,
+    build_atlas,
+    decode_jpeg_rgb,
+    encode_png_rgba,
+    run_png_jobs,
+)
 from onward_generator.dress.catalog import MaterialCatalog, load_catalog
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.dress.surfaces import _load_features, _tags_of
@@ -437,22 +446,23 @@ def apply_materials(
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
         tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
-    repeat_images: dict[str, bytes] = {}
+    png_jobs: dict[str, Callable[[], bytes]] = {}
     for index, color_id in enumerate(sorted(used_ids)):
         if color_id in ("glass_dark", "glass_view"):
-            repeat_images[color_id] = window_png()
+            png_jobs[color_id] = window_png
             prev = materials.get(color_id) or Material(WHITE, 0.15)
             materials[color_id] = Material(WHITE, prev.roughness)
             continue
         if color_id == "glass_boarded":
-            repeat_images[color_id] = boarded_png()
+            png_jobs[color_id] = boarded_png
             materials[color_id] = Material(WHITE, 0.85)
             continue
         if color_id in photo_tiles:
             rgb, mode = photo_tiles[color_id]
-            repeat_images[color_id] = _photo_png(rgb, mode)
+            png_jobs[color_id] = partial(_photo_png, rgb, mode)
             continue
-        repeat_images[color_id] = _procedural_png(color_id, seed + index)
+        png_jobs[color_id] = partial(_procedural_png, color_id, seed + index)
+    repeat_images = run_png_jobs(png_jobs)
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,

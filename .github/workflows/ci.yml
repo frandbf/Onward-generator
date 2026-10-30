@@ -1,7 +1,7 @@
 # Verification gate for every pull request. It runs `task ci` in the same Docker image
 # as a local `task ci`, so a failure here reproduces on any machine with Docker and go-task.
 # Linux only: macOS runners are not free for this private repository.
-# `mutate` mutates only the functions the change touched (tools/mutate/run.py) and fails
+# `mutate` (pull requests and manual runs) mutates only the functions the change touched (tools/mutate/run.py) and fails
 # when a mutant survives, i.e. when no test notices the changed behaviour. Before that,
 # `task guard` fails when the same change edits src/ and a quality gate.
 name: ci
@@ -46,6 +46,9 @@ jobs:
 
   mutate:
     name: mutate (changed functions)
+    # Pull requests only: a fork PR is rebased on main and mutated before it is
+    # rebase-merged, so the push to main carries the same tree and would repeat it.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     # Measured 9-13 min with source changes; well under 1 min without.
     timeout-minutes: 30

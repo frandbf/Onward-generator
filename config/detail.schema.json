@@ -159,12 +159,13 @@
     },
     "interiors": {
       "type": "object", "additionalProperties": false,
-      "required": ["enabled", "min_buildings", "max_buildings", "max_triangles", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m", "lights_max", "shops"],
+      "required": ["enabled", "min_buildings", "max_buildings", "max_triangles", "max_collision_triangles", "include_ids", "exclude_ids", "rule", "floors", "wall_thickness_m", "slab_m", "door", "stair", "door_clearance_m", "lights_max", "shops"],
       "properties": {
         "enabled": { "type": "boolean" },
         "min_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
         "max_buildings": { "type": "integer", "minimum": 0, "maximum": 50 },
         "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
+        "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 200000 },
         "include_ids": { "$ref": "#/$defs/ids" },
         "exclude_ids": { "$ref": "#/$defs/ids" },
         "rule": {
@@ -193,10 +194,11 @@
         "door_clearance_m": { "$ref": "#/$defs/len" },
         "lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
         "shops": {
-          "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_area_m2", "categories", "generic"],
+          "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_collision_triangles", "max_area_m2", "categories", "generic"],
           "properties": {
             "enabled": { "type": "boolean" },
             "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
+            "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 200000 },
             "max_area_m2": { "type": "number", "exclusiveMinimum": 0 },
             "categories": {
               "type": "array",

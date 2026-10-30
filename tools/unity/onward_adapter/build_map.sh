@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The Unity steps of `onward-generator run`, on the host: tool, scene, launcher, then the Quest question.
 #
-#   build_map.sh [--platform macos|linux|auto] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]
+#   build_map.sh [--platform macos|linux|auto] [--listing MODE] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]
 #
 # With no map, the newest export package of any map is used: the one task map just wrote.
 # A map takes the card name given to task map ("Map name"), its id (map_name) or its folder,
@@ -11,6 +11,8 @@
 # Only s, si, y or yes runs push with CONFIRM_PUSH=yes, which backs up the headset map and
 # replaces it. Without .venv/bin/python (and no PYTHON), run_export.sh uses the Docker image
 # through tools/docker/python.sh. Unity and adb are the host's (tools/unity/lib.sh).
+# --listing MODE, or ONWARD_QUEST_LISTING=MODE, picks how push installs the map:
+# local (default, today's install), local-thumb, named, named-thumb. See docs/12-export.md.
 set -euo pipefail
 
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,17 +20,23 @@ TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$TOOL_DIR/../lib.sh"
 REPO="$(cd "$TOOL_DIR/../../.." && pwd)"
 
-usage() { echo "usage: $0 [--platform macos|linux|auto] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]" >&2; exit 2; }
+usage() { echo "usage: $0 [--platform macos|linux|auto] [--listing ${QUEST_LISTINGS// /|}] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]" >&2; exit 2; }
 
 platform=()
-if [[ "${1:-}" == "--platform" ]]; then
-  [[ $# -ge 2 ]] || usage
-  platform=(--platform "$2")
-  shift 2
-elif [[ "${1:-}" == --platform=* ]]; then
-  platform=("$1")
-  shift
-fi
+listing="${ONWARD_QUEST_LISTING:-local}"
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --platform) [[ $# -ge 2 ]] || usage; platform=(--platform "$2"); shift 2 ;;
+    --platform=*) platform=("$1"); shift ;;
+    --listing) [[ $# -ge 2 ]] || usage; listing="$2"; shift 2 ;;
+    --listing=*) listing="${1#--listing=}"; shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+check_quest_listing "$listing"
+export ONWARD_QUEST_LISTING="$listing"
+set -- ${args[@]+"${args[@]}"}
 if [[ $# -gt 1 ]]; then
   # A command copied with its trailing comment arrives as extra words when the copy turned spaces into U+00A0.
   printf 'unity: expected one map, got %d arguments:' "$#" >&2; printf ' [%s]' "$@" >&2; echo >&2
@@ -84,13 +92,19 @@ else
   started=$SECONDS
   "$TOOL_DIR/run_export.sh" ${platform[@]+"${platform[@]}"} "$package" "${steps[@]}"
   echo "✓ Unity $(elapsed "$started")"
+  # Seconds per Unity phase, from build/scene_report.json and build/launcher_report.json.
+  "${PYTHON:-$REPO/.venv/bin/python}" "$REPO/tools/unity/report_timings.py" "$package" || true
 fi
 
 if [[ ! -t 0 ]]; then
   echo "unity: Quest upload skipped. Run this in a terminal to answer the question."
   exit 0
 fi
-echo "Subir al Quest sustituye el mapa local del visor (unity-export.local). Antes se guarda una copia del que haya."
+if [[ "$listing" == "local" ]]; then
+  echo "Subir al Quest sustituye el mapa local del visor (unity-export.local). Antes se guarda una copia del que haya."
+else
+  echo "Instalación de prueba '$listing' (sin verificar en el visor, docs/12-export.md). Antes se guarda una copia; no se borra nada."
+fi
 read -r -p "¿Subir al Quest? [s/N] " answer || answer=""
 case "$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')" in
   s|si|sí|y|yes)

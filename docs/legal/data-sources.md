@@ -19,7 +19,7 @@ Obligations that apply to this project:
 
 The licence text is https://opendatacommons.org/licenses/odbl/1-0/.
 
-`map create` makes one Overpass request for the map square plus its margin. The area comes from latitude, longitude, and radius, measured in the map CRS and converted to WGS84. `geo` and the later stages do not download OSM again. Repeating the request is `osm download --map DIRECTORY --overwrite`. The body is `data/raw/<id>.osm`, with provider, licence, query, bounding box, and SHA-256 in the `.source.json` beside it. Limit: 32 MB, and a side of at most 4100 m. The source file is never modified.
+`map create` makes one Overpass request for the map square plus its margin. The area comes from latitude, longitude, and radius, measured in the map CRS and converted to WGS84. `geo` and the later stages do not download OSM again. Repeating the request is `osm download --map DIRECTORY --overwrite`. The request asks for every node and way in the box and only the `type=multipolygon` relations; the `.source.json` records that in `relation_types`. The body is `data/raw/<id>.osm`, with provider, licence, query, relation types, bounding box, and SHA-256 in the `.source.json` beside it. Limit: 32 MiB, and a side of at most 4100 m. In central Madrid the answer at radius 150 m went from 3.6 MB with every relation to 0.6 MB with multipolygons only, with the same `geo_scene` features. The 32 MiB cap is therefore reached at about radius 1100 m in a dense centre, up from about 880 m before the filter; both are estimates from r300 and r500, and Overpass's own `[timeout:90]` may stop a large request first. The source file is never modified.
 
 ## What the pipeline records
 
@@ -39,7 +39,7 @@ Each source file is a `SourceDataset`:
 
 ## Catastro INSPIRE Buildings (BU)
 
-Spain only.
+Spain only, without Navarre and the Basque Country, which have their own foral cadastres and are not used. The peninsula, the Balearic and Canary Islands, Ceuta and Melilla: one provider, one licence (`docs/05-cadastre.md#coverage`).
 
 | Field | Value |
 | --- | --- |
@@ -52,7 +52,7 @@ Spain only.
 
 Obligations, from the Catastro licence:
 
-- **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height. Since ADR-016, `cadastre split` also divides an OSM footprint into sub-footprints: each is a cadastral part outline clipped to the OSM outline, snapped to 1 mm, merged by parcel and storey count, with slivers dropped and gaps filled. That shape is a transformation of the cadastral geometry; the GML itself is never copied into a scene or a package.
+- **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. A download of several tiles is merged into that one file, each part once; the sidecar records every request. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height. Since ADR-016, `cadastre split` also divides an OSM footprint into sub-footprints: each is a cadastral part outline clipped to the OSM outline, snapped to 1 mm, merged by parcel and storey count, with slivers dropped and gaps filled. That shape is a transformation of the cadastral geometry; the GML itself is never copied into a scene or a package.
 - **No impersonation.** Derived products must not be presented as "cartografía catastral", "información catastral", or equivalent terms.
 - **No warranty.** Catastro is not responsible for derived products, and the data can be out of date.
 - **Attribution (CC BY 4.0).** `heights_overrides.catastro.json`, `heights.json`, `scene3d.json`, and the GLBs carry the source and the licence. The split scene `data/processed/cadastre/geo_scene.json` carries it in `subdivision.cadastre` and on every sub-building (`subdivision.license`, `attribution`, `retrieved_at`).

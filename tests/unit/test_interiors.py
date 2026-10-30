@@ -16,16 +16,20 @@ from onward_generator.detail.interiors import (
     Interior,
     InteriorPlan,
     _inner_walls,
+    _lands_on_roof,
+    assemble_interior,
     build_interior,
     fits_triangle_budget,
     glass_penetrations,
+    interior_visual,
     light_anchors,
     pierce_room_windows,
     plan_interior,
     room_window_cuts,
+    visual_triangles,
 )
 from onward_generator.detail.modules import recess
-from onward_generator.detail.scene import interior_quota
+from onward_generator.detail.scene import InteriorBudget, interior_quota
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects
 from onward_generator.materials.openings import GLASS_ALPHA, boarded_rgba, window_png, window_rgba
@@ -343,3 +347,133 @@ def test_light_uses_the_centroid_of_an_l_shaped_room() -> None:
     room = light_anchors(replace(plan, inner=inner), _rooms(2.8))["rooms"][0]
     assert inner.centroid.distance(inner.representative_point()) > 0.5
     assert room["light_m"][:2] == [round(inner.centroid.x, 3), round(inner.centroid.y, 3)]
+
+
+def test_the_visual_pass_is_what_the_built_interior_draws_and_its_colliders_are_counted() -> None:
+    """``interior_visual`` alone gives the drawn triangles the scene budgets before it builds the shell."""
+    cfg = load_detail_config()
+    footprint = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    plan = plan_interior("block-split", footprint, door, segment, 18.0, 3.0, 6, cfg)
+    assert not isinstance(plan, str) and any(f.role == "roof" for f in plan.flights)
+    layout = Layout(holes=[_window(4.0, 0.9), _window(16.0, 0.9)])
+    assert pierce_room_windows(layout, [segment], plan.inner, footprint, cfg.interiors.wall_thickness_m, 6.0) == (2, 0)
+    cuts, panes = room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment])
+
+    built = build_interior(plan, 18.0, 18.0, footprint, cfg, cuts, panes, wall_material="interior_shop_bar")
+    visual = interior_visual(plan, 18.0, cfg, cuts, wall_material="interior_shop_bar")
+    drawn = {name: [m.triangle_count for m in meshes] for name, meshes in visual.items()}
+    assert drawn == {name: [m.triangle_count for m in meshes] for name, meshes in built.visual.items()}
+    assert visual_triangles(visual) == built.visual_triangles == sum(sum(counts) for counts in drawn.values())
+    # Without the window cuts the inner walls are plain quads: fewer triangles than with them.
+    assert visual_triangles(interior_visual(plan, 18.0, cfg, wall_material="interior_shop_bar")) < built.visual_triangles
+    assert visual_triangles({"a": [], "b": []}) == 0
+
+    assembled = assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg, panes)
+    assert assembled.visual is visual
+    assert [(n, m.triangle_count) for n, m in assembled.colliders] == [(n, m.triangle_count) for n, m in built.colliders]
+    assert assembled.spec == built.spec and assembled.roof_well is not None
+    assert len(built.glass_colliders) == 2 and all(m.triangle_count == 12 for m in built.glass_colliders)
+    walls_and_slabs = sum(m.triangle_count for _, m in built.colliders)
+    assert built.collision_triangles == walls_and_slabs + 24
+    assert assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg).collision_triangles < built.collision_triangles
+
+
+def test_interior_budgets_name_the_limit_they_refuse_on() -> None:
+    cfg = load_detail_config()
+    stairs, shops = InteriorBudget.of_stairs(cfg), InteriorBudget.of_shops(cfg)
+    assert (stairs.prefix, stairs.limits) == ("", {"triangles": 8000, "collision_triangles": 24000})
+    assert (shops.prefix, shops.limits) == ("shops.", {"triangles": 6000, "collision_triangles": 72000})
+    assert stairs.used == shops.used == {"triangles": 0, "collision_triangles": 0}
+    assert stairs.refuse("triangles", 8000) is None and stairs.refuse("collision_triangles", 24000) is None
+    assert stairs.refuse("triangles", 8001) == "triangle_budget: needs 8001 triangles, 8000 left of max_triangles 8000"
+    assert shops.refuse("collision_triangles", 72001) == (
+        "triangle_budget: needs 72001 collision triangles, 72000 left of shops.max_collision_triangles 72000")
+    built = Interior(InteriorPlan("b", Polygon(), 1, 3.0, _window(0, 0), Segment(0, 0, 0, (0.0, 0.0), (1.0, 0.0), True), ()),
+                     {"interior_wall": [Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 5))]},
+                     [("walls_0", Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 7)))], {},
+                     glass_colliders=[Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]] * 3))])
+    assert (built.visual_triangles, built.collision_triangles) == (5, 10)
+    stairs.spend(built)
+    stairs.spend(built)
+    assert stairs.used == {"triangles": 10, "collision_triangles": 20} and shops.used["triangles"] == 0
+    assert stairs.refuse("triangles", 7991) == "triangle_budget: needs 7991 triangles, 7990 left of max_triangles 8000"
+    assert stairs.refuse("collision_triangles", 23981) == (
+        "triangle_budget: needs 23981 collision triangles, 23980 left of max_collision_triangles 24000")
+
+
+def _normals(mesh: Mesh) -> np.ndarray:
+    v = mesh.vertices[mesh.triangles]
+    return np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0])
+
+
+def _split_plan(**kwargs: object):
+    cfg = load_detail_config()
+    footprint = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    plan = plan_interior("block-split", footprint, door, segment, 18.0, 3.0, 6, cfg, **kwargs)
+    assert not isinstance(plan, str)
+    return cfg, footprint, segment, door, plan
+
+
+def test_interior_visual_puts_each_slab_well_and_stair_at_its_storey() -> None:
+    cfg, footprint, segment, door, plan = _split_plan()
+    s, slab, height = plan.storey_m, cfg.interiors.slab_m, 18.0
+    roles = [f.role for f in plan.flights]
+    # Storey flights, then a switchback of several roof flights: only the last lands on the roof.
+    assert roles.count("storey") >= 1 and roles.count("roof") >= 2 and roles[-1] == "roof"
+    matrices = [f.matrix.copy() for f in plan.flights]
+    visual = interior_visual(plan, height, cfg, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
+    assert all(np.array_equal(f.matrix, m) for f, m in zip(plan.flights, matrices, strict=True))  # the plan is not moved
+    walls_meshes, floors, stairs = list(visual["interior_wall"]), list(visual["interior_floor"]), visual["stair"]
+    assert len(stairs) == len(plan.flights)
+    landed = 0
+    for flight, stair_mesh in zip(plan.flights, stairs, strict=True):
+        z = stair_mesh.vertices[:, 2]
+        assert z.min() == pytest.approx(flight.level * s) and z.max() == pytest.approx(flight.level * s + (flight.geometry.risers - 1) * flight.geometry.riser_m)
+        top = (flight.level + 1) * s
+        if flight is plan.flights[-1]:
+            top = height
+            landed += 1
+        else:
+            [floor] = [floors.pop(0)]
+            assert set(floor.vertices[:, 2].round(9)) == {round(top, 9)} and (_normals(floor)[:, 2] > 0).all()
+        soffit, well = walls_meshes.pop(0), walls_meshes.pop(0)
+        assert set(soffit.vertices[:, 2].round(9)) == {round(top - slab, 9)} and (_normals(soffit)[:, 2] < 0).all()
+        assert (well.vertices[:, 2].min(), well.vertices[:, 2].max()) == pytest.approx((top - slab, top))
+        centre = np.array([flight.well.centroid.x, flight.well.centroid.y])
+        tri = well.vertices[well.triangles]
+        towards = centre - tri.mean(axis=1)[:, :2]
+        assert (np.einsum("ij,ij->i", _normals(well)[:, :2], towards) > 0).all()  # the well walls face into the well
+    assert landed == 1 and walls_meshes == [] and floors == []
+    # The door is cut through the room wall at its own span, from the inner face of the wall.
+    [room_walls] = visual["interior_shop_bar"]
+    corners = {(round(float(x), 6), round(float(y), 6), round(float(z), 6)) for x, y, z in room_walls.vertices}
+    for along in (door.s0, door.s0 + door.width):
+        x, y, _ = segment.point(along, door.height, cfg.interiors.wall_thickness_m)
+        assert (round(float(x), 6), round(float(y), 6), round(door.height, 6)) in corners
+    built = build_interior(plan, height, height, footprint, cfg)
+    names = [n for n, _ in built.colliders]
+    assert "upper_solid" not in names and "roof_slab" not in names and names.count("roof_deck") == 1
+
+
+def test_an_interior_without_roof_access_closes_its_top_room() -> None:
+    cfg, footprint, _, _, plan = _split_plan(roof_access=False)
+    assert plan.flights and all(f.role == "storey" for f in plan.flights)
+    visual = interior_visual(plan, 18.0, cfg, wall_material="interior_shop_bar")
+    ceiling = visual["interior_wall"][0]
+    assert set(ceiling.vertices[:, 2].round(9)) == {round(plan.floors * plan.storey_m, 9)} and (_normals(ceiling)[:, 2] < 0).all()
+    assert len(visual["interior_wall"]) == 1 + 2 * len(plan.flights)
+    names = [n for n, _ in build_interior(plan, 18.0, 18.0, footprint, cfg).colliders]
+    assert names.count("upper_solid") == 1 and "roof_deck" not in names
+
+
+def test_only_a_roof_flight_within_15_cm_of_the_roof_lands_on_it() -> None:
+    _, _, _, _, plan = _split_plan()
+    roof = next(f for f in plan.flights if f.role == "roof")
+    storey = next(f for f in plan.flights if f.role == "storey")
+    assert _lands_on_roof(roof, 0.0, 0.15) and _lands_on_roof(roof, 0.15, 0.0)
+    assert not _lands_on_roof(roof, 0.0, 0.1501) and not _lands_on_roof(roof, 0.0, 1.0)
+    assert not _lands_on_roof(storey, 3.0, 3.0)

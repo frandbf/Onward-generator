@@ -18,7 +18,7 @@ from shapely import STRtree, affinity, union_all
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
-from onward_generator.cadastre.acquire import CRS, CadastreError, DownloadRecord
+from onward_generator.cadastre.acquire import CadastreError, DownloadRecord
 from onward_generator.cadastre.gml import BuildingPart, PartIssue
 
 OVERRIDES_VERSION = "0.1.0"
@@ -99,10 +99,11 @@ def _osm_levels(feature: Mapping[str, Any]) -> int | None:
 def match_buildings(
     scene: Mapping[str, Any], parts: Sequence[BuildingPart], options: MatchOptions | None = None
 ) -> list[BuildingMatch]:
+    """One match per scene building. ``parts`` are in the scene CRS (``gml.reproject_parts``)."""
     options = options or MatchOptions()
     frame = scene.get("frame") or {}
-    if frame.get("crs") != CRS or frame.get("coordinate_system") != "local_grid" or frame.get("unit") != "m":
-        raise CadastreError(f"scene must be a local grid in {CRS} metres")
+    if frame.get("coordinate_system") != "local_grid" or frame.get("unit") != "m":
+        raise CadastreError("scene must be a local grid in metres")
     e0, n0 = frame["origin_projected"]
     local_parts = [affinity.translate(p.geometry, -e0, -n0) for p in parts]
     tree = STRtree(local_parts)

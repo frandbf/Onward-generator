@@ -485,6 +485,7 @@ namespace OnwardGenerator
         {
             RunGuarded(() =>
             {
+                ResetPhases();
                 ApplyQuestGraphics();
                 var clock = Stopwatch.StartNew();
                 Package pkg = LoadPackage(packageDir);
@@ -537,6 +538,7 @@ namespace OnwardGenerator
                 {
                     AssetDatabase.StopAssetEditing();
                 }
+                MarkPhase("import");
 
                 int visualObjects;
                 if (opt.combine_cell_m > 0)
@@ -561,6 +563,7 @@ namespace OnwardGenerator
                         visualObjects++;
                     }
                 }
+                MarkPhase("combine");
 
                 // Collision stays separate from the visual meshes: MeshCollider only, no renderer.
                 var collisionRoot = new GameObject("Collision");
@@ -606,6 +609,7 @@ namespace OnwardGenerator
                     GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.NavigationStatic);
                     colliders++;
                 }
+                MarkPhase("import");
 
                 var sun = new GameObject("Directional Light");
                 var light = sun.AddComponent<Light>();
@@ -650,6 +654,7 @@ namespace OnwardGenerator
                 }
                 EditorUtility.SetDirty(descriptor);
 
+                MarkPhase("gameplay");
                 double buildSeconds = clock.Elapsed.TotalSeconds;
                 var bakeClock = Stopwatch.StartNew();
                 Bake(root, opt);
@@ -658,6 +663,8 @@ namespace OnwardGenerator
                 EditorSceneManager.MarkSceneDirty(scene);
                 EditorSceneManager.SaveScene(scene, scenePath);
                 AssetDatabase.SaveAssets();
+                MarkPhase("save");
+                LogTimings();
 
                 File.WriteAllText(reportOut, SceneReport(pkg, scenePath, visualObjects, colliders, buildSeconds, bakeSeconds));
                 Debug.Log($"{LogPrefix} Scene saved: {scenePath}. Lightmaps: {LightmapSettings.lightmaps.Length}. Report: {reportOut}");
@@ -666,13 +673,14 @@ namespace OnwardGenerator
 
         [MenuItem("ONWARD Murcia Export/2. Build for Quest via Onward Launcher")]
         public static void BuildQuestViaLauncher() =>
-            BuildLauncherFromPaths(RequireArg("-exportPackage"), RequireArg("-exportOut"));
+            BuildLauncherFromPaths(RequireArg("-exportPackage"), RequireArg("-exportOut"), OptionalArg("-exportReport"));
 
         /// <summary>Same as the batch launcher step, for the live Editor / MCP.</summary>
-        public static void BuildLauncherFromPaths(string packageDir, string outDir)
+        public static void BuildLauncherFromPaths(string packageDir, string outDir, string reportOut = null)
         {
             RunGuarded(() =>
             {
+                ResetPhases();
                 Package pkg = LoadPackage(packageDir);
                 if (Directory.Exists(outDir) && Directory.EnumerateFileSystemEntries(outDir).Any())
                     throw new InvalidOperationException($"{outDir} is not empty; launcher output is never overwritten");
@@ -685,10 +693,12 @@ namespace OnwardGenerator
                 EditorPrefs.SetString(LauncherBinPathPref, outDir);
                 EditorPrefs.SetInt(LauncherPlatformPref, LauncherPlatformQuest);
                 EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                MarkPhase("open");
                 RestoreFullHuntRoster(pkg.Layout);
                 PrepareHuntPatrol();
                 if (EditorSceneManager.GetActiveScene().isDirty)
                     EditorSceneManager.SaveOpenScenes();
+                MarkPhase("hunt");
 
                 string title = pkg.Manifest.map.title;
                 string description = pkg.Manifest.map.description;
@@ -707,6 +717,7 @@ namespace OnwardGenerator
                     ref workshopItem);
                 if (!built)
                     throw new InvalidOperationException($"ContentBuilder.BuildScene failed for {pkg.Manifest.package_id}");
+                MarkPhase("bundle");
 
                 string bundlePath = Path.Combine(Application.dataPath + "/../", ContentBuilder.FullAssetBundlePath);
                 GM_Base[] allModes = UnityEngine.Object.FindObjectsOfType<GM_Base>();
@@ -729,6 +740,10 @@ namespace OnwardGenerator
                 string info = Path.Combine(outDir, $"unity-export.local.{CustomContentUtils.INFO_EXTENSION}");
                 if (!File.Exists(content) || !File.Exists(info))
                     throw new FileNotFoundException($"Launcher did not produce both files in {outDir}.");
+                MarkPhase("copy");
+                LogTimings();
+                if (!string.IsNullOrEmpty(reportOut))
+                    File.WriteAllText(reportOut, LauncherReport(pkg));
                 Debug.Log($"{LogPrefix} Launcher output OK in {clock.Elapsed.TotalSeconds:F1} s: {content} ({new FileInfo(content).Length} bytes)");
             });
         }
@@ -854,21 +869,32 @@ namespace OnwardGenerator
             }
             string scenePath = EditorSceneManager.GetActiveScene().path.Replace('\\', '/');
             string dir = Path.GetDirectoryName(scenePath)?.Replace('\\', '/') + "/" + Path.GetFileNameWithoutExtension(scenePath);
+            // Every page the bake wrote, not a fixed count; a directional bake also wrote Lightmap-N_comp_dir.png.
             var maps = new List<LightmapData>();
-            for (int i = 0; i < 8; i++)
+            int directional = 0;
+            for (int i = 0; ; i++)
             {
                 var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/Lightmap-{i}_comp_light.exr");
                 if (tex == null) break;
-                maps.Add(new LightmapData { lightmapColor = tex });
+                var dirTex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/Lightmap-{i}_comp_dir.png");
+                if (dirTex != null) directional++;
+                maps.Add(new LightmapData { lightmapColor = tex, lightmapDir = dirTex });
             }
             if (maps.Count == 0)
             {
                 Debug.LogWarning($"{LogPrefix} No lightmaps assigned and no Lightmap files beside {scenePath}.");
                 return;
             }
+            if (directional > 0 && directional != maps.Count)
+            {
+                Debug.LogWarning($"{LogPrefix} Only {directional} of {maps.Count} lightmaps beside {scenePath} have a direction map; assigning them non-directional.");
+                foreach (LightmapData data in maps) data.lightmapDir = null;
+                directional = 0;
+            }
+            LightmapSettings.lightmapsMode = directional > 0 ? LightmapsMode.CombinedDirectional : LightmapsMode.NonDirectional;
             LightmapSettings.lightmaps = maps.ToArray();
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-            Debug.Log($"{LogPrefix} Assigned {maps.Count} existing lightmaps.");
+            Debug.Log($"{LogPrefix} Assigned {maps.Count} existing lightmaps ({LightmapSettings.lightmapsMode}).");
         }
 
         // ---- Scene pieces --------------------------------------------------------------------
@@ -1047,7 +1073,9 @@ namespace OnwardGenerator
             generator.OutDoorPoints = new List<Vector3> { origin };
             LogNavIslands(origin);
             RequireNavigationObject(generator, map);
+            MarkPhase("navmesh");
             BakeNodesToFit(generator, map);
+            MarkPhase("nav_nodes");
             EditorUtility.SetDirty(map);
         }
 
@@ -1131,12 +1159,13 @@ namespace OnwardGenerator
             float spacing = InitialNavSpacing(area, span);
             for (int attempt = 1; attempt <= NavSpacingAttempts; attempt++)
             {
+                var attemptClock = Stopwatch.StartNew();
                 ApplyNavSpacing(generator, spacing);
                 generator.GenerateNodes();
                 int dropped = DropCoincidentLinks(map);
                 int reversed = OrientLinksOneWay(map);
                 NavWalk walk = MeasureOpenWalk(map);
-                Debug.Log($"{LogPrefix} Navigation spacing {spacing:F1} m, attempt {attempt}: {walk.nodes} nodes, depth {walk.depth}, one-way {reversed}, dropped {dropped}.");
+                Debug.Log($"{LogPrefix} Navigation spacing {spacing:F1} m, attempt {attempt}: {walk.nodes} nodes, depth {walk.depth}, one-way {reversed}, dropped {dropped}, in {attemptClock.Elapsed.TotalSeconds:F1} s.");
                 if (walk.depth <= MaxNavWalkDepth)
                     return;
                 if (attempt == NavSpacingAttempts)
@@ -2258,11 +2287,39 @@ namespace OnwardGenerator
             Lightmapping.lightingSettings = settings;
             if (opt.occlusion_culling && !StaticOcclusionCulling.Compute())
                 throw new InvalidOperationException("StaticOcclusionCulling.Compute() returned false.");
-            if (!Lightmapping.Bake()) throw new InvalidOperationException("Lightmapping.Bake() returned false.");
+            var fallbackWarnings = new List<string>();
+            Application.LogCallback watch = (message, stack, type) =>
+            {
+                if (message != null && IsLightmapperFallback(message)) fallbackWarnings.Add(message.Split('\n')[0].Trim());
+            };
+            Application.logMessageReceived += watch;
+            try
+            {
+                if (!Lightmapping.Bake()) throw new InvalidOperationException("Lightmapping.Bake() returned false.");
+            }
+            finally
+            {
+                Application.logMessageReceived -= watch;
+            }
+            MarkPhase("gi_bake");
             CompressLightmapsAstc();
+            MarkPhase("astc");
+            LightingSettings.Lightmapper used = Lightmapping.lightingSettings.lightmapper;
+            lastBake = new LightmapBake
+            {
+                lightmapper_requested = settings.lightmapper.ToString(),
+                lightmapper = used.ToString(),
+                fallback = used != LightingSettings.Lightmapper.ProgressiveGPU || fallbackWarnings.Count > 0,
+                fallback_warning = fallbackWarnings.Count > 0 ? fallbackWarnings[0] : "",
+                sizes = LightmapSizes(),
+            };
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} Lightmaps: {1}, {2} texels, at {3} texels/m, at most {4} px.",
                 LogPrefix, LightmapSettings.lightmaps.Length, LightmapTexels(), opt.lightmap_texels_per_m, opt.lightmap_max_size));
+            string fellBack = lastBake.fallback ? "yes" : "no";
+            string warning = lastBake.fallback_warning.Length > 0 ? ": " + lastBake.fallback_warning : "";
+            Debug.Log($"{LogPrefix} Lightmapper: {lastBake.lightmapper} (requested {lastBake.lightmapper_requested}, fallback {fellBack}{warning}"
+                + $"). Lightmaps: {lastBake.sizes.Length} ({SizeSummary(lastBake.sizes)}).");
         }
 
         // Baked colour texels of every lightmap; compare with lightmap_estimate in onward_export.json.
@@ -2354,10 +2411,102 @@ namespace OnwardGenerator
             sb.Append($"\"lightmaps\":{LightmapSettings.lightmaps.Length},\"lightmap_texels\":{LightmapTexels()},");
             int probeCount = UnityEngine.Object.FindObjectsOfType<LightProbeGroup>().Sum(g => g.probePositions.Length);
             sb.Append($"\"lights\":{UnityEngine.Object.FindObjectsOfType<Light>().Length},\"light_probes\":{probeCount},");
+            sb.Append($"\"lightmap_bake\":{JsonUtility.ToJson(lastBake)},");
             sb.Append(string.Format(CultureInfo.InvariantCulture, "\"seconds\":{{\"scene\":{0:F1},\"bake\":{1:F1}", buildSeconds, bakeSeconds));
+            sb.Append(PhaseSecondsJson());
             sb.Append("}}");
             return sb.ToString();
         }
+
+        // The launcher step's own timings; scene_report.json belongs to the scene step and is not rewritten.
+        private static string LauncherReport(Package pkg)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"schema\":\"onward_generator.onward_adapter_launcher_report\",\"schema_version\":\"0.1.0\",");
+            sb.Append("\"note\":\"Unity Editor timings; not device measurements.\",");
+            sb.Append($"\"adapter\":{{\"name\":\"{AdapterName}\",\"version\":\"{AdapterVersion}\"}},");
+            sb.Append($"\"package_id\":\"{pkg.Manifest.package_id}\",\"manifest_sha256\":\"{pkg.ManifestSha256}\",");
+            sb.Append($"\"unity\":\"{Application.unityVersion}\",");
+            sb.Append("\"seconds\":{");
+            sb.Append(PhaseSecondsJson().Substring(1));
+            sb.Append("}}");
+            return sb.ToString();
+        }
+
+        // ---- Phase timings ---------------------------------------------------------------------
+        // Each step charges the time since its previous mark to a named phase. A phase marked
+        // twice adds up. They go to the report as seconds.<phase> and to one "Timings:" log line.
+        private static readonly List<string> PhaseOrder = new List<string>();
+        private static readonly Dictionary<string, double> PhaseSeconds = new Dictionary<string, double>();
+        private static Stopwatch phaseClock = new Stopwatch();
+        private static Stopwatch stepClock = new Stopwatch();
+
+        private static void ResetPhases()
+        {
+            PhaseOrder.Clear();
+            PhaseSeconds.Clear();
+            phaseClock = Stopwatch.StartNew();
+            stepClock = Stopwatch.StartNew();
+            lastBake = new LightmapBake();
+        }
+
+        private static void MarkPhase(string phase)
+        {
+            double seconds = phaseClock.Elapsed.TotalSeconds;
+            phaseClock.Restart();
+            if (!PhaseSeconds.ContainsKey(phase))
+            {
+                PhaseOrder.Add(phase);
+                PhaseSeconds[phase] = 0;
+            }
+            PhaseSeconds[phase] += seconds;
+        }
+
+        private static void LogTimings()
+        {
+            Debug.Log($"{LogPrefix} Timings: "
+                + string.Join(", ", PhaseOrder.Select(p => string.Format(CultureInfo.InvariantCulture, "{0} {1:F1} s", p, PhaseSeconds[p])))
+                + string.Format(CultureInfo.InvariantCulture, ", total {0:F1} s", stepClock.Elapsed.TotalSeconds));
+        }
+
+        // ,"<phase>":s,... and ,"total":s, appended inside a "seconds" object.
+        private static string PhaseSecondsJson()
+        {
+            var sb = new StringBuilder();
+            foreach (string phase in PhaseOrder)
+                sb.Append(string.Format(CultureInfo.InvariantCulture, ",\"{0}\":{1:F1}", phase, PhaseSeconds[phase]));
+            sb.Append(string.Format(CultureInfo.InvariantCulture, ",\"total\":{0:F1}", stepClock.Elapsed.TotalSeconds));
+            return sb.ToString();
+        }
+
+        // Which lightmapper baked, and the lightmap pages it wrote. The SDK guide asks for
+        // ProgressiveGPU; without a usable OpenCL device Unity bakes on the CPU instead.
+        [Serializable]
+        private class LightmapBake
+        {
+            public string lightmapper_requested = "";
+            public string lightmapper = "";
+            public bool fallback;
+            public string fallback_warning = "";
+            public string[] sizes = new string[0];
+        }
+
+        private static LightmapBake lastBake = new LightmapBake();
+
+        private static bool IsLightmapperFallback(string message) =>
+            message.IndexOf("fall", StringComparison.OrdinalIgnoreCase) >= 0
+            && (message.IndexOf("CPU", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("lightmapper", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("OpenCL", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        private static string[] LightmapSizes() =>
+            LightmapSettings.lightmaps
+                .Select(d => d.lightmapColor == null ? "none" : $"{d.lightmapColor.width}x{d.lightmapColor.height}")
+                .ToArray();
+
+        // "2048x2048 x2, 1024x1024"
+        private static string SizeSummary(string[] sizes) =>
+            sizes.Length == 0 ? "none" : string.Join(", ", sizes.GroupBy(s => s).Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key));
 
         // ---- Helpers ---------------------------------------------------------------------------
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).

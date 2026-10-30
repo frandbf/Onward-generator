@@ -345,7 +345,7 @@ def _unity_summary(text: str, *, failed: bool, content_md5: str | None = None) -
             continue
         if " dropped:" in stripped:
             continue
-        if stripped.startswith("[OnwardAdapter] Navigation ") or stripped.startswith("[OnwardAdapter] Hunt "):
+        if stripped.startswith(("[OnwardAdapter] Navigation ", "[OnwardAdapter] Hunt ", "[OnwardAdapter] Timings: ", "[OnwardAdapter] Lightmapper: ")):
             kept.append(stripped.removeprefix("[OnwardAdapter] "))
             continue
         if "Launcher output OK in " in stripped:
@@ -356,7 +356,7 @@ def _unity_summary(text: str, *, failed: bool, content_md5: str | None = None) -
             continue
         if stripped.startswith("[export] content3 md5 "):
             continue
-        if stripped.startswith("[export] pushed "):
+        if stripped.startswith(("[export] pushed ", "[export] lightmapper: ")):
             kept.append(stripped.removeprefix("[export] "))
             continue
         if stripped.startswith("[export] device backup:"):

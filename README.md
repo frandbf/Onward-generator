@@ -2,7 +2,7 @@
 
 Local tool that turns legal geographic data into 3D scenes for custom Onward maps on Meta Quest. The command is `onward-generator` (`python -m onward_generator`), version 0.1.0.
 
-OpenStreetMap supplies the streets and building footprints. The generator extrudes footprints the extract actually contains. Heights can come from a deterministic estimate or, in peninsular Spain, from Catastro floor counts. A later dressing pass adds facades, materials, street names, and an optional abandoned-city layer. Unity 2021.3 and the Onward custom-content SDK build the headset package. A GLB is not a playable map. The headset checklist in `quest_acceptance.md` is still open, so `device_verified` stays false. See [docs/12-export.md](docs/12-export.md).
+OpenStreetMap supplies the streets and building footprints. The generator extrudes footprints the extract actually contains. Heights can come from a deterministic estimate or, in Spain outside Navarre and the Basque Country, from Catastro floor counts. A later dressing pass adds facades, materials, street names, and an optional abandoned-city layer. Unity 2021.3 and the Onward custom-content SDK build the headset package. A GLB is not a playable map. The headset checklist in `quest_acceptance.md` is still open, so `device_verified` stays false. See [docs/12-export.md](docs/12-export.md).
 
 Documentation is in English. Working rules for changes are in [AGENTS.md](AGENTS.md). The operational contract is [docs/01-pipeline.md](docs/01-pipeline.md).
 
@@ -85,7 +85,7 @@ Each stage prints one line: number, name, duration and its key numbers. Breakdow
 - **Overpass.** A busy server is retried on its own: HTTP 429 and 5xx, a dropped connection and a timeout three times each, waiting 8, 16, 32 s and up to 90 s, and a runtime-error remark twice, 30 s apart. If the download still fails after the folder exists, `onward-generator osm download --map maps/<id>` tries again.
 - **Packages.** An export package is never overwritten; the next one is `pkg_02`.
 - **Unity.** If the Editor has `~/Unity/OnwardPhase0Project` open, `run` asks you to close it first. After the build it asks before uploading; only `s` or `si` uploads.
-- **One slot.** The headset has one local slot. The card title is `Unity Export`; the name passed to `run` is the folder name and the title in `maps/<id>/config/export.json`.
+- **One slot.** The headset has one local slot. The card title is `Unity Export`; the name passed to `run` is the folder name and the title in `maps/<id>/config/export.json`. `ONWARD_QUEST_LISTING` tries other installs ([below](#map-name-and-thumbnail-on-the-headset-experimental)).
 
 Each stage can also run by hand; the commands are in [docs/01-pipeline.md](docs/01-pipeline.md#recipe-for-a-new-map), and every command and flag is in [docs/commands.md](docs/commands.md). `cadastre` (Spain only) and `props place` are optional and not called by `run`.
 
@@ -109,6 +109,23 @@ The project is `~/Unity/OnwardPhase0Project`. Open it only with 2021.3.23f1: a n
 tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 tool scene launcher
 CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 push
 ```
+
+### Map name and thumbnail on the headset (experimental)
+
+On the Quest the local map is listed as `Unity Export` with a generic picture. One switch tries other installs that might show the map's own title and its 512×256 thumbnail. It is off by default: without it, `task unity` does exactly what it did before.
+
+```bash
+ONWARD_QUEST_LISTING=named task unity          # or: task unity -- --listing named
+```
+
+| Mode | What `push` installs |
+| --- | --- |
+| `local` (default) | Today's install: `unity-export.local.*`, card `Unity Export`, Hunt verified |
+| `local-thumb` | The same slot and name; the `.info3` points `ThumbnailUrl` at the copied PNG (`file://…/unity-export.local.png`) |
+| `named` | A second map `onwardgen.<map id>.*` beside the local one, with the map's title as its name. The local slot is left as it is |
+| `named-thumb` | `named` plus `ThumbnailUrl` pointing at its PNG |
+
+An unknown mode stops with exit 2 and the list. Every mode backs up the headset files first, never deletes one, and still asks before uploading. None of them has been verified on the headset; what to check is in [docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental).
 
 The editor log is `~/Library/Logs/onward-export/` on macOS and `~/.local/state/onward-generator/onward-export/` on Linux. Running Unity itself in a container (GameCI `unityci/editor`) is not set up yet: it needs a Unity licence file and the SDK project on the machine.
 
@@ -165,6 +182,7 @@ Read [docs/01](docs/01-pipeline.md) through [docs/12](docs/12-export.md) in orde
 - [docs/decisions/](docs/decisions/): architecture decision records, one per choice.
 - [docs/abandoned-assets.md](docs/abandoned-assets.md): the props overgrow can place, with a picture of each.
 - [docs/legal/data-sources.md](docs/legal/data-sources.md): licences, attribution and ODbL obligations.
+- [docs/plans/](docs/plans/): measured studies and work plans (in Spanish), such as the [speed and scale plan](docs/plans/2026-10-30-scale-and-speed.md).
 
 ## Layout
 

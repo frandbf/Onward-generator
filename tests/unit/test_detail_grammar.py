@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from shapely import Polygon, affinity, box
 
 from onward_generator.detail.config import load_detail_config
+from onward_generator.detail.facades import _hip_roof
 from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
+from onward_generator.generation.mesh import upward_area
 
 CFG = load_detail_config("config/detail.default.json")
 RESIDENTIAL = CFG.templates["generic_residential"]
@@ -131,3 +134,20 @@ def test_a_building_without_evidence_is_estimated_residential() -> None:
         "use": "retail", "origin": "observed",
         "evidence": [{"source_id": "osm-node-4", "tag": "shop=bakery", "match": "poi_inside"}],
     }
+
+
+def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
+    """A near-convex footprint with a 4 cm reflex jog: a fan from the centroid folds one face under the roof."""
+    template, *_ = choose_roof({"roof:shape": "hipped"}, RESIDENTIAL, CFG.seed, "osm-way-1", 18.0)
+    plain = _hip_roof(box(0, 0, 5, 3.6), 30.0, template)
+    assert plain is not None and upward_area(plain[0]) == pytest.approx(18.0)
+    jog = Polygon([(0.04, 0), (5, 0), (5, 3.6), (0, 3.6), (0, 3.4), (0.04, 3.4)])  # the west wall steps in under its top
+    assert jog.area >= 0.995 * jog.convex_hull.area
+    assert _hip_roof(jog, 30.0, template) is None
+    assert _hip_roof(affinity.rotate(jog, 45, origin=(0, 0)), 30.0, template) is None  # a slanted step too
+    chamfer = Polygon([(0.1, 0), (5, 0), (5, 3.6), (0, 3.6), (0, 0.1)])  # a short eave still faces the apex
+    assert _hip_roof(chamfer, 30.0, template) is not None
+    # Two 2 cm steps on the centroid's own line: their faces would be edge-on, so the roof stays flat too.
+    edge_on = Polygon([(0.02, 0), (4, 0), (4, 1), (3.98, 1), (3.98, 2), (0, 2), (0, 1), (0.02, 1)])
+    assert edge_on.centroid.y == 1.0 and edge_on.area >= 0.995 * edge_on.convex_hull.area
+    assert _hip_roof(edge_on, 30.0, template) is None

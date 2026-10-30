@@ -58,7 +58,7 @@ def test_adapter_refuses_a_navigation_map_the_quest_cannot_use() -> None:
     for needle in (
         "NavigationMap has a missing script",
         "Navigation node {i} lists itself",
-        "dropped {dropped}.",
+        "dropped {dropped}, in {attemptClock.Elapsed.TotalSeconds:F1} s.",
         "one-way {reversed}",
         "Navigation walk does not end",
         "Navigation graph walk exceeded the node count",

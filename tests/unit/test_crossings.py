@@ -116,10 +116,10 @@ def test_a_dead_end_inside_another_street_bounding_box_keeps_its_own_setback() -
     assert _same(near, union_all([box(87, -36, 93, -32), box(87, 2, 93, 6)]))
 
 
-def _slab_defects(geometry: BaseGeometry) -> int:
+def _slab_defects(geometry: BaseGeometry, precision_m: float = 0.001) -> int:
     """The steps scene.py runs before it extrudes a ground slab."""
     cleaned, _ = drop_degenerate_holes(geometry)
-    return closed_manifold_defects(prism(open_point_contacts(cleaned), -1.0, -0.15, bottom=True))
+    return closed_manifold_defects(prism(open_point_contacts(cleaned, precision_m=precision_m), -1.0, -0.15, bottom=True))
 
 
 def test_the_carriageway_slab_closes_around_its_crossings() -> None:
@@ -131,7 +131,7 @@ def test_the_carriageway_slab_closes_around_its_crossings() -> None:
     ]
     partition = build_partition(box(-50, -50, 50, 50), [], ways, [], CFG)
     carriageway = partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
-    assert _slab_defects(carriageway.difference(partition.crossings)) > 0
+    assert _slab_defects(carriageway.difference(partition.crossings), precision_m=1e-9) > 0
     slab = carriageway_slab(partition, CFG.precision_m)
     assert _slab_defects(slab) == 0
     assert slab.area + partition.crossings.area == pytest.approx(carriageway.area, abs=0.01)

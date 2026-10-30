@@ -317,3 +317,6 @@ def test_cadastre_reports_the_split(tmp_path: Path) -> None:
     split.update(osm_buildings_split=0, sub_buildings=0, levels_range=None)
     _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 0}, "split": {"counts": split}})
     assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 0  split 0 → 0")
+    split.update(status_quarantined=2, quarantined_m2=1234.56)
+    _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 0}, "split": {"counts": split}})
+    assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 0  split 0 → 0  kept whole 2 (1 235 m²)")

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+from functools import partial
+
 import numpy as np
 import pytest
 
-from onward_generator.dress.atlas import decode_png_rgba, encode_png_rgba
+from onward_generator.dress.atlas import PNG_WORKERS, decode_png_rgba, encode_png_rgba, run_png_jobs
 from onward_generator.generation.preview import _png
 
 
@@ -49,3 +52,22 @@ def test_decode_widens_rgb_png_to_opaque_rgba() -> None:
     decoded = decode_png_rgba(_png(rgb))
     assert np.array_equal(decoded[..., :3], rgb)
     assert (decoded[..., 3] == 255).all()
+
+
+def test_png_jobs_on_threads_give_the_serial_bytes_in_input_order() -> None:
+    rng = np.random.default_rng(11)
+    # Large and small images interleaved, more than one per worker, so jobs finish out of order.
+    images = [rng.integers(0, 256, size=(side, side, 4), dtype=np.uint8) for side in (512, 3, 256, 1, 384, 9) * PNG_WORKERS]
+    serial = [hashlib.sha256(encode_png_rgba(image)).hexdigest() for image in images]
+    threaded = run_png_jobs({f"tile_{index}": partial(encode_png_rgba, image) for index, image in enumerate(images)})
+    assert list(threaded) == [f"tile_{index}" for index in range(len(images))]
+    assert [hashlib.sha256(data).hexdigest() for data in threaded.values()] == serial
+
+
+def test_png_jobs_raise_the_first_failure() -> None:
+    def broken() -> bytes:
+        raise ValueError("bad tile")
+
+    with pytest.raises(ValueError, match="bad tile"):
+        run_png_jobs({"good": partial(encode_png_rgba, _pixels()), "bad": broken})
+    assert run_png_jobs({}) == {}

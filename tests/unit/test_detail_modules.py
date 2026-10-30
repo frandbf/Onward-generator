@@ -248,6 +248,12 @@ def _mutated(path: list[str | int], value: object) -> dict:
         (["interiors", "max_triangles"], 100001, "maximum"),
         (["interiors", "max_triangles"], 8000.5, "integer"),
         (["interiors", "max_triangles"], "8000", "integer"),
+        (["interiors", "max_collision_triangles"], -1, "minimum"),
+        (["interiors", "max_collision_triangles"], 200001, "maximum"),
+        (["interiors", "max_collision_triangles"], 24000.5, "integer"),
+        (["interiors", "shops", "max_collision_triangles"], -1, "minimum"),
+        (["interiors", "shops", "max_collision_triangles"], 200001, "maximum"),
+        (["interiors", "shops", "max_collision_triangles"], "72000", "integer"),
     ],
 )
 def test_invalid_detail_config_is_rejected(path: list[str | int], value: object, fragment: str) -> None:
@@ -272,6 +278,24 @@ def test_interior_triangle_budget_is_required_and_read_as_given() -> None:
         config_from_document(doc)
     for value in (0, 1234, 100000):
         assert config_from_document(_mutated(["interiors", "max_triangles"], value)).interiors.max_triangles == value
+
+
+@pytest.mark.parametrize("path", [["interiors"], ["interiors", "shops"]])
+def test_interior_collision_budgets_are_required_and_read_as_given(path: list[str]) -> None:
+    doc = copy.deepcopy(DOC)
+    target = doc
+    for key in path:
+        target = target[key]
+    del target["max_collision_triangles"]
+    with pytest.raises(DetailConfigError, match="'max_collision_triangles' is a required property"):
+        config_from_document(doc)
+    for value in (0, 4321, 200000):
+        cfg = config_from_document(_mutated([*path, "max_collision_triangles"], value))
+        read = cfg.interiors if path == ["interiors"] else cfg.interiors.shops
+        assert read.max_collision_triangles == value
+        assert (cfg.interiors.max_triangles, cfg.interiors.shops.max_triangles) == (8000, 6000)
+    defaults = config_from_document(copy.deepcopy(DOC)).interiors
+    assert (defaults.max_collision_triangles, defaults.shops.max_collision_triangles) == (24000, 72000)
 
 
 def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:
@@ -300,8 +324,33 @@ def test_shop_evidence_prefers_the_footprint_that_contains_the_point() -> None:
     inside = _shop_evidence([poi("in", -1.0, 7.0)], footprints, CFG)
     assert dict(inside) == {"low": ["in"]}  # 1 m from the tall neighbour, but inside the low one
     street = _shop_evidence([poi("street", -1.0, 5.0)], footprints, CFG)
-    assert dict(street) == {"low": ["street"], "tall": ["street"]}  # outside both: the 2 m rule
+    assert dict(street) == {"low": ["street"]}  # outside both, 1 m from low and 1.41 m from tall: the nearest only
     assert dict(_shop_evidence([poi("far", -1.0, 3.0)], footprints, CFG)) == {}
+
+
+def test_a_poi_on_a_party_line_gives_one_building_a_shopfront() -> None:
+    from onward_generator.detail.scene import _shop_evidence, _use_evidence
+
+    footprints = {"b": box(0, 6, 14, 22), "a": box(-15, 6, 0, 22)}
+
+    def poi(pid: str, x: float, y: float) -> dict:
+        return {"id": pid, "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [x, y]}}
+
+    # 1 m in front of the party wall x = 0: as near to a as to b. The lower id takes it.
+    assert dict(_shop_evidence([poi("front", 0.0, 5.0)], footprints, CFG)) == {"a": ["front"]}
+    assert dict(_use_evidence([poi("front", 0.0, 5.0)], footprints, CFG)) == {"a": [("front", {"shop": "bakery"}, "poi_near")]}
+    # On the party wall itself: on both outlines, inside neither. Still one building, and inside.
+    assert dict(_shop_evidence([poi("wall", 0.0, 10.0)], footprints, CFG)) == {"a": ["wall"]}
+    assert dict(_use_evidence([poi("wall", 0.0, 10.0)], footprints, CFG)) == {"a": [("wall", {"shop": "bakery"}, "poi_inside")]}
+
+
+def test_a_poi_on_one_outline_and_inside_another_goes_to_the_one_that_contains_it() -> None:
+    from onward_generator.detail.scene import _shop_evidence
+
+    # "a" overlaps "b": the point is on a's outline and inside b, so b holds it although a sorts first.
+    footprints = {"a": box(0, 0, 10, 10), "b": box(5, 0, 20, 10)}
+    point = {"id": "p", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [10.0, 5.0]}}
+    assert dict(_shop_evidence([point], footprints, CFG)) == {"b": ["p"]}
 
 
 def test_shop_evidence_inside_a_box_but_outside_the_shape_is_not_inside() -> None:

@@ -11,11 +11,11 @@ from pathlib import Path
 from onward_generator.cadastre.acquire import (
     DOWNLOAD_MARGIN_M,
     CadastreError,
-    bbox_from_scene,
+    DownloadRecord,
     download_building_parts,
     load_download_record,
 )
-from onward_generator.cadastre.gml import parse_building_parts
+from onward_generator.cadastre.gml import BuildingPart, PartIssue, parse_building_parts, reproject_parts
 from onward_generator.cadastre.match import (
     DEFAULT_MIN_COVERAGE,
     MatchOptions,
@@ -24,6 +24,7 @@ from onward_generator.cadastre.match import (
     overrides_document,
 )
 from onward_generator.cadastre.split import SplitOptions, split_overrides, split_scene, split_summary, subdivided_scene
+from onward_generator.cadastre.zones import scene_request
 from onward_generator.contracts import is_schema
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_json, prepare_outputs
@@ -43,12 +44,19 @@ def _load_scene(path: str) -> tuple[dict, dict]:
     return scene, {"path": str(scene_path), "sha256": sha256_file(scene_path), "schema_version": scene.get("schema_version")}
 
 
+def _parts(gml_path: Path, scene: dict) -> tuple[DownloadRecord, list[BuildingPart], list[PartIssue]]:
+    """The download record and its parts, moved from the download CRS to the scene CRS."""
+    record = load_download_record(gml_path)
+    parts, issues = parse_building_parts(gml_path, record.crs)
+    return record, reproject_parts(parts, record.crs, scene["frame"]["crs"]), issues
+
+
 def _download(args: argparse.Namespace) -> int:
     scene, _ = _load_scene(args.scene)
-    bbox = bbox_from_scene(scene, args.margin_m)
-    record = download_building_parts(bbox, args.out, overwrite=args.overwrite)
-    print(f"downloaded {record.size_bytes} bytes, sha256 {record.sha256}")
-    print(f"bbox {record.bbox} ({record.crs}); licence {record.license}")
+    bbox, zone = scene_request(scene, args.margin_m)
+    record = download_building_parts(bbox, args.out, crs=zone.crs, overwrite=args.overwrite)
+    print(f"downloaded {record.size_bytes} bytes in {len(record.tiles)} tile(s), sha256 {record.sha256}")
+    print(f"bbox {record.bbox} ({record.crs}, {zone.territory}); licence {record.license}")
     print(f"wrote {args.out} and its .source.json sidecar")
     return 0
 
@@ -56,8 +64,7 @@ def _download(args: argparse.Namespace) -> int:
 def _match(args: argparse.Namespace) -> int:
     scene, scene_ref = _load_scene(args.scene)
     gml_path = Path(args.gml).expanduser().resolve()
-    record = load_download_record(gml_path)
-    parts, part_issues = parse_building_parts(gml_path)
+    record, parts, part_issues = _parts(gml_path, scene)
     options = MatchOptions(min_coverage=args.min_coverage)
     matches = match_buildings(scene, parts, options)
     if sha256_file(gml_path) != record.sha256:
@@ -88,8 +95,7 @@ def _split(args: argparse.Namespace) -> int:
 
     scene, scene_ref = _load_scene(args.scene)
     gml_path = Path(args.gml).expanduser().resolve()
-    record = load_download_record(gml_path)
-    parts, part_issues = parse_building_parts(gml_path)
+    record, parts, part_issues = _parts(gml_path, scene)
     height_config = load_height_config()
     match_options = MatchOptions(min_coverage=args.min_coverage)
     options = SplitOptions(
@@ -125,7 +131,7 @@ def _split(args: argparse.Namespace) -> int:
     span = f"{levels[0]}-{levels[1]}" if levels else "none"
     print(
         f"parts={len(parts)} buildings={c['osm_buildings']} split={c['osm_buildings_split']} "
-        f"sub_buildings={c['sub_buildings']} levels={span}"
+        f"sub_buildings={c['sub_buildings']} levels={span} quarantined={c['status_quarantined']}"
     )
     print(f"wrote {out_scene}")
     print(f"wrote {out_overrides}")

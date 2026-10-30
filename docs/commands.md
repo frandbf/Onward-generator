@@ -13,7 +13,7 @@ Every command is `onward-generator <command>`, the same as `python -m onward_gen
 | `osm download` | Repeat the Overpass request for one map folder. | `0` / `1` |
 | `geo` | Geographic pipeline. The command is in [docs/01-pipeline.md](01-pipeline.md#recipe-for-a-new-map). | `0` / `1` |
 | `heights` | Building heights from `geo_scene.json`: `--scene`, `--out`, `[--config]`, `[--overrides]`, `[--overwrite]`. See `04-heights.md`. | `0` / `1` |
-| `cadastre download` | **Uses the network.** One Catastro WFS request (`BuildingPart`) for the scene bbox: `--scene`, `--out`, `[--margin-m]`, `[--overwrite]`. Spain only. | `0` / `1` |
+| `cadastre download` | **Uses the network.** Catastro WFS requests (`BuildingPart`) for the scene bbox, in tiles of at most 1 km², in the CRS of the map's Catastro zone: `--scene`, `--out`, `[--margin-m]`, `[--overwrite]`. Spain without Navarre and the Basque Country. See `05-cadastre.md`. | `0` / `1` |
 | `cadastre match` | Catastro storeys to `heights_overrides.catastro.json` and a report: `--scene`, `--gml`, `--out`, `[--min-coverage]`, `[--overwrite]`. See `05-cadastre.md`. | `0` / `1` |
 | `cadastre split` | Splits OSM footprints into one sub-building per Catastro construction and writes a new `geo_scene.json`, the overrides and the report: `--scene`, `--gml`, `--out`, `[--min-coverage]`, `[--split-min-coverage]`, `[--min-piece-area-m2]`, `[--min-piece-width-m]`, `[--overwrite]`. Offline. ADR-016. | `0` / `1` |
 | `generate` | Base meshes: `--scene`, `--heights`, `--out`, `[--config]`, `[--no-preview]`, `[--overwrite]`. See `06-generation.md`. | `0` when the 03 → 04 check passes, `1` on a critical error |

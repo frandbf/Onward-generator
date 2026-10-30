@@ -28,6 +28,7 @@ from onward_generator.generation.gltf import nodes_from_glb
 DEFAULT_CLASS_SCALES: Mapping[str, float] = {"roof": 0.25, "ground": 0.5, "interior": 0.5}
 GROUND_MATERIALS = frozenset({
     "ground", "pedestrian", "sidewalk", "carriageway", "curb", "green", "water", "cobblestone_paving",
+    "road_marking",
 })
 INTERIOR_MATERIALS = frozenset({"interior_wall", "interior_floor", "stair"})
 # Shop interiors paint their walls and floors with ``interior_shop_*`` (docs/07-detail.md).

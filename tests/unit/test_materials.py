@@ -13,7 +13,16 @@ import pytest
 from PIL import Image
 
 from onward_generator.cli import main
-from onward_generator.dress.atlas import MIN_MEAN_LUMA, MIN_TILE_PX, build_atlas, decode_jpeg_rgb, decode_png_rgba, tile_luminance
+from onward_generator.dress.atlas import (
+    MIN_MEAN_LUMA,
+    MIN_TILE_PX,
+    _tile_pixels,
+    build_atlas,
+    decode_jpeg_rgb,
+    decode_png_rgba,
+    encode_png_rgba,
+    tile_luminance,
+)
 from onward_generator.dress.catalog import load_catalog
 from onward_generator.dress.surfaces import osm_material_override
 from onward_generator.generation.config import Material, load_generation_config
@@ -359,6 +368,24 @@ def test_apply_remaps_only_listed_ids(tmp_path: Path) -> None:
     unused = atlas[atlas.shape[0] // 2 :, atlas.shape[1] // 2 :]
     assert tile_luminance(unused) >= MIN_MEAN_LUMA
     assert (base / "scene_visual.glb").read_bytes() != (out / "scene_visual.glb").read_bytes()
+
+
+def test_apply_threads_write_the_bytes_of_the_serial_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, brick=False, cobble=True, salmon=True)
+    plan = _polyhaven_plan(tmp_path / "plan.json")
+    apply_materials(base, tmp_path / "threaded", cache_dir=cache, download=False, plan_path=plan)
+    monkeypatch.setattr("onward_generator.materials.apply.run_png_jobs", lambda jobs: {key: job() for key, job in jobs.items()})
+    apply_materials(base, tmp_path / "serial", cache_dir=cache, download=False, plan_path=plan)
+    for name in ("scene_visual.glb", "atlas.png"):
+        threaded = hashlib.sha256((tmp_path / "threaded" / name).read_bytes()).hexdigest()
+        assert threaded == hashlib.sha256((tmp_path / "serial" / name).read_bytes()).hexdigest()
+    # A colour with no photograph keeps the procedural tile seeded by its place among the used colours.
+    images = images_by_material((tmp_path / "threaded" / "scene_visual.glb").read_bytes())
+    index = sorted(images).index("tree_canopy")
+    assert index > 0
+    assert images["tree_canopy"] == encode_png_rgba(_tile_pixels("tree_canopy", 256, 48152 + index))
 
 
 def test_apply_brick_only_when_osm_says_brick(tmp_path: Path) -> None:

@@ -141,6 +141,7 @@ class ShopInteriors:
 
     enabled: bool
     max_triangles: int
+    max_collision_triangles: int
     max_area_m2: float
     categories: tuple[ShopCategory, ...]
     generic: ShopCategory
@@ -152,6 +153,7 @@ class Interiors:
     min_buildings: int
     max_buildings: int
     max_triangles: int
+    max_collision_triangles: int
     include_ids: tuple[str, ...]
     exclude_ids: frozenset[str]
     rule: InteriorRule
@@ -290,7 +292,7 @@ def _shop_interiors(d: Mapping[str, Any]) -> ShopInteriors:
         for c in d["categories"]
     )
     generic = ShopCategory("generic", MappingProxyType({}), d["generic"]["wall"], d["generic"]["floor"])
-    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), float(d["max_area_m2"]), categories, generic)
+    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]), categories, generic)
 
 
 def _template(name: str, d: Mapping[str, Any]) -> Template:
@@ -413,6 +415,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
             min_buildings=int(i["min_buildings"]),
             max_buildings=int(i["max_buildings"]),
             max_triangles=int(i["max_triangles"]),
+            max_collision_triangles=int(i["max_collision_triangles"]),
             include_ids=tuple(i["include_ids"]),
             exclude_ids=frozenset(i["exclude_ids"]),
             rule=InteriorRule(frozenset(i["rule"]["categories"]), int(i["rule"]["min_levels"]), float(i["rule"]["min_area_m2"]),

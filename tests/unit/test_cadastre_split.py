@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from shapely import affinity, box, union_all
+from shapely import Polygon, affinity, box, set_precision, union_all
 from shapely.geometry import shape
 
 from onward_generator.cadastre import CadastreError, DownloadRecord
@@ -13,7 +13,10 @@ from onward_generator.cadastre.split import (
     SplitOptions,
     SubBuilding,
     _nearest,
+    check_quarantine,
+    footprint_defects,
     is_sliver,
+    open_pinches,
     split_footprint,
     split_overrides,
     split_scene,
@@ -45,11 +48,11 @@ def split(footprint, *overlaps, options: SplitOptions = OPTIONS, parent: str = "
 def test_default_options() -> None:
     assert OPTIONS.to_dict() == {
         "min_coverage": 0.8, "min_piece_area_m2": 6.0, "min_piece_width_m": 2.0, "confident_share": 0.8,
-        "confidence_high": 0.85, "confidence_low": 0.7,
+        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05,
     }
 
 
-@pytest.mark.parametrize("name", ["min_coverage", "confident_share", "confidence_high", "confidence_low"])
+@pytest.mark.parametrize("name", ["min_coverage", "confident_share", "confidence_high", "confidence_low", "max_quarantine_share"])
 @pytest.mark.parametrize("value", [-0.01, 1.01])
 def test_shares_must_be_within_unit_interval(name: str, value: float) -> None:
     with pytest.raises(ValueError, match=rf"^{name} must be within \[0, 1\]$"):
@@ -118,7 +121,7 @@ def test_a_block_becomes_one_building_per_construction() -> None:
     assert union_all([s.geometry for s in result.subs]).area == pytest.approx(300.0)
     assert result.to_dict() == {
         "building_id": "osm-way-1", "status": "split", "coverage": 1.0, "courtyard_m2": 0.0, "dropped_m2": 0.0,
-        "sub_buildings": [s.to_dict() for s in result.subs],
+        "quarantined_m2": 0.0, "reason": "", "sub_buildings": [s.to_dict() for s in result.subs],
     }
     assert result.subs[1].to_dict() == {
         "id": "osm-way-1:1000002AA0000A_part1", "refcat": "1000002AA0000A", "parts": ["1000002AA0000A_part1"],
@@ -333,11 +336,11 @@ def test_landmarks_are_split_when_not_flagged() -> None:
     assert dict((r.parent_id, r.status) for r in results)["osm-way-1"] == "split"
 
 
-@pytest.mark.parametrize(("key", "value"), [("crs", "EPSG:4326"), ("coordinate_system", "wgs84"), ("unit", "deg")])
+@pytest.mark.parametrize(("key", "value"), [("coordinate_system", "wgs84"), ("unit", "deg")])
 def test_scene_must_be_a_local_metric_grid(key: str, value: str) -> None:
     scene = _scene()
     scene["frame"][key] = value
-    with pytest.raises(CadastreError, match="local grid"):
+    with pytest.raises(CadastreError, match="^scene must be a local grid in metres$"):
         split_scene(scene, PARTS, RECORD, OPTIONS, is_landmark=_is_church)
 
 
@@ -345,7 +348,8 @@ def test_summary_counts_split_buildings_and_storeys() -> None:
     _, results = split_scene(_scene(), PARTS, RECORD, OPTIONS, is_landmark=_is_church)
     assert split_summary(results) == {
         "osm_buildings": 3, "osm_buildings_split": 1, "sub_buildings": 2, "levels_range": [1, 5], "courtyard_m2": 0.0, "dropped_m2": 0.0,
-        "status_split": 1, "status_single_group": 0, "status_low_coverage": 0, "status_no_parts": 1, "status_landmark": 1,
+        "quarantined_m2": 0.0, "status_split": 1, "status_single_group": 0, "status_low_coverage": 0, "status_no_parts": 1,
+        "status_landmark": 1, "status_quarantined": 0,
     }
     empty = split_summary([ParentSplit("osm-way-1", "low_coverage", 0.5, (), 0.0)])
     assert empty["levels_range"] is None and empty["status_low_coverage"] == 1 and empty["sub_buildings"] == 0
@@ -465,10 +469,10 @@ def test_records_round_areas_and_coverage() -> None:
     assert sub.to_dict() == {
         "id": "osm-way-1:A_part1", "refcat": "A", "parts": ["A_part1"], "levels": 3, "area_m2": 12.346, "leftover_m2": 1.235,
     }
-    parent = ParentSplit("osm-way-1", "split", 0.123456, (sub,), 7.65432, 0.98765)
+    parent = ParentSplit("osm-way-1", "split", 0.123456, (sub,), 7.65432, 0.98765, 4.32109, "why")
     assert parent.to_dict() == {
         "building_id": "osm-way-1", "status": "split", "coverage": 0.1235, "courtyard_m2": 7.654, "dropped_m2": 0.988,
-        "sub_buildings": [sub.to_dict()],
+        "quarantined_m2": 4.321, "reason": "why", "sub_buildings": [sub.to_dict()],
     }
     from onward_generator.cadastre.split import _sub_feature
 
@@ -478,7 +482,7 @@ def test_records_round_areas_and_coverage() -> None:
 
 
 def test_polygons_skip_empty_and_non_polygon_parts() -> None:
-    from shapely import GeometryCollection, Point, Polygon
+    from shapely import GeometryCollection, Point
 
     from onward_generator.cadastre.split import _polygons
 
@@ -502,9 +506,7 @@ def test_leftover_without_extra_area_is_a_float() -> None:
     result = split(box(0, 0, 20, 10), part("A_part1", 3, box(0, 0, 10, 10)), part("B_part1", 4, box(10, 0, 20, 10)))
     assert repr(result.subs[0].leftover_m2) == "0.0"
 
-
 def test_a_part_whose_box_overlaps_but_whose_shape_does_not_is_ignored() -> None:
-    from shapely import Polygon
 
     scene = _scene()
     ell = Polygon([(40, 0), (50, 0), (50, 2), (42, 2), (42, 10), (40, 10)])  # L-shaped, inside osm-way-2's box
@@ -512,3 +514,68 @@ def test_a_part_whose_box_overlaps_but_whose_shape_does_not_is_ignored() -> None
     near = _projected("E_part1", 4, box(45, 5, 49, 9))  # in the notch: the boxes overlap, the shapes do not
     _, results = split_scene(scene, [*PARTS, near], RECORD, OPTIONS, is_landmark=_is_church)
     assert dict((r.parent_id, r.status) for r in results)["osm-way-2"] == "no_parts"
+
+
+# --- Pinched pieces and quarantine (P11: Madrid r200 and r300). ---
+
+
+def test_a_hole_touching_the_outline_at_a_point_is_notched_open() -> None:
+    """B sits in a bay of A whose tip meets A's façade: A becomes a polygon whose hole touches its outline."""
+    bay = Polygon([(10, 0), (14, 6), (6, 6)])
+    pinched = box(0, 0, 20, 20).difference(bay)
+    assert len(pinched.interiors) == 1 and footprint_defects(pinched) == 2
+    result = split(box(0, 0, 20, 20), part("A_part1", 4, pinched), part("B_part1", 2, bay))
+    assert result.status == "split"
+    assert [footprint_defects(s.geometry) for s in result.subs] == [0, 0]
+    a, b = result.subs
+    assert not a.geometry.interiors and b.geometry.equals(bay)
+    assert a.geometry.area == pytest.approx(376.0 - 0.00006) and result.dropped_m2 == pytest.approx(0.00006)
+    assert a.geometry.area + b.geometry.area + result.dropped_m2 == pytest.approx(400.0)
+
+
+def test_open_pinches_keeps_a_piece_without_contacts_and_snaps_the_notch() -> None:
+    courtyard = Polygon(box(0, 0, 20, 20).exterior.coords, [box(5, 5, 15, 15).exterior.coords])
+    assert open_pinches(courtyard) == [courtyard]
+    pinched = Polygon(box(0, 0, 20, 20).exterior.coords, [[(10, 0), (14, 6), (6, 6), (10, 0)]])
+    opened = open_pinches(pinched)
+    assert len(opened) == 1 and opened[0].is_valid and not opened[0].interiors
+    assert set_precision(opened[0], 0.001).equals(opened[0])
+    assert len(opened[0].exterior.coords) == 11  # a diamond notch: two corners each side of the cut, not a disk
+    assert pinched.area - opened[0].area == pytest.approx(0.00006)
+
+
+def test_a_sub_building_that_will_not_close_quarantines_its_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.cadastre import split as split_module
+
+    monkeypatch.setattr(split_module, "footprint_defects", lambda geometry: 3 if geometry.bounds[0] >= 10 else 0)
+    result = split(box(0, 0, 20, 10), part("A_part1", 3, box(0, 0, 10, 10)), part("B_part1", 4, box(10, 0, 20, 10)))
+    assert result.status == "quarantined" and result.subs == () and result.coverage == 1.0
+    assert result.quarantined_m2 == 200.0
+    assert result.reason == "osm-way-1:B_part1: 3 open or non-manifold edges"
+    assert result.to_dict()["reason"] == result.reason
+    summary = split_summary([result])
+    assert summary["status_quarantined"] == 1 and summary["quarantined_m2"] == 200.0 and summary["sub_buildings"] == 0
+    assert split_summary([ParentSplit("osm-way-2", "quarantined", 1.0, quarantined_m2=12.34567)])["quarantined_m2"] == 12.346
+
+
+def test_a_quarantined_block_keeps_its_osm_footprint_in_the_scene(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.cadastre import split as split_module
+
+    monkeypatch.setattr(split_module, "footprint_defects", lambda geometry: 1)
+    scene = _scene()
+    options = SplitOptions(max_quarantine_share=0.4)  # osm-way-3 is 200 of 500 m² of buildings
+    features, results = split_scene(scene, PARTS, RECORD, options, is_landmark=_is_church)
+    assert [f["id"] for f in features] == ["osm-way-3", "osm-node-9", "osm-way-1", "osm-way-2"]
+    assert features[0] == scene["features"][0]
+    assert dict((r.parent_id, r.status) for r in results)["osm-way-3"] == "quarantined"
+    assert split_overrides(results, RECORD, options) == []
+    with pytest.raises(CadastreError, match=r"^200\.0 of 500\.0 m² of buildings quarantined \(kept unsplit\), above the 5% limit$"):
+        split_scene(scene, PARTS, RECORD, OPTIONS, is_landmark=_is_church)
+
+
+def test_quarantine_at_the_limit_passes() -> None:
+    results = [ParentSplit("osm-way-1", "quarantined", 1.0, quarantined_m2=5.0), ParentSplit("osm-way-2", "quarantined", 1.0, quarantined_m2=5.0)]
+    check_quarantine(results, 200.0, SplitOptions(max_quarantine_share=0.05))
+    with pytest.raises(CadastreError, match="10.0 of 199.9 m²"):
+        check_quarantine(results, 199.9, SplitOptions(max_quarantine_share=0.05))
+    check_quarantine([], 0.0, OPTIONS)
