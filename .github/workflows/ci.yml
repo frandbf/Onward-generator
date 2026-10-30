@@ -26,14 +26,14 @@ jobs:
     # About four times the measured p90 (1.5 min).
     timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v4
-      - uses: arduino/setup-task@v2
+      - uses: actions/checkout@v7
+      - uses: arduino/setup-task@v3
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -52,7 +52,7 @@ jobs:
     env:
       BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # The check still reports when nothing in src/ changed; it just skips the image build and mutmut.
@@ -67,16 +67,16 @@ jobs:
           else
             echo "src=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: arduino/setup-task@v2
+      - uses: arduino/setup-task@v3
         if: steps.changes.outputs.src == 'true'
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
         if: steps.changes.outputs.src == 'true'
       - name: Build image
         if: steps.changes.outputs.src == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
