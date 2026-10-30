@@ -60,8 +60,21 @@ Phases 00 through 06 are done. Phase 07, the final export, stays open. `device_v
 - Tests use the Murcia city-centre point latitude 37.98407, longitude −1.12863 (`MURCIA_CENTER` in `tests/conftest.py`) as origin and reference location.
 - Test invalid input and failure cases.
 - Do not claim tests passed unless they were actually executed.
-- Before a pull request, run `task ci` and `task mutate`. A surviving mutant needs a test that kills it, or `# pragma: no mutate: <reason>` on that line when the edit is not observable.
 - Test game compatibility on the real headset when the task requires it.
+
+## Quality gates
+
+A pull request is ready when every gate below passes. CI runs them on Linux in the Docker image; `task ci`, `task mutate` and `task guard` run the same checks locally.
+
+- `task lint`: ruff, with the rules in `pyproject.toml`. Fix the finding; `task lint -- --fix` applies the safe fixes.
+- `task typecheck`: mypy on `src`. An error missing from `mypy-baseline.txt` fails. Fix it; never add it to the baseline. When you fix a listed error, run `task typecheck:baseline` and commit the shorter file.
+- `task test`: the whole suite.
+- `task mutate`: mutation testing of the lines the branch changed in `src/onward_generator`. A surviving mutant needs a test that kills it. Use `# pragma: no mutate: <reason>` only when the edit changes nothing a caller can see, and say why.
+- `task guard`: one pull request does not edit both `src/` and a gate (the `[tool.ruff]`, `[tool.mypy]`, `[tool.mutmut]` and `[tool.pytest]` tables, `Taskfile.yml`, `.github/workflows/`, `.githooks/`, `tools/mutate/`, `tools/quality/`, the lint and mutate lock files, or new `mypy-baseline.txt` entries). Change a gate in its own pull request and explain why.
+
+Every suppression names its code and gives a reason: `# noqa: CODE - reason`, `# type: ignore[code]`, `# pragma: no mutate: reason`. `tests/unit/test_quality_gates.py` and ruff check this. Do not weaken or delete an assertion to make a gate pass.
+
+`git config core.hooksPath .githooks` runs lint, typecheck and the tests before each push.
 
 ## Scope control
 

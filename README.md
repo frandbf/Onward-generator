@@ -37,11 +37,12 @@ To keep the machine clean, the Python pipeline and its checks can run in a conta
 The checks have the same names locally and in CI ([go-task](https://taskfile.dev), `Taskfile.yml`). CI runs `task ci` on Linux.
 
 ```bash
-task --list            # test, lint, typecheck, lint:shell, lint:actions, smoke, ci, mutate, image, shell
+task --list            # test, lint, typecheck, guard, lint:shell, lint:actions, smoke, ci, mutate, image, shell
 task ci                # everything the CI gate runs
 task test -- -k cadastre
 task lint -- --fix     # ruff (rules in pyproject.toml); --fix applies the safe fixes
 task typecheck         # mypy on src; only errors missing from mypy-baseline.txt fail
+task guard             # a change must not edit both src/ and a quality gate (AGENTS.md)
 ```
 
 ### Mutation testing

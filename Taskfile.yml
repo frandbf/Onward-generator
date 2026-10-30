@@ -29,7 +29,7 @@ tasks:
   lint:shell:
     desc: Check the shell scripts with shellcheck
     cmds:
-      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh"
+      - "{{.RUN}} shellcheck -S warning tools/docker/run.sh tools/unity/lib.sh tools/unity/*/*.sh .githooks/pre-push"
 
   lint:
     desc: Check the Python code with ruff (rules in pyproject.toml)
@@ -64,6 +64,13 @@ tasks:
       MAX: '{{.MAX | default "40"}}'
     cmds:
       - "{{.RUN}} python tools/mutate/run.py --base {{.BASE}} --max {{.MAX}} {{.CLI_ARGS}}"
+
+  guard:
+    desc: Fail when the change since BASE (default main) edits both src/ and a quality gate
+    vars:
+      BASE: '{{.BASE | default "main"}}'
+    cmds:
+      - "{{.RUN}} python tools/quality/gate_guard.py --base {{.BASE}}"
 
   ci:
     desc: Everything the CI gate runs, cheapest first so a lint failure stops it early
