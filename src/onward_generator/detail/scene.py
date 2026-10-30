@@ -48,6 +48,7 @@ from onward_generator.detail.interiors import (
     interior_visual,
     pierce_room_windows,
     plan_interior,
+    plan_shop_rooms,
     rectangularity,
     room_ceiling,
     room_window_cuts,
@@ -55,7 +56,7 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
-from onward_generator.detail.shops import plan_shops, shop_category
+from onward_generator.detail.shops import plan_shops
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -585,7 +586,10 @@ def detail_scene(
                 bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
                 roof_access=shell_template.parapet_m > 0,
                 max_floors=1 if shop else None,
+                several_parts=shop,
             ) if door else "no_door_position"
+            if shop and not isinstance(plan, str):
+                plan = plan_shop_rooms(plan, refined, trial, segments, _shops_of(evidence[bid], feature_of, tags), cfg)
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))
             else:
@@ -598,20 +602,16 @@ def detail_scene(
         doors_on = door_walls(segments, others, cfg)
         door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         opened_windows = omitted_windows = 0
-        category = shop_category([t for _, t, _ in _shops_of(evidence[bid], feature_of, tags)], cfg) if shop else None
         budget = budgets[shop]
         shell = built = refusal = None
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
-                layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
-                room_ceiling(interior, height, cfg.interiors.slab_m),
+                layout, segments, interior.ground, refined, cfg.interiors.wall_thickness_m,
+                room_ceiling(interior, height, cfg.interiors.slab_m), interior.hosts,
             )
             # The drawn triangles are counted before the shell and the colliders are built, so an
             # interior over the budget costs its plan and its visual meshes, not a whole building.
-            drawn = interior_visual(
-                interior, height, cfg, room_window_cuts(layout, segments),
-                **({"wall_material": category.wall, "floor_material": category.floor} if category else {}),
-            )
+            drawn = interior_visual(interior, height, cfg, room_window_cuts(layout, segments))
             refusal = budget.refuse("triangles", visual_triangles(drawn))
             if refusal is None:
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
@@ -652,7 +652,7 @@ def detail_scene(
             if shell.parapet_collider is not None and built.roof_well is not None:
                 colliders.append(shell.parapet_collider)
             interior_record = built.spec | {
-                "kind": "shop" if category else "residential",
+                "kind": "shop" if shop else "residential",
                 "checks": built.checks,
                 "collider_parts": [n for n, _ in built.colliders],
                 "through_windows": opened_windows,
@@ -660,9 +660,6 @@ def detail_scene(
                 "visual_triangles": built.visual_triangles,
                 "collision_triangles": built.collision_triangles,
             }
-            if category:
-                interior_record["shop"] = {"category": category.name, "wall_material": category.wall,
-                                           "floor_material": category.floor, "attribute_origin": "generated"}
             objects.append(DetailObject(
                 f"interior/{bid}", "interior",
                 [Primitive(merge(ms), mat) for mat, ms in sorted(built.visual.items()) if ms],
@@ -671,8 +668,8 @@ def detail_scene(
                 light_anchors=built.light_anchors,
             ))
             assert built.light_anchors is not None
-            lit.append((category is not None, built.light_anchors))
-            if category:
+            lit.append((shop, built.light_anchors))
+            if shop:
                 shop_interiors.append(bid)
             else:
                 interiors_built.append(bid)
@@ -696,7 +693,8 @@ def detail_scene(
         for reason, n in sorted(layout.skipped.items()):
             counts[f"skipped:{reason}"] += n
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
-        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg) if shop else []
+        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg,
+                           interior.shop_doors if interior is not None else ()) if shop else []
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
             "generation": {"method": "phase03_volume + generic facade template", "phase03": o.record.get("generation"),

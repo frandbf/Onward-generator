@@ -58,11 +58,16 @@ ROW_POIS: dict[int, tuple[tuple[float, float], dict[str, str]]] = {
 }
 
 
+# A multipolygon building: (ring, role) members, role "outer" or "inner", and the relation tags.
+Relations = dict[int, tuple[list[tuple[list[tuple[float, float]], str]], dict[str, str]]]
+
+
 def write_block_osm(
     path: Path,
     origin: tuple[float, float],
     buildings: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = BUILDINGS,
     pois: dict[int, tuple[tuple[float, float], dict[str, str]]] = POIS,
+    relations: Relations | None = None,
 ) -> Path:
     frame = LocalFrame.create(origin[0], origin[1])
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<osm version="0.6" generator="onward-synthetic-fixture">',
@@ -94,9 +99,18 @@ def write_block_osm(
         refs = [node(x, y) for x, y in ring]
         way(wid, [*refs, refs[0]], tags)
     way(301, [node(x, y) for x, y in ROAD[0]], ROAD[1])
+    members: list[str] = []
+    for rid, (rings, tags) in (relations or {}).items():
+        members.append(f'  <relation id="{rid}" version="1">')
+        for k, (ring, role) in enumerate(rings):
+            refs = [node(x, y) for x, y in ring]
+            way(rid * 10 + k, [*refs, refs[0]], {})
+            members.append(f'    <member type="way" ref="{rid * 10 + k}" role="{role}"/>')
+        members.extend(f"    <tag k={quoteattr(k)} v={quoteattr(v)}/>" for k, v in {"type": "multipolygon", **tags}.items())
+        members.append("  </relation>")
     for _pid, ((x, y), tags) in pois.items():
         node(x, y, tags)
-    lines += ways
+    lines += ways + members
     lines.append("</osm>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path

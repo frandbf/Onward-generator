@@ -27,6 +27,8 @@ from onward_generator.detail.facades import Hole, Segment, stable_unit
 
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
 VINYL_BACKS = frozenset({"glass_dark", "glass_view"})
+# One shop: its POI id (``None`` for the building itself), its tags, and its point in local metres.
+Shop = tuple[str | None, Mapping[str, Any], tuple[float, float] | None]
 
 
 def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
@@ -86,35 +88,56 @@ def _vinyl(seg: Segment, hole: Hole, cfg: DetailConfig) -> dict[str, Any]:
                   hole.width * sc.vinyl_width_share, sc.vinyl_height_m, 0.0)
 
 
+def _fronts(holes: Sequence[Hole], segments: Sequence[Segment], entrances: Sequence[Hole]) -> dict[Hole, tuple[float, ...]]:
+    """The shopfronts and ``entrances``, in wall order, with the centre of each."""
+    fronts = sorted((h for h in holes if h.kind == "shopfront" or h in entrances), key=lambda h: (h.segment, h.s0))
+    return {h: tuple(segments[h.segment].point(h.s0 + h.width / 2)[:2]) for h in fronts}
+
+
+def shop_bays(shops: Sequence[Shop], holes: Sequence[Hole], segments: Sequence[Segment], entrances: Sequence[Hole] = ()) -> list[Hole | None]:
+    """The bay of each shop: the free shopfront nearest to its point (the first free one without a point), else ``None``.
+
+    ``entrances`` are walkable doors that took a shopfront (``interiors.plan_shop_rooms``); they count as one.
+    """
+    centre = _fronts(holes, segments, entrances)
+    free = list(centre)
+    bays: list[Hole | None] = []
+    for _, _, point in shops:
+        bay = None if not free else free[0] if point is None else _nearest(point, free, centre)
+        if bay is not None:
+            free.remove(bay)
+        bays.append(bay)
+    return bays
+
+
 def plan_shops(
     building_id: str,
-    shops: Sequence[tuple[str | None, Mapping[str, Any], tuple[float, float] | None]],
+    shops: Sequence[Shop],
     holes: Sequence[Hole],
     segments: Sequence[Segment],
     cfg: DetailConfig,
+    entrances: Sequence[Hole] = (),
 ) -> list[dict[str, Any]]:
     """One record per shop ``(poi_id, tags, point)``: its name, its sign, and the vinyls on the windows it owns.
 
-    A shop takes the free shopfront nearest to its point (the first free one without a point).
-    A shop left without a shopfront gets no sign and no vinyl. ``shops`` is never empty.
+    A shop takes its bay (``shop_bays``) and its sign goes on it. A shop left without one gets no sign
+    and no vinyl. A door in ``entrances`` gets no vinyl. ``shops`` is never empty.
     """
-    fronts = sorted((h for h in holes if h.kind == "shopfront"), key=lambda h: (h.segment, h.s0))
-    centre = {h: tuple(segments[h.segment].point(h.s0 + h.width / 2)[:2]) for h in fronts}
-    free = list(fronts)
+    centre = _fronts(holes, segments, entrances)
     records: list[dict[str, Any]] = []
     bays: list[tuple[Hole, dict[str, Any]]] = []
-    for poi_id, tags, point in shops:
+    assigned = shop_bays(shops, holes, segments, entrances)
+    for index, (poi_id, tags, _) in enumerate(shops):
+        bay = assigned[index]
         key = poi_id or "building"
         record: dict[str, Any] = {"id": f"shop/{building_id}/{key}", "poi_id": poi_id, **shop_name(tags, cfg), "sign": None, "vinyls": []}
         records.append(record)
-        if not free:
+        if bay is None:
             continue
-        bay = free[0] if point is None else _nearest(point, free, centre)
-        free.remove(bay)
         kind = "fascia" if stable_unit(cfg.seed, building_id, key, "shop_sign") < cfg.shops.fascia_share else "blade"
         record["sign"] = {**_sign(kind, segments[bay.segment], bay, cfg), "attribute_origin": "generated"}
         bays.append((bay, record))
-    for hole in fronts:
+    for hole in centre:
         if hole.back not in VINYL_BACKS or stable_unit(cfg.seed, building_id, hole.segment, hole.column, "vinyl") >= cfg.shops.vinyl_share:
             continue
         owner = _nearest(centre[hole], [b for b, _ in bays], centre)
