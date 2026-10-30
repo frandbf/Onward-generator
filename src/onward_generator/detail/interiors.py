@@ -521,7 +521,7 @@ def interior_visual(
     ic = cfg.interiors
     s, t = plan.storey_m, ic.wall_thickness_m
     seg, door = plan.door_segment, plan.door
-    rim = (seg.point(door.s0, 0, t), seg.point(door.s0 + door.width, 0, t))
+    rim = (seg.point(door.s0, depth_in=t), seg.point(door.s0 + door.width, depth_in=t))
     top = room_ceiling(plan, height, ic.slab_m)
     visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": [], wall_material: [], floor_material: []}
     visual[wall_material].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
@@ -557,8 +557,8 @@ def _lands_on_roof(flight: Flight, z_floor: float, height: float) -> bool:
 
 
 def _lifted(flight: Flight, storey_m: float) -> np.ndarray:
-    lifted = np.array(flight.matrix, copy=True)
-    lifted[2, 3] += flight.level * storey_m
+    lifted = flight.matrix.copy()
+    lifted[2, 3] = flight.level * storey_m  # a flight is planned at z = 0 (``Flight``); this is its floor
     return lifted
 
 

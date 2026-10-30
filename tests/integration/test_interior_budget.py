@@ -190,3 +190,22 @@ def test_the_default_collision_budgets_leave_the_fixtures_their_interiors(unlimi
     for name, d in unlimited.items():
         assert d.stats["interior_collision_triangles"] <= DOC["interiors"]["max_collision_triangles"], name
         assert d.stats["shop_interior_collision_triangles"] <= DOC["interiors"]["shops"]["max_collision_triangles"], name
+
+
+def test_the_counted_interior_is_the_one_drawn_with_its_window_cuts(residential_inputs: tuple[Path, Path, Path],
+                                                                     detail_inputs: tuple[Path, Path, Path]) -> None:
+    # Built here, not in a fixture: the visual pass the budget counts is the mesh the scene writes.
+    for inputs in (residential_inputs, detail_inputs):
+        d = _detail(inputs, _cfg())
+        assert [*d.stats["interiors"], *d.stats["shop_interiors"]]
+        for bid in [*d.stats["interiors"], *d.stats["shop_interiors"]]:
+            record = _interior(d, bid)
+            node = next(o for o in d.objects if o.id == f"interior/{bid}")
+            assert record["visual_triangles"] == sum(p.mesh.triangle_count for p in node.visual)
+            building = next(o for o in d.objects if o.id == f"building/{bid}")
+            assert record["through_windows"] == len(building.glass_colliders) > 0
+            heights = {round(float(z), 6) for p in node.visual for z in p.mesh.vertices[:, 2]}
+            for pane in building.glass_colliders:
+                # The room wall is cut where each pane is: its sill and its head are vertices of the interior.
+                assert round(float(pane.vertices[:, 2].min()), 6) in heights, bid
+                assert round(float(pane.vertices[:, 2].max()), 6) in heights, bid
