@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
-from shapely import Point, Polygon, make_valid
+from shapely import Point, Polygon, make_valid, unary_union
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
@@ -51,6 +51,18 @@ PANE_INSET_M = 0.01
 GLASS_VIEW = "glass_view"
 ROOM_GLASS = frozenset({"window", "narrow_window", "shopfront", "balcony_door"})
 WallCut = tuple[np.ndarray, np.ndarray, float, float]
+# Light anchors (ADR-013). Modelling assumptions, not observations: one light under the
+# ceiling of each furnished room, a reach that covers the room's corners, and a small
+# probe grid kept off the walls and out of the stair wells.
+LIGHT_BELOW_CEILING_M = 0.3
+LIGHT_RANGE_MIN_M = 4.0
+LIGHT_RANGE_MAX_M = 12.0
+WELL_CLEARANCE_M = 0.3
+PROBE_INSET_M = 0.5
+PROBE_STEP_M = 4.0
+PROBE_MAX_PER_AXIS = 4
+PROBE_LOW_M = 1.0
+PROBE_HIGH_BELOW_CEILING_M = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +101,7 @@ class Interior:
     checks: dict[str, Any] = field(default_factory=dict)
     roof_well: Polygon | None = None
     glass_colliders: list[Mesh] = field(default_factory=list)
+    light_anchors: dict[str, Any] | None = None
 
 
 def rectangularity(geometry: BaseGeometry) -> float:
@@ -219,6 +232,56 @@ def plan_interior(
                     climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
                     flights.append(climb)
     return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights))
+
+
+def _probe_columns(inner: Polygon, wells: BaseGeometry) -> list[tuple[float, float]]:
+    """Grid points across the room's rotated rectangle that stay inside it, off the walls and the wells."""
+    free = inner.buffer(-PROBE_INSET_M).difference(wells)
+    corners = list(inner.minimum_rotated_rectangle.exterior.coords)
+    p0, p1, p2 = (np.array(c) for c in corners[:3])
+    u, v = p1 - p0, p2 - p1
+    nu = min(PROBE_MAX_PER_AXIS, max(2, math.ceil(float(np.linalg.norm(u)) / PROBE_STEP_M)))
+    nv = min(PROBE_MAX_PER_AXIS, max(2, math.ceil(float(np.linalg.norm(v)) / PROBE_STEP_M)))
+    columns = []
+    for i in range(nu):
+        for j in range(nv):
+            p = p0 + u * ((i + 0.5) / nu) + v * ((j + 0.5) / nv)
+            if free.contains(Point(p[0], p[1])):
+                columns.append((float(p[0]), float(p[1])))
+    return columns
+
+
+def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Where the adapter may put one baked light and a few light probes in each furnished room (ADR-013).
+
+    Coordinates are local metres (x east, y north, z up), like ``uv_frame``. The light sits
+    under the ceiling at the room's centroid, or at a point of the room clear of the
+    stair wells when the centroid falls in one. ``range_m`` reaches the corners of the
+    room's rotated rectangle, clamped. ``probes_m`` is a flat list of x, y, z triples:
+    one layer above the floor and one under the ceiling.
+    """
+    wells = unary_union([flight.well.buffer(WELL_CLEARANCE_M) for flight in plan.flights])
+    clear = plan.inner.difference(wells)
+    centre = plan.inner.centroid
+    if not clear.contains(centre):
+        centre = clear.representative_point()
+    corners = list(plan.inner.minimum_rotated_rectangle.exterior.coords)
+    reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
+    columns = _probe_columns(plan.inner, wells)
+    anchors = []
+    for room in rooms:
+        floor, ceiling = float(room["floor_z_m"]), float(room["ceiling_z_m"])
+        probes: list[float] = []
+        for z in (floor + PROBE_LOW_M, ceiling - PROBE_HIGH_BELOW_CEILING_M):
+            for x, y in columns:
+                probes.extend((round(x, 3), round(y, 3), round(z, 3)))
+        anchors.append({
+            "room_id": room["id"],
+            "light_m": [round(centre.x, 3), round(centre.y, 3), round(ceiling - LIGHT_BELOW_CEILING_M, 3)],
+            "range_m": round(reach, 3),
+            "probes_m": probes,
+        })
+    return {"attribute_origin": "generated", "method": "room_ceiling_centre", "rooms": anchors}
 
 
 def _edge_parameters(ax: float, ay: float, bx: float, by: float, p: np.ndarray, q: np.ndarray) -> tuple[float, float] | None:
@@ -505,4 +568,5 @@ def build_interior(
     }
     built = Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)
     built.glass_colliders = glass
+    built.light_anchors = light_anchors(plan, rooms)
     return built

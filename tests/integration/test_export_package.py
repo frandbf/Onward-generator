@@ -157,6 +157,8 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["adapter"].update(version="9.9.9"), "/adapter/version"),
     (lambda c: c["target"].update(sdk="1.16"), "/target/sdk"),
     (lambda c: c["build"].update(lightmap_max_size=3000), "/build/lightmap_max_size"),
+    (lambda c: c["build"].update(interior_lights_max=65), "/build/interior_lights_max"),
+    (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -249,3 +251,6 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "tree_" in source
     # Overgrow props (material prop_<id>) are lit by probes, not lightmaps: small ones baked black.
     assert 'StartsWith("m_prop_")' in source
+    # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
+    assert "public GLightAnchors light_anchors;" in source
+    assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source

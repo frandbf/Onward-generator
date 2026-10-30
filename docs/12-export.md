@@ -67,6 +67,18 @@ CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/process
 
 Unity logs stay in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS and `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. `LOG_DIR` replaces the whole folder. The host comes from `--platform` as the script's first argument, then `ONWARD_PLATFORM`, then `uname -s` ([01-pipeline.md](01-pipeline.md#host-platform)). The Editor must be closed before `scene` starts. `run` detects that from the exclusive lock on `Temp/UnityLockfile`, or from `Library/EditorInstance.json` when the lock file is absent and its process is still alive. A newer Unity editor rewrites the project and 2021.3.23f1 can no longer open it.
 
+## Lighting
+
+Everything is baked. No realtime light reaches the Quest.
+
+- **Sun.** One directional light, `Baked`, intensity 1.2, soft shadows.
+- **Out of the lightmap.** Renderers whose material is a tree, urban metal, a railing, or an overgrow prop (`M_prop_*`) neither contribute GI nor take lightmap space (`scaleInLightmap = 0`). Thin or small meshes baked black at the map's texel density. They are lit by light probes.
+- **Interior lights** ([ADR-013](decisions/ADR-013-interior-light-anchors.md)). For each room in the visual GLB's `light_anchors`, one `Point` light, `Baked`, soft baked shadows, warm white, intensity `build.interior_light_intensity` (default 0.8), range from the anchor. At most `build.interior_lights_max` (default 24) per map. Both keys are optional in the export configuration.
+- **Light probes.** One `LightProbeGroup`: the room probes from the anchors plus outdoor columns on the walkable navmesh every 12 m (wider on a large map, at most 1500 columns), at 1 m and 6 m. Without a navmesh (`perf_layout`) no group is added and unlit renderers keep the ambient probe.
+- `build/scene_report.json` counts `lights` and `light_probes`.
+
+Unknown, to check on the headset: whether the Onward runtime or the `UrbanDay1` post-processing profile changes ambient light, the skybox (`UseBuiltInSkybox = true`), or how probes and extra baked lights are used.
+
 ## Known limits
 
 - The local pair is always `unity-export.local.*`. The adapter passes the package title to `ContentBuilder.BuildScene`. The launcher script sets `MapName` to `Unity Export` and confirms the description. It sets `GameModes` to Free Roam (4), Hunt (10), and Uplink (1). When the layout is `gameplay_layout`, it sets `EnvironmentType` to Urban (2). It does not change `ID` or `BundleHash`. `ThumbnailUrl` in the local `.info3` stays empty: Onward fills it only when a map is published to the Workshop. The thumbnail is assigned to `SharedSettings.Thumbnail` and copied to the headset as `unity-export.local.png`.

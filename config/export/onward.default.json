@@ -14,6 +14,8 @@
     "occlusion_culling": false,
     "lightmap_texels_per_m": 10.0,
     "lightmap_max_size": 2048,
-    "lightmap_directional": false
+    "lightmap_directional": false,
+    "interior_lights_max": 24,
+    "interior_light_intensity": 0.8
   }
 }

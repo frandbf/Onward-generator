@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import numpy as np
 import pytest
-from shapely import Polygon
+from shapely import Point, Polygon
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
 from onward_generator.detail.interiors import (
     GLASS_VIEW,
+    InteriorPlan,
     _inner_walls,
     build_interior,
     glass_penetrations,
+    light_anchors,
     pierce_room_windows,
     plan_interior,
     room_window_cuts,
@@ -204,3 +207,104 @@ def test_seed_splits_tall_interiors_between_two_and_three_floors() -> None:
     assert any(name == "roof_deck" for name, _mesh in built.colliders)
     for _name, mesh in built.colliders:
         assert closed_manifold_defects(mesh) == 0
+
+
+# ---- Light anchors (ADR-013) --------------------------------------------------------------
+# A room off the origin so every coordinate keeps three decimals after rounding.
+X0, Y0 = 100.1234, 200.5678
+
+
+def _room_plan(width: float, depth: float, wells: tuple[Polygon, ...] = ()) -> InteriorPlan:
+    """A plan whose inner polygon is ``width`` × ``depth`` at (X0, Y0). Only ``inner`` and the wells matter."""
+    cfg = load_detail_config()
+    size = 24.0
+    footprint = Polygon([(0.0, 0.0), (size, 0.0), (size, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (size, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    template = plan_interior("block-light", footprint, door, segment, 18.0, 3.0, 6, cfg)
+    assert not isinstance(template, str) and template.flights
+    inner = Polygon([(X0, Y0), (X0 + width, Y0), (X0 + width, Y0 + depth), (X0, Y0 + depth)])
+    flights = tuple(replace(template.flights[0], well=well) for well in wells)
+    return replace(template, inner=inner, flights=flights)
+
+
+def _rooms(*ceilings: float) -> list[dict[str, object]]:
+    return [{"id": f"block-light/L{i}", "floor_z_m": round(i * 3.0, 3), "ceiling_z_m": c} for i, c in enumerate(ceilings)]
+
+
+def _columns(probes: list[float]) -> set[tuple[float, float]]:
+    return {(probes[k], probes[k + 1]) for k in range(0, len(probes), 3)}
+
+
+def _grid(width: float, depth: float, nu: int, nv: int) -> tuple[list[float], list[float]]:
+    return ([round(X0 + width * (i + 0.5) / nu, 3) for i in range(nu)],
+            [round(Y0 + depth * (j + 0.5) / nv, 3) for j in range(nv)])
+
+
+def test_light_anchor_sits_under_the_ceiling_of_each_room() -> None:
+    assert MURCIA_CENTER == (-1.12863, 37.98407)
+    anchors = light_anchors(_room_plan(10.0, 7.0), _rooms(2.7777, 5.6))
+    assert anchors["attribute_origin"] == "generated" and anchors["method"] == "room_ceiling_centre"
+    first, second = anchors["rooms"]
+    assert first["room_id"] == "block-light/L0" and second["room_id"] == "block-light/L1"
+    assert first["light_m"] == [round(X0 + 5.0, 3), round(Y0 + 3.5, 3), round(2.7777 - 0.3, 3)]
+    assert second["light_m"][2] == 5.3
+    # Half the diagonal plus one metre, so the light reaches the corners.
+    assert first["range_m"] == round(math.hypot(10.0, 7.0) / 2 + 1.0, 3)
+    # Columns at the centres of a 3 × 2 grid; one layer 1 m over the floor, one 0.5 m under the ceiling.
+    xs, ys = _grid(10.0, 7.0, 3, 2)
+    assert _columns(first["probes_m"]) == {(x, y) for x in xs for y in ys}
+    assert len(first["probes_m"]) == 2 * 6 * 3
+    assert sorted(set(first["probes_m"][2::3])) == [1.0, round(2.7777 - 0.5, 3)]
+    assert sorted(set(second["probes_m"][2::3])) == [4.0, 5.1]
+
+
+def test_light_range_is_clamped_and_small_rooms_keep_two_probes_per_axis() -> None:
+    small = light_anchors(_room_plan(4.0, 3.6), _rooms(2.8))["rooms"][0]
+    assert small["range_m"] == 4.0
+    xs, ys = _grid(4.0, 3.6, 2, 2)
+    assert _columns(small["probes_m"]) == {(x, y) for x in xs for y in ys}
+    large = light_anchors(_room_plan(30.0, 20.0), _rooms(2.8))["rooms"][0]
+    assert large["range_m"] == 12.0
+    xs, ys = _grid(30.0, 20.0, 4, 4)
+    assert _columns(large["probes_m"]) == {(x, y) for x in xs for y in ys}
+
+
+def test_probes_stay_half_a_metre_off_the_walls() -> None:
+    # A 1.6 m corridor: the two probe rows sit 0.4 m from each wall, so none is kept.
+    assert light_anchors(_room_plan(10.0, 1.6), _rooms(2.8))["rooms"][0]["probes_m"] == []
+
+
+def test_light_and_probes_keep_clear_of_the_stair_wells() -> None:
+    # A well over the centroid moves the light; a well 0.53 m from a probe column keeps that column.
+    centre_well = Polygon([(X0 + 4.0, Y0 + 1.0), (X0 + 6.0, Y0 + 1.0), (X0 + 6.0, Y0 + 6.0), (X0 + 4.0, Y0 + 6.0)])
+    side_well = Polygon([(X0 + 6.2, Y0 + 0.5), (X0 + 7.8, Y0 + 0.5), (X0 + 7.8, Y0 + 6.5), (X0 + 6.2, Y0 + 6.5)])
+    plan = _room_plan(10.0, 7.0, (centre_well, side_well))
+    room = light_anchors(plan, _rooms(2.8))["rooms"][0]
+    light = Point(room["light_m"][0], room["light_m"][1])
+    assert plan.inner.contains(light)
+    assert light.distance(centre_well) >= 0.3 - 1e-3 and light.distance(side_well) >= 0.3 - 1e-3
+    xs, ys = _grid(10.0, 7.0, 3, 2)
+    # The middle column falls in the centre well; the last one is 0.53 m from the side well and stays.
+    assert _columns(room["probes_m"]) == {(x, y) for x in (xs[0], xs[2]) for y in ys}
+
+
+def test_built_interior_carries_one_anchor_per_furnished_room() -> None:
+    cfg = load_detail_config()
+    footprint = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    plan = plan_interior("block-anchor", footprint, door, segment, 18.0, 3.0, 6, cfg)
+    assert not isinstance(plan, str)
+    built = build_interior(plan, 18.0, 18.0, footprint, cfg)
+    assert built.light_anchors == light_anchors(plan, built.spec["rooms"])
+    assert [a["room_id"] for a in built.light_anchors["rooms"]] == [r["id"] for r in built.spec["rooms"]]
+
+
+def test_light_uses_the_centroid_of_an_l_shaped_room() -> None:
+    # The centroid of a fat L is inside the room but is not the point shapely picks as representative.
+    plan = _room_plan(10.0, 7.0)
+    inner = Polygon([(X0, Y0), (X0 + 10.0, Y0), (X0 + 10.0, Y0 + 4.0), (X0 + 4.0, Y0 + 4.0), (X0 + 4.0, Y0 + 7.0), (X0, Y0 + 7.0)])
+    room = light_anchors(replace(plan, inner=inner), _rooms(2.8))["rooms"][0]
+    assert inner.centroid.distance(inner.representative_point()) > 0.5
+    assert room["light_m"][:2] == [round(inner.centroid.x, 3), round(inner.centroid.y, 3)]
