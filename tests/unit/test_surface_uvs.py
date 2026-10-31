@@ -100,6 +100,33 @@ def test_repeat_images_are_separate_textures_unless_identical() -> None:
     assert images_by_material(data) == {"plaster_ochre": png, "party_plaster_ochre": png, "glass_dark": other}
 
 
+def test_identical_repeat_images_share_one_texture_and_explicit_uvs_stay() -> None:
+    wall = Mesh(
+        np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 6.0], [0.0, 0.0, 6.0]], dtype=np.float64),
+        np.array([[0, 1, 2], [0, 2, 3]]),
+    )
+    stored = np.array([[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]], dtype=np.float32)
+    atlas, other = window_png(32), window_png(16)
+    white = Material((1.0, 1.0, 1.0, 1.0), 0.9)
+    data = build_glb(
+        [Node("b", (Primitive(wall, "facade_trim_x", stored), Primitive(wall, "scenic_trim_x", stored), Primitive(wall, "plaster_ochre", stored)))],
+        {"facade_trim_x": white, "scenic_trim_x": white, "plaster_ochre": white},
+        repeat_images={"facade_trim_x": atlas, "scenic_trim_x": atlas, "plaster_ochre": other},
+        repeat_tile_m={"plaster_ochre": 2.0},
+        explicit_uv_materials={"facade_trim_x", "scenic_trim_x"},
+    )
+    doc, _ = read_glb(data)
+    assert len(doc["images"]) == 2 and len(doc["textures"]) == 2
+    index = {m["name"]: m["pbrMetallicRoughness"]["baseColorTexture"]["index"] for m in doc["materials"]}
+    assert index == {"facade_trim_x": 0, "plaster_ochre": 1, "scenic_trim_x": 0}
+    assert images_by_material(data) == {"facade_trim_x": atlas, "plaster_ochre": other, "scenic_trim_x": atlas}
+    nodes, _ = nodes_from_glb(data)
+    by_material = {p.material: p.uvs for p in nodes[0].primitives}
+    assert np.array_equal(by_material["facade_trim_x"], stored)
+    assert np.array_equal(by_material["scenic_trim_x"], stored)
+    assert not np.array_equal(by_material["plaster_ochre"], stored)
+
+
 def test_library_plan_colours_the_plaster_slots(tmp_path: Path) -> None:
     from onward_generator.materials.library_plan import select_texture_plan
 

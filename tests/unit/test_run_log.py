@@ -243,6 +243,14 @@ def test_materials_groups_skips_by_reason(tmp_path: Path) -> None:
     )
 
 
+def test_materials_names_the_facade_path(tmp_path: Path) -> None:
+    out = tmp_path / "scene_materials"
+    _write(out / "materials_report.json", {"applied": [{}], "skipped": [], "facades": {"mode": "trim", "style": "mediterranean"}})
+    assert summarize("materials", ["--out", str(out)]) == StageReport("applied 1  skipped 0  facades trim mediterranean")
+    _write(out / "materials_report.json", {"applied": [], "skipped": [], "facades": {"mode": "legacy", "style": "anglo"}})
+    assert summarize("materials", ["--out", str(out)]).summary == "applied 0  skipped 0  facades legacy anglo"
+
+
 def test_panoramax_signs_fit_bounds(tmp_path: Path) -> None:
     _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [1, 2]})
     assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("2 facades")

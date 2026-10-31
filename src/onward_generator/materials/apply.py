@@ -16,6 +16,7 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import material_base, party_base, party_material
 from onward_generator.detail.s3db import tint_base
 from onward_generator.dress.atlas import (
@@ -43,6 +44,8 @@ from onward_generator.materials.polyhaven import (
     ensure_diffuse_1k,
 )
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
+from onward_generator.materials.trim import apply_trim
+from onward_generator.materials.trim_style import AUTO
 from onward_generator.tiers import SCENIC_WALLS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -55,6 +58,7 @@ OUTPUT_FILES = (
     "atlas.png",
     "materials_report.json",
     "materials.catalog.json",
+    "facade_trim.png",
 )
 PROTECTED_OUTPUT_NAMES = frozenset({
     "scene_detail_v07_2",
@@ -377,8 +381,16 @@ def apply_materials(
     fetch: Fetcher | None = None,
     seed: int = 48152,
     tile_cache: bool = True,
+    facades: str = "trim",
+    facade_style: str = AUTO,
+    style_table: str | Path | None = None,
 ) -> dict[str, Any]:
-    """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it."""
+    """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
+
+    ``facades`` is ``trim`` (the regional trim-sheet atlas, ADR-020) or ``legacy`` (one
+    material per facade part). ``facade_style`` names a style of ``style_table``, or
+    ``auto`` to choose it from the map centre.
+    """
     base = Path(base_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     if not (base / "scene_visual.glb").is_file() or not (base / "scene_detail.json").is_file():
@@ -422,6 +434,15 @@ def apply_materials(
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
+    trim_root = tile_cache_dir() if tile_cache else None
+    # A wall strip takes the colour the scene gives that material; a colour the scene does not use
+    # takes the detail configuration's, so the atlas of a style is the same for every map.
+    colors = {name: m.color for name, m in load_detail_config().materials.items()} | {
+        name: m.color for name, m in vis_mats.items()
+    }
+    trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
+                      cache=None if trim_root is None else TileCache(trim_root))
+    visual_nodes = trim.nodes
     # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
     # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.
     used = {party_base(name) for name in _used_materials(visual_nodes)}
@@ -501,7 +522,7 @@ def apply_materials(
     targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite, protected=protected)
     used_ids = _used_materials(visual_nodes)
     bases = sorted({party_base(color_id) for color_id in used_ids})
-    atlas_ids = [color_id for color_id in bases if color_id not in ATLAS_SKIP]
+    atlas_ids = [color_id for color_id in bases if color_id not in ATLAS_SKIP and color_id not in trim.materials]
     built = build_atlas(catalog, materials, used_color_ids=atlas_ids, seed=seed, photo_tiles=photo_tiles)
     extras: dict[str, Any] = {
         "attribution": manifest.get("attribution"),
@@ -525,6 +546,10 @@ def apply_materials(
     cache = None if cache_root is None else TileCache(cache_root)
     png_jobs: dict[str, Callable[[], bytes]] = {}
     for index, color_id in enumerate(bases):
+        if color_id in trim.materials:
+            png_jobs[color_id] = partial(bytes, trim.png)
+            materials[color_id] = Material(WHITE, 0.9)
+            continue
         if color_id in ("glass_dark", "glass_view"):
             png_jobs[color_id] = window_png
             prev = materials.get(color_id) or Material(WHITE, 0.15)
@@ -557,6 +582,7 @@ def apply_materials(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
         roof_uv_materials={color_id for color_id in used_ids if material_base(color_id) in roof_ids},
+        explicit_uv_materials=trim.materials,
     )
     atomic_write_bytes(targets[0], visual)
     if collision.is_file():
@@ -585,6 +611,8 @@ def apply_materials(
     }
     atomic_write_json(targets[3], detail_report)
     atomic_write_bytes(targets[4], built.png)
+    if trim.png:
+        atomic_write_bytes(targets[7], trim.png)
     snapshot = _catalog_snapshot(catalog, applied)
     atomic_write_json(targets[6], snapshot)
     materials_report = {
@@ -610,6 +638,7 @@ def apply_materials(
             "tint_shared": tint_shared,
             "shop_interior": shop_shared,
         },
+        "facades": dict(trim.report),
         "geometry": compare,
         "input_hashes": before_hashes,
         "min_mean_luma": MIN_MEAN_LUMA,

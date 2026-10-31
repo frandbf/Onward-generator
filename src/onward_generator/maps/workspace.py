@@ -171,6 +171,26 @@ def source_enabled(directory: str | Path, plugin_id: str) -> bool:
     return any(choice.runs for choice in choices(document) if choice.plugin.id == plugin_id)
 
 
+def facade_options(directory: str | Path) -> list[str]:
+    """``materials apply`` flags from this map's ``map.json`` ``"facades"`` block (ADR-019).
+
+    ``{"mode": "trim" | "legacy", "style": "<name>" | "auto"}``; either key may be left
+    out. A map without the block, or without a ``map.json``, gets no flags and the stage
+    defaults (``trim``, ``auto``). A block of another shape is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return []
+    block = document.get("facades")
+    if block is None:
+        return []
+    if not isinstance(block, dict) or not set(block) <= {"mode", "style"} or not all(isinstance(v, str) for v in block.values()):
+        raise MapError('map.json "facades" must be {"mode": "trim" | "legacy", "style": "<name>" | "auto"}')
+    flags = ["--facades", block["mode"]] if "mode" in block else []
+    return flags + (["--facade-style", block["style"]] if "style" in block else [])
+
+
 def store_sources(directory: str | Path, switches: Mapping[str, bool]) -> None:
     """Record ``run --source`` / ``--no-source`` in ``map.json`` ``sources``. Does not rewrite scenes.
 

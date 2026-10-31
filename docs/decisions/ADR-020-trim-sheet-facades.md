@@ -49,7 +49,7 @@ The trim path takes 20 % of the predicted draws off Madrid (−44) and 29 % off 
 - **Scenic shells** (ADR-017): plain faces, so zocalo, body and parapet, on the strip their `scenic_wall_*` maps to, in the building's tone.
 - **Interiors** do not change.
 - **Panoramax** (off by default) replaces facade images of exposed faces after `materials`; with trim on it would treat the merged primitive as a wall. Not tested together: keep `"facades": {"mode": "legacy"}` on a map that turns Panoramax on.
-- **OSM colours** (`building:colour`, in progress elsewhere): an observed colour is not a strip, so it keeps its own material. Quantising observed colours to a few strips per style is the way to keep them inside the atlas.
+- **OSM colours** (`building:colour`, ADR-023): an observed colour is a tinted material (`<wall>__tint_<key>`), not a strip, so the wall keeps that material and its photograph, and the report counts it under `kept_materials`; the building's openings and trim still join the atlas. Quantising observed colours to a few strips per style is the way to bring those walls inside the atlas.
 
 ## Rejected alternatives
 

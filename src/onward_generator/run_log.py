@@ -268,6 +268,9 @@ def _materials(out: Path) -> StageReport:
     report = _read(out / "materials_report.json")
     skipped = report["skipped"]
     summary = f"applied {len(report['applied'])}  skipped {len(skipped)}"
+    facades = report.get("facades")
+    if facades:
+        summary += f"  facades {facades['mode']} {facades['style']}"
     reasons: dict[str, list[str]] = {}
     for row in skipped:
         reasons.setdefault(str(row["reason"]), []).append(str(row.get("catalog_id") or row.get("id")))

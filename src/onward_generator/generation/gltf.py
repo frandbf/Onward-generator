@@ -293,8 +293,16 @@ def build_glb(
     unit_uv_materials: Collection[str] | None = None,
     roof_uv_materials: Collection[str] | None = None,
     preserve_uvs: bool = False,
+    explicit_uv_materials: Collection[str] | None = None,
 ) -> bytes:
+    """``explicit_uv_materials`` keep the UVs stored on their primitives even when they have a repeat image.
+
+    Materials whose repeat images have the same bytes share one glTF image and texture,
+    unless that would leave one image: the adapter clamps the image of a one-image GLB
+    (the old shared atlas), which would stop a repeat image from repeating.
+    """
     builder = _Builder()
+    explicit = frozenset(explicit_uv_materials or ())
     material_names = sorted({p.material for n in nodes for p in n.primitives})
     material_index = {name: i for i, name in enumerate(material_names)}
     repeat = {name: png for name, png in (repeat_images or {}).items() if name in material_index}
@@ -329,7 +337,7 @@ def build_glb(
                 "POSITION": builder.add(positions, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC3", minmax=True),
                 "NORMAL": builder.add(normals, target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC3"),
             }
-            if preserve_uvs and prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
+            if (preserve_uvs or prim.material in explicit) and prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):
                 attributes["TEXCOORD_0"] = builder.add(np.asarray(prim.uvs, dtype=np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             elif using_repeat and prim.material in repeat:
                 tile = float((repeat_tile_m or {}).get(prim.material, 2.0))
