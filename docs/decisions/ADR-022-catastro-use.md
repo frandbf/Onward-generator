@@ -1,0 +1,32 @@
+# ADR-022 — Catastro current use as ground-floor shop evidence
+
+Status: accepted · 31 October 2026. Extends ADR-016 (Catastro split) and ADR-018 (source plugins), whose *Consequences* left points of interest without a contract.
+
+## Context
+
+A ground floor is a `shopfront` only with evidence (`docs/07-detail.md`, *Fidelity*): an OSM shop, amenity, office or craft POI, or a commercial building category. On a real Madrid map (40.40657, −3.719187, r150, Catastro split into 84 buildings) OSM has three such POIs within 300 m, so three buildings got a shopfront. A dense Madrid neighbourhood has much more commerce than OSM records.
+
+The DG Catastro INSPIRE BU service that already gives us `bu:BuildingPart` also serves `bu:Building`: one feature per parcel. Checked on that map with one `GetFeature` (37 buildings): every feature has `currentUse` (`1_residential` 30, `3_industrial` 1, `4_1_office` 2, `4_2_retail` 2, `4_3_publicServices` 2), `numberOfBuildingUnits` and `numberOfDwellings`; `numberOfFloorsAboveGround` is `xsi:nil`. `DescribeFeatureType` only points at the INSPIRE `BuildingExtended2D` schema. The use is the parcel's *predominant* use by area. A block of flats with shops downstairs is `1_residential`. A retail parcel can still hold dwellings (one Madrid retail parcel has 43 units and 42 dwellings).
+
+## Decision
+
+1. **Download, inside the `es.catastro` plugin.** `cadastre download`, the plugin's download stage, fetches `bu:Building` after the parts through the same fetch: the same tiles, retries, size and prolog checks, user agent and CC BY 4.0 licence record, into `data/raw/catastro_buildings.gml` with its own sidecar. Both files are checked for `--overwrite` before the first request. The buildings file, written last, is the stage's marker, so a map downloaded before this decision downloads both files again on its next `run`, and the `cadastre` stage is as new as both. The plugin's `produces` gains `use`.
+2. **Attach, in `cadastre split --buildings`.** Each building of the split scene gets `catastro_use` from its parcel: a sub-building from its own `refcat`, a footprint left whole from the parcel whose storeyed parts cover most of it, when that parcel covers at least `use_min_share` (0.5). The record keeps the code, a plain name, the share, both counts and full provenance, with `attribute_origin: observed`. `subdivision.uses` records the file, or that it was not requested or is missing. The geometry of `bu:Building` is not read: the parcel is already named by the parts.
+3. **One ranking of shop evidence.** `config/sources.json` gains `evidence`, the only ranking of ground-floor shop evidence, beside the height `priority`: `["osm", "es.catastro", "overture"]`. `osm` is the OSM shop, amenity, office and craft POIs and a commercial building category; the plugin ids are the `use` plugins. Every plugin whose `produces` has `use`, and `osm`, must have a rank, or the configuration is refused. Per building the first source with evidence wins whole: when a plugin outranks `osm`, the building's POIs are not its shops. `overture` keeps its slot for the Overture Places plugin.
+4. **Use, in `detail`.** A building whose winning evidence is its Catastro use, with a code in `doors.shop_catastro_uses` (default `4_1_office` → `Oficina`, `4_2_retail` → `Comercio`), gets a shopfront ground floor with `ground_floor_evidence.source: catastro_use`, `use_origin: observed` and `floor_assignment: estimated`, and the rule. It is one shop without a POI, named by the building's OSM name or by that generic word (`name_origin: estimated`). With the default ranking, OSM keeps its order and wins: the building category, then POIs. `4_3_publicServices`, industrial and residential give nothing, whatever the dwelling count. Landmarks keep their door.
+5. **Not a source of buildings.** The use only labels an OSM footprint (or its Catastro sub-buildings, ADR-016). No building is added.
+
+## Consequences
+
+- Madrid r150 (40.40657, −3.719187, `run --no-unity`, default configuration with shop rooms, ADR-019; the same split scene and heights before and after): 3 → 6 shops, all from office parcels (6 office sub-buildings qualified; 2 have no street front and 1 is a strip under 2.1 m wide, so they keep their template ground floor; the two retail parcels in the download box were attached to no OSM building); shop interiors 3 → 6, so every shop has one; interior lights 15 → 18 of 24; drawn triangles 91 823 → 91 965 (shop interiors 332 → 640), collision triangles 27 468 → 30 208. The shop interiors and the light cap apply to them as to any shop.
+- A Catastro use counts only where a shop fits: the building has an exposed street front, and inside its walls some point is at least `wall_thickness_m + door_clearance_m / 2` (1.05 m) from every wall. The use is the parcel's, and one-look-per-parcel (ADR-016) gives it to every part, including the parts behind the others and the passage strips, which hold no shop. A part that fails gives the next source in `evidence` its turn.
+- The ground floor is a guess. An office parcel may have offices on every floor and no street-level shop. The record says so (`floor_assignment: estimated`), and the facade use and palette still follow OSM.
+- The predominant use misses the common case: flats over shops. `numberOfBuildingUnits − numberOfDwellings` (non-dwelling units, which may also be parking spaces or storage) is recorded but not used. Whether it is good evidence of shops is left open.
+- A map downloaded before this decision has no buildings file: its next `run` downloads Catastro again. `cadastre split` called by hand without the file says so and attaches nothing.
+- The licence is unchanged (CC BY 4.0, transformed use only, `docs/legal/data-sources.md`). Only the code, the counts and the parcel reference are copied downstream, each with its attribution.
+
+## Rejected alternatives
+
+- **Counting non-dwelling units as shops.** They include garages and storerooms. On the Madrid sample, residential parcels have 0–398 more units than dwellings, which does not separate a building with one shop from one with an underground car park.
+- **Reading the use from the Catastro addresses or cadastral parcel services.** That means more services, more requests and more licence surface for the same predominant use.
+- **Treating the use as a facade use.** The predominant use describes the floor area, not the street front. The palette stays with the OSM evidence.

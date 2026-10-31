@@ -74,7 +74,8 @@
     "shopfront": { "min_width_m": 2.0, "max_width_m": 3.4, "sill_m": 0.25, "min_height_m": 1.9, "max_height_m": 3.2, "head_m": 0.45 },
     "shop_door": { "width_m": 1.6, "height_m": 2.5 },
     "shop_evidence_keys": ["shop", "amenity", "office", "craft"],
-    "shop_evidence_distance_m": 2.0
+    "shop_evidence_distance_m": 2.0,
+    "shop_catastro_uses": { "4_1_office": "Oficina", "4_2_retail": "Comercio" }
   },
   "facade_palettes": {
     "residential": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white", "brick_red"],

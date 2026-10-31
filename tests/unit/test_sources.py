@@ -37,6 +37,7 @@ def catastro_only(monkeypatch: pytest.MonkeyPatch) -> None:
 
 ALLOWLIST = "sources config: licence_allowlist must be a list of SPDX ids"
 PRIORITY = "sources config: priority must be a list of plugin ids"
+EVIDENCE = "sources config: evidence must be a list of source ids"
 OPEN = LicenceRecord("CC-BY-4.0", "CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/", "Someone", "attribute")
 
 
@@ -69,6 +70,7 @@ def _config(**changes: Any) -> dict[str, Any]:
         "schema": "onward_generator.sources",
         "licence_allowlist": ["CC-BY-4.0"],
         "priority": ["es.catastro"],
+        "evidence": ["osm", "es.catastro"],
         **changes,
     }
 
@@ -97,6 +99,7 @@ def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_
     config = load_source_config()
     assert config.priority == ("es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture")
     assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0"})
+    assert config.evidence == ("osm", "es.catastro", "overture")
     for plugin in (CatastroPlugin(), PnoaNdsmPlugin()):
         check_licence(plugin, config)
 
@@ -113,6 +116,13 @@ def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_
         ({"priority": [None]}, PRIORITY),
         ({"priority": ["es.catastro", "es.catastro"]}, "sources config: priority names a plugin twice"),
         ({"priority": []}, "sources config: priority has no rank for es.catastro"),
+        ({"evidence": "osm"}, EVIDENCE),
+        ({"evidence": ["osm", ""]}, EVIDENCE),
+        ({"evidence": [7]}, EVIDENCE),
+        ({"evidence": ["osm", "es.catastro", "osm"]}, "sources config: evidence names a source twice"),
+        ({"evidence": ["es.catastro"]}, "sources config: evidence has no rank for osm"),
+        ({"evidence": ["osm"]}, "sources config: evidence has no rank for es.catastro"),
+        ({"evidence": []}, "sources config: evidence has no rank for es.catastro, osm"),
     ],
 )
 def test_source_config_refuses_an_invalid_document(changes: dict[str, Any], message: str) -> None:
@@ -130,6 +140,12 @@ def test_source_config_names_every_unranked_plugin(two_plugins: tuple[Any, ...])
 def test_a_plugin_without_overrides_needs_no_rank(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (FakeHeights(produces=frozenset({"footprints"})),))
     assert source_config(_config(priority=[])).priority == ()
+
+
+def test_only_osm_needs_an_evidence_rank_without_a_use_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (FakeHeights(),))
+    config = source_config(_config(priority=["xx.lidar"], evidence=["osm", "overture"]))
+    assert config.evidence == ("osm", "overture")
 
 
 def test_check_licence_refuses_a_licence_off_the_allowlist() -> None:
@@ -154,10 +170,10 @@ def test_plugin_by_id_lists_every_known_id(two_plugins: tuple[Any, ...]) -> None
     assert str(caught.value) == "unknown source 'es.nope'. Known: es.catastro, xx.lidar"
 
 
-def test_catastro_plugin_writes_footprints_and_levels_under_its_cadastre_licence() -> None:
+def test_catastro_plugin_writes_footprints_levels_and_uses_under_its_cadastre_licence() -> None:
     plugin = CatastroPlugin()
     assert plugin.id == "es.catastro"
-    assert plugin.produces == frozenset({"footprints", "levels"})
+    assert plugin.produces == frozenset({"footprints", "levels", "use"})
     assert plugin.licence.spdx == "CC-BY-4.0"
     assert plugin.licence.attribution == "Dirección General del Catastro, INSPIRE Buildings (BU)"
     assert "must not be redistributed" in plugin.licence.obligations
@@ -275,7 +291,7 @@ def test_merge_refuses_an_unranked_source_and_a_duplicate_id() -> None:
 
 def test_source_list_prints_rank_kinds_licence_and_coverage(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["source", "list", "--lat", "42.8125", "--lon", "-1.6432"]) == 0
-    assert capsys.readouterr().out == "es.catastro  rank 3  footprints,levels  CC-BY-4.0 (allowed)  not here\n"
+    assert capsys.readouterr().out == "es.catastro  rank 3  footprints,levels,use  CC-BY-4.0 (allowed)  not here\n"
     assert main(["source", "list", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]) == 0
     assert capsys.readouterr().out.endswith("(allowed)  covers\n")
     assert main(["source", "list", "--lat", str(MURCIA_CENTER_LAT)]) == 0
@@ -286,7 +302,7 @@ def test_source_list_marks_an_unranked_plugin_and_a_licence_off_the_allowlist(tm
     config = tmp_path / "sources.json"
     config.write_text(json.dumps(_config(licence_allowlist=["ODbL-1.0"])), encoding="utf-8")
     assert main(["source", "--config", str(config), "list"]) == 0
-    assert capsys.readouterr().out == "es.catastro  rank 1  footprints,levels  CC-BY-4.0 (NOT ALLOWED)\n"
+    assert capsys.readouterr().out == "es.catastro  rank 1  footprints,levels,use  CC-BY-4.0 (NOT ALLOWED)\n"
 
 
 def test_source_list_shows_a_dash_for_a_plugin_without_rank(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -388,9 +404,12 @@ def test_catastro_alone_keeps_its_stages_and_overrides_without_a_merge(tmp_path:
     stages, final, overrides = source_plan(root, scene)
     assert [s.name for s in stages] == ["catastro", "cadastre"]
     assert stages[0].download and not stages[1].download
-    assert stages[0].marker == root / "data" / "raw" / "catastro.gml"
+    raw = root / "data" / "raw"
+    assert stages[0].argv[stages[0].argv.index("--out") + 1] == str(raw / "catastro.gml")
+    assert stages[0].marker == raw / "catastro_buildings.gml"  # written last: a map without it downloads both again
     assert stages[0].inputs == (scene,)
-    assert stages[1].inputs == (root / "data" / "raw" / "catastro.gml",)
+    assert stages[1].inputs == (raw / "catastro.gml", raw / "catastro_buildings.gml")
+    assert stages[1].argv[stages[1].argv.index("--buildings") + 1] == str(raw / "catastro_buildings.gml")
     assert final == root / "data" / "processed" / "cadastre" / "geo_scene.json"
     assert overrides == root / "data" / "processed" / "cadastre" / "heights_overrides.catastro.json"
 

@@ -102,7 +102,7 @@
     "templates": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/template" } },
     "landmark_template": { "$ref": "#/$defs/name" },
     "doors": {
-      "type": "object", "additionalProperties": false, "required": ["main", "landmark", "shopfront", "shop_door", "shop_evidence_keys", "shop_evidence_distance_m"],
+      "type": "object", "additionalProperties": false, "required": ["main", "landmark", "shopfront", "shop_door", "shop_evidence_keys", "shop_evidence_distance_m", "shop_catastro_uses"],
       "properties": {
         "main": { "$ref": "#/$defs/opening" }, "landmark": { "$ref": "#/$defs/opening" }, "shop_door": { "$ref": "#/$defs/opening" },
         "shopfront": {
@@ -114,7 +114,12 @@
           }
         },
         "shop_evidence_keys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
-        "shop_evidence_distance_m": { "$ref": "#/$defs/len0" }
+        "shop_evidence_distance_m": { "$ref": "#/$defs/len0" },
+        "shop_catastro_uses": {
+          "type": "object",
+          "propertyNames": { "enum": ["1_residential", "2_agriculture", "3_industrial", "4_1_office", "4_2_retail", "4_3_publicServices"] },
+          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
       }
     },
     "shops": {

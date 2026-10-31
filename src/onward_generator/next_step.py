@@ -12,6 +12,8 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
+from onward_generator.cadastre.acquire import buildings_path
+
 _PREFIX = ".venv/bin/python -m onward_generator"
 
 
@@ -100,6 +102,7 @@ def cadastre_split_command(scene: Path, gml: Path) -> StageCommand:
         "cadastre", "split",
         "--scene", show(scene),
         "--gml", show(gml),
+        "--buildings", show(buildings_path(gml)),
         "--out", show(stage_path(scene, "cadastre")),
     )
 

@@ -16,9 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
-Kind = Literal["footprints", "height_m", "levels"]
+Kind = Literal["footprints", "height_m", "levels", "use"]
 """What a plugin contributes. ``footprints``: it writes a new scene that later stages read.
-``height_m`` and ``levels``: it writes a ``heights_overrides.<id>.json`` (``config/heights.overrides.schema.json``)."""
+``height_m`` and ``levels``: it writes a ``heights_overrides.<id>.json`` (``config/heights.overrides.schema.json``).
+``use``: it labels the buildings of its scene with an observed use that ``detail`` reads as shop evidence (ADR-022)."""
 
 OVERRIDE_KINDS: frozenset[Kind] = frozenset({"height_m", "levels"})
 

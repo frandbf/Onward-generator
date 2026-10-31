@@ -3,8 +3,9 @@
 Discovery is this explicit tuple, not an import scan: the order is the order
 ``run`` adds the stages, so it is deterministic. A plugin that writes a new
 scene (``footprints``) comes before the ones that read the scene.
-``config/sources.json`` holds the licence allowlist and the one priority
-that ranks height sources; nothing else ranks them.
+``config/sources.json`` holds the licence allowlist, the one priority
+that ranks height sources and the one ranking of shop evidence (ADR-022);
+nothing else ranks them.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ from onward_generator.sources.plugin import OVERRIDE_KINDS, SourceError, SourceP
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_PATH = REPO_ROOT / "config" / "sources.json"
 SCHEMA = "onward_generator.sources"
+OSM_EVIDENCE = "osm"
+"""The evidence rank of the OSM shop, amenity, office and craft POIs and of a commercial building category."""
 
 PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin())
 
@@ -33,10 +36,12 @@ PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHd
 class SourceConfig:
     licence_allowlist: frozenset[str]
     priority: tuple[str, ...]
+    evidence: tuple[str, ...]
+    """The ranking of ground-floor shop evidence: ``osm`` (POIs and the building category) and the ``use`` plugins (ADR-022)."""
 
 
 def source_config(document: Mapping[str, Any]) -> SourceConfig:
-    """Validate ``config/sources.json``: every plugin that writes overrides must have a rank."""
+    """Validate ``config/sources.json``: every plugin that writes overrides must have a rank, every ``use`` plugin an evidence rank."""
     if not is_schema(document.get("schema"), SCHEMA):
         raise SourceError(f"sources config: schema must be {SCHEMA}")
     allowlist = document.get("licence_allowlist")
@@ -50,7 +55,15 @@ def source_config(document: Mapping[str, Any]) -> SourceConfig:
     unranked = sorted(p.id for p in PLUGINS if p.produces & OVERRIDE_KINDS and p.id not in priority)
     if unranked:
         raise SourceError(f"sources config: priority has no rank for {', '.join(unranked)}")
-    return SourceConfig(frozenset(allowlist), tuple(priority))
+    evidence = document.get("evidence")
+    if not isinstance(evidence, list) or not all(isinstance(item, str) and item for item in evidence):
+        raise SourceError("sources config: evidence must be a list of source ids")
+    if len(set(evidence)) != len(evidence):
+        raise SourceError("sources config: evidence names a source twice")
+    unranked = sorted(({OSM_EVIDENCE} | {p.id for p in PLUGINS if "use" in p.produces}) - set(evidence))
+    if unranked:
+        raise SourceError(f"sources config: evidence has no rank for {', '.join(unranked)}")
+    return SourceConfig(frozenset(allowlist), tuple(priority), tuple(evidence))
 
 
 @cache

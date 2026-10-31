@@ -19,7 +19,7 @@ from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.cadastre.acquire import CadastreError, DownloadRecord
-from onward_generator.cadastre.gml import BuildingPart
+from onward_generator.cadastre.gml import BuildingPart, BuildingUse
 from onward_generator.cadastre.match import SOURCE_LABEL
 from onward_generator.generation.mesh import cap, merge, open_base_defects, walls
 
@@ -45,9 +45,11 @@ class SplitOptions:
     confidence_low: float = 0.7
     max_quarantine_share: float = 0.05
     """Share of the scene's building area that may fall back to the unsplit OSM footprint before the stage fails."""
+    use_min_share: float = 0.5
+    """Share of a footprint left whole that one parcel must cover before the footprint takes that parcel's Catastro use."""
 
     def __post_init__(self) -> None:
-        for name in ("min_coverage", "confident_share", "confidence_high", "confidence_low", "max_quarantine_share"):
+        for name in ("min_coverage", "confident_share", "confidence_high", "confidence_low", "max_quarantine_share", "use_min_share"):
             if not 0 <= getattr(self, name) <= 1:
                 raise ValueError(f"{name} must be within [0, 1]")
         for name in ("min_piece_area_m2", "min_piece_width_m"):
@@ -292,6 +294,81 @@ def split_scene(
     return features, results
 
 
+CURRENT_USES = {
+    "1_residential": "residential",
+    "2_agriculture": "agriculture",
+    "3_industrial": "industrial",
+    "4_1_office": "office",
+    "4_2_retail": "retail",
+    "4_3_publicServices": "public_services",
+}
+"""Catastro ``currentUse`` codes (INSPIRE ``CurrentUseValue``, numbered by Catastro) and their plain names."""
+USE_SOURCE = "Catastro INSPIRE BU bu:Building currentUse"
+
+
+def _parcel_of(feature: Mapping[str, Any], tree: STRtree, parts: Sequence[BuildingPart], local_parts: Sequence[BaseGeometry]) -> tuple[str, float] | None:
+    """The parcel (``refcat``) a building stands on and the share of its footprint it covers.
+
+    A sub-building names its parcel and covers its own share. A footprint left whole takes the parcel
+    whose parts with at least one storey cover most of it.
+    """
+    footprint = shape(feature["geometry"])
+    subdivision = feature.get("subdivision")
+    if subdivision is not None:
+        return subdivision["refcat"], 1.0 - subdivision["leftover_m2"] / footprint.area
+    covered: dict[str, float] = defaultdict(float)
+    for k in sorted(int(i) for i in tree.query(footprint)):  # a box neighbour adds an empty intersection
+        if parts[k].floors_above >= 1:
+            covered[parts[k].refcat] += footprint.intersection(local_parts[k]).area
+    if not covered:
+        return None
+    refcat = max(sorted(covered), key=lambda r: covered[r])
+    return refcat, covered[refcat] / footprint.area
+
+
+def attach_uses(
+    scene: Mapping[str, Any],
+    features: Sequence[dict[str, Any]],
+    parts: Sequence[BuildingPart],
+    uses: Mapping[str, BuildingUse],
+    record: DownloadRecord,
+    options: SplitOptions,
+) -> dict[str, int]:
+    """Write ``catastro_use`` on every building whose parcel has a Catastro use; return the count of each code.
+
+    The use is observed: it is Catastro's predominant use of the parcel. A footprint left whole gets it only
+    when that parcel covers at least ``use_min_share`` of it. ``parts`` are in the scene CRS.
+    """
+    e0, n0 = scene["frame"]["origin_projected"]
+    local_parts = [affinity.translate(p.geometry, -e0, -n0) for p in parts]
+    tree = STRtree(local_parts)
+    counts: Counter[str] = Counter()
+    for feature in features:
+        if feature.get("kind") != "building":
+            continue
+        parcel = _parcel_of(feature, tree, parts, local_parts)
+        if parcel is None or parcel[1] < options.use_min_share or parcel[0] not in uses:
+            continue
+        use = uses[parcel[0]]
+        feature["catastro_use"] = {
+            "current_use": use.current_use,
+            "use": CURRENT_USES.get(use.current_use, "other"),
+            "refcat": use.refcat,
+            "share": round(parcel[1], 4),
+            "dwellings": use.dwellings,
+            "building_units": use.building_units,
+            "attribute_origin": "observed",
+            "source": USE_SOURCE,
+            "provider": record.provider,
+            "license": record.license,
+            "license_url": record.license_url,
+            "attribution": record.attribution,
+            "retrieved_at": record.retrieved_at,
+        }
+        counts[use.current_use] += 1
+    return dict(sorted(counts.items()))
+
+
 def check_quarantine(results: Sequence[ParentSplit], building_m2: float, options: SplitOptions) -> None:
     """Fail when more than ``max_quarantine_share`` of the building area had to stay unsplit."""
     quarantined = sum(r.quarantined_m2 for r in results)
@@ -349,8 +426,12 @@ def subdivided_scene(
     scene_ref: Mapping[str, Any],
     record: DownloadRecord,
     options: SplitOptions,
+    uses: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The geo scene contract with split footprints and a ``subdivision`` block."""
+    """The geo scene contract with split footprints and a ``subdivision`` block.
+
+    ``uses`` describes the Catastro buildings read for ``catastro_use`` (``attach_uses``), or why none were.
+    """
     return {
         **scene,
         "features": [dict(f) for f in features],
@@ -368,6 +449,7 @@ def subdivided_scene(
             },
             "options": options.to_dict(),
             "counts": split_summary(results),
+            "uses": dict(uses) if uses is not None else {"status": "not_requested"},
         },
     }
 

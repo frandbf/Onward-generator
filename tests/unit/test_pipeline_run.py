@@ -562,9 +562,10 @@ def _finish_python_stages(root: Path) -> None:
             if name in ("geo", "cadastre"):
                 destination.mkdir(parents=True, exist_ok=True)
                 (destination / "geo_scene.json").write_text("{}", encoding="utf-8")
-            elif name == "catastro":
+            elif name == "catastro":  # the parts, then the parcels with their use beside them (ADR-022)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text("<gml/>", encoding="utf-8")
+                destination.with_name(f"{destination.stem}_buildings.gml").write_text("<gml/>", encoding="utf-8")
             elif name == "heights":
                 destination.mkdir(parents=True, exist_ok=True)
                 (destination / "heights.json").write_text("{}", encoding="utf-8")
@@ -1365,12 +1366,18 @@ def test_catastro_and_cadastre_are_stale_after_their_input(tmp_path: Path) -> No
     now = (root / "map.json").stat().st_mtime
     _touch(processed / "geo" / "geo_scene.json", now)
     _touch(root / "data" / "raw" / "catastro.gml", now + 1)
+    assert not output_ready("catastro", [], root)  # downloaded before ADR-022: no buildings file yet
+    _touch(root / "data" / "raw" / "catastro_buildings.gml", now + 1)
     _touch(processed / "cadastre" / "geo_scene.json", now + 2)
     _touch(processed / "heights" / "heights.json", now + 3)
     assert all(output_ready(name, [], root) for name in ("catastro", "cadastre", "heights"))
     _touch(processed / "cadastre" / "geo_scene.json", now + 4)
     assert not output_ready("heights", [], root)
     _touch(root / "data" / "raw" / "catastro.gml", now + 5)
+    assert not output_ready("cadastre", [], root)
+    _touch(processed / "cadastre" / "geo_scene.json", now + 5)
+    assert output_ready("cadastre", [], root)
+    _touch(root / "data" / "raw" / "catastro_buildings.gml", now + 5.5)
     assert not output_ready("cadastre", [], root)
     _touch(processed / "geo" / "geo_scene.json", now + 6)
     assert not output_ready("catastro", [], root)

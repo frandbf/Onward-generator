@@ -116,7 +116,8 @@ def test_catastro_commands_download_then_split_beside_geo(tmp_path: Path) -> Non
     gml = tmp_path / "raw" / "catastro.gml"
     assert catastro_command(scene, gml).argv == ("cadastre", "download", "--scene", str(scene), "--out", str(gml))
     assert cadastre_split_command(scene, gml).argv == (
-        "cadastre", "split", "--scene", str(scene), "--gml", str(gml), "--out", str(tmp_path / "cadastre"),
+        "cadastre", "split", "--scene", str(scene), "--gml", str(gml),
+        "--buildings", str(tmp_path / "raw" / "catastro_buildings.gml"), "--out", str(tmp_path / "cadastre"),
     )
     split_scene = tmp_path / "cadastre" / "geo_scene.json"
     split_scene.parent.mkdir()

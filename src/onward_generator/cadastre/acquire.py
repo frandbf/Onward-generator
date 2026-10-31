@@ -43,6 +43,9 @@ MAX_BYTES = 64 * 1024 * 1024
 DOWNLOAD_MARGIN_M = 20.0
 # Like Overpass: 429, 5xx and dropped connections are retried three times, waits doubling from 8 s.
 CATASTRO_RETRIES = 3
+PARTS_TYPE = "bu:BuildingPart"
+BUILDINGS_TYPE = "bu:Building"
+"""One feature per parcel: its predominant ``currentUse`` and its dwelling and unit counts (ADR-022)."""
 
 CATASTRO_BU = LicenseInfo(
     provider="catastro-inspire-bu",
@@ -102,13 +105,19 @@ def validate_bbox(bbox: BBox, *, max_area_km2: float = MAX_AREA_KM2) -> BBox:
     return (xmin, ymin, xmax, ymax)
 
 
-def building_parts_url(bbox: BBox, crs: str = CRS) -> str:
+def buildings_path(gml: Path) -> Path:
+    """Where ``cadastre download`` writes the ``bu:Building`` features beside the parts: ``<stem>_buildings.gml``."""
+    return gml.with_name(f"{gml.stem}_buildings{gml.suffix}")
+
+
+def building_parts_url(bbox: BBox, crs: str = CRS, typename: str = PARTS_TYPE) -> str:
+    """The ``GetFeature`` URL of ``typename`` features (parts, or ``BUILDINGS_TYPE``) in ``bbox``."""
     xmin, ymin, xmax, ymax = validate_bbox(bbox)
     query = {
         "service": "WFS",
         "version": "2.0.0",
         "request": "GetFeature",
-        "typenames": "bu:BuildingPart",
+        "typenames": typename,
         "bbox": f"{xmin:.2f},{ymin:.2f},{xmax:.2f},{ymax:.2f}",
         "srsName": crs,
     }
@@ -253,8 +262,9 @@ def download_building_parts(
     timeout: float = 180.0,
     fetch: Fetcher = _http_fetch,
     now: datetime | None = None,
+    typename: str = PARTS_TYPE,
 ) -> DownloadRecord:
-    """Download BuildingPart features in ``bbox`` (metres in ``crs``) to ``out_path`` (+ sidecar).
+    """Download ``typename`` features (BuildingPart by default) in ``bbox`` (metres in ``crs``) to ``out_path`` (+ sidecar).
 
     A box over ``MAX_AREA_KM2`` is fetched tile by tile (``split_bbox``) and merged.
     """
@@ -265,7 +275,7 @@ def download_building_parts(
     if (target.exists() or side.exists()) and not overwrite:
         raise FileExistsError(f"refusing to overwrite {target}")
     tiles = split_bbox(bbox)
-    urls = [building_parts_url(tile, crs) for tile in tiles]
+    urls = [building_parts_url(tile, crs, typename) for tile in tiles]
     retrieved = (now or datetime.now(tz=UTC)).isoformat(timespec="seconds")
     payloads: list[bytes] = []
     for url in urls:

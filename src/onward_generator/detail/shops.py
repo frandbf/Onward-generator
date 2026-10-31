@@ -27,6 +27,8 @@ import numpy as np
 from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCategory
 from onward_generator.detail.facades import Hole, Segment, stable_unit
 
+CATASTRO_USE_TAG = "catastro:current_use"
+"""The tag a shop of a Catastro-use building carries in place of an OSM POI's tags (ADR-022). Not an OSM tag."""
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
 VINYL_BACKS = frozenset({"glass_dark", "glass_view", "shop_glass"})
 # One shop: its POI id (``None`` for the building itself), its tags, and its point in local metres.
@@ -34,7 +36,8 @@ Shop = tuple[str | None, Mapping[str, Any], tuple[float, float] | None]
 
 
 def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
-    """``{"name", "name_origin", "name_rule"}``: the OSM name, else a generic word for the first evidence key."""
+    """``{"name", "name_origin", "name_rule"}``: the OSM name, else a generic word for the first evidence key,
+    else the generic word for the building's Catastro use, else the default."""
     name = " ".join(str(tags.get("name") or "").split())
     if name:
         return {"name": name, "name_origin": "observed", "name_rule": "name"}
@@ -45,6 +48,9 @@ def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
         for rule in (f"{key}={tags[key]}", key):
             if rule in names:
                 return {"name": names[rule], "name_origin": "estimated", "name_rule": rule}
+    use = str(tags.get(CATASTRO_USE_TAG))
+    if use in cfg.shop_catastro_uses:
+        return {"name": cfg.shop_catastro_uses[use], "name_origin": "estimated", "name_rule": f"catastro_use={use}"}
     return {"name": cfg.shops.default_name, "name_origin": "estimated", "name_rule": "default"}
 
 

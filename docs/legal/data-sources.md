@@ -44,7 +44,7 @@ Spain only, without Navarre and the Basque Country, which have their own foral c
 | Field | Value |
 | --- | --- |
 | Provider | Dirección General del Catastro (Ministerio de Hacienda) |
-| Dataset | INSPIRE Buildings (BU), object `BuildingPart`, field `numberOfFloorsAboveGround` |
+| Dataset | INSPIRE Buildings (BU): object `BuildingPart`, field `numberOfFloorsAboveGround`; object `Building` (one per parcel), fields `currentUse`, `numberOfDwellings`, `numberOfBuildingUnits` (ADR-022) |
 | Service | WFS 2.0 `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx`. It refuses curl's default user agent. The generator identifies itself as `onward-generator/<version>` |
 | Licence | CC BY 4.0, as stated by the official catalogue (datos.gob.es, "Building INSPIRE Download Service - WFS") |
 | Catastro's own licence | "Licencia de acceso y uso de los servicios y conjuntos de datos INSPIRE", v1.0, July 2016 |
@@ -53,6 +53,7 @@ Spain only, without Navarre and the Basque Country, which have their own foral c
 Obligations, from the Catastro licence:
 
 - **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. A download of several tiles is merged into that one file, each part once; the sidecar records every request. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height. Since ADR-016, `cadastre split` also divides an OSM footprint into sub-footprints: each is a cadastral part outline clipped to the OSM outline, snapped to 1 mm, merged by parcel and storey count, with slivers dropped and gaps filled. That shape is a transformation of the cadastral geometry; the GML itself is never copied into a scene or a package.
+- **Current use (ADR-022).** The `bu:Building` features are downloaded beside the parts into `data/raw/catastro_buildings.gml`, outside git, with their own sidecar. Downstream only each building's parcel reference, its `currentUse` code and its two counts are copied, as `catastro_use` on the buildings of the split scene, with the provider, licence, attribution and retrieval date. `detail` turns an office or retail use into a generic ground-floor shopfront: the use is observed, the floor it is put on is estimated. Neither the Building geometry nor the GML is copied.
 - **No impersonation.** Derived products must not be presented as "cartografía catastral", "información catastral", or equivalent terms.
 - **No warranty.** Catastro is not responsible for derived products, and the data can be out of date.
 - **Attribution (CC BY 4.0).** `heights_overrides.catastro.json`, `heights.json`, `scene3d.json`, and the GLBs carry the source and the licence. The split scene `data/processed/cadastre/geo_scene.json` carries it in `subdivision.cadastre` and on every sub-building (`subdivision.license`, `attribution`, `retrieved_at`).
@@ -65,7 +66,7 @@ Sources checked on 2026-10-18:
 - https://www.catastro.hacienda.gob.es/webinspire/documentos/Licencia.pdf
 - https://datos.gob.es/es/catalogo/e0dat0002-spanish-general-directorate-for-cadastre-building-inspire-download-service-wfs1
 
-The fixture `tests/fixtures/cadastre/synthetic_bu.gml` is synthetic (CC0-1.0) and contains no Catastro data.
+The fixtures `tests/fixtures/cadastre/synthetic_bu.gml` and `synthetic_bu_buildings.gml` are synthetic (CC0-1.0) and contain no Catastro data.
 
 ## Source plugins
 

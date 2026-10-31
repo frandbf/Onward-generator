@@ -229,6 +229,8 @@ class DetailConfig:
     shops: ShopSigns
     shop_evidence_keys: tuple[str, ...]
     shop_evidence_distance_m: float
+    shop_catastro_uses: Mapping[str, str]
+    """Catastro ``currentUse`` codes that give a building a commercial ground floor, and the generic name of its shop (ADR-022)."""
     facade_palettes: Mapping[str, tuple[str, ...]]
     interiors: Interiors
     urban_observed: Mapping[str, Mapping[str, frozenset[str]]]
@@ -416,6 +418,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         shops=_shops(doc["shops"]),
         shop_evidence_keys=tuple(doc["doors"]["shop_evidence_keys"]),
         shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
+        shop_catastro_uses=MappingProxyType(dict(sorted(doc["doors"]["shop_catastro_uses"].items()))),
         facade_palettes=MappingProxyType({use: tuple(doc["facade_palettes"][use]) for use in FACADE_USES}),
         interiors=Interiors(
             enabled=bool(i["enabled"]),

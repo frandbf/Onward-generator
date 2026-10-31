@@ -1,7 +1,8 @@
 {
   "schema": "onward_generator.sources",
   "schema_version": "1.0.0",
-  "description": "Optional data-source plugins (ADR-018). licence_allowlist: SPDX ids a plugin may be fetched under. priority: the single ranking of building-height sources, first wins per building; a winner with height_m and no levels takes levels from the next source that has them. OSM height, OSM levels and the estimate rank below every entry here (docs/04-heights.md). Ids not registered yet (overture) keep their slot for the plugin that will use them.",
+  "description": "Optional data-source plugins (ADR-018). licence_allowlist: SPDX ids a plugin may be fetched under. priority: the single ranking of building-height sources, first wins per building; a winner with height_m and no levels takes levels from the next source that has them. OSM height, OSM levels and the estimate rank below every entry here (docs/04-heights.md). evidence: the single ranking of ground-floor shop evidence (ADR-022), first source with evidence wins per building; osm is the OSM shop, amenity, office and craft POIs and a commercial building category. Ids not registered yet (overture) keep their slot for the plugin that will use them.",
   "licence_allowlist": ["CC-BY-4.0", "etalab-2.0", "ODbL-1.0"],
-  "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture"]
+  "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture"],
+  "evidence": ["osm", "es.catastro", "overture"]
 }

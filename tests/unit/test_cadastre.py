@@ -19,12 +19,15 @@ from onward_generator.cadastre import (
     overrides_document,
     parse_building_parts,
 )
+from onward_generator.cadastre.acquire import BUILDINGS_TYPE, buildings_path
+from onward_generator.cadastre.gml import BuildingUse, parse_building_uses
 from onward_generator.cadastre.match import weighted_median
 from onward_generator.geo.pipeline import GeoResult
 from onward_generator.heights import HeightSource, estimate_heights, load_height_config
 from onward_generator.heights.estimator import buildings_from_scene
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "cadastre" / "synthetic_bu.gml"
+BUILDINGS_FIXTURE = FIXTURE.with_name("synthetic_bu_buildings.gml")
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
 CENTER_BBOX = (664243.98, 4205599.65, 664443.98, 4205799.65)  # MURCIA_CENTER ± 100 m in EPSG:25830
 
@@ -112,6 +115,65 @@ def test_parse_parts_and_report_bad_ones() -> None:
         ("malformed_part", "0000007AA0000A_part1"),
     ]
     assert "srsName" in next(i.message for i in issues if i.local_id == "0000007AA0000A_part1")
+
+
+def test_buildings_are_requested_as_their_own_type_beside_the_parts() -> None:
+    url = building_parts_url(CENTER_BBOX, typename=BUILDINGS_TYPE)
+    assert "typenames=bu:Building&" in url and "bbox=664243.98,4205599.65,664443.98,4205799.65" in url
+    assert "typenames=bu:BuildingPart&" in building_parts_url(CENTER_BBOX)
+    assert buildings_path(Path("/m/data/raw/catastro.gml")) == Path("/m/data/raw/catastro_buildings.gml")
+
+
+def test_download_of_buildings_fetches_the_building_type(tmp_path: Path) -> None:
+    fetch = fake_fetch(BUILDINGS_FIXTURE.read_bytes())
+    record = download_building_parts(CENTER_BBOX, tmp_path / "b.gml", fetch=fetch, now=NOW, typename=BUILDINGS_TYPE)
+    assert ["typenames=bu:Building&" in url for url in fetch.calls] == [True]
+    assert record.url == fetch.calls[0] and load_download_record(tmp_path / "b.gml").sha256 == record.sha256
+
+
+def test_parse_building_uses_and_report_bad_ones() -> None:
+    uses, issues = parse_building_uses(BUILDINGS_FIXTURE)
+    assert uses == {
+        "0000001AA0000A": BuildingUse("0000001AA0000A", "4_2_retail", 8, 9),
+        "0000003AA0000A": BuildingUse("0000003AA0000A", "4_1_office", None, None),
+        "0000004AA0000A": BuildingUse("0000004AA0000A", "1_residential", 55, 58),
+    }
+    assert list(uses) == sorted(uses)
+    assert [(i.code, i.local_id, i.message) for i in issues] == [
+        ("duplicate_building", "0000001AA0000A", "repeated localId; later copy ignored"),
+        ("malformed_building", "0000005AA0000A", "missing currentUse"),
+        ("malformed_building", "0000006AA0000A", "negative numberOfDwellings"),
+        ("malformed_building", None, "missing localId"),
+    ]
+
+
+def test_parse_building_uses_reads_a_zero_count_and_reports_a_missing_use_element(tmp_path: Path) -> None:
+    edited = tmp_path / "edited.gml"
+    nil_use = b'<bu-ext2d:currentUse xsi:nil="true"></bu-ext2d:currentUse>'
+    assert nil_use in BUILDINGS_FIXTURE.read_bytes()
+    edited.write_bytes(BUILDINGS_FIXTURE.read_bytes().replace(b">8<", b">0<").replace(nil_use, b""))
+    uses, issues = parse_building_uses(edited)
+    assert uses["0000001AA0000A"] == BuildingUse("0000001AA0000A", "4_2_retail", 0, 9)
+    assert ("malformed_building", "0000005AA0000A", "missing currentUse") in [(i.code, i.local_id, i.message) for i in issues]
+
+
+def test_parse_building_uses_refuses_what_is_not_a_clean_feature_collection(tmp_path: Path) -> None:
+    bomb = tmp_path / "bomb.gml"
+    bomb.write_text('<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaa">]><gml:FeatureCollection/>', encoding="utf-8")
+    with pytest.raises(CadastreError, match="DTD"):
+        parse_building_uses(bomb)
+    page = tmp_path / "page.gml"
+    page.write_text("<html>No se puede procesar</html>", encoding="utf-8")
+    with pytest.raises(CadastreError, match="not a WFS FeatureCollection"):
+        parse_building_uses(page)
+    broken = tmp_path / "broken.gml"
+    broken.write_text("<gml:FeatureCollection><open>", encoding="utf-8")
+    with pytest.raises(CadastreError, match="XML parse error"):
+        parse_building_uses(broken)
+    bad = tmp_path / "bad.gml"
+    bad.write_bytes(BUILDINGS_FIXTURE.read_bytes().replace(b">58<", b">many<"))
+    uses, issues = parse_building_uses(bad)
+    assert "0000004AA0000A" not in uses and [i.local_id for i in issues if i.code == "malformed_building"][0] == "0000004AA0000A"
 
 
 def test_parse_rejects_entities(tmp_path: Path) -> None:
@@ -239,8 +301,10 @@ def test_cli_split_writes_scene_overrides_and_report(
     assert report["counts"]["status_matched"] == 3 and report["split"]["counts"]["osm_buildings_split"] == 2
     assert report["split"]["options"] == {
         "min_coverage": 0.8, "min_piece_area_m2": 6.0, "min_piece_width_m": 2.0, "confident_share": 0.8,
-        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05,
+        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05, "use_min_share": 0.5,
     }
+    assert scene["subdivision"]["uses"] == {"status": "not_requested"}
+    assert not [f for f in scene["features"] if "catastro_use" in f]
     assert report["options"]["min_coverage"] == 0.5
     assert [b["building_id"] for b in report["split"]["buildings"]] == [
         "osm-relation-201", "osm-way-101", "osm-way-102", "osm-way-104", "osm-way-108",
@@ -365,10 +429,122 @@ def test_cli_download_passes_the_margin(
     scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
     seen: list[tuple[tuple[float, ...], str]] = []
 
-    def fake_download(bbox, out, *, crs, overwrite):
+    def fake_download(bbox, out, *, crs, overwrite, typename="bu:BuildingPart"):
         seen.append((tuple(bbox), crs))
         return download_building_parts(CENTER_BBOX, out, fetch=fake_fetch(FIXTURE.read_bytes()), now=NOW)
 
     monkeypatch.setattr(cadastre_cli, "download_building_parts", fake_download)
     assert cadastre_cli.main(["download", "--scene", str(scene_path), "--out", str(tmp_path / "c.gml"), *extra]) == 0
-    assert seen == [(bbox_from_scene(json.loads(scene_path.read_text(encoding="utf-8")), margin), "EPSG:25830")]
+    assert seen == [(bbox_from_scene(json.loads(scene_path.read_text(encoding="utf-8")), margin), "EPSG:25830")] * 2
+
+
+@pytest.fixture
+def downloaded_uses(downloaded: Path) -> Path:
+    target = buildings_path(downloaded)
+    download_building_parts(CENTER_BBOX, target, fetch=fake_fetch(BUILDINGS_FIXTURE.read_bytes()), now=NOW, typename=BUILDINGS_TYPE)
+    return target
+
+
+def test_cli_split_attaches_the_catastro_use_of_each_parcel(
+    pipeline_result: GeoResult, downloaded: Path, downloaded_uses: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    out = tmp_path / "cad"
+    assert main(_split_args(scene_path, downloaded, out, "--buildings", str(downloaded_uses))) == 0
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[0] == "buildings=3 uses attached=5 {'1_residential': 1, '4_2_retail': 4}"
+    scene = json.loads((out / "geo_scene.json").read_text(encoding="utf-8"))
+    uses = {f["id"]: f["catastro_use"] for f in scene["features"] if "catastro_use" in f}
+    assert sorted(uses) == [
+        "osm-relation-201", "osm-way-101:0000001AA0000A_part1", "osm-way-101:0000001AA0000A_part2",
+        "osm-way-108:0000001AA0000A_part1", "osm-way-108:0000001AA0000A_part2",
+    ]
+    assert uses["osm-way-101:0000001AA0000A_part2"]["current_use"] == "4_2_retail"
+    assert (uses["osm-relation-201"]["use"], uses["osm-relation-201"]["dwellings"]) == ("residential", 55)
+    block = scene["subdivision"]["uses"]
+    record = load_download_record(downloaded_uses)
+    assert block == {
+        "status": "read", "path": str(downloaded_uses.resolve()), "provider": "catastro-inspire-bu", "license": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "attribution": "Dirección General del Catastro, INSPIRE Buildings (BU)", "retrieved_at": "2026-10-18T12:00:00+00:00",
+        "sha256": record.sha256, "url": record.url, "buildings": 3,
+        "issues": [i.to_dict() for i in parse_building_uses(downloaded_uses)[1]],
+        "attached": {"1_residential": 1, "4_2_retail": 4},
+    }
+
+
+def test_cli_split_without_the_buildings_file_says_so(
+    pipeline_result: GeoResult, downloaded: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    missing = tmp_path / "none.gml"
+    assert main(_split_args(scene_path, downloaded, tmp_path / "cad", "--buildings", str(missing))) == 0
+    assert capsys.readouterr().out.splitlines()[0] == (
+        f"no Catastro buildings at {missing}; current uses not read (download again to get them)")
+    scene = json.loads((tmp_path / "cad" / "geo_scene.json").read_text(encoding="utf-8"))
+    assert scene["subdivision"]["uses"] == {"status": "missing", "path": str(missing)}
+    assert not [f for f in scene["features"] if "catastro_use" in f]
+
+
+def test_cli_split_refuses_a_buildings_file_changed_since_download(
+    pipeline_result: GeoResult, downloaded: Path, downloaded_uses: Path, tmp_path: Path,
+) -> None:
+    from onward_generator.cli import main
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    downloaded_uses.write_bytes(downloaded_uses.read_bytes() + b"\n")
+    assert main(_split_args(scene_path, downloaded, tmp_path / "cad", "--buildings", str(downloaded_uses))) == 1
+    assert not (tmp_path / "cad" / "geo_scene.json").exists()
+
+
+def test_cli_download_writes_parts_and_buildings(
+    pipeline_result: GeoResult, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    from onward_generator.cadastre import __main__ as cadastre_cli
+    from onward_generator.geo.pipeline import write_outputs
+
+    scene_path, _ = write_outputs(pipeline_result, tmp_path / "geo")
+    payload = {"bu:BuildingPart": FIXTURE.read_bytes(), "bu:Building": BUILDINGS_FIXTURE.read_bytes()}
+    calls: list[tuple[str, bool]] = []
+
+    def fake_download(bbox, out, *, crs, overwrite, typename="bu:BuildingPart"):
+        calls.append((typename, overwrite))
+        return download_building_parts(CENTER_BBOX, out, fetch=fake_fetch(payload[typename]), now=NOW, overwrite=overwrite, typename=typename)
+
+    monkeypatch.setattr(cadastre_cli, "download_building_parts", fake_download)
+    out = tmp_path / "raw" / "catastro.gml"
+    assert cadastre_cli.main(["download", "--scene", str(scene_path), "--out", str(out)]) == 0
+    assert calls == [("bu:BuildingPart", False), ("bu:Building", False)]
+    printed = capsys.readouterr().out.splitlines()
+    uses = out.with_name("catastro_buildings.gml")
+    assert printed[3:] == [
+        f"downloaded {uses.stat().st_size} bytes of buildings (current use), sha256 {load_download_record(uses).sha256}",
+        f"wrote {uses} and its .source.json sidecar",
+    ]
+    assert uses.read_bytes() == BUILDINGS_FIXTURE.read_bytes()
+    # The buildings file is checked before anything is fetched; --overwrite replaces both.
+    out.unlink()
+    calls.clear()
+    assert cadastre_cli.main(["download", "--scene", str(scene_path), "--out", str(out)]) == 1
+    assert calls == [] and not out.exists()
+    assert capsys.readouterr().err == f"cadastre: refusing to overwrite {uses}\n"
+    assert cadastre_cli.main(["download", "--scene", str(scene_path), "--out", str(out), "--overwrite"]) == 0
+    assert calls == [("bu:BuildingPart", True), ("bu:Building", True)]
+
+
+def test_help_names_the_buildings_download_and_the_buildings_switch(capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.cadastre.__main__ import main as cadastre_main
+
+    assert cadastre_main(["--help"]) == 0
+    text = " ".join(capsys.readouterr().out.split())
+    assert "download download BuildingPart and Building features around a geo scene (network)" in text
+    assert cadastre_main(["split", "--help"]) == 0
+    text = " ".join(capsys.readouterr().out.split())
+    assert "--buildings BUILDINGS the bu:Building GML that `download` writes beside the parts (current use)" in text

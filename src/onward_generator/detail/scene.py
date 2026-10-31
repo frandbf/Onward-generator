@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter, defaultdict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -63,13 +63,15 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
-from onward_generator.detail.shops import plan_shops
+from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
+from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
 from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
@@ -278,6 +280,40 @@ def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, Base
     return evidence
 
 
+def _catastro_shops(ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], evidence: Mapping[str, list[str]],
+                    templates: Mapping[str, Template], cfg: DetailConfig, ranking: Sequence[str],
+                    fits: Callable[[str], bool]) -> dict[str, Mapping[str, Any]]:
+    """The ``catastro_use`` of each building whose best-ranked shop evidence is its Catastro use (ADR-022).
+
+    ``ranking`` is ``config/sources.json`` ``evidence``. ``osm`` is a shop POI or a commercial building category;
+    the Catastro use counts when its code is in ``shop_catastro_uses`` and a shop fits the building (``fits``):
+    the use is the parcel's, and a part of it behind the others, or a strip too narrow for a room, holds no shop.
+    A source with no evidence for the building passes its turn to the next.
+    """
+    out: dict[str, Mapping[str, Any]] = {}
+    for bid in ids:
+        use = feature_of[bid].get("catastro_use")
+        found = {
+            OSM_EVIDENCE: bool(evidence.get(bid)) or templates[bid].ground == "shopfront",
+            CATASTRO_ID: use is not None and use["current_use"] in cfg.shop_catastro_uses and fits(bid),
+        }
+        if use is not None and next((source for source in ranking if found.get(source)), None) == CATASTRO_ID:
+            out[bid] = use
+    return out
+
+
+def _shop_fits(bid: str, ids: Sequence[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, cfg: DetailConfig) -> bool:
+    """A street front, and somewhere inside the walls the door clearance of a shop room is wide enough (ADR-022).
+
+    ``tree`` indexes ``footprints`` in ``ids`` order. Every box neighbour within ``probe_m`` is passed on;
+    ``refine_exposure`` only lets the ones within ``probe_m`` of a wall hide it.
+    """
+    near = [footprints[ids[k]] for k in tree.query(footprints[bid].buffer(cfg.probe_m)) if ids[k] != bid]
+    refined, segments = refine_exposure(footprints[bid], union_all(near), cfg)
+    reach = cfg.interiors.wall_thickness_m + cfg.interiors.door_clearance_m / 2
+    return exposed_frontage(segments) is not None and not refined.buffer(-reach).is_empty
+
+
 def _use_evidence(
     features: list[Mapping[str, Any]], footprints: dict[str, BaseGeometry], cfg: DetailConfig,
 ) -> dict[str, list[tuple[str, Mapping[str, str], str]]]:
@@ -373,12 +409,26 @@ def _roof_plans(
     return plans
 
 
-def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str]) -> dict[str, Any] | None:
+def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str],
+                     catastro: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
+    """Why a ground floor is a shopfront: the Catastro use of the parcel when it ranked first (``_catastro_shops``),
+    else the building category, else OSM POIs.
+
+    The Catastro use is observed for the parcel; that its commerce is on the ground floor is estimated.
+    """
     if ground != "shopfront":
         return None
-    if template.ground == "shopfront":
-        return {"source": "building_category", "category": category, "osm_poi_ids": poi_ids}
-    return {"source": "osm_poi", "osm_poi_ids": poi_ids}
+    if catastro is None:
+        if template.ground == "shopfront":
+            return {"source": "building_category", "category": category, "osm_poi_ids": poi_ids}
+        return {"source": "osm_poi", "osm_poi_ids": poi_ids}
+    return {
+        "source": "catastro_use", "osm_poi_ids": [],
+        "current_use": catastro["current_use"], "refcat": catastro["refcat"], "share": catastro["share"],
+        "use_origin": catastro["attribute_origin"], "floor_assignment": "estimated",
+        "rule": f"Catastro predominant use {catastro['current_use']}: commercial ground floor",
+        "provider": catastro["provider"], "license": catastro["license"], "attribution": catastro["attribution"],
+    }
 
 
 def _shops_of(poi_ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], building_tags: Mapping[str, Any]) -> list[
@@ -610,6 +660,10 @@ def detail_scene(
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
     heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
     templates = _templates(ids, height_of, cfg)
+    catastro = _catastro_shops(ids, feature_of, evidence, templates, cfg, load_source_config().evidence,
+                               lambda bid: _shop_fits(bid, ids, footprints, tree, cfg))
+    for bid in catastro:  # the POIs of a building whose Catastro use ranked above them are not its shops
+        evidence.pop(bid, None)
     roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
                              templates, heights_m, cfg)
     setbacks: Counter[str] = Counter()
@@ -638,7 +692,8 @@ def detail_scene(
     def queue_key(b: Any) -> tuple[int, float]:
         bid = b.record["source_ids"][0]
         centre = footprints[bid].centroid
-        return (len(rank) if evidence.get(bid) else rank.get(bid, len(rank))), float(np.hypot(centre.x, centre.y))
+        sells = evidence.get(bid) or bid in catastro
+        return (len(rank) if sells else rank.get(bid, len(rank))), float(np.hypot(centre.x, centre.y))
 
     order = sorted(building_objs, key=queue_key)
     leading_issues = len(issues)
@@ -665,9 +720,10 @@ def detail_scene(
         if abs(refined.area - geom.area) > 1e-6 * max(1.0, geom.area):
             issues.append(Issue("refined_footprint_area_changed", "critical", bid, f"{refined.area - geom.area:.6f} m²"))
         storeys = storeys_for(height, h.get("estimated_levels"), landmark, cfg)
-        ground = "shopfront" if evidence.get(bid) and template.ground != "main_door_only" else template.ground
+        ground = "shopfront" if (evidence.get(bid) or bid in catastro) and template.ground != "main_door_only" else template.ground
         main = exposed_frontage(segments)
         tags = dict(feature_of[bid].get("tags") or {})
+        shop_tags = {**tags, CATASTRO_USE_TAG: catastro[bid]["current_use"]} if bid in catastro else tags
         use, wall_material, wall_origin = facade_walls[bid]
         shell_template, roof_material, roof_origin, roof_shape = roof_plans[bid]
         shop = ground == "shopfront"
@@ -705,7 +761,7 @@ def detail_scene(
                 min_area_m2=ic.shops.min_room_area_m2 if shop else MIN_ROOM_M2,
             ) if door else "no_door_position"
             if shop and not isinstance(plan, str):
-                plan = plan_shop_rooms(plan, refined, trial, segments, _shops_of(evidence[bid], feature_of, tags), cfg)
+                plan = plan_shop_rooms(plan, refined, trial, segments, _shops_of(evidence[bid], feature_of, shop_tags), cfg)
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))
             else:
@@ -813,7 +869,7 @@ def detail_scene(
         for reason, n in sorted(layout.skipped.items()):
             counts[f"skipped:{reason}"] += n
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
-        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg,
+        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
                            interior.shop_doors if interior is not None else ()) if shop else []
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
@@ -827,7 +883,7 @@ def detail_scene(
                 "note": FIDELITY_NOTE,
                 "needs_custom_model": landmark,
                 "ground_floor": ground,
-                "ground_floor_evidence": _ground_evidence(ground, template, str(h.get("category")), evidence.get(bid, [])),
+                "ground_floor_evidence": _ground_evidence(ground, template, str(h.get("category")), evidence[bid], catastro.get(bid)),
                 "storeys": {"count": storeys.count, "height_m": round(storeys.height_m, 3), "origin": storeys.origin},
                 "exposed_length_m": round(seg_exposed, 3),
                 "party_wall_length_m": round(sum(s.length for s in segments if not s.exposed), 3),
@@ -943,6 +999,8 @@ def detail_scene(
     detailed.stats["interior_visual_triangles"] = budgets[False].used["triangles"]
     detailed.stats["interior_collision_triangles"] = budgets[False].used["collision_triangles"]
     detailed.stats["shop_interiors"] = sorted(shop_interiors)
+    grounds = [o.record["facade"].get("ground_floor_evidence") for o in objects if o.type == "building"]
+    detailed.stats["shopfront_evidence"] = dict(sorted(Counter(g["source"] for g in grounds if g).items()))
     detailed.stats["shop_interior_visual_triangles"] = budgets[True].used["triangles"]
     detailed.stats["shop_interior_collision_triangles"] = budgets[True].used["collision_triangles"]
     detailed.stats["interior_lights"] = {

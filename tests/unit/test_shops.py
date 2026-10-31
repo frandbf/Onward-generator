@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from typing import Any
 
 import pytest
 from shapely import Polygon, box
@@ -122,6 +123,11 @@ def test_other_entrances_keep_their_back(kind: str) -> None:
         ({"amenity": "pharmacy", "shop": "bakery"}, ("Panadería", "estimated", "shop=bakery")),
         ({"craft": "carpenter"}, ("Taller", "estimated", "craft")),
         ({"building": "retail"}, ("Comercio", "estimated", "default")),
+        ({"building": "apartments", "catastro:current_use": "4_1_office"}, ("Oficina", "estimated", "catastro_use=4_1_office")),
+        ({"catastro:current_use": "4_2_retail"}, ("Comercio", "estimated", "catastro_use=4_2_retail")),
+        ({"catastro:current_use": "1_residential"}, ("Comercio", "estimated", "default")),
+        ({"catastro:current_use": "4_1_office", "craft": "carpenter"}, ("Taller", "estimated", "craft")),
+        ({"catastro:current_use": "4_1_office", "name": "Torre"}, ("Torre", "observed", "name")),
     ],
 )
 def test_shop_name_is_the_osm_name_or_a_generic_spanish_word(tags: dict, expected: tuple[str, str, str]) -> None:
@@ -310,3 +316,79 @@ def test_shop_config_is_read_as_given() -> None:
     assert (cfg.shop_door.width_m, cfg.shop_door.height_m) == (1.6, 2.5)
     assert cfg.shops == CFG.shops and cfg.shopfront == CFG.shopfront
     assert (FASCIA_GAP_M, FASCIA_CLEAR_M) == (0.05, 0.07)
+    assert dict(cfg.shop_catastro_uses) == {"4_1_office": "Oficina", "4_2_retail": "Comercio"}
+
+
+def test_catastro_shop_uses_are_known_codes_with_a_name() -> None:
+    cfg = config_from_document(_doc(doors__shop_catastro_uses={"4_2_retail": "Tienda", "3_industrial": "Nave"}))
+    assert list(cfg.shop_catastro_uses) == ["3_industrial", "4_2_retail"]
+    assert dict(config_from_document(_doc(doors__shop_catastro_uses={})).shop_catastro_uses) == {}
+    for bad, fragment in (({"5_retail": "Tienda"}, "is not one of"), ({"4_2_retail": ""}, "should be non-empty")):
+        with pytest.raises(DetailConfigError, match=fragment):
+            config_from_document(_doc(doors__shop_catastro_uses=bad))
+    doc = _doc()
+    del doc["doors"]["shop_catastro_uses"]
+    with pytest.raises(DetailConfigError, match="'shop_catastro_uses' is a required property"):
+        config_from_document(doc)
+
+
+def _use_case() -> tuple[dict[str, dict], dict[str, list[str]], dict[str, Any]]:
+    def use(code: str) -> dict:
+        return {"catastro_use": {"current_use": code}}
+
+    feature_of = {"a": use("4_2_retail"), "b": use("4_1_office"), "c": use("1_residential"), "d": {}, "e": use("4_2_retail"),
+                  "f": use("4_1_office")}
+    templates = {bid: CFG.template_for("commercial" if bid == "f" else "residential", False) for bid in feature_of}
+    return feature_of, {"e": ["osm-node-1"], "a": []}, templates
+
+
+def test_a_catastro_use_counts_only_where_osm_has_no_shop_evidence() -> None:
+    from onward_generator.detail.scene import _catastro_shops
+
+    feature_of, evidence, templates = _use_case()
+    out = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("osm", "es.catastro", "overture"), lambda bid: True)
+    assert out == {"a": {"current_use": "4_2_retail"}, "b": {"current_use": "4_1_office"}}  # e has a POI, f a commercial category
+
+
+def test_the_evidence_ranking_decides_between_osm_and_the_catastro_use() -> None:
+    from onward_generator.detail.scene import _catastro_shops
+
+    feature_of, evidence, templates = _use_case()
+    ranked_first = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("es.catastro", "osm"), lambda bid: True)
+    assert sorted(ranked_first) == ["a", "b", "e", "f"]
+    assert _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("osm",), lambda bid: True) == {}
+    assert _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("overture", "es.catastro"), lambda bid: True) == {
+        "a": {"current_use": "4_2_retail"}, "b": {"current_use": "4_1_office"},
+        "e": {"current_use": "4_2_retail"}, "f": {"current_use": "4_1_office"},
+    }
+
+
+def test_a_catastro_use_where_no_shop_fits_gives_way_to_the_next_source() -> None:
+    from onward_generator.detail.scene import _catastro_shops
+
+    feature_of, evidence, templates = _use_case()
+    out = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("es.catastro", "osm"), lambda bid: bid != "a")
+    assert sorted(out) == ["b", "e", "f"]  # no shop fits a, which has no OSM evidence either: it sells nothing
+
+
+def _fits(target: Polygon, *others: Polygon) -> bool:
+    from shapely import STRtree
+
+    from onward_generator.detail.scene import _shop_fits
+
+    footprints = {"a": target, **{f"n{i}": g for i, g in enumerate(others)}}
+    ids = sorted(footprints)
+    return _shop_fits("a", ids, footprints, STRtree([footprints[i] for i in ids]), CFG)
+
+
+def test_a_shop_fits_a_building_with_a_street_front_and_room_for_the_door_clearance() -> None:
+    assert CFG.interiors.wall_thickness_m + CFG.interiors.door_clearance_m / 2 == pytest.approx(1.05)
+    assert _fits(box(0, 0, 10, 10))
+    assert _fits(box(0, 0, 20, 5))  # 5 m deep: the clearance fits
+    assert _fits(box(0, 0, 20, 2.2))  # just over 2 x 1.05 m
+    assert not _fits(box(0, 0, 20, 1.8))  # a passage strip
+    assert not _fits(box(0, 0, 20, 2.0))
+    # Closed in on every side, with a neighbour 0.5 m away across a light well: no street front.
+    ring = [box(-10, -10, 20, 0), box(-10, 10, 20, 20), box(-10, 0, 0, 10), box(10.5, 0, 20, 10)]
+    assert not _fits(box(0, 0, 10, 10), *ring)
+    assert _fits(box(0, 0, 10, 10), *ring[:3])  # the east wall is on the street

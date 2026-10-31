@@ -195,7 +195,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | Output | `heights.json`, `heights_report.json` |
 | Classes | measured, inferred, fallback, needs_manual_review |
 
-`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Without a source plugin for the map, heights stay on the OSM estimate. `source merge` combines the overrides of several plugins by priority ([ADR-018](decisions/ADR-018-source-plugins.md)).
+`cadastre download` uses the network (Catastro WFS requests for building parts and, beside them, buildings with their current use). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. With `--buildings` it also copies each parcel's Catastro current use onto its buildings, which `detail` reads as shop evidence ([ADR-022](decisions/ADR-022-catastro-use.md)). [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Without a source plugin for the map, heights stay on the OSM estimate. `source merge` combines the overrides of several plugins by priority ([ADR-018](decisions/ADR-018-source-plugins.md)).
 
 ## 4. Generate
 

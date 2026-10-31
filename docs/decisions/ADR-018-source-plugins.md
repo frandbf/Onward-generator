@@ -39,3 +39,7 @@ The generator works for any city from OpenStreetMap alone. Better data exists on
 ## Amendment — LiDAR height plugins (30 October 2026)
 
 `es.pnoa_ndsm` is the first raster plugin. The shared code is `sources.raster` (an ESRI ASCII grid and a raw float32 grid are a header and an array: numpy and shapely read them, so no GDAL, rasterio or tifffile dependency is added) and `sources.lidar` (`source fetch`, `source normalize`, the footprint median with an inner buffer). A raster plugin also satisfies `sources.lidar.RasterHeights`: its CRS, cell grid and requests, how to decode a reply, and the date of the data at a point. It runs after `cadastre`, on the split scene. Rule and measurements: `docs/04-heights.md#lidar-heights`. `fr.lidar_hd` is the second: the same code, a native 0.5 m grid in Lambert-93 (the footprints move to the raster CRS, the raster is never resampled) and the acquisition dates of each IGN tile.
+
+## Amendment — shop evidence (31 October 2026)
+
+A plugin may also produce `use`: an observed use on the buildings of its scene that `detail` reads as ground-floor shop evidence. `config/sources.json` `evidence` ranks it against OSM, separately from the height `priority`: `osm`, then `es.catastro`, then `overture`. Contract and measurements: [ADR-022](ADR-022-catastro-use.md).
