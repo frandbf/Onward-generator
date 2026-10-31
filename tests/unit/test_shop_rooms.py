@@ -321,7 +321,7 @@ def test_a_window_counts_as_on_a_hosting_part_up_to_the_tolerance() -> None:
         assert pierce_room_windows(layout, [SEG], inner, FOOTPRINT, T, 2.8, hosts) == result
 
 
-def test_a_door_off_the_room_or_a_room_too_small_or_split_is_refused() -> None:
+def test_a_door_off_the_room_or_a_room_too_small_is_refused_and_a_split_room_is_the_door_piece() -> None:
     floating = Segment(0, 0, 0, (2.0, 5.0), (18.0, 5.0), True)
     assert plan_interior("b", FOOTPRINT, DOOR, floating, 3.0, 3.0, 1, CFG, max_floors=1) == "door_not_on_inner_wall"
     corner = replace(DOOR, s0=0.35)  # on the inner wall, but the clear floor beside it runs into the side wall
@@ -333,10 +333,11 @@ def test_a_door_off_the_room_or_a_room_too_small_or_split_is_refused() -> None:
     assert not isinstance(plan_interior("b", exact, door, wall, 3.0, 3.0, 1, CFG, max_floors=1), str)
     small = box(-T, -T, 4.0 + T, 4.9 + T)
     assert plan_interior("b", small, door, wall, 3.0, 3.0, 1, CFG, max_floors=1) == "inner_space_too_small"
-    # Two 6 m rooms joined by a 0.4 m neck: the walls close the neck and leave two rooms, which is refused.
+    # Two 6 m rooms joined by a 0.4 m neck: the walls close the neck; the room is the one behind the door (ADR-018).
     split = box(0.0, 0.0, 6.0, 6.0).union(box(6.0, 2.8, 8.0, 3.2)).union(box(8.0, 0.0, 14.0, 6.0))
     sill = Segment(0, 0, 0, (0.0, 0.0), (6.0, 0.0), True)
-    assert plan_interior("b", split, door, sill, 3.0, 3.0, 1, CFG, max_floors=1) == "inner_space_too_small"
+    plan = plan_interior("b", split, door, sill, 3.0, 3.0, 1, CFG, max_floors=1)
+    assert not isinstance(plan, str) and plan.inner.bounds == pytest.approx((T, T, 6.0 - T, 6.0 - T))
 
 
 def test_a_part_whose_walls_leave_two_rooms_gets_no_room() -> None:
