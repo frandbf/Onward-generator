@@ -351,6 +351,8 @@ _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "cadastre": _cadastre,
     "pnoa_ndsm": _raster_download,
     "pnoa_heights": _raster_heights,
+    "lidar_hd": _raster_download,
+    "lidar_hd_heights": _raster_heights,
     "overrides": _overrides,
     "heights": _heights,
     "generate": _generate,

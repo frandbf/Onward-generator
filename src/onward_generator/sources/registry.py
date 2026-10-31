@@ -19,13 +19,14 @@ from typing import Any
 from onward_generator.contracts import is_schema
 from onward_generator.sources.es.catastro import CatastroPlugin
 from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
+from onward_generator.sources.fr.lidar_hd import LidarHdPlugin
 from onward_generator.sources.plugin import OVERRIDE_KINDS, SourceError, SourcePlugin
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_PATH = REPO_ROOT / "config" / "sources.json"
 SCHEMA = "onward_generator.sources"
 
-PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin())
+PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin())
 
 
 @dataclass(frozen=True, slots=True)

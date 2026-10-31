@@ -73,8 +73,11 @@ A height outside the `heights` bounds (2.5–120 m) is not written (`out_of_boun
 | Plugin | Data | Cell | Buffer | `min_cells` | Confidence | Data date |
 | --- | --- | --- | --- | --- | --- | --- |
 | `es.pnoa_ndsm` | IGN MDSn, building class (trees already removed) | 2.5 m | 1 m | 3 | 0.8 | PNOA-LiDAR first coverage, 2008–2015 (per sheet, not per building) |
+| `fr.lidar_hd` | IGN LiDAR HD MNH (surface minus terrain: buildings and trees) | 0.5 m, native Lambert-93 grid | 1 m | 8 | 0.9 | acquisition dates of the IGN 1 km tile under the footprint (WFS `IGNF_LIDAR-HD_METADONNEE:metadata`) |
 
 On Madrid (40.40657, −3.719187, r150, Catastro split, 30 October 2026): 84 footprints, 66 measured (13.1–27.0 m), 18 `no_data` (small courtyard pieces and sub-buildings under 3 cells); 27 of the 66 were sampled without the buffer. Against Catastro `levels × storey height` on the same footprints the LiDAR height is a median 3.0 m higher (|Δ| median 3.0 m, p90 6.5 m, 34 of 66 within 3 m): a storey of 3 m misses the taller ground floor, the roof and the parapet. The largest differences (up to 20 m) are footprints Catastro gives 1–2 storeys that the LiDAR sees as tall (a low part under a taller volume, or a part OSM and Catastro outline differently). `fetch` took 3.4 s (one 99 KB tile), `normalize` 0.7 s. One map, one date: not a guarantee for another city.
+
+On Lyon (45.7640, 4.8357, r150, no cadastre plugin, 30 October 2026): 225 footprints, 219 measured (2.8–34.8 m), 5 `no_data`, 1 `out_of_bounds` (a 2.4 m canopy); 14 sampled without the buffer; every footprint in one tile acquired 2021-04-14 to 2021-09-24. Against OSM `building:levels × storey height` (75 footprints with levels) the LiDAR height is a median 7.1 m higher (|Δ| p90 10.8 m, 6 of 75 within 3 m): Lyon storeys are taller than 3 m, and the roofs add to that. `fetch` took 7.1 s (one 2.5 MB tile and the metadata request), `normalize` 1.4 s.
 
 ## Configuration
 

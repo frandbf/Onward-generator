@@ -83,6 +83,18 @@ Datasets that only cover some countries are source plugins ([ADR-018](../decisio
 
 Obligations, from the IGN conditions: cite `<product> <date> CC-BY 4.0 <producer>`, visible next to the data; a derived product (heights per footprint are one) prefixes `Obra derivada de`. The date is the series period; the CNIG lists sheet dates of 2009, 2010 and 2012. Ceuta, Melilla and Alborán are not in the product. The tiles stay in `maps/<id>/data/raw/es.pnoa_ndsm/`, outside git. Checked 2026-10-30: capabilities, a real `GetCoverage` over Madrid, the CNIG product page and the datos.gob.es record `e00125901-spaignmds-normalizado`.
 
+### IGN LiDAR HD MNH (`fr.lidar_hd`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Institut national de l'information géographique et forestière (IGN) |
+| Dataset | LiDAR HD, Modèle Numérique de Hauteur (MNH, surface minus terrain), 0.5 m, Lambert-93 (EPSG:2154), IGN69 |
+| Service | Géoplateforme WMS-R `https://data.geopf.fr/wms-r/wms`, layer `IGNF_LIDAR-HD_MNH_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93`, `FORMAT=image/x-bil;bits=32` (raw float32, no data `-9999` in restricted zones); acquisition dates from the WFS `https://data.geopf.fr/wfs/ows` layer `IGNF_LIDAR-HD_METADONNEE:metadata`. No key is needed; the service announces 1 request per second, which `fetch` keeps |
+| Licence | Licence Ouverte / Open Licence 2.0 (Etalab), SPDX `etalab-2.0` (data.gouv.fr dataset "MNH LiDAR HD") |
+| Attribution | `IGN, LiDAR HD MNH` and the acquisition dates |
+
+Obligations, from the Licence Ouverte 2.0: mention the source (the producer and the date of the data) and do not suggest the IGN endorses the reuse. The heights per footprint are derived from the MNH; the overrides and the report carry the source, the licence and the tile dates. The tiles stay in `maps/<id>/data/raw/fr.lidar_hd/`, outside git. Coverage is `config/lidar_hd_coverage.json`, a coarse polygon around metropolitan France and Corsica; the national acquisition was due to finish in 2026. Checked 2026-10-30: WMS-R capabilities (formats, layer extent), a real `GetMap` over Lyon and over a restricted zone (all `-9999`), the metadata WFS, and the data.gouv.fr dataset page.
+
 ## Generated geometry
 
 Phase 04 does not use external models. Windows, balconies, roofs, street furniture, and interiors are procedural geometry from this code. `scene_detail.json` and `scene_visual.glb` inherit the base attributions (OpenStreetMap ODbL-1.0, and Catastro CC BY 4.0 when it was used) and state that the facades are generic templates, not a faithful reconstruction. They must not be presented as the real buildings.

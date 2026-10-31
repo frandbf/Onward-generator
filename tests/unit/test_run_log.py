@@ -362,3 +362,9 @@ def test_a_lidar_download_and_its_heights_report_tiles_and_measured_footprints(t
     assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 1 066/1 084  3.5–27 m")
     _write(out / "es.pnoa_ndsm_report.json", {"counts": {"measured": 0, "buildings": 3}, "height_range_m": None})
     assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 0/3")
+    hd = tmp_path / "fr.lidar_hd"
+    _write(hd / "fr.lidar_hd_report.json", {"counts": {"measured": 2, "buildings": 3}, "height_range_m": [6.0, 21.5]})
+    assert summarize("lidar_hd_heights", ["--out", str(hd)]) == StageReport("measured 2/3  6–21.5 m")
+    hd_raw = tmp_path / "raw" / "fr.lidar_hd"
+    _write(hd_raw.with_name("fr.lidar_hd.source.json"), {"license": "etalab-2.0", "tiles": [{"size_bytes": 4096}]})
+    assert summarize("lidar_hd", ["--out", str(hd_raw)]) == StageReport("4 KiB  1 tile  etalab-2.0")
