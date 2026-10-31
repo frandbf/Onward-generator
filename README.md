@@ -20,7 +20,7 @@ task unity
 ## Requirements
 
 - macOS (tested on macOS 26.6.2, Apple M4 Pro) or Linux. The host is detected, or chosen with `--platform macos|linux` or `ONWARD_PLATFORM`; see [docs/01-pipeline.md](docs/01-pipeline.md#host-platform). The Linux Unity paths are the Unity Hub defaults and have not been checked with Unity on Linux.
-- Docker and go-task, or Python 3.12 or newer (tested with 3.14.6). The pinned dependencies, all binary wheels, are in `requirements.lock`: shapely (GEOS), pyproj (PROJ, with the EPSG database offline), jsonschema, pillow, numpy and certifi.
+- Docker and go-task, or Python 3.12 or newer (tested with 3.14.6). The pinned dependencies, all binary wheels, are in `requirements.lock`: shapely (GEOS), pyproj (PROJ, with the EPSG database offline), jsonschema, pillow, numpy, certifi and duckdb (Overture GeoParquet, ADR-021; the image also installs its httpfs extension).
 - Optional: [Ollama](https://ollama.com) on loopback with a model already installed (tested with Ollama 0.33.2 and `qwen3:14b`), for AI plans, texture selection and overgrow plans. Without it, those steps use a deterministic fallback.
 - Unity **2021.3.23f1** and the Onward Custom Content SDK v1.15, both outside this repository.
 

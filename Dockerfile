@@ -16,6 +16,10 @@ WORKDIR /work
 COPY requirements.lock requirements-mutate.lock requirements-lint.lock ./
 RUN python -m pip install --only-binary=:all: -r requirements.lock \
     && python -m pip install -r requirements-mutate.lock -r requirements-lint.lock
+# DuckDB's httpfs extension (MIT, signed by DuckDB) reads Overture GeoParquet over HTTPS (ADR-021).
+# Installed at build time so `overture fetch` does not download code at run time; HOME is /tmp/home.
+RUN mkdir -p /tmp/home && python -c "import duckdb; duckdb.connect().execute('INSTALL httpfs')" \
+    && chmod -R a+rX /tmp/home
 
 # Editable install against an empty package: at run time the bind mount at /work
 # brings the real src/ to the path the install points at. Only pyproject.toml is

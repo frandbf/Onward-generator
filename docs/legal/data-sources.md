@@ -70,7 +70,32 @@ The fixtures `tests/fixtures/cadastre/synthetic_bu.gml` and `synthetic_bu_buildi
 
 ## Source plugins
 
-Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`, plus the Overture place licences `CDLA-Permissive-2.0`, `Apache-2.0` and `CC0-1.0`, checked per place by `overture match`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+
+## Overture Maps
+
+Places and buildings used by `overture fetch` and `overture match` (ADR-021). A source plugin (`overture`, ADR-018) that covers every city; `run --no-source overture` turns it off.
+
+| Field | Value |
+| --- | --- |
+| Provider | Overture Maps Foundation, release GeoParquet on `s3://overturemaps-us-west-2/release/<release>/`; release from `https://stac.overturemaps.org/catalog.json` |
+| Places licence | Per record, in `sources[].license`: CDLA Permissive 2.0 (Meta, Microsoft, BrightQuery, PinMeTo, DAC, Uberall, …), Apache 2.0 (Foursquare), CC0 1.0 (AllThePlaces) |
+| Buildings licence | ODbL 1.0 (OpenStreetMap; Microsoft Global ML Building Footprints), CC BY 4.0 (Esri Community Maps, Google Open Buildings, IGN BTN 2024) |
+| Attribution | The wording of https://docs.overturemaps.org/attribution/ per dataset: `Data from <provider>` for places; `© OpenStreetMap contributors, Overture Maps Foundation`; `Global ML Building Footprints, licensed by Microsoft`; `Work derived from BTN 2024 ign.es`; Foursquare adds `Copyright 2024 Foursquare Labs, Inc. All rights reserved.` and the release NOTICE |
+| What is stored | `data/raw/overture_places.parquet` and `overture_buildings.parquet`: the release rows whose bbox meets the map, unchanged, with a `.source.json` (release, query, SHA-256, records per dataset and licence with `license_origin`, attribution lines). Outside git, like the OSM extract |
+
+Obligations that apply:
+
+- **Per-record licence.** `overture_places.json` keeps the dataset and licence of every place. A place whose licence is not on the `config/sources.json` allowlist, or that has none, is dropped (`licence_not_allowed`). A shop made from a place records them in `poi_source`, and the attribution of its dataset goes into `scene_detail.json` and the export package. A place whose dataset gives no shop adds nothing.
+- **Foursquare (Apache 2.0).** Keep the copyright line and the NOTICE text of the Overture release with the attribution. The data was transformed to the Overture schema by Overture; this project transforms it again (category to an OSM-style tag, name, position in the local grid).
+- **Buildings.** A height used from Overture carries the dataset in the override `source` and its licence; `heights.json` lists the sources a building used, and `generate` adds them to the scene attribution. ODbL share-alike applies to a distributed derived database as for OSM. CC BY 4.0 sources need their attribution line.
+- **Records without a licence.** IGN, Google Open Buildings and Esri records carry no `license` in `sources[]`. The licence then comes from the Overture attribution page (checked 2026-10-30) and is marked `license_origin: overture_attribution_page`. Any other dataset without one is recorded as `unknown`, and neither its places nor its heights are used: `unknown` is not on the allowlist.
+- **OpenStreetMap through Overture.** Overture building values whose dataset is OpenStreetMap are not lent (`skip_datasets` in `config/overture.default.json`): the OSM extract already has them under ODbL.
+- **Origin.** Places are `observed` by a third party. Heights are `observed` (OSM, Esri, IGN), `ai_generated` (Microsoft and Google ML footprints) or `estimated` (any other dataset), recorded as `origin` on every override. Neither is ever `measured`.
+
+Checked on 2026-10-30: https://docs.overturemaps.org/attribution/, https://docs.overturemaps.org/guides/places/, https://docs.overturemaps.org/schema/reference/buildings/building/.
+
+Test parquets are written at test time by `tests/overture_fixture.py`. They are synthetic (CC0-1.0) and contain no Overture data.
 
 ### IGN MDSn (`es.pnoa_ndsm`)
 
