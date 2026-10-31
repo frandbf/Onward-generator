@@ -29,6 +29,7 @@ from onward_generator.maps.workspace import (
     store_sources,
 )
 from onward_generator.next_step import (
+    STAGE_DIRS,
     detail_command,
     dress_command,
     export_invocation,
@@ -451,24 +452,13 @@ def output_ready(name: str, argv: Sequence[str], root: Path) -> bool:
     return _fresh(marker, _input_markers(root, name))
 
 
+# The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.
+_MARKER_FILES = {"geo": "geo_scene.json", "heights": "heights.json", "fit": "fit.json", "layout": "layout.json"}
+
+
 def _canon(root: Path, name: str) -> Path | None:
-    processed = root / "data" / "processed"
-    files = {
-        "geo": processed / "geo" / "geo_scene.json",
-        "heights": processed / "heights" / "heights.json",
-        "generate": processed / "scene3d" / "scene_visual.glb",
-        "detail": processed / "scene_detail" / "scene_visual.glb",
-        "dress": processed / "scene_dress" / "scene_visual.glb",
-        "materials": processed / "scene_materials" / "scene_visual.glb",
-        "panoramax": processed / "scene_panoramax" / "scene_visual.glb",
-        "signs": processed / "scene_signs" / "scene_visual.glb",
-        "overgrow": processed / "scene_overgrow" / "scene_visual.glb",
-        "fit": processed / "scene_overgrow" / "fit.json",
-        "bounds": processed / "scene_playable" / "scene_visual.glb",
-        "layout": processed / "layout" / "layout.json",
-    }
-    if name in files:
-        return files[name]
+    if name in STAGE_DIRS:
+        return root / "data" / "processed" / STAGE_DIRS[name] / _MARKER_FILES.get(name, "scene_visual.glb")
     return next((stage.marker for stage in _source_stages(root) if stage.name == name), None)
 
 

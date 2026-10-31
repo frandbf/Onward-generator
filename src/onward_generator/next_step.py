@@ -9,12 +9,29 @@ from __future__ import annotations
 
 import json
 import shlex
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 from onward_generator.cadastre.acquire import buildings_path
 
 _PREFIX = ".venv/bin/python -m onward_generator"
+# The directory under data/processed that each pipeline stage writes. `run` reads it to find a stage's output.
+STAGE_DIRS: Mapping[str, str] = MappingProxyType({
+    "geo": "geo",
+    "heights": "heights",
+    "generate": "scene3d",
+    "detail": "scene_detail",
+    "dress": "scene_dress",
+    "materials": "scene_materials",
+    "panoramax": "scene_panoramax",
+    "signs": "scene_signs",
+    "overgrow": "scene_overgrow",
+    "fit": "scene_overgrow",
+    "bounds": "scene_playable",
+    "layout": "layout",
+})
 
 
 @dataclass(frozen=True)
@@ -88,7 +105,7 @@ def geo_command(directory: str | Path, retrieved_at: str | None = None) -> Stage
 
 def heights_command(scene: Path, overrides: Path | None = None) -> StageCommand:
     extra = ("--overrides", show(overrides)) if overrides is not None else ()
-    return invoke("heights", "--scene", show(scene), *extra, "--out", show(stage_path(scene, "heights")))
+    return invoke("heights", "--scene", show(scene), *extra, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
 
 
 def catastro_command(scene: Path, gml: Path) -> StageCommand:
@@ -112,7 +129,7 @@ def generate_command(scene: Path, heights: Path) -> StageCommand:
         "generate",
         "--scene", show(scene),
         "--heights", show(heights),
-        "--out", show(stage_path(scene, "scene3d")),
+        "--out", show(stage_path(scene, STAGE_DIRS["generate"])),
     )
 
 
@@ -133,7 +150,7 @@ def detail_command(scene: Path, heights: Path, base: Path) -> StageCommand:
         "--scene", show(scene),
         "--heights", show(heights),
         "--base", show(base),
-        "--out", show(stage_path(scene, "scene_detail")),
+        "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *(("--core-radius-m", f"{core:g}") if core is not None else ()),
     )
 
@@ -147,7 +164,7 @@ def materials_command(base: Path) -> StageCommand:
         "--base", show(base),
         "--plan", show(plan),
         "--download",
-        "--out", show(stage_path(base, "scene_materials")),
+        "--out", show(stage_path(base, STAGE_DIRS["materials"])),
     )
 
 
@@ -157,7 +174,7 @@ def dress_command(detail: Path, scene: Path | None = None, heights: Path | None 
         parts.extend(["--scene", show(scene)])
     if heights is not None:
         parts.extend(["--heights", show(heights)])
-    parts.extend(["--out", show(stage_path(detail, "scene_dress"))])
+    parts.extend(["--out", show(stage_path(detail, STAGE_DIRS["dress"]))])
     return invoke(*parts)
 
 
@@ -191,13 +208,13 @@ def panoramax_command(base: Path) -> StageCommand:
     return invoke(
         "panoramax", "apply",
         "--base", show(base),
-        "--out", show(stage_path(base, "scene_panoramax")),
+        "--out", show(stage_path(base, STAGE_DIRS["panoramax"])),
     )
 
 
 def signs_command(base: Path) -> StageCommand:
     scene = _geo_for(base)
-    out_name = "scene_signs_compact" if "compact" in Path(base).name else "scene_signs"
+    out_name = STAGE_DIRS["signs"] + ("_compact" if "compact" in Path(base).name else "")
     return invoke(
         "signs", "place",
         "--base", show(base),
@@ -242,16 +259,17 @@ def overgrow_command(base: Path) -> StageCommand:
         selection = root / "config" / "prop_selection.json"
         if selection.is_file():
             parts.extend(["--selection", show(selection)])
-    out_name = "scene_phase3" if compact else "scene_overgrow"
+    out_name = "scene_phase3" if compact else STAGE_DIRS["overgrow"]
     parts.extend(["--out", show(stage_path(base, out_name))])
     return invoke(*parts)
 
 
 def bounds_command(base: Path) -> StageCommand:
-    out = stage_path(base, "scene_playable")
+    playable = STAGE_DIRS["bounds"]
+    out = stage_path(base, playable)
     if out.exists():
-        compact = stage_path(base, "scene_playable_compact")
-        out = compact if not compact.exists() else stage_path(base, "scene_playable_next")
+        compact = stage_path(base, f"{playable}_compact")
+        out = compact if not compact.exists() else stage_path(base, f"{playable}_next")
     return invoke("bounds", "--base", show(base), "--out", show(out))
 
 
@@ -274,7 +292,7 @@ def layout_command(playable: Path) -> StageCommand | None:
         "--base", show(base),
         "--detail", show(playable),
         "--playable",
-        "--out", show(stage_path(playable, "layout", "layout.json")),
+        "--out", show(stage_path(playable, STAGE_DIRS["layout"], "layout.json")),
     )
 
 

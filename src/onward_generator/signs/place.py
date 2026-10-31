@@ -26,6 +26,7 @@ from onward_generator.dress.geometry import compare_fingerprints, file_sha256, g
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, quad
+from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.signs.plaque import plaque_png
 from onward_generator.signs.shop import shop_signs
@@ -521,10 +522,7 @@ def _geometry(feature: Mapping[str, Any]) -> Mapping[str, Any]:
 def _height_m(tags: Mapping[str, Any]) -> float | None:
     raw = tags.get("height") or tags.get("building:height")
     if raw not in (None, ""):
-        try:
-            return float(str(raw).split()[0].replace(",", "."))
-        except ValueError:
-            return None
+        return parse_metres(raw)
     levels = tags.get("building:levels")
     if levels not in (None, ""):
         try:

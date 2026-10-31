@@ -15,6 +15,7 @@ import pytest
 from onward_generator.cli import build_parser, main
 from onward_generator.maps.workspace import create_map, store_sources
 from onward_generator.next_step import (
+    STAGE_DIRS,
     cadastre_split_command,
     catastro_command,
     detail_command,
@@ -31,6 +32,7 @@ from onward_generator.next_step import (
 from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import (
     _build_package,
+    _canon,
     _push_package,
     _stage_summary,
     _unity_summary,
@@ -1593,3 +1595,21 @@ def test_run_command_passes_the_core(monkeypatch: pytest.MonkeyPatch) -> None:
     assert received["core_radius_m"] == 150.0
     assert main([*args, "--core-radius-m", "0"]) == 0
     assert received["core_radius_m"] == 0.0
+
+
+def test_each_stage_marker_is_its_file_in_the_stage_directory(tmp_path: Path) -> None:
+    processed = tmp_path / "data" / "processed"
+    assert {name: _canon(tmp_path, name) for name in STAGE_DIRS} == {
+        "geo": processed / "geo" / "geo_scene.json",
+        "heights": processed / "heights" / "heights.json",
+        "generate": processed / "scene3d" / "scene_visual.glb",
+        "detail": processed / "scene_detail" / "scene_visual.glb",
+        "dress": processed / "scene_dress" / "scene_visual.glb",
+        "materials": processed / "scene_materials" / "scene_visual.glb",
+        "panoramax": processed / "scene_panoramax" / "scene_visual.glb",
+        "signs": processed / "scene_signs" / "scene_visual.glb",
+        "overgrow": processed / "scene_overgrow" / "scene_visual.glb",
+        "fit": processed / "scene_overgrow" / "fit.json",
+        "bounds": processed / "scene_playable" / "scene_visual.glb",
+        "layout": processed / "layout" / "layout.json",
+    }

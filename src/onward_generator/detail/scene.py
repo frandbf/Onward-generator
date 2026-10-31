@@ -70,6 +70,7 @@ from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.geo.attributes import parse_metres as _metres
 from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
 from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
@@ -476,21 +477,6 @@ def _select_interiors(candidates: list[tuple[str, Mapping[str, Any], BaseGeometr
             ruled.append(bid)
     ruled.sort(key=lambda b: hashlib.sha256(f"{cfg.seed}:interior:{b}".encode()).hexdigest())
     return [b for b in dict.fromkeys([*ordered, *ruled]) if b not in ic.exclude_ids]
-
-
-def _metres(raw: object) -> float | None:
-    if raw is None or raw == "":
-        return None
-    text = str(raw).strip().lower().replace(",", ".")
-    if text.endswith("m"):
-        text = text[:-1].strip()
-    try:
-        value = float(text)
-    except ValueError:
-        return None
-    if not 0 < value <= 200:
-        return None
-    return value
 
 
 def _largest_polygon(geom: BaseGeometry) -> BaseGeometry | None:

@@ -22,6 +22,9 @@ from onward_generator.next_step import (
     geo_command,
     heights_command,
     invoke,
+    layout_command,
+    overgrow_command,
+    signs_command,
     stage_path,
 )
 
@@ -150,3 +153,21 @@ def test_detail_command_without_a_core_has_no_core_flag(tmp_path: Path) -> None:
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     assert core_radius(scene) is None
     assert core_radius(tmp_path / "elsewhere" / "geo_scene.json") is None
+
+
+def test_layout_and_compact_overgrow_write_their_own_directories(tmp_path: Path) -> None:
+    root = tmp_path / "obelisco"
+    create_map(root, map_id="obelisco", name="Obelisco", latitude=LAT, longitude=LON, radius_m=400)
+    processed = root / "data" / "processed"
+    for path in (processed / "geo" / "geo_scene.json", processed / "heights" / "heights.json"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    (processed / "scene3d").mkdir()
+    playable = processed / "scene_playable"
+    layout = layout_command(playable)
+    assert layout is not None
+    assert layout.argv[-2:] == ("--out", str(processed / "layout" / "layout.json"))
+    assert overgrow_command(processed / "scene_signs_compact").argv[-2:] == ("--out", str(processed / "scene_phase3"))
+    assert overgrow_command(processed / "scene_signs").argv[-2:] == ("--out", str(processed / "scene_overgrow"))
+    assert signs_command(processed / "scene_materials_compact").argv[-2:] == ("--out", str(processed / "scene_signs_compact"))
+    assert signs_command(processed / "scene_materials").argv[-2:] == ("--out", str(processed / "scene_signs"))

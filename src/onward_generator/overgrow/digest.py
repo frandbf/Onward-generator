@@ -17,6 +17,7 @@ from shapely import Point, STRtree
 from shapely.geometry import LineString, Polygon, shape
 from shapely.geometry.polygon import orient
 
+from onward_generator.geo.attributes import parse_metres
 from onward_generator.overgrow.constants import LANE_M
 from onward_generator.overgrow.fit import SKIP_HIGHWAYS
 
@@ -223,12 +224,9 @@ def _geom(feature: Mapping[str, object]):
 
 
 def _height(tags: Mapping[str, object]) -> tuple[float, str]:
-    raw = tags.get("height") or tags.get("building:height")
-    if raw not in (None, ""):
-        try:
-            return float(str(raw).split()[0].replace(",", ".")), "observed"
-        except ValueError:
-            pass
+    height = parse_metres(tags.get("height") or tags.get("building:height"))
+    if height is not None:
+        return height, "observed"
     levels = tags.get("building:levels")
     if levels not in (None, ""):
         try:
