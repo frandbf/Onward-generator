@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--description", default=None, help="card description, max 600 characters")
     create.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
+    create.add_argument("--core-radius-m", type=float, default=150.0, help="half-side of the playable core square, metres (default 150; 0 or at least the radius plays the whole map; ADR-017)")
     create.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     create.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     create.add_argument("--overwrite", action="store_true", help="replace map.json and configs when processed/ is empty")
@@ -66,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
                 ambient_ai=args.ai,
                 panoramax=args.panoramax,
                 lightmap_texels_per_m=args.lightmap_texels_per_m,
+                core_radius_m=args.core_radius_m,
                 overwrite=args.overwrite,
                 texture_provider=_texture_provider(args.seed),
             )

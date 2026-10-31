@@ -183,7 +183,7 @@ def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Pa
     scales = {row["material"]: row["scale"] for row in options["lightmap_scales"]}
     names = {m["name"] for m in read_glb((inputs[0] / "scene_visual.glb").read_bytes())[0]["materials"]}
     assert set(scales) <= names
-    assert {surface_class(name) for name in scales} == {"roof", "ground", "interior"}
+    assert {surface_class(name) for name in scales} == {"roof", "ground", "interior", "party"}
     assert all(scales[name] == DEFAULT_CLASS_SCALES[surface_class(name)] for name in scales)
     lm = result.manifest["lightmap_estimate"]
     assert lm["texels_per_m"] == options["lightmap_texels_per_m"] and lm["max_size"] == options["lightmap_max_size"]
@@ -193,7 +193,7 @@ def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Pa
     (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
     other = package(inputs, tmp_path / "other", export_config=tmp_path / "cfg.json")
     rows = load(other.directory / "adapter_options.json")["lightmap_scales"]
-    assert {surface_class(row["material"]): row["scale"] for row in rows} == {"ground": 0.5, "interior": 0.5, "facade": 0.5}
+    assert {surface_class(row["material"]): row["scale"] for row in rows} == {"ground": 0.5, "interior": 0.5, "party": 0.5, "facade": 0.5}
     assert other.manifest["lightmap_estimate"]["texels"] != lm["texels"]
     assert other.manifest["package_id"] != result.manifest["package_id"]
 

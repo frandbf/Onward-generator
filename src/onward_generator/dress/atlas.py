@@ -20,6 +20,11 @@ from onward_generator.generation.config import Material
 
 MIN_TILE_PX = 256
 MIN_MEAN_LUMA = 80  # unused / fallback tiles stay visible after shader multiply
+PNG_LEVEL = 9  # zlib level of an RGBA PNG (windows, signs, plaques, growth, dress tiles)
+# zlib level of an opaque tile (materials repeats and the contact sheet). Level 3 encodes about
+# three times faster than 9 for about 4 % more bytes; Unity recompresses the textures anyway.
+TILE_PNG_LEVEL = 3
+PNG_FORMAT = "PNG"  # pragma: no mutate: Pillow reads the format name case-insensitively
 # Threads that bake and encode texture PNGs at once. zlib and Pillow's resize release the GIL.
 PNG_WORKERS = 6  # pragma: no mutate: the pool size changes speed, never the bytes or their order
 
@@ -37,18 +42,39 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def encode_png_rgba(pixels: np.ndarray) -> bytes:
-    """8-bit RGBA PNG through Pillow. ``pixels`` is (h, w, 4) uint8.
+    """8-bit RGBA PNG through Pillow at ``PNG_LEVEL``. ``pixels`` is (h, w, 4) uint8.
 
     Fixed save options and no metadata chunks, so the same pixels give the
     same bytes for the pinned Pillow version.
     """
+    _check_rgba(pixels)
+    return _save_png(pixels, PNG_LEVEL)
+
+
+def encode_opaque_png(pixels: np.ndarray) -> bytes:
+    """An (h, w, 4) uint8 tile whose alpha is 255 everywhere, as an 8-bit RGB PNG at ``TILE_PNG_LEVEL``.
+
+    The alpha channel carries nothing, so it is not written: the PNG is smaller
+    and faster to encode, and decodes to the same RGBA. A tile with any other
+    alpha is refused.
+    """
+    _check_rgba(pixels)
+    if not (pixels[..., 3] == 255).all():
+        raise ValueError("an opaque tile has alpha 255 everywhere")
+    return _save_png(pixels[..., :3], TILE_PNG_LEVEL)
+
+
+def _check_rgba(pixels: np.ndarray) -> None:
     if pixels.ndim != 3 or pixels.shape[2] != 4 or pixels.dtype != np.uint8:
         raise ValueError("pixels must be an HxWx4 uint8 array")
+
+
+def _save_png(pixels: np.ndarray, level: int) -> bytes:
     from PIL import Image
 
     image = Image.fromarray(np.ascontiguousarray(pixels))
     buffer = BytesIO()
-    image.save(buffer, format="PNG", optimize=False, compress_level=9)
+    image.save(buffer, format=PNG_FORMAT, compress_level=level)
     return buffer.getvalue()
 
 
@@ -242,7 +268,7 @@ def build_atlas(
         + (f"Photo slots: {', '.join(photo_ids)}. " if photo_ids else "")
         + (f"Pending photographic textures: {', '.join(pending)}." if pending else "")
     )
-    return Atlas(encode_png_rgba(image), size, tiles, slots, note)
+    return Atlas(encode_opaque_png(image), size, tiles, slots, note)
 
 
 def tile_luminance(pixels: np.ndarray) -> float:

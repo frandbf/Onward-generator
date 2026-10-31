@@ -6,7 +6,7 @@ from functools import partial
 import numpy as np
 import pytest
 
-from onward_generator.dress.atlas import PNG_WORKERS, decode_png_rgba, encode_png_rgba, run_png_jobs
+from onward_generator.dress.atlas import PNG_WORKERS, decode_png_rgba, encode_opaque_png, encode_png_rgba, run_png_jobs
 from onward_generator.generation.preview import _png
 
 
@@ -71,3 +71,29 @@ def test_png_jobs_raise_the_first_failure() -> None:
     with pytest.raises(ValueError, match="bad tile"):
         run_png_jobs({"good": partial(encode_png_rgba, _pixels()), "bad": broken})
     assert run_png_jobs({}) == {}
+
+
+def _opaque() -> np.ndarray:
+    pixels = np.random.default_rng(13).integers(0, 256, size=(24, 20, 4), dtype=np.uint8)
+    pixels[1::2, :, :3] = pixels[::2, :, :3]  # repeated rows, so the zlib level changes the bytes
+    pixels[..., 3] = 255
+    return pixels
+
+
+def test_opaque_tile_is_an_rgb_png_at_level_3_that_decodes_to_the_same_rgba() -> None:
+    pixels = _opaque()
+    data = encode_opaque_png(pixels)
+    assert data[25] == 2  # IHDR colour type 2: RGB, no alpha channel
+    assert np.array_equal(decode_png_rgba(data), pixels)
+    assert data == encode_opaque_png(pixels.copy())
+    assert hashlib.sha256(data).hexdigest() == "045d39d3b24d583ce4eb754e650c6965aa038167a6bbdb9aca30fb80e3cdafc0"
+    assert data != _png(pixels[..., :3])  # the RGBA path's level 9 writes other bytes
+
+
+def test_opaque_tile_refuses_alpha_or_a_wrong_array() -> None:
+    pixels = _opaque()
+    pixels[3, 4, 3] = 254
+    with pytest.raises(ValueError, match="^an opaque tile has alpha 255 everywhere$"):
+        encode_opaque_png(pixels)
+    with pytest.raises(ValueError, match="HxWx4 uint8"):
+        encode_opaque_png(np.zeros((4, 4, 3), dtype=np.uint8))

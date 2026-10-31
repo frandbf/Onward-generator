@@ -50,6 +50,12 @@ def _glb(*parts: tuple[str, Mesh]) -> bytes:
     ("shop_interior", "facade"),
     ("plaster_cream", "facade"),
     ("glass_dark", "facade"),
+    ("scenic_wall_light", "scenic"),
+    ("scenic_wall_ochre", "scenic"),
+    ("wall_scenic_x", "facade"),
+    ("party_plaster_cream", "party"),
+    ("party_brick_red", "party"),
+    ("counterparty_wall", "facade"),
 ])
 def test_surface_class(material: str, expected: str) -> None:
     assert surface_class(material) == expected
@@ -71,10 +77,11 @@ def test_contributes_gi_mirrors_the_adapter(material: str, lit: bool) -> None:
 
 
 def test_material_scales_default_classes() -> None:
-    names = ["roof_tile", "ground", "interior_wall", "plaster_cream", "prop_x", "tree_trunk", "ground"]
+    names = ["roof_tile", "ground", "interior_wall", "plaster_cream", "party_plaster_cream", "prop_x", "tree_trunk", "ground"]
     assert material_scales(names, DEFAULT_CLASS_SCALES) == [
         {"material": "ground", "scale": 0.5},
         {"material": "interior_wall", "scale": 0.5},
+        {"material": "party_plaster_cream", "scale": 0.5},
         {"material": "roof_tile", "scale": 0.25},
     ]
 
@@ -160,3 +167,10 @@ def test_estimate_groups_by_cell_below_one_metre() -> None:
     node = Node("n", (Primitive(_floor(0, 0.2, 0, 0.2), "ground"), Primitive(_floor(5, 5.2, 0, 0.2), "ground")))
     glb = build_glb([node], {"ground": Material((1, 1, 1, 1), 0.9)})
     assert estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=0.5)["renderers"] == 2
+
+
+def test_scenic_shells_bake_at_the_roof_scale() -> None:
+    assert DEFAULT_CLASS_SCALES["scenic"] == DEFAULT_CLASS_SCALES["roof"] == 0.25
+    assert material_scales(["scenic_wall_warm", "plaster_cream"], DEFAULT_CLASS_SCALES) == [
+        {"material": "scenic_wall_warm", "scale": 0.25},
+    ]

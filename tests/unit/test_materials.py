@@ -20,15 +20,15 @@ from onward_generator.dress.atlas import (
     build_atlas,
     decode_jpeg_rgb,
     decode_png_rgba,
-    encode_png_rgba,
+    encode_opaque_png,
     tile_luminance,
 )
 from onward_generator.dress.catalog import load_catalog
 from onward_generator.dress.surfaces import osm_material_override
 from onward_generator.generation.config import Material, load_generation_config
-from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, read_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.materials.apply import apply_materials, share_facade_photos
+from onward_generator.materials.apply import apply_materials, rematerialize_brick_walls, share_facade_photos
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.materials.plan import PlanError, load_texture_plan
 from onward_generator.materials.polyhaven import DownloadError, TextureRecord, ensure_diffuse_1k, resolve_polyhaven_id
@@ -138,7 +138,7 @@ def _node(name: str, material: str, extras: dict[str, Any]) -> Node:
     return Node(name, (Primitive(_mesh(), material),), extras)
 
 
-def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False) -> Path:
+def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False, party: bool = False) -> Path:
     _ = MURCIA_CENTER
     detail = root / "base"
     detail.mkdir()
@@ -191,6 +191,14 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon:
             "building/osm-way-brick", "plaster_ochre",
             {"type": "building", "source_ids": ["osm-way-brick"], "object_id": "building/osm-way-brick"},
         ))
+    if party:
+        # A party wall beside its wall on the same mesh, so both get the same UV phase. Salmon is used only as a party wall.
+        extra = {"building/osm-way-1": "party_plaster_ochre", "building/osm-way-white": "party_plaster_white",
+                 "building/osm-way-stone": "party_plaster_salmon", "building/osm-way-brick": "party_plaster_ochre"}
+        for name in set(extra.values()):
+            materials[name] = materials.get(name.removeprefix("party_"), Material((0.88, 0.68, 0.58, 1.0), 0.9))
+        nodes = [Node(n.name, (*n.primitives, Primitive(_mesh(), extra[n.name])), n.extras) if n.name in extra else n
+                 for n in nodes]
     (detail / "scene_visual.glb").write_bytes(build_glb(nodes, materials))
     (detail / "scene_collision.glb").write_bytes(build_glb(nodes, materials))
     objects = [
@@ -385,7 +393,7 @@ def test_apply_threads_write_the_bytes_of_the_serial_path(tmp_path: Path, monkey
     images = images_by_material((tmp_path / "threaded" / "scene_visual.glb").read_bytes())
     index = sorted(images).index("tree_canopy")
     assert index > 0
-    assert images["tree_canopy"] == encode_png_rgba(_tile_pixels("tree_canopy", 256, 48152 + index))
+    assert images["tree_canopy"] == encode_opaque_png(_tile_pixels("tree_canopy", 256, 48152 + index))
 
 
 def test_apply_brick_only_when_osm_says_brick(tmp_path: Path) -> None:
@@ -423,6 +431,46 @@ def test_salmon_walls_borrow_a_plaster_photo_in_greyscale_under_their_own_tint(t
     assert abs(int(tile.mean()) - 178) <= 2
 
 
+def test_brick_walls_keep_their_uvs_and_their_party_walls() -> None:
+    uvs = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.5]])
+    node = Node("building/b", (Primitive(_mesh(), "plaster_ochre", uvs), Primitive(_mesh(), "party_plaster_white", uvs),
+                               Primitive(_mesh(), "glass_dark", uvs)), {"type": "building", "source_ids": ["b"]})
+    [out], changed = rematerialize_brick_walls([node], {"b": {"tags": {"building:material": "brick"}}})
+    assert changed == ["building/b"]
+    assert [p.material for p in out.primitives] == ["brick_red", "party_brick_red", "glass_dark"]
+    assert all(p.uvs is uvs for p in out.primitives)
+
+
+def test_party_walls_take_their_wall_albedo_colour_and_repeat(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, brick=True, party=True)
+    out = tmp_path / "with_party"
+    report = apply_materials(base, out, cache_dir=cache, download=False, plan_path=_polyhaven_plan(tmp_path / "plan.json"))
+    data = (out / "scene_visual.glb").read_bytes()
+    doc, _ = read_glb(data)
+    factor = {m["name"]: m["pbrMetallicRoughness"]["baseColorFactor"] for m in doc["materials"]}
+    texture = {m["name"]: m["pbrMetallicRoughness"]["baseColorTexture"]["index"] for m in doc["materials"]}
+    # The contact sheet has one tile per wall, not one per party copy.
+    assert doc["extras"]["atlas"]["tiles"] == len({name.removeprefix("party_") for name in factor} - {"glass_view"})
+    # The OSM brick building's party wall becomes a brick party wall.
+    assert "party_plaster_ochre" in factor and "party_brick_red" in factor
+    for party, wall in (("party_plaster_ochre", "plaster_ochre"), ("party_plaster_white", "plaster_white"),
+                        ("party_brick_red", "brick_red")):
+        assert factor[party] == factor[wall] == [1.0, 1.0, 1.0, 1.0]
+        assert texture[party] == texture[wall]
+    # Salmon appears only as a party wall: it still borrows the plaster photograph under its own tint.
+    assert [row["color_id"] for row in report["textures"]["facade_shared"]] == ["plaster_salmon"]
+    assert factor["party_plaster_salmon"] == pytest.approx([0.88, 0.68, 0.58, 1.0])
+    tile = decode_png_rgba(images_by_material(data)["party_plaster_salmon"])[..., :3].astype(int)
+    assert (tile[..., 0] == tile[..., 1]).all() and abs(int(tile.mean()) - 178) <= 2
+    # Same mesh, same building: a party wall repeats exactly like its wall (plaster_white 4 m, brick 1.2 m).
+    uvs = {(n.name, p.material): p.uvs for n in nodes_from_glb(data)[0] for p in n.primitives}
+    assert np.array_equal(uvs[("building/osm-way-white", "party_plaster_white")], uvs[("building/osm-way-white", "plaster_white")])
+    assert np.array_equal(uvs[("building/osm-way-brick", "party_brick_red")], uvs[("building/osm-way-brick", "brick_red")])
+    assert not np.array_equal(uvs[("building/osm-way-white", "plaster_white")], uvs[("building/osm-way-brick", "brick_red")])
+
+
 def _record(tmp_path: Path, name: str, color: tuple[int, int, int]) -> TextureRecord:
     path = tmp_path / f"{name}.jpg"
     path.write_bytes(_jpeg_bytes(color))
@@ -444,6 +492,53 @@ def test_share_facade_photos_takes_the_first_plaster_slot_the_plan_has(tmp_path:
     assert kept == {"plaster_salmon": ("photo", "color_albedo")}
     empty: dict[str, tuple[Any, str]] = {}
     assert share_facade_photos({"doors": ochre}, {"plaster_salmon"}, empty) == [] and empty == {}
+
+
+def test_a_warm_tile_cache_writes_the_bytes_of_a_cold_one_without_baking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, cobble=True, salmon=True)
+    plan = _polyhaven_plan(tmp_path / "plan.json")
+    apply_materials(base, tmp_path / "off", cache_dir=cache, download=False, plan_path=plan)
+    monkeypatch.delenv("ONWARD_GENERATOR_NO_TILE_CACHE")
+    monkeypatch.setenv("ONWARD_GENERATOR_CACHE_DIR", str(tmp_path / "tiles_home"))
+    tiles = tmp_path / "tiles_home" / "tiles"
+    apply_materials(base, tmp_path / "unused", cache_dir=cache, download=False, plan_path=plan, tile_cache=False)
+    assert not tiles.exists()
+    report = apply_materials(base, tmp_path / "cold", cache_dir=cache, download=False, plan_path=plan)
+    photos = {row["color_id"] for row in report["applied"]} | {row["color_id"] for row in report["textures"]["interior"]}
+    photos |= {row["color_id"] for row in report["textures"]["facade_shared"]}
+    # Two colours can share one photograph, mode and side, and so one entry.
+    assert 0 < len(list(tiles.iterdir())) <= len(photos)
+
+    def no_bake(*_: object) -> None:
+        raise AssertionError("a warm cache does not bake again")
+
+    monkeypatch.setattr("onward_generator.materials.apply.bake_photo_tile", no_bake)
+    apply_materials(base, tmp_path / "warm", cache_dir=cache, download=False, plan_path=plan)
+    for name in ("scene_visual.glb", "atlas.png"):
+        cold = (tmp_path / "cold" / name).read_bytes()
+        assert cold == (tmp_path / "off" / name).read_bytes() == (tmp_path / "warm" / name).read_bytes()
+
+
+def test_apply_help_names_the_tile_cache_switch(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["materials", "apply", "--help"]) == 0
+    text = " ".join(capsys.readouterr().out.split())
+    assert "--no-tile-cache bake every photo tile again instead of reading the tile cache" in text
+
+
+def test_cli_no_tile_cache_leaves_the_cache_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path)
+    plan = _polyhaven_plan(tmp_path / "plan.json")
+    monkeypatch.delenv("ONWARD_GENERATOR_NO_TILE_CACHE")
+    monkeypatch.setenv("ONWARD_GENERATOR_CACHE_DIR", str(tmp_path / "tiles_home"))
+    args = ["materials", "apply", "--base", str(base), "--cache", str(cache), "--plan", str(plan)]
+    assert main([*args, "--out", str(tmp_path / "first"), "--no-tile-cache"]) == 0
+    assert not (tmp_path / "tiles_home").exists()
+    assert main([*args, "--out", str(tmp_path / "second")]) == 0
+    assert list((tmp_path / "tiles_home" / "tiles").iterdir())
 
 
 def test_cli_refuses_protected_output(tmp_path: Path) -> None:
@@ -486,3 +581,14 @@ def test_plaster_tile_m_is_two_metres() -> None:
     catalog = load_catalog()
     assert catalog.get("historic_plaster_cream").technical["tile_m"] == 2.0
     assert catalog.get("plaster_ochre_wall").technical["tile_m"] == 2.0
+
+
+def test_scenic_walls_share_a_plaster_photograph(tmp_path: Path) -> None:
+    plain, ochre = _record(tmp_path, "plain", (180, 178, 170)), _record(tmp_path, "ochre", (200, 150, 60))
+    tiles: dict[str, tuple[Any, str]] = {}
+    shared = share_facade_photos({"plain_facades": plain, "ochre_facades": ochre}, {"scenic_wall_ochre", "scenic_wall_light"}, tiles)
+    assert [row["color_id"] for row in shared] == ["scenic_wall_light", "scenic_wall_ochre"]
+    assert {row["slot"] for row in shared} == {"plain_facades"}
+    assert {mode for _rgb, mode in tiles.values()} == {"greyscale_modulation"}
+    only_ochre: dict[str, tuple[Any, str]] = {}
+    assert share_facade_photos({"ochre_facades": ochre}, {"scenic_wall_warm"}, only_ochre)[0]["slot"] == "ochre_facades"

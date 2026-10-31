@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     apply_p.add_argument("--cache", default=str(DEFAULT_CACHE), help="raw texture cache (gitignored)")
     apply_p.add_argument("--download", action="store_true", help="the only network path; fetch missing CC0 1k JPEGs")
     apply_p.add_argument("--overwrite", action="store_true")
+    apply_p.add_argument("--no-tile-cache", action="store_true", help="bake every photo tile again instead of reading the tile cache")
     apply_p.add_argument("--seed", type=int, default=48152)
     return parser
 
@@ -44,6 +45,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         download=args.download,
         overwrite=args.overwrite,
         seed=args.seed,
+        tile_cache=not args.no_tile_cache,
     )
     applied = report["applied"]
     skipped = report["skipped"]

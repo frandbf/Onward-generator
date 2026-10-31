@@ -108,11 +108,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
         panoramax=args.panoramax,
         catastro=args.catastro,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
+        core_radius_m=args.core_radius_m,
         overwrite=args.overwrite,
         start=args.start,
         host=host,
         verbose=args.verbose,
         no_unity=args.no_unity,
+        preview=args.preview,
     )
 
 
@@ -203,6 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--description", default=None)
     run.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
+    run.add_argument("--core-radius-m", type=float, default=150.0, help="half-side of the playable core square, metres (default 150; 0 or at least the radius plays the whole map; ADR-017)")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
@@ -214,6 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--platform", choices=PLATFORM_CHOICES, default=None, help="host for the Unity steps; same as the global --platform")
     run.add_argument("--verbose", action="store_true", help="also print each stage's full output")
     run.add_argument("--no-unity", action="store_true", help="stop after export and print the command for the Unity steps (task map uses this)")
+    run.add_argument("--preview", action="store_true", help="also draw the diagnostic PNGs of generate and detail (off by default; the export thumbnail is always drawn)")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
     return parser

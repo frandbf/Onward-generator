@@ -31,7 +31,7 @@ Schema codes look like `schema_<keyword>`: `schema_minimum`, `schema_enum`, `sch
 
 ## One folder per map
 
-`onward-generator map create` writes this configuration from a name and a WGS84 centre. The id and `maps/<id>` are the slug of that name (`Apocalipsis Murciana` becomes `maps/apocalipsis_murciana`). The folder holds `map.json`, `config/project.json`, `config/export.json` (card title and `build.lightmap_texels_per_m`, default 10, at most 40), `config/texture_plan.json`, and `reference/aoi.geojson`. The projected CRS is EPSG:25830 in peninsular Spain and the UTM zone of the centre anywhere else. See [01-pipeline.md](01-pipeline.md).
+`onward-generator map create` writes this configuration from a name and a WGS84 centre. The id and `maps/<id>` are the slug of that name (`Apocalipsis Murciana` becomes `maps/apocalipsis_murciana`). The folder holds `map.json`, `config/project.json`, `config/export.json` (card title and `build.lightmap_texels_per_m`, default 10, at most 40), `config/texture_plan.json`, and `reference/aoi.geojson`. `map.json` keeps `core_radius_m` (`--core-radius-m`, default 150): the half-side of the playable core square, or `null` when the whole map is played (0, a value at or above `radius_m`, or a map created before the key existed). A core must be at least 50 m. It is read by `detail` through its `next:` line; later stages read the `core` block of `scene_detail.json` ([ADR-017](decisions/ADR-017-playable-core.md)). The projected CRS is EPSG:25830 in peninsular Spain and the UTM zone of the centre anywhere else. See [01-pipeline.md](01-pipeline.md).
 
 ## Paths
 

@@ -28,6 +28,12 @@ SYNTHETIC_LICENSE = LicenseInfo(
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_tile_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never read or write the user's tile cache. A test that wants one sets its own directory."""
+    monkeypatch.setenv("ONWARD_GENERATOR_NO_TILE_CACHE", "1")
+
+
 @pytest.fixture
 def synthetic_source() -> SourceDataset:
     return register_local_source(
@@ -49,13 +55,13 @@ def pipeline_result(synthetic_source: SourceDataset, synthetic_aoi: AreaOfIntere
     return run_geo_pipeline(synthetic_source, synthetic_aoi, origin=ORIGIN)
 
 
-def _detail_inputs(root: Path, buildings: object = None, pois: object = None) -> tuple[Path, Path, Path]:
+def _detail_inputs(root: Path, buildings: object = None, pois: object = None, relations: object = None) -> tuple[Path, Path, Path]:
     from onward_generator.generation.__main__ import main as generate_main
     from onward_generator.geo.pipeline import write_outputs
     from onward_generator.heights import run_heights, write_height_outputs
     from tests.detail_fixture import write_block_osm
 
-    extra = {} if buildings is None else {"buildings": buildings, "pois": pois}
+    extra = {} if buildings is None else {"buildings": buildings, "pois": pois, "relations": relations or {}}
     osm = write_block_osm(root / "block.osm", ORIGIN, **extra)  # type: ignore[arg-type]
     source = register_local_source(osm, license_info=SYNTHETIC_LICENSE, retrieved_at=FIXED_NOW,
                                    data_timestamp="2026-10-18T00:00:00Z", now=FIXED_NOW)

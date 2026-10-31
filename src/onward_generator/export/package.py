@@ -35,6 +35,7 @@ from onward_generator.perf.layout import (
     SPAWN_SEPARATION_M,
     hunt_spawn_problems,
 )
+from onward_generator.tiers import core_of, tier_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPORT_CONFIG_DEFAULT = REPO_ROOT / "config" / "export" / "onward.default.json"
@@ -45,6 +46,8 @@ MANIFEST_FILE = "onward_export.json"
 OPTIONS_FILE = "adapter_options.json"
 THUMBNAIL_FILE = "thumbnail.png"
 CHECKLIST_FILE = "quest_acceptance.md"
+# The adapter's combine cell (ADR-005), used to predict draws when the card leaves combining off.
+DEFAULT_CELL_M = 100.0
 LAYOUT_SCHEMA = "onward_generator.perf_layout"
 GAMEPLAY_SCHEMA = "onward_generator.gameplay_layout"
 SDK_SPAWN_POINTS = 8
@@ -354,6 +357,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
                 scales=options["lightmap_scales"],
             ),
+            "tiers": _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"])),
             "warnings": warnings,
         }
         atomic_write_json(out / MANIFEST_FILE, manifest)
@@ -362,6 +366,17 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         shutil.rmtree(out, ignore_errors=True)
         raise
     return PackageResult(out, manifest, tuple(warnings))
+
+
+def _tiers(visual: bytes, detail_manifest: Mapping[str, Any], cell_m: float) -> dict[str, Any] | None:
+    """Triangles and predicted draws of the playable core and the scenic ring (ADR-017); None without a core.
+
+    ``combine_cell_m`` 0 leaves one renderer per node; the prediction then uses 100 m cells (ADR-005).
+    """
+    core = core_of(detail_manifest)
+    if core is None:
+        return None
+    return tier_summary(visual, detail_manifest.get("objects") or [], core, cell_m=cell_m or DEFAULT_CELL_M)
 
 
 def checklist(manifest: Mapping[str, Any]) -> str:

@@ -17,6 +17,7 @@ from onward_generator.generation.preview import render_rgb, side_by_side
 from onward_generator.generation.scene import GenerationError
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.next_step import dress_command, emit
+from onward_generator.tiers import SCENIC_WALLS
 
 VISUAL_FILE = "scene_visual.glb"
 COLLISION_FILE = "scene_collision.glb"
@@ -36,6 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", default=None, help="detail config (default: config/detail.default.json)")
     parser.add_argument("--generation-config", default=None, help="phase 03 config used for the base (default: config/generation.default.json)")
     parser.add_argument("--no-preview", action="store_true", help="skip the before/after comparison images")
+    parser.add_argument("--core-radius-m", type=float,
+                        help="half-side of the playable core square, metres (ADR-017); buildings outside it are scenic shells")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -57,12 +60,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
-        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg)
+        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m)
     except (DetailConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
 
-    materials = dict(gen_cfg.materials) | dict(cfg.materials) | {"collider": COLLIDER_MATERIAL}
+    materials = dict(gen_cfg.materials) | dict(cfg.materials) | dict(SCENIC_WALLS) | {"collider": COLLIDER_MATERIAL}
     extras = {"attribution": base.attribution, "manifest": MANIFEST_FILE, "fidelity": "generic templates; not a faithful reconstruction"}
     visual = detailed.visual_nodes()
     atomic_write_bytes(targets[0], build_glb(visual, materials, extras=extras))

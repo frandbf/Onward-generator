@@ -120,7 +120,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 
 | | |
 | --- | --- |
-| Input | `--name` (1–80). The id and `maps/<id>` are that name in lower case, without accents, spaces as `_`. `--lat`, `--lon`, `--radius-m` (50–1500, default 400), `--margin-m` (default 30), `--lightmap-texels-per-m` (greater than 0 and at most 40, default 10) |
+| Input | `--name` (1–80). The id and `maps/<id>` are that name in lower case, without accents, spaces as `_`. `--lat`, `--lon`, `--radius-m` (50–1500, default 400), `--margin-m` (default 30), `--lightmap-texels-per-m` (greater than 0 and at most 40, default 10), `--core-radius-m` (default 150; 0 or at least the radius plays the whole map, otherwise at least 50) |
 | Output | `map.json`, `config/project.json`, `config/export.json`, `config/texture_plan.json`, `reference/aoi.geojson`, `data/raw/<id>.osm` |
 | Area | A square in local metres around the centre, converted to WGS84. Degrees are not treated as metres |
 | CRS | EPSG:25830 when the centre is in peninsular Spain. Otherwise the WGS84 UTM zone of that point (north `EPSG:326xx`, south `EPSG:327xx`). Stored in `map.json`. `map show` prints the `--crs` that `geo` must use |
@@ -154,6 +154,8 @@ LogSample  maps/logsample
 ✓ Python 45.0 s  (map setup 37.4 s)  10 warnings
 → Unity: tool, scene, launcher
 ```
+
+`run` passes `--no-preview` to `generate` and `detail`, so a run does not draw their diagnostic PNGs (`preview_*.png`, `compare_*.png`); a PNG left by an earlier run stays in place and is not current. `run --preview` draws them, and so does `generate` or `detail` run on its own, which draws them unless given `--no-preview`. The export thumbnail (`thumbnail.png`) is always drawn.
 
 `--no-unity` stops after `export`, does not check the Editor, and prints the host command for the Unity steps (`task unity -- <package>`). It is what `task map` runs inside Docker, where Unity is not installed. The editor log remains in `$LOG_ROOT/onward-export/`: `~/Library/Logs/onward-export/` on macOS, `${XDG_STATE_HOME:-~/.local/state}/onward-generator/onward-export/` on Linux. See [Host platform](#host-platform). Each Unity step reports its wall time (`scene OK in 4 min 05 s`); a failed step says how long it ran. The `content3 md5` line comes from `build/content3.md5`, not from the log, so it is printed after the other Unity lines (only `routes dropped` follows it), whatever its position in the log. Without that file, no md5 line is printed. `run` executes each stage from its argument list. It does not parse the printed `next:` line, so a path with spaces or quotes runs as written. `export package` gets `--config config/export.json` only when that file exists, the same as its `next:` line.
 
@@ -214,6 +216,7 @@ This directory is the base for `detail`. The wall is not added here.
 | Input | `--scene`, `--heights`, `--base` of the `generate` (requires `phase_03_exit.passed` and matching hashes) |
 | Output | A new directory: GLBs, `scene_detail.json`, `detail_report.json` |
 | Fidelity | Generic templates. Not a photographed facade |
+| Core | `--core-radius-m` (the `next:` line and `run` read it from `map.json`). A building outside the core square is a scenic shell: walls and a flat roof, three shared wall materials, no openings, interior, shop or collider. Urban elements outside it are dropped and the ground colliders end at its edge. `scene_detail.json` gets `core` and each building `tier` ([ADR-017](decisions/ADR-017-playable-core.md)) |
 
 `--base` stays the original `generate` even after a later copy has the wall.
 
@@ -265,7 +268,7 @@ Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.
 
 ## 8b. Street plates
 
-`onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. The text uses DejaVu Sans Bold 2.37, vendored in `assets/fonts/dejavu` and loaded by path, so the plate does not depend on system fonts. The name is normalised to Unicode NFC before drawing, so a decomposed accent draws as one letter (`í`, `ñ`). The plate is not the official design of any city.
+`onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. On a map with a playable core, only walls whose midpoint is inside the core get a plate (ADR-017). The text uses DejaVu Sans Bold 2.37, vendored in `assets/fonts/dejavu` and loaded by path, so the plate does not depend on system fonts. The name is normalised to Unicode NFC before drawing, so a decomposed accent draws as one letter (`í`, `ñ`). The plate is not the official design of any city.
 
 The same command draws the shop signs and window vinyls that `detail` recorded in `facade.shops` (`docs/07-detail.md`): one fascia or blade sign per shop and a vinyl strip on some shop windows. All labels go into one atlas (`shop_sign_atlas_0`, a second page only when the first is full, roughly 40 shops; never more than two) plus `shop_sign_edge` for rims and brackets. A building whose glass `materials apply` boarded up keeps its sign and loses its vinyls. They are visual only. `signs_report.json` has `shop_signs` (count, kinds, pages, triangles, labels skipped because the atlas was full).
 
@@ -286,7 +289,7 @@ The sidewalk and the foot of the facade receive grass tufts. There is no moss st
 | --- | --- |
 | `--profile 10\|30\|100` | Multiplies densities. It is not a simulation. Default `100` |
 | `--seed` | Seed. Default `48152` |
-| `--zone-radius` | A disc in local metres around the origin. With no zone, the default is one block: a 110 m square |
+| `--zone-radius` | A disc in local metres around the origin. With no zone, the default is one block: a 110 m square. On a map with a playable core, any zone is cut to the core square (ADR-017); a zone that leaves nothing, or two pieces, inside it is refused |
 | `--zone-polygon` | A GeoJSON polygon in local metres |
 | `--library` | One catalogue directory, or a parent such as `assets` whose child folders each contain `manifest.json`. Every such manifest is one catalogue. If the folder is missing, no models are placed and the step does not fail. A GLB with a material whose `alphaMode` is not `OPAQUE` is refused on load, because the exported material is opaque and albedo only; `overgrow_report.json` lists each refusal in `library_rejects` as `{asset_id, reason}` (for example `alpha_mode_blend`). A `vegetation` mesh with `anchor: flat` taller than 0.05 m is a slope tile, not ground cover, and is refused as `flat_vegetation_not_flat`. A row whose curated `placement` is `kit_only` (a building or road kit piece) is refused as `kit_only` before its GLB is read, and a row with `refused` (for example `unknown_scale`) is refused with that reason. The whole scene of a GLB is loaded: every node with its transform and every triangle primitive. Primitives that share an albedo form one part, exported as material `prop_<id>`, then `prop_<id>__1` and so on. A row's `yaw_deg` turns the mesh on load so its long side lies on +X. A `0.2.0` manifest that fails `config/asset_manifest.schema.json` stops the step. See `abandoned-assets.md` |
 | `--selection` | `prop_selection.json`. Only those ids, and they must be installed. Without this flag the whole library is used |
@@ -313,6 +316,7 @@ The sidewalk and the foot of the facade receive grass tufts. There is no moss st
 | Output | A copy with `envelope/perimeter_wall` |
 | Size | 12 m high, 0.4 m thick, unless `--height-m` and `--thickness-m` |
 | Purpose | Closes the edge with a 12 m collider. It is not drawn. There is no concrete wall mesh |
+| Core | With a `core` in `scene_detail.json`, the wall stands on the core square, so players stay in the core; the backdrop stays at the site edge (ADR-017). `bounds_report.json` gives `wall.core_half_side_m` |
 | Optional | `--backdrop`: a visual haze ring just outside the wall, no collider (ADR-014, `docs/12-export.md`). Off by default; `run` does not pass it |
 
 An export of a `gameplay_layout` refuses a `--detail` directory that does not contain that wall.

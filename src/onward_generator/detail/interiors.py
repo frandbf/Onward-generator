@@ -6,6 +6,10 @@ between each pair of floors. A see-through window is a hole in that wall plus on
 closed pane. A building tall enough for three floors gets the third when the seed
 says so. From the top floor a switchback continues to the
 flat roof. Slabs and colliders leave the doorway and the stairs walkable.
+
+A shop has one storey and one room per shop on its frontage: a partition wall at the
+bay boundary between two shops' shopfronts, one more room for each other footprint
+part with a shopfront, and a courtyard left as a hole with walls around it.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from typing import Any
 
 import numpy as np
@@ -20,9 +25,10 @@ from shapely import Point, Polygon, make_valid, unary_union
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
-from onward_generator.detail.config import DetailConfig
+from onward_generator.detail.config import DetailConfig, Interiors, ShopCategory
 from onward_generator.detail.facades import UP, Hole, Layout, Segment, face_with_openings, stable_unit
 from onward_generator.detail.modules import StairGeometry, frame_matrix, stair, stair_geometry
+from onward_generator.detail.shops import Shop, shop_bays, shop_category
 from onward_generator.generation.mesh import (
     Mesh,
     box,
@@ -63,6 +69,9 @@ PROBE_STEP_M = 4.0
 PROBE_MAX_PER_AXIS = 4
 PROBE_LOW_M = 1.0
 PROBE_HIGH_BELOW_CEILING_M = 0.5
+# The wall between two shop rooms. Centred on a bay boundary, it stays in the pier
+# (at least min_pier_m / 2 = 0.25 m each side), clear of both shopfronts.
+PARTITION_M = 0.2
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,8 +89,25 @@ class Flight:
     role: str = "storey"
 
 
+@dataclass(frozen=True, slots=True)
+class Room:
+    """One ground-floor room of a shop. ``entrance`` (its walkable door and that door's wall) is ``None``
+    for a room seen through its windows only.
+
+    ``shops`` are the indices of the building's shops in this room; ``category`` paints it.
+    """
+
+    polygon: Polygon
+    entrance: tuple[Hole, Segment] | None
+    category: ShopCategory | None = None
+    shops: tuple[int, ...] = ()
+
+
 @dataclass(slots=True)
 class InteriorPlan:
+    """``inner`` is the room behind ``door``. ``rooms`` lists every room of a shop, that one first;
+    a stair interior leaves it empty. ``hosts`` are the footprint parts that hold a room."""
+
     building_id: str
     inner: Polygon
     floors: int
@@ -89,6 +115,18 @@ class InteriorPlan:
     door: Hole
     door_segment: Segment
     flights: tuple[Flight, ...]
+    rooms: tuple[Room, ...] = ()
+    hosts: BaseGeometry | None = None
+
+    @property
+    def ground(self) -> BaseGeometry:
+        """The ground-floor rooms: every shop room, or the one room behind the door."""
+        return unary_union([room.polygon for room in self.rooms]) if self.rooms else self.inner
+
+    @property
+    def shop_doors(self) -> tuple[Hole, ...]:
+        """The walkable doors that took a shop's shopfront: every room's door but the main one."""
+        return tuple(room.entrance[0] for room in self.rooms[1:] if room.entrance is not None)
 
 
 @dataclass(slots=True)
@@ -190,34 +228,63 @@ def _roof_steps(start_z: float, height: float, storey: float) -> int:
     return steps
 
 
+def _rim_on(room: Polygon, seg: Segment, hole: Hole, depth: float) -> bool:
+    """Whether both inner corners of an opening, ``depth`` behind the face, lie on a ring of ``room``."""
+    rim = (seg.point(hole.s0, depth_in=depth), seg.point(hole.s0 + hole.width, depth_in=depth))
+    return not any(room.boundary.distance(Point(p[0], p[1])) > RIM_TOLERANCE_M for p in rim)
+
+
+def _inset(part: Polygon, thickness: float) -> BaseGeometry:
+    """The room inside a part's walls: the part shrunk by ``thickness``, corners mitred up to twice the thickness."""
+    return part.buffer(-thickness, join_style="mitre", mitre_limit=2.0)
+
+
+def _door_zone(segment: Segment, door: Hole, ic: Interiors) -> Polygon:
+    """The floor kept clear behind a door: ``door_clearance_m`` deep and 0.3 m wider on each side."""
+    t = ic.wall_thickness_m
+    return segment.plan_rect(door.s0 - 0.3, door.s0 + door.width + 0.3, -(t + ic.door_clearance_m), -t)
+
+
+def _door_problem(room: Polygon, door: Hole, segment: Segment, ic: Interiors) -> str | None:
+    """Why ``door`` cannot lead into ``room``, or ``None`` when it can."""
+    if not _rim_on(room, segment, door, ic.wall_thickness_m):
+        return "door_not_on_inner_wall"
+    if not room.buffer(1e-3).contains(_door_zone(segment, door, ic)):
+        return "no_room_behind_door"
+    return None
+
+
 def plan_interior(
     building_id: str, refined: BaseGeometry, door: Hole, segment: Segment, height: float, storey_m: float, levels: int, cfg: DetailConfig,
     *,
     roof_access: bool = True,
     max_floors: int | None = None,
+    several_parts: bool = False,
 ) -> InteriorPlan | str:
     """Return a plan, or the reason the building cannot host the generic interior.
 
     ``max_floors`` caps the furnished floors below ``interiors.floors``: a shop takes 1, so it has no stair.
     The stair interior leaves the top storey solid. A shop may use every storey, so a one-storey shop
-    has its room under the roof.
+    has its room under the roof. A courtyard stays a hole in the room. A footprint of several parts is
+    refused unless ``several_parts``; the room is then in the part that holds the door, and
+    ``plan_shop_rooms`` adds the others.
     """
     ic = cfg.interiors
-    if len(polygons_of(refined)) != 1 or polygons_of(refined)[0].interiors:
+    parts = polygons_of(refined)
+    if len(parts) != 1 and not several_parts:
         return "footprint_not_a_simple_polygon"
     floors = min(ic.floors, levels - 1) if max_floors is None else min(max_floors, levels)
     if floors < 1:
         return "not_enough_levels"
-    inner = refined.buffer(-ic.wall_thickness_m, join_style="mitre", mitre_limit=2.0)
-    if inner.geom_type != "Polygon" or inner.is_empty or inner.interiors or inner.area < 20.0:
+    host = min(parts, key=Point(segment.a).distance)
+    inner = _inset(host, ic.wall_thickness_m)
+    if inner.geom_type != "Polygon" or inner.is_empty or inner.area < 20.0:
         return "inner_space_too_small"
     inner = orient(inner, sign=1.0)
-    rim = [segment.point(door.s0, 0, ic.wall_thickness_m), segment.point(door.s0 + door.width, 0, ic.wall_thickness_m)]
-    if any(inner.exterior.distance(Point(p[0], p[1])) > RIM_TOLERANCE_M for p in rim):
-        return "door_not_on_inner_wall"
-    door_zone = segment.plan_rect(door.s0 - 0.3, door.s0 + door.width + 0.3, -(ic.wall_thickness_m + ic.door_clearance_m), -ic.wall_thickness_m)
-    if not inner.buffer(1e-3).contains(door_zone):
-        return "no_room_behind_door"
+    problem = _door_problem(inner, door, segment, ic)
+    if problem is not None:
+        return problem
+    door_zone = _door_zone(segment, door, ic)
 
     if floors < 2:
         return InteriorPlan(building_id, inner, floors, storey_m, door, segment, ())
@@ -255,6 +322,73 @@ def plan_interior(
     return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights))
 
 
+def _bay_boundary(a: Hole, b: Hole) -> float:
+    """Where the wall between the bays of ``a`` and ``b`` (same wall, ``a`` first) goes: the middle bay boundary."""
+    ca, cb = a.s0 + a.width / 2, b.s0 + b.width / 2
+    columns = b.column - a.column
+    return ca + (cb - ca) / columns * ((columns - 1) // 2 + 0.5)
+
+
+def _bay_door(room: Polygon, bay: Hole, seg: Segment, ic: Interiors) -> Hole | None:
+    """The walkable door centred on a shop's shopfront bay, or ``None`` when it does not lead into ``room``."""
+    width = ic.door.width_m
+    door = Hole("interior_door", bay.segment, bay.s0 + (bay.width - width) / 2, 0.0, width, ic.door.height_m,
+                ic.wall_thickness_m, None, bay.column, 0)
+    return door if _door_problem(room, door, seg, ic) is None else None
+
+
+def plan_shop_rooms(
+    plan: InteriorPlan, refined: BaseGeometry, layout: Layout, segments: Sequence[Segment], shops: Sequence[Shop], cfg: DetailConfig,
+) -> InteriorPlan:
+    """Split a shop's one storey into one room per shop and add a room for each other part with a shopfront.
+
+    Each shop takes its shopfront as ``plan_shops`` will (``shop_bays``). Between two shops whose
+    shopfronts are on the door's wall, a ``PARTITION_M`` wall runs across the room, perpendicular to
+    that wall, on the middle bay boundary between their shopfronts. Every other part of the footprint
+    whose inner ring holds a shopfront is one more room. A shop belongs to the room its shopfront
+    opens into; a shop without one belongs to the room of the main door. The room of the main door
+    keeps it. Any other room with a shop gets a walkable door in place of its first shop's
+    shopfront, which ``layout`` loses; a room left without a door is seen through its windows only.
+    Each room takes the category of its shops, or of every shop when it has none.
+    """
+    ic = cfg.interiors
+    t = ic.wall_thickness_m
+    seg = plan.door_segment
+    bays = shop_bays(shops, layout.holes, segments)
+    front = sorted((bay for bay in bays if bay is not None and bay.segment == seg.index), key=lambda bay: bay.s0)
+    reach = refined.length  # longer than any line across the footprint
+    cuts = [seg.plan_rect(s - PARTITION_M / 2, s + PARTITION_M / 2, -reach, reach)
+            for s in (_bay_boundary(a, b) for a, b in pairwise(front))]
+    pieces = polygons_of(plan.inner.difference(unary_union(cuts)))
+    fronts = [h for h in layout.holes if h.kind == "shopfront"]
+    for part in polygons_of(refined):
+        inner = _inset(part, t)
+        if part.intersects(plan.inner) or inner.geom_type != "Polygon" or inner.is_empty:
+            continue
+        if any(_rim_on(inner, segments[h.segment], h, t) for h in fronts):
+            pieces.append(inner)
+    pieces = [orient(piece) for piece in pieces]
+    home = next(i for i, piece in enumerate(pieces) if _rim_on(piece, seg, plan.door, t))
+    owner = [next((i for i, piece in enumerate(pieces) if bay is not None and _rim_on(piece, segments[bay.segment], bay, t)), home)
+             for bay in bays]
+    every = shop_category([tags for _, tags, _ in shops], cfg)
+    rooms: list[Room] = []
+    for i in [home, *(i for i in range(len(pieces)) if i != home)]:
+        held = tuple(k for k, o in enumerate(owner) if o == i)
+        category = shop_category([shops[k][1] for k in held], cfg) if held else every
+        entrance: tuple[Hole, Segment] | None = (plan.door, seg)
+        if i != home:
+            # Only the room of the main door holds a shop without a shopfront, so ``held`` shops have one here.
+            bay = bays[held[0]] if held else None
+            door = None if bay is None else _bay_door(pieces[i], bay, segments[bay.segment], ic)
+            entrance = None if door is None else (door, segments[door.segment])
+            layout.holes = [door if h == bay and door is not None else h for h in layout.holes]
+        rooms.append(Room(pieces[i], entrance, category, held))
+    area = unary_union(pieces)
+    hosts = unary_union([part for part in polygons_of(refined) if part.intersects(area)])
+    return replace(plan, inner=pieces[home], rooms=tuple(rooms), hosts=hosts)
+
+
 def _probe_columns(inner: Polygon, wells: BaseGeometry) -> list[tuple[float, float]]:
     """Grid points across the room's rotated rectangle that stay inside it, off the walls and the wells."""
     free = inner.buffer(-PROBE_INSET_M).difference(wells)
@@ -279,18 +413,21 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]]) -> dict[s
     under the ceiling at the room's centroid, or at a point of the room clear of the
     stair wells when the centroid falls in one. ``range_m`` reaches the corners of the
     room's rotated rectangle, clamped. ``probes_m`` is a flat list of x, y, z triples:
-    one layer above the floor and one under the ceiling.
+    one layer above the floor and one under the ceiling. A shop's rooms are ``plan.rooms``, in order;
+    a courtyard is not part of the room, so a centroid in it moves too.
     """
     wells = unary_union([flight.well.buffer(WELL_CLEARANCE_M) for flight in plan.flights])
-    clear = plan.inner.difference(wells)
-    centre = plan.inner.centroid
-    if not clear.contains(centre):
-        centre = clear.representative_point()
-    corners = list(plan.inner.minimum_rotated_rectangle.exterior.coords)
-    reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
-    columns = _probe_columns(plan.inner, wells)
+    areas = [room.polygon for room in plan.rooms] or [plan.inner] * len(rooms)
     anchors = []
-    for room in rooms:
+    for index, room in enumerate(rooms):
+        area = areas[index]
+        clear = area.difference(wells)
+        centre = area.centroid
+        if not clear.contains(centre):
+            centre = clear.representative_point()
+        corners = list(area.minimum_rotated_rectangle.exterior.coords)
+        reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
+        columns = _probe_columns(area, wells)
         floor, ceiling = float(room["floor_z_m"]), float(room["ceiling_z_m"])
         probes: list[float] = []
         for z in (floor + PROBE_LOW_M, ceiling - PROBE_HIGH_BELOW_CEILING_M):
@@ -337,39 +474,47 @@ def _locate_cut(coords: Sequence[tuple[float, float]], cut: WallCut) -> tuple[in
     return None
 
 
+def _rings(rooms: BaseGeometry) -> list[list[tuple[float, float]]]:
+    """Every ring of every room, outer ring and courtyards alike."""
+    return [list(ring.coords) for room in polygons_of(rooms) for ring in (room.exterior, *room.interiors)]
+
+
 def pierce_room_windows(
     layout: Layout,
     segments: Sequence[Segment],
-    inner: Polygon,
+    inner: BaseGeometry,
     footprint: BaseGeometry,
     thickness: float,
     ceiling_z: float,
+    hosts: BaseGeometry | None = None,
 ) -> tuple[int, int]:
     """Put one see-through pane in glass the player can reach from the room.
 
     A window, shopfront, or balcony door below the accessible ceiling becomes
     a hole of ``thickness`` with a single ``glass_view`` quad when that opening
-    lands on the inner wall. The inner wall is cut on the same span. Otherwise
-    the opening is removed. Glass above the ceiling stays ``glass_dark``.
+    lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
+    the opening is removed. Glass above the ceiling stays ``glass_dark``, and so does glass in a wall
+    of a footprint part outside ``hosts`` (the parts that hold a room; ``None`` checks no part).
     Returns how many openings were pierced and how many were removed.
     """
-    coords = list(inner.exterior.coords)
+    rings = _rings(inner)
+    edges = [edge for coords in rings for edge in pairwise(coords)]
     opened = omitted = 0
     kept: list[Hole] = []
     for hole in layout.holes:
         if hole.kind not in ROOM_GLASS or hole.v0 >= ceiling_z - 1e-6:
             kept.append(hole)
             continue
+        seg = segments[hole.segment]
+        if hosts is not None and hosts.boundary.distance(Point(seg.a)) > RIM_TOLERANCE_M:
+            kept.append(hole)  # a wall of a part without a room
+            continue
         if hole.v0 + hole.height > ceiling_z + 1e-3:
             omitted += 1
             continue
-        seg = segments[hole.segment]
         recess = seg.plan_rect(hole.s0, hole.s0 + hole.width, -thickness, 0.0)
-        ends = (seg.point(hole.s0, 0.0, thickness), seg.point(hole.s0 + hole.width, 0.0, thickness))
-        on_inner = any(
-            _edge_parameters(ax, ay, bx, by, ends[0], ends[1]) is not None
-            for (ax, ay), (bx, by) in zip(coords[:-1], coords[1:], strict=True)
-        )
+        ends = (seg.point(hole.s0, depth_in=thickness), seg.point(hole.s0 + hole.width, depth_in=thickness))
+        on_inner = any(_edge_parameters(ax, ay, bx, by, ends[0], ends[1]) is not None for (ax, ay), (bx, by) in edges)
         if not on_inner or not footprint.buffer(1e-6).contains(recess):
             omitted += 1
             continue
@@ -405,9 +550,16 @@ def room_window_cuts(layout: Layout, segments: Sequence[Segment]) -> list[WallCu
 
 
 def _inner_walls(inner: Polygon, z0: float, z1: float, cuts: Sequence[WallCut]) -> Mesh:
-    """Inward-facing walls on the inner ring, with door and window cuts."""
+    """Inward-facing walls on every ring of the room, with door and window cuts.
+
+    ``inner`` is oriented (outer ring counter-clockwise, courtyards clockwise), so the right of
+    each edge is away from the room on both: a courtyard's walls face into the room too.
+    """
+    return merge(_ring_inner_walls(coords, z0, z1, cuts) for coords in _rings(inner))
+
+
+def _ring_inner_walls(coords: Sequence[tuple[float, float]], z0: float, z1: float, cuts: Sequence[WallCut]) -> Mesh:
     parts: list[Mesh] = []
-    coords = list(inner.exterior.coords)
     grouped: dict[int, list[tuple[float, float, float, float]]] = {}
     for cut in cuts:
         located = _locate_cut(coords, cut)
@@ -451,15 +603,14 @@ def _pane(seg: Segment, hole: Hole, thickness: float) -> Mesh:
 
 def _pierced_walls(
     ring: BaseGeometry,
-    gap: Polygon,
+    doors: Sequence[tuple[Polygon, float]],
     penetrations: Sequence[tuple[Segment, Hole]],
     thickness: float,
-    door_height: float,
     z_top: float,
 ) -> tuple[list[tuple[str, Mesh]], list[Mesh]]:
-    """Concrete bands with the door and each see-through opening removed, plus one pane per opening.
+    """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per opening.
 
-    Bands split on the door head and on every opening edge, so a band is either fully
+    Bands split on the door heads and on every opening edge, so a band is either fully
     open or fully solid. The band above an opening keeps the full ring: a downward
     navmesh ray still hits concrete, and the sill or the pier still stops a body.
     """
@@ -470,7 +621,7 @@ def _pierced_walls(
             -(thickness + CUT_OVERLAP_M), CUT_OVERLAP_M,
         )
         cuts.append((rect, hole.v0, hole.v0 + hole.height))
-    levels = {0.0, float(door_height), float(z_top)}
+    levels = {0.0, float(z_top), *(float(height) for _, height in doors)}
     for _, z0, z1 in cuts:
         if 1e-4 < z0 < z_top:
             levels.add(float(z0))
@@ -482,8 +633,9 @@ def _pierced_walls(
         if zb - za < 1e-4:
             continue
         poly: BaseGeometry = ring
-        if zb <= door_height + 1e-6:
-            poly = poly.difference(gap)
+        for gap, height in doors:
+            if za < height:  # the band is below this door's head: the levels split on it
+                poly = poly.difference(gap)
         for rect, z0, z1 in cuts:
             if z0 <= za + 1e-6 and zb <= z1 + 1e-6:
                 poly = poly.difference(rect)
@@ -503,6 +655,25 @@ def room_ceiling(plan: InteriorPlan, height: float, slab_m: float) -> float:
     return height - slab_m if top >= height - 1e-3 else top
 
 
+def _shop_record(category: ShopCategory) -> dict[str, Any]:
+    return {"category": category.name, "wall_material": category.wall, "floor_material": category.floor, "attribute_origin": "generated"}
+
+
+def _shop_room(building_id: str, index: int, room: Room, ceiling: float) -> dict[str, Any]:
+    """The record of one shop room: ``<building>/L0``, then ``<building>/L0-<n>``. ``reachable`` says whether it has a door."""
+    record: dict[str, Any] = {"id": f"{building_id}/L0" + (f"-{index}" if index else ""), "level": 0, "floor_z_m": 0.0,
+                              "ceiling_z_m": round(ceiling, 3), "area_m2": round(room.polygon.area, 3),
+                              "reachable": room.entrance is not None, "shops": list(room.shops)}
+    if room.category is not None:
+        record["shop"] = _shop_record(room.category)
+    return record
+
+
+def _ground_rooms(plan: InteriorPlan) -> tuple[Room, ...]:
+    """The ground-floor rooms: every shop room, or the one room behind the door."""
+    return plan.rooms or (Room(plan.inner, (plan.door, plan.door_segment)),)
+
+
 def interior_visual(
     plan: InteriorPlan,
     height: float,
@@ -514,20 +685,25 @@ def interior_visual(
 ) -> dict[str, list[Mesh]]:
     """The meshes the planned interior draws, by material. No collider.
 
-    ``wall_material`` and ``floor_material`` paint the room's walls and ground floor (a shop's colours);
-    ceilings, slabs and upper floors keep ``interior_wall`` and ``interior_floor``. The scene counts these
-    triangles against the interior budget before it builds the shell and the colliders (``assemble_interior``).
+    ``wall_material`` and ``floor_material`` paint the room's walls and ground floor; a shop room takes its
+    category's colours instead. Ceilings, slabs and upper floors keep ``interior_wall`` and ``interior_floor``.
+    The scene counts these triangles against the interior budget before it builds the shell and the
+    colliders (``assemble_interior``).
     """
     ic = cfg.interiors
     s, t = plan.storey_m, ic.wall_thickness_m
-    seg, door = plan.door_segment, plan.door
-    rim = (seg.point(door.s0, depth_in=t), seg.point(door.s0 + door.width, depth_in=t))
     top = room_ceiling(plan, height, ic.slab_m)
     visual: dict[str, list[Mesh]] = {"interior_wall": [], "interior_floor": [], "stair": [], wall_material: [], floor_material: []}
-    visual[wall_material].append(_inner_walls(plan.inner, 0.0, top, ((rim[0], rim[1], 0.0, door.height), *window_cuts)))
-    visual[floor_material].append(cap(plan.inner, 0.0))
+    for room in _ground_rooms(plan):
+        cuts = list(window_cuts)
+        if room.entrance is not None:
+            door, seg = room.entrance
+            cuts.append((seg.point(door.s0, depth_in=t), seg.point(door.s0 + door.width, depth_in=t), 0.0, door.height))
+        paint = (room.category.wall, room.category.floor) if room.category is not None else (wall_material, floor_material)
+        visual.setdefault(paint[0], []).append(_inner_walls(room.polygon, 0.0, top, cuts))
+        visual.setdefault(paint[1], []).append(cap(room.polygon, 0.0))
     if not _climbs_to_roof(plan):
-        visual["interior_wall"].append(cap(plan.inner, top, up=False))
+        visual["interior_wall"].append(cap(plan.ground, top, up=False))
     for flight in plan.flights:
         z_floor = (flight.level + 1) * s
         plate = plan.inner.difference(flight.well)
@@ -591,25 +767,33 @@ def assemble_interior(
     """The interior that draws ``visual`` (``interior_visual``): its colliders and panes, rooms, connections and checks."""
     ic = cfg.interiors
     s, k, t = plan.storey_m, plan.floors, ic.wall_thickness_m
-    seg, door = plan.door_segment, plan.door
+    ground = _ground_rooms(plan)
+    area = plan.ground
     top = room_ceiling(plan, height, ic.slab_m)
     under_roof = top < k * s
+    doors = [(seg.plan_rect(door.s0, door.s0 + door.width, -(t + CUT_OVERLAP_M), CUT_OVERLAP_M), door.height)
+             for door, seg in (room.entrance for room in ground if room.entrance is not None)]
     colliders: list[tuple[str, Mesh]] = []
 
-    ring = refined.difference(plan.inner)
-    gap = seg.plan_rect(door.s0, door.s0 + door.width, -(t + CUT_OVERLAP_M), CUT_OVERLAP_M)
-    wall_parts, glass = _pierced_walls(ring, gap, penetrations, t, door.height, z_top)
+    # Everything outside the rooms stays solid: the outer walls, the partitions, and a part without a room.
+    wall_parts, glass = _pierced_walls(refined.difference(area), doors, penetrations, t, z_top)
     colliders.extend(wall_parts)
     if not _climbs_to_roof(plan):
         # A room under the roof is closed by a roof slab; otherwise the storeys above stay solid.
-        colliders.append(("roof_slab" if under_roof else "upper_solid", prism(plan.inner, top, height, bottom=True)))
+        colliders.append(("roof_slab" if under_roof else "upper_solid", prism(area, top, height, bottom=True)))
 
     rooms = [{"id": f"{plan.building_id}/L{i}", "level": i, "floor_z_m": round(i * s, 3),
               "ceiling_z_m": round(top if i + 1 == k else (i + 1) * s - ic.slab_m, 3), "area_m2": round(plan.inner.area, 3)} for i in range(k)]
-    connections: list[dict[str, Any]] = [{
-        "type": "door", "from": "exterior", "to": rooms[0]["id"], "width_m": door.width, "height_m": door.height,
-        "position_m": [round(float(v), 3) for v in seg.point(door.s0 + door.width / 2)[:2]],
-    }]
+    if plan.rooms:
+        rooms = [_shop_room(plan.building_id, index, room, top) for index, room in enumerate(plan.rooms)]
+    connections: list[dict[str, Any]] = []
+    for index, room in enumerate(ground):  # a stair interior has one ground room and a record per floor
+        if room.entrance is not None:
+            door, seg = room.entrance
+            connections.append({
+                "type": "door", "from": "exterior", "to": rooms[index]["id"], "width_m": door.width, "height_m": door.height,
+                "position_m": [round(float(v), 3) for v in seg.point(door.s0 + door.width / 2)[:2]],
+            })
     roof_well: Polygon | None = None
     for flight in plan.flights:
         g = flight.geometry
@@ -657,6 +841,8 @@ def assemble_interior(
         "roof_access": roof_well is not None,
         "glass_panes": len(glass),
     }
+    if plan.rooms and plan.rooms[0].category is not None:
+        spec["shop"] = _shop_record(plan.rooms[0].category)
     built = Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)
     built.glass_colliders = glass
     built.light_anchors = light_anchors(plan, rooms)

@@ -143,6 +143,46 @@ def test_party_walls_have_no_openings(detailed) -> None:
     assert ((glass[:, 0] < -14.5) & (glass[:, 1] > 18)).any()
 
 
+def _wall_faces(meshes: list[Mesh], x: float, nx: float) -> np.ndarray:
+    """Triangles lying on the plane ``x`` and facing ``nx`` (+1 east, -1 west), as an (n, 3, 3) array."""
+    tri = np.concatenate([m.vertices[m.triangles] for m in meshes if m.triangle_count])
+    normal = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    on = np.all(np.abs(tri[:, :, 0] - x) < 0.01, axis=1) & (normal[:, 0] * nx > 0)
+    return tri[on]
+
+
+def test_party_walls_against_a_neighbour_leave_the_visual_mesh(detail_inputs: tuple[Path, Path, Path]) -> None:
+    detailed = _detail(detail_inputs)  # in the test, not the module fixture, so mutation testing runs it
+    objs = {n: _obj(detailed, f"building/osm-way-{n}") for n in (311, 312, 313)}
+    walls = {n: o.record["facade"]["materials"]["wall"] for n, o in objs.items()}
+    top = {n: max(float(p.mesh.vertices[:, 2].max()) for p in o.visual if p.material == walls[n]) for n, o in objs.items()}
+    assert top[311] < top[312] and top[313] < top[312]
+    areas = {n: o.record["facade"]["wall_area_m2"] for n, o in objs.items()}
+    # 311 and 313 are lower than 312: their walls against it are hidden whole.
+    assert areas[311]["hidden"] == pytest.approx(12 * top[311], abs=0.1) and areas[311]["party"] == 0.0
+    assert areas[313]["hidden"] == pytest.approx(14 * top[313], abs=0.1) and areas[313]["party"] == 0.0
+    # 312 keeps its wall above each neighbour, and the 2 m blind run past 313 (y 20–22) whole.
+    assert areas[312]["hidden"] == pytest.approx(12 * top[311] + 14 * top[313], abs=0.1)
+    assert areas[312]["party"] == pytest.approx(12 * (top[312] - top[311]) + 14 * (top[312] - top[313]) + 2 * top[312], abs=0.1)
+    for n, perimeter in ((311, 54.0), (312, 62.0), (313, 56.0)):
+        assert sum(areas[n].values()) == pytest.approx(perimeter * top[n], abs=0.2)
+        assert objs[n].record["materials"] == [p.material for p in objs[n].visual]
+        assert objs[n].record["visual"]["triangles"] == sum(p.mesh.triangle_count for p in objs[n].visual)
+    # Nothing of 311 faces east on x = -15; 312 faces west there only above 311, in its party material.
+    assert not len(_wall_faces([p.mesh for p in objs[311].visual], -15.0, 1.0))
+    party = _wall_faces([p.mesh for p in objs[312].visual if p.material == f"party_{walls[312]}"], -15.0, -1.0)
+    assert party[:, :, 2].min() == pytest.approx(top[311]) and party[:, :, 2].max() == pytest.approx(top[312])
+    assert party[:, :, 1].min() == pytest.approx(6.0, abs=0.01) and party[:, :, 1].max() == pytest.approx(18.0, abs=0.01)
+    assert f"party_{walls[312]}" in objs[312].record["materials"] and f"party_{walls[311]}" not in objs[311].record["materials"]
+    # The collider keeps the whole wall.
+    assert len(_wall_faces(objs[311].colliders, -15.0, 1.0))
+    report = detailed.report()["counts"]["wall_area_m2"]
+    buildings = [o.record["facade"]["wall_area_m2"] for o in detailed.objects if o.type == "building"]
+    assert set(report) == {"street", "party", "hidden"}
+    assert all(report[k] == pytest.approx(sum(b[k] for b in buildings), abs=0.5) for k in report)
+    assert report["hidden"] > 0 and report["party"] > 0 and report["street"] > 0
+
+
 def test_shop_evidence_turns_the_ground_floor_into_shopfronts(detailed) -> None:
     shop = _obj(detailed, "building/osm-way-312").record["facade"]
     assert shop["ground_floor"] == "shopfront" and shop["ground_floor_evidence"]["source"] == "osm_poi"

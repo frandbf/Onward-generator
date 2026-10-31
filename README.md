@@ -33,7 +33,7 @@ tools/docker/run.sh onward-generator doctor
 tools/docker/run.sh --build pytest -q
 ```
 
-`--build` rebuilds the image first; use it after a lock file changes.
+`--build` rebuilds the image first; use it after a lock file changes. The wrapper also mounts `${XDG_CACHE_HOME:-~/.cache}/onward-generator`, so the texture tile cache (`docs/08-dress.md`) is kept between runs.
 
 **Local virtual environment.**
 
@@ -63,8 +63,9 @@ onward-generator run \
 ```
 
 - `--radius-m` is half the side of the square, in metres (50–1500, default 400). `--margin-m` defaults to 30. `--lightmap-texels-per-m` defaults to 10 and cannot exceed 40.
+- `--core-radius-m` (default 150) is half the side of the playable core. Past it, buildings are plain scenic shells with no openings, interiors, signs or colliders, and the wall stands on the core edge, so a larger map stays near the Quest triangle budget. `0`, or a value at or above the radius, plays the whole map ([ADR-017](docs/decisions/ADR-017-playable-core.md)).
 - `--brief` is stored on the map and read by overgrow. `--ai` asks local Ollama for a placement plan; a rejected reply falls back to the rules. `--panoramax` (under development) projects street photos onto facades.
-- `--verbose` prints each stage's full output. `--no-unity` stops after `export` and prints the Unity command for the host; `task map` always uses it.
+- `--verbose` prints each stage's full output. `--preview` also draws the diagnostic PNGs of `generate` and `detail`, which `run` skips by default. `--no-unity` stops after `export` and prints the Unity command for the host; `task map` always uses it.
 
 `run` creates `maps/<id>/` from the name, downloads that square from Overpass, and runs:
 
@@ -183,6 +184,7 @@ Read [docs/01](docs/01-pipeline.md) through [docs/12](docs/12-export.md) in orde
 - [docs/abandoned-assets.md](docs/abandoned-assets.md): the props overgrow can place, with a picture of each.
 - [docs/legal/data-sources.md](docs/legal/data-sources.md): licences, attribution and ODbL obligations.
 - [docs/plans/](docs/plans/): measured studies and work plans (in Spanish), such as the [speed and scale plan](docs/plans/2026-10-30-scale-and-speed.md).
+  - [Realism sources](docs/plans/2026-10-30-realism-sources.md): global data sources (Overture, OSM 3D tags, canopy height), per-country plugins (LiDAR, LoD2) and the top 8 realism opportunities.
 
 ## Layout
 

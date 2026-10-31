@@ -18,6 +18,8 @@ Returns `0` when the phase 03 → 04 check passes (no critical error) and `1` ot
 - `heights.json` computed from **that same scene**. The SHA-256 stored in `heights.json` must match.
 - `config/generation.default.json`, validated with `config/generation.schema.json`. It sets way classes (`vehicular` and `pedestrian`) and default widths, sidewalk width (2 m), carriageway depth (0.15 m), water and green tags, the collision simplification tolerance, and the materials.
 
+`detail`, `dress style` and `perf layout` rebuild phase 03 from the same two files. Within one process the last build is kept, keyed by the resolved path and SHA-256 of `geo_scene.json` and `heights.json` and the configuration's SHA-256, and a later call with the same key gets a copy of it. `run` executes every stage in one process, so it builds phase 03 once instead of four times. A stage run on its own still builds it. Nothing is kept on disk: the check in `detail` (see `docs/07-detail.md`, Inputs) compares the stored manifest with what this code builds, and a file left by older code could not prove that.
+
 ## What is built
 
 | Object | Geometry | z | Origin |
@@ -63,7 +65,7 @@ On the Madrid test extract (141 strips, 32 OSM crossings): 26 strips observed, 1
 | `scene_collision.glb` | One `<id>#collider` node per collider, one material |
 | `scene3d.json` | `onward_generator.scene3d` 0.1.0: inputs with SHA-256, attributions (OSM and Catastro), the frame and glTF axes, and one record per object |
 | `generation_report.json` | `onward_generator.generation_report` 0.1.0: triangle, vertex, material, and collider counts; area by class; checks; issues; `phase_03_exit` |
-| `preview_southwest.png`, `preview_northeast.png` | Axonometric views rendered with no extra dependencies |
+| `preview_southwest.png`, `preview_northeast.png` | Axonometric views rendered with no extra dependencies. Not written with `--no-preview`, which `run` passes unless given `--preview` |
 
 Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 

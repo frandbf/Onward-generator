@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 from shapely import LineString, Point, Polygon, STRtree
 
 from onward_generator.generation.config import Material
@@ -21,7 +22,7 @@ from onward_generator.overgrow.library import load_library, read_library
 from onward_generator.overgrow.normalize import cluster_decimate, normalize_arrays
 from onward_generator.overgrow.place import overgrow
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
-from onward_generator.overgrow.zone import radius_zone, square_zone
+from onward_generator.overgrow.zone import ZoneError, radius_zone, square_zone, within_core, zone_from_polygon
 from tests.conftest import MURCIA_CENTER
 
 
@@ -750,3 +751,32 @@ def test_overgrow_covers_avoid_trees_and_spawns_and_sit_on_the_floor(tmp_path: P
         assert float(np.hypot(point[0] - plain[0][0], point[1] - plain[0][1])) >= 1.5
         assert float(np.hypot(point[0] - plain[1][0], point[1] - plain[1][1])) >= 5.0
     assert [plain[2][0], plain[2][1], -0.2] in moved
+
+
+def test_the_zone_is_cut_to_the_playable_core() -> None:
+    from shapely import Polygon, box
+
+    zone = square_zone(80)
+    assert within_core(zone, None) is zone
+    inner = square_zone(40)
+    assert within_core(inner, box(-100, -100, 100, 100)) is inner
+    cut = within_core(zone, box(-50, -50, 50, 50))
+    assert cut.kind == "square" and cut.polygon.bounds == (-50, -50, 50, 50)
+    with pytest.raises(ZoneError, match="does not overlap the playable core"):
+        within_core(zone_from_polygon(box(200, 200, 260, 260)), box(-50, -50, 50, 50))
+    # Two bars joined outside the core leave two pieces inside it.
+    u_shape = Polygon([(-40, -100), (40, -100), (40, 100), (30, 100), (30, -90), (-30, -90), (-30, 100), (-40, 100)])
+    with pytest.raises(ZoneError, match="^the zone does not overlap the playable core in one piece$"):
+        within_core(zone_from_polygon(u_shape), box(-50, -50, 50, 50))
+
+
+def test_overgrow_keeps_its_zone_inside_the_core(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    manifest = tmp_path / "base" / "scene_detail.json"
+    manifest.write_text(json.dumps({**json.loads(manifest.read_text(encoding="utf-8")), "core": {"half_side_m": 50.0}}),
+                        encoding="utf-8")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", seed=48152, zone=square_zone(80))
+    assert report["zone"]["key"] == within_core(square_zone(80), square_zone(50).polygon).stable_key()
+    assert report["zone"]["key"] != square_zone(80).stable_key()

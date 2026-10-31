@@ -23,8 +23,12 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator import __version__
 from onward_generator.detail.config import DetailConfig, Template
 from onward_generator.detail.facades import (
+    HIDDEN_GAP_M,
     Layout,
+    Segment,
+    Shell,
     Storeys,
+    WallAreas,
     build_shell,
     cut_roof_deck,
     door_walls,
@@ -34,6 +38,7 @@ from onward_generator.detail.facades import (
     interior_storey,
     layout_segment,
     refine_exposure,
+    split_blank_walls,
     stable_unit,
     storeys_for,
     wall_uv_frame,
@@ -48,6 +53,7 @@ from onward_generator.detail.interiors import (
     interior_visual,
     pierce_room_windows,
     plan_interior,
+    plan_shop_rooms,
     rectangularity,
     room_ceiling,
     room_window_cuts,
@@ -55,13 +61,14 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
-from onward_generator.detail.shops import plan_shops, shop_category
+from onward_generator.detail.shops import plan_shops
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
-from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene
+from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
@@ -98,6 +105,7 @@ class DetailedScene:
     config: DetailConfig
     inputs: dict[str, Any]
     stats: dict[str, Any] = field(default_factory=dict)
+    core: dict[str, Any] | None = None  # ADR-017: half-side and building counts, None without a core
 
     @property
     def critical(self) -> list[Issue]:
@@ -147,6 +155,7 @@ class DetailedScene:
             "attribution": self.base.attribution,
             "frame": self.base.manifest()["frame"],
             "files": {"visual": "scene_visual.glb", "collision": "scene_collision.glb"},
+            "core": self.core,
             "prototypes": {k: {"triangles": p.triangle_count, "materials": [m for m, _ in p.parts],
                                "collider_triangles": p.collider.triangle_count if p.collider is not None else 0}
                            for k, p in sorted(self.prototypes.items())},
@@ -473,6 +482,58 @@ def _building_parts(
     return objects, issues
 
 
+def _scenic_building(o: Any, geom: BaseGeometry, landmark: bool, use: FacadeUse, cfg: DetailConfig) -> DetailObject:
+    """A scenic-tier building (ADR-017): its footprint extruded to its height, walls and a flat roof cap, no collider.
+
+    No openings, doors, parapets, hip roofs, towers, interiors or shops. The wall is one of
+    the shared scenic materials and the roof is ``SCENIC_ROOF``, so a ring cell is a few draws.
+    """
+    bid = o.record["source_ids"][0]
+    height = float(o.record["height"]["height_m"])
+    wall = scenic_wall(cfg.seed, bid)
+    visual = [Primitive(walls(geom, 0.0, height), wall), Primitive(cap(geom, height), SCENIC_ROOF)]
+    roof = {"type": "flat", "material": SCENIC_ROOF, "origin": "generated", "roof_shape": "flat"}
+    record = {
+        # The phase-03 checks describe the phase-03 mesh; every other key below replaces its phase-03 value.
+        **{k: v for k, v in o.record.items() if k != "checks"},
+        "tier": SCENIC,
+        "generation": {"method": "phase03_volume + scenic shell", "phase03": o.record.get("generation"),
+                       "template_config_version": cfg.version, "seed": cfg.seed},
+        "facade": {
+            "template": "scenic_shell",
+            "representation": "scenic_shell",
+            "representative_of_real_facade": False,
+            "attribute_origin": "generated",
+            "note": FIDELITY_NOTE,
+            "needs_custom_model": landmark,
+            "ground_floor": "none",
+            "openings": {},
+            "shops": [],
+            "materials": {"wall": wall, "wall_origin": "generated", "roof": SCENIC_ROOF, "roof_origin": "generated"},
+            "use": use.to_record(),
+            "door": "none",
+        },
+        "roof": roof,
+        "interior": False,
+        "materials": [p.material for p in visual],
+        "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
+        "collider": {"source": "none_scenic", "parts": 0, "triangles": 0, "balconies": 0, "glass_panes": 0},
+    }
+    return DetailObject(o.id, "building", visual, [], record)
+
+
+def _tier_counts(objects: list[DetailObject], dropped_elements: int) -> dict[str, Any]:
+    """Buildings, visual and collision triangles of the objects that carry a tier (ADR-017)."""
+    counts: dict[str, Any] = {t: {"buildings": 0, "visual_triangles": 0, "collision_triangles": 0} for t in (CORE, SCENIC)}
+    for x in (o for o in objects if "tier" in o.record):
+        entry = counts[x.record["tier"]]
+        entry["buildings"] += x.type == "building"
+        entry["visual_triangles"] += sum(p.mesh.triangle_count for p in x.visual)
+        entry["collision_triangles"] += sum(m.triangle_count for m in (*x.colliders, *x.glass_colliders))
+    counts[SCENIC]["urban_elements_dropped"] = dropped_elements
+    return counts
+
+
 ExtraUrban = Callable[
     [BaseGeometry, BaseGeometry, Mapping[str, Prototype], DetailConfig, list[Element]],
     tuple[list[Element], list[Rejected]],
@@ -488,7 +549,11 @@ def detail_scene(
     *,
     prototypes: Mapping[str, Prototype] | None = None,
     extra_urban: ExtraUrban | None = None,
+    core_half_side_m: float | None = None,
 ) -> DetailedScene:
+    """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
+    outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge."""
+    core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
     scene = json.loads(Path(scene_path).expanduser().read_text(encoding="utf-8"))
     height_of = {b["building_id"]: b for b in heights.get("buildings", [])}
@@ -503,7 +568,8 @@ def detail_scene(
     evidence = _shop_evidence(features, footprints, cfg)
     facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
 
-    candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids]
+    tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
+    candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids if tier_of[bid] == CORE]
     interior_queue = _select_interiors(candidates, cfg, issues)
     interiors_left = interior_quota(cfg)
 
@@ -531,12 +597,17 @@ def detail_scene(
     order = sorted(building_objs, key=queue_key)
     leading_issues = len(issues)
     emitted: dict[str, tuple[list[DetailObject], list[Issue]]] = {}
+    core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]] = {}
 
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
         geom = footprints[bid]
         h = height_of[bid]
+        if tier_of[bid] == SCENIC:
+            objects.append(_scenic_building(o, geom, bool(h.get("landmark")), facade_walls[bid][0], cfg))
+            emitted[o.id] = (objects[first_object:], issues[first_issue:])
+            continue
         height = float(o.record["height"]["height_m"])
         landmark = bool(h.get("landmark"))
         template = cfg.template_for(str(h.get("category")), landmark)
@@ -585,7 +656,10 @@ def detail_scene(
                 bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
                 roof_access=shell_template.parapet_m > 0,
                 max_floors=1 if shop else None,
+                several_parts=shop,
             ) if door else "no_door_position"
+            if shop and not isinstance(plan, str):
+                plan = plan_shop_rooms(plan, refined, trial, segments, _shops_of(evidence[bid], feature_of, tags), cfg)
             if isinstance(plan, str):
                 issues.append(Issue("interior_not_generated", "info", bid, plan))
             else:
@@ -597,21 +671,17 @@ def detail_scene(
             layout = run_layout(*plain_door, storeys)
         doors_on = door_walls(segments, others, cfg)
         door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
-        opened_windows = omitted_windows = 0
-        category = shop_category([t for _, t, _ in _shops_of(evidence[bid], feature_of, tags)], cfg) if shop else None
+        opened_windows = omitted_windows = 0  # pragma: no mutate: read only when an interior is built, and building one pierces the windows first
         budget = budgets[shop]
         shell = built = refusal = None
         if interior is not None:
             opened_windows, omitted_windows = pierce_room_windows(
-                layout, segments, interior.inner, refined, cfg.interiors.wall_thickness_m,
-                room_ceiling(interior, height, cfg.interiors.slab_m),
+                layout, segments, interior.ground, refined, cfg.interiors.wall_thickness_m,
+                room_ceiling(interior, height, cfg.interiors.slab_m), interior.hosts,
             )
             # The drawn triangles are counted before the shell and the colliders are built, so an
             # interior over the budget costs its plan and its visual meshes, not a whole building.
-            drawn = interior_visual(
-                interior, height, cfg, room_window_cuts(layout, segments),
-                **({"wall_material": category.wall, "floor_material": category.floor} if category else {}),
-            )
+            drawn = interior_visual(interior, height, cfg, room_window_cuts(layout, segments))
             refusal = budget.refuse("triangles", visual_triangles(drawn))
             if refusal is None:
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
@@ -652,7 +722,7 @@ def detail_scene(
             if shell.parapet_collider is not None and built.roof_well is not None:
                 colliders.append(shell.parapet_collider)
             interior_record = built.spec | {
-                "kind": "shop" if category else "residential",
+                "kind": "shop" if shop else "residential",
                 "checks": built.checks,
                 "collider_parts": [n for n, _ in built.colliders],
                 "through_windows": opened_windows,
@@ -660,9 +730,6 @@ def detail_scene(
                 "visual_triangles": built.visual_triangles,
                 "collision_triangles": built.collision_triangles,
             }
-            if category:
-                interior_record["shop"] = {"category": category.name, "wall_material": category.wall,
-                                           "floor_material": category.floor, "attribute_origin": "generated"}
             objects.append(DetailObject(
                 f"interior/{bid}", "interior",
                 [Primitive(merge(ms), mat) for mat, ms in sorted(built.visual.items()) if ms],
@@ -671,8 +738,8 @@ def detail_scene(
                 light_anchors=built.light_anchors,
             ))
             assert built.light_anchors is not None
-            lit.append((category is not None, built.light_anchors))
-            if category:
+            lit.append((shop, built.light_anchors))
+            if shop:
                 shop_interiors.append(bid)
             else:
                 interiors_built.append(bid)
@@ -696,7 +763,8 @@ def detail_scene(
         for reason, n in sorted(layout.skipped.items()):
             counts[f"skipped:{reason}"] += n
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
-        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg) if shop else []
+        shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, tags), layout.holes, segments, cfg,
+                           interior.shop_doors if interior is not None else ()) if shop else []
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
             "generation": {"method": "phase03_volume + generic facade template", "phase03": o.record.get("generation"),
@@ -739,13 +807,18 @@ def detail_scene(
             }
         frame = wall_uv_frame(segments, storeys, h.get("estimated_levels"))
         objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders, uv_frame=frame))
+        core_shells[bid] = (shell, segments, objects[-1])
         if landmark:
             towers, tower_issues = attach_towers(bid, geom, features, cfg)
             issues.extend(tower_issues)
             for part in towers:
                 objects.append(DetailObject(part.id, "landmark_part", list(part.visual), [part.collider], part.record))
+        if core is not None:
+            for x in objects[first_object:]:
+                x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
+    wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
     dropped_lights = cap_lights(lit, cfg.interiors.lights_max)
@@ -754,13 +827,23 @@ def detail_scene(
 
     part_objects, part_issues = _building_parts(features, footprints, cfg)
     issues.extend(part_issues)
+    if core is not None:
+        for piece in part_objects:
+            piece.record["tier"] = tier_of[piece.record["source_ids"][0]]
+            if piece.record["tier"] == SCENIC:
+                piece.colliders = []
     objects.extend(part_objects)
 
-    # Surfaces, curbs and ground slabs are reused from phase 03 unchanged.
+    # Surfaces, curbs and ground slabs are reused from phase 03 unchanged. With a core,
+    # the ground slabs are rebuilt over the part of the ground inside it (ADR-017).
     for o in base.objects:
-        if o.type == "building":
+        if o.type == "building" or (core is not None and o.type == "ground_collider"):
             continue
         objects.append(DetailObject(o.id, o.type, list(o.visual), [o.collider] if o.collider is not None else [], dict(o.record)))
+    if core is not None:
+        slabs, slab_issues = ground_slabs(base.partition, base.config, clip=core)
+        issues.extend(slab_issues)
+        objects.extend(DetailObject(o.id, o.type, [], [o.collider], dict(o.record)) for o in slabs if o.collider is not None)
 
     prototypes = dict(prototypes or urban_prototypes())
     walkable = [s.geometry for c, s in base.partition.surfaces.items() if c not in (SurfaceClass.CARRIAGEWAY, SurfaceClass.WATER)]
@@ -771,6 +854,9 @@ def detail_scene(
         extra, extra_rejected = extra_urban(free, buildings_union, prototypes, cfg, elements)
         elements.extend(extra)
         rejected.extend(extra_rejected)
+    placed = len(elements)
+    if core is not None:
+        elements = [e for e in elements if core.covers(Point(float(e.matrix[0, 3]), float(e.matrix[1, 3])))]
     for r in rejected:
         severity = "info" if "#lamp" in r.id else "warning"
         issues.append(Issue("urban_element_not_placed", severity, r.id, f"{r.kind}: {r.reason}"))
@@ -815,10 +901,39 @@ def detail_scene(
         "dropped": dropped_lights,
     }
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
-    detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in facade_walls.values()).items()))
-    detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in facade_walls.values()).items()))
+    detailed.stats["wall_area_m2"] = wall_areas.to_record()
+    shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
+    detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
+    detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))
+    if core is not None:
+        tiers = Counter(tier_of.values())
+        detailed.core = {"half_side_m": core_half_side_m, "buildings": {CORE: tiers[CORE], SCENIC: tiers[SCENIC]}}
+        detailed.stats["tiers"] = _tier_counts(objects, placed - len(elements))
     _budget(detailed)
     return detailed
+
+
+def _split_party_walls(shells: Mapping[str, tuple[Shell, list[Segment], DetailObject]], footprints: Mapping[str, Any],
+                       tree: STRtree, ids: list[str]) -> WallAreas:
+    """Drop the party walls hidden by a neighbour's wall and give the visible ones the party material.
+
+    Runs once every shell is built, since a neighbour's wall top is only known then
+    (an interior can raise it). Updates each building's visual and its record.
+    """
+    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items()}
+    total = WallAreas()
+    for bid, (shell, segments, obj) in shells.items():
+        found = tree.query(footprints[bid].buffer(HIDDEN_GAP_M))  # pragma: no mutate: a wider query only adds candidates that wall_cover finds nothing in
+        # Only core shells hide a wall: a scenic shell (ADR-017) is not in ``shells``.
+        near = [(footprints[ids[k]], tops[ids[k]]) for k in found if ids[k] in tops and ids[k] != bid]
+        areas = split_blank_walls(shell, near)
+        areas += WallAreas(street=sum(s.length for s in segments) * shell.z_top - areas.party - areas.hidden)
+        total += areas
+        obj.visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
+        obj.record["materials"] = [p.material for p in obj.visual]
+        obj.record["visual"] = {"triangles": sum(p.mesh.triangle_count for p in obj.visual)}
+        obj.record["facade"]["wall_area_m2"] = areas.to_record()
+    return total
 
 
 def _stats(d: DetailedScene, counts: Counter[str], templates: Counter[str], roofs: Counter[str], interiors: list[str],

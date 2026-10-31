@@ -52,6 +52,10 @@ The phase-03 ground is `collider/walkable`. It covers the site minus the carriag
 
 The return the rifleman walks is the neighbour list in `AI_NavBake`. It is not the Points list and it is not the Loops flag by itself.
 
+### Playable core
+
+On a map with a playable core (ADR-017) the ground colliders (`collider/walkable`, `collider/carriageway`, `collider/walkable_crossing`) end at the core edge and the perimeter wall stands on it. The navmesh, its nodes and the outdoor light probes (laid on the navmesh bounds) therefore cover the core only, with no change in the adapter. `perf layout` keeps every spawn, objective, route and pickup inside the core within its wall. `layout.json` gets `navigation: {walkable_area_m2, span_m, node_spacing_estimate_m}`: the adapter's first spacing, `max(1, span / 400, sqrt(area / 320))`, computed on the 2D navmesh islands. It is an estimate; the adapter measures the baked mesh and raises the spacing while the walk is deeper than 400.
+
 ### Hunt routes
 
 `perf layout --playable` draws the patrols (`hunt_routes` in `perf/layout.py`):
@@ -96,7 +100,7 @@ Checked on disk, without opening a newer editor:
 
 XR (Oculus, Single Pass Instanced on PC, Multiview on Android) is a guide requirement. Android does not keep the automatic graphics API: Vulkan first, OpenGLES3 as fallback. The adapter sets that again when it builds the scene.
 
-The export bake follows the Onward lightmap guide (August 2023), at the low end of the range for a city: Progressive GPU, 256 direct samples, 512 indirect and environment, 2 to 4 bounces, ambient occlusion, Open Image denoiser, non-directional lightmaps, the map's texels per metre (default 10, at most 40) scaled per surface class (roofs 0.25, ground and interiors 0.5, facades 1; [12-export.md](12-export.md#lighting)), and 2048 px. After the bake, the Android lightmaps become ASTC 8×8. Occlusion culling and static batching stay off.
+The export bake follows the Onward lightmap guide (August 2023), at the low end of the range for a city: Progressive GPU, 256 direct samples, 512 indirect and environment, 2 to 4 bounces, ambient occlusion, Open Image denoiser, non-directional lightmaps, the map's texels per metre (default 10, at most 40) scaled per surface class (roofs 0.25, ground, interiors and blank party walls 0.5, facades 1; [12-export.md](12-export.md#lighting)), and 2048 px. After the bake, the Android lightmaps become ASTC 8×8. Occlusion culling and static batching stay off.
 
 A higher texel density makes the bake much longer. It does not change the navigation rules.
 

@@ -113,13 +113,25 @@ def generate_command(scene: Path, heights: Path) -> StageCommand:
     )
 
 
+def core_radius(start: Path) -> float | None:
+    """``core_radius_m`` of the map that contains ``start`` (ADR-017), or None without a core or a map."""
+    root = map_root(start)
+    if root is None:
+        return None
+    value = json.loads((root / "map.json").read_bytes()).get("core_radius_m")
+    return float(value) if value else None
+
+
 def detail_command(scene: Path, heights: Path, base: Path) -> StageCommand:
+    """``detail``, with the map's playable core when ``map.json`` has one."""
+    core = core_radius(scene)
     return invoke(
         "detail",
         "--scene", show(scene),
         "--heights", show(heights),
         "--base", show(base),
         "--out", show(stage_path(scene, "scene_detail")),
+        *(("--core-radius-m", f"{core:g}") if core is not None else ()),
     )
 
 

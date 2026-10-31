@@ -33,6 +33,10 @@ Shops now get a one-storey interior with one room and one anchor (`docs/07-detai
 
 The adapter now collects the probes of a room before it checks `light_m`, so a room without a light still adds its probes. Before, a room without `light_m` was skipped whole. `export package` warns when the scene asks for more lights than `build.interior_lights_max`. Not compiled in Unity on this host.
 
+## Amendment — several shop rooms (30 October 2026)
+
+A shop building now has one room per shop on its main frontage, one per other footprint part with a shopfront, and keeps a courtyard as a hole (`docs/07-detail.md`, *Shop interiors*). Each room has its own anchor, in the order of the interior record's `rooms`, and its own id: `<building>/L0`, then `<building>/L0-1`, `<building>/L0-2`, … `light_m`, `range_m` and the probe grid are computed per room polygon, so a light never sits in a courtyard or across a partition. A room with no door (a part seen through its windows) is lit too. They all count against the same cap, shops first.
+
 ## Rejected alternatives
 
 - Realtime or mixed lights. They cost every frame on the Quest; a baked light costs nothing at runtime.

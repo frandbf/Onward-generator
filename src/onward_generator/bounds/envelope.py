@@ -35,6 +35,7 @@ from onward_generator.generation.mesh import Mesh, polygons_of, prism
 from onward_generator.geo.clipping import inclusion_zone
 from onward_generator.geo.projection import LocalFrame
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.tiers import core_of
 
 WALL_ID = "envelope/perimeter_wall"
 WALL_MATERIAL = "envelope_wall"
@@ -197,6 +198,11 @@ def _backdrop_record(node: Node, offset_m: float, height_m: float) -> dict[str, 
     }
 
 
+def wall_site(site: BaseGeometry, core: BaseGeometry | None) -> BaseGeometry:
+    """Where the wall stands: the site, or the part of it inside the playable core (ADR-017)."""
+    return site if core is None else site.intersection(core)
+
+
 def _wall_record(height_m: float, thickness_m: float, site: BaseGeometry, triangles: int) -> dict[str, Any]:
     return {
         "id": WALL_ID,
@@ -233,10 +239,14 @@ def apply_bounds(
         raise BoundsError(f"{base}: missing scene_visual.glb or scene_collision.glb")
     if any(o.get("id") == WALL_ID for o in (manifest.get("objects") or [])):
         raise BoundsError(f"{base}: already has {WALL_ID}")
-    site = site_polygon(manifest)
+    full_site = site_polygon(manifest)
+    core = core_of(manifest)
+    core_m = (manifest.get("core") or {}).get("half_side_m")
+    site = wall_site(full_site, core)
     visual_wall, collision_wall = wall_nodes(site, height_m=height_m, thickness_m=thickness_m)
     tris = visual_wall.primitives[0].mesh.triangle_count
-    ring = backdrop_node(site, offset_m=backdrop_offset_m, height_m=backdrop_height_m) if backdrop else None
+    # The backdrop stays at the site edge, past the scenic ring (ADR-014, ADR-017).
+    ring = backdrop_node(full_site, offset_m=backdrop_offset_m, height_m=backdrop_height_m) if backdrop else None
 
     names = ("scene_visual.glb", "scene_collision.glb", "bounds_report.json")
     if kind == "detail":
@@ -275,7 +285,7 @@ def apply_bounds(
         "schema": "onward_generator.bounds_report",
         "schema_version": "0.1.0",
         "base": {"dir": str(base), "kind": kind, "manifest_sha256": file_sha256(protected[2])},
-        "wall": {"id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m, "triangles": tris,
+        "wall": {"id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m, "triangles": tris, "core_half_side_m": core_m,
                  "site_area_m2": round(float(site.area), 3)},
         "backdrop": ring_record,
         "geometry": compare,

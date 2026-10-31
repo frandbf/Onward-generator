@@ -41,4 +41,6 @@ Real silhouettes of the buildings outside the area of interest would look better
 
 ## Next step, not done: silhouettes of real buildings outside the area
 
+ADR-017 takes the cheaper route first: the buildings already extracted between a playable core and the site edge become plain scenic shells, and the wall moves to the core edge. The band outside the extract below is still not done.
+
 Extract OSM buildings in a band (for example 150–400 m) outside the inclusion zone, extrude each footprint as a prism with its OSM height or levels (or the heights default), no roofs, no openings, one dark haze material, no collision, no lightmap, combined into one mesh per sector. Estimate from the Murcia centre: about 2 000–4 000 footprints in a 400 m band; at about 8 vertices per footprint a plain prism without a base is about 16 wall triangles plus 6 roof triangles, so 45 000–90 000 triangles before simplification. The map already uses about 248 000 of the guide's 250 000 (docs/09-perf.md). It needs footprint simplification to 4–6 vertices, merging adjacent blocks, and dropping buildings hidden behind nearer ones; a target of 10 000–20 000 triangles would still require taking triangles from the playable area. Data, licence and attribution are the existing OSM extract (ODbL), widened.

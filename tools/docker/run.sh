@@ -31,5 +31,10 @@ common="$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir 2>/de
 if [[ -n "$common" && "$common" != "$REPO/.git" ]]; then
   mounts=(-v "$common:$common")
 fi
+# The baked texture tile cache (src/onward_generator/materials/tile_cache.py) outlives the container:
+# the host's ${XDG_CACHE_HOME:-~/.cache}/onward-generator is mounted and named by ONWARD_GENERATOR_CACHE_DIR.
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/onward-generator"
+mkdir -p "$cache"
+mounts+=(-v "$cache:/cache/onward-generator" -e ONWARD_GENERATOR_CACHE_DIR=/cache/onward-generator)
 # ${a[@]+"${a[@]}"} expands an empty array under set -u on macOS bash 3.2 too.
 exec "${compose[@]}" run --rm ${tty[@]+"${tty[@]}"} ${mounts[@]+"${mounts[@]}"} dev "$@"

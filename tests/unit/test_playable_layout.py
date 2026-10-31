@@ -13,7 +13,9 @@ from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
+    BLOCK_GAP_M,
     GAMEPLAY_VERSION,
+    GRID_M,
     MIN_SPAWN_SEPARATION_M,
     MODE_CODES,
     NAV_AGENT_RADIUS_M,
@@ -21,6 +23,7 @@ from onward_generator.perf.layout import (
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
     LayoutError,
+    _block,
     _patrol_lines,
     _routes,
     _sample_route,
@@ -30,8 +33,10 @@ from onward_generator.perf.layout import (
     free_ground,
     hunt_routes,
     nav_islands,
+    navigation_estimate,
     patrol_seeds,
     patrol_spawns,
+    playable_area,
     scatter_points,
     spread_routes,
     yaw_toward,
@@ -45,8 +50,42 @@ def test_assault_second_block_stays_clear_of_both_teams() -> None:
     centre = extra_spawn_block(PLAZA, (0.0, 0.0), [(0.0, 0.0), (30.0, 0.0)])
     assert math.hypot(centre[0], centre[1]) >= 10 - 1e-6
     assert math.hypot(centre[0] - 30, centre[1]) >= 10 - 1e-6
-    with pytest.raises(LayoutError, match="second spawn block"):
+    with pytest.raises(LayoutError, match="^no second spawn block fits for Assault$"):
         extra_spawn_block(box(0, 0, 6, 6), (3.0, 3.0), [(3.0, 3.0)])
+
+
+def _first_block_by_scanning(area: BaseGeometry, near: tuple[float, float], avoid: list[tuple[float, float]]) -> tuple[float, float] | None:
+    """The scan ``extra_spawn_block`` replaced: every grid slot, smallest (dist, y, x) wins."""
+    minx, miny, maxx, maxy = area.bounds
+    best, best_key = None, None
+    y = math.floor(miny / GRID_M) * GRID_M
+    while y <= maxy + 1e-6:
+        x = math.floor(minx / GRID_M) * GRID_M
+        while x <= maxx + 1e-6:
+            clear = all(math.hypot(x - ax, y - ay) >= BLOCK_GAP_M - 1e-6 for ax, ay in avoid)
+            if clear and all(area.contains(Point(p)) for p in _block(x, y)):
+                key = (math.hypot(x - near[0], y - near[1]), y, x)
+                if best_key is None or key < best_key:
+                    best_key, best = key, (round(x, 2), round(y, 2))
+            x += GRID_M
+        y += GRID_M
+    return best
+
+
+def test_assault_second_block_is_the_nearest_slot_south_then_west_first() -> None:
+    # Twelve slots lie exactly 10 m from the team; the southernmost, then westernmost, wins.
+    first = extra_spawn_block(PLAZA, (0.0, 0.0), [(0.0, 0.0)])
+    assert first == (0.0, -10.0) and all(type(v) is float for v in first)
+    # The gap is measured from each team, not from the origin.
+    assert extra_spawn_block(PLAZA, (20.0, 0.0), [(20.0, 0.0)]) == (20.0, -10.0)
+    assert extra_spawn_block(PLAZA, (0.0, 20.0), [(0.0, 20.0)]) == (0.0, 10.0)
+    # 9.5 m is too close; exactly the gap less the 1e-6 m tolerance is not.
+    assert extra_spawn_block(PLAZA, (0.0, 0.5), [(0.0, 0.5)]) == (-10.0, 0.0)
+    assert extra_spawn_block(PLAZA, (0.0, 10.0), [(0.0, 1e-6)]) == (0.0, 10.0)
+    assert extra_spawn_block(box(-80, -9, 80, 80), (0.0, 0.0), [(0.0, 0.0)]) == (-6.0, -8.0)
+    yard = Polygon([(-41, -37), (53, -37), (53, 3), (13, 3), (13, 47), (-41, 47)], [[(-5, -9), (7, -9), (7, 9), (-5, 9)]])
+    for near, avoid in (((0.0, 0.0), [(0.0, 0.0)]), ((40.0, -20.0), [(0.0, 0.0), (30.0, -30.0)]), ((-30.0, 40.0), [])):
+        assert extra_spawn_block(yard, near, avoid) == _first_block_by_scanning(yard, near, avoid)
 
 
 def test_uplink_stays_on_its_own_sidewalk_when_another_is_larger() -> None:
@@ -409,3 +448,55 @@ def test_spread_routes_returns_nothing_for_no_room() -> None:
     routes = [{"points": [{"x": x, "y": 0.0}, {"x": x, "y": 14.0}]} for x in range(0, 80, 8)]
     assert spread_routes(routes, 0, (0.0, 0.0)) == []
     assert spread_routes(routes, 1, (0.0, 0.0)) == [routes[0]]
+
+
+def test_the_playable_area_is_the_core_inside_its_wall() -> None:
+    assert playable_area({"core": None}) is None
+    assert playable_area({}) is None
+    assert playable_area({"core": {"half_side_m": 60.0}}).bounds == (-59.6, -59.6, 59.6, 59.6)
+    thick = playable_area({"core": {"half_side_m": 60.0}, "envelope": {"thickness_m": 1.0}})
+    assert thick.bounds == (-59.0, -59.0, 59.0, 59.0)
+    assert thick.area == pytest.approx(118.0 ** 2)  # mitred corners: still a square
+
+
+def test_free_ground_and_islands_stay_inside_the_core() -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-210, 0), (210, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
+    base = _base(street, partition=partition)
+    inside = box(-60, -60, 60, 60)
+    islands = nav_islands(base, inside)  # type: ignore[arg-type]
+    assert len(islands) == 1
+    assert [round(v, 6) for v in islands[0].bounds] == [-60 + NAV_AGENT_RADIUS_M] * 2 + [60 - NAV_AGENT_RADIUS_M] * 2
+
+
+def test_navigation_estimate_follows_the_adapter_rule() -> None:
+    # 320.37 x 30.03 m away from the origin: sqrt(9620.71 / 320) = 5.483 beats the span over 400 (0.8).
+    assert navigation_estimate([box(100, 200, 420.37, 230.03)]) == {
+        "walkable_area_m2": 9620.7, "span_m": 320.4, "node_spacing_estimate_m": 5.48}
+    assert navigation_estimate([box(200, 100, 230.03, 420.37)])["span_m"] == 320.4
+    # A 2 400 m strip, 2 m wide: span / 400 = 6 beats sqrt(4800 / 320) = 3.87.
+    assert navigation_estimate([box(0, 0, 2400, 2)])["node_spacing_estimate_m"] == 6.0
+    # Two islands: their areas add, their span is the union's.
+    two = navigation_estimate([box(0, 0, 10, 10), box(90, 0, 100, 10)])
+    assert two == {"walkable_area_m2": 200.0, "span_m": 100.0, "node_spacing_estimate_m": 1.0}
+    assert navigation_estimate([box(0, 0, 300, 300)])["node_spacing_estimate_m"] == pytest.approx(16.77, abs=0.01)
+    # The span is the longer side.
+    assert navigation_estimate([box(0, 0, 2, 2400)])["span_m"] == 2400.0
+    # Never below 1 m, even for a tiny island.
+    assert navigation_estimate([box(0, 0, 0.5, 0.5)])["node_spacing_estimate_m"] == 1.0
+
+
+def test_spawns_stay_in_the_core_of_a_larger_site() -> None:
+    """The plaza runs from the core to 400 m east; without the core the teams would stand near its middle."""
+    from onward_generator.perf.layout import gameplay_layout
+
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, -200), (-60, -190)]), 2.0, "config_default")
+    partition = build_partition(box(-60, -60, 400, 60), [], [street], [], config)
+    base = _base(street, partition=partition)
+    doc = gameplay_layout(base, {"objects": [], "core": {"half_side_m": 60.0}})  # type: ignore[arg-type]
+    for team in ("attackers", "defenders"):
+        assert all(abs(p["x"]) < 60 and abs(p["y"]) < 60 for p in doc[team]["points_m"])
+    wide = gameplay_layout(base, {"objects": []})  # type: ignore[arg-type]
+    assert wide["attackers"]["centre_m"][0] > 60
