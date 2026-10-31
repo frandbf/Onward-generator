@@ -113,6 +113,7 @@ Street photographs used by `panoramax apply`. The step is under development. It 
 | | |
 | --- | --- |
 | Provider | Panoramax (GeoVisio). Search is the metacatalogue `https://api.panoramax.xyz/api/search` |
+| Hosts | Search pages, `next` links included, only from `api.panoramax.xyz`. A JPEG comes from the host its search href names: the instance or its object store (for example `panoramax.ign.fr`, an OVH bucket, `panoramax.mapcomplete.org`), which the metacatalogue instance list does not name. Only `https` on a DNS name with a dot is fetched; `file://`, `http://`, IP literals and `localhost` are refused. A search page is capped at 32 MiB and a JPEG at 64 MiB; HTTP 429 and transient failures are retried twice |
 | Licence | CC BY-SA 4.0. `https://spdx.org/licenses/CC-BY-SA-4.0.html` |
 | What is stored | A picture whose `field_of_view` is 360, its JPEG, and a sidecar: provider, licence, licence URL, attribution, URL, author, SHA-256, `retrieved_at`. A flat picture is listed as `skipped: flat` and the JPEG is not downloaded |
 | Where | JPEGs and sidecars: `cache/panoramax/<picture id>`, gitignored, shared by every map. Each map keeps its search index in `maps/<id>/data/raw/panoramax/` |

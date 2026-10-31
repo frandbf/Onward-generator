@@ -13,11 +13,11 @@ in search order.
 
 from __future__ import annotations
 
+import ipaddress
 import json
-import urllib.error
+import time
 import urllib.parse
-import urllib.request
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,11 +28,19 @@ from onward_generator import __version__
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.maps.workspace import MapError, load_map
+from onward_generator.net import fetch_bytes
 from onward_generator.osm.acquire import OsmDownloadError, inclusion_bbox
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CATALOGUE = REPO_ROOT / "cache" / "panoramax"
 META_SEARCH = "https://api.panoramax.xyz/api/search"
+# Search pages, ``next`` links included, come only from the metacatalogue.
+SEARCH_HOSTS = frozenset({"api.panoramax.xyz"})
+# One search page of 100 features is about 300 KB.
+MAX_JSON_BYTES = 32 * 1024 * 1024
+# An HD equirectangular JPEG is a few MB.
+MAX_JPEG_BYTES = 64 * 1024 * 1024
+RETRIES = 2
 USER_AGENT = f"onward-generator/{__version__} (local map generator)"
 PAGE_LIMIT = 100
 MAX_PAGES = 20
@@ -76,13 +84,22 @@ class CacheReport:
 
 
 class UrllibTransport:
-    """The live client. Tests do not construct it."""
+    """The live client, through ``net.fetch_bytes``: https only, a size cap, transient failures retried.
 
-    def __init__(self, timeout_s: float = 60.0) -> None:
+    Search pages must come from ``SEARCH_HOSTS``. A picture href comes from
+    the search response and points at whichever instance or object store
+    holds the picture (``panoramax.ign.fr``, an OVH bucket, MapComplete...),
+    and the instance list does not name those stores. So a picture is fetched
+    from its own host, over https only, and never from an IP literal or a
+    name without a dot (``localhost``). ``file://`` and ``http://`` are refused.
+    """
+
+    def __init__(self, timeout_s: float = 60.0, *, sleep: Callable[[float], None] = time.sleep) -> None:
         self._timeout_s = timeout_s
+        self._sleep = sleep
 
     def get_json(self, url: str) -> Mapping[str, Any]:
-        body = self.get_bytes(url)
+        body = self._fetch(url, SEARCH_HOSTS, MAX_JSON_BYTES, "application/geo+json, application/json")
         try:
             data = json.loads(body.decode("utf-8"))
         except json.JSONDecodeError as exc:
@@ -92,15 +109,30 @@ class UrllibTransport:
         return data
 
     def get_bytes(self, url: str) -> bytes:
-        request = urllib.request.Request(
+        return self._fetch(url, picture_hosts(url), MAX_JPEG_BYTES, "image/jpeg")
+
+    def _fetch(self, url: str, hosts: frozenset[str], max_bytes: int, accept: str) -> bytes:
+        return fetch_bytes(
             url,
-            headers={"User-Agent": USER_AGENT, "Accept": "application/geo+json, application/json, image/jpeg"},
+            allowed_hosts=hosts,
+            max_bytes=max_bytes,
+            timeout=self._timeout_s,
+            headers={"User-Agent": USER_AGENT, "Accept": accept},
+            retry_429=RETRIES,
+            retry_transient=RETRIES,
+            error=PanoramaxError,
+            sleep=self._sleep,
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
-                return response.read()
-        except urllib.error.URLError as exc:
-            raise PanoramaxError(f"Panoramax request failed: {exc}") from exc
+
+
+def picture_hosts(url: str) -> frozenset[str]:
+    """The host a picture href may be fetched from: its own DNS name, or none."""
+    host = str(urllib.parse.urlparse(url).hostname)
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return frozenset({host}) if "." in host else frozenset()
+    return frozenset()
 
 
 def catalogue_directory() -> Path:
