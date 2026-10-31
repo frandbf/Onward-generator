@@ -28,6 +28,8 @@ from onward_generator.sources.registry import (
 )
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
+ALLOWLIST = "sources config: licence_allowlist must be a list of SPDX ids"
+PRIORITY = "sources config: priority must be a list of plugin ids"
 OPEN = LicenceRecord("CC-BY-4.0", "CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/", "Someone", "attribute")
 
 
@@ -96,19 +98,26 @@ def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_
     ("changes", "message"),
     [
         ({"schema": "other"}, "schema must be onward_generator.sources"),
-        ({"licence_allowlist": "CC-BY-4.0"}, "licence_allowlist must be a list"),
-        ({"licence_allowlist": [""]}, "licence_allowlist must be a list"),
-        ({"licence_allowlist": [3]}, "licence_allowlist must be a list"),
-        ({"priority": "es.catastro"}, "priority must be a list"),
-        ({"priority": ["es.catastro", ""]}, "priority must be a list"),
-        ({"priority": [None]}, "priority must be a list"),
-        ({"priority": ["es.catastro", "es.catastro"]}, "names a plugin twice"),
-        ({"priority": []}, "priority has no rank for es.catastro"),
+        ({"licence_allowlist": "CC-BY-4.0"}, ALLOWLIST),
+        ({"licence_allowlist": [""]}, ALLOWLIST),
+        ({"licence_allowlist": [3]}, ALLOWLIST),
+        ({"priority": "es.catastro"}, PRIORITY),
+        ({"priority": ["es.catastro", ""]}, PRIORITY),
+        ({"priority": [None]}, PRIORITY),
+        ({"priority": ["es.catastro", "es.catastro"]}, "sources config: priority names a plugin twice"),
+        ({"priority": []}, "sources config: priority has no rank for es.catastro"),
     ],
 )
 def test_source_config_refuses_an_invalid_document(changes: dict[str, Any], message: str) -> None:
-    with pytest.raises(SourceError, match=message):
+    with pytest.raises(SourceError) as caught:
         source_config(_config(**changes))
+    assert str(caught.value) == message.replace("schema must", "sources config: schema must")
+
+
+def test_source_config_names_every_unranked_plugin(two_plugins: tuple[Any, ...]) -> None:
+    with pytest.raises(SourceError) as caught:
+        source_config(_config(priority=[]))
+    assert str(caught.value) == "sources config: priority has no rank for es.catastro, xx.lidar"
 
 
 def test_a_plugin_without_overrides_needs_no_rank(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -126,8 +135,16 @@ def test_check_licence_refuses_a_licence_off_the_allowlist() -> None:
 
 def test_plugin_by_id_finds_catastro_and_names_the_known_ids() -> None:
     assert plugin_by_id("es.catastro").id == "es.catastro"
-    with pytest.raises(SourceError, match=r"unknown source 'es\.nope'\. Known: es\.catastro"):
+    with pytest.raises(SourceError) as caught:
         plugin_by_id("es.nope")
+    assert str(caught.value) == "unknown source 'es.nope'. Known: es.catastro"
+
+
+def test_plugin_by_id_lists_every_known_id(two_plugins: tuple[Any, ...]) -> None:
+    assert plugin_by_id("xx.lidar") is two_plugins[1]
+    with pytest.raises(SourceError) as caught:
+        plugin_by_id("es.nope")
+    assert str(caught.value) == "unknown source 'es.nope'. Known: es.catastro, xx.lidar"
 
 
 def test_catastro_plugin_writes_footprints_and_levels_under_its_cadastre_licence() -> None:
@@ -166,6 +183,10 @@ def test_choices_and_describe_report_running_off_and_absent_plugins(two_plugins:
     lyon = choices({"center": {"latitude": 45.764, "longitude": 4.8357}, "sources": {"xx.lidar": False}})
     assert describe(lyon) == "sources  none  (off: xx.lidar)  (not here: es.catastro)"
     assert describe([SourceChoice(FakeHeights(), False, True)]) == "sources  none  (not here: xx.lidar)"
+    two = [SourceChoice(FakeHeights(id="a"), True, True), SourceChoice(FakeHeights(id="b"), True, True)]
+    assert describe(two) == "sources  none  (off: a, b)"
+    gone = [SourceChoice(FakeHeights(id="a"), False, False), SourceChoice(FakeHeights(id="b"), False, False)]
+    assert describe(gone) == "sources  none  (not here: a, b)"
 
 
 # --- merge -----------------------------------------------------------------------------------
@@ -227,9 +248,17 @@ def test_merge_keeps_the_winner_levels_and_skips_a_donor_without_levels() -> Non
     assert [c["levels_lent"] for c in counts["sources"]] == [0, 0, 1]
 
 
+def test_merge_counts_every_building_a_source_lends_levels_to() -> None:
+    _, counts = merge_overrides(
+        {"a": _doc(LIDAR, {**LIDAR, "id": "osm-way-2"}), "b": _doc(CAT, {**CAT, "id": "osm-way-2"})}, ["a", "b"],
+    )
+    assert counts["sources"][1]["levels_lent"] == 2
+
+
 def test_merge_refuses_an_unranked_source_and_a_duplicate_id() -> None:
-    with pytest.raises(SourceError, match="overrides from z have no rank"):
-        merge_overrides({"a": _doc(CAT), "z": _doc(CAT)}, ["a"])
+    with pytest.raises(SourceError) as caught:
+        merge_overrides({"a": _doc(CAT), "z": _doc(CAT), "y": _doc(CAT)}, ["a"])
+    assert str(caught.value) == "overrides from y, z have no rank in config/sources.json priority"
     with pytest.raises(SourceError, match="a: duplicate override id osm-way-1"):
         merge_overrides({"a": _doc(CAT, CAT)}, ["a"])
 
@@ -255,7 +284,6 @@ def test_source_list_marks_an_unranked_plugin_and_a_licence_off_the_allowlist(tm
 
 def test_source_list_shows_a_dash_for_a_plugin_without_rank(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (FakeHeights(produces=frozenset({"footprints"})),))
-    monkeypatch.setattr("onward_generator.sources.__main__.PLUGINS", (FakeHeights(produces=frozenset({"footprints"})),))
     assert main(["source", "list"]) == 0
     assert capsys.readouterr().out == "xx.lidar  rank -  footprints  CC-BY-4.0 (allowed)\n"
 
@@ -292,9 +320,58 @@ def test_source_merge_refuses_a_bad_pair(tmp_path: Path, capsys: pytest.CaptureF
     assert not (tmp_path / "o").exists()
 
 
-def test_source_cli_reports_usage_errors_with_exit_2() -> None:
+def test_source_cli_reports_usage_errors_with_exit_2(tmp_path: Path) -> None:
     assert main(["source"]) == 2
     assert main(["source", "--help"]) == 0
+    assert main(["source", "list", "--lat", "north"]) == 2
+    assert main(["source", "list", "--lon", "east"]) == 2
+    assert main(["source", "merge", "--out", str(tmp_path / "o")]) == 2
+    assert main(["source", "merge", "--overrides", "es.catastro=x"]) == 2
+
+
+def test_source_parser_help() -> None:
+    import argparse
+
+    from onward_generator.sources.__main__ import build_parser
+
+    parser = build_parser()
+    assert parser.prog == "onward-generator source"
+    assert parser.description == "optional data-source plugins (ADR-018)"
+    helps = {action.dest: action.help for action in parser._actions}
+    assert helps["config"] == "licence allowlist and priority (default config/sources.json)"
+    subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
+    listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
+    assert listed == {
+        "list": "registered plugins, rank, licence; with --lat/--lon, whether each covers that point",
+        "merge": "merge plugin overrides by priority into one heights_overrides.json (offline)",
+    }
+    merge = {action.dest: action.help for action in subparsers.choices["merge"]._actions}
+    assert merge["overrides"] == "<plugin id>=<heights_overrides file>; repeat per plugin"
+
+
+def test_source_merge_refuses_to_write_over_an_input(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    out = tmp_path / "o"
+    out.mkdir()
+    inside = out / "heights_overrides.json"
+    inside.write_text(json.dumps(_doc(CAT)), encoding="utf-8")
+    assert main(["source", "merge", "--overrides", f"es.catastro={inside}", "--out", str(out), "--overwrite"]) == 1
+    assert "output would overwrite an input file" in capsys.readouterr().err
+
+
+def test_source_merge_keeps_an_equals_sign_in_the_path_and_prints_every_winner(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], two_plugins: tuple[Any, ...], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "onward_generator.sources.__main__.load_source_config",
+        lambda path: source_config(_config(priority=["xx.lidar", "es.catastro"])),
+    )
+    catastro = tmp_path / "a=b.json"
+    catastro.write_text(json.dumps(_doc(CAT)), encoding="utf-8")
+    lidar = tmp_path / "l.json"
+    lidar.write_text(json.dumps(_doc({**LIDAR, "id": "osm-way-9"})), encoding="utf-8")
+    out = tmp_path / "o"
+    assert main(["source", "merge", "--overrides", f"es.catastro={catastro}", "--overrides", f"xx.lidar={lidar}", "--out", str(out)]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "buildings=2 won: xx.lidar 1, es.catastro 1"
 
 
 # --- run planning ----------------------------------------------------------------------------

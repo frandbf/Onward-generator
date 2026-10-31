@@ -10,14 +10,15 @@ from pathlib import Path
 
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_json, prepare_outputs
+from onward_generator.sources import registry
 from onward_generator.sources.merge import MERGED_FILE, REPORT_FILE, REPORT_SCHEMA, merge_overrides
 from onward_generator.sources.plugin import SourceError
-from onward_generator.sources.registry import CONFIG_PATH, PLUGINS, load_source_config, plugin_by_id
+from onward_generator.sources.registry import CONFIG_PATH, load_source_config, plugin_by_id
 
 
 def _list(args: argparse.Namespace) -> int:
     config = load_source_config(Path(args.config))
-    for plugin in PLUGINS:
+    for plugin in registry.PLUGINS:
         rank = config.priority.index(plugin.id) + 1 if plugin.id in config.priority else "-"
         allowed = "allowed" if plugin.licence.spdx in config.licence_allowlist else "NOT ALLOWED"
         here = ""
@@ -40,7 +41,7 @@ def _merge(args: argparse.Namespace) -> int:
     inputs = dict(_pair(text) for text in args.overrides)
     for plugin_id in inputs:
         plugin_by_id(plugin_id)
-    documents = {plugin_id: json.loads(path.read_text(encoding="utf-8")) for plugin_id, path in inputs.items()}
+    documents = {plugin_id: json.loads(path.read_bytes()) for plugin_id, path in inputs.items()}
     merged, counts = merge_overrides(documents, config.priority)
     out_merged, out_report = prepare_outputs(
         args.out, (MERGED_FILE, REPORT_FILE), overwrite=args.overwrite, protected=tuple(inputs.values()),
@@ -66,10 +67,10 @@ def _merge(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="onward-generator source", description="optional data-source plugins (ADR-018)")
     parser.add_argument("--config", default=str(CONFIG_PATH), help="licence allowlist and priority (default config/sources.json)")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(required=True)
     listing = sub.add_parser("list", help="registered plugins, rank, licence; with --lat/--lon, whether each covers that point")
-    listing.add_argument("--lat", type=float, default=None)
-    listing.add_argument("--lon", type=float, default=None)
+    listing.add_argument("--lat", type=float)
+    listing.add_argument("--lon", type=float)
     listing.set_defaults(handler=_list)
     merge = sub.add_parser("merge", help="merge plugin overrides by priority into one heights_overrides.json (offline)")
     merge.add_argument("--overrides", action="append", required=True, help="<plugin id>=<heights_overrides file>; repeat per plugin")

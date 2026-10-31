@@ -1382,7 +1382,7 @@ def test_a_catastro_sidecar_alone_is_downloaded_again_with_overwrite(tmp_path: P
     assert "--overwrite" in dict(prepare_from(steps, "catastro", root))["catastro"]
 
 
-def test_run_stores_the_source_switches(tmp_path: Path) -> None:
+def test_run_stores_the_source_switches(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _ready_map(tmp_path)
 
     def run(sources: dict[str, bool] | None) -> dict:
@@ -1395,6 +1395,7 @@ def test_run_stores_the_source_switches(tmp_path: Path) -> None:
         return json.loads((root / "map.json").read_text(encoding="utf-8"))
 
     assert "sources" not in run(None)
+    assert "sources  es.catastro\n" in capsys.readouterr().out
     assert "sources" not in run({})
     assert run({"es.catastro": False})["sources"] == {"es.catastro": False}
     assert run({"es.catastro": True})["sources"] == {"es.catastro": True}
@@ -1461,6 +1462,7 @@ def test_run_passes_the_source_switches(monkeypatch: pytest.MonkeyPatch) -> None
         (["--source", "xx.nothing"], "unknown source 'xx.nothing'"),
         (["--source", "es.catastro", "--no-source", "es.catastro"], "--source and --no-source both name es.catastro"),
         (["--catastro", "--no-source", "es.catastro"], "--source and --no-source both name es.catastro"),
+        (["--source", "b", "--source", "a", "--no-source", "a", "--no-source", "b"], "--source and --no-source both name a, b"),
     ],
 )
 def test_run_refuses_unknown_or_contradictory_sources(
@@ -1483,6 +1485,8 @@ def test_run_help_describes_the_source_switches() -> None:
     )
     assert helps["source"] == "use this source plugin for the map when it covers the centre (stored in map.json; see: source list)"
     assert helps["no_source"] == "do not use this source plugin for the map (stored in map.json)"
+    metavars = {action.dest: action.metavar for action in run._actions}
+    assert metavars["source"] == metavars["no_source"] == "ID"
     listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
     assert listed["cadastre"] == "Catastro INSPIRE floors: download | match | split (see: cadastre --help)"
     assert listed["source"] == "optional data-source plugins: list | merge (see: source --help)"

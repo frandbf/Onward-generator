@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -181,6 +182,21 @@ def test_an_older_map_keeps_its_catastro_key_until_a_source_switch_replaces_it(t
     stored = json.loads((root / "map.json").read_text(encoding="utf-8"))
     assert "catastro" not in stored and stored["sources"] == {"es.catastro": True}
     assert catastro_enabled(root) is True
+
+
+def test_store_sources_keeps_the_other_switches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.sources.es.catastro import CatastroPlugin
+
+    @dataclass(frozen=True)
+    class Other(CatastroPlugin):
+        id: str = "xx.other"
+
+    monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (CatastroPlugin(), Other()))
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    store_sources(root, {"xx.other": True})
+    store_sources(root, {"es.catastro": False})
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["sources"] == {"es.catastro": False, "xx.other": True}
 
 
 def test_store_sources_refuses_an_unknown_plugin_and_writes_nothing(tmp_path: Path) -> None:
