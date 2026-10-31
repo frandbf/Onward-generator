@@ -35,8 +35,8 @@ def _package(root: Path, name: str, scene: dict[str, Any], launcher: dict[str, A
 
 NEW_SCENE = {
     "package_id": "murcia_new",
-    "lightmap_bake": {"lightmapper_requested": "ProgressiveGPU", "lightmapper": "ProgressiveCPU", "fallback": True,
-                      "fallback_warning": "Falling back to CPU", "sizes": ["2048x2048", "2048x2048", "1024x1024"]},
+    "lightmap_bake": {"profile": "draft", "lightmapper_requested": "ProgressiveGPU", "lightmapper": "ProgressiveCPU",
+                      "fallback": True, "fallback_warning": "Falling back to CPU", "sizes": ["2048x2048", "2048x2048", "1024x1024"]},
     "seconds": {"scene": 50.04, "bake": 210.0, "import": 12.25, "gi_bake": 200.0, "total": 261.0},
 }
 LAUNCHER = {"package_id": "murcia_new", "seconds": {"open": 9.0, "bundle": 30.2, "total": 41.0}}
@@ -60,6 +60,7 @@ def test_table_has_one_column_per_package_and_rows_in_first_seen_order(tmp_path:
         "| launcher.total | 41.0 | - |",
         "| lightmapper | ProgressiveCPU (fallback from ProgressiveGPU) | - |",
         "| lightmaps | 3 (2048x2048 x2, 1024x1024) | - |",
+        "| bake profile | draft | - |",
     ]
 
 
@@ -69,6 +70,15 @@ def test_gpu_bake_without_fallback_and_report_file_argument(tmp_path: Path) -> N
     title, cells = timings.column(timings.report_path(report))
     assert title == "p"
     assert cells == {"scene.bake": "1.0", "lightmapper": "ProgressiveGPU", "lightmaps": "0 (none)"}
+
+
+def test_bake_profile_row_only_when_the_report_names_one(tmp_path: Path) -> None:
+    scene = {"lightmap_bake": {"lightmapper": "ProgressiveGPU", "profile": "final", "sizes": ["1024x1024"]}}
+    _, cells = timings.column(timings.report_path(_package(tmp_path, "pkg_final", scene)))
+    assert cells == {"lightmapper": "ProgressiveGPU", "lightmaps": "1 (1024x1024)", "bake profile": "final"}
+    scene["lightmap_bake"]["profile"] = ""
+    _, cells = timings.column(timings.report_path(_package(tmp_path, "pkg_empty", scene)))
+    assert "bake profile" not in cells
 
 
 def test_fallback_without_requested_lightmapper_and_title_from_folder(tmp_path: Path) -> None:

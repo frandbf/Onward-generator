@@ -111,6 +111,14 @@ tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 
 CONFIRM_PUSH=yes tools/unity/onward_adapter/run_export.sh maps/<id>/data/processed/export/pkg_01 push
 ```
 
+The lightmap bake is most of the `scene` step. `task unity` bakes the `draft` profile by default: fewer samples and bounces, the same lightmap pages, noisier and darker bounced light, roughly 4–7 times faster to bake (estimated, not yet measured). Build a release map with `final`, the full bake:
+
+```bash
+ONWARD_BAKE=final task unity -- "Map name"     # or: task unity -- --bake final "Map name"
+```
+
+An unknown profile stops with exit 2. The scene step runs once per package, so a package baked as `draft` needs a new `task map` to bake as `final`. Details and sources: [docs/12-export.md](docs/12-export.md#bake-profiles).
+
 ### Map name and thumbnail on the headset (experimental)
 
 On the Quest the local map is listed as `Unity Export` with a generic picture. One switch tries other installs that might show the map's own title and its 512×256 thumbnail. It is off by default: without it, `task unity` does exactly what it did before.

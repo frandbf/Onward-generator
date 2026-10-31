@@ -217,3 +217,130 @@ def test_tool_step_copies_only_changed_files(setup: tuple[Path, Path, dict[str, 
     third = _run(package, env, "tool")
     assert "copied 1 changed file(s) into the project: OnwardMapAdapter.cs\n" in third.stdout
     assert adapter.read_bytes() == (tools / "Editor" / "OnwardMapAdapter.cs").read_bytes()
+
+
+# Records every Unity call (one line per argument, a blank line after each call) and writes the OK marker.
+FAKE_UNITY = """#!/usr/bin/env bash
+printf '%s\\n' "$@" '' >> "$UNITY_CALLS"
+while [[ $# -gt 0 ]]; do
+  [[ "$1" == -logFile ]] && echo "[OnwardAdapter] OK" > "$2"
+  shift
+done
+exit 0
+"""
+
+# The scene step verifies the package first; this fixture is not a real package, so verify passes.
+FAKE_PYTHON = """#!/usr/bin/env bash
+[[ "$1" == -m ]] && exit 0
+exec "$REAL_PYTHON" "$@"
+"""
+
+
+def _executable(path: Path, text: str) -> str:
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o755)
+    return str(path)
+
+
+@pytest.fixture
+def unity_env(setup: tuple[Path, Path, dict[str, str]], tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    package, _, env = setup
+    env = env | {
+        "UNITY": _executable(tmp_path / "unity", FAKE_UNITY), "UNITY_CALLS": str(tmp_path / "unity.calls"),
+        "PYTHON": _executable(tmp_path / "python", FAKE_PYTHON), "REAL_PYTHON": sys.executable,
+    }
+    return package, env
+
+
+def _unity_calls(env: dict[str, str]) -> list[list[str]]:
+    calls = Path(env["UNITY_CALLS"])
+    if not calls.exists():
+        return []
+    return [block.splitlines() for block in calls.read_text(encoding="utf-8").split("\n\n") if block.strip()]
+
+
+def _bake_arg(call: list[str]) -> str:
+    return call[call.index("-onwardBake") + 1]
+
+
+@pytest.mark.parametrize(("extra", "args", "profile"), [
+    ({}, (), "draft"),
+    ({"ONWARD_BAKE": ""}, (), "draft"),
+    ({"ONWARD_BAKE": "final"}, (), "final"),
+    ({"ONWARD_BAKE": "final"}, ("--bake", "draft"), "draft"),
+    ({}, ("--bake=final",), "final"),
+])
+def test_scene_step_passes_the_bake_profile_to_unity(unity_env: tuple[Path, dict[str, str]], extra: dict[str, str],
+                                                      args: tuple[str, ...], profile: str) -> None:
+    package, env = unity_env
+    result = _run(package, env | extra, "scene", *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"[export] bake profile {profile}\n" in result.stdout
+    (call,) = _unity_calls(env)
+    assert "OnwardGenerator.OnwardMapAdapter.BuildScene" in call
+    assert call.count("-onwardBake") == 1
+    assert _bake_arg(call) == profile
+
+
+@pytest.mark.parametrize(("extra", "args"), [({}, ("--bake", "fast")), ({"ONWARD_BAKE": "Final"}, ())])
+def test_unknown_bake_profile_exits_2_before_unity(unity_env: tuple[Path, dict[str, str]], extra: dict[str, str],
+                                                    args: tuple[str, ...]) -> None:
+    package, env = unity_env
+    result = _run(package, env | extra, "scene", *args)
+    assert result.returncode == 2
+    assert "unknown bake profile '" in result.stderr
+    assert "'; use one of: draft final" in result.stderr
+    assert result.stdout == ""
+    assert _unity_calls(env) == []
+
+
+def test_bake_flag_without_a_value_exits_2(unity_env: tuple[Path, dict[str, str]]) -> None:
+    package, env = unity_env
+    result = _run(package, env, "scene", "--bake")
+    assert result.returncode == 2
+    assert "[--bake draft|final]" in result.stderr
+    assert _unity_calls(env) == []
+
+
+def test_build_map_validates_the_bake_profile_and_hands_it_to_the_scene_step(unity_env: tuple[Path, dict[str, str]],
+                                                                             tmp_path: Path) -> None:
+    package, env = unity_env
+    build_map = SCRIPT.with_name("build_map.sh")
+    for args, extra in ((["--bake", "fast", str(package)], {}), ([str(package)], {"ONWARD_BAKE": "x"})):
+        result = subprocess.run(["bash", str(build_map), *args], env=env | extra, capture_output=True, text=True,
+                                check=False, stdin=subprocess.DEVNULL)
+        assert result.returncode == 2
+        assert "unknown bake profile" in result.stderr
+        assert "use one of: draft final" in result.stderr
+        assert "Package" not in result.stdout
+    # Without the launcher pair build_map runs tool, scene and launcher. The fake Unity writes no launcher
+    # output, so the launcher step fails after the scene step has run with the profile.
+    shutil.rmtree(package / "build" / "launcher")
+    project = tmp_path / "project"
+    builder = project / "Assets" / "OnwardCustomContent" / "Internal" / "Scripts" / "Editor" / "ContentBuilder.cs"
+    builder.parent.mkdir(parents=True)
+    tools = REPO_ROOT / "tools" / "unity" / "onward_adapter"
+    spec = importlib.util.spec_from_file_location("patch_content_builder", tools / "patch_content_builder.py")
+    assert spec is not None and spec.loader is not None
+    patch = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(patch)
+    builder.write_text(patch.NEW_ASSIGN + patch.NEW_BUILD, encoding="utf-8")
+    env = env | {"PROJECT": str(project), "ONWARD_BAKE": "draft"}
+    result = subprocess.run(["bash", str(build_map), "--bake=final", str(package)], env=env, capture_output=True,
+                            text=True, check=False, stdin=subprocess.DEVNULL)
+    assert "→ Unity: tool scene launcher (bake final)" in result.stdout, result.stdout + result.stderr
+    calls = _unity_calls(env)
+    assert [call[call.index("-executeMethod") + 1] for call in calls] == [
+        "OnwardGenerator.OnwardMapAdapter.BuildScene", "OnwardGenerator.OnwardMapAdapter.BuildQuestViaLauncher"]
+    assert _bake_arg(calls[0]) == "final"
+    assert "-onwardBake" not in calls[1]
+
+
+def test_shell_and_adapter_list_the_same_bake_profiles() -> None:
+    line = next(row for row in (REPO_ROOT / "tools" / "unity" / "lib.sh").read_text(encoding="utf-8").splitlines()
+                if row.startswith("BAKE_PROFILES="))
+    profiles = line.split("=", 1)[1].strip('"').split()
+    adapter = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
+    assert profiles == ["draft", "final"]
+    assert all(f'case "{name}":' in adapter for name in profiles)
+    assert f"use one of: {' '.join(profiles)}" in adapter

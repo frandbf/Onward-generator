@@ -30,6 +30,22 @@ check_quest_listing() {
   exit 2
 }
 
+# How the scene step bakes the lightmaps (ONWARD_BAKE or --bake), passed to Unity as
+# -onwardBake. The first, "draft", is the default, for iteration: fewer samples and bounces, the same
+# lightmap layout. "final" is the release bake. Same names as BakeProfileFor in
+# OnwardMapAdapter.cs; docs/12-export.md, "Bake profiles".
+BAKE_PROFILES="draft final"
+
+# Exit 2 with the list when $1 is not a bake profile.
+check_bake_profile() {
+  local profile
+  for profile in $BAKE_PROFILES; do
+    [[ "$1" == "$profile" ]] && return 0
+  done
+  echo "unknown bake profile '$1'; use one of: $BAKE_PROFILES" >&2
+  exit 2
+}
+
 # Wall time since $1, a $SECONDS value, written as the Python run writes it: "42 s" or "4 min 05 s".
 elapsed() {
   local s=$((SECONDS - $1))
