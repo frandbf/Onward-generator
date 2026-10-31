@@ -98,6 +98,9 @@ namespace OnwardGenerator
             public float lightmap_texels_per_m = 10f;
             public int lightmap_max_size = 2048;
             public bool lightmap_directional = false;
+            // Android format of the albedo textures: astc_6x6 through a TextureImporter, or none for the
+            // uncompressed RGBA32 assets of before. Absent in older packages, which get ASTC 6x6.
+            public string albedo_compression = "astc_6x6";
             // scaleInLightmap per glTF material (onward_generator.export.lightmap): roofs, ground,
             // interiors and blank party walls (party_<wall>) below 1. A material not listed keeps 1.
             // Absent in older packages.
@@ -283,20 +286,80 @@ namespace OnwardGenerator
             return result;
         }
 
-        private static Texture2D LoadPng(Glb glb, GImage img, string assetPath, bool repeat)
+        // Albedo format on Android (adapter_options.json albedo_compression, docs/12-export.md).
+        // "none" keeps the uncompressed RGBA32 assets of before, to roll a headset regression back without code.
+        private const string AlbedoAstc6x6 = "astc_6x6";
+        private const string AlbedoNone = "none";
+        // The importer's default of 2048 would halve the 2048 x 4096 facade atlas (ADR-020).
+        private const int AlbedoMinMaxTextureSize = 4096;
+        private const int UnityMaxTextureSize = 16384;
+
+        // assetBase is the asset path without extension: <base>.png (ASTC) or <base>.asset (none).
+        private static Texture2D LoadPng(Glb glb, GImage img, string assetBase, bool repeat, string compression)
         {
             if (img == null || img.bufferView < 0 || img.mimeType != "image/png") return null;
             GView v = glb.Doc.bufferViews[img.bufferView];
             var png = new byte[v.byteLength];
             Buffer.BlockCopy(glb.Bin, v.byteOffset, png, 0, v.byteLength);
-            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true);
-            if (!tex.LoadImage(png)) return null;
             // One shared atlas must clamp so a tile does not sample its neighbour.
             // One image per material repeats at the UV scale (metres / tile_m).
-            tex.wrapMode = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
-            tex.name = Path.GetFileNameWithoutExtension(assetPath);
-            AssetDatabase.CreateAsset(tex, assetPath);
-            return tex;
+            TextureWrapMode wrap = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+            if (compression == AlbedoNone)
+            {
+                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true);
+                if (!tex.LoadImage(png)) return null;
+                tex.wrapMode = wrap;
+                tex.name = Path.GetFileName(assetBase);
+                AssetDatabase.CreateAsset(tex, assetBase + ".asset");
+                return tex;
+            }
+
+            if (compression != AlbedoAstc6x6)
+                throw new InvalidDataException($"albedo_compression {compression} is neither {AlbedoAstc6x6} nor {AlbedoNone}");
+            int width, height;
+            if (!PngSize(png, out width, out height)) return null;
+            int maxSize = Math.Max(AlbedoMinMaxTextureSize, Mathf.NextPowerOfTwo(Math.Max(width, height)));
+            if (maxSize > UnityMaxTextureSize)
+                throw new InvalidDataException($"{assetBase}: {width} x {height} px is larger than Unity's {UnityMaxTextureSize} px");
+            // The PNG goes into the project as it is, so the TextureImporter can compress it per platform.
+            string assetPath = assetBase + ".png";
+            File.WriteAllBytes(assetPath, png);
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+                throw new InvalidOperationException($"{assetPath}: no TextureImporter after the import");
+            importer.textureType = TextureImporterType.Default;
+            importer.sRGBTexture = true;
+            importer.mipmapEnabled = true;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            // LoadImage kept every size; the importer would otherwise scale a non-power-of-two image.
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.isReadable = false;
+            importer.wrapMode = wrap;
+            importer.maxTextureSize = maxSize;
+            TextureImporterPlatformSettings android = importer.GetPlatformTextureSettings("Android");
+            android.overridden = true;
+            android.format = TextureImporterFormat.ASTC_6x6;
+            android.maxTextureSize = maxSize;
+            android.compressionQuality = 50;
+            importer.SetPlatformTextureSettings(android);
+            importer.SaveAndReimport();
+            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (imported == null)
+                throw new InvalidOperationException($"{assetPath}: imported, but no Texture2D to load");
+            return imported;
+        }
+
+        // Width and height from the IHDR chunk (big-endian), which always follows the 8-byte signature.
+        private static bool PngSize(byte[] png, out int width, out int height)
+        {
+            width = height = 0;
+            if (png.Length < 24 || png[0] != 0x89 || Encoding.ASCII.GetString(png, 1, 3) != "PNG"
+                || Encoding.ASCII.GetString(png, 12, 4) != "IHDR")
+                return false;
+            width = (png[16] << 24) | (png[17] << 16) | (png[18] << 8) | png[19];
+            height = (png[20] << 24) | (png[21] << 16) | (png[22] << 8) | png[23];
+            return width > 0 && height > 0;
         }
 
         private static int[] ReadIndices(Glb glb, int accessorIndex)
@@ -525,7 +588,9 @@ namespace OnwardGenerator
                 var images = new Texture2D[imageCount];
                 if (imageCount > 0) EnsureFolder(root + "/Textures");
                 for (int i = 0; i < imageCount; i++)
-                    images[i] = LoadPng(visual, visual.Doc.images[i], $"{root}/Textures/T{i:D2}.asset", repeatTextures);
+                    images[i] = LoadPng(visual, visual.Doc.images[i], $"{root}/Textures/T{i:D2}", repeatTextures, opt.albedo_compression);
+                if (imageCount > 0)
+                    Debug.Log($"{LogPrefix} Albedo: {images.Count(t => t != null)} of {imageCount} images, Android {opt.albedo_compression}.");
                 Material[] materials = visual.Doc.materials.Select(g =>
                 {
                     int index = g.pbrMetallicRoughness != null && g.pbrMetallicRoughness.baseColorTexture != null

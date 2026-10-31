@@ -15,6 +15,7 @@
     "lightmap_texels_per_m": 10.0,
     "lightmap_max_size": 2048,
     "lightmap_directional": false,
+    "albedo_compression": "astc_6x6",
     "interior_lights_max": 24,
     "interior_light_intensity": 0.8,
     "fog_enabled": true,

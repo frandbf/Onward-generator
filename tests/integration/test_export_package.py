@@ -163,6 +163,8 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(interior_lights_max=65), "/build/interior_lights_max"),
     (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
     (lambda c: c["build"].update(fog_color="grey"), "/build/fog_color"),
+    (lambda c: c["build"].update(albedo_compression="astc_8x8"), "/build/albedo_compression"),
+    (lambda c: c["build"].update(albedo_compression=None), "/build/albedo_compression"),
     (lambda c: c["build"].update(fog_end_m=0), "/build/fog_end_m"),
     (lambda c: c["build"].update(lightmap_class_scales={"roof": 0}), "/build/lightmap_class_scales/roof"),
     (lambda c: c["build"].update(lightmap_class_scales={"roof": 1.5}), "/build/lightmap_class_scales/roof"),
@@ -174,6 +176,18 @@ def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: P
     (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
     with pytest.raises(ExportError, match=match):
         package(inputs, tmp_path / "pkg", export_config=tmp_path / "cfg.json")
+
+
+def test_albedo_compression_reaches_the_adapter_options(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    # ASTC 6x6 by default; "none" rolls the headset back to uncompressed RGBA32 without a code change.
+    default = package(inputs, tmp_path / "pkg")
+    assert load(default.directory / "adapter_options.json")["albedo_compression"] == "astc_6x6"
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"]["albedo_compression"] = "none"
+    (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
+    rolled_back = package(inputs, tmp_path / "none", export_config=tmp_path / "cfg.json")
+    assert load(rolled_back.directory / "adapter_options.json")["albedo_compression"] == "none"
+    assert rolled_back.manifest["package_id"] != default.manifest["package_id"]
 
 
 def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Path], tmp_path: Path) -> None:
@@ -342,6 +356,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "public LightmapScale[] lightmap_scales" in source
     assert "public string material; public float scale" in source
     assert '\\"lightmap_texels\\":{LightmapTexels()}' in source
+    # Albedo: ASTC 6x6 through a TextureImporter by default, RGBA32 assets with "none", 4096 px atlas not downscaled.
+    assert 'public string albedo_compression = "astc_6x6";' in source
+    assert 'AlbedoNone = "none"' in source and 'AlbedoAstc6x6 = "astc_6x6"' in source
+    assert "TextureImporterFormat.ASTC_6x6" in source and "AlbedoMinMaxTextureSize = 4096" in source
 
 
 def test_default_fog_colour_is_the_backdrop_haze() -> None:
