@@ -146,6 +146,9 @@ class ShopInteriors:
     max_triangles: int
     max_collision_triangles: int
     max_area_m2: float
+    band_depth_m: float
+    """A shop above ``max_area_m2`` has its room cut to this depth behind the door's wall."""
+    min_room_area_m2: float
     categories: tuple[ShopCategory, ...]
     generic: ShopCategory
 
@@ -295,7 +298,8 @@ def _shop_interiors(d: Mapping[str, Any]) -> ShopInteriors:
         for c in d["categories"]
     )
     generic = ShopCategory("generic", MappingProxyType({}), d["generic"]["wall"], d["generic"]["floor"])
-    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]), categories, generic)
+    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]),
+                         float(d["band_depth_m"]), float(d["min_room_area_m2"]), categories, generic)
 
 
 def _template(name: str, d: Mapping[str, Any]) -> Template:

@@ -74,6 +74,8 @@ PROBE_STEP_M = 4.0
 PROBE_MAX_PER_AXIS = 4
 PROBE_LOW_M = 1.0
 PROBE_HIGH_BELOW_CEILING_M = 0.5
+# The smallest room behind a door for the stair interior (a shop room takes interiors.shops.min_room_area_m2).
+MIN_ROOM_M2 = 20.0
 # The wall between two shop rooms. Centred on a bay boundary, it stays in the pier
 # (at least min_pier_m / 2 = 0.25 m each side), clear of both shopfronts.
 PARTITION_M = 0.2
@@ -122,6 +124,8 @@ class InteriorPlan:
     flights: tuple[Flight, ...]
     rooms: tuple[Room, ...] = ()
     hosts: BaseGeometry | None = None
+    depth_m: float | None = None
+    """The band behind the door's wall the room is cut to (a shop above ``max_area_m2``), or ``None``."""
 
     @property
     def ground(self) -> BaseGeometry:
@@ -244,6 +248,13 @@ def _inset(part: Polygon, thickness: float) -> BaseGeometry:
     return part.buffer(-thickness, join_style="mitre", mitre_limit=2.0)
 
 
+def _door_piece(inner: BaseGeometry, door: Hole, segment: Segment, thickness: float) -> Polygon | None:
+    """The piece of ``inner`` whose ring holds the door's inner corners; else the largest piece; ``None`` when empty."""
+    pieces = polygons_of(inner)
+    behind = [piece for piece in pieces if _rim_on(piece, segment, door, thickness)]
+    return max(behind or pieces, key=lambda piece: piece.area, default=None)
+
+
 def _door_zone(segment: Segment, door: Hole, ic: Interiors) -> Polygon:
     """The floor kept clear behind a door: ``door_clearance_m`` deep and 0.3 m wider on each side."""
     t = ic.wall_thickness_m
@@ -265,6 +276,8 @@ def plan_interior(
     roof_access: bool = True,
     max_floors: int | None = None,
     several_parts: bool = False,
+    depth_m: float | None = None,
+    min_area_m2: float = MIN_ROOM_M2,
 ) -> InteriorPlan | str:
     """Return a plan, or the reason the building cannot host the generic interior.
 
@@ -273,6 +286,11 @@ def plan_interior(
     has its room under the roof. A courtyard stays a hole in the room. A footprint of several parts is
     refused unless ``several_parts``; the room is then in the part that holds the door, and
     ``plan_shop_rooms`` adds the others.
+
+    The room is the piece of the inset part the door opens into: a neck narrower than two walls splits
+    the inset, and the other pieces stay solid. With ``depth_m`` the room is also cut to the band of
+    that depth behind the door's wall, closed by a back wall (a shop above ``max_area_m2``). A room
+    under ``min_area_m2`` is ``inner_space_too_small``.
     """
     ic = cfg.interiors
     parts = polygons_of(refined)
@@ -283,16 +301,20 @@ def plan_interior(
         return "not_enough_levels"
     host = min(parts, key=Point(segment.a).distance)
     inner = _inset(host, ic.wall_thickness_m)
-    if inner.geom_type != "Polygon" or inner.is_empty or inner.area < 20.0:
+    if depth_m is not None:
+        reach = host.length  # longer than any line across the part
+        inner = inner.intersection(segment.plan_rect(-reach, segment.length + reach, -depth_m, reach))
+    room = _door_piece(inner, door, segment, ic.wall_thickness_m)
+    if room is None or room.area < min_area_m2:
         return "inner_space_too_small"
-    inner = orient(inner, sign=1.0)
+    inner = orient(room, sign=1.0)
     problem = _door_problem(inner, door, segment, ic)
     if problem is not None:
         return problem
     door_zone = _door_zone(segment, door, ic)
 
     if floors < 2:
-        return InteriorPlan(building_id, inner, floors, storey_m, door, segment, ())
+        return InteriorPlan(building_id, inner, floors, storey_m, door, segment, (), depth_m=depth_m)
 
     # Of the buildings that can hold a third floor, half do: sha256(seed, id).
     wanted = floors
@@ -324,7 +346,7 @@ def plan_interior(
                 for _ in range(steps - 1):
                     climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
                     flights.append(climb)
-    return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights))
+    return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights), depth_m=depth_m)
 
 
 def _bay_boundary(a: Hole, b: Hole) -> float:
@@ -848,6 +870,8 @@ def assemble_interior(
         "glass_panes": len(glass),
         "open_shopfronts": sum(1 for _, hole in penetrations if hole.back == SHOP_GLASS),
     }
+    if plan.depth_m is not None:
+        spec["room_depth_m"] = plan.depth_m
     if plan.rooms and plan.rooms[0].category is not None:
         spec["shop"] = _shop_record(plan.rooms[0].category)
     built = Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)

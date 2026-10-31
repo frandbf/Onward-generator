@@ -46,6 +46,7 @@ from onward_generator.detail.facades import (
 )
 from onward_generator.detail.grammar import FacadeUse, appearance_key, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
+    MIN_ROOM_M2,
     Interior,
     assemble_interior,
     cap_lights,
@@ -687,11 +688,10 @@ def detail_scene(
         layout = None
         ic = cfg.interiors
         # A shop gets a one-storey room behind its shopfront and never the stair interior. Neither uses the other's budget.
+        # A shop above max_area_m2 has its room cut to a band behind the door's wall, closed by a back wall.
         sells = shop and ic.enabled and ic.shops.enabled
-        too_large = sells and geom.area > ic.shops.max_area_m2
-        if too_large:
-            issues.append(Issue("interior_not_generated", "info", bid, f"shop_too_large: {geom.area:.1f} m² > max_area_m2 {ic.shops.max_area_m2}"))
-        if main is not None and ((sells and not too_large) or (not shop and bid in interior_queue and interiors_left > 0)):
+        depth = ic.shops.band_depth_m if shop and geom.area > ic.shops.max_area_m2 else None
+        if main is not None and (sells or (not shop and bid in interior_queue and interiors_left > 0)):
             raised = interior_storey(height, storeys, h.get("height_source") or o.record["height"].get("height_source"))
             attempt_height, attempt_storeys = raised if raised is not None else (height, storeys)
             trial = run_layout("interior_door", ic.wall_thickness_m, ic.door, attempt_storeys)
@@ -701,6 +701,8 @@ def detail_scene(
                 roof_access=shell_template.parapet_m > 0,
                 max_floors=1 if shop else None,
                 several_parts=shop,
+                depth_m=depth,
+                min_area_m2=ic.shops.min_room_area_m2 if shop else MIN_ROOM_M2,
             ) if door else "no_door_position"
             if shop and not isinstance(plan, str):
                 plan = plan_shop_rooms(plan, refined, trial, segments, _shops_of(evidence[bid], feature_of, tags), cfg)

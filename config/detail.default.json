@@ -129,6 +129,8 @@
       "max_triangles": 6000,
       "max_collision_triangles": 72000,
       "max_area_m2": 600.0,
+      "band_depth_m": 12.0,
+      "min_room_area_m2": 9.0,
       "categories": [
         { "name": "bakery", "tags": { "shop": ["bakery", "pastry", "confectionery"] }, "wall": "interior_shop_bakery", "floor": "interior_shop_tile" },
         { "name": "pharmacy", "tags": { "amenity": ["pharmacy"], "shop": ["chemist"], "healthcare": ["pharmacy"] }, "wall": "interior_shop_pharmacy", "floor": "interior_shop_tile" },

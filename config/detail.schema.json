@@ -194,12 +194,14 @@
         "door_clearance_m": { "$ref": "#/$defs/len" },
         "lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
         "shops": {
-          "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_collision_triangles", "max_area_m2", "categories", "generic"],
+          "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_collision_triangles", "max_area_m2", "band_depth_m", "min_room_area_m2", "categories", "generic"],
           "properties": {
             "enabled": { "type": "boolean" },
             "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
             "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 200000 },
             "max_area_m2": { "type": "number", "exclusiveMinimum": 0 },
+            "band_depth_m": { "type": "number", "minimum": 3, "maximum": 50 },
+            "min_room_area_m2": { "type": "number", "minimum": 4, "maximum": 100 },
             "categories": {
               "type": "array",
               "items": {
