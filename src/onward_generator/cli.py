@@ -244,6 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--preview", action="store_true", help="also draw the diagnostic PNGs of generate and detail (off by default; the export thumbnail is always drawn)")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
+    sub.add_parser("overture", help="Overture Maps places and buildings: fetch (see: overture --help)", add_help=False)  # pragma: no mutate: main dispatches overture before this stub is parsed, so add_help is never read
     return parser
 
 
@@ -329,6 +330,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from onward_generator.osm.__main__ import main as osm_main
 
         return osm_main(argv[1:])
+    if argv[:1] == ["overture"]:
+        from onward_generator.overture.__main__ import main as overture_main
+
+        return overture_main(argv[1:])
     if argv[:1] == ["map"]:
         from onward_generator.maps.__main__ import main as map_main
 
