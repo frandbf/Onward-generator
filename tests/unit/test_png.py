@@ -6,8 +6,7 @@ from functools import partial
 import numpy as np
 import pytest
 
-from onward_generator.dress.atlas import PNG_WORKERS, decode_png_rgba, encode_opaque_png, encode_png_rgba, run_png_jobs
-from onward_generator.generation.preview import _png
+from onward_generator.dress.atlas import PNG_WORKERS, decode_png_rgba, encode_opaque_png, encode_png, encode_png_rgba, run_png_jobs
 
 
 def _pixels() -> np.ndarray:
@@ -49,7 +48,7 @@ def test_decode_rejects_non_png() -> None:
 
 def test_decode_widens_rgb_png_to_opaque_rgba() -> None:
     rgb = _pixels()[..., :3].copy()
-    decoded = decode_png_rgba(_png(rgb))
+    decoded = decode_png_rgba(encode_png(rgb, 9))
     assert np.array_equal(decoded[..., :3], rgb)
     assert (decoded[..., 3] == 255).all()
 
@@ -87,7 +86,7 @@ def test_opaque_tile_is_an_rgb_png_at_level_3_that_decodes_to_the_same_rgba() ->
     assert np.array_equal(decode_png_rgba(data), pixels)
     assert data == encode_opaque_png(pixels.copy())
     assert hashlib.sha256(data).hexdigest() == "045d39d3b24d583ce4eb754e650c6965aa038167a6bbdb9aca30fb80e3cdafc0"
-    assert data != _png(pixels[..., :3])  # the RGBA path's level 9 writes other bytes
+    assert data != encode_png(pixels[..., :3], 9)  # the RGBA path's level 9 writes other bytes
 
 
 def test_opaque_tile_refuses_alpha_or_a_wrong_array() -> None:

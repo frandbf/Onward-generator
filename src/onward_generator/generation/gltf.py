@@ -12,7 +12,6 @@ import json
 import struct
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -414,19 +413,7 @@ def build_glb(
     doc["buffers"] = [{"byteLength": len(builder.blob)}]
     if extras:
         doc["extras"] = dict(extras)
-    json_chunk = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    json_chunk += b" " * (-len(json_chunk) % 4)
-    bin_chunk = bytes(builder.blob) + b"\x00" * (-len(builder.blob) % 4)
-    total = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
-    return b"".join(
-        [
-            struct.pack("<4sII", b"glTF", 2, total),
-            struct.pack("<I4s", len(json_chunk), b"JSON"),
-            json_chunk,
-            struct.pack("<I4s", len(bin_chunk), b"BIN\x00"),
-            bin_chunk,
-        ]
-    )
+    return pack_glb(doc, bytes(builder.blob))
 
 
 def images_by_material(data: bytes) -> dict[str, bytes]:
@@ -446,6 +433,23 @@ def images_by_material(data: bytes) -> dict[str, bytes]:
     return found
 
 
+def pack_glb(doc: Mapping[str, Any], blob: bytes) -> bytes:
+    """A GLB container: compact JSON padded with spaces, then ``blob`` padded with zeros. Inverse of :func:`read_glb`."""
+    json_chunk = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")  # pragma: no mutate: None is falsy like False and "UTF-8" names the same codec, so the bytes are the same
+    json_chunk += b" " * (-len(json_chunk) % 4)
+    bin_chunk = blob + b"\x00" * (-len(blob) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    return b"".join(
+        [
+            struct.pack("<4sII", b"glTF", 2, total),  # pragma: no mutate: "i" and "I" pack the same bytes below 2 GiB, far above any GLB this writes
+            struct.pack("<I4s", len(json_chunk), b"JSON"),  # pragma: no mutate: "i" and "I" pack the same bytes below 2 GiB, far above any GLB this writes
+            json_chunk,
+            struct.pack("<I4s", len(bin_chunk), b"BIN\x00"),  # pragma: no mutate: "i" and "I" pack the same bytes below 2 GiB, far above any GLB this writes
+            bin_chunk,
+        ]
+    )
+
+
 def read_glb(data: bytes) -> tuple[dict[str, Any], bytes]:
     """Parse a GLB container (used by tests and validation)."""
     if len(data) < 28:
@@ -462,12 +466,6 @@ def read_glb(data: bytes) -> tuple[dict[str, Any], bytes]:
         raise ValueError("second chunk must be BIN")
     start = 28 + json_len
     return doc, data[start : start + bin_len]
-
-
-def write_glb(path: Path, data: bytes) -> None:
-    from onward_generator.io import atomic_write_bytes
-
-    atomic_write_bytes(path, data)
 
 
 def _local_matrix(gltf_cols: Sequence[float]) -> np.ndarray:
