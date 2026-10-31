@@ -13,7 +13,9 @@ from typing import Any
 
 from onward_generator.detail.config import FACADE_USES, HipRoof, Template
 from onward_generator.detail.facades import stable_choice, stable_unit
-from onward_generator.detail.roofs import pitched_spec
+from onward_generator.detail.roofs import APPROXIMATIONS, PITCHED_SHAPES, pitched_spec
+from onward_generator.detail.s3db import ROOF_PALETTE, ROOF_TINT_BASES, WALL_PALETTE, WALL_TINT_BASES, Tint, quantize_colour, tint_material
+from onward_generator.generation.config import Material
 
 FLAT_SHAPES = frozenset({"flat"})
 
@@ -132,21 +134,47 @@ def _first(tags: dict[str, str], key: str) -> str:
     return raw.split(";")[0].strip().lower()
 
 
-def tagged_wall(tags: Mapping[str, str]) -> tuple[str, str] | None:
-    """``(material, tag)`` when ``building:material`` (or ``material``) names a catalogue wall, else ``None``.
+def _tinted(colours: Mapping[str, Material] | None, base: str, raw: str, palette: tuple[Tint, ...]) -> str | None:
+    """``base`` under the palette entry nearest ``raw``, when ``raw`` is a colour and ``colours`` defines that tint."""
+    tint = quantize_colour(raw, palette)
+    if tint is None or not colours:
+        return None
+    name = tint_material(base, tint)
+    return name if name in colours else None
 
-    The first of the two keys present decides.
+
+def tagged_wall(tags: Mapping[str, str], colours: Mapping[str, Material] | None = None) -> tuple[str, str] | None:
+    """``(material, tag)`` when an OSM tag names the wall. ``None`` otherwise.
+
+    ``building:colour`` wins: the nearest ``WALL_PALETTE`` tint of the texture ``building:material`` (or
+    ``material``) names when it is one of ``WALL_TINT_BASES``, else of plain plaster. Without a colour the
+    material tag alone picks the catalogue material. ``colours`` holds the defined materials; with none,
+    colours are not read.
     """
+    material: tuple[str, str] | None = None
     for key in ("building:material", "material"):
         raw = _first(dict(tags), key)
         if raw:
-            return (WALL_MATERIALS[raw], key) if raw in WALL_MATERIALS else None
-    return None
+            material = (WALL_MATERIALS[raw], key) if raw in WALL_MATERIALS else None
+            break
+    base = material[0] if material and material[0] in WALL_TINT_BASES else WALL_TINT_BASES[0]
+    tinted = _tinted(colours, base, _first(dict(tags), "building:colour"), WALL_PALETTE)
+    return (tinted, "building:colour") if tinted else material
 
 
-def tagged_roof(tags: Mapping[str, str]) -> tuple[str, str] | None:
-    """``(material, "roof:material")`` when ``roof:material`` names a catalogue roof, else ``None``."""
+def tagged_roof(tags: Mapping[str, str], colours: Mapping[str, Material] | None = None) -> tuple[str, str] | None:
+    """``(material, tag)`` when an OSM tag names the roof. ``None`` otherwise.
+
+    ``roof:colour`` wins: the nearest ``ROOF_PALETTE`` tint of the material ``roof:material`` names, else
+    of tile under a pitched ``roof:shape`` and of a flat roof otherwise. Then ``roof:material`` alone.
+    """
     material = ROOF_MATERIALS.get(_first(dict(tags), "roof:material"))
+    shape = _first(dict(tags), "roof:shape")
+    pitched = APPROXIMATIONS.get(shape, shape) in PITCHED_SHAPES
+    base = material or ROOF_TINT_BASES[0 if pitched else 1]
+    tinted = _tinted(colours, base, _first(dict(tags), "roof:colour"), ROOF_PALETTE)
+    if tinted:
+        return tinted, "roof:colour"
     return (material, "roof:material") if material else None
 
 
@@ -156,14 +184,15 @@ def choose_wall(
     seed: int,
     building_id: str,
     avoid: Collection[str] = (),
+    colours: Mapping[str, Material] | None = None,
 ) -> tuple[str, str]:
     """Return ``(material, origin)``. Origin is ``observed`` or ``generated``.
 
-    A wall tag wins (``tagged_wall``). Without one the palette is
+    A wall tag wins (``tagged_wall``: the colour, then the material). Without one the palette is
     ranked by ``sha256(seed, building, material)``, and the first material not in ``avoid`` (the
     neighbours' walls) wins. When every palette material is in ``avoid``, the first one is used.
     """
-    tagged = tagged_wall(tags)
+    tagged = tagged_wall(tags, colours)
     if tagged is not None:
         return tagged[0], "observed"
     ranked = sorted(palette, key=lambda material: stable_unit(seed, building_id, "wall", material))
@@ -179,6 +208,7 @@ def choose_roof(
     *,
     convex: bool = True,
     storey_m: float = 3.0,
+    colours: Mapping[str, Material] | None = None,
 ) -> tuple[Template, str, str, str | None]:
     """Return ``(template, roof_material, origin, roof:shape or None)``.
 
@@ -188,7 +218,7 @@ def choose_roof(
     hip. The roof material is ``tagged_roof``, else the template's.
     """
     shape = _first(tags, "roof:shape")
-    tagged = tagged_roof(tags)
+    tagged = tagged_roof(tags, colours)
     tagged_material = tagged[0] if tagged else None
     material = tagged_material or (template.hip.material if template.hip else "roof_tile")
     pitched = pitched_spec(tags, material, storey_m)

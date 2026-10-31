@@ -14,7 +14,7 @@ from shapely import Point, STRtree, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.detail.config import DetailConfig
-from onward_generator.detail.facades import party_base, stable_unit
+from onward_generator.detail.facades import material_base, party_base, stable_unit
 from onward_generator.detail.modules import Prototype, urban_prototypes, yaw_matrix
 from onward_generator.detail.urban import Element, Rejected, _footprint
 from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
@@ -272,8 +272,9 @@ def write_styled(
         }
         repeat_images = {color_id: tiles[party_base(color_id)] for color_id in used}
         catalog_tile = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
-        tile_m = {color_id: catalog_tile[party_base(color_id)] for color_id in used if party_base(color_id) in catalog_tile}
-        roofs = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
+        tile_m = {color_id: catalog_tile[material_base(color_id)] for color_id in used if material_base(color_id) in catalog_tile}
+        roof_ids = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
+        roofs = {color_id for color_id in used if material_base(color_id) in roof_ids}  # a tint is mapped as its base
         extras["atlas"] = {
             "size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note,
             "role": "contact_sheet",

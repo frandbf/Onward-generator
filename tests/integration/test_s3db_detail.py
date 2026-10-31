@@ -41,7 +41,7 @@ def test_tagged_roof_shapes_are_drawn_closed_on_their_walls(s3db) -> None:
     assert not s3db.critical
     gabled = _obj(s3db, "building/osm-way-801").record
     assert gabled["roof"] == {"type": "gabled", "rise_m": 3.0, "pitch_deg": 36.9, "rise_rule": "roof:height", "rise_origin": "observed",
-                              "direction_origin": "estimated", "material": "roof_flat_grey", "origin": "observed", "roof_shape": "gabled"}
+                              "direction_origin": "estimated", "material": "roof_tile__tint_grey", "origin": "observed", "roof_shape": "gabled"}
     # 1 080 m²: an OSM shape is no longer limited to 800 m². One roof level is one 4 m storey (12 m over 3).
     hipped = _obj(s3db, "building/osm-way-802").record
     assert hipped["roof"]["type"] == "hipped" and hipped["roof"]["rise_m"] == 4.0 and hipped["roof"]["rise_rule"] == "roof:levels"
@@ -64,7 +64,7 @@ def test_tagged_roof_shapes_are_drawn_closed_on_their_walls(s3db) -> None:
 def test_every_roof_of_the_block(s3db) -> None:
     roofs = {o.record["source_ids"][0]: (o.record["roof"]["type"], o.record["roof"]["material"]) for o in s3db.objects if o.type == "building"}
     assert roofs == {
-        "osm-relation-807": ("flat", "roof_tile"), "osm-way-801": ("gabled", "roof_flat_grey"), "osm-way-802": ("hipped", "roof_tile"),
+        "osm-relation-807": ("flat", "roof_tile"), "osm-way-801": ("gabled", "roof_tile__tint_grey"), "osm-way-802": ("hipped", "roof_tile"),
         "osm-way-803": ("skillion", "roof_tile"), "osm-way-805": ("flat_parapet", "roof_flat_grey"),
         "osm-way-806": ("flat_parapet", "roof_flat_grey"), "osm-way-808": ("flat_parapet", "roof_flat_grey"),
         "osm-way-809": ("gabled", "roof_tile"), "osm-way-822": ("half-hipped", "roof_tile"),
@@ -99,19 +99,18 @@ def test_every_roof_and_part_issue_is_reported(s3db) -> None:
     ]
 
 
-def test_material_tags_name_their_source(s3db) -> None:
+def test_colour_tags_tint_shared_materials(s3db) -> None:
     materials = _obj(s3db, "building/osm-way-801").record["facade"]["materials"]
-    wall = materials["wall"]
-    assert materials == {"wall": wall, "wall_origin": "generated", "wall_source": None,
-                         "roof": "roof_flat_grey", "roof_origin": "observed", "roof_source": "roof:material"}
+    assert materials == {"wall": "plaster_white__tint_white", "wall_origin": "observed", "wall_source": "building:colour",
+                         "roof": "roof_tile__tint_grey", "roof_origin": "observed", "roof_source": "roof:colour"}
     plain = _obj(s3db, "building/osm-way-806").record["facade"]["materials"]
     assert plain["wall_origin"] == "generated" and plain["wall_source"] is None and plain["roof_source"] is None
     brick = _obj(s3db, "building/osm-way-803").record["facade"]["materials"]
     assert (brick["wall"], brick["wall_origin"], brick["wall_source"]) == ("brick_red", "observed", "building:material")
     # The gable ends take the wall material; the slopes the roof material.
     by_material = {p.material: p.mesh for p in _obj(s3db, "building/osm-way-801").visual}
-    assert upward_area(by_material["roof_flat_grey"]) == pytest.approx(96.0)
-    assert by_material[wall].vertices[:, 2].max() == pytest.approx(by_material["roof_flat_grey"].vertices[:, 2].max())
+    assert upward_area(by_material["roof_tile__tint_grey"]) == pytest.approx(96.0)
+    assert by_material["plaster_white__tint_white"].vertices[:, 2].max() == pytest.approx(by_material["roof_tile__tint_grey"].vertices[:, 2].max())
     # A half-hipped end wall is a trapezoid half way up the 30° roof, in the wall material.
     ends = {p.material: p.mesh for p in _obj(s3db, "building/osm-way-822").visual}
     top = float(_obj(s3db, "building/osm-way-822").record["height"]["height_m"])
@@ -139,12 +138,12 @@ def test_building_parts_take_their_height_from_levels_and_their_roof_from_tags(s
     assert raised["height"] == {"height_m": 20.0, "min_height_m": 10.0, "origin": "observed", "min_height_origin": "observed",
                                 "rule": "height", "eave_m": 16.0}
     assert raised["roof"] == {"type": "gabled", "rise_m": 4.0, "pitch_deg": 53.1, "rise_rule": "roof:height", "rise_origin": "observed",
-                              "direction_origin": "estimated", "material": "roof_flat_grey", "roof_shape": "gabled", "origin": "observed"}
-    assert raised["materials"] == {"wall": "brick_red", "wall_origin": "observed", "wall_source": "building:material",
-                                   "roof": "roof_flat_grey", "roof_origin": "observed", "roof_source": "roof:material"}
+                              "direction_origin": "estimated", "material": "roof_tile__tint_grey", "roof_shape": "gabled", "origin": "observed"}
+    assert raised["materials"] == {"wall": "plaster_white__tint_red", "wall_origin": "observed", "wall_source": "building:colour",
+                                   "roof": "roof_tile__tint_grey", "roof_origin": "observed", "roof_source": "roof:colour"}
     # The gable ends of a part take its wall material.
     assert [(p.material, p.mesh.triangle_count) for p in parts["osm-way-903"].visual] == [
-        ("brick_red", 8), ("roof_flat_grey", 4), ("brick_red", 2)]
+        ("plaster_white__tint_red", 8), ("roof_tile__tint_grey", 4), ("plaster_white__tint_red", 2)]
     assert [(p.material, p.mesh.triangle_count) for p in parts["osm-way-905"].visual] == [("plaster_ochre", 8), ("roof_tile", 2)]
     assert [p.material for p in parts["osm-way-908"].visual] == ["plaster_ochre", "roof_tile", "plaster_ochre"]
     flat = parts["osm-way-905"].record

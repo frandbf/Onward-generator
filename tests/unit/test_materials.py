@@ -144,7 +144,7 @@ def _node(name: str, material: str, extras: dict[str, Any]) -> Node:
 
 
 def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False, party: bool = False,
-                shop: bool = False) -> Path:
+                shop: bool = False, tint: bool = False) -> Path:
     _ = MURCIA_CENTER
     detail = root / "base"
     detail.mkdir()
@@ -204,6 +204,19 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon:
                              ("shop_glass", (0.80, 0.87, 0.90, 1.0))):
             materials[name] = Material(colour, 0.6)
             nodes.append(_node(f"interior/{name}", name, {"type": "interior", "source_ids": ["osm-way-1"], "object_id": f"interior/{name}"}))
+    if tint:
+        # building:colour=blue and roof:colour=green on a gabled house, plus a white plaster wall on the same mesh,
+        # and a tinted brick (no plan photograph bound to it here) that keeps the procedural tile.
+        tints = {"plaster_white__tint_blue": (0.54, 0.64, 0.78, 1.0), "party_plaster_white__tint_blue": (0.54, 0.64, 0.78, 1.0),
+                 "roof_tile__tint_green": (0.36, 0.56, 0.46, 1.0), "stone_light__tint_red": (0.66, 0.27, 0.22, 1.0)}
+        for name, colour in tints.items():
+            materials[name] = Material(colour, 0.9)
+        # A 30° slope, 4 m along the eave and 2 m up the slope, for both roof materials.
+        slope = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 3**0.5, 1.0], [0.0, 3**0.5, 1.0]]), np.array([[0, 1, 2], [0, 2, 3]]))
+        walls = tuple(Primitive(_mesh(), name) for name in ("plaster_white", *tints) if not name.startswith("roof"))
+        roofs = tuple(Primitive(slope, name) for name in ("roof_tile", "roof_tile__tint_green"))
+        nodes.append(Node("building/osm-way-tint", walls + roofs,
+                          {"type": "building", "source_ids": ["osm-way-tint"], "object_id": "building/osm-way-tint"}))
     if party:
         # A party wall beside its wall on the same mesh, so both get the same UV phase. Salmon is used only as a party wall.
         extra = {"building/osm-way-1": "party_plaster_ochre", "building/osm-way-white": "party_plaster_white",
@@ -530,6 +543,44 @@ def test_party_walls_take_their_wall_albedo_colour_and_repeat(tmp_path: Path) ->
     assert np.array_equal(uvs[("building/osm-way-white", "party_plaster_white")], uvs[("building/osm-way-white", "plaster_white")])
     assert np.array_equal(uvs[("building/osm-way-brick", "party_brick_red")], uvs[("building/osm-way-brick", "brick_red")])
     assert not np.array_equal(uvs[("building/osm-way-white", "plaster_white")], uvs[("building/osm-way-brick", "brick_red")])
+
+
+def test_a_tint_shows_its_base_photograph_in_greyscale_under_its_own_colour(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path, tint=True)
+    out = tmp_path / "tinted"
+    report = apply_materials(base, out, cache_dir=cache, download=False, plan_path=_polyhaven_plan(tmp_path / "plan.json"))
+    data = (out / "scene_visual.glb").read_bytes()
+    doc, _ = read_glb(data)
+    factor = {m["name"]: m["pbrMetallicRoughness"]["baseColorFactor"] for m in doc["materials"]}
+    images = images_by_material(data)
+    assert report["textures"]["tint_shared"] == [
+        {"color_id": "plaster_white__tint_blue", "base": "plaster_white", "albedo_mode": "greyscale_modulation"},
+        {"color_id": "roof_tile__tint_green", "base": "roof_tile", "albedo_mode": "greyscale_modulation"},
+    ]
+    # The base shows its colour photograph on white; the tint keeps its colour over the same photograph in grey.
+    assert factor["plaster_white"] == [1.0, 1.0, 1.0, 1.0]
+    assert factor["plaster_white__tint_blue"] == factor["party_plaster_white__tint_blue"] == pytest.approx([0.54, 0.64, 0.78, 1.0])
+    assert factor["roof_tile__tint_green"] == pytest.approx([0.36, 0.56, 0.46, 1.0])
+    for name in ("plaster_white__tint_blue", "roof_tile__tint_green"):
+        tile = decode_png_rgba(images[name])[..., :3].astype(int)
+        assert (tile[..., 0] == tile[..., 1]).all() and (tile[..., 1] == tile[..., 2]).all()
+    assert images["party_plaster_white__tint_blue"] == images["plaster_white__tint_blue"] != images["plaster_white"]
+    # stone_light has no plan photograph: its tint keeps the procedural tile and its colour.
+    assert factor["stone_light__tint_red"] == pytest.approx([0.66, 0.27, 0.22, 1.0])
+    assert "stone_light__tint_red" not in {row["color_id"] for row in report["textures"]["tint_shared"]}
+    # Same mesh: the tint repeats at its base's scale; the tinted roof is mapped as a roof.
+    uvs = {(n.name, p.material): p.uvs for n in nodes_from_glb(data)[0] for p in n.primitives}
+    node = "building/osm-way-tint"
+    assert np.array_equal(uvs[(node, "plaster_white__tint_blue")], uvs[(node, "plaster_white")])
+    def span(key: tuple[str, str]) -> np.ndarray:
+        return uvs[key].max(axis=0) - uvs[key].min(axis=0)
+
+    assert np.array_equal(uvs[(node, "roof_tile__tint_green")], uvs[(node, "roof_tile")])
+    # A roof is mapped on its slope, 4 m by 2 m; mapped as a wall the slope would read flat, 4 m by √3 m.
+    along, up = sorted(span((node, "roof_tile")), reverse=True)
+    assert along / up == pytest.approx(2.0)
 
 
 def _record(tmp_path: Path, name: str, color: tuple[int, int, int]) -> TextureRecord:

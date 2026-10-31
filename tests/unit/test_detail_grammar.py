@@ -157,22 +157,39 @@ def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
     assert _hip_roof(edge_on, 30.0, template) is None
 
 
-def test_a_material_tag_names_the_wall_and_the_roof() -> None:
-    assert tagged_wall({"building:material": "brick", "material": "limestone"}) == ("brick_red", "building:material")
-    assert tagged_wall({"material": "limestone"}) == ("stone_light", "material")
-    # The first key present decides, even when it names nothing in the catalogue.
-    assert tagged_wall({"building:material": "glass", "material": "brick"}) is None
-    assert tagged_wall({}) is None
-    assert choose_wall({"material": "brick"}, ("plaster_white",), CFG.seed, "b") == ("brick_red", "observed")
-    assert tagged_roof({"roof:material": "tiles"}) == ("roof_tile", "roof:material")
-    assert tagged_roof({"roof:material": "metal"}) == ("roof_flat_grey", "roof:material")
-    assert tagged_roof({"roof:material": "thatch"}) is None and tagged_roof({}) is None
+def test_a_colour_tag_tints_the_wall_texture_a_material_tag_names() -> None:
+    colours = CFG.materials
+    assert tagged_wall({"building:colour": "#faf0e6", "building:material": "brick"}, colours) == ("brick_red__tint_white", "building:colour")
+    assert tagged_wall({"building:colour": "blue", "material": "limestone"}, colours) == ("stone_light__tint_blue", "building:colour")
+    # Plaster (or a material that is not a tint base) is tinted as plain plaster.
+    assert tagged_wall({"building:colour": "yellow", "building:material": "plaster"}, colours) == ("plaster_white__tint_yellow", "building:colour")
+    assert tagged_wall({"building:colour": "red", "building:material": "glass"}, colours) == ("plaster_white__tint_red", "building:colour")
+    assert tagged_wall({"building:colour": "#faf0e6", "building:material": "brick"}) == ("brick_red", "building:material")
+    assert tagged_wall({"building:colour": "nope", "material": "limestone"}, colours) == ("stone_light", "material")
+    assert tagged_wall({"building:material": "glass", "material": "brick"}, colours) is None
+    assert tagged_wall({"roof:colour": "red"}, colours) is None
+    assert tagged_wall({}, {}) is None
+    # A configuration without the tint keeps the material tag.
+    assert tagged_wall({"building:colour": "red", "material": "brick"}, {"brick_red": colours["brick_red"]}) == ("brick_red", "material")
+    assert choose_wall({"building:colour": "red"}, ("plaster_white",), CFG.seed, "b", colours=colours) == ("plaster_white__tint_red", "observed")
+    assert choose_wall({"building:colour": "red"}, ("plaster_white",), CFG.seed, "b") == ("plaster_white", "generated")
 
 
-def test_a_tagged_roof_takes_its_rise_and_its_material() -> None:
-    template, material, origin, shape = choose_roof({"roof:shape": "gabled", "roof:material": "metal", "roof:height": "2"},
-                                                    RESIDENTIAL, CFG.seed, "b", 100.0, storey_m=3.5)
-    assert material == "roof_flat_grey" and template.pitched is not None and template.pitched.material == material
+def test_a_colour_tag_tints_the_roof_before_a_material_tag() -> None:
+    colours = CFG.materials
+    assert tagged_roof({"roof:colour": "grey", "roof:material": "tiles"}, colours) == ("roof_tile__tint_grey", "roof:colour")
+    assert tagged_roof({"roof:colour": "green", "roof:material": "metal"}, colours) == ("roof_flat_grey__tint_green", "roof:colour")
+    # Without roof:material a pitched shape tints tile, any other roof a flat roof.
+    assert tagged_roof({"roof:colour": "green", "roof:shape": "gabled"}, colours) == ("roof_tile__tint_green", "roof:colour")
+    assert tagged_roof({"roof:colour": "green", "roof:shape": "gambrel"}, colours) == ("roof_tile__tint_green", "roof:colour")
+    assert tagged_roof({"roof:colour": "green", "roof:shape": "flat"}, colours) == ("roof_flat_grey__tint_green", "roof:colour")
+    assert tagged_roof({"roof:colour": "green"}, colours) == ("roof_flat_grey__tint_green", "roof:colour")
+    assert tagged_roof({"roof:colour": "grey", "roof:material": "tiles"}) == ("roof_tile", "roof:material")
+    assert tagged_roof({"roof:colour": "nope"}, colours) is None
+    assert tagged_roof({"building:colour": "grey"}, colours) is None
+    template, material, origin, shape = choose_roof({"roof:shape": "gabled", "roof:colour": "grey", "roof:height": "2"},
+                                                    RESIDENTIAL, CFG.seed, "b", 100.0, storey_m=3.5, colours=colours)
+    assert material == "roof_tile__tint_grey" and template.pitched is not None and template.pitched.material == material
     assert template.pitched.rise_m == 2.0 and origin == "observed" and shape == "gabled"
     template, *_ = choose_roof({"roof:shape": "gabled", "roof:levels": "2"}, RESIDENTIAL, CFG.seed, "b", 100.0, storey_m=3.5)
     assert template.pitched is not None and template.pitched.rise_m == 7.0 and template.pitched.material == "roof_tile"
@@ -183,10 +200,10 @@ def test_a_tagged_roof_takes_its_rise_and_its_material() -> None:
     hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 30.0, 4.0, "roof_flat_light"))
     template, material, *_ = choose_roof({"roof:shape": "gabled"}, hipped, CFG.seed, "b", 100.0)
     assert material == "roof_flat_light" and template.hip is None and template.pitched is not None
-    flat, material, origin, shape = choose_roof({"roof:shape": "flat", "roof:material": "metal"}, RESIDENTIAL, CFG.seed, "b", 100.0)
-    assert flat is RESIDENTIAL and material == "roof_flat_grey" and origin == "observed" and shape == "flat"
-    plain, material, origin, _ = choose_roof({"roof:material": "tiles"}, RESIDENTIAL, CFG.seed, "osm-way-311", 180.0)
-    assert plain is RESIDENTIAL and material == "roof_tile" and origin == "observed"
+    flat, material, origin, shape = choose_roof({"roof:shape": "flat", "roof:colour": "grey"}, RESIDENTIAL, CFG.seed, "b", 100.0, colours=colours)
+    assert flat is RESIDENTIAL and material == "roof_flat_grey__tint_grey" and origin == "observed" and shape == "flat"
+    plain, material, origin, _ = choose_roof({"roof:colour": "white"}, RESIDENTIAL, CFG.seed, "osm-way-311", 180.0, colours=colours)
+    assert plain is RESIDENTIAL and material == "roof_flat_grey__tint_light" and origin == "observed"
 
 
 def test_an_unknown_shape_tag_gets_no_estimated_hip() -> None:

@@ -395,7 +395,7 @@ def _facade_walls(
             palette = cfg.facade_palettes[use.use]
         near = {ids[k] for m in members[key] for k in tree.query(footprints[m], predicate="dwithin", distance=cfg.probe_m)}
         avoid = {out[n][1] for n in near if n in out}  # no other part of this parcel is drawn yet
-        wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid)
+        wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid, cfg.materials)
         out[bid] = (use, wall, origin)
     return out
 
@@ -427,7 +427,7 @@ def _roof_plans(
         terrace = any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
         convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
         plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace,
-                                 storey_m=storeys_m[bid])
+                                 storey_m=storeys_m[bid], colours=cfg.materials)
     return plans
 
 
@@ -654,8 +654,8 @@ def _building_parts(
                                 f"{height:.2f} m is not above building {parent} ({top_of[parent]:.2f} m); skipped"))
             continue
         clipped = orient(clipped, sign=1.0)
-        wall, wall_origin = choose_wall(tags, template.wall_materials, cfg.seed, fid)
-        tagged = tagged_roof(tags)
+        wall, wall_origin = choose_wall(tags, template.wall_materials, cfg.seed, fid, colours=cfg.materials)
+        tagged = tagged_roof(tags, cfg.materials)
         roof_material = tagged[0] if tagged else "roof_tile"
         eave, roof, roof_record, fallback = _part_roof(clipped, tags, (wall, roof_material), storey_m, height, min_h)
         if fallback is not None:
@@ -680,7 +680,7 @@ def _building_parts(
                 "height": measured.to_record() | {"eave_m": round(eave, 3)},
                 "roof": roof_record | {"material": roof_material, "roof_shape": tags.get("roof:shape"),
                                        "origin": "observed" if tags.get("roof:shape") or tagged else "generated"},
-                "materials": {"wall": wall, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags), wall_origin),
+                "materials": {"wall": wall, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags, cfg.materials), wall_origin),
                               "roof": roof_material, "roof_origin": "observed" if tagged else "generated",
                               "roof_source": tagged[1] if tagged else None},
                 "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
@@ -1030,8 +1030,8 @@ def detail_scene(
                 "openings": dict(sorted(shell.counts.items())),
                 "shops": shops,
                 "skipped": dict(sorted(layout.skipped.items())),
-                "materials": {"wall": wall_material, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags), wall_origin),
-                              "roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": _source(tagged_roof(tags), roof_origin)},
+                "materials": {"wall": wall_material, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags, cfg.materials), wall_origin),
+                              "roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": _source(tagged_roof(tags, cfg.materials), roof_origin)},
                 "use": use.to_record(),
                 "door": door_rule,
             },

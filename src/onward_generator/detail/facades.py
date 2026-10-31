@@ -25,6 +25,7 @@ from shapely.geometry.polygon import orient
 from onward_generator.detail.config import PARTY_PREFIX, DetailConfig, Opening, Template
 from onward_generator.detail.modules import Prototype, balcony, frame_matrix, recess, recess_rim
 from onward_generator.detail.roofs import BuiltRoof, build_roof
+from onward_generator.detail.s3db import tint_base
 from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
 
 SNAP_M = 0.05
@@ -627,6 +628,11 @@ def party_material(wall_material: str) -> str:
 def party_base(material: str) -> str:
     """The wall material a party material copies; any other material is its own base."""
     return material.removeprefix(PARTY_PREFIX)
+
+
+def material_base(material: str) -> str:
+    """The catalogue material whose texture ``material`` shows: without its party prefix and its tint (ADR-023)."""
+    return tint_base(party_base(material))
 
 
 @dataclass(frozen=True, slots=True)

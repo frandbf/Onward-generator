@@ -28,3 +28,7 @@ Flat-colour volumes needed textures, better trees, and sidewalk furniture, plus 
 - The classify report stores the raw reply, the catalogue hash, and the geometry comparison. It can be audited and dropped.
 - A future classify apply must be opt-in, on a copy, and must reuse the validated remap.
 - The atlas is not a photograph of a city. An older Poly Haven plan can still download Diffuse 1k CC0 with `--download`. A library plan reads files that are already imported.
+
+## Amendment — colour tints (31 October 2026)
+
+[ADR-023](ADR-023-simple-3d-buildings.md) adds tinted copies of catalogue materials (`<base>__tint_<key>`) for OSM `building:colour` and `roof:colour`. `materials apply` and `dress style` give a tint its base's texture, in greyscale under the tint colour, and its base's repeat. No photograph is added.

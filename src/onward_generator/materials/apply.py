@@ -16,7 +16,8 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
-from onward_generator.detail.facades import party_base, party_material
+from onward_generator.detail.facades import material_base, party_base, party_material
+from onward_generator.detail.s3db import tint_base
 from onward_generator.dress.atlas import (
     MIN_MEAN_LUMA,
     _tile_pixels,
@@ -115,6 +116,21 @@ def share_facade_photos(
             photo_tiles[target] = (decode_jpeg_rgb(Path(records[slot].path).read_bytes()), "greyscale_modulation")
             shared.append({"color_id": target, "slot": slot, "albedo_mode": "greyscale_modulation",
                            "asset_id": records[slot].asset_id})
+    return shared
+
+
+def share_tint_photos(used: Collection[str], photo_tiles: dict[str, tuple[Any, str]]) -> list[dict[str, Any]]:
+    """Give each used tint (``building:colour``, ``roof:colour``; ADR-023) its base's photograph, in greyscale.
+
+    The tint stays on _BaseColor, so a blue facade shows the plaster of its base under its own colour.
+    A tint whose base has no photograph keeps the procedural tile.
+    """
+    shared: list[dict[str, Any]] = []
+    for tint in sorted(name for name in used if tint_base(name) != name):
+        base = tint_base(tint)
+        if base in photo_tiles:
+            photo_tiles[tint] = (photo_tiles[base][0], "greyscale_modulation")
+            shared.append({"color_id": tint, "base": base, "albedo_mode": "greyscale_modulation"})
     return shared
 
 
@@ -406,8 +422,10 @@ def apply_materials(
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
-    # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall.
+    # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
+    # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.
     used = {party_base(name) for name in _used_materials(visual_nodes)}
+    used |= {tint_base(name) for name in used}
     cobble_ok = bool(cobble_nodes)
 
     materials = dict(vis_mats)
@@ -466,6 +484,7 @@ def apply_materials(
             })
     interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
     facade_shared = share_facade_photos(records, used, photo_tiles)
+    tint_shared = share_tint_photos(used, photo_tiles)
     shop_tile_m: dict[str, float] = {}
     shop_shared = share_shop_interior_photos(used, photo_tiles, materials, shop_tile_m)
 
@@ -528,14 +547,16 @@ def apply_materials(
     for color_id in used_ids:
         base_id = party_base(color_id)
         repeat_images[color_id] = repeat_images[base_id]
-        if base_id in tile_m:
-            tile_m[color_id] = tile_m[base_id]
+        texture_id = material_base(color_id)  # a tint repeats at its base's scale
+        if texture_id in tile_m:
+            tile_m[color_id] = tile_m[texture_id]
         if base_id in materials:
             materials[color_id] = materials[base_id]
+    roof_ids = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
-        roof_uv_materials={e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces},
+        roof_uv_materials={color_id for color_id in used_ids if material_base(color_id) in roof_ids},
     )
     atomic_write_bytes(targets[0], visual)
     if collision.is_file():
@@ -586,6 +607,7 @@ def apply_materials(
             "window": "project-generated frame, not a photograph",
             "interior": interior_shared,
             "facade_shared": facade_shared,
+            "tint_shared": tint_shared,
             "shop_interior": shop_shared,
         },
         "geometry": compare,

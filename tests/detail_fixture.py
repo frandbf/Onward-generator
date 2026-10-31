@@ -58,18 +58,18 @@ ROW_POIS: dict[int, tuple[tuple[float, float], dict[str, str]]] = {
 }
 
 
-# A block tagged with the Simple 3D Buildings scheme. 801 is gabled with a roof height and a metal roof; 802
+# A block tagged with the Simple 3D Buildings scheme. 801 is gabled with a roof height and colours; 802
 # (1 080 m², 12 m over 3 storeys) is hipped with one 4 m roof level; 803 is a brick L with a skillion facing south;
 # 805 has a roof shape nothing draws; 808 is tagged flat, 809 is a second gabled roof and 822 is half-hipped. 811–816 are small
 # untagged houses, some of which get the estimated hip, and 817–821 small untagged L-shapes. 806 is industrial (6 m storeys, 12 m) and carries
 # building:part ways (geo keeps them as closed lines): a tower of 8 + 1 levels with a pyramidal roof (901),
-# one level hidden inside the building (902), a brick part from 10 to 20 m with a 4 m gabled metal roof (903), one
+# one level hidden inside the building (902), a part from 10 to 20 m with a 4 m red gabled roof (903), one
 # with no height or levels (904), a flat 15 m part (905), one whose base is above its top (906), one whose
 # 15 m roof is cut to fit (908), one with no room for a roof (909) and a triangle (910). 907 stands outside
 # every building.
 S3DB_BUILDINGS: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = {
     801: ([(-40, 8), (-28, 8), (-28, 16), (-40, 16)], {"building": "house", "building:levels": "2", "roof:shape": "gabled",
-                                                       "roof:height": "3", "roof:material": "metal"}),
+                                                       "roof:height": "3", "building:colour": "#faf0e6", "roof:colour": "grey"}),
     802: ([(-20, 8), (16, 8), (16, 38), (-20, 38)], {"building": "yes", "building:levels": "3", "height": "12", "roof:shape": "hipped",
                                                      "roof:levels": "1"}),
     803: ([(30, 8), (42, 8), (42, 14), (36, 14), (36, 20), (30, 20)], {"building": "yes", "building:levels": "2", "roof:shape": "skillion",
@@ -87,7 +87,7 @@ S3DB_BUILDINGS: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = {
     901: ([(52, 10), (58, 10), (58, 16), (52, 16)], {"building:part": "yes", "building:levels": "8", "roof:levels": "1", "roof:shape": "pyramidal"}),
     902: ([(60, 10), (68, 10), (68, 18), (60, 18)], {"building:part": "yes", "building:levels": "1"}),
     903: ([(60, 20), (68, 20), (68, 26), (60, 26)], {"building:part": "yes", "height": "20", "min_height": "10", "roof:shape": "gabled",
-                                                     "roof:height": "4", "building:material": "brick", "roof:material": "metal"}),
+                                                     "roof:height": "4", "building:colour": "red", "roof:colour": "grey"}),
     904: ([(52, 20), (56, 20), (56, 24), (52, 24)], {"building:part": "yes"}),
     905: ([(52, 24.5), (56, 24.5), (56, 27), (52, 27)], {"building:part": "yes", "height": "15"}),
     906: ([(57, 24), (59, 24), (59, 27), (57, 27)], {"building:part": "yes", "height": "25", "min_height": "30"}),

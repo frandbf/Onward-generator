@@ -14,6 +14,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.detail.s3db import tint_base, tint_materials
 from onward_generator.generation.config import Material
 
 # A blank party wall keeps its wall's albedo under this prefix, so the export can give it its own lightmap scale.
@@ -96,7 +97,7 @@ class HipRoof:
 class PitchedRoof:
     """A roof the OSM ``roof:*`` tags describe (``detail/roofs.py``). Observed, never from the template."""
 
-    shape: str  # drawn: gabled | hipped | half-hipped | pyramidal | skillion | dome
+    shape: str  # drawn: gabled | hipped | pyramidal | skillion | dome
     tag: str  # the OSM roof:shape value
     material: str
     rise_m: float | None  # roof:height or roof:levels × storey; None leaves it to roof:angle or the default pitch
@@ -464,9 +465,9 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         budget=MappingProxyType({k: int(v) for k, v in doc["budget"].items() if k != "note"}),
         closeup_focus=tuple(float(v) for v in doc["preview"]["closeup_focus_m"]),  # type: ignore[arg-type]
         closeup_elevation_deg=float(doc["preview"]["closeup_elevation_deg"]),
-        materials=MappingProxyType(_with_party(
+        materials=MappingProxyType(_with_party(_with_tints(
             {name: Material(tuple(m["color"]), float(m["roughness"])) for name, m in sorted(doc["materials"].items())}  # type: ignore[arg-type]
-        )),
+        ))),
         landmarks=_landmarks(doc.get("landmarks")),
         document=MappingProxyType(json.loads(json.dumps(doc))),
         path=path,
@@ -476,6 +477,13 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
     if problems:
         raise DetailConfigError(path or "<document>", problems)
     return cfg
+
+
+def _with_tints(materials: dict[str, Material]) -> dict[str, Material]:
+    """Each material and the palette tints of the wall and roof bases among them (``building:colour``,
+    ``roof:colour``; docs/07-detail.md, ADR-023): the base's roughness under the palette colour."""
+    tints = tint_materials({name: m.color for name, m in materials.items()})
+    return materials | {name: Material(colour, materials[tint_base(name)].roughness) for name, colour in tints.items()}
 
 
 def _with_party(materials: dict[str, Material]) -> dict[str, Material]:
