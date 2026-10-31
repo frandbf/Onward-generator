@@ -478,7 +478,7 @@ def _select_interiors(candidates: list[tuple[str, Mapping[str, Any], BaseGeometr
                 and rectangularity(geom) >= rule.min_rectangularity):
             ruled.append(bid)
     ruled.sort(key=lambda b: hashlib.sha256(f"{cfg.seed}:interior:{b}".encode()).hexdigest())
-    return [b for b in [*ordered, *ruled] if b not in ic.exclude_ids]
+    return [b for b in dict.fromkeys([*ordered, *ruled]) if b not in ic.exclude_ids]
 
 
 def _metres(raw: object) -> float | None:

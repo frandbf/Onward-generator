@@ -30,7 +30,7 @@ from onward_generator.detail.interiors import (
     visual_triangles,
 )
 from onward_generator.detail.modules import recess
-from onward_generator.detail.scene import InteriorBudget, interior_quota
+from onward_generator.detail.scene import InteriorBudget, _select_interiors, interior_quota
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects
 from onward_generator.materials.openings import GLASS_ALPHA, boarded_rgba, window_png, window_rgba
@@ -479,3 +479,15 @@ def test_only_a_roof_flight_within_15_cm_of_the_roof_lands_on_it() -> None:
     assert _lands_on_roof(roof, 0.0, 0.15) and _lands_on_roof(roof, 0.15, 0.0)
     assert not _lands_on_roof(roof, 0.0, 0.1501) and not _lands_on_roof(roof, 0.0, 1.0)
     assert not _lands_on_roof(storey, 3.0, 3.0)
+
+
+def test_an_included_building_that_also_matches_the_rule_keeps_the_first_place() -> None:
+    # Seed 3 sorts osm-way-b before osm-way-a, so a repeated osm-way-a at the end would lose its include_ids priority.
+    base = load_detail_config()
+    cfg = replace(base, seed=3, interiors=replace(base.interiors, min_buildings=1, max_buildings=1, include_ids=("osm-way-a",)))
+    room = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)])
+    heights = {"category": "residential_multi", "estimated_levels": 3}
+    candidates = [("osm-way-a", heights, room), ("osm-way-b", heights, room)]
+    assert _select_interiors(candidates, cfg, []) == ["osm-way-a", "osm-way-b"]
+    excluded = replace(cfg, interiors=replace(cfg.interiors, exclude_ids=frozenset({"osm-way-a"})))
+    assert _select_interiors(candidates, excluded, []) == ["osm-way-b"]
