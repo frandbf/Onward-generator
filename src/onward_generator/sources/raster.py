@@ -18,6 +18,8 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.sources.plugin import SourceError
 
 BBox = tuple[float, float, float, float]
+NAN32 = np.float32(math.nan)
+"""The empty cell of a mosaic; its type also makes the mosaic float32."""
 HEADER_KEYS = frozenset({"ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"})
 
 
@@ -115,7 +117,7 @@ def mosaic(grids: Sequence[Grid]) -> Grid:
     east = max(g.bbox[2] for g in grids)
     south = min(g.bbox[1] for g in grids)
     shape = (round((north - south) / cell), round((east - west) / cell))
-    out = np.full(shape, np.float32(math.nan))
+    out = np.full(shape, NAN32)
     for g in grids:
         row, column = round((north - g.north) / cell), round((g.west - west) / cell)
         rows, columns = g.values.shape

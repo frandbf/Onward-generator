@@ -68,7 +68,7 @@ def wcs_requests(bbox: BBox) -> list[TileRequest]:
                 ("subset", f"x({xmin:.2f},{xmax:.2f})"), ("subset", f"y({ymin:.2f},{ymax:.2f})"),
                 ("subsettingCRS", crs_uri), ("outputCRS", crs_uri),
             ],
-            safe="(),:/",
+            safe="(),:/",  # pragma: no mutate: letters are never escaped, so adding them to safe changes nothing
         )
         out.append(TileRequest(f"{WCS_URL}?{query}", tile, columns, rows))
     return out
