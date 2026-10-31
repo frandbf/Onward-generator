@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import Point, STRtree, union_all
+from shapely import Point, Polygon, STRtree, union_all
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
@@ -44,7 +44,17 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
-from onward_generator.detail.grammar import FLAT_SHAPES, FacadeUse, appearance_key, choose_roof, choose_wall, facade_use, resolve_use
+from onward_generator.detail.grammar import (
+    FLAT_SHAPES,
+    FacadeUse,
+    appearance_key,
+    choose_roof,
+    choose_wall,
+    facade_use,
+    resolve_use,
+    tagged_roof,
+    tagged_wall,
+)
 from onward_generator.detail.interiors import (
     MIN_ROOM_M2,
     Interior,
@@ -62,6 +72,8 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.modules import Prototype, urban_prototypes
+from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
+from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
@@ -69,7 +81,6 @@ from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
-from onward_generator.geo.attributes import parse_metres as _metres
 from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
 from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
@@ -538,12 +549,70 @@ def _largest_polygon(geom: BaseGeometry) -> BaseGeometry | None:
     return None
 
 
+MIN_PART_WALL_M = 0.5  # a part's roof leaves at least this much wall above its base
+# Issue codes of a building:part that is not drawn.
+PART_SKIPS = frozenset({
+    "building_part_no_height", "building_part_height_order", "building_part_outside_footprint",
+    "building_part_not_closed", "building_part_hidden", "building_part_mesh_not_closed",
+})
+
+
+def _source(tagged: tuple[str, str] | None, origin: str) -> str | None:
+    """The OSM tag that chose an observed material, or ``None`` for a generated one."""
+    return tagged[1] if tagged is not None and origin == "observed" else None
+
+
+def _part_polygon(geometry: Mapping[str, Any]) -> BaseGeometry | None:
+    """The part's polygon: its largest polygon, or the ring of a closed way (``geo`` keeps a part as a line)."""
+    geom = shape(geometry)
+    if geom.geom_type == "LineString":
+        coords = list(geom.coords)
+        if len(coords) < 4 or coords[0] != coords[-1]:
+            return None
+        geom = Polygon(coords).buffer(0)
+    return _largest_polygon(geom)
+
+
+def _part_roof(
+    clipped: BaseGeometry, tags: Mapping[str, str], materials: tuple[str, str], storey_m: float, height: float, min_h: float,
+) -> tuple[float, list[Primitive], dict[str, Any], str | None]:
+    """``(eave height, roof primitives, roof record, fallback reason)`` of a part whose ``height`` includes its roof.
+
+    ``materials`` is ``(wall, roof)``; a gable piece takes the wall.
+    """
+    wall, material = materials
+    flat_roof = [Primitive(cap(clipped, height), material)]
+    spec = pitched_spec(tags, material, storey_m)
+    if spec is None:
+        return height, flat_roof, {"type": "flat"}, None
+    built = build_roof(clipped, 0.0, spec)
+    room = height - min_h - MIN_PART_WALL_M
+    if isinstance(built, BuiltRoof) and built.rise_m > room:  # pragma: no mutate: at a rise of exactly the room the rebuilt roof is the same
+        built = build_roof(clipped, 0.0, with_rise(spec, room)) if room >= MIN_RISE_M else "no_room_under_height"  # pragma: no mutate: a room of exactly 0.1 m is a float coincidence
+    if isinstance(built, str):
+        return height, flat_roof, {"type": "flat"}, built
+    eave = height - built.rise_m
+    lift = np.array([0.0, 0.0, eave])
+    roof = [Primitive(Mesh(built.roof.vertices + lift, built.roof.triangles), spec.material)]
+    if built.gables.triangle_count:
+        roof.append(Primitive(Mesh(built.gables.vertices + lift, built.gables.triangles), wall))
+    return eave, roof, dict(built.record), None
+
+
 def _building_parts(
     features: list[Mapping[str, Any]],
     footprints: Mapping[str, BaseGeometry],
     cfg: DetailConfig,
+    *,
+    storey_of: Callable[[str], tuple[float, str]],
+    top_of: Mapping[str, float],
 ) -> tuple[list[DetailObject], list[Issue]]:
-    """Extrude OSM ``building:part`` polygons that carry a height, clipped to a building footprint."""
+    """Extrude OSM ``building:part`` polygons, clipped to the building footprint they overlap most.
+
+    The part's height is its ``height`` tag, else its levels times the storey height of that building's
+    category (``storey_of``: storey metres and category). A part no higher than that building
+    (``top_of``) is inside it and is not drawn. ``roof:*`` tags shape its roof under its height.
+    """
     from shapely.geometry.polygon import orient
 
     objects: list[DetailObject] = []
@@ -553,16 +622,12 @@ def _building_parts(
         tags = dict(f.get("tags") or {})
         if "building:part" not in tags or f.get("kind") == "building":
             continue
-        height = _metres(tags.get("height"))
-        if height is None:
-            issues.append(Issue("building_part_no_height", "info", str(f["id"]), "building:part without a parseable height; skipped"))
+        fid = str(f["id"])
+        geom = _part_polygon(f["geometry"])
+        if geom is None:
+            issues.append(Issue("building_part_not_closed", "info", fid, "building:part is not a closed ring or polygon; skipped"))
             continue
-        min_h = _metres(tags.get("min_height")) or 0.0
-        if min_h >= height:
-            issues.append(Issue("building_part_height_order", "warning", str(f["id"]), "min_height is not below height; skipped"))
-            continue
-        geom = _largest_polygon(shape(f["geometry"]))
-        if geom is None or geom.area < 1.0:
+        if geom.area < 1.0:
             continue
         parent: str | None = None
         best = 0.0
@@ -572,18 +637,37 @@ def _building_parts(
             if inter is not None and inter.area > best:
                 best, parent, clipped = inter.area, bid, inter
         if parent is None or clipped.area < 1.0:
-            issues.append(Issue("building_part_outside_footprint", "info", str(f["id"]),
+            issues.append(Issue("building_part_outside_footprint", "info", fid,
                                 "building:part does not overlap a building footprint; skipped"))
             continue
+        storey_m, category = storey_of(parent)
+        measured = part_height(tags, storey_m, category)
+        if measured is None:
+            issues.append(Issue("building_part_no_height", "info", fid, "building:part without a parseable height or building:levels; skipped"))
+            continue
+        height, min_h = measured.height_m, measured.min_height_m
+        if min_h >= height:
+            issues.append(Issue("building_part_height_order", "warning", fid, "min_height is not below height; skipped"))
+            continue
+        if height <= top_of[parent] + 1e-6:  # pragma: no mutate: a height of exactly the building's plus 1e-6 m is a float coincidence
+            issues.append(Issue("building_part_hidden", "info", fid,
+                                f"{height:.2f} m is not above building {parent} ({top_of[parent]:.2f} m); skipped"))
+            continue
         clipped = orient(clipped, sign=1.0)
-        wall, wall_origin = choose_wall(tags, template.wall_materials, cfg.seed, str(f["id"]))
-        collider = prism(clipped, min_h, height, bottom=True)
+        wall, wall_origin = choose_wall(tags, template.wall_materials, cfg.seed, fid)
+        tagged = tagged_roof(tags)
+        roof_material = tagged[0] if tagged else "roof_tile"
+        eave, roof, roof_record, fallback = _part_roof(clipped, tags, (wall, roof_material), storey_m, height, min_h)
+        if fallback is not None:
+            issues.append(Issue("roof_shape_fallback", "info", fid, f"roof:shape={tags.get('roof:shape')} drawn flat: {fallback}"))
+            roof_record["fallback"] = fallback
+        collider = prism(clipped, min_h, eave, bottom=True)
         defects = closed_manifold_defects(collider)
         if defects:
-            issues.append(Issue("building_part_mesh_not_closed", "warning", str(f["id"]), f"{defects} collider defects; skipped"))
+            issues.append(Issue("building_part_mesh_not_closed", "warning", fid, f"{defects} collider defects; skipped"))
             continue
         part_id = f"building_part/{parent}/{f['id']}"
-        visual = [Primitive(walls(clipped, min_h, height), wall), Primitive(cap(clipped, height), "roof_tile")]
+        visual = [Primitive(walls(clipped, min_h, eave), wall), *roof]
         objects.append(DetailObject(
             part_id, "building_part", visual, [collider],
             {
@@ -593,8 +677,12 @@ def _building_parts(
                 "representation": "osm_building_part",
                 "attribute_origin": "observed",
                 "part": tags.get("building:part"),
-                "height": {"height_m": height, "min_height_m": min_h, "origin": "observed"},
-                "materials": {"wall": wall, "wall_origin": wall_origin, "roof": "roof_tile"},
+                "height": measured.to_record() | {"eave_m": round(eave, 3)},
+                "roof": roof_record | {"material": roof_material, "roof_shape": tags.get("roof:shape"),
+                                       "origin": "observed" if tags.get("roof:shape") or tagged else "generated"},
+                "materials": {"wall": wall, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags), wall_origin),
+                              "roof": roof_material, "roof_origin": "observed" if tagged else "generated",
+                              "roof_source": tagged[1] if tagged else None},
                 "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
             },
         ))
@@ -942,7 +1030,8 @@ def detail_scene(
                 "openings": dict(sorted(shell.counts.items())),
                 "shops": shops,
                 "skipped": dict(sorted(layout.skipped.items())),
-                "materials": {"wall": wall_material, "wall_origin": wall_origin, "roof": shell.roof["material"], "roof_origin": roof_origin},
+                "materials": {"wall": wall_material, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags), wall_origin),
+                              "roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": _source(tagged_roof(tags), roof_origin)},
                 "use": use.to_record(),
                 "door": door_rule,
             },
@@ -985,7 +1074,12 @@ def detail_scene(
     issues.extend(Issue("interior_light_dropped", "info", room, f"over interiors.lights_max {cfg.interiors.lights_max}")
                   for room in dropped_lights)
 
-    part_objects, part_issues = _building_parts(features, footprints, cfg)
+    storeys_m = heights["assumptions"]["storey_height_m"]
+    part_objects, part_issues = _building_parts(
+        features, footprints, cfg,
+        storey_of=lambda b: (float(storeys_m[height_of[b]["category"]]), str(height_of[b]["category"])),
+        top_of={o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs},
+    )
     issues.extend(part_issues)
     if core is not None:
         for piece in part_objects:
@@ -1067,6 +1161,12 @@ def detail_scene(
     detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}
     _third_party_record(detailed, objects, places, third_party)
     detailed.stats["roof_shapes"] = dict(sorted(roof_shapes.items()))
+    detailed.stats["building_parts"] = {
+        "kept": len(part_objects),
+        "height_origin": dict(sorted(Counter(str(x.record["height"]["origin"]) for x in part_objects).items())),
+        "roofs": dict(sorted(Counter(str(x.record["roof"]["type"]) for x in part_objects).items())),
+        "skipped": dict(sorted(Counter(i.code for i in part_issues if i.code in PART_SKIPS).items())),
+    }
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))

@@ -187,13 +187,13 @@ def _part(fid: str, ring: list[tuple[float, float]], height: str) -> dict[str, A
 
 
 def test_building_parts_take_the_tier_of_their_building(ring_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
-    """geo does not keep OSM building:part ways yet, so two parts are handed to detail directly."""
+    """Two parts are handed to detail directly."""
     import onward_generator.detail.scene as detail_module
 
     original = detail_module._building_parts
     extra = [_part("osm-way-317", [(-59, 31), (-56, 31), (-56, 34), (-59, 34)], "9"),
              _part("osm-way-318", [(-28, 8), (-24, 8), (-24, 12), (-28, 12)], "20")]
-    monkeypatch.setattr(detail_module, "_building_parts", lambda features, footprints, cfg: original([*features, *extra], footprints, cfg))
+    monkeypatch.setattr(detail_module, "_building_parts", lambda features, footprints, cfg, **kw: original([*features, *extra], footprints, cfg, **kw))
     scene, heights, base = ring_inputs
     generated, ref = load_base(base, scene, heights, GEN)
     cored = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=CORE_M)

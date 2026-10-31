@@ -132,6 +132,24 @@ def _first(tags: dict[str, str], key: str) -> str:
     return raw.split(";")[0].strip().lower()
 
 
+def tagged_wall(tags: Mapping[str, str]) -> tuple[str, str] | None:
+    """``(material, tag)`` when ``building:material`` (or ``material``) names a catalogue wall, else ``None``.
+
+    The first of the two keys present decides.
+    """
+    for key in ("building:material", "material"):
+        raw = _first(dict(tags), key)
+        if raw:
+            return (WALL_MATERIALS[raw], key) if raw in WALL_MATERIALS else None
+    return None
+
+
+def tagged_roof(tags: Mapping[str, str]) -> tuple[str, str] | None:
+    """``(material, "roof:material")`` when ``roof:material`` names a catalogue roof, else ``None``."""
+    material = ROOF_MATERIALS.get(_first(dict(tags), "roof:material"))
+    return (material, "roof:material") if material else None
+
+
 def choose_wall(
     tags: dict[str, str],
     palette: tuple[str, ...],
@@ -141,13 +159,13 @@ def choose_wall(
 ) -> tuple[str, str]:
     """Return ``(material, origin)``. Origin is ``observed`` or ``generated``.
 
-    Without a material tag the palette is ranked by ``sha256(seed, building, material)``,
-    and the first material not in ``avoid`` (the neighbours' walls) wins. When every
-    palette material is in ``avoid``, the first one is used.
+    A wall tag wins (``tagged_wall``). Without one the palette is
+    ranked by ``sha256(seed, building, material)``, and the first material not in ``avoid`` (the
+    neighbours' walls) wins. When every palette material is in ``avoid``, the first one is used.
     """
-    raw = _first(tags, "building:material") or _first(tags, "material")
-    if raw in WALL_MATERIALS:
-        return WALL_MATERIALS[raw], "observed"
+    tagged = tagged_wall(tags)
+    if tagged is not None:
+        return tagged[0], "observed"
     ranked = sorted(palette, key=lambda material: stable_unit(seed, building_id, "wall", material))
     return next((m for m in ranked if m not in avoid), ranked[0]), "generated"
 
@@ -167,10 +185,11 @@ def choose_roof(
     An OSM ``roof:shape`` the roof builder draws (``detail/roofs.py``) replaces the template roof on
     any footprint; ``build_shell`` falls back to a flat roof when the shape does not fit it. ``flat``
     keeps the template. Without a shape tag, convex footprints of 160 m² or less may get an estimated
-    hip. The roof material is the one ``roof:material`` names, else the template's.
+    hip. The roof material is ``tagged_roof``, else the template's.
     """
     shape = _first(tags, "roof:shape")
-    tagged_material = ROOF_MATERIALS.get(_first(tags, "roof:material"))
+    tagged = tagged_roof(tags)
+    tagged_material = tagged[0] if tagged else None
     material = tagged_material or (template.hip.material if template.hip else "roof_tile")
     pitched = pitched_spec(tags, material, storey_m)
     if pitched is not None:

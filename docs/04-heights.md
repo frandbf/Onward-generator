@@ -124,4 +124,4 @@ Outputs are deterministic (no timestamps) and are not overwritten without `--ove
 
 - Blocks come from footprints that touch, not from streets. A centre with disconnected footprints falls through to the radius level.
 - When few heights are known, one tagged group dominates its surroundings.
-- `roof:levels`, `min_height`, and `building:part` are not used here. A `building:part` with `height` is extruded later, in `detail`.
+- `roof:levels`, `min_height`, and `building:part` are not used here. `detail` extrudes each `building:part` from its `height`, or from `(building:levels + roof:levels)` × the `storey_height_m` of this configuration for the category of the building it stands on, and draws the `roof:*` tags (`docs/07-detail.md`, *Roofs* and *Parts*).

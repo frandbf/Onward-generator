@@ -9,7 +9,7 @@ from shapely import Polygon, affinity, box
 
 from onward_generator.detail.config import HipRoof, load_detail_config
 from onward_generator.detail.facades import _hip_roof
-from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
+from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use, tagged_roof, tagged_wall
 from onward_generator.generation.mesh import upward_area
 
 CFG = load_detail_config("config/detail.default.json")
@@ -155,6 +155,18 @@ def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
     edge_on = Polygon([(0.02, 0), (4, 0), (4, 1), (3.98, 1), (3.98, 2), (0, 2), (0, 1), (0.02, 1)])
     assert edge_on.centroid.y == 1.0 and edge_on.area >= 0.995 * edge_on.convex_hull.area
     assert _hip_roof(edge_on, 30.0, template) is None
+
+
+def test_a_material_tag_names_the_wall_and_the_roof() -> None:
+    assert tagged_wall({"building:material": "brick", "material": "limestone"}) == ("brick_red", "building:material")
+    assert tagged_wall({"material": "limestone"}) == ("stone_light", "material")
+    # The first key present decides, even when it names nothing in the catalogue.
+    assert tagged_wall({"building:material": "glass", "material": "brick"}) is None
+    assert tagged_wall({}) is None
+    assert choose_wall({"material": "brick"}, ("plaster_white",), CFG.seed, "b") == ("brick_red", "observed")
+    assert tagged_roof({"roof:material": "tiles"}) == ("roof_tile", "roof:material")
+    assert tagged_roof({"roof:material": "metal"}) == ("roof_flat_grey", "roof:material")
+    assert tagged_roof({"roof:material": "thatch"}) is None and tagged_roof({}) is None
 
 
 def test_a_tagged_roof_takes_its_rise_and_its_material() -> None:
