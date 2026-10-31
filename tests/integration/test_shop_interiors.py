@@ -421,12 +421,13 @@ def test_shop_rooms_share_the_light_cap_nearest_the_centre_first(complex_inputs:
 
 
 # Apart on one street: a kiosk whose room (4.4 x 3.4 m) is under the stair interior's 20 m²; a shop whose
-# back half hangs on a 0.4 m neck; and a 30 x 25 m shop, above max_area_m2.
+# back half hangs on a 0.4 m neck; a 30 x 25 m shop, above max_area_m2; and a block of flats as small as the kiosk.
 TIGHT = {
     870: ([(-60, 6), (-55, 6), (-55, 10), (-60, 10)], {"building": "retail", "building:levels": "1"}),
     871: ([(-40, 6), (-20, 6), (-20, 14), (-29.8, 14), (-29.8, 16), (-20, 16), (-20, 24), (-40, 24), (-40, 16),
            (-30.2, 16), (-30.2, 14), (-40, 14)], {"building": "retail", "building:levels": "1"}),
     872: ([(0, 6), (30, 6), (30, 31), (0, 31)], {"building": "retail", "building:levels": "1"}),
+    873: ([(40, 6), (45, 6), (45, 10), (40, 10)], {"building": "apartments", "building:levels": "4"}),
 }
 TIGHT_POIS = {970: ((-57.5, 7), {"shop": "kiosk"}), 971: ((-35, 7), {"shop": "books"}), 972: ((15, 7), {"shop": "supermarket"})}
 
@@ -462,3 +463,6 @@ def test_a_kiosk_a_necked_shop_and_a_large_shop_all_get_rooms(tight_inputs: tupl
     refused = [(i.object_id, i.message) for i in strict.issues if i.code == "interior_not_generated"]
     assert ("osm-way-870", "inner_space_too_small") in refused
     assert strict.stats["shop_interiors"] == ["osm-way-871", "osm-way-872"]
+    # The stair interior keeps its 20 m² floor: the flats the size of the kiosk get no room.
+    flats = _detail(tight_inputs, _cfg(interiors__include_ids=["osm-way-873"]))
+    assert ("osm-way-873", "inner_space_too_small") in [(i.object_id, i.message) for i in flats.issues if i.code == "interior_not_generated"]

@@ -307,7 +307,7 @@ def plan_interior(
     room = _door_piece(inner, door, segment, ic.wall_thickness_m)
     if room is None or room.area < min_area_m2:
         return "inner_space_too_small"
-    inner = orient(room, sign=1.0)
+    inner = orient(room)
     problem = _door_problem(inner, door, segment, ic)
     if problem is not None:
         return problem

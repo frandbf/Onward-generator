@@ -278,6 +278,9 @@ def test_a_shop_room_can_be_cut_to_a_band_behind_its_door_wall() -> None:
     assert any(_inside(m, np.array([12.0, 6.5, 1.0])) for _, m in built.colliders)
     [walls] = built.visual["interior_wall"][:1]
     assert walls.vertices[:, 1].max() == pytest.approx(6.0)
+    # The band reaches a plan of several floors too.
+    tall = plan_interior("big", FOOTPRINT, DOOR, SEG, 18.0, 3.0, 6, CFG, depth_m=12.0)
+    assert not isinstance(tall, str) and tall.flights and tall.depth_m == 12.0
     # A band deeper than the footprint leaves the whole room.
     deep = plan_interior("big", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, max_floors=1, depth_m=30.0)
     assert not isinstance(deep, str) and deep.inner.area == pytest.approx((24.0 - 2 * t) * (18.0 - 2 * t))
