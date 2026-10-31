@@ -115,7 +115,7 @@ def mosaic(grids: Sequence[Grid]) -> Grid:
     east = max(g.bbox[2] for g in grids)
     south = min(g.bbox[1] for g in grids)
     shape = (round((north - south) / cell), round((east - west) / cell))
-    out = np.full(shape, np.float32("nan"))
+    out = np.full(shape, np.float32(math.nan))
     for g in grids:
         row, column = round((north - g.north) / cell), round((g.west - west) / cell)
         rows, columns = g.values.shape
