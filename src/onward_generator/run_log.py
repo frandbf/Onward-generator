@@ -244,6 +244,8 @@ def _detail(out: Path) -> StageReport:
         ("openings", count_items(counts["openings"])),
         ("urban", count_items(counts["urban_elements"], rename=_urban)),
         ("tiers", _tiers(counts.get("tiers") or {})),
+        ("typology", count_items(counts.get("typologies") or {})),
+        ("era", count_items(counts.get("eras") or {})),
     )
     return StageReport(summary, details=details, alerts=_severity(report))
 

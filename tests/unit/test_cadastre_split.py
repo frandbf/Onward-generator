@@ -588,7 +588,7 @@ def test_quarantine_at_the_limit_passes() -> None:
 # --- Catastro use (ADR-022). ---
 
 USES = {
-    "A": BuildingUse("A", "1_residential", 12, 14),
+    "A": BuildingUse("A", "1_residential", 12, 14, 1931),
     "B": BuildingUse("B", "4_2_retail", None, 1),
     "C": BuildingUse("C", "4_1_office", 0, 3),
     "E": BuildingUse("E", "9_unknown", None, None),
@@ -612,13 +612,14 @@ def test_every_sub_building_takes_the_use_of_its_parcel() -> None:
     out = _with_uses()
     shop = out["osm-way-3:B_part1"]["catastro_use"]
     assert shop == {
-        "current_use": "4_2_retail", "use": "retail", "refcat": "B", "share": 1.0, "dwellings": None, "building_units": 1,
+        "current_use": "4_2_retail", "use": "retail", "refcat": "B", "share": 1.0, "dwellings": None, "building_units": 1, "construction_year": None,
         "attribute_origin": "observed", "source": "Catastro INSPIRE BU bu:Building currentUse",
         "provider": "catastro-inspire-bu", "license": "CC-BY-4.0", "license_url": "https://creativecommons.org/licenses/by/4.0/",
         "attribution": "Dirección General del Catastro, INSPIRE Buildings (BU)", "retrieved_at": "2026-10-18T12:00:00+00:00",
     }
     flats = out["osm-way-3:A_part1"]["catastro_use"]
-    assert (flats["current_use"], flats["use"], flats["dwellings"], flats["building_units"]) == ("1_residential", "residential", 12, 14)
+    assert (flats["current_use"], flats["use"], flats["dwellings"], flats["building_units"], flats["construction_year"]) == (
+        "1_residential", "residential", 12, 14, 1931)
     # A church is not split but stands on parcels C and D; C covers half of it, and D has no Catastro building.
     assert out["osm-way-1"]["catastro_use"]["refcat"] == "C" and out["osm-way-1"]["catastro_use"]["share"] == 0.5
     # A footprint left whole (B's 2 m strip is a sliver) takes the parcel that covers most of it: C (60 %), not B (20 %).

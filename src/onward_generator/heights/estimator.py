@@ -28,7 +28,7 @@ from onward_generator.heights.classify import Classification, classify
 from onward_generator.heights.config import HeightConfig
 
 SCENE_SCHEMA = "onward_generator.geo_scene"
-SUPPORTED_SCENE_VERSIONS = frozenset({"0.1.0", "0.2.0"})
+SUPPORTED_SCENE_VERSIONS = frozenset({"0.1.0", "0.2.0", "0.3.0"})
 _DECIMALS = 2
 
 

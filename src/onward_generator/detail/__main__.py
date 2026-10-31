@@ -14,6 +14,7 @@ import numpy as np
 from onward_generator.contracts import is_schema
 from onward_generator.detail.config import DetailConfigError, load_detail_config
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
+from onward_generator.detail.typology import TypologyConfigError, load_typology_config
 from onward_generator.generation.config import GenerationConfigError, Material, load_generation_config
 from onward_generator.generation.gltf import build_glb
 from onward_generator.generation.preview import render_rgb, side_by_side
@@ -38,6 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base", required=True, help="validated phase 03 output directory (scene3d.json, generation_report.json)")
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--config", default=None, help="detail config (default: config/detail.default.json)")
+    parser.add_argument("--typology-config", default=None, help="typology rules (default: config/typology.default.json, ADR-024)")  # pragma: no mutate: help text; argparse's default for an option is already None
     parser.add_argument("--generation-config", default=None, help="phase 03 config used for the base (default: config/generation.default.json)")
     parser.add_argument("--no-preview", action="store_true", help="skip the before/after comparison images")
     parser.add_argument("--core-radius-m", type=float,
@@ -68,6 +70,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if exc.code in (0, None) else 2
     try:
         cfg = load_detail_config(args.config)
+        typology = load_typology_config(args.typology_config)
         gen_cfg = load_generation_config(args.generation_config)
         clash = sorted(set(cfg.materials) & set(gen_cfg.materials))
         if clash:
@@ -79,8 +82,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
-        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places)
-    except (DetailConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
+        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
+                                typology=typology)
+    except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
 

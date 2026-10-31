@@ -109,6 +109,30 @@ A mismatch raises `DetailError` and writes nothing.
 | `generic_minor` | `minor` | door and windows | `hip` in `roof_tile` when convex and ≤ 200 m²; otherwise `flat` |
 | `landmark_placeholder` | `religious` and any `landmark` | door only (2.4 × 4 m) | `flat` |
 
+### Typology
+
+[ADR-024](decisions/ADR-024-building-typology.md). Each building records `facade.typology`. It is **recorded and counted, not drawn**: templates, palettes, geometry and the GLB do not read it yet. The rules are in `config/typology.default.json` (schema beside it; `detail --typology-config`), and every threshold is a modelling assumption.
+
+- **Era.** Observed or nothing, never estimated. `config/sources.json` `evidence` ranks the sources: an OSM date (`building:start_date`, `start_date`, `construction_date`: a leading four-digit year, as in `1890-05-01`, `~1890`, `1960s`), then the Catastro `construction_year`. Overture has no year. A date with no leading year (`C19`, `before 1900`) is `era_unparsable` (info) and gives no era. Periods: `pre_1900`, `1900_1939`, `1940_1959`, `1960_1979`, `1980_1999`, `2000_plus`.
+- **Morphology.** In the scene's metric CRS: area, perimeter, compactness (4πA/P²), elongation (long over short side of the minimum rotated rectangle), and the shared-wall share: the share of the outer ring that the facade probe (`probe_m`) finds against another building. An exposed run under 0.1 m is the end of a probe and is not counted as exposed; a real gap between two neighbours is.
+- **One record per parcel.** The parts of a Catastro parcel (the key of *Choice*) share one record, measured on their union, against the footprints of other keys. Height and storeys are those of the tallest part.
+- **Rule.** The first that matches names the typology:
+
+  | Order | Typology | Rule |
+  | --- | --- | --- |
+  | 1 | `landmark` | a part is a landmark in `heights.json` |
+  | 2 | `other` | the category is minor |
+  | 3 | `civic` | use `institutional` or `historic`, Catastro `public_services`, or category `public` or `religious` |
+  | 4 | `industrial_shed` | use, Catastro use or category industrial; or at most 1 storey and at least 800 m² |
+  | 5 | `tower` | at least 13 storeys |
+  | 6 | `historic_core` | attached (share ≥ 0.1), era before 1940 |
+  | 7 | `row_house`, `detached_house` | at most 3 storeys and 250 m²; attached or not |
+  | 8 | `closed_block` | share ≥ 0.3, 2 to 12 storeys |
+  | 9 | `open_block` | share < 0.3, 4 to 12 storeys, at least 150 m²; a slab with elongation ≥ 2, a point block with compactness ≥ 0.6 |
+  | 10 | `other` | no rule |
+
+- **Record.** `{"typology", "origin": "estimated", "rule", "inputs": {...}, "era": {"year", "period", "origin": "observed", "source", "evidence"} | null}`. The typology is always `estimated`; the era keeps its own origin. `counts.typologies`, `counts.eras` and `counts.era_sources` in `detail_report.json` count core buildings, and `run` prints `typology` and `era` lines.
+
 ### Shopfronts and shop signs
 
 Only a building with a `shopfront` ground floor (the evidence above) gets these. Configuration: `doors.shopfront`, `doors.shop_door` and `shops` in `config/detail.default.json`.
@@ -229,8 +253,8 @@ Every collider must be closed, manifold, and have positive volume (`collider_not
 | --- | --- |
 | `scene_visual.glb` | The detailed scene. Shared prototype meshes. Attribution and the fidelity statement in `extras`. Each building node has a `uv_frame` in its extras, each interior node a `light_anchors`. No `TEXCOORD_0` |
 | `scene_collision.glb` | Collision, separate from the visual mesh |
-| `scene_detail.json` | `onward_generator.scene_detail` 0.2.0. Input hashes, including the phase-03 base; fidelity, prototypes, and attribution; per object: template, storeys, openings, flat and recessed openings (`facade.relief`, added in 0.2.0), shops, materials, facade use and its evidence, how the door was placed, roof, evidence, interior, and checks |
-| `detail_report.json` | `onward_generator.detail_report` 0.2.0. The full configuration; opening, flat opening (`counts.flat_openings`, added in 0.2.0), template, roof, roof shape (`counts.roof_shapes`), building part (`counts.building_parts`), door (`counts.doors`), setback wall (`counts.setback_walls`), facade use, and wall material counts; triangles by material and the budget; issues; `phase_04_checks` |
+| `scene_detail.json` | `onward_generator.scene_detail` 0.3.0. Input hashes, including the phase-03 base; fidelity, prototypes, and attribution; per object: template, storeys, openings, flat and recessed openings (`facade.relief`, added in 0.2.0), shops, materials, facade use and its evidence, typology and era (`facade.typology`, added in 0.3.0), how the door was placed, roof, evidence, interior, and checks |
+| `detail_report.json` | `onward_generator.detail_report` 0.3.0. The full configuration; opening, flat opening (`counts.flat_openings`, added in 0.2.0), typology and era (`counts.typologies`, `counts.eras`, `counts.era_sources`, added in 0.3.0), template, roof, roof shape (`counts.roof_shapes`), building part (`counts.building_parts`), door (`counts.doors`), setback wall (`counts.setback_walls`), facade use, and wall material counts; triangles by material and the budget; issues; `phase_04_checks` |
 | `compare_overview.png`, `compare_closeup.png` | Before and after, phase 03 on the left and phase 04 on the right, same camera. Not written with `--no-preview`, which `run` passes unless given `--preview` |
 
 Material names that collide with the generation configuration are refused. Input files and the base are never overwritten, even with `--overwrite`.

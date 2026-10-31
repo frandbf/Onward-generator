@@ -1,0 +1,24 @@
+{
+  "version": "0.1.0",
+  "description": "Building typology rules for detail (ADR-024). The rules run in order and the first that matches names the typology. Every threshold is a modelling assumption, not an observation. The typology is recorded only: it does not change geometry, materials or templates yet.",
+  "era_tags": ["building:start_date", "start_date", "construction_date"],
+  "minor_categories": ["minor"],
+  "civic": {
+    "uses": ["institutional", "historic"],
+    "catastro_uses": ["public_services"],
+    "categories": ["public", "religious"]
+  },
+  "industrial": {
+    "uses": ["industrial"],
+    "catastro_uses": ["industrial"],
+    "categories": ["industrial"],
+    "shed_max_storeys": 1,
+    "shed_min_area_m2": 800.0
+  },
+  "tower_min_storeys": 13,
+  "attached_min_share": 0.1,
+  "historic_core_periods": ["pre_1900", "1900_1939"],
+  "house": { "max_storeys": 3, "max_area_m2": 250.0 },
+  "closed_block": { "min_share": 0.3, "min_storeys": 2, "max_storeys": 12 },
+  "open_block": { "min_storeys": 4, "max_storeys": 12, "min_area_m2": 150.0, "slab_min_elongation": 2.0, "point_min_compactness": 0.6 }
+}

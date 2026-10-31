@@ -215,6 +215,8 @@ def test_detail_breaks_down_openings_and_urban_elements(tmp_path: Path) -> None:
         ("openings", ("window 435", "balcony 231", "door 3")),
         ("urban", ("street lamp 26", "tree 24 obs", "bench 9", "kiosk 1")),
         ("tiers", ()),
+        ("typology", ()),
+        ("era", ()),
     )
     assert report.alerts == (Alert("warning", "warning 1 (late 1)", 1),)
 
@@ -318,7 +320,23 @@ def test_detail_prints_the_tiers_of_a_map_with_a_core(tmp_path: Path) -> None:
         },
     } | _severity(0, 0))
     report = summarize("detail", ["--out", str(out)])
-    assert report.details[-1] == ("tiers", ("core 108 bldg 127 033 tris", "scenic 446 bldg 19 641 tris"))
+    assert report.details[2] == ("tiers", ("core 108 bldg 127 033 tris", "scenic 446 bldg 19 641 tris"))
+
+
+def test_detail_prints_the_typologies_and_eras_of_the_core(tmp_path: Path) -> None:
+    out = tmp_path / "scene_detail"
+    _write(out / "detail_report.json", {
+        "counts": {
+            "visual_triangles": 1, "materials": 1, "visual_nodes": 1, "openings": {}, "urban_elements": {},
+            "typologies": {"closed_block": 40, "row_house": 3, "other": 0, "landmark": 2},
+            "eras": {"unknown": 30, "1960_1979": 12, "pre_1900": 3},
+        },
+    } | _severity(0, 0))
+    report = summarize("detail", ["--out", str(out)])
+    assert report.details[3:] == (
+        ("typology", ("closed_block 40", "row_house 3", "landmark 2")),
+        ("era", ("unknown 30", "1960_1979 12", "pre_1900 3")),
+    )
 
 
 @pytest.mark.parametrize("argv", [["geo"], ["geo", "--out"]])

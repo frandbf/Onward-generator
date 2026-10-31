@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -22,6 +23,10 @@ NS = {
 }
 _GML = "{http://www.opengis.net/gml/3.2}"
 _EXT = "{http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0}"
+_CORE = "{http://inspire.jrc.ec.europa.eu/schemas/bu-core2d/2.0}"
+# INSPIRE DateOfEvent: Catastro fills ``beginning`` (and ``end``, the same day); ``anyPoint`` is the generic form.
+_DATE_EVENTS = ("beginning", "anyPoint", "end")
+_YEAR = re.compile(r"(\d{4})-\d{2}-\d{2}")
 _BASE = "{urn:x-inspire:specification:gmlas:BaseTypes:3.2}"
 _PROLOG_SCAN = 64 * 1024
 
@@ -152,6 +157,7 @@ class BuildingUse:
     current_use: str
     dwellings: int | None
     building_units: int | None
+    construction_year: int | None = None
 
 
 def _optional_int(building: ET.Element, tag: str) -> int | None:
@@ -166,12 +172,35 @@ def _optional_int(building: ET.Element, tag: str) -> int | None:
     return value
 
 
+def construction_year(building: ET.Element) -> int | None:
+    """The year of ``bu-core2d:dateOfConstruction``: ``None`` when it is absent or ``xsi:nil``.
+
+    The first filled ``beginning``, ``anyPoint`` or ``end`` of its ``DateOfEvent`` is read. A date that is
+    not ``YYYY-MM-DD...`` raises ``ValueError``.
+    """
+    event = building.find(f"{_CORE}dateOfConstruction/{_CORE}DateOfEvent")
+    if event is None:
+        return None
+    for name in _DATE_EVENTS:
+        elem = event.find(f"{_CORE}{name}")
+        text = "" if elem is None else (elem.text or "").strip()
+        if not text:
+            continue
+        match = _YEAR.match(text)
+        if match is None:
+            raise ValueError(f"dateOfConstruction {name} {text!r} is not a date")
+        return int(match.group(1))
+    return None
+
+
 def parse_building_uses(path: str | Path) -> tuple[dict[str, BuildingUse], list[PartIssue]]:
-    """Every ``bu-ext2d:Building`` of a downloaded GML by ``refcat``: its ``currentUse`` and unit counts.
+    """Every ``bu-ext2d:Building`` of a downloaded GML by ``refcat``: its ``currentUse``, unit counts and
+    construction year.
 
     A building without a ``localId`` or a ``currentUse``, or with a bad count, is ``malformed_building``;
-    a repeated ``localId`` is ``duplicate_building``. The geometry is not read: a building is the parcel
-    its parts already name.
+    a repeated ``localId`` is ``duplicate_building``. A ``dateOfConstruction`` that is not a date is
+    ``malformed_construction_date``: the building keeps its use, with no year. The geometry is not read:
+    a building is the parcel its parts already name.
     """
     source = Path(path)
     _check_prolog(source)
@@ -193,8 +222,13 @@ def parse_building_uses(path: str | Path) -> tuple[dict[str, BuildingUse], list[
                 current = (use_elem.text or "").strip() if use_elem is not None else ""
                 if not current:
                     raise ValueError("missing currentUse")
-                uses[refcat] = BuildingUse(refcat, current, _optional_int(elem, "numberOfDwellings"),
-                                           _optional_int(elem, "numberOfBuildingUnits"))
+                dwellings, units = _optional_int(elem, "numberOfDwellings"), _optional_int(elem, "numberOfBuildingUnits")
+                try:
+                    year = construction_year(elem)
+                except ValueError as exc:
+                    issues.append(PartIssue("malformed_construction_date", refcat, str(exc)))
+                    year = None
+                uses[refcat] = BuildingUse(refcat, current, dwellings, units, year)
             except ValueError as exc:
                 issues.append(PartIssue("malformed_building", refcat, str(exc)))
             finally:

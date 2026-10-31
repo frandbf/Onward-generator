@@ -75,6 +75,7 @@ from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
+from onward_generator.detail.typology import TypologyConfig, building_typologies, load_typology_config
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -89,7 +90,8 @@ from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, cor
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
+"""0.2.0: ``facade.relief`` and ``counts.flat_openings`` (ADR-025). 0.3.0: ``facade.typology`` and its counts (ADR-024)."""
 BASE_MANIFEST = "scene3d.json"
 BASE_REPORT = "generation_report.json"
 FIDELITY_NOTE = "Generic template chosen by rules; it does not represent the real facade of this building."
@@ -758,12 +760,15 @@ def detail_scene(
     extra_urban: ExtraUrban | None = None,
     core_half_side_m: float | None = None,
     places: Sequence[Mapping[str, Any]] = (),
+    typology: TypologyConfig | None = None,
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
 
     ``places`` are third-party POIs from ``overture_places.json`` (ADR-021): shop evidence ``overture``,
-    ranked by ``config/sources.json`` ``evidence`` (ADR-022)."""
+    ranked by ``config/sources.json`` ``evidence`` (ADR-022). ``typology`` (default ``config/typology.default.json``)
+    names each building's typology and era (ADR-024); it changes nothing that is drawn."""
+    tcfg = typology or load_typology_config()
     core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
     scene = json.loads(Path(scene_path).expanduser().read_text(encoding="utf-8"))
@@ -784,7 +789,10 @@ def detail_scene(
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
     heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
     templates = _templates(ids, height_of, cfg)
-    sources = _shop_sources(ids, feature_of, evidence, templates, cfg, load_source_config().evidence,
+    ranking = load_source_config().evidence
+    typologies = building_typologies(ids, footprints, tree, key_of, feature_of, height_of, heights_m,
+                                     {bid: facade_walls[bid][0] for bid in ids}, ranking, cfg, tcfg, issues)
+    sources = _shop_sources(ids, feature_of, evidence, templates, cfg, ranking,
                             lambda bid: _shop_fits(bid, ids, footprints, tree, cfg), place_evidence)
     catastro = {bid: feature_of[bid]["catastro_use"] for bid, source in sources.items() if source == CATASTRO_ID}
     third_party = {bid for bid, source in sources.items() if source == OVERTURE_ID}
@@ -1072,6 +1080,9 @@ def detail_scene(
 
     wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
+    for x in objects:
+        if x.type == "building":
+            x.record["facade"]["typology"] = typologies[x.record["source_ids"][0]]
     issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
     dropped_lights = cap_lights(lit, cfg.interiors.lights_max)
     issues.extend(Issue("interior_light_dropped", "info", room, f"over interiors.lights_max {cfg.interiors.lights_max}")
@@ -1145,6 +1156,7 @@ def detail_scene(
         "heights": base.inputs["heights"],
         "generation_config": base.inputs["config"],
         "detail_config": {"path": cfg.path, "sha256": cfg.sha256, "version": cfg.version},
+        "typology_config": {"path": tcfg.path, "sha256": tcfg.sha256, "version": tcfg.version},
     }
     detailed.stats = _stats(detailed, counts, templates_used, roof_types, interiors_built, exposed_m, party_m, elements)
     detailed.stats["interior_visual_triangles"] = budgets[False].used["triangles"]
@@ -1174,6 +1186,10 @@ def detail_scene(
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))
+    core_typologies = [typologies[bid] for bid in ids if tier_of[bid] == CORE]
+    detailed.stats["typologies"] = dict(sorted(Counter(t["typology"] for t in core_typologies).items()))
+    detailed.stats["eras"] = dict(sorted(Counter(t["era"]["period"] if t["era"] else "unknown" for t in core_typologies).items()))
+    detailed.stats["era_sources"] = dict(sorted(Counter(t["era"]["source"] for t in core_typologies if t["era"]).items()))
     if core is not None:
         tiers = Counter(tier_of.values())
         detailed.core = {"half_side_m": core_half_side_m, "buildings": {CORE: tiers[CORE], SCENIC: tiers[SCENIC]}}

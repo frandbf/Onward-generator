@@ -92,12 +92,13 @@ def _uses(path: str | None, scene: dict, features: list[dict], parts: list[Build
     if sha256_file(gml_path) != record.sha256:
         raise CadastreError("cadastre buildings file changed while being read")
     counts = attach_uses(scene, features, parts, uses, record, options)
-    print(f"buildings={len(uses)} uses attached={sum(counts.values())} {counts}")
+    years = sum(1 for f in features if (f.get("catastro_use") or {}).get("construction_year") is not None)
+    print(f"buildings={len(uses)} uses attached={sum(counts.values())} {counts} with construction year={years}")
     return {
         "status": "read", "path": str(gml_path), "provider": record.provider, "license": record.license,
         "license_url": record.license_url, "attribution": record.attribution, "retrieved_at": record.retrieved_at,
         "sha256": record.sha256, "url": record.url, "buildings": len(uses), "issues": [i.to_dict() for i in issues],
-        "attached": counts,
+        "attached": counts, "with_construction_year": years,
     }
 
 

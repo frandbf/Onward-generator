@@ -2,23 +2,26 @@
 <!-- Synthetic Catastro INSPIRE BU Building fixture (CC0-1.0). Not real cadastre data.
      One Building per parcel of synthetic_bu.gml; geometry left out, it is not read. -->
 <gml:FeatureCollection gml:id="ES.SDGC.BU" xmlns:base="urn:x-inspire:specification:gmlas:BaseTypes:3.2" xmlns:bu-core2d="http://inspire.jrc.ec.europa.eu/schemas/bu-core2d/2.0" xmlns:bu-ext2d="http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <!-- Parcel of P1 and P2 (way 101 / 108): retail, a few dwellings above. -->
+  <!-- Parcel of P1 and P2 (way 101 / 108): retail, a few dwellings above, built in 1976. -->
   <gml:featureMember><bu-ext2d:Building gml:id="ES.SDGC.BU.0000001AA0000A">
+    <bu-core2d:dateOfConstruction><bu-core2d:DateOfEvent><bu-core2d:beginning>1976-01-01T00:00:00</bu-core2d:beginning><bu-core2d:end>1976-01-01T00:00:00</bu-core2d:end></bu-core2d:DateOfEvent></bu-core2d:dateOfConstruction>
     <bu-core2d:inspireId><base:Identifier><base:localId>0000001AA0000A</base:localId><base:namespace>ES.SDGC.BU</base:namespace></base:Identifier></bu-core2d:inspireId>
     <bu-ext2d:currentUse>4_2_retail</bu-ext2d:currentUse>
     <bu-ext2d:numberOfBuildingUnits>9</bu-ext2d:numberOfBuildingUnits>
     <bu-ext2d:numberOfDwellings>8</bu-ext2d:numberOfDwellings>
     <bu-ext2d:numberOfFloorsAboveGround xsi:nil="true" nilReason="other:unpopulated"></bu-ext2d:numberOfFloorsAboveGround>
   </bu-ext2d:Building></gml:featureMember>
-  <!-- Parcel of P5 (relation 201): residential, many dwellings. -->
+  <!-- Parcel of P5 (relation 201): residential, many dwellings, no construction date. -->
   <gml:featureMember><bu-ext2d:Building gml:id="ES.SDGC.BU.0000004AA0000A">
+    <bu-core2d:dateOfConstruction xsi:nil="true" nilReason="other:unpopulated"></bu-core2d:dateOfConstruction>
     <bu-core2d:inspireId><base:Identifier><base:localId>0000004AA0000A</base:localId><base:namespace>ES.SDGC.BU</base:namespace></base:Identifier></bu-core2d:inspireId>
     <bu-ext2d:currentUse>1_residential</bu-ext2d:currentUse>
     <bu-ext2d:numberOfBuildingUnits>58</bu-ext2d:numberOfBuildingUnits>
     <bu-ext2d:numberOfDwellings>55</bu-ext2d:numberOfDwellings>
   </bu-ext2d:Building></gml:featureMember>
-  <!-- Parcel of P4: office, counts left nil. -->
+  <!-- Parcel of P4: office, counts and construction date left nil. -->
   <gml:featureMember><bu-ext2d:Building gml:id="ES.SDGC.BU.0000003AA0000A">
+    <bu-core2d:dateOfConstruction><bu-core2d:DateOfEvent><bu-core2d:beginning xsi:nil="true" nilReason="other:unpopulated"></bu-core2d:beginning></bu-core2d:DateOfEvent></bu-core2d:dateOfConstruction>
     <bu-core2d:inspireId><base:Identifier><base:localId>0000003AA0000A</base:localId><base:namespace>ES.SDGC.BU</base:namespace></base:Identifier></bu-core2d:inspireId>
     <bu-ext2d:currentUse>4_1_office</bu-ext2d:currentUse>
     <bu-ext2d:numberOfBuildingUnits xsi:nil="true" nilReason="other:unpopulated"></bu-ext2d:numberOfBuildingUnits>

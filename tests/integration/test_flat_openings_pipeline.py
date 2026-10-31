@@ -25,8 +25,8 @@ def _buildings(d) -> dict[str, dict]:
 
 def test_flat_upper_openings_are_recorded_and_save_their_reveals(detail_inputs: tuple[Path, Path, Path]) -> None:
     flat, deep = _detail(detail_inputs, 2), _detail(detail_inputs, 1000)
-    assert SCHEMA_VERSION == "0.2.0"
-    assert flat.manifest()["schema_version"] == flat.report()["schema_version"] == "0.2.0"
+    assert SCHEMA_VERSION == "0.3.0"
+    assert flat.manifest()["schema_version"] == flat.report()["schema_version"] == "0.3.0"
     records, before = _buildings(flat), _buildings(deep)
     assert records and records.keys() == before.keys()
     for oid, record in records.items():
