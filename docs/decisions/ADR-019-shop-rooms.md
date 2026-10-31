@@ -1,4 +1,4 @@
-# ADR-018 — Shop rooms that fit large shops and necked footprints
+# ADR-019 — Shop rooms that fit large shops and necked footprints
 
 Status: accepted · 30 October 2026.
 
