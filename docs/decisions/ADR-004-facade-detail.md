@@ -36,3 +36,7 @@ OSM and Catastro provide the footprint, the height, and the storey count. They d
 - Reveals (`frame_stone`) were 45% of the visual triangles on the measured scene (106 500 of 235 327). If a Quest budget requires it, simplifying those reveals is the first lever.
 - Collision does not follow opening recesses. A flat surface is more stable for the player.
 - Landmarks need a specific model in a later stage. An observed OSM tower height may add a clipped prism (ADR-008).
+
+## Amendment — Simple 3D Buildings tags (31 October 2026)
+
+[ADR-023](ADR-023-simple-3d-buildings.md) replaces the tagged hip of this decision. `roof:shape` is drawn on any area as its own shape, with a recorded flat fallback. `building:part` is extruded from `height` or its levels, and `building:colour` and `roof:colour` tint shared materials.

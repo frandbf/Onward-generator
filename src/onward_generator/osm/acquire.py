@@ -8,10 +8,7 @@ and is not committed.
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import tempfile
 import time
 import urllib.parse
 from collections.abc import Callable
@@ -27,6 +24,7 @@ from onward_generator.geo.aoi import AoiError, load_aoi_geojson
 from onward_generator.geo.clipping import ClipError, inclusion_zone
 from onward_generator.geo.projection import LocalFrame, ProjectionError
 from onward_generator.geo.sources import OPENSTREETMAP, sha256_file
+from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.maps.workspace import MapError, load_map
 from onward_generator.net import fetch_bytes
 
@@ -230,15 +228,7 @@ def download_map_osm(
             sleep(REMARK_RETRY_DELAY_S)
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-        os.chmod(tmp, 0o644)
-        os.replace(tmp, target)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
+    atomic_write_bytes(target, data)
     center = document["center"]
     record = DownloadRecord(
         provider=OPENSTREETMAP.provider,
@@ -261,5 +251,5 @@ def download_map_osm(
         user_agent=USER_AGENT,
         path=str(target),
     )
-    side.write_text(json.dumps(record.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(side, record.to_dict())
     return record

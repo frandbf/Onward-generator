@@ -4,25 +4,17 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from io import BytesIO
 
 import numpy as np
-from PIL import Image
 
+from onward_generator.dress.atlas import encode_png
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node
 
 _LIGHT = np.array([-0.45, -0.35, 0.82])
 _LIGHT = _LIGHT / np.linalg.norm(_LIGHT)
 _BACKGROUND = np.array([0.93, 0.95, 0.97])
-
-
-def _png(rgb: np.ndarray) -> bytes:
-    """8-bit RGB PNG with fixed save options and no metadata, so output is deterministic."""
-    image = Image.fromarray(np.ascontiguousarray(rgb, dtype=np.uint8))
-    buffer = BytesIO()
-    image.save(buffer, format="PNG", optimize=False, compress_level=9)
-    return buffer.getvalue()
+PREVIEW_PNG_LEVEL = 9
 
 
 def render(
@@ -43,9 +35,9 @@ def render(
     instead of the whole scene, so different scenes rendered with the same focus align.
     ``splat_subpixel`` draws triangles smaller than a pixel as one sample (much faster for dense scenes).
     """
-    return _png((render_rgb(nodes, materials, width=width, height=height, azimuth_deg=azimuth_deg,
+    return encode_png((render_rgb(nodes, materials, width=width, height=height, azimuth_deg=azimuth_deg,
                             elevation_deg=elevation_deg, margin_px=margin_px, focus=focus,
-                            splat_subpixel=splat_subpixel) * 255).round().astype(np.uint8))
+                            splat_subpixel=splat_subpixel) * 255).round().astype(np.uint8), PREVIEW_PNG_LEVEL)
 
 
 def side_by_side(images: Sequence[np.ndarray], gap_px: int = 8) -> bytes:
@@ -58,7 +50,7 @@ def side_by_side(images: Sequence[np.ndarray], gap_px: int = 8) -> bytes:
         pad = np.tile(_BACKGROUND, (h, img.shape[1], 1))
         pad[: img.shape[0]] = img
         parts.append(pad)
-    return _png((np.concatenate(parts, axis=1) * 255).round().astype(np.uint8))
+    return encode_png((np.concatenate(parts, axis=1) * 255).round().astype(np.uint8), PREVIEW_PNG_LEVEL)
 
 
 def _splat(

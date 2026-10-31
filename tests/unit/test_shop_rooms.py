@@ -20,6 +20,7 @@ from onward_generator.detail.interiors import (
     GLASS_VIEW,
     PARTITION_M,
     RIM_TOLERANCE_M,
+    SHOP_GLASS,
     InteriorPlan,
     _inner_walls,
     _inset,
@@ -208,7 +209,7 @@ def test_each_part_with_a_shopfront_is_a_room_and_only_a_part_with_a_shop_gets_a
     assert plan.hosts.equals(FOOTPRINT.union(PART_B))
     opened, omitted = pierce_room_windows(layout, list(segments), plan.ground, PARTS, T, 2.8, plan.hosts)
     assert (opened, omitted) == (2, 0)
-    assert [h.back for h in layout.holes if h.kind != "interior_door"] == [GLASS_VIEW, GLASS_VIEW, "glass_dark"]
+    assert [h.back for h in layout.holes if h.kind != "interior_door"] == [SHOP_GLASS, SHOP_GLASS, "glass_dark"]
     built = build_interior(plan, 3.0, 3.0, PARTS, CFG, room_window_cuts(layout, list(segments)), glass_penetrations(layout, list(segments)))
     assert built.defects == 0 and [r["reachable"] for r in built.spec["rooms"]] == [True, False]
     concrete = [m for _, m in built.colliders]
@@ -225,7 +226,7 @@ def test_glass_on_a_part_without_a_room_stays_dark_and_is_not_omitted() -> None:
     inner = FOOTPRINT.buffer(-T, join_style="mitre")
     layout = Layout(holes=[Hole("window", 1, 4.4, 0.9, 1.2, 1.4, 0.15, "glass_dark", 0, 0), _front(0)])
     assert pierce_room_windows(layout, [SEG, SEG_B], inner, PARTS, T, 2.8, FOOTPRINT) == (1, 0)
-    assert [h.back for h in layout.holes] == ["glass_dark", GLASS_VIEW]
+    assert [h.back for h in layout.holes] == ["glass_dark", SHOP_GLASS]
     layout.holes = layout.holes[:1]
     assert pierce_room_windows(layout, [SEG, SEG_B], inner, PARTS, T, 2.8) == (0, 1) and layout.holes == []
 
@@ -251,7 +252,9 @@ def test_a_courtyard_shop_has_walls_round_the_hole_and_a_see_through_courtyard_w
     assert len(room.polygon.interiors) == 1
     assert pierce_room_windows(layout, [SEG, YARD], plan.ground, COURTYARD, T, 2.8, plan.hosts) == (2, 0)
     built = build_interior(plan, 3.0, 3.0, COURTYARD, CFG, room_window_cuts(layout, [SEG, YARD]), glass_penetrations(layout, [SEG, YARD]))
-    assert built.defects == 0 and built.spec["glass_panes"] == 2
+    # The courtyard window keeps its pane; the shopfront is frameless shop glass with no pane.
+    assert [h.back for h in layout.holes if h.kind != "interior_door"] == [SHOP_GLASS, GLASS_VIEW]
+    assert built.defects == 0 and (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (1, 1)
     [walls] = built.visual["interior_shop_bakery"]
     ceiling = 3.0 - CFG.interiors.slab_m
     assert _area(walls) == pytest.approx((81.6 + 30.4) * ceiling - 1.2 * 2.4 - 1.2 * 1.4 - 3.0 * 2.3)
@@ -267,6 +270,9 @@ def test_a_courtyard_shop_has_walls_round_the_hole_and_a_see_through_courtyard_w
     assert any(_inside(m, np.array([12.0, 6.0 - T / 2, 0.5])) for m in concrete)
     assert not any(_inside(m, np.array([12.0, 6.0 - T / 2, 1.6])) for m in concrete)
     assert sum(_inside(m, np.array([12.0, 6.0 - T / 2, 1.6])) for m in built.glass_colliders) == 1
+    # The shopfront (x 0.5 to 3.5) is open above its stallriser: no wall and no pane stops a shot.
+    assert any(_inside(m, np.array([2.0, T / 2, 0.1])) for m in concrete)
+    assert not any(_inside(m, np.array([2.0, T / 2, 1.2])) for m in [*concrete, *built.glass_colliders])
     # The light moves out of the courtyard into the room.
     [anchor] = built.light_anchors["rooms"]
     assert room.polygon.contains(Point(anchor["light_m"][:2])) and not Polygon(COURTYARD.interiors[0]).contains(Point(anchor["light_m"][:2]))
@@ -315,7 +321,7 @@ def test_a_window_counts_as_on_a_hosting_part_up_to_the_tolerance() -> None:
         assert pierce_room_windows(layout, [SEG], inner, FOOTPRINT, T, 2.8, hosts) == result
 
 
-def test_a_door_off_the_room_or_a_room_too_small_or_split_is_refused() -> None:
+def test_a_door_off_the_room_or_a_room_too_small_is_refused_and_a_split_room_is_the_door_piece() -> None:
     floating = Segment(0, 0, 0, (2.0, 5.0), (18.0, 5.0), True)
     assert plan_interior("b", FOOTPRINT, DOOR, floating, 3.0, 3.0, 1, CFG, max_floors=1) == "door_not_on_inner_wall"
     corner = replace(DOOR, s0=0.35)  # on the inner wall, but the clear floor beside it runs into the side wall
@@ -327,10 +333,11 @@ def test_a_door_off_the_room_or_a_room_too_small_or_split_is_refused() -> None:
     assert not isinstance(plan_interior("b", exact, door, wall, 3.0, 3.0, 1, CFG, max_floors=1), str)
     small = box(-T, -T, 4.0 + T, 4.9 + T)
     assert plan_interior("b", small, door, wall, 3.0, 3.0, 1, CFG, max_floors=1) == "inner_space_too_small"
-    # Two 6 m rooms joined by a 0.4 m neck: the walls close the neck and leave two rooms, which is refused.
+    # Two 6 m rooms joined by a 0.4 m neck: the walls close the neck; the room is the one behind the door (ADR-019).
     split = box(0.0, 0.0, 6.0, 6.0).union(box(6.0, 2.8, 8.0, 3.2)).union(box(8.0, 0.0, 14.0, 6.0))
     sill = Segment(0, 0, 0, (0.0, 0.0), (6.0, 0.0), True)
-    assert plan_interior("b", split, door, sill, 3.0, 3.0, 1, CFG, max_floors=1) == "inner_space_too_small"
+    plan = plan_interior("b", split, door, sill, 3.0, 3.0, 1, CFG, max_floors=1)
+    assert not isinstance(plan, str) and plan.inner.bounds == pytest.approx((T, T, 6.0 - T, 6.0 - T))
 
 
 def test_a_part_whose_walls_leave_two_rooms_gets_no_room() -> None:

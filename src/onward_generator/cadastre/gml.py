@@ -1,4 +1,4 @@
-"""Parsing of Catastro INSPIRE BU ``BuildingPart`` GML (read only)."""
+"""Parsing of Catastro INSPIRE BU ``BuildingPart`` and ``Building`` GML (read only)."""
 
 from __future__ import annotations
 
@@ -87,10 +87,8 @@ def _int(part: ET.Element, tag: str) -> int:
     return value
 
 
-def parse_building_parts(path: str | Path, crs: str = CRS) -> tuple[list[BuildingPart], list[PartIssue]]:
-    """Read every BuildingPart in ``crs``, the download CRS. Malformed parts (another CRS among them) are reported and skipped."""
-    source = Path(path)
-    accepted = _accepted_srs(crs)
+def _check_prolog(source: Path) -> None:
+    """Refuse a file without a FeatureCollection, or with a DTD or entities before it."""
     with source.open("rb") as handle:
         head = handle.read(_PROLOG_SCAN)
     root_at = head.find(b"FeatureCollection")
@@ -99,6 +97,13 @@ def parse_building_parts(path: str | Path, crs: str = CRS) -> tuple[list[Buildin
         raise CadastreError(f"{source}: DTD or entity declarations are not allowed")
     if root_at < 0:
         raise CadastreError(f"{source}: not a WFS FeatureCollection")
+
+
+def parse_building_parts(path: str | Path, crs: str = CRS) -> tuple[list[BuildingPart], list[PartIssue]]:
+    """Read every BuildingPart in ``crs``, the download CRS. Malformed parts (another CRS among them) are reported and skipped."""
+    source = Path(path)
+    accepted = _accepted_srs(crs)
+    _check_prolog(source)
 
     parts: list[BuildingPart] = []
     issues: list[PartIssue] = []
@@ -137,6 +142,66 @@ def parse_building_parts(path: str | Path, crs: str = CRS) -> tuple[list[Buildin
         raise CadastreError(f"{source}: XML parse error: {exc}") from exc
     parts.sort(key=lambda p: p.local_id)
     return parts, issues
+
+
+@dataclass(frozen=True, slots=True)
+class BuildingUse:
+    """The predominant use of one Catastro building (a parcel, ``localId`` = ``refcat``) and its unit counts."""
+
+    refcat: str
+    current_use: str
+    dwellings: int | None
+    building_units: int | None
+
+
+def _optional_int(building: ET.Element, tag: str) -> int | None:
+    """An integer that Catastro may leave ``xsi:nil``: ``None`` when it is empty."""
+    elem = building.find(f"{_EXT}{tag}")
+    text = None if elem is None else (elem.text or "").strip()
+    if not text:
+        return None
+    value = int(text)
+    if value < 0:
+        raise ValueError(f"negative {tag}")
+    return value
+
+
+def parse_building_uses(path: str | Path) -> tuple[dict[str, BuildingUse], list[PartIssue]]:
+    """Every ``bu-ext2d:Building`` of a downloaded GML by ``refcat``: its ``currentUse`` and unit counts.
+
+    A building without a ``localId`` or a ``currentUse``, or with a bad count, is ``malformed_building``;
+    a repeated ``localId`` is ``duplicate_building``. The geometry is not read: a building is the parcel
+    its parts already name.
+    """
+    source = Path(path)
+    _check_prolog(source)
+    uses: dict[str, BuildingUse] = {}
+    issues: list[PartIssue] = []
+    try:
+        for _, elem in ET.iterparse(source):
+            if elem.tag != f"{_EXT}Building":
+                continue
+            id_elem = elem.find(f".//{_BASE}localId")
+            refcat = id_elem.text.strip() if id_elem is not None and id_elem.text else None
+            try:
+                if not refcat:
+                    raise ValueError("missing localId")
+                if refcat in uses:
+                    issues.append(PartIssue("duplicate_building", refcat, "repeated localId; later copy ignored"))
+                    continue
+                use_elem = elem.find(f"{_EXT}currentUse")
+                current = (use_elem.text or "").strip() if use_elem is not None else ""
+                if not current:
+                    raise ValueError("missing currentUse")
+                uses[refcat] = BuildingUse(refcat, current, _optional_int(elem, "numberOfDwellings"),
+                                           _optional_int(elem, "numberOfBuildingUnits"))
+            except ValueError as exc:
+                issues.append(PartIssue("malformed_building", refcat, str(exc)))
+            finally:
+                elem.clear()
+    except ET.ParseError as exc:
+        raise CadastreError(f"{source}: XML parse error: {exc}") from exc
+    return dict(sorted(uses.items())), issues
 
 
 def reproject_parts(parts: Sequence[BuildingPart], source_crs: str, target_crs: str) -> list[BuildingPart]:

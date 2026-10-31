@@ -1,0 +1,322 @@
+{
+  "version": "0.1.0",
+  "places": {
+    "min_confidence": 0.7,
+    "operating_status": [
+      "open"
+    ],
+    "accept_missing_status": true,
+    "categories": {
+      "accountant": {
+        "office": "accountant"
+      },
+      "art_gallery": {
+        "shop": "art"
+      },
+      "arts_crafts_and_hobby_store": {
+        "shop": "craft"
+      },
+      "attorney_or_law_firm": {
+        "office": "lawyer"
+      },
+      "auto_insurance": {
+        "office": "insurance"
+      },
+      "bakery": {
+        "shop": "bakery"
+      },
+      "bank": {
+        "amenity": "bank"
+      },
+      "bank_or_credit_union": {
+        "amenity": "bank"
+      },
+      "bar": {
+        "amenity": "bar"
+      },
+      "barber": {
+        "shop": "hairdresser"
+      },
+      "beauty_salon": {
+        "shop": "beauty"
+      },
+      "book_store": {
+        "shop": "books"
+      },
+      "books_music_and_video_store": {
+        "shop": "books"
+      },
+      "bookstore": {
+        "shop": "books"
+      },
+      "bridal_shop": {
+        "shop": "clothes"
+      },
+      "butcher_shop": {
+        "shop": "butcher"
+      },
+      "cafe": {
+        "amenity": "cafe"
+      },
+      "camera_and_photography_store": {
+        "shop": "photo"
+      },
+      "candy_store": {
+        "shop": "confectionery"
+      },
+      "casual_eatery": {
+        "amenity": "fast_food"
+      },
+      "childrens_clothing_store": {
+        "shop": "clothes"
+      },
+      "chocolatier": {
+        "shop": "chocolate"
+      },
+      "clothing_store": {
+        "shop": "clothes"
+      },
+      "cocktail_bar": {
+        "amenity": "bar"
+      },
+      "coffee_shop": {
+        "amenity": "cafe"
+      },
+      "convenience_store": {
+        "shop": "convenience"
+      },
+      "cosmetics_and_fragrance_store": {
+        "shop": "cosmetics"
+      },
+      "delicatessen": {
+        "shop": "deli"
+      },
+      "dental_clinic": {
+        "amenity": "dentist"
+      },
+      "dentist": {
+        "amenity": "dentist"
+      },
+      "department_store": {
+        "shop": "department_store"
+      },
+      "dessert_shop": {
+        "shop": "pastry"
+      },
+      "doctors_office": {
+        "amenity": "doctors"
+      },
+      "drugstore": {
+        "shop": "chemist"
+      },
+      "dry_cleaning": {
+        "shop": "dry_cleaning"
+      },
+      "electronics_store": {
+        "shop": "electronics"
+      },
+      "eye_care_store": {
+        "shop": "optician"
+      },
+      "eyewear_store": {
+        "shop": "optician"
+      },
+      "fashion_accessories_store": {
+        "shop": "clothes"
+      },
+      "fashion_and_apparel_store": {
+        "shop": "clothes"
+      },
+      "fashion_boutique": {
+        "shop": "clothes"
+      },
+      "fast_food_restaurant": {
+        "amenity": "fast_food"
+      },
+      "financial_service": {
+        "office": "financial"
+      },
+      "fishmonger": {
+        "shop": "seafood"
+      },
+      "florist": {
+        "shop": "florist"
+      },
+      "flower_shop": {
+        "shop": "florist"
+      },
+      "flowers_and_gifts_store": {
+        "shop": "florist"
+      },
+      "food_and_beverage_store": {
+        "shop": "convenience"
+      },
+      "furniture_store": {
+        "shop": "furniture"
+      },
+      "gelato_shop": {
+        "amenity": "ice_cream"
+      },
+      "general_dentistry": {
+        "amenity": "dentist"
+      },
+      "gift_shop": {
+        "shop": "gift"
+      },
+      "grocery_store": {
+        "shop": "supermarket"
+      },
+      "hair_salon": {
+        "shop": "hairdresser"
+      },
+      "hardware_home_and_garden_store": {
+        "shop": "hardware"
+      },
+      "hardware_store": {
+        "shop": "hardware"
+      },
+      "ice_cream_shop": {
+        "amenity": "ice_cream"
+      },
+      "insurance_agency": {
+        "office": "insurance"
+      },
+      "irish_pub": {
+        "amenity": "pub"
+      },
+      "jewelry_store": {
+        "shop": "jewelry"
+      },
+      "laundromat": {
+        "shop": "laundry"
+      },
+      "lawyer": {
+        "office": "lawyer"
+      },
+      "legal_service": {
+        "office": "lawyer"
+      },
+      "liquor_store": {
+        "shop": "alcohol"
+      },
+      "mens_clothing_store": {
+        "shop": "clothes"
+      },
+      "mobile_phone_store": {
+        "shop": "mobile_phone"
+      },
+      "nail_salon": {
+        "shop": "beauty"
+      },
+      "newsstand": {
+        "shop": "kiosk"
+      },
+      "optician": {
+        "shop": "optician"
+      },
+      "pastry_shop": {
+        "shop": "pastry"
+      },
+      "personal_care_and_beauty_store": {
+        "shop": "cosmetics"
+      },
+      "personal_or_beauty_service": {
+        "shop": "beauty"
+      },
+      "pet_store": {
+        "shop": "pet"
+      },
+      "pharmacy": {
+        "amenity": "pharmacy"
+      },
+      "post_office": {
+        "amenity": "post_office"
+      },
+      "produce_store": {
+        "shop": "greengrocer"
+      },
+      "pub": {
+        "amenity": "pub"
+      },
+      "real_estate_agent": {
+        "office": "estate_agent"
+      },
+      "real_estate_service": {
+        "office": "estate_agent"
+      },
+      "restaurant": {
+        "amenity": "restaurant"
+      },
+      "seafood_market": {
+        "shop": "seafood"
+      },
+      "second_hand_store": {
+        "shop": "second_hand"
+      },
+      "shoe_store": {
+        "shop": "shoes"
+      },
+      "sporting_goods_store": {
+        "shop": "sports"
+      },
+      "stationery_store": {
+        "shop": "stationery"
+      },
+      "supermarket": {
+        "shop": "supermarket"
+      },
+      "tapas_bar": {
+        "amenity": "bar"
+      },
+      "tattoo_and_piercing": {
+        "shop": "tattoo"
+      },
+      "tobacco_shop": {
+        "shop": "tobacco"
+      },
+      "toy_store": {
+        "shop": "toys"
+      },
+      "travel_agency": {
+        "shop": "travel_agency"
+      },
+      "travel_agent": {
+        "shop": "travel_agency"
+      },
+      "travel_service": {
+        "shop": "travel_agency"
+      },
+      "veterinarian": {
+        "amenity": "veterinary"
+      },
+      "wine_bar": {
+        "amenity": "bar"
+      },
+      "wine_store": {
+        "shop": "wine"
+      },
+      "womens_clothing_store": {
+        "shop": "clothes"
+      }
+    }
+  },
+  "buildings": {
+    "min_iou": 0.5,
+    "skip_datasets": [
+      "OpenStreetMap"
+    ],
+    "origins": {
+      "OpenStreetMap": "observed",
+      "Esri Community Maps": "observed",
+      "Instituto Geográfico Nacional (España)": "observed",
+      "Microsoft ML Buildings": "ai_generated",
+      "Google Open Buildings": "ai_generated"
+    },
+    "default_origin": "estimated",
+    "confidence": {
+      "observed": 0.8,
+      "estimated": 0.6,
+      "ai_generated": 0.5
+    }
+  }
+}

@@ -84,7 +84,7 @@
         "min_samples": { "type": "integer", "minimum": 1 },
         "reliable_sources": {
           "type": "array",
-          "items": { "enum": ["explicit_height", "override", "authoritative_levels", "explicit_levels", "building_type"] },
+          "items": { "enum": ["explicit_height", "override", "authoritative_levels", "third_party_height", "third_party_levels", "explicit_levels", "building_type"] },
           "uniqueItems": true
         }
       }

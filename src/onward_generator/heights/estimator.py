@@ -1,7 +1,8 @@
 """Hierarchical, deterministic building-height estimation.
 
 Order per building: override height → explicit ``height`` → authoritative
-floor count (override ``levels``) → explicit ``building:levels`` → building
+floor count (override ``levels``) → third-party height, then floor count
+(secondary overrides, Overture) → explicit ``building:levels`` → building
 type → neighbourhood median → category fallback. Landmarks without
 an explicit or authoritative height get a flagged placeholder instead of the
 generic type/neighbourhood estimates.
@@ -35,6 +36,8 @@ class HeightSource(StrEnum):
     OVERRIDE = "override"
     EXPLICIT_HEIGHT = "explicit_height"
     AUTHORITATIVE_LEVELS = "authoritative_levels"
+    THIRD_PARTY_HEIGHT = "third_party_height"
+    THIRD_PARTY_LEVELS = "third_party_levels"
     EXPLICIT_LEVELS = "explicit_levels"
     BUILDING_TYPE = "building_type"
     NEIGHBOURHOOD = "neighbourhood"
@@ -52,6 +55,8 @@ HEIGHT_CLASS: Mapping[HeightSource, HeightClass] = {
     HeightSource.OVERRIDE: HeightClass.MEASURED,
     HeightSource.EXPLICIT_HEIGHT: HeightClass.MEASURED,
     HeightSource.AUTHORITATIVE_LEVELS: HeightClass.INFERRED,
+    HeightSource.THIRD_PARTY_HEIGHT: HeightClass.INFERRED,
+    HeightSource.THIRD_PARTY_LEVELS: HeightClass.INFERRED,
     HeightSource.EXPLICIT_LEVELS: HeightClass.INFERRED,
     HeightSource.BUILDING_TYPE: HeightClass.INFERRED,
     HeightSource.NEIGHBOURHOOD: HeightClass.INFERRED,
@@ -304,11 +309,32 @@ class _Estimator:
                 f"{override.source} ({override.license}): levels", "override",
             )
             return
+        if self.third_party(draft):
+            return
         if b.explicit_levels is not None:
             self.from_levels(
                 draft, b.explicit_levels, HeightSource.EXPLICIT_LEVELS, cfg.confidence["explicit_levels"],
                 "building:levels", "explicit",
             )
+
+    def third_party(self, draft: _Draft) -> bool:
+        """A secondary override (Overture): its height, else its floor count. True when it set the result."""
+        b = draft.building
+        entry = self.cfg.secondary_overrides.get(b.id)
+        if entry is None:
+            return False
+        label = f"third-party {entry.origin or 'unstated'}: {entry.source} ({entry.license})"
+        if entry.height_m is not None:
+            self.finish(
+                draft, entry.height_m, HeightSource.THIRD_PARTY_HEIGHT, entry.confidence, label,
+                levels=entry.levels or b.explicit_levels,
+                levels_source="override" if entry.levels else ("explicit" if b.explicit_levels else "derived_from_height"),
+            )
+            return True
+        if entry.levels is not None:
+            self.from_levels(draft, entry.levels, HeightSource.THIRD_PARTY_LEVELS, entry.confidence, f"{label}: levels", "override")
+            return True
+        return False
 
     # Landmarks: no generic estimate.
     def landmark(self, draft: _Draft) -> None:
@@ -429,7 +455,7 @@ def estimate_heights(buildings: Sequence[BuildingInput], config: HeightConfig) -
             est.fallback(draft)
 
     ids = {d.building.id for d in drafts}
-    for override_id in sorted(set(config.overrides) - ids):
+    for override_id in sorted((set(config.overrides) | set(config.secondary_overrides)) - ids):
         est.issue("override_not_in_scene", "warning", override_id, "override id matches no building in the scene")
     results = tuple(d.result for d in drafts if d.result is not None)
     assert len(results) == len(drafts)

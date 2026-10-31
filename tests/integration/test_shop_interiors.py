@@ -90,9 +90,13 @@ def test_shop_display_windows_are_see_through_and_carry_their_vinyls(detail_inpu
     room = _obj(shops, f"interior/{SHOP}").record
     building = _obj(shops, f"building/{SHOP}")
     ceiling = room["rooms"][0]["ceiling_z_m"]
-    view = [p for p in building.visual if p.material == "glass_view"]
-    assert len(view) == 1 and view[0].mesh.triangle_count == 2 * room["through_windows"] == 2 * room["glass_panes"]
-    assert room["through_windows"] >= building.record["facade"]["openings"]["shopfront"]
+    # Every display window is frameless shop glass with no pane collider; any other window keeps glass_view and its pane.
+    fronts = building.record["facade"]["openings"]["shopfront"]
+    [shop_glass] = [p for p in building.visual if p.material == "shop_glass"]
+    view = [p.mesh.triangle_count for p in building.visual if p.material == "glass_view"]
+    assert shop_glass.mesh.triangle_count == 2 * room["open_shopfronts"] == 2 * fronts > 0
+    assert sum(view) == 2 * room["glass_panes"] == 2 * len(building.glass_colliders)
+    assert room["through_windows"] == room["open_shopfronts"] + room["glass_panes"]
     for prim in building.visual:
         if prim.material == "glass_dark":
             assert prim.mesh.vertices[:, 2].min() >= ceiling - 1e-3  # only the upper floors keep the opaque glass
@@ -171,16 +175,24 @@ def test_shop_interiors_have_their_own_triangle_budget(detail_inputs: tuple[Path
     assert building["interior"] is False and building["facade"]["openings"]["shop_door"] == 1
 
 
-def test_a_shop_too_large_or_with_shop_interiors_off_gets_no_interior(detail_inputs: tuple[Path, Path, Path]) -> None:
+def test_a_shop_too_large_gets_a_band_and_with_shop_interiors_off_no_interior(detail_inputs: tuple[Path, Path, Path]) -> None:
     area = _footprint(detail_inputs, SHOP).area
     assert area == pytest.approx(240.0, abs=0.5)
-    edge = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=area))
-    assert edge.stats["shop_interiors"] == [SHOP]
-    large = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=area - 0.5))
-    assert large.stats["shop_interiors"] == []
-    assert [(i.object_id, i.severity, i.message) for i in large.issues if i.code == "interior_not_generated"] == [
-        (SHOP, "info", f"shop_too_large: {area:.1f} m² > max_area_m2 {area - 0.5}")]
-    assert _obj(large, f"building/{SHOP}").record["facade"]["openings"]["shop_door"] == 1
+    edge = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=area, interiors__shops__band_depth_m=3.0))
+    assert edge.stats["shop_interiors"] == [SHOP] and "room_depth_m" not in _obj(edge, f"interior/{SHOP}").record
+    large = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=area - 0.5, interiors__shops__band_depth_m=3.0))
+    assert large.stats["shop_interiors"] == [SHOP]
+    assert not [i for i in large.issues if i.code == "interior_not_generated" and i.object_id == SHOP]
+    banded = _obj(large, f"interior/{SHOP}").record
+    whole = _obj(edge, f"interior/{SHOP}").record
+    assert banded["room_depth_m"] == 3.0 and banded["rooms"][0]["area_m2"] < whole["rooms"][0]["area_m2"]
+    assert banded["checks"]["collider_defects"] == 0
+    # The band is for shops: stair interiors above max_area_m2 keep their whole floors.
+    small = _detail(detail_inputs, _cfg(interiors__shops__max_area_m2=100.0, interiors__shops__band_depth_m=3.0))
+    assert sorted(small.stats["interiors"]) == ["osm-way-311", "osm-way-313"]
+    for bid in small.stats["interiors"]:
+        record = _obj(small, f"interior/{bid}").record
+        assert "room_depth_m" not in record and _footprint(detail_inputs, bid).area > 100.0
     for cfg in (_cfg(interiors__shops__enabled=False), _cfg(interiors__enabled=False)):
         off = _detail(detail_inputs, cfg)
         assert off.stats["shop_interiors"] == [] and SHOP not in off.stats["interiors"]
@@ -222,7 +234,7 @@ def one_storey_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, P
     return _detail_inputs(tmp_path_factory.mktemp("one_storey"), ONE_STOREY, ONE_STOREY_POIS)
 
 
-@pytest.mark.parametrize(("bid", "category", "roof"), [("osm-way-801", "bakery", "flat_parapet"), ("osm-way-802", "pharmacy", "hip")])
+@pytest.mark.parametrize(("bid", "category", "roof"), [("osm-way-801", "bakery", "flat_parapet"), ("osm-way-802", "pharmacy", "hipped")])
 def test_a_one_storey_shop_has_its_room_under_a_closed_roof(one_storey_inputs: tuple[Path, Path, Path], bid: str,
                                                            category: str, roof: str) -> None:
     d = _detail(one_storey_inputs)
@@ -250,7 +262,8 @@ def test_a_one_storey_shop_has_its_room_under_a_closed_roof(one_storey_inputs: t
     assert any(_inside(m, np.array([*centre, height - 0.1])) for m in building.colliders)
     # See-through shop windows, and a light under the roof slab.
     assert interior["through_windows"] > 0
-    assert [p.mesh.triangle_count for p in building.visual if p.material == "glass_view"] == [2 * interior["through_windows"]]
+    assert [p.mesh.triangle_count for p in building.visual if p.material == "shop_glass"] == [2 * interior["through_windows"]]
+    assert interior["open_shopfronts"] == interior["through_windows"] and not building.glass_colliders
     assert anchor["light_m"][2] == pytest.approx(room["ceiling_z_m"] - LIGHT_BELOW_CEILING_M)
 
 
@@ -328,9 +341,11 @@ def test_a_courtyard_shop_room_goes_round_the_courtyard(complex_inputs: tuple[Pa
     assert yard["checks"]["collider_defects"] == 0 and not open_yard.critical
     assert yard["through_windows"] > interior.record["through_windows"] and yard["omitted_windows"] == 0
     # Panes sit on the room side of the wall, so the courtyard's are within t of its ring (x -32…-24, y 14…22).
-    [panes] = [p.mesh.vertices for p in _obj(open_yard, f"building/{bid}").visual if p.material == "glass_view"]
+    # The courtyard's openings are display windows too: shop glass, with no pane collider.
+    [panes] = [p.mesh.vertices for p in _obj(open_yard, f"building/{bid}").visual if p.material == "shop_glass"]
     yard_panes = (np.abs(panes[:, 0] + 28.0) <= 4.0 + t + 0.01) & (np.abs(panes[:, 1] - 18.0) <= 4.0 + t + 0.01)
     assert yard_panes.sum() == 4 * (yard["through_windows"] - interior.record["through_windows"])
+    assert yard["open_shopfronts"] == yard["through_windows"] and yard["glass_panes"] == 0
 
 
 def test_a_shop_of_two_parts_has_a_room_in_each_and_one_door(complex_shops) -> None:
@@ -344,7 +359,7 @@ def test_a_shop_of_two_parts_has_a_room_in_each_and_one_door(complex_shops) -> N
     assert [a["room_id"] for a in interior.light_anchors["rooms"]] == [f"{bid}/L0", f"{bid}/L0-1"]
     # The second part (x 16-26) is hollow behind its see-through shopfronts, and closed at the street.
     assert _free(building, 21.0, 10.0) and _free(building, 6.0, 11.0)
-    panes = [p for p in building.visual if p.material == "glass_view"][0].mesh.vertices
+    panes = [p for p in building.visual if p.material == "shop_glass"][0].mesh.vertices
     assert ((panes[:, 0] > 16.0) & (panes[:, 0] < 26.0)).any() and ((panes[:, 0] > 0.0) & (panes[:, 0] < 12.0)).any()
     assert building.record["facade"]["openings"]["interior_door"] == 1
     # The third part has windows only: it has no room, stays solid, and its ground-floor glass stays dark.
@@ -403,3 +418,51 @@ def test_shop_rooms_share_the_light_cap_nearest_the_centre_first(complex_inputs:
     # Lights near (-36, 18), (6, 11), (21, 10), (43.4, 12), (34.6, 12) and (-63, 11): the three farthest go dark.
     assert capped.stats["interior_lights"] == {
         "max": 3, "placed": 3, "dropped": ["osm-relation-820/L0", "osm-way-840/L0", "osm-way-860/L0"]}
+
+
+# Apart on one street: a kiosk whose room (4.4 x 3.4 m) is under the stair interior's 20 m²; a shop whose
+# back half hangs on a 0.4 m neck; a 30 x 25 m shop, above max_area_m2; and a block of flats as small as the kiosk.
+TIGHT = {
+    870: ([(-60, 6), (-55, 6), (-55, 10), (-60, 10)], {"building": "retail", "building:levels": "1"}),
+    871: ([(-40, 6), (-20, 6), (-20, 14), (-29.8, 14), (-29.8, 16), (-20, 16), (-20, 24), (-40, 24), (-40, 16),
+           (-30.2, 16), (-30.2, 14), (-40, 14)], {"building": "retail", "building:levels": "1"}),
+    872: ([(0, 6), (30, 6), (30, 31), (0, 31)], {"building": "retail", "building:levels": "1"}),
+    873: ([(40, 6), (45, 6), (45, 10), (40, 10)], {"building": "apartments", "building:levels": "4"}),
+}
+TIGHT_POIS = {970: ((-57.5, 7), {"shop": "kiosk"}), 971: ((-35, 7), {"shop": "books"}), 972: ((15, 7), {"shop": "supermarket"})}
+
+
+@pytest.fixture(scope="module")
+def tight_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    from tests.conftest import _detail_inputs
+
+    return _detail_inputs(tmp_path_factory.mktemp("tight"), TIGHT, TIGHT_POIS)
+
+
+def test_a_kiosk_a_necked_shop_and_a_large_shop_all_get_rooms(tight_inputs: tuple[Path, Path, Path]) -> None:
+    d = _detail(tight_inputs)
+    assert not d.critical and not [i for i in d.issues if i.code == "interior_not_generated"]
+    assert d.stats["shop_interiors"] == ["osm-way-870", "osm-way-871", "osm-way-872"]
+    t = CFG.interiors.wall_thickness_m
+    rooms = {b: _obj(d, f"interior/{b}").record for b in d.stats["shop_interiors"]}
+    assert all(r["checks"]["collider_defects"] == 0 for r in rooms.values())
+    assert rooms["osm-way-870"]["rooms"][0]["area_m2"] == pytest.approx((5 - 2 * t) * (4 - 2 * t), abs=0.01)
+    assert "room_depth_m" not in rooms["osm-way-870"] and "room_depth_m" not in rooms["osm-way-871"]
+    # The necked shop's room is the half behind its door; the other half stays solid.
+    assert rooms["osm-way-871"]["rooms"][0]["area_m2"] == pytest.approx((20 - 2 * t) * (8 - 2 * t), abs=0.01)
+    necked = _obj(d, "building/osm-way-871")
+    assert _free(necked, -35, 10) and not _free(necked, -35, 20)
+    # The large shop's room is the 12 m band behind its frontage, closed by a back wall.
+    depth = CFG.interiors.shops.band_depth_m
+    assert rooms["osm-way-872"]["room_depth_m"] == depth
+    assert rooms["osm-way-872"]["rooms"][0]["area_m2"] == pytest.approx((30 - 2 * t) * (depth - t), abs=0.05)
+    large = _obj(d, "building/osm-way-872")
+    assert _free(large, 15, 6 + depth - 0.5) and not _free(large, 15, 6 + depth + 0.5)
+    # With the stair interior's 20 m² floor the kiosk gets no room.
+    strict = _detail(tight_inputs, _cfg(interiors__shops__min_room_area_m2=20.0))
+    refused = [(i.object_id, i.message) for i in strict.issues if i.code == "interior_not_generated"]
+    assert ("osm-way-870", "inner_space_too_small") in refused
+    assert strict.stats["shop_interiors"] == ["osm-way-871", "osm-way-872"]
+    # The stair interior keeps its 20 m² floor: the flats the size of the kiosk get no room.
+    flats = _detail(tight_inputs, _cfg(interiors__include_ids=["osm-way-873"]))
+    assert ("osm-way-873", "inner_space_too_small") in [(i.object_id, i.message) for i in flats.issues if i.code == "interior_not_generated"]

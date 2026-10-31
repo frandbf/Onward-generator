@@ -29,6 +29,7 @@ from onward_generator.detail.config import config_from_document as detail_from_d
 from onward_generator.heights.config import DEFAULT_CONFIG_PATH as HEIGHTS_DEFAULT
 from onward_generator.heights.config import HeightConfigError
 from onward_generator.heights.config import config_from_document as heights_from_document
+from onward_generator.io import sha256_file as _sha256
 
 PROMPT_VERSION = "0.1.0"
 DocName = Literal["project", "heights", "detail"]
@@ -111,10 +112,6 @@ class BaseConfigs:
 
     def provenance(self) -> dict[str, Any]:
         return {n: {"path": str(b.path), "sha256": b.sha256} for n, b in self.by_name().items()}
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load_base(project: str | Path, heights: str | Path | None = None, detail: str | Path | None = None) -> BaseConfigs:

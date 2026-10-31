@@ -141,3 +141,22 @@ def test_style_gives_a_party_wall_its_wall_tile_and_repeat(tmp_path: Path) -> No
     assert np.array_equal(uvs["party_plaster_white"], uvs["plaster_white"])
     span = uvs["party_brick_red"].max(axis=0) - uvs["party_brick_red"].min(axis=0)
     assert np.allclose(span, [12.0 / tile["brick_red"], 9.0 / tile["brick_red"]], rtol=1e-4)
+
+
+def test_style_repeats_a_tint_at_its_base_scale_and_maps_a_tinted_roof_as_a_roof(tmp_path: Path) -> None:
+    wall = quad((0.0, 0.0, 0.0), (12.0, 0.0, 0.0), (12.0, 0.0, 9.0), (0.0, 0.0, 9.0))
+    roof = quad((0.0, 0.0, 9.0), (12.0, 0.0, 9.0), (12.0, 8.0, 12.0), (0.0, 8.0, 12.0))
+    prims = (Primitive(wall, "brick_red"), Primitive(wall, "brick_red__tint_white"), Primitive(wall, "party_brick_red__tint_white"),
+             Primitive(roof, "roof_tile"), Primitive(roof, "roof_tile__tint_green"))
+    materials = {p.material: Material((0.9, 0.9, 0.9, 1.0), 0.9) for p in prims}
+    nodes = [Node("building/1", prims, {"type": "building"})]
+    out = tmp_path / "tint"
+    out.mkdir()
+    targets = {name: out / f"{name}.bin" for name in ("visual", "collision", "manifest", "report", "atlas")}
+    write_styled(nodes, nodes, [], [], materials, load_catalog(), targets, atlas=True,
+                 attribution="© OpenStreetMap contributors", seed=SEED, source_manifest={},
+                 source_detail_sha256=None, generated_accessories={})
+    uvs = _uvs(targets["visual"])
+    assert np.array_equal(uvs["brick_red__tint_white"], uvs["brick_red"])
+    assert np.array_equal(uvs["party_brick_red__tint_white"], uvs["brick_red"])
+    assert np.array_equal(uvs["roof_tile__tint_green"], uvs["roof_tile"])

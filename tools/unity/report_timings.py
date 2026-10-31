@@ -7,7 +7,8 @@ package folder. The scene step writes ``seconds`` in ``scene_report.json``; the
 launcher step writes its own ``seconds`` in ``launcher_report.json`` beside it,
 read when present. One column per package, one row per phase, in the order the
 adapter wrote them. A report from before the per-phase timings has only
-``scene`` and ``bake``. Editor timings only, not device measurements.
+``scene`` and ``bake``; one from before the bake profiles has no ``bake profile``
+row (it baked as ``final``). Editor timings only, not device measurements.
 """
 
 from __future__ import annotations
@@ -54,7 +55,10 @@ def _bake_rows(report: dict[str, Any]) -> dict[str, str]:
     for size in sizes:
         counts[size] = counts.get(size, 0) + 1
     pages = ", ".join(f"{size} x{count}" if count > 1 else size for size, count in counts.items())
-    return {"lightmapper": used, "lightmaps": f"{len(sizes)} ({pages or 'none'})"}
+    rows = {"lightmapper": used, "lightmaps": f"{len(sizes)} ({pages or 'none'})"}
+    if bake.get("profile"):
+        rows["bake profile"] = str(bake["profile"])
+    return rows
 
 
 def column(scene_report: Path) -> tuple[str, dict[str, str]]:

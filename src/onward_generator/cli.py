@@ -89,6 +89,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
             return EXIT_USAGE
         host = resolve_host()
     try:
+        sources = _source_switches(args)
+    except ValueError as exc:
+        print(f"run: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
         directory = map_directory(args.name)
     except MapError as exc:
         print(f"run: {exc}", file=sys.stderr)
@@ -106,7 +111,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         brief=args.brief,
         ambient_ai=args.ai,
         panoramax=args.panoramax,
-        catastro=args.catastro,
+        sources=sources,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         core_radius_m=args.core_radius_m,
         overwrite=args.overwrite,
@@ -118,11 +123,27 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
 
 
+def _source_switches(args: argparse.Namespace) -> dict[str, bool]:
+    """``--source`` / ``--no-source`` ids (and the ``--catastro`` alias) as ``{plugin id: on}`` (ADR-018)."""
+    from onward_generator.sources.registry import plugin_by_id
+
+    switches = dict.fromkeys(args.source, True)
+    if args.catastro is not None:
+        switches["es.catastro"] = args.catastro
+    both = sorted(set(switches) & set(args.no_source))
+    if both:
+        raise ValueError(f"--source and --no-source both name {', '.join(both)}")
+    switches.update(dict.fromkeys(args.no_source, False))
+    for plugin_id in switches:
+        plugin_by_id(plugin_id)
+    return switches
+
+
 def _cmd_heights(args: argparse.Namespace) -> int:
     from onward_generator.heights import HeightConfigError, SceneError, load_height_config, run_heights, write_height_outputs
 
     try:
-        config = load_height_config(args.config, overrides_path=args.overrides)
+        config = load_height_config(args.config, overrides_path=args.overrides, secondary_overrides_path=args.secondary_overrides)
         run = run_heights(args.scene, config)
         heights_path, report_path = write_height_outputs(run, args.out, overwrite=args.overwrite)
     except (HeightConfigError, SceneError, FileExistsError, ValueError) as exc:
@@ -174,11 +195,16 @@ def build_parser() -> argparse.ArgumentParser:
     heights.add_argument("--out", required=True, help="output directory for heights.json and heights_report.json")
     heights.add_argument("--config", default=None, help="height configuration (default: config/heights.default.json)")
     heights.add_argument("--overrides", default=None, help="authoritative overrides JSON (replaces the config's overrides_file)")
+    heights.add_argument(
+        "--secondary-overrides",
+        help="third-party overrides JSON (overture match), ranked below --overrides and an OSM height, above building:levels",
+    )
     heights.add_argument("--overwrite", action="store_true", help="replace existing outputs")
     heights.set_defaults(handler=_cmd_heights)
 
     sub.add_parser("geo", help="run the geographic pipeline (see: geo --help)", add_help=False)
     sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match | split (see: cadastre --help)", add_help=False)  # pragma: no mutate: main dispatches cadastre before this stub is parsed, so add_help is never read
+    sub.add_parser("source", help="optional data-source plugins: list | merge (see: source --help)", add_help=False)  # pragma: no mutate: main dispatches source before this stub is parsed, so add_help is never read
     sub.add_parser("generate", help="phase 03 geometry: ground, streets, buildings (see: generate --help)", add_help=False)
     sub.add_parser("detail", help="phase 04: facades, roofs, urban elements, interiors (see: detail --help)", add_help=False)
     sub.add_parser("perf", help="phase 05: measure | layout | device | drawcalls (see: perf --help)", add_help=False)
@@ -210,8 +236,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
         "--catastro", action=argparse.BooleanOptionalAction,
-        help="split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country); --no-catastro turns it off for this map",
+        help="same as --source es.catastro / --no-source es.catastro: split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country)",
     )
+    run.add_argument("--source", action="append", default=[], metavar="ID", help="use this source plugin for the map when it covers the centre (stored in map.json; see: source list)")
+    run.add_argument("--no-source", action="append", default=[], metavar="ID", help="do not use this source plugin for the map (stored in map.json)")
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")
     run.add_argument("--platform", choices=PLATFORM_CHOICES, default=None, help="host for the Unity steps; same as the global --platform")
@@ -220,6 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--preview", action="store_true", help="also draw the diagnostic PNGs of generate and detail (off by default; the export thumbnail is always drawn)")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
+    sub.add_parser("overture", help="Overture Maps places and buildings: fetch | match (see: overture --help)", add_help=False)  # pragma: no mutate: main dispatches overture before this stub is parsed, so add_help is never read
     return parser
 
 
@@ -249,6 +278,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from onward_generator.cadastre.__main__ import main as cadastre_main
 
         return cadastre_main(argv[1:])
+    if argv[:1] == ["source"]:
+        from onward_generator.sources.__main__ import main as source_main
+
+        return source_main(argv[1:])
     if argv[:1] == ["generate"]:
         from onward_generator.generation.__main__ import main as generate_main
 
@@ -301,6 +334,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from onward_generator.osm.__main__ import main as osm_main
 
         return osm_main(argv[1:])
+    if argv[:1] == ["overture"]:
+        from onward_generator.overture.__main__ import main as overture_main
+
+        return overture_main(argv[1:])
     if argv[:1] == ["map"]:
         from onward_generator.maps.__main__ import main as map_main
 

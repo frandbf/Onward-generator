@@ -47,6 +47,23 @@ def parse_length_m(raw: str) -> float | None:
     return value if math.isfinite(value) and value > 0 else None
 
 
+def parse_metres(raw: object) -> float | None:
+    """A building height tag in metres: ``"12"``, ``"12 m"``, ``"12m"`` or ``"12,5"``.
+
+    Anything else (``None`` and ``""`` included), and any value outside (0, 200], is None.
+    """
+    text = str(raw).strip().lower().replace(",", ".")
+    if text.endswith("m"):
+        text = text[:-1].strip()
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    if not 0 < value <= 200:
+        return None
+    return value
+
+
 def parse_count(raw: str) -> int | None:
     stripped = raw.strip()
     if not stripped.isdigit():

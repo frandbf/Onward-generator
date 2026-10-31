@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
+from onward_generator.contracts import is_schema
 from onward_generator.detail.config import DetailConfigError, load_detail_config
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
 from onward_generator.generation.config import GenerationConfigError, Material, load_generation_config
@@ -39,8 +42,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-preview", action="store_true", help="skip the before/after comparison images")
     parser.add_argument("--core-radius-m", type=float,
                         help="half-side of the playable core square, metres (ADR-017); buildings outside it are scenic shells")
+    parser.add_argument("--places",
+                        help="overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)")
     parser.add_argument("--overwrite", action="store_true")
     return parser
+
+
+def load_places(path: str | None, scene_path: str) -> list[dict[str, Any]]:
+    """The places of ``overture_places.json``, after checking it was made for this scene's local grid."""
+    if path is None:
+        return []
+    doc = json.loads(Path(path).expanduser().read_bytes())
+    if not is_schema(doc.get("schema"), "onward_generator.overture_places"):
+        raise DetailError(f"{path} is not onward_generator.overture_places")
+    frame = json.loads(Path(scene_path).expanduser().read_bytes()).get("frame") or {}
+    if any(doc["frame"].get(k) != frame.get(k) for k in ("crs", "origin_projected")):
+        raise DetailError(f"{path} was made for another local grid than {scene_path}")
+    return list(doc["places"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -56,17 +74,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise DetailConfigError(cfg.path or "<detail config>", [f"materials {clash} are already defined by the generation config"])
         names = (VISUAL_FILE, COLLISION_FILE, MANIFEST_FILE, REPORT_FILE) + (() if args.no_preview else COMPARE_FILES)
         base_dir = Path(args.base)
+        places = load_places(args.places, args.scene)
         protected = (Path(args.scene), Path(args.heights), base_dir / "scene3d.json", base_dir / "generation_report.json",
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
-        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m)
-    except (DetailConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError) as exc:
+        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places)
+    except (DetailConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
 
     materials = dict(gen_cfg.materials) | dict(cfg.materials) | dict(SCENIC_WALLS) | {"collider": COLLIDER_MATERIAL}
-    extras = {"attribution": base.attribution, "manifest": MANIFEST_FILE, "fidelity": "generic templates; not a faithful reconstruction"}
+    # The attribution names the third-party datasets that gave a shop (ADR-021).
+    extras = {"attribution": detailed.attribution, "manifest": MANIFEST_FILE, "fidelity": "generic templates; not a faithful reconstruction"}
     visual = detailed.visual_nodes()
     atomic_write_bytes(targets[0], build_glb(visual, materials, extras=extras))
     atomic_write_bytes(targets[1], build_glb(detailed.collision_nodes(), materials, extras=extras))

@@ -28,3 +28,15 @@ def test_checklist_text() -> None:
         "MD5 del `.content3` probado: (ver `build/content3.md5`)\n"
     )
     assert text.splitlines()[8] == f"| 1 | {QUEST_CHECKLIST[0]} | | |"
+
+
+def test_the_checklist_asks_the_headset_about_shop_glass_and_keeps_the_walk_through_risk_open() -> None:
+    start = QUEST_CHECKLIST.index("La iluminación y los materiales son correctos en el dispositivo.") + 1
+    assert QUEST_CHECKLIST[start:start + 5] == (
+        "Escaparates de tienda: vidrio sin marco, visible desde la calle y desde dentro (anotar qué material de vidrio registró el adaptador).",
+        "Un disparo atraviesa el escaparate de una tienda sin impacto en el vidrio.",
+        "Riesgo abierto: el escaparate no tiene colisión sobre el zócalo de 0,25 m. Anotar si el jugador entra a la tienda por él.",
+        "El nombre de la tienda en el escaparate se lee en letras negras desde la calle y no tapa el interior.",
+        "Los interiores de tienda muestran suelo y paredes con textura.",
+    )
+    assert QUEST_CHECKLIST[start + 5].startswith("La tasa de fotogramas") and len(QUEST_CHECKLIST) == 21

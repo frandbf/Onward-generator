@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Phase 07: Onward export adapter (onward_unity 0.1.0).
 #
-#   run_export.sh [--platform macos|linux|auto] PACKAGE_DIR step... [--listing MODE]
+#   run_export.sh [--platform macos|linux|auto] PACKAGE_DIR step... [--listing MODE] [--bake draft|final]
 #   steps: tool scene launcher push inspect
 #
 # PACKAGE_DIR is written by `onward-generator export package`; its files are
@@ -13,6 +13,9 @@
 # "local": today's install, the one that loaded Hunt. local-thumb, named and
 # named-thumb are unverified candidates for the map's own name and thumbnail
 # (ADR-007, amendment 1). Every mode backs up first and never deletes a device file.
+# The bake profile (scene only) comes from --bake, else ONWARD_BAKE, else "draft":
+# fewer samples and bounces for iteration. "final" is the release bake. Unity gets it
+# as -onwardBake (docs/12-export.md, "Bake profiles").
 # "inspect" is read-only: it lists the game's folder and copies its .info3 files.
 set -euo pipefail
 
@@ -28,22 +31,26 @@ PYTHON="${PYTHON:-$REPO/.venv/bin/python}"
 DEVICE_DIR="/sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent"
 
 log() { printf '[export] %s\n' "$*"; }
-usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|launcher|push|inspect)... [--listing ${QUEST_LISTINGS// /|}]" >&2; exit 2; }
+usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|launcher|push|inspect)... [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}]" >&2; exit 2; }
 
 [[ $# -ge 2 ]] || usage
 PACKAGE="$(cd "$1" && pwd)"
 shift
 LISTING="${ONWARD_QUEST_LISTING:-local}"
+BAKE="${ONWARD_BAKE:-${BAKE_PROFILES%% *}}"
 STEPS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --listing) [[ $# -ge 2 ]] || usage; LISTING="$2"; shift 2 ;;
     --listing=*) LISTING="${1#--listing=}"; shift ;;
+    --bake) [[ $# -ge 2 ]] || usage; BAKE="$2"; shift 2 ;;
+    --bake=*) BAKE="${1#--bake=}"; shift ;;
     *) STEPS+=("$1"); shift ;;
   esac
 done
 [[ ${#STEPS[@]} -ge 1 ]] || usage
 check_quest_listing "$LISTING"
+check_bake_profile "$BAKE"
 [[ -f "$PACKAGE/onward_export.json" ]] || { log "$PACKAGE is not an export package"; exit 2; }
 PACKAGE_ID="$("$PYTHON" -c 'import json,sys; print(json.load(open(sys.argv[1]))["package_id"])' "$PACKAGE/onward_export.json")"
 [[ "$PACKAGE_ID" =~ ^[A-Za-z0-9_]+$ ]] || { log "invalid package_id '$PACKAGE_ID'"; exit 2; }
@@ -96,8 +103,9 @@ step_scene() {
   verify
   [[ -e "$BUILD/scene_report.json" ]] && { log "$BUILD/scene_report.json exists; the scene step runs once per package"; exit 1; }
   mkdir -p "$BUILD"
+  log "bake profile $BAKE"
   run_unity scene -executeMethod OnwardGenerator.OnwardMapAdapter.BuildScene \
-    -exportPackage "$PACKAGE" -exportReport "$BUILD/scene_report.json"
+    -exportPackage "$PACKAGE" -exportReport "$BUILD/scene_report.json" -onwardBake "$BAKE"
   # A GPU lightmapper without a usable OpenCL device bakes on the CPU; Unity says so in its own log.
   # The adapter's own "Lightmapper: ... fallback no" line is left out.
   grep -iE 'fall(ing)? ?back' "$LOG_DIR/${PACKAGE_ID}-scene.log" | grep -v '\[OnwardAdapter\]' | grep -iE 'cpu|lightmapper|opencl' \

@@ -243,6 +243,14 @@ def test_materials_groups_skips_by_reason(tmp_path: Path) -> None:
     )
 
 
+def test_materials_names_the_facade_path(tmp_path: Path) -> None:
+    out = tmp_path / "scene_materials"
+    _write(out / "materials_report.json", {"applied": [{}], "skipped": [], "facades": {"mode": "trim", "style": "mediterranean"}})
+    assert summarize("materials", ["--out", str(out)]) == StageReport("applied 1  skipped 0  facades trim mediterranean")
+    _write(out / "materials_report.json", {"applied": [], "skipped": [], "facades": {"mode": "legacy", "style": "anglo"}})
+    assert summarize("materials", ["--out", str(out)]).summary == "applied 0  skipped 0  facades legacy anglo"
+
+
 def test_panoramax_signs_fit_bounds(tmp_path: Path) -> None:
     _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [1, 2]})
     assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("2 facades")
@@ -344,3 +352,27 @@ def test_cadastre_reports_the_split(tmp_path: Path) -> None:
     split.update(status_quarantined=2, quarantined_m2=1234.56)
     _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 0}, "split": {"counts": split}})
     assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 0  split 0 → 0  kept whole 2 (1 235 m²)")
+
+
+def test_overrides_reports_the_winners_per_source(tmp_path: Path) -> None:
+    out = tmp_path / "sources"
+    report = {"buildings": 1250, "sources": [{"source": "es.pnoa_ndsm", "won": 1200}, {"source": "es.catastro", "won": 50}]}
+    _write(out / "sources_report.json", report)
+    assert summarize("overrides", ["source", "merge", "--out", str(out)]) == StageReport("1 250 buildings  es.pnoa_ndsm 1 200  es.catastro 50")
+
+
+def test_a_lidar_download_and_its_heights_report_tiles_and_measured_footprints(tmp_path: Path) -> None:
+    raw = tmp_path / "raw" / "es.pnoa_ndsm"
+    _write(raw.with_name("es.pnoa_ndsm.source.json"), {"license": "CC-BY-4.0", "tiles": [{"size_bytes": 2048}, {"size_bytes": 3072}]})
+    assert summarize("pnoa_ndsm", ["source", "fetch", "--out", str(raw)]) == StageReport("5 KiB  2 tiles  CC-BY-4.0")
+    out = tmp_path / "es.pnoa_ndsm"
+    _write(out / "es.pnoa_ndsm_report.json", {"counts": {"measured": 1066, "buildings": 1084}, "height_range_m": [3.5, 27.0]})
+    assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 1 066/1 084  3.5–27 m")
+    _write(out / "es.pnoa_ndsm_report.json", {"counts": {"measured": 0, "buildings": 3}, "height_range_m": None})
+    assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 0/3")
+    hd = tmp_path / "fr.lidar_hd"
+    _write(hd / "fr.lidar_hd_report.json", {"counts": {"measured": 2, "buildings": 3}, "height_range_m": [6.0, 21.5]})
+    assert summarize("lidar_hd_heights", ["--out", str(hd)]) == StageReport("measured 2/3  6–21.5 m")
+    hd_raw = tmp_path / "raw" / "fr.lidar_hd"
+    _write(hd_raw.with_name("fr.lidar_hd.source.json"), {"license": "etalab-2.0", "tiles": [{"size_bytes": 4096}]})
+    assert summarize("lidar_hd", ["--out", str(hd_raw)]) == StageReport("4 KiB  1 tile  etalab-2.0")

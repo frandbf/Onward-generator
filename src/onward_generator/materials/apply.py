@@ -16,7 +16,9 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
-from onward_generator.detail.facades import party_base, party_material
+from onward_generator.detail.config import load_detail_config
+from onward_generator.detail.facades import material_base, party_base, party_material
+from onward_generator.detail.s3db import tint_base
 from onward_generator.dress.atlas import (
     MIN_MEAN_LUMA,
     _tile_pixels,
@@ -32,7 +34,7 @@ from onward_generator.dress.surfaces import _load_features, _tags_of
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
-from onward_generator.materials.openings import boarded_png, window_png
+from onward_generator.materials.openings import boarded_png, shop_glass_png, window_png
 from onward_generator.materials.plan import TexturePlan, load_texture_plan
 from onward_generator.materials.polyhaven import (
     DEFAULT_CACHE,
@@ -42,6 +44,8 @@ from onward_generator.materials.polyhaven import (
     ensure_diffuse_1k,
 )
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
+from onward_generator.materials.trim import apply_trim
+from onward_generator.materials.trim_style import AUTO
 from onward_generator.tiers import SCENIC_WALLS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -54,6 +58,7 @@ OUTPUT_FILES = (
     "atlas.png",
     "materials_report.json",
     "materials.catalog.json",
+    "facade_trim.png",
 )
 PROTECTED_OUTPUT_NAMES = frozenset({
     "scene_detail_v07_2",
@@ -71,9 +76,21 @@ WALL_COLOR_IDS = frozenset({
 })
 WHITE = (1.0, 1.0, 1.0, 1.0)
 MAX_PHOTO_PX = 1024
-UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "door_wood"})
-# The see-through pane keeps its RGBA window image. The contact atlas is opaque.
-ATLAS_SKIP = frozenset({"glass_view"})
+UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "shop_glass", "door_wood"})
+# The see-through panes keep their RGBA images. The contact atlas is opaque.
+ATLAS_SKIP = frozenset({"glass_view", "shop_glass"})
+# Shop interiors (docs/07-detail.md, *Shop interiors*): one library photograph per shared material,
+# not a plan slot. Walls keep their category tint over a greyscale plaster; floors show the photograph.
+# ``(library id, albedo mode, metres per repeat)``.
+SHOP_WALL_TEXTURE = ("ph_plastered_wall", "greyscale_modulation", 2.0)
+SHOP_INTERIOR_TEXTURES: dict[str, tuple[str, str, float]] = {
+    "interior_shop_bakery": SHOP_WALL_TEXTURE,
+    "interior_shop_pharmacy": SHOP_WALL_TEXTURE,
+    "interior_shop_bar": SHOP_WALL_TEXTURE,
+    "interior_shop_generic": SHOP_WALL_TEXTURE,
+    "interior_shop_tile": ("acg_tiles139", "color_albedo", 2.0),
+    "interior_shop_wood": ("ph_wood_planks", "color_albedo", 2.0),
+}
 # Interior surfaces are not plan slots. They reuse a photograph the plan already chose.
 INTERIOR_PHOTO_SLOTS: dict[str, tuple[str, ...]] = {
     "interior_wall": ("plain_facades", "historic_facades", "ochre_facades"),
@@ -103,6 +120,21 @@ def share_facade_photos(
             photo_tiles[target] = (decode_jpeg_rgb(Path(records[slot].path).read_bytes()), "greyscale_modulation")
             shared.append({"color_id": target, "slot": slot, "albedo_mode": "greyscale_modulation",
                            "asset_id": records[slot].asset_id})
+    return shared
+
+
+def share_tint_photos(used: Collection[str], photo_tiles: dict[str, tuple[Any, str]]) -> list[dict[str, Any]]:
+    """Give each used tint (``building:colour``, ``roof:colour``; ADR-023) its base's photograph, in greyscale.
+
+    The tint stays on _BaseColor, so a blue facade shows the plaster of its base under its own colour.
+    A tint whose base has no photograph keeps the procedural tile.
+    """
+    shared: list[dict[str, Any]] = []
+    for tint in sorted(name for name in used if tint_base(name) != name):
+        base = tint_base(tint)
+        if base in photo_tiles:
+            photo_tiles[tint] = (photo_tiles[base][0], "greyscale_modulation")
+            shared.append({"color_id": tint, "base": base, "albedo_mode": "greyscale_modulation"})
     return shared
 
 
@@ -146,6 +178,33 @@ def share_interior_photos(
                 "asset_id": record.asset_id,
             })
             break
+    return shared
+
+
+def share_shop_interior_photos(
+    used: Collection[str],
+    photo_tiles: dict[str, tuple[Any, str]],
+    materials: dict[str, Material],
+    tile_m: dict[str, float],
+) -> list[dict[str, Any]]:
+    """Give each used shop interior material of ``SHOP_INTERIOR_TEXTURES`` its library photograph.
+
+    A floor in ``color_albedo`` gets a white base colour; a wall in ``greyscale_modulation`` keeps its tint.
+    """
+    from onward_generator.materials.library_plan import texture_record
+
+    shared: list[dict[str, Any]] = []
+    for target, (library_id, mode, metres) in SHOP_INTERIOR_TEXTURES.items():
+        if target not in used:
+            continue
+        record = texture_record(library_id)
+        photo_tiles[target] = (decode_jpeg_rgb(Path(record.path).read_bytes()), mode)
+        tile_m[target] = metres
+        if mode == "color_albedo":
+            materials[target] = Material(WHITE, materials[target].roughness)
+        shared.append({"color_id": target, "library_id": library_id, "albedo_mode": mode, "tile_m": metres,
+                       "provider": record.provider, "license": record.license, "sha256": record.sha256,
+                       "repo_path": _rel(Path(record.path))})
     return shared
 
 
@@ -322,8 +381,16 @@ def apply_materials(
     fetch: Fetcher | None = None,
     seed: int = 48152,
     tile_cache: bool = True,
+    facades: str = "trim",
+    facade_style: str = AUTO,
+    style_table: str | Path | None = None,
 ) -> dict[str, Any]:
-    """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it."""
+    """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
+
+    ``facades`` is ``trim`` (the regional trim-sheet atlas, ADR-020) or ``legacy`` (one
+    material per facade part). ``facade_style`` names a style of ``style_table``, or
+    ``auto`` to choose it from the map centre.
+    """
     base = Path(base_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     if not (base / "scene_visual.glb").is_file() or not (base / "scene_detail.json").is_file():
@@ -367,8 +434,19 @@ def apply_materials(
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
-    # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall.
+    trim_root = tile_cache_dir() if tile_cache else None
+    # A wall strip takes the colour the scene gives that material; a colour the scene does not use
+    # takes the detail configuration's, so the atlas of a style is the same for every map.
+    colors = {name: m.color for name, m in load_detail_config().materials.items()} | {
+        name: m.color for name, m in vis_mats.items()
+    }
+    trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
+                      cache=None if trim_root is None else TileCache(trim_root))
+    visual_nodes = trim.nodes
+    # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
+    # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.
     used = {party_base(name) for name in _used_materials(visual_nodes)}
+    used |= {tint_base(name) for name in used}
     cobble_ok = bool(cobble_nodes)
 
     materials = dict(vis_mats)
@@ -427,6 +505,9 @@ def apply_materials(
             })
     interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
     facade_shared = share_facade_photos(records, used, photo_tiles)
+    tint_shared = share_tint_photos(used, photo_tiles)
+    shop_tile_m: dict[str, float] = {}
+    shop_shared = share_shop_interior_photos(used, photo_tiles, materials, shop_tile_m)
 
     after_hashes = _base_hashes(base)
     if after_hashes != before_hashes:
@@ -441,7 +522,7 @@ def apply_materials(
     targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite, protected=protected)
     used_ids = _used_materials(visual_nodes)
     bases = sorted({party_base(color_id) for color_id in used_ids})
-    atlas_ids = [color_id for color_id in bases if color_id not in ATLAS_SKIP]
+    atlas_ids = [color_id for color_id in bases if color_id not in ATLAS_SKIP and color_id not in trim.materials]
     built = build_atlas(catalog, materials, used_color_ids=atlas_ids, seed=seed, photo_tiles=photo_tiles)
     extras: dict[str, Any] = {
         "attribution": manifest.get("attribution"),
@@ -457,6 +538,7 @@ def apply_materials(
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
     for row in interior_shared:
         tile_m[str(row["color_id"])] = float(row["tile_m"])
+    tile_m.update(shop_tile_m)
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
         tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
@@ -464,10 +546,18 @@ def apply_materials(
     cache = None if cache_root is None else TileCache(cache_root)
     png_jobs: dict[str, Callable[[], bytes]] = {}
     for index, color_id in enumerate(bases):
+        if color_id in trim.materials:
+            png_jobs[color_id] = partial(bytes, trim.png)
+            materials[color_id] = Material(WHITE, 0.9)
+            continue
         if color_id in ("glass_dark", "glass_view"):
             png_jobs[color_id] = window_png
             prev = materials.get(color_id) or Material(WHITE, 0.15)
             materials[color_id] = Material(WHITE, prev.roughness)
+            continue
+        if color_id == "shop_glass":
+            png_jobs[color_id] = shop_glass_png
+            materials[color_id] = Material(WHITE, materials[color_id].roughness)
             continue
         if color_id == "glass_boarded":
             png_jobs[color_id] = boarded_png
@@ -482,14 +572,17 @@ def apply_materials(
     for color_id in used_ids:
         base_id = party_base(color_id)
         repeat_images[color_id] = repeat_images[base_id]
-        if base_id in tile_m:
-            tile_m[color_id] = tile_m[base_id]
+        texture_id = material_base(color_id)  # a tint repeats at its base's scale
+        if texture_id in tile_m:
+            tile_m[color_id] = tile_m[texture_id]
         if base_id in materials:
             materials[color_id] = materials[base_id]
+    roof_ids = {e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces}
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
-        roof_uv_materials={e.color_id for e in catalog.entries if "roof" in e.compatible_surfaces},
+        roof_uv_materials={color_id for color_id in used_ids if material_base(color_id) in roof_ids},
+        explicit_uv_materials=trim.materials,
     )
     atomic_write_bytes(targets[0], visual)
     if collision.is_file():
@@ -518,6 +611,8 @@ def apply_materials(
     }
     atomic_write_json(targets[3], detail_report)
     atomic_write_bytes(targets[4], built.png)
+    if trim.png:
+        atomic_write_bytes(targets[7], trim.png)
     snapshot = _catalog_snapshot(catalog, applied)
     atomic_write_json(targets[6], snapshot)
     materials_report = {
@@ -540,7 +635,10 @@ def apply_materials(
             "window": "project-generated frame, not a photograph",
             "interior": interior_shared,
             "facade_shared": facade_shared,
+            "tint_shared": tint_shared,
+            "shop_interior": shop_shared,
         },
+        "facades": dict(trim.report),
         "geometry": compare,
         "input_hashes": before_hashes,
         "min_mean_luma": MIN_MEAN_LUMA,

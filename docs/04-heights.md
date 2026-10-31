@@ -11,7 +11,9 @@ The module does not import `geo` and does not modify the scene. It reads `geo_sc
   [--config config/heights.default.json] [--overrides <overrides.json>] [--overwrite]
 ```
 
-`--overrides` replaces `overrides_file` in the configuration. That is how Catastro overrides from `cadastre match` or `cadastre split` are applied (`docs/05-cadastre.md`). Outside Spain, and in Navarre and the Basque Country, there is no Catastro step. Heights stay on the OSM estimate.
+`--secondary-overrides <heights_overrides.overture.json>` adds third-party values from `overture match` (ADR-021) in a tier of their own, below an OSM `height` and the `--overrides` file. The file uses the same schema; an entry may add `origin` (`observed`, `estimated` or `ai_generated`). `run` passes it when the `overture` plugin runs, and stops at the plan when `config/sources.json` ranks `overture` above a plugin of the map that writes authoritative overrides, so the priority stays the only ranking.
+
+`--overrides` replaces `overrides_file` in the configuration. That is how Catastro overrides from `cadastre match` or `cadastre split` are applied (`docs/05-cadastre.md`). Outside Spain, and in Navarre and the Basque Country, there is no Catastro step. Source plugins (ADR-018) each write a `heights_overrides.<id>.json`; when a map has more than one, `source merge` ranks them by `config/sources.json` `priority` into one file, and `run` passes that one. The priority is the only place sources are ranked. Without a plugin for the map, heights stay on the OSM estimate.
 
 After `cadastre split` the scene is `data/processed/cadastre/geo_scene.json`. A block OSM drew as one polygon arrives as several sub-buildings (`parent` names the OSM building), each with its own Catastro storey count, so each gets its own `authoritative_levels` height instead of one estimate for the whole block. `heights_report.json` counts them in `counts.subdivided`: `osm_buildings_split`, `sub_buildings`, `levels_range` (`null` when nothing was split). Override ids may be an OSM id or `<osm id>:<localId>` (`config/heights.overrides.schema.json`). ADR-016.
 
@@ -24,6 +26,8 @@ The first step that produces a value wins:
 | 1a | `override` | measured | An override with `height_m`, from an authorised open dataset, with source and licence | the file's (0.9 by default) |
 | 1b | `explicit_height` | measured | An OSM `height` tag inside the bounds | 0.95 |
 | 1c′ | `authoritative_levels` | inferred | An override that only has `levels` (Catastro): `levels × storey height` for the category. If it differs from OSM `building:levels`, `override_levels_differ_from_osm` is recorded | the file's (Catastro: 0.6–0.85) |
+| 1d | `third_party_height` | inferred | A secondary override with `height_m` (Overture). The rule names its origin, dataset and licence | the file's (Overture: 0.8 observed, 0.6 estimated, 0.5 ai_generated) |
+| 1e | `third_party_levels` | inferred | A secondary override with only `levels`: `levels × storey height` | the file's |
 | 1c | `explicit_levels` | inferred | `building:levels × storey height` (3.0 m residential; 3.75 m commercial and public) | 0.75 |
 | — | `landmark_placeholder` | fallback | A landmark with no explicit value and no override: the category default, **flagged for manual review** | 0.1 |
 | 2 | `building_type` | inferred | Typical storeys for the category × storey height, clamped to the category range. Only when a tag identifies the type. `building=yes` alone is not enough | 0.4 |
@@ -53,6 +57,32 @@ The right fix is an override from an authorised source, not an invented number. 
 - Tried in order: same block and category, same block, within `radius_m` (75 m between footprints) and the same category, then radius alone. The first level with at least `min_samples` (3) wins.
 - The median is used, not the mean.
 
+## LiDAR heights
+
+Source plugins that read a LiDAR height model (nDSM: height above ground) write `height_m` overrides, so their heights are step 1a (`override`, class `measured`). They rank above Catastro storeys in `config/sources.json` `priority`; a footprint they cannot measure keeps the next source (ADR-018).
+
+```bash
+onward-generator source fetch es.pnoa_ndsm --scene <scene> --out maps/<id>/data/raw/es.pnoa_ndsm
+onward-generator source normalize es.pnoa_ndsm --scene <scene> --raw maps/<id>/data/raw/es.pnoa_ndsm --out maps/<id>/data/processed/es.pnoa_ndsm
+```
+
+`fetch` asks the service for the box around the scene's buildings plus 20 m (at most 6 km a side), on the raster's own cell grid, in tiles, and keeps every reply as received in `data/raw/<id>/tile_NNN.bin` with `data/raw/<id>.source.json` (URL, box, SHA-256 and size per tile, retrieval time, licence, attribution, the plugin's metadata). Replies are checked before anything is written; HTTP 429, 5xx and dropped connections are retried three times, the wait doubling from 8 s; one request per second. `normalize` checks every tile's SHA-256, joins the tiles and, for each footprint of the scene (in `run`, the Catastro split scene, so each sub-building is measured on its own):
+
+1. takes the cells whose centre lies inside the footprint shrunk by an **inner buffer** (1 m). The buffer keeps facade edges, eaves and trees that overhang the outline out of the sample. A footprint too narrow to keep the minimum number of cells after the buffer is sampled without it (`buffer_m: 0` in the report);
+2. keeps the **valid** cells: with data and at least 2 m (lower is ground or a courtyard, not a roof);
+3. writes the **median** (`percentile`, 50) when at least `min_cells` cells are valid and they are at least half of the cells sampled. The 25th and 75th percentiles go into the note: a wide spread is a pitched roof or a mixed footprint.
+
+A height outside the `heights` bounds (2.5–120 m) is not written (`out_of_bounds`); a footprint without enough valid cells is `no_data`. Both stay in `<id>_report.json` with the cell counts. The median of a pitched roof lies between eave and ridge, so it is above the wall height `levels × storey height` describes.
+
+| Plugin | Data | Cell | Buffer | `min_cells` | Confidence | Data date |
+| --- | --- | --- | --- | --- | --- | --- |
+| `es.pnoa_ndsm` | IGN MDSn, building class (trees already removed) | 2.5 m | 1 m | 3 | 0.8 | PNOA-LiDAR first coverage, 2008–2015 (per sheet, not per building) |
+| `fr.lidar_hd` | IGN LiDAR HD MNH (surface minus terrain: buildings and trees) | 0.5 m, native Lambert-93 grid | 1 m | 8 | 0.9 | acquisition dates of the IGN 1 km tile under the footprint (WFS `IGNF_LIDAR-HD_METADONNEE:metadata`) |
+
+On Madrid (40.40657, −3.719187, r150, Catastro split, 30 October 2026): 84 footprints, 66 measured (13.1–27.0 m), 18 `no_data` (small courtyard pieces and sub-buildings under 3 cells); 27 of the 66 were sampled without the buffer. Against Catastro `levels × storey height` on the same footprints the LiDAR height is a median 3.0 m higher (|Δ| median 3.0 m, p90 6.5 m, 34 of 66 within 3 m): a storey of 3 m misses the taller ground floor, the roof and the parapet. The largest differences (up to 20 m) are footprints Catastro gives 1–2 storeys that the LiDAR sees as tall (a low part under a taller volume, or a part OSM and Catastro outline differently). `fetch` took 3.4 s (one 99 KB tile), `normalize` 0.7 s. One map, one date: not a guarantee for another city.
+
+On Lyon (45.7640, 4.8357, r150, no cadastre plugin, 30 October 2026): 225 footprints, 219 measured (2.8–34.8 m), 5 `no_data`, 1 `out_of_bounds` (a 2.4 m canopy); 14 sampled without the buffer; every footprint in one tile acquired 2021-04-14 to 2021-09-24. Against OSM `building:levels × storey height` (75 footprints with levels) the LiDAR height is a median 7.1 m higher (|Δ| p90 10.8 m, 6 of 75 within 3 m): Lyon storeys are taller than 3 m, and the roofs add to that. `fetch` took 7.1 s (one 2.5 MB tile and the metadata request), `normalize` 1.4 s.
+
 ## Configuration
 
 `config/heights.default.json`, validated with `config/heights.schema.json`. Every number is a modelling assumption.
@@ -74,7 +104,9 @@ Global bounds: 2.5–120 m.
 
 `overrides_file` (relative to the configuration file) points at JSON validated with `config/heights.overrides.schema.json`. `id`, `source`, and `license` are required, plus `height_m`, `levels`, or both. Duplicate ids and heights outside the bounds are refused.
 
-Issues: `override_not_in_scene`, and `override_differs_from_osm` when the override contradicts the OSM `height` by more than 10%.
+Secondary overrides (`--secondary-overrides`) follow the same validation. `heights.json` and the report record them under `secondary_overrides`: path, SHA-256, `count`, `used`, and the attribution `sources` of the entries a building used. `generate` adds those sources to the scene attribution. They feed the neighbourhood median only when `neighbourhood.reliable_sources` lists `third_party_height` or `third_party_levels`; the default does not.
+
+Issues: `override_not_in_scene` (for either file), and `override_differs_from_osm` when the override contradicts the OSM `height` by more than 10%.
 
 The default configuration has no overrides. Catastro overrides are produced by `cadastre match` and passed with `--overrides`.
 
@@ -92,4 +124,4 @@ Outputs are deterministic (no timestamps) and are not overwritten without `--ove
 
 - Blocks come from footprints that touch, not from streets. A centre with disconnected footprints falls through to the radius level.
 - When few heights are known, one tagged group dominates its surroundings.
-- `roof:levels`, `min_height`, and `building:part` are not used here. A `building:part` with `height` is extruded later, in `detail`.
+- `roof:levels`, `min_height`, and `building:part` are not used here. `detail` extrudes each `building:part` from its `height`, or from `(building:levels + roof:levels)` × the `storey_height_m` of this configuration for the category of the building it stands on, and draws the `roof:*` tags (`docs/07-detail.md`, *Roofs* and *Parts*).

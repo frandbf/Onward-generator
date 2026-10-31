@@ -74,13 +74,7 @@ def read_selection(path: str | Path) -> list[str]:
     raw = document.get("ids") if isinstance(document, dict) else None
     if not isinstance(raw, list) or not raw or not all(isinstance(item, str) and item for item in raw):
         raise LibraryError(f"{path}: selection ids must be a non-empty list of strings")
-    seen: set[str] = set()
-    chosen: list[str] = []
-    for item in raw:
-        if item not in seen:
-            seen.add(item)
-            chosen.append(item)
-    return chosen
+    return list(dict.fromkeys(raw))
 
 
 def write_selection(path: str | Path, ids: Sequence[str]) -> None:

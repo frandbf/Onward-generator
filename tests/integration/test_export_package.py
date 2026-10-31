@@ -303,6 +303,18 @@ def test_info3_listing_is_rewritten_without_touching_the_bundle_id(tmp_path: Pat
         apply_local_listing(other, title="X", description="Y")
 
 
+def test_unity_adapter_knows_the_shop_glass_and_decal_material_names() -> None:
+    # C# cannot be compiled here; at least the names it keys on are the ones the Python stages write.
+    from onward_generator.detail.interiors import GLASS_VIEW, SHOP_GLASS
+    from onward_generator.signs.shop import DECAL_MATERIAL
+
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert f'ViewGlassMaterial = "{GLASS_VIEW}"' in source
+    assert f'ShopGlassMaterial = "{SHOP_GLASS}"' in source
+    assert f'ShopDecalPrefix = "{DECAL_MATERIAL.format("")}"' in source
+    assert 'SdkGlassNames = { "GlassVfx", "Glass" }' in source
+
+
 def test_unity_adapter_matches_the_package_contract() -> None:
     source = ADAPTER_CS.read_text(encoding="utf-8")
     cfg = load(EXPORT_CONFIG_DEFAULT)

@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import struct
 from pathlib import Path
 
 import numpy as np
 
-from onward_generator.generation.gltf import read_glb
+from onward_generator.generation.gltf import pack_glb, read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 
 # Retro Urban Kit. 0.628 m door → 2.01 m. 1 m wall → 3.2 m storey.
@@ -95,7 +94,7 @@ def scale_glb_positions(data: bytes, factor: float) -> bytes:
     extras = dict(doc.get("extras") or {})
     extras[_STREET_SCALE] = factor
     doc["extras"] = extras
-    return _pack(doc, bytes(raw))
+    return pack_glb(doc, bytes(raw))
 
 
 def normalize_installed(repo: Path) -> int:
@@ -204,18 +203,3 @@ def _clean(value: float) -> float:
     return number
 
 
-def _pack(doc: dict, blob: bytes) -> bytes:
-    json_chunk = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    json_chunk += b" " * (-len(json_chunk) % 4)
-    if len(blob) % 4:
-        blob += b"\x00" * (-len(blob) % 4)
-    total = 12 + 8 + len(json_chunk) + 8 + len(blob)
-    return b"".join(
-        (
-            struct.pack("<4sII", b"glTF", 2, total),
-            struct.pack("<I4s", len(json_chunk), b"JSON"),
-            json_chunk,
-            struct.pack("<I4s", len(blob), b"BIN\x00"),
-            blob,
-        )
-    )

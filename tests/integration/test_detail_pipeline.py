@@ -111,7 +111,8 @@ def test_no_critical_errors_and_every_facade_is_labelled_generic(detailed) -> No
     assert detailed.manifest()["fidelity"]["facades"] == "generic_templates"
 
 
-def test_templates_roofs_and_landmark(detailed) -> None:
+def test_templates_roofs_and_landmark(detail_inputs: tuple[Path, Path, Path]) -> None:
+    detailed = _detail(detail_inputs)  # in the test, not the module fixture, so mutation testing runs it
     church = _obj(detailed, "building/osm-way-314").record
     assert church["facade"]["template"] == "landmark_placeholder" and church["facade"]["needs_custom_model"] is True
     assert church["facade"]["openings"] == {"landmark_door": 1}
@@ -226,10 +227,19 @@ def test_a_commercial_building_without_a_poi_is_one_shop(detail_inputs: tuple[Pa
     doc["templates"]["generic_commercial"]["applies_to"] = ["commercial", "residential_multi", "residential_small"]
     fresh = _detail(detail_inputs, config_from_document(doc))
     facade = _obj(fresh, "building/osm-way-313").record["facade"]
-    assert facade["ground_floor_evidence"]["source"] == "building_category"
+    assert facade["ground_floor_evidence"] == {"source": "building_category", "category": "residential_multi", "osm_poi_ids": []}
     [shop] = facade["shops"]
     assert (shop["id"], shop["poi_id"], shop["name"], shop["name_rule"]) == ("shop/osm-way-313/building", None, "Comercio", "default")
     assert shop["sign"] is not None
+
+
+def test_a_main_door_only_template_keeps_its_door_over_a_shop_poi(detail_inputs: tuple[Path, Path, Path]) -> None:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["enabled"] = False
+    for template in doc["templates"].values():
+        template["ground"] = "main_door_only"
+    facade = _obj(_detail(detail_inputs, config_from_document(doc)), "building/osm-way-312").record["facade"]
+    assert (facade["ground_floor"], facade["ground_floor_evidence"], facade["shops"]) == ("main_door_only", None, [])
 
 
 def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(detail_inputs: tuple[Path, Path, Path]) -> None:

@@ -199,6 +199,15 @@ def _cadastre(out: Path) -> StageReport:
     return StageReport("  ".join(parts))
 
 
+def _overture_match(out: Path) -> StageReport:
+    report = _read(out / "overture_match_report.json")
+    places, buildings = report["places"]["counts"], report["buildings"]["counts"]
+    return StageReport(
+        f"places {group(int(places['kept']))} of {group(int(places['rows']))}  "
+        f"heights {group(int(buildings['matched']))} of {group(int(buildings['osm_buildings']))}"
+    )
+
+
 def _heights(out: Path) -> StageReport:
     report = _read(out / "heights_report.json")
     counts = report["counts"]
@@ -259,6 +268,9 @@ def _materials(out: Path) -> StageReport:
     report = _read(out / "materials_report.json")
     skipped = report["skipped"]
     summary = f"applied {len(report['applied'])}  skipped {len(skipped)}"
+    facades = report.get("facades")
+    if facades:
+        summary += f"  facades {facades['mode']} {facades['style']}"
     reasons: dict[str, list[str]] = {}
     for row in skipped:
         reasons.setdefault(str(row["reason"]), []).append(str(row.get("catalog_id") or row.get("id")))
@@ -297,6 +309,30 @@ def _bounds(out: Path) -> StageReport:
     return StageReport(f"wall {wall['height_m']:g} m  {group(wall['triangles'])} tris{core}")
 
 
+def _raster_download(out: Path) -> StageReport:
+    """A LiDAR plugin's download: the tiles kept in ``data/raw/<id>`` (ADR-018)."""
+    record = _read(out.with_name(out.name + ".source.json"))
+    size = sum(int(tile["size_bytes"]) for tile in record["tiles"])
+    return StageReport(f"{group(size // 1024)} KiB  {plural(len(record['tiles']), 'tile')}  {record['license']}")
+
+
+def _raster_heights(out: Path) -> StageReport:
+    """A LiDAR plugin's normalize: how many footprints got a measured height."""
+    report = _read(out / f"{out.name}_report.json")
+    counts = report["counts"]
+    parts = [f"measured {group(int(counts['measured']))}/{group(int(counts['buildings']))}"]
+    span = report["height_range_m"]
+    if span:
+        parts.append(f"{span[0]:g}–{span[1]:g} m")
+    return StageReport("  ".join(parts))
+
+
+def _overrides(out: Path) -> StageReport:
+    report = _read(out / "sources_report.json")
+    won = "  ".join(f"{entry['source']} {group(int(entry['won']))}" for entry in report["sources"])
+    return StageReport(f"{group(int(report['buildings']))} buildings  {won}")
+
+
 def _layout(out: Path) -> StageReport:
     layout = _read(out)
     parts: list[str] = []
@@ -325,6 +361,12 @@ _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "geo": _geo,
     "catastro": _catastro,
     "cadastre": _cadastre,
+    "pnoa_ndsm": _raster_download,
+    "pnoa_heights": _raster_heights,
+    "lidar_hd": _raster_download,
+    "lidar_hd_heights": _raster_heights,
+    "overrides": _overrides,
+    "overture-match": _overture_match,
     "heights": _heights,
     "generate": _generate,
     "detail": _detail,

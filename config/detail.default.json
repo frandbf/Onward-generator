@@ -74,7 +74,8 @@
     "shopfront": { "min_width_m": 2.0, "max_width_m": 3.4, "sill_m": 0.25, "min_height_m": 1.9, "max_height_m": 3.2, "head_m": 0.45 },
     "shop_door": { "width_m": 1.6, "height_m": 2.5 },
     "shop_evidence_keys": ["shop", "amenity", "office", "craft"],
-    "shop_evidence_distance_m": 2.0
+    "shop_evidence_distance_m": 2.0,
+    "shop_catastro_uses": { "4_1_office": "Oficina", "4_2_retail": "Comercio" }
   },
   "facade_palettes": {
     "residential": ["plaster_ochre", "plaster_cream", "plaster_salmon", "plaster_white", "brick_red"],
@@ -129,6 +130,8 @@
       "max_triangles": 6000,
       "max_collision_triangles": 72000,
       "max_area_m2": 600.0,
+      "band_depth_m": 12.0,
+      "min_room_area_m2": 9.0,
       "categories": [
         { "name": "bakery", "tags": { "shop": ["bakery", "pastry", "confectionery"] }, "wall": "interior_shop_bakery", "floor": "interior_shop_tile" },
         { "name": "pharmacy", "tags": { "amenity": ["pharmacy"], "shop": ["chemist"], "healthcare": ["pharmacy"] }, "wall": "interior_shop_pharmacy", "floor": "interior_shop_tile" },
@@ -180,6 +183,7 @@
     "frame_stone": { "color": [0.90, 0.88, 0.83, 1.0], "roughness": 0.8 },
     "glass_dark": { "color": [0.16, 0.20, 0.24, 1.0], "roughness": 0.15 },
     "glass_view": { "color": [0.16, 0.20, 0.24, 1.0], "roughness": 0.15 },
+    "shop_glass": { "color": [0.80, 0.87, 0.90, 1.0], "roughness": 0.1 },
     "door_wood": { "color": [0.36, 0.24, 0.16, 1.0], "roughness": 0.7 },
     "railing_metal": { "color": [0.16, 0.16, 0.17, 1.0], "roughness": 0.5 },
     "urban_metal": { "color": [0.22, 0.24, 0.24, 1.0], "roughness": 0.5 },

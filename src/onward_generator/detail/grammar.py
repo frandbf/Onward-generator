@@ -13,8 +13,10 @@ from typing import Any
 
 from onward_generator.detail.config import FACADE_USES, HipRoof, Template
 from onward_generator.detail.facades import stable_choice, stable_unit
+from onward_generator.detail.roofs import APPROXIMATIONS, PITCHED_SHAPES, pitched_spec
+from onward_generator.detail.s3db import ROOF_PALETTE, ROOF_TINT_BASES, WALL_PALETTE, WALL_TINT_BASES, Tint, quantize_colour, tint_material
+from onward_generator.generation.config import Material
 
-HIP_SHAPES = frozenset({"hipped", "gabled", "pyramidal", "skillion", "half-hipped", "gambrel", "round"})
 FLAT_SHAPES = frozenset({"flat"})
 
 # OSM roof:material → a material the detail catalogue already defines.
@@ -115,9 +117,65 @@ def resolve_use(building_id: str, tags: Mapping[str, str], related: Sequence[tup
     return FacadeUse(FACADE_USES[rank], "estimated" if match == "poi_near" else "observed", source_id, tag, match)
 
 
+def appearance_key(building_id: str, feature: Mapping[str, Any]) -> str:
+    """The identity a building's wall, use and roof are drawn for (ADR-016).
+
+    The sub-buildings a Catastro split made of one parcel are one building: ``parcel:<refcat>``.
+    A sub-building without a parcel reference takes its OSM parent's id; any other building its own id.
+    """
+    refcat = (feature.get("subdivision") or {}).get("refcat")
+    if refcat:
+        return f"parcel:{refcat}"
+    return str((feature.get("parent") or {}).get("id") or building_id)
+
+
 def _first(tags: dict[str, str], key: str) -> str:
     raw = tags.get(key) or ""
     return raw.split(";")[0].strip().lower()
+
+
+def _tinted(colours: Mapping[str, Material] | None, base: str, raw: str, palette: tuple[Tint, ...]) -> str | None:
+    """``base`` under the palette entry nearest ``raw``, when ``raw`` is a colour and ``colours`` defines that tint."""
+    tint = quantize_colour(raw, palette)
+    if tint is None or not colours:
+        return None
+    name = tint_material(base, tint)
+    return name if name in colours else None
+
+
+def tagged_wall(tags: Mapping[str, str], colours: Mapping[str, Material] | None = None) -> tuple[str, str] | None:
+    """``(material, tag)`` when an OSM tag names the wall. ``None`` otherwise.
+
+    ``building:colour`` wins: the nearest ``WALL_PALETTE`` tint of the texture ``building:material`` (or
+    ``material``) names when it is one of ``WALL_TINT_BASES``, else of plain plaster. Without a colour the
+    material tag alone picks the catalogue material. ``colours`` holds the defined materials; with none,
+    colours are not read.
+    """
+    material: tuple[str, str] | None = None
+    for key in ("building:material", "material"):
+        raw = _first(dict(tags), key)
+        if raw:
+            material = (WALL_MATERIALS[raw], key) if raw in WALL_MATERIALS else None
+            break
+    base = material[0] if material and material[0] in WALL_TINT_BASES else WALL_TINT_BASES[0]
+    tinted = _tinted(colours, base, _first(dict(tags), "building:colour"), WALL_PALETTE)
+    return (tinted, "building:colour") if tinted else material
+
+
+def tagged_roof(tags: Mapping[str, str], colours: Mapping[str, Material] | None = None) -> tuple[str, str] | None:
+    """``(material, tag)`` when an OSM tag names the roof. ``None`` otherwise.
+
+    ``roof:colour`` wins: the nearest ``ROOF_PALETTE`` tint of the material ``roof:material`` names, else
+    of tile under a pitched ``roof:shape`` and of a flat roof otherwise. Then ``roof:material`` alone.
+    """
+    material = ROOF_MATERIALS.get(_first(dict(tags), "roof:material"))
+    shape = _first(dict(tags), "roof:shape")
+    pitched = APPROXIMATIONS.get(shape, shape) in PITCHED_SHAPES
+    base = material or ROOF_TINT_BASES[0 if pitched else 1]
+    tinted = _tinted(colours, base, _first(dict(tags), "roof:colour"), ROOF_PALETTE)
+    if tinted:
+        return tinted, "roof:colour"
+    return (material, "roof:material") if material else None
 
 
 def choose_wall(
@@ -126,16 +184,17 @@ def choose_wall(
     seed: int,
     building_id: str,
     avoid: Collection[str] = (),
+    colours: Mapping[str, Material] | None = None,
 ) -> tuple[str, str]:
     """Return ``(material, origin)``. Origin is ``observed`` or ``generated``.
 
-    Without a material tag the palette is ranked by ``sha256(seed, building, material)``,
-    and the first material not in ``avoid`` (the neighbours' walls) wins. When every
-    palette material is in ``avoid``, the first one is used.
+    A wall tag wins (``tagged_wall``: the colour, then the material). Without one the palette is
+    ranked by ``sha256(seed, building, material)``, and the first material not in ``avoid`` (the
+    neighbours' walls) wins. When every palette material is in ``avoid``, the first one is used.
     """
-    raw = _first(tags, "building:material") or _first(tags, "material")
-    if raw in WALL_MATERIALS:
-        return WALL_MATERIALS[raw], "observed"
+    tagged = tagged_wall(tags, colours)
+    if tagged is not None:
+        return tagged[0], "observed"
     ranked = sorted(palette, key=lambda material: stable_unit(seed, building_id, "wall", material))
     return next((m for m in ranked if m not in avoid), ranked[0]), "generated"
 
@@ -148,24 +207,29 @@ def choose_roof(
     area_m2: float,
     *,
     convex: bool = True,
+    storey_m: float = 3.0,
+    colours: Mapping[str, Material] | None = None,
 ) -> tuple[Template, str, str, str | None]:
     """Return ``(template, roof_material, origin, roof:shape or None)``.
 
-    A hipped/gabled OSM tag forces a hip on footprints up to 800 m².
-    Without a tag, convex footprints of 160 m² or less may get an estimated hip.
-    Everything else keeps the template roof.
+    An OSM ``roof:shape`` the roof builder draws (``detail/roofs.py``) replaces the template roof on
+    any footprint; ``build_shell`` falls back to a flat roof when the shape does not fit it. ``flat``
+    keeps the template. Without a shape tag, convex footprints of 160 m² or less may get an estimated
+    hip. The roof material is ``tagged_roof``, else the template's.
     """
     shape = _first(tags, "roof:shape")
-    tagged_material = ROOF_MATERIALS.get(_first(tags, "roof:material"))
-    if shape in HIP_SHAPES and area_m2 <= 800.0:
-        material = tagged_material or (template.hip.material if template.hip else "roof_tile")
-        hip = HipRoof(max(area_m2, 1.0), 30.0, 4.0, material)
-        return replace(template, parapet_m=0.0, hip=hip), material, "observed", shape
+    tagged = tagged_roof(tags, colours)
+    tagged_material = tagged[0] if tagged else None
+    material = tagged_material or (template.hip.material if template.hip else "roof_tile")
+    pitched = pitched_spec(tags, material, storey_m)
+    if pitched is not None:
+        return replace(template, parapet_m=0.0, hip=None, pitched=pitched), material, "observed", shape
     if shape in FLAT_SHAPES:
         material = tagged_material or stable_choice(seed, template.flat_roof_materials, building_id, "roof")
         return template, material, "observed", shape
     if (
-        template.hip is None
+        not shape
+        and template.hip is None
         and template.parapet_m > 0
         and convex
         and area_m2 <= ESTIMATED_HIP_MAX_AREA_M2

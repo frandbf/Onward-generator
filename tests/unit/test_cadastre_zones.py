@@ -456,6 +456,8 @@ def test_cli_download_asks_in_the_zone_crs_prints_the_tiles_and_overwrites_only_
         f"downloaded {record.size_bytes} bytes in 1 tile(s), sha256 {record.sha256}",
         f"bbox {record.bbox} (EPSG:25830, peninsula); licence CC-BY-4.0",
         f"wrote {out} and its .source.json sidecar",
+        f"downloaded {record.size_bytes} bytes of buildings (current use), sha256 {record.sha256}",
+        f"wrote {out.with_name('c_buildings.gml')} and its .source.json sidecar",
     ]
     assert cadastre_cli.main(args) == 1
     assert cadastre_cli.main([*args, "--overwrite"]) == 0

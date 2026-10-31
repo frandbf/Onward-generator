@@ -59,6 +59,12 @@ namespace OnwardGenerator
         // It has no _BaseColor. Alpha is vertex alpha times _MainTex alpha.
         private const string SpriteShaderPath = SdkRoot + "/Internal/Shaders/PP_Sprite_Lit.shadergraph";
         private const string ViewGlassMaterial = "glass_view";
+        // A shop's frameless display window (docs/07-detail.md). The SDK glass material when the
+        // project has one under SdkRoot, by exact asset name in this order; else PP_Sprite_Lit.
+        private const string ShopGlassMaterial = "shop_glass";
+        private static readonly string[] SdkGlassNames = { "GlassVfx", "Glass" };
+        // Black shop names on shop glass: RGBA atlas pages, transparent background, PP_Sprite_Lit.
+        private const string ShopDecalPrefix = "shop_decal_atlas_";
         private const string WorkRoot = "Assets/OnwardAdapter";
         private const string LauncherBinPathPref = "_ONWARD_BIN_PATH_";
         private const string LauncherPlatformPref = "_ONWARD_PLATFORM_";
@@ -373,8 +379,13 @@ namespace OnwardGenerator
             mesh.SetColors(colors);
         }
 
+        // Every material drawn with PP_Sprite_Lit (or the SDK glass): white vertex colours keep the texture alpha.
         private static bool IsViewGlass(GMaterial material) =>
-            material != null && material.name == ViewGlassMaterial;
+            material != null && (material.name == ViewGlassMaterial || IsShopOverlay(material));
+
+        // Shop glass and its decals are see-through: they cast no shadow into the shop.
+        private static bool IsShopOverlay(GMaterial material) =>
+            material != null && (material.name == ShopGlassMaterial || material.name.StartsWith(ShopDecalPrefix, StringComparison.Ordinal));
 
         private static void ApplyMatrix(Transform t, float[] m)
         {
@@ -461,7 +472,8 @@ namespace OnwardGenerator
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var renderer = go.AddComponent<MeshRenderer>();
                 renderer.sharedMaterial = materials[mat];
-                renderer.shadowCastingMode = ShadowCastingMode.On;
+                renderer.shadowCastingMode = mat >= 0 && mat < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[mat])
+                    ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
                 renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
                 byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
@@ -479,14 +491,17 @@ namespace OnwardGenerator
 
         [MenuItem("ONWARD Murcia Export/1. Build scene from export package")]
         public static void BuildScene() =>
-            BuildSceneFromPaths(RequireArg("-exportPackage"), RequireArg("-exportReport"));
+            BuildSceneFromPaths(RequireArg("-exportPackage"), RequireArg("-exportReport"), OptionalArg("-onwardBake"));
 
-        /// <summary>Same as the batch <c>-executeMethod BuildScene</c> path, for the live Editor / MCP.</summary>
-        public static void BuildSceneFromPaths(string packageDir, string reportOut)
+        /// <summary>Same as the batch <c>-executeMethod BuildScene</c> path, for the live Editor / MCP.
+        /// <paramref name="bakeProfile"/> is "draft" or "final"; null is "final", the bake before profiles.</summary>
+        public static void BuildSceneFromPaths(string packageDir, string reportOut, string bakeProfile = null)
         {
             RunGuarded(() =>
             {
                 ResetPhases();
+                // Checked before the import: an unknown profile fails in seconds, not after the scene is built.
+                BakeProfile profile = BakeProfileFor(bakeProfile ?? "final");
                 ApplyQuestGraphics();
                 var clock = Stopwatch.StartNew();
                 Package pkg = LoadPackage(packageDir);
@@ -557,7 +572,8 @@ namespace OnwardGenerator
                         go.AddComponent<MeshFilter>().sharedMesh = visualMeshes[node.mesh];
                         var renderer = go.AddComponent<MeshRenderer>();
                         renderer.sharedMaterials = visualMaterials[node.mesh].Select(k => materials[k]).ToArray();
-                        renderer.shadowCastingMode = ShadowCastingMode.On;
+                        renderer.shadowCastingMode = visualMaterials[node.mesh].All(k => k >= 0 && k < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[k]))
+                            ? ShadowCastingMode.Off : ShadowCastingMode.On;
                         GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
                         renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m)) ? 0f
                             : visualMaterials[node.mesh].Select(k => ScaleInLightmap(opt, visual.Doc.materials, k)).DefaultIfEmpty(1f).Max();
@@ -658,7 +674,7 @@ namespace OnwardGenerator
                 MarkPhase("gameplay");
                 double buildSeconds = clock.Elapsed.TotalSeconds;
                 var bakeClock = Stopwatch.StartNew();
-                Bake(root, opt);
+                Bake(root, opt, profile);
                 double bakeSeconds = bakeClock.Elapsed.TotalSeconds;
 
                 EditorSceneManager.MarkSceneDirty(scene);
@@ -2259,7 +2275,37 @@ namespace OnwardGenerator
             return points.Count;
         }
 
-        private static void Bake(string root, Options opt)
+        // Lightmap bake profiles (docs/12-export.md, "Bake profiles"). Same names as BAKE_PROFILES
+        // in tools/unity/lib.sh. Both keep the texel density, padding, page size, AO and denoisers,
+        // so a draft packs the same lightmap pages as the final bake and only converges less.
+        private sealed class BakeProfile
+        {
+            public string name;
+            public int directSamples;
+            public int indirectSamples;
+            public int environmentSamples;
+            public int minBounces;
+            public int maxBounces;
+        }
+
+        private static BakeProfile BakeProfileFor(string name)
+        {
+            switch (name)
+            {
+                // Iteration. Unity's Progressive Lightmapper manual: "For some Scenes, especially outdoor
+                // Scenes, 100 samples should be enough" (indirect), and 2 bounces is its default.
+                // The OpenImage denoiser stays on and hides most of the extra noise.
+                case "draft":
+                    return new BakeProfile { name = name, directSamples = 32, indirectSamples = 128, environmentSamples = 128, minBounces = 1, maxBounces = 2 };
+                // Release. Onward lightmapping guide (Aug 2023): lower end of the city range.
+                case "final":
+                    return new BakeProfile { name = name, directSamples = 256, indirectSamples = 512, environmentSamples = 512, minBounces = 2, maxBounces = 4 };
+                default:
+                    throw new ArgumentException($"unknown bake profile '{name}'; use one of: draft final");
+            }
+        }
+
+        private static void Bake(string root, Options opt, BakeProfile profile)
         {
             var settings = new LightingSettings { name = "Lighting" };
             AssetDatabase.CreateAsset(settings, $"{root}/Lighting.lighting");
@@ -2271,13 +2317,14 @@ namespace OnwardGenerator
             settings.lightmapPadding = 2;
             settings.lightmapMaxSize = opt.lightmap_max_size;
             settings.directionalityMode = opt.lightmap_directional ? LightmapsMode.CombinedDirectional : LightmapsMode.NonDirectional;
-            // Onward lightmapping guide (Aug 2023): lower end of the city range.
-            // Occlusion culling and static batching stay off (ADR-005).
-            settings.directSampleCount = 256;
-            settings.indirectSampleCount = 512;
-            settings.environmentSampleCount = 512;
-            settings.minBounces = 2;
-            settings.maxBounces = 4;
+            // Samples and bounces from the profile. Occlusion culling and static batching stay off (ADR-005).
+            settings.directSampleCount = profile.directSamples;
+            settings.indirectSampleCount = profile.indirectSamples;
+            settings.environmentSampleCount = profile.environmentSamples;
+            settings.minBounces = profile.minBounces;
+            settings.maxBounces = profile.maxBounces;
+            // Batch mode has no Scene view to bake first; the whole map converges at once.
+            settings.prioritizeView = false;
             settings.ao = true;
             settings.lightmapCompression = LightmapCompression.None;
             settings.filteringMode = LightingSettings.FilterMode.Advanced;
@@ -2308,6 +2355,7 @@ namespace OnwardGenerator
             LightingSettings.Lightmapper used = Lightmapping.lightingSettings.lightmapper;
             lastBake = new LightmapBake
             {
+                profile = profile.name,
                 lightmapper_requested = settings.lightmapper.ToString(),
                 lightmapper = used.ToString(),
                 fallback = used != LightingSettings.Lightmapper.ProgressiveGPU || fallbackWarnings.Count > 0,
@@ -2319,7 +2367,7 @@ namespace OnwardGenerator
                 LogPrefix, LightmapSettings.lightmaps.Length, LightmapTexels(), opt.lightmap_texels_per_m, opt.lightmap_max_size));
             string fellBack = lastBake.fallback ? "yes" : "no";
             string warning = lastBake.fallback_warning.Length > 0 ? ": " + lastBake.fallback_warning : "";
-            Debug.Log($"{LogPrefix} Lightmapper: {lastBake.lightmapper} (requested {lastBake.lightmapper_requested}, fallback {fellBack}{warning}"
+            Debug.Log($"{LogPrefix} Lightmapper: {lastBake.lightmapper} (bake {lastBake.profile}, requested {lastBake.lightmapper_requested}, fallback {fellBack}{warning}"
                 + $"). Lightmaps: {lastBake.sizes.Length} ({SizeSummary(lastBake.sizes)}).");
         }
 
@@ -2485,6 +2533,7 @@ namespace OnwardGenerator
         [Serializable]
         private class LightmapBake
         {
+            public string profile = "";
             public string lightmapper_requested = "";
             public string lightmapper = "";
             public bool fallback;
@@ -2534,7 +2583,23 @@ namespace OnwardGenerator
             string path = $"{folder}/M_{safe}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null) return existing;
-            if (safe == ViewGlassMaterial)
+            if (safe == ShopGlassMaterial)
+            {
+                Material sdkGlass = FindSdkGlass();
+                if (sdkGlass != null)
+                {
+                    // A copy in the package folder: the SDK asset is never edited.
+                    var copy = new Material(sdkGlass) { name = $"M_{safe}" };
+                    bool twoSided = copy.HasProperty("_Cull");
+                    if (twoSided) copy.SetFloat("_Cull", (float)CullMode.Off);
+                    Debug.Log($"{LogPrefix} shop_glass: SDK material {AssetDatabase.GetAssetPath(sdkGlass)} (shader {sdkGlass.shader.name}); "
+                        + (twoSided ? "_Cull set to Off" : "no _Cull property: check from inside a shop that the glass shows"));
+                    AssetDatabase.CreateAsset(copy, path);
+                    return copy;
+                }
+                Debug.Log($"{LogPrefix} shop_glass: no SDK material named {string.Join(" or ", SdkGlassNames)} under {SdkRoot}; PP_Sprite_Lit with the generated tint");
+            }
+            if (safe == ViewGlassMaterial || safe == ShopGlassMaterial || safe.StartsWith(ShopDecalPrefix, StringComparison.Ordinal))
             {
                 // Compiled shader already blends and draws both faces. Do not set
                 // Surface, Cull, or _BaseColor: this graph does not expose them.
@@ -2544,6 +2609,12 @@ namespace OnwardGenerator
                 if (atlas != null && view.HasProperty("_MainTex"))
                     view.SetTexture("_MainTex", atlas);
                 view.enableInstancing = false;
+                // A decal sits 1 cm in front of the shop glass: drawn after it, the letters stay on top from the street.
+                if (safe.StartsWith(ShopDecalPrefix, StringComparison.Ordinal))
+                {
+                    Material sdkGlass = FindSdkGlass();
+                    view.renderQueue = Math.Max(sprite.renderQueue, sdkGlass != null ? sdkGlass.renderQueue : sprite.renderQueue) + 1;
+                }
                 AssetDatabase.CreateAsset(view, path);
                 return view;
             }
@@ -2579,6 +2650,22 @@ namespace OnwardGenerator
             material.enableInstancing = false;
             AssetDatabase.CreateAsset(material, path);
             return material;
+        }
+
+        // The first material under SdkRoot whose file name is exactly one of SdkGlassNames, in that
+        // order; null when there is none. FindAssets matches by substring, so the name is compared again.
+        private static Material FindSdkGlass()
+        {
+            foreach (string name in SdkGlassNames)
+            {
+                string match = AssetDatabase.FindAssets($"{name} t:Material", new[] { SdkRoot })
+                    .Select(AssetDatabase.GUIDToAssetPath)
+                    .Where(p => string.Equals(Path.GetFileNameWithoutExtension(p), name, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(p => p, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (match != null) return AssetDatabase.LoadAssetAtPath<Material>(match);
+            }
+            return null;
         }
 
         private static GameObject InstantiatePrefab(string relativePath)

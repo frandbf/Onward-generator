@@ -7,12 +7,13 @@ from shapely import Polygon, affinity, box, set_precision, union_all
 from shapely.geometry import shape
 
 from onward_generator.cadastre import CadastreError, DownloadRecord
-from onward_generator.cadastre.gml import BuildingPart
+from onward_generator.cadastre.gml import BuildingPart, BuildingUse
 from onward_generator.cadastre.split import (
     ParentSplit,
     SplitOptions,
     SubBuilding,
     _nearest,
+    attach_uses,
     check_quarantine,
     footprint_defects,
     is_sliver,
@@ -48,7 +49,7 @@ def split(footprint, *overlaps, options: SplitOptions = OPTIONS, parent: str = "
 def test_default_options() -> None:
     assert OPTIONS.to_dict() == {
         "min_coverage": 0.8, "min_piece_area_m2": 6.0, "min_piece_width_m": 2.0, "confident_share": 0.8,
-        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05,
+        "confidence_high": 0.85, "confidence_low": 0.7, "max_quarantine_share": 0.05, "use_min_share": 0.5,
     }
 
 
@@ -394,7 +395,10 @@ def test_subdivided_scene_keeps_the_contract_and_records_the_source() -> None:
         },
         "options": OPTIONS.to_dict(),
         "counts": split_summary(results),
+        "uses": {"status": "not_requested"},
     }
+    read = {"status": "read", "buildings": 2}
+    assert subdivided_scene(scene, features, results, scene_ref=ref, record=RECORD, options=OPTIONS, uses=read)["subdivision"]["uses"] == read
 
 
 def test_summary_adds_dropped_area() -> None:
@@ -579,3 +583,84 @@ def test_quarantine_at_the_limit_passes() -> None:
     with pytest.raises(CadastreError, match="10.0 of 199.9 m²"):
         check_quarantine(results, 199.9, SplitOptions(max_quarantine_share=0.05))
     check_quarantine([], 0.0, OPTIONS)
+
+
+# --- Catastro use (ADR-022). ---
+
+USES = {
+    "A": BuildingUse("A", "1_residential", 12, 14),
+    "B": BuildingUse("B", "4_2_retail", None, 1),
+    "C": BuildingUse("C", "4_1_office", 0, 3),
+    "E": BuildingUse("E", "9_unknown", None, None),
+}
+
+
+def _with_uses(options: SplitOptions = OPTIONS, extra: list | None = None) -> dict[str, dict]:
+    scene = _scene()
+    scene["features"].append(_feature("osm-way-4", box(60, 0, 70, 10), {"building": "yes"}))
+    scene["features"].append(_feature("osm-way-5", box(80, 0, 90, 10), {"building": "yes"}))
+    parts = [*PARTS, _projected("C_part2", 2, box(60, 0, 66, 10)), _projected("B_part2", 2, box(66, 0, 68, 10)),
+             _projected("F_part1", 0, box(80, 0, 90, 10)), *(extra or [])]
+    features, _ = split_scene(scene, parts, RECORD, options, is_landmark=_is_church)
+    counts = attach_uses(scene, features, parts, USES, RECORD, options)
+    out = {f["id"]: f for f in features}
+    out["counts"] = counts
+    return out
+
+
+def test_every_sub_building_takes_the_use_of_its_parcel() -> None:
+    out = _with_uses()
+    shop = out["osm-way-3:B_part1"]["catastro_use"]
+    assert shop == {
+        "current_use": "4_2_retail", "use": "retail", "refcat": "B", "share": 1.0, "dwellings": None, "building_units": 1,
+        "attribute_origin": "observed", "source": "Catastro INSPIRE BU bu:Building currentUse",
+        "provider": "catastro-inspire-bu", "license": "CC-BY-4.0", "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "attribution": "Dirección General del Catastro, INSPIRE Buildings (BU)", "retrieved_at": "2026-10-18T12:00:00+00:00",
+    }
+    flats = out["osm-way-3:A_part1"]["catastro_use"]
+    assert (flats["current_use"], flats["use"], flats["dwellings"], flats["building_units"]) == ("1_residential", "residential", 12, 14)
+    # A church is not split but stands on parcels C and D; C covers half of it, and D has no Catastro building.
+    assert out["osm-way-1"]["catastro_use"]["refcat"] == "C" and out["osm-way-1"]["catastro_use"]["share"] == 0.5
+    # A footprint left whole (B's 2 m strip is a sliver) takes the parcel that covers most of it: C (60 %), not B (20 %).
+    whole = out["osm-way-4"]["catastro_use"]
+    assert (whole["refcat"], whole["use"], whole["share"]) == ("C", "office", 0.6)
+    # No part (osm-way-2), or parts with no storey above ground (osm-way-5): no use. POIs are never touched.
+    assert "catastro_use" not in out["osm-way-2"] and "catastro_use" not in out["osm-way-5"] and "catastro_use" not in out["osm-node-9"]
+    assert out["counts"] == {"1_residential": 1, "4_1_office": 2, "4_2_retail": 1}
+
+
+def test_a_whole_footprint_needs_the_minimum_share_and_a_known_parcel() -> None:
+    strict = _with_uses(SplitOptions(use_min_share=0.6))
+    assert strict["osm-way-4"]["catastro_use"]["share"] == 0.6 and "catastro_use" not in strict["osm-way-1"]
+    stricter = _with_uses(SplitOptions(use_min_share=0.61))
+    assert "catastro_use" not in stricter["osm-way-4"]
+    # A sub-building with leftover shares less than all of itself; an unknown code is kept and called "other".
+    unknown = _with_uses(extra=[_projected("E_part1", 1, box(40, 0, 50, 10))])
+    assert unknown["osm-way-2"]["catastro_use"]["use"] == "other"
+    assert unknown["osm-way-2"]["catastro_use"]["current_use"] == "9_unknown"
+
+
+def test_a_sub_building_shares_its_own_part_of_the_footprint() -> None:
+    feature = {"kind": "building", "geometry": {"type": "Polygon", "coordinates": [[(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]]},
+               "subdivision": {"refcat": "B", "leftover_m2": 25.0}}
+    attach_uses(_scene(), [feature], [], USES, RECORD, OPTIONS)
+    assert feature["catastro_use"]["share"] == 0.75
+    low = {**{k: v for k, v in feature.items() if k != "catastro_use"}, "subdivision": {"refcat": "B", "leftover_m2": 60.0}}
+    attach_uses(_scene(), [low], [], USES, RECORD, OPTIONS)
+    assert "catastro_use" not in low
+
+
+def test_a_whole_footprint_adds_up_the_parts_of_each_parcel() -> None:
+    whole = {"kind": "building", "geometry": {"type": "Polygon", "coordinates": [list(box(0, 0, 9, 10).exterior.coords)]}}
+    parts = [_projected("B_part1", 1, box(0, 0, 3, 10)), _projected("B_part2", 2, box(3, 0, 6, 10)),
+             _projected("C_part1", 3, box(6, 0, 9, 10))]
+    attach_uses(_scene(), [whole], parts, USES, RECORD, OPTIONS)
+    assert (whole["catastro_use"]["refcat"], whole["catastro_use"]["share"]) == ("B", 0.6667)  # 3 + 3 of 9 m, not C's 3
+
+
+def test_use_min_share_is_a_share() -> None:
+    for bad in (-0.1, 1.1):
+        with pytest.raises(ValueError, match="use_min_share"):
+            SplitOptions(use_min_share=bad)
+    SplitOptions(use_min_share=0.0)
+    SplitOptions(use_min_share=1.0)

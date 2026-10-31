@@ -1,0 +1,125 @@
+{
+  "schema": "onward_generator.facade_styles",
+  "schema_version": "0.1.0",
+  "description": "Regional facade styles for the trim-sheet atlas (ADR-020). The selection boxes are a coarse rule on the map centre, not a country lookup: the first box that holds the centre wins, else default_style. map.json \"facades\": {\"style\": \"<name>\"} overrides it. A style whose atlas is null keeps the per-material facade path until its atlas exists.",
+  "default_style": "generic",
+  "selection": [
+    {
+      "style": "mediterranean",
+      "note": "Mediterranean basin and Iberia, the Maghreb, the Levant and western Turkey, the Canary Islands, coastal California",
+      "boxes": [
+        [35.0, 44.5, -10.0, 29.0],
+        [43.0, 45.5, 3.0, 16.0],
+        [30.0, 42.0, 26.0, 37.0],
+        [27.0, 37.5, -10.0, 26.0],
+        [27.5, 29.5, -18.5, -13.0],
+        [32.0, 42.0, -124.5, -117.0]
+      ]
+    },
+    {
+      "style": "anglo",
+      "note": "Britain and Ireland, the United States, Canada, Australia, New Zealand",
+      "boxes": [
+        [49.8, 61.0, -11.0, 2.0],
+        [24.5, 49.5, -125.0, -66.5],
+        [42.0, 70.0, -141.0, -52.0],
+        [-44.0, -10.0, 112.0, 154.0],
+        [-47.5, -34.0, 166.0, 179.0]
+      ]
+    },
+    {
+      "style": "latin_american",
+      "note": "Mexico, Central America, the Caribbean and South America",
+      "boxes": [
+        [-56.0, 32.7, -118.0, -34.0]
+      ]
+    },
+    {
+      "style": "central_european",
+      "note": "From the Alps and the Rhine to the Vistula and the Carpathians",
+      "boxes": [
+        [45.0, 56.0, 5.0, 30.0]
+      ]
+    }
+  ],
+  "styles": {
+    "mediterranean": {
+      "note": "Rendered plaster in warm tones over a stone zocalo, a string course at every floor, a moulded cornice under the parapet, stone window surrounds, roller shutters (persianas) and panelled wooden doors.",
+      "atlas": {
+        "size_px": 2048,
+        "height_px": 4096,
+        "gutter_px": 8,
+        "fit_row_px": 384,
+        "fit_cell_px": 192,
+        "cornice_px": 128,
+        "zocalo_px": 128,
+        "stone_px": 64,
+        "wall_repeat_m": 12.0,
+        "zocalo_m": 0.9,
+        "zocalo_repeat_m": 6.0,
+        "cornice_repeat_m": 6.0,
+        "stone_repeat_m": 1.0,
+        "storey_ref_m": 3.0,
+        "max_band_m": 4.5,
+        "walls": {
+          "plaster_ochre": "plaster",
+          "plaster_cream": "plaster",
+          "plaster_white": "plaster",
+          "plaster_salmon": "plaster",
+          "stone_warm": "ashlar",
+          "brick_red": "brick"
+        },
+        "scenic_walls": {
+          "scenic_wall_light": "plaster_white",
+          "scenic_wall_warm": "plaster_cream",
+          "scenic_wall_ochre": "plaster_ochre"
+        },
+        "sources": {
+          "plaster": "ph_plastered_wall",
+          "stone": "acg_rock030",
+          "brick": "acg_bricks105"
+        },
+        "source_tile_m": {
+          "plaster": 2.0,
+          "stone": 2.0,
+          "brick": 1.0
+        },
+        "zocalo_color": [0.42, 0.39, 0.35],
+        "cornice_color": [0.90, 0.88, 0.83],
+        "stone_color": [0.90, 0.88, 0.83],
+        "window_families": [
+          { "frame": [0.86, 0.85, 0.81], "shutter": [0.30, 0.36, 0.26], "closed": [0.0, 0.4] },
+          { "frame": [0.30, 0.20, 0.13], "shutter": [0.70, 0.62, 0.48], "closed": [0.25, 0.7] }
+        ],
+        "door_colors": [[0.30, 0.19, 0.11], [0.16, 0.26, 0.19]],
+        "tones": [[1.0, 1.0, 1.0], [0.80, 0.77, 0.72], [1.0, 0.90, 0.74]],
+        "dress": { "zocalo_share": 0.7, "cornice_share": 0.6, "course_share": 0.5 },
+        "grime": {
+          "streaks_per_strip": 70,
+          "streak_dark": 0.10,
+          "streak_length_m": [0.3, 1.6],
+          "under_course_dark": 0.22,
+          "base_splash_dark": 0.32,
+          "base_splash_m": 0.35,
+          "mottle": 0.04
+        }
+      }
+    },
+    "central_european": {
+      "note": "Planned: pastel render over a rusticated ground floor, window aediculae, a deep cornice, casement windows without shutters.",
+      "atlas": null
+    },
+    "anglo": {
+      "note": "Planned: brick in Flemish bond, painted sash windows, stone lintels and sills, a rendered or stone ground floor on shops.",
+      "atlas": null
+    },
+    "latin_american": {
+      "note": "Planned: bright lime-washed render, a painted zocalo band, iron window grilles, flat parapets.",
+      "atlas": null
+    },
+    "generic": {
+      "note": "No regional atlas: the per-material facade path.",
+      "atlas": null
+    }
+  }
+}

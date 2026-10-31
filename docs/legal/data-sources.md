@@ -44,7 +44,7 @@ Spain only, without Navarre and the Basque Country, which have their own foral c
 | Field | Value |
 | --- | --- |
 | Provider | Dirección General del Catastro (Ministerio de Hacienda) |
-| Dataset | INSPIRE Buildings (BU), object `BuildingPart`, field `numberOfFloorsAboveGround` |
+| Dataset | INSPIRE Buildings (BU): object `BuildingPart`, field `numberOfFloorsAboveGround`; object `Building` (one per parcel), fields `currentUse`, `numberOfDwellings`, `numberOfBuildingUnits` (ADR-022) |
 | Service | WFS 2.0 `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx`. It refuses curl's default user agent. The generator identifies itself as `onward-generator/<version>` |
 | Licence | CC BY 4.0, as stated by the official catalogue (datos.gob.es, "Building INSPIRE Download Service - WFS") |
 | Catastro's own licence | "Licencia de acceso y uso de los servicios y conjuntos de datos INSPIRE", v1.0, July 2016 |
@@ -53,6 +53,7 @@ Spain only, without Navarre and the Basque Country, which have their own foral c
 Obligations, from the Catastro licence:
 
 - **Transformed information only.** Use of transformed information is allowed, including commercial use, in the sense of article 21 of the Spanish intellectual-property law. **Redistributing the original information is not allowed.** The downloaded GML stays in `maps/<id>/data/raw/`, outside git. A download of several tiles is merged into that one file, each part once; the sidecar records every request. What continues downstream is a storey count per OSM building, the overlap-weighted median of the cadastral parts, later turned into an estimated height. Since ADR-016, `cadastre split` also divides an OSM footprint into sub-footprints: each is a cadastral part outline clipped to the OSM outline, snapped to 1 mm, merged by parcel and storey count, with slivers dropped and gaps filled. That shape is a transformation of the cadastral geometry; the GML itself is never copied into a scene or a package.
+- **Current use (ADR-022).** The `bu:Building` features are downloaded beside the parts into `data/raw/catastro_buildings.gml`, outside git, with their own sidecar. Downstream only each building's parcel reference, its `currentUse` code and its two counts are copied, as `catastro_use` on the buildings of the split scene, with the provider, licence, attribution and retrieval date. `detail` turns an office or retail use into a generic ground-floor shopfront: the use is observed, the floor it is put on is estimated. Neither the Building geometry nor the GML is copied.
 - **No impersonation.** Derived products must not be presented as "cartografía catastral", "información catastral", or equivalent terms.
 - **No warranty.** Catastro is not responsible for derived products, and the data can be out of date.
 - **Attribution (CC BY 4.0).** `heights_overrides.catastro.json`, `heights.json`, `scene3d.json`, and the GLBs carry the source and the licence. The split scene `data/processed/cadastre/geo_scene.json` carries it in `subdivision.cadastre` and on every sub-building (`subdivision.license`, `attribution`, `retrieved_at`).
@@ -65,13 +66,68 @@ Sources checked on 2026-10-18:
 - https://www.catastro.hacienda.gob.es/webinspire/documentos/Licencia.pdf
 - https://datos.gob.es/es/catalogo/e0dat0002-spanish-general-directorate-for-cadastre-building-inspire-download-service-wfs1
 
-The fixture `tests/fixtures/cadastre/synthetic_bu.gml` is synthetic (CC0-1.0) and contains no Catastro data.
+The fixtures `tests/fixtures/cadastre/synthetic_bu.gml` and `synthetic_bu_buildings.gml` are synthetic (CC0-1.0) and contain no Catastro data.
+
+## Source plugins
+
+Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`, plus the Overture place licences `CDLA-Permissive-2.0`, `Apache-2.0` and `CC0-1.0`, checked per place by `overture match`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+
+## Overture Maps
+
+Places and buildings used by `overture fetch` and `overture match` (ADR-021). A source plugin (`overture`, ADR-018) that covers every city; `run --no-source overture` turns it off.
+
+| Field | Value |
+| --- | --- |
+| Provider | Overture Maps Foundation, release GeoParquet on `s3://overturemaps-us-west-2/release/<release>/`; release from `https://stac.overturemaps.org/catalog.json` |
+| Places licence | Per record, in `sources[].license`: CDLA Permissive 2.0 (Meta, Microsoft, BrightQuery, PinMeTo, DAC, Uberall, …), Apache 2.0 (Foursquare), CC0 1.0 (AllThePlaces) |
+| Buildings licence | ODbL 1.0 (OpenStreetMap; Microsoft Global ML Building Footprints), CC BY 4.0 (Esri Community Maps, Google Open Buildings, IGN BTN 2024) |
+| Attribution | The wording of https://docs.overturemaps.org/attribution/ per dataset: `Data from <provider>` for places; `© OpenStreetMap contributors, Overture Maps Foundation`; `Global ML Building Footprints, licensed by Microsoft`; `Work derived from BTN 2024 ign.es`; Foursquare adds `Copyright 2024 Foursquare Labs, Inc. All rights reserved.` and the release NOTICE |
+| What is stored | `data/raw/overture_places.parquet` and `overture_buildings.parquet`: the release rows whose bbox meets the map, unchanged, with a `.source.json` (release, query, SHA-256, records per dataset and licence with `license_origin`, attribution lines). Outside git, like the OSM extract |
+
+Obligations that apply:
+
+- **Per-record licence.** `overture_places.json` keeps the dataset and licence of every place. A place whose licence is not on the `config/sources.json` allowlist, or that has none, is dropped (`licence_not_allowed`). A shop made from a place records them in `poi_source`, and the attribution of its dataset goes into `scene_detail.json` and the export package. A place whose dataset gives no shop adds nothing.
+- **Foursquare (Apache 2.0).** Keep the copyright line and the NOTICE text of the Overture release with the attribution. The data was transformed to the Overture schema by Overture; this project transforms it again (category to an OSM-style tag, name, position in the local grid).
+- **Buildings.** A height used from Overture carries the dataset in the override `source` and its licence; `heights.json` lists the sources a building used, and `generate` adds them to the scene attribution. ODbL share-alike applies to a distributed derived database as for OSM. CC BY 4.0 sources need their attribution line.
+- **Records without a licence.** IGN, Google Open Buildings and Esri records carry no `license` in `sources[]`. The licence then comes from the Overture attribution page (checked 2026-10-30) and is marked `license_origin: overture_attribution_page`. Any other dataset without one is recorded as `unknown`, and neither its places nor its heights are used: `unknown` is not on the allowlist.
+- **OpenStreetMap through Overture.** Overture building values whose dataset is OpenStreetMap are not lent (`skip_datasets` in `config/overture.default.json`): the OSM extract already has them under ODbL.
+- **Origin.** Places are `observed` by a third party. Heights are `observed` (OSM, Esri, IGN), `ai_generated` (Microsoft and Google ML footprints) or `estimated` (any other dataset), recorded as `origin` on every override. Neither is ever `measured`.
+
+Checked on 2026-10-30: https://docs.overturemaps.org/attribution/, https://docs.overturemaps.org/guides/places/, https://docs.overturemaps.org/schema/reference/buildings/building/.
+
+Test parquets are written at test time by `tests/overture_fixture.py`. They are synthetic (CC0-1.0) and contain no Overture data.
+
+### IGN MDSn (`es.pnoa_ndsm`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Instituto Geográfico Nacional (IGN) / CNIG |
+| Dataset | Modelo Digital de Superficies normalizado, clase edificación, primera cobertura, 2.5 m (MDSnE2,5), from PNOA-LiDAR first-coverage flights (series 2008–2015) |
+| Service | WCS 2.0 `https://wcs-mds.idee.es/mds`, coverage `mdsn_e025`, format `application/asc`, EPSG:25830. The capabilities state `AccessConstraints: CC BY 4.0 scne.es` and `Fees: No se aplican condiciones` |
+| Licence | CC BY 4.0 (Orden FOM/2807/2015; IGN licence conditions `https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf`) |
+| Attribution | `Obra derivada de MDSn 2008-2015 CC-BY 4.0 ign.es` |
+
+Obligations, from the IGN conditions: cite `<product> <date> CC-BY 4.0 <producer>`, visible next to the data; a derived product (heights per footprint are one) prefixes `Obra derivada de`. The date is the series period; the CNIG lists sheet dates of 2009, 2010 and 2012. Ceuta, Melilla and Alborán are not in the product. The tiles stay in `maps/<id>/data/raw/es.pnoa_ndsm/`, outside git. Checked 2026-10-30: capabilities, a real `GetCoverage` over Madrid, the CNIG product page and the datos.gob.es record `e00125901-spaignmds-normalizado`.
+
+### IGN LiDAR HD MNH (`fr.lidar_hd`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Institut national de l'information géographique et forestière (IGN) |
+| Dataset | LiDAR HD, Modèle Numérique de Hauteur (MNH, surface minus terrain), 0.5 m, Lambert-93 (EPSG:2154), IGN69 |
+| Service | Géoplateforme WMS-R `https://data.geopf.fr/wms-r/wms`, layer `IGNF_LIDAR-HD_MNH_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93`, `FORMAT=image/x-bil;bits=32` (raw float32, no data `-9999` in restricted zones); acquisition dates from the WFS `https://data.geopf.fr/wfs/ows` layer `IGNF_LIDAR-HD_METADONNEE:metadata`. No key is needed; the service announces 1 request per second, which `fetch` keeps |
+| Licence | Licence Ouverte / Open Licence 2.0 (Etalab), SPDX `etalab-2.0` (data.gouv.fr dataset "MNH LiDAR HD") |
+| Attribution | `IGN, LiDAR HD MNH` and the acquisition dates |
+
+Obligations, from the Licence Ouverte 2.0: mention the source (the producer and the date of the data) and do not suggest the IGN endorses the reuse. The heights per footprint are derived from the MNH; the overrides and the report carry the source, the licence and the tile dates. The tiles stay in `maps/<id>/data/raw/fr.lidar_hd/`, outside git. Coverage is `config/lidar_hd_coverage.json`, a coarse polygon around metropolitan France and Corsica; the national acquisition was due to finish in 2026. Checked 2026-10-30: WMS-R capabilities (formats, layer extent), a real `GetMap` over Lyon and over a restricted zone (all `-9999`), the metadata WFS, and the data.gouv.fr dataset page.
 
 ## Generated geometry
 
 Phase 04 does not use external models. Windows, balconies, roofs, street furniture, and interiors are procedural geometry from this code. `scene_detail.json` and `scene_visual.glb` inherit the base attributions (OpenStreetMap ODbL-1.0, and Catastro CC BY 4.0 when it was used) and state that the facades are generic templates, not a faithful reconstruction. They must not be presented as the real buildings.
 
 `dress style` adds no third-party asset. Its atlas is generated in code (noise on the existing colours, 256 px tiles). It is not a photograph of a city and it is not an extract from Onward. Licence of that atlas: `project-generated`.
+
+`materials apply` bakes the trim-sheet facade atlas ([ADR-020](../decisions/ADR-020-trim-sheet-facades.md)) in code from three photographs already in the imported library, all CC0 1.0: `ph_plastered_wall` (Poly Haven, Amal Kumar) for the plaster grain, `acg_rock030` (ambientCG) for the stone grain of the zocalo, cornice, ashlar and window surrounds, and `acg_bricks105` (ambientCG) for brick. Only their luminance (brick: its colour) is resampled; colours, string courses, cornices, shutters, doors, shop glass, boards and grime are drawn by the code. `apply_trim` re-checks each source's library hash and refuses one whose licence is not CC0. Licence of the atlas: `project-generated`, recorded with the sources in `materials_report.json` (`facades.atlas`). The OSM2World default-style textures were considered and are not used, so their licence was not needed; a style that adds them must record and verify it here first.
 
 `signs place` paints the OSM `name` of the way on a generated plate. The name is ODbL data. The map keeps the OpenStreetMap attribution. The name is not translated and not invented. A way with no `name` gets no plate.
 
@@ -84,6 +140,7 @@ Street photographs used by `panoramax apply`. The step is under development. It 
 | | |
 | --- | --- |
 | Provider | Panoramax (GeoVisio). Search is the metacatalogue `https://api.panoramax.xyz/api/search` |
+| Hosts | Search pages, `next` links included, only from `api.panoramax.xyz`. A JPEG comes from the host its search href names: the instance or its object store (for example `panoramax.ign.fr`, an OVH bucket, `panoramax.mapcomplete.org`), which the metacatalogue instance list does not name. Only `https` on a DNS name with a dot is fetched; `file://`, `http://`, IP literals and `localhost` are refused. A search page is capped at 32 MiB and a JPEG at 64 MiB; HTTP 429 and transient failures are retried twice |
 | Licence | CC BY-SA 4.0. `https://spdx.org/licenses/CC-BY-SA-4.0.html` |
 | What is stored | A picture whose `field_of_view` is 360, its JPEG, and a sidecar: provider, licence, licence URL, attribution, URL, author, SHA-256, `retrieved_at`. A flat picture is listed as `skipped: flat` and the JPEG is not downloaded |
 | Where | JPEGs and sidecars: `cache/panoramax/<picture id>`, gitignored, shared by every map. Each map keeps its search index in `maps/<id>/data/raw/panoramax/` |
@@ -100,6 +157,7 @@ A new map's plan is `maps/<id>/config/texture_plan.json`, written by `map create
 | ambientCG, [docs.ambientcg.com/license](https://docs.ambientcg.com/license/) | CC0 1.0 | The `Color` JPG at 1k only. Normal, roughness, displacement, blend, and USD are not copied |
 | Kenney packs (City Kit Suburban, Modular Buildings, Retro Urban Kit, Retro Textures Fantasy), each pack's `License.txt` | CC0 1.0 | GLBs in `assets/kenney`. Texture-pack PNGs in `assets/textures/`. FBX and OBJ are not copied |
 | Poly Haven `painted_plaster_wall` and `plastered_wall` by Amal Kumar, already in `assets/textures/` with their `.source.json` | CC0 1.0 | `Diffuse` map, `1k`, `jpg`. Listed in the imported library as `ph_painted_plaster_wall` and `ph_plastered_wall` (plaster family) since 2026-10-30 |
+| Poly Haven `wood_planks` by Amal Kumar, already in `assets/textures/wood_planks/` with its `.source.json` | CC0 1.0 | `Diffuse` map, `1k`, `jpg`. Listed in the imported library as `ph_wood_planks` since 2026-10-30, with no texture family, so no plan slot draws it. It floors the bars and generic shops; `ph_plastered_wall` and ambientCG `Tiles139` cover the other shop walls and floors (`docs/07-detail.md`, *Shop interiors*) |
 | Poly Haven, only when an older plan still names those ids and `--download` is passed | CC0 1.0 | `Diffuse` map, `1k`, `jpg`, from `api.polyhaven.com` / `dl.polyhaven.org`. HTML is not scraped. An explicit licence other than CC0 is refused. JPEG cache: `assets/textures/` |
 
 The 71 Kenney meshes whose role was `building` (suburban houses, modular building pieces, and two cliff blocks) were removed on 2026-10-26. The installed GLBs were scaled to street metres on 2026-10-27; the factor is `street_scale` in `assets/kenney_review.json`. The removed meshes were not scaled. `assets/kenney_review.json` describes every Kenney mesh, including those. On 2026-10-29, 20 Retro Urban meshes whose material uses `alphaMode: BLEND` were also removed: the crossed-card trees, the balconies, scaffolding, see-through walls and fence, cables, and three barriers. The export material is opaque, so their transparent cards rendered solid. The same day the four Retro Urban grass tiles (`grass`, `grass-corner`, `grass-corner-inner`, `grass-hill`) were removed: they are 3.2 m terrain tiles, and the slopes stood in a plaza as a tilted triangle. Their review cards say why. The meshes that remain are listed in `assets/kenney/manifest.json` and do not replace OpenStreetMap footprints. `overgrow` includes that manifest with every other `assets/*/manifest.json`. Each GLB references `Textures/<name>.png` beside itself. Those PNGs are in `assets/kenney/<pack>/Textures/`. The shader uses albedo only: `_BaseColor × _BaseMap`. Cobble is applied only to `surface/pedestrian_cobble`.

@@ -1,0 +1,18 @@
+{
+  "schema": "onward_generator.source_coverage",
+  "schema_version": "1.0.0",
+  "source": "fr.lidar_hd",
+  "description": "Where run uses the IGN LiDAR HD height model (ADR-018): coarse WGS84 longitude/latitude rings around metropolitan France and Corsica, generous over the sea and the borders (the service returns no data there, and no override is written). The national acquisition was due to finish in 2026; restricted zones (ZICAD) have no data. Checked 2026-10-30 against the WMS-R capabilities (layer extent -5.5..10 E, 41..52 N).",
+  "polygons": [
+    [[
+      [-5.3, 48.3], [-4.8, 48.75], [-3.4, 48.95], [-1.95, 48.75], [-1.95, 49.8], [-0.2, 49.5], [1.4, 50.2],
+      [1.5, 51.15], [2.6, 51.15], [4.2, 50.15], [4.9, 50.2], [5.9, 49.55], [6.7, 49.2], [8.3, 49.05],
+      [7.6, 47.6], [7.0, 47.45], [6.0, 46.45], [6.85, 46.1], [7.1, 45.9], [6.65, 45.1], [7.1, 44.25],
+      [7.75, 43.8], [6.6, 43.0], [4.0, 43.35], [3.2, 42.4], [1.75, 42.45], [0.65, 42.7], [-0.75, 42.85],
+      [-1.8, 43.3], [-1.6, 44.4], [-1.4, 45.8], [-2.6, 47.2], [-4.5, 47.75], [-5.3, 48.3]
+    ]],
+    [[
+      [8.45, 41.3], [9.65, 41.3], [9.65, 43.1], [8.45, 42.4], [8.45, 41.3]
+    ]]
+  ]
+}

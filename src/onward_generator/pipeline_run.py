@@ -15,23 +15,21 @@ import os
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from onward_generator.maps.workspace import (
     MapError,
-    catastro_enabled,
     load_map,
     map_directory,
     panoramax_enabled,
     store_brief,
-    store_catastro,
     store_panoramax,
+    store_sources,
 )
 from onward_generator.next_step import (
-    cadastre_split_command,
-    catastro_command,
+    STAGE_DIRS,
     detail_command,
     dress_command,
     export_invocation,
@@ -59,6 +57,9 @@ from onward_generator.run_log import (
     summarize,
     use_color,
 )
+from onward_generator.sources.merge import MERGED_FILE
+from onward_generator.sources.plugin import SourceError, SourceStage, SourceSteps
+from onward_generator.sources.registry import check_licence, check_secondary_rank, choices, describe, load_source_config
 
 Execute = Callable[[Sequence[str]], int]
 Ask = Callable[[], str]
@@ -123,20 +124,15 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     root = Path(directory)
     no_preview = () if preview else ("--no-preview",)
     geo_argv = list(geo_command(root).argv)
-    scene = _flag(geo_argv, "--out") / "geo_scene.json"
-    cadastre_steps: list[tuple[str, list[str]]] = []
-    overrides: Path | None = None
-    if catastro_enabled(root):
-        gml = root / "data" / "raw" / "catastro.gml"
-        split_argv = list(cadastre_split_command(scene, gml).argv)
-        cadastre_steps = [("catastro", list(catastro_command(scene, gml).argv)), ("cadastre", split_argv)]
-        scene = _flag(split_argv, "--out") / "geo_scene.json"
-        overrides = _flag(split_argv, "--out") / "heights_overrides.catastro.json"
-    heights_argv = list(heights_command(scene, overrides).argv)
+    geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
+    sources, scene, overrides = source_plan(root, geo_scene)
+    secondary, places = third_party_plan(root, geo_scene)
+    source_steps = [(stage.name, list(stage.argv)) for stage in sources]
+    heights_argv = list(heights_command(scene, overrides, secondary).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = [*detail_command(scene, heights, scene3d).argv, *no_preview]
+    detail_argv = [*detail_command(scene, heights, scene3d, places).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -174,7 +170,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         picture_steps.append(("panoramax", panoramax_argv))
     return [
         ("geo", geo_argv),
-        *cadastre_steps,
+        *source_steps,
         ("heights", heights_argv),
         ("generate", generate_argv),
         ("detail", detail_argv),
@@ -188,6 +184,70 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         ("layout", layout_argv),
         ("export", export_argv),
     ]
+
+
+def source_plan(root: Path, scene: Path) -> tuple[list[SourceStage], Path, Path | None]:
+    """The stages of the source plugins this map uses, the scene ``heights`` reads, and its overrides (ADR-018).
+
+    Plugins run in registry order; one that writes a scene hands it to the
+    next. With overrides from more than one plugin, ``overrides`` merges them
+    by the priority in ``config/sources.json``. A plugin whose licence is not
+    on the allowlist stops the plan before anything is fetched.
+    """
+    stages: list[SourceStage] = []
+    overrides: list[tuple[str, Path]] = []
+    for plugin_id, steps in _plugin_steps(root, scene):
+        stages.extend(steps.stages)
+        scene = steps.scene or scene
+        if steps.overrides is not None:
+            overrides.append((plugin_id, steps.overrides))
+    if len(overrides) < 2:
+        return stages, scene, overrides[0][1] if overrides else None
+    out = root / "data" / "processed" / "sources"
+    pairs = [part for plugin_id, path in overrides for part in ("--overrides", f"{plugin_id}={show(path)}")]
+    argv = invoke("source", "merge", *pairs, "--out", show(out)).argv
+    stages.append(SourceStage("overrides", argv, out / MERGED_FILE, tuple(path for _id, path in overrides)))
+    return stages, scene, out / MERGED_FILE
+
+
+def _plugin_steps(root: Path, scene: Path) -> list[tuple[str, SourceSteps]]:
+    """The steps of every plugin this map runs, in registry order, each reading the scene of the ones before it."""
+    config = load_source_config()
+    found: list[tuple[str, SourceSteps]] = []
+    for choice in choices(load_map(root)):
+        if not choice.runs:
+            continue
+        try:
+            check_licence(choice.plugin, config)
+        except SourceError as exc:
+            raise PipelineError(str(exc)) from exc
+        steps = choice.plugin.steps(root, scene)
+        scene = steps.scene or scene
+        found.append((choice.plugin.id, steps))
+    primary = [plugin_id for plugin_id, steps in found if steps.overrides is not None]
+    secondary = [plugin_id for plugin_id, steps in found if steps.secondary_overrides is not None]
+    try:
+        check_secondary_rank(primary, secondary, config)
+    except SourceError as exc:
+        raise PipelineError(str(exc)) from exc
+    return found
+
+
+def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None]:
+    """The secondary overrides ``heights`` reads and the places ``detail`` reads, from the last plugin that writes each (ADR-021)."""
+    secondary: Path | None = None
+    places: Path | None = None
+    for _plugin_id, steps in _plugin_steps(root, scene):
+        secondary = steps.secondary_overrides or secondary
+        places = steps.places or places
+    return secondary, places
+
+
+def _source_stages(root: Path) -> list[SourceStage]:
+    try:
+        return source_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json")[0]
+    except (MapError, PipelineError):
+        return []
 
 
 def format_duration(seconds: float) -> str:
@@ -399,13 +459,12 @@ def _emit_captured(err: str, out: str) -> None:
         print(summary, flush=True)
 
 
-def output_ready(name: str, argv: Sequence[str], root: Path) -> bool:
+def output_ready(name: str, root: Path) -> bool:
     """True when this stage's file exists and is at least as new as the file it reads.
 
     A repeated earlier stage makes every later file stale, so the next run
     continues there instead of trusting a package or scene left from before.
     """
-    del argv
     if name == "map":
         return (root / "map.json").is_file()
     if name == "osm":
@@ -419,33 +478,24 @@ def output_ready(name: str, argv: Sequence[str], root: Path) -> bool:
     return _fresh(marker, _input_markers(root, name))
 
 
+# The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.
+_MARKER_FILES = {"geo": "geo_scene.json", "heights": "heights.json", "fit": "fit.json", "layout": "layout.json"}
+
+
 def _canon(root: Path, name: str) -> Path | None:
-    processed = root / "data" / "processed"
-    files = {
-        "geo": processed / "geo" / "geo_scene.json",
-        "catastro": root / "data" / "raw" / "catastro.gml",
-        "cadastre": processed / "cadastre" / "geo_scene.json",
-        "heights": processed / "heights" / "heights.json",
-        "generate": processed / "scene3d" / "scene_visual.glb",
-        "detail": processed / "scene_detail" / "scene_visual.glb",
-        "dress": processed / "scene_dress" / "scene_visual.glb",
-        "materials": processed / "scene_materials" / "scene_visual.glb",
-        "panoramax": processed / "scene_panoramax" / "scene_visual.glb",
-        "signs": processed / "scene_signs" / "scene_visual.glb",
-        "overgrow": processed / "scene_overgrow" / "scene_visual.glb",
-        "fit": processed / "scene_overgrow" / "fit.json",
-        "bounds": processed / "scene_playable" / "scene_visual.glb",
-        "layout": processed / "layout" / "layout.json",
-    }
-    return files.get(name)
+    if name in STAGE_DIRS:
+        return root / "data" / "processed" / STAGE_DIRS[name] / _MARKER_FILES.get(name, "scene_visual.glb")
+    return next((stage.marker for stage in _source_stages(root) if stage.name == name), None)
 
 
 def _input_markers(root: Path, name: str) -> list[Path]:
+    sources = _source_stages(root)
+    for stage in sources:
+        if stage.name == name:
+            return list(stage.inputs)
     previous_of = {
         "geo": "osm",
-        "catastro": "geo",
-        "cadastre": "catastro",
-        "heights": "cadastre" if catastro_enabled(root) else "geo",
+        "heights": sources[-1].name if sources else "geo",
         "generate": "heights",
         "detail": "generate",
         "dress": "detail",
@@ -495,7 +545,7 @@ def _export_is_fresh(root: Path) -> bool:
 
 
 def _occupied(name: str, argv: Sequence[str], root: Path) -> bool:
-    if name in ("osm", "catastro"):
+    if name == "osm" or any(stage.download for stage in _source_stages(root) if stage.name == name):
         target = osm_target(root) if name == "osm" else _flag(argv, "--out")
         return target.exists() or target.with_name(target.name + ".source.json").exists()
     return _flag(argv, "--out").exists()
@@ -698,7 +748,7 @@ def run_map(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
-    catastro: bool | None = None,
+    sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float = 150.0,
     overwrite: bool = False,
@@ -792,9 +842,10 @@ def run_map(
         if code != 0:
             print_total(log, failed=True)
             return code
-        if catastro is not None:
-            store_catastro(root, catastro)
+        if sources:
+            store_sources(root, sources)
         try:
+            say(describe(choices(load_map(root))))
             steps = plan_steps(out, preview=preview)
         except PipelineError as exc:
             print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
@@ -809,10 +860,11 @@ def run_map(
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
             if panoramax:
                 store_panoramax(root, True)
-            if catastro is not None:
-                store_catastro(root, catastro)
+            if sources:
+                store_sources(root, sources)
+            say(describe(choices(load_map(root))))
             steps = resume_steps(root, preview=preview)
-            done = [step for step, argv in steps if output_ready(step, argv, root)]
+            done = [step for step, _argv in steps if output_ready(step, root)]
             done.insert(0, "map")
             pending = [step for step, _argv in steps if step not in done]
             chosen = choose_start(

@@ -19,6 +19,7 @@ from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, box, quad, transform
+from onward_generator.geo.attributes import parse_metres
 from onward_generator.overgrow.ambient import blocks_street, cross_yaw, is_solid
 from onward_generator.overgrow.catalog import FACADE_Z_M, RULES_BY_ID, SIDEWALK_COVER_RULE, PlacementRule, rules_for
 from onward_generator.overgrow.constants import (
@@ -677,13 +678,7 @@ def _heights(features: list) -> dict[str, float]:
         if feature.get("kind") != "building":
             continue
         tags = feature.get("tags") or {}
-        raw = tags.get("height") or tags.get("building:height")
-        height = None
-        if raw not in (None, ""):
-            try:
-                height = float(str(raw).split()[0].replace(",", "."))
-            except ValueError:
-                height = None
+        height = parse_metres(tags.get("height") or tags.get("building:height"))
         if height is None and tags.get("building:levels") not in (None, ""):
             try:
                 height = float(str(tags.get("building:levels")).split()[0]) * 3.0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ from shapely import Point
 from onward_generator.cli import main
 from onward_generator.geo.aoi import load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame
-from onward_generator.maps.workspace import MapError, catastro_enabled, create_map, store_catastro
+from onward_generator.maps.workspace import MapError, create_map, source_enabled, store_sources
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -156,15 +157,55 @@ def _polygon(ring: tuple[tuple[float, float], ...]):
     return Polygon(ring)
 
 
+def catastro_enabled(root: Path) -> bool:
+    return source_enabled(root, "es.catastro")
+
+
 def test_catastro_is_on_by_default_in_spain_and_follows_the_stored_switch(tmp_path: Path) -> None:
     root = tmp_path / "murcia"
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     assert catastro_enabled(root) is True
-    store_catastro(root, False)
-    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is False
+    store_sources(root, {"es.catastro": False})
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["sources"] == {"es.catastro": False}
     assert catastro_enabled(root) is False
-    store_catastro(root, True)
+    store_sources(root, {"es.catastro": True})
     assert catastro_enabled(root) is True
+
+
+def test_an_older_map_keeps_its_catastro_key_until_a_source_switch_replaces_it(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps({**document, "catastro": False}), encoding="utf-8")
+    assert catastro_enabled(root) is False
+    store_sources(root, {"es.catastro": True})
+    stored = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    assert "catastro" not in stored and stored["sources"] == {"es.catastro": True}
+    assert catastro_enabled(root) is True
+
+
+def test_store_sources_keeps_the_other_switches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.sources.es.catastro import CatastroPlugin
+
+    @dataclass(frozen=True)
+    class Other(CatastroPlugin):
+        id: str = "xx.other"
+
+    monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (CatastroPlugin(), Other()))
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    store_sources(root, {"xx.other": True})
+    store_sources(root, {"es.catastro": False})
+    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["sources"] == {"es.catastro": False, "xx.other": True}
+
+
+def test_store_sources_refuses_an_unknown_plugin_and_writes_nothing(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    before = (root / "map.json").read_bytes()
+    with pytest.raises(ValueError, match="unknown source 'xx.nothing'"):
+        store_sources(root, {"xx.nothing": True})
+    assert (root / "map.json").read_bytes() == before
 
 
 def test_catastro_is_off_outside_spain_in_navarre_and_without_a_map(tmp_path: Path) -> None:

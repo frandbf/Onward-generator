@@ -55,6 +55,11 @@ PANE_INSET_M = 0.01
 # Openings the player can stand on either side of. One quad, material glass_view.
 # The adapter draws both faces with PP_Sprite_Lit. Do not add a second quad.
 GLASS_VIEW = "glass_view"
+# A shop's display window: frameless glass, the same single quad, and no pane collider, so a shot
+# crosses it. The wall collider is open on it above the stallriser. The adapter draws it with the
+# SDK glass material when the project has one, else PP_Sprite_Lit like ``glass_view``.
+SHOP_GLASS = "shop_glass"
+SEE_THROUGH = frozenset({GLASS_VIEW, SHOP_GLASS})
 ROOM_GLASS = frozenset({"window", "narrow_window", "shopfront", "balcony_door"})
 WallCut = tuple[np.ndarray, np.ndarray, float, float]
 # Light anchors (ADR-013). Modelling assumptions, not observations: one light under the
@@ -69,6 +74,8 @@ PROBE_STEP_M = 4.0
 PROBE_MAX_PER_AXIS = 4
 PROBE_LOW_M = 1.0
 PROBE_HIGH_BELOW_CEILING_M = 0.5
+# The smallest room behind a door for the stair interior (a shop room takes interiors.shops.min_room_area_m2).
+MIN_ROOM_M2 = 20.0
 # The wall between two shop rooms. Centred on a bay boundary, it stays in the pier
 # (at least min_pier_m / 2 = 0.25 m each side), clear of both shopfronts.
 PARTITION_M = 0.2
@@ -117,6 +124,8 @@ class InteriorPlan:
     flights: tuple[Flight, ...]
     rooms: tuple[Room, ...] = ()
     hosts: BaseGeometry | None = None
+    depth_m: float | None = None
+    """The band behind the door's wall the room is cut to (a shop above ``max_area_m2``), or ``None``."""
 
     @property
     def ground(self) -> BaseGeometry:
@@ -150,11 +159,6 @@ class Interior:
     def collision_triangles(self) -> int:
         """Triangles of the interior's colliders: its walls, slabs, stairs and solids, and the glass panes."""
         return sum(mesh.triangle_count for _, mesh in self.colliders) + sum(mesh.triangle_count for mesh in self.glass_colliders)
-
-
-def fits_triangle_budget(used: int, cost: int, limit: int) -> bool:
-    """Whether one more interior of ``cost`` triangles keeps the interiors at or under ``limit``."""
-    return used + cost <= limit
 
 
 def rectangularity(geometry: BaseGeometry) -> float:
@@ -239,6 +243,13 @@ def _inset(part: Polygon, thickness: float) -> BaseGeometry:
     return part.buffer(-thickness, join_style="mitre", mitre_limit=2.0)
 
 
+def _door_piece(inner: BaseGeometry, door: Hole, segment: Segment, thickness: float) -> Polygon | None:
+    """The piece of ``inner`` whose ring holds the door's inner corners; else the largest piece; ``None`` when empty."""
+    pieces = polygons_of(inner)
+    behind = [piece for piece in pieces if _rim_on(piece, segment, door, thickness)]
+    return max(behind or pieces, key=lambda piece: piece.area, default=None)
+
+
 def _door_zone(segment: Segment, door: Hole, ic: Interiors) -> Polygon:
     """The floor kept clear behind a door: ``door_clearance_m`` deep and 0.3 m wider on each side."""
     t = ic.wall_thickness_m
@@ -260,6 +271,8 @@ def plan_interior(
     roof_access: bool = True,
     max_floors: int | None = None,
     several_parts: bool = False,
+    depth_m: float | None = None,
+    min_area_m2: float = MIN_ROOM_M2,
 ) -> InteriorPlan | str:
     """Return a plan, or the reason the building cannot host the generic interior.
 
@@ -268,6 +281,11 @@ def plan_interior(
     has its room under the roof. A courtyard stays a hole in the room. A footprint of several parts is
     refused unless ``several_parts``; the room is then in the part that holds the door, and
     ``plan_shop_rooms`` adds the others.
+
+    The room is the piece of the inset part the door opens into: a neck narrower than two walls splits
+    the inset, and the other pieces stay solid. With ``depth_m`` the room is also cut to the band of
+    that depth behind the door's wall, closed by a back wall (a shop above ``max_area_m2``). A room
+    under ``min_area_m2`` is ``inner_space_too_small``.
     """
     ic = cfg.interiors
     parts = polygons_of(refined)
@@ -278,16 +296,20 @@ def plan_interior(
         return "not_enough_levels"
     host = min(parts, key=Point(segment.a).distance)
     inner = _inset(host, ic.wall_thickness_m)
-    if inner.geom_type != "Polygon" or inner.is_empty or inner.area < 20.0:
+    if depth_m is not None:
+        reach = host.length  # longer than any line across the part
+        inner = inner.intersection(segment.plan_rect(-reach, segment.length + reach, -depth_m, reach))
+    room = _door_piece(inner, door, segment, ic.wall_thickness_m)
+    if room is None or room.area < min_area_m2:
         return "inner_space_too_small"
-    inner = orient(inner, sign=1.0)
+    inner = orient(room)
     problem = _door_problem(inner, door, segment, ic)
     if problem is not None:
         return problem
     door_zone = _door_zone(segment, door, ic)
 
     if floors < 2:
-        return InteriorPlan(building_id, inner, floors, storey_m, door, segment, ())
+        return InteriorPlan(building_id, inner, floors, storey_m, door, segment, (), depth_m=depth_m)
 
     # Of the buildings that can hold a third floor, half do: sha256(seed, id).
     wanted = floors
@@ -319,7 +341,7 @@ def plan_interior(
                 for _ in range(steps - 1):
                     climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
                     flights.append(climb)
-    return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights))
+    return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights), depth_m=depth_m)
 
 
 def _bay_boundary(a: Hole, b: Hole) -> float:
@@ -491,8 +513,8 @@ def pierce_room_windows(
     """Put one see-through pane in glass the player can reach from the room.
 
     A window, shopfront, or balcony door below the accessible ceiling becomes
-    a hole of ``thickness`` with a single ``glass_view`` quad when that opening
-    lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
+    a hole of ``thickness`` with a single see-through quad (``shop_glass`` on a shopfront,
+    ``glass_view`` on the rest) when that opening lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
     the opening is removed. Glass above the ceiling stays ``glass_dark``, and so does glass in a wall
     of a footprint part outside ``hosts`` (the parts that hold a room; ``None`` checks no part).
     Returns how many openings were pierced and how many were removed.
@@ -518,18 +540,18 @@ def pierce_room_windows(
         if not on_inner or not footprint.buffer(1e-6).contains(recess):
             omitted += 1
             continue
-        kept.append(replace(hole, depth=thickness, back=GLASS_VIEW))
+        kept.append(replace(hole, depth=thickness, back=SHOP_GLASS if hole.kind == "shopfront" else GLASS_VIEW))
         opened += 1
     layout.holes = kept
     return opened, omitted
 
 
 def glass_penetrations(layout: Layout, segments: Sequence[Segment]) -> list[tuple[Segment, Hole]]:
-    """See-through openings ``pierce_room_windows`` kept. One pane each, both directions."""
+    """See-through openings ``pierce_room_windows`` kept. The wall collider opens on each of them."""
     return [
         (segments[hole.segment], hole)
         for hole in layout.holes
-        if hole.back == GLASS_VIEW and hole.kind in ROOM_GLASS
+        if hole.back in SEE_THROUGH and hole.kind in ROOM_GLASS
     ]
 
 
@@ -537,7 +559,7 @@ def room_window_cuts(layout: Layout, segments: Sequence[Segment]) -> list[WallCu
     """Inner-wall spans of the room panes ``pierce_room_windows`` kept."""
     cuts: list[WallCut] = []
     for hole in layout.holes:
-        if hole.back != GLASS_VIEW or hole.kind not in ROOM_GLASS:
+        if hole.back not in SEE_THROUGH or hole.kind not in ROOM_GLASS:
             continue
         seg = segments[hole.segment]
         cuts.append((
@@ -608,7 +630,8 @@ def _pierced_walls(
     thickness: float,
     z_top: float,
 ) -> tuple[list[tuple[str, Mesh]], list[Mesh]]:
-    """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per opening.
+    """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per
+    ``glass_view`` opening. A ``shop_glass`` opening gets no pane: a shot crosses it, and so can a body.
 
     Bands split on the door heads and on every opening edge, so a band is either fully
     open or fully solid. The band above an opening keeps the full ring: a downward
@@ -645,7 +668,7 @@ def _pierced_walls(
         if poly.is_empty or float(poly.area) < 1e-4:
             continue
         walls_out.append((f"walls_{index}", prism(poly, za, zb, bottom=True)))
-    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations]
+    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations if hole.back == GLASS_VIEW]
     return walls_out, panes
 
 
@@ -840,7 +863,10 @@ def assemble_interior(
         "accessible_floors": k,
         "roof_access": roof_well is not None,
         "glass_panes": len(glass),
+        "open_shopfronts": sum(1 for _, hole in penetrations if hole.back == SHOP_GLASS),
     }
+    if plan.depth_m is not None:
+        spec["room_depth_m"] = plan.depth_m
     if plan.rooms and plan.rooms[0].category is not None:
         spec["shop"] = _shop_record(plan.rooms[0].category)
     built = Interior(plan, visual, colliders, spec, defects, {"collider_defects": defects, "collider_volumes_m3": volumes}, roof_well)

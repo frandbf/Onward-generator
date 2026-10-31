@@ -8,18 +8,17 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from io import BytesIO
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PIL import Image
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator.contracts import is_schema
+from onward_generator.dress.atlas import encode_png
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import (
@@ -125,6 +124,7 @@ BACKDROP_SIMPLIFY_M = 1.0
 HAZE_HEX = "#C8CDD2"
 SKY_HEX = "#D6E0EC"
 GRADIENT_ROWS = 64
+BACKDROP_PNG_LEVEL = 6  # zlib default, which Pillow used before the level was named
 
 
 def _rgb(hex_colour: str) -> np.ndarray:
@@ -135,10 +135,7 @@ def backdrop_png() -> bytes:
     """A vertical gradient, sky at the top row and haze at the bottom row. 4 px wide, no noise."""
     t = np.linspace(0.0, 1.0, GRADIENT_ROWS)[:, None]
     rows = np.rint(_rgb(SKY_HEX) * (1.0 - t) + _rgb(HAZE_HEX) * t).astype(np.uint8)
-    image = Image.fromarray(np.ascontiguousarray(np.repeat(rows[:, None, :], 4, axis=1)))
-    buffer = BytesIO()
-    image.save(buffer, format="PNG")  # pragma: no mutate: PIL reads the format name case-insensitively, so "png" writes the same bytes
-    return buffer.getvalue()
+    return encode_png(np.repeat(rows[:, None, :], 4, axis=1), BACKDROP_PNG_LEVEL)
 
 
 def backdrop_node(site: BaseGeometry, *, offset_m: float, height_m: float) -> Node:

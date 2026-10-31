@@ -31,7 +31,13 @@ flowchart LR
   osm --> geo[geo]
   geo -.-> catastro[catastro download]
   catastro -.-> cadastre[cadastre split]
+  cadastre -.-> overture[overture fetch + match]
+  overture -.->|secondary overrides| heights
+  overture -.->|places| detail
+  cadastre -.-> plugins[other source plugins]
+  plugins -.-> merge[source merge]
   cadastre -.-> heights
+  merge -.-> heights
   geo --> heights[heights]
   heights --> generate[generate]
   generate --> detail[detail]
@@ -51,7 +57,7 @@ flowchart LR
   unity --> quest[Quest]
 ```
 
-`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `catastro` and `cadastre` run by default when the map is in mainland Spain (EPSG:25830, latitude 35.85°–43.8°) and fits one Catastro request; `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. The dashed source stages come from source plugins (ADR-018): `run` adds the stages of every registered plugin that covers the map centre and is not switched off (`run --no-source <id>`), and prints them on a `sources` line. `onward-generator source list` shows the plugins. `catastro` and `cadastre` (`es.catastro`) run by default in the territories the DG Catastro WFS serves (`docs/05-cadastre.md#coverage`); `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). In Spain (Navarre and the Basque Country included, Ceuta and Melilla not) `es.pnoa_ndsm` adds `pnoa_ndsm` (`source fetch`, network) and `pnoa_heights` (`source normalize`), measured on the split scene ([04-heights.md](04-heights.md#lidar-heights)). In metropolitan France and Corsica `fr.lidar_hd` adds `lidar_hd` and `lidar_hd_heights` (`config/lidar_hd_coverage.json`). When more than one plugin writes height overrides, `overrides` (`source merge`) ranks them by `config/sources.json` `priority` into `data/processed/sources/heights_overrides.json`, and `heights` reads that file. The `overture` plugin (ADR-021) covers every city: `overture` (fetch, network) and `overture-match` run after the plugins that write a scene; `run --no-source overture` skips them. Its height overrides do not join the merge: `heights` reads them with `--secondary-overrides`, below an OSM `height` and the merged overrides, and `detail` reads its places with `--places`. `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
 
 ## 0. Unity project — once
 
@@ -101,7 +107,8 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Centre, radius, or card name | `map create` and, if the area changed, everything from `geo` | the other maps |
 | OSM extract | `geo` and everything after it | the map folder |
 | Catastro split | `cadastre` (or `catastro` for a new download), then `heights` and everything after it | `geo` |
-| Heights or Catastro | `heights`, then `generate` and everything after it | `geo` |
+| Overture places or heights | `overture-match` (or `overture` for a new download), then `heights` and everything after it | `geo`, Catastro |
+| Heights, Catastro or another source plugin | the plugin's stages and `overrides` when it runs, then `heights`, `generate` and everything after it | `geo` |
 | Volumes | `generate` and everything after it | `geo`, `heights` |
 | Facades | `detail` and everything after it | `generate` |
 | Generated trees and benches | `dress style` and everything after it | `detail` |
@@ -192,7 +199,9 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | Output | `heights.json`, `heights_report.json` |
 | Classes | measured, inferred, fallback, needs_manual_review |
 
-`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
+`cadastre download` uses the network (Catastro WFS requests for building parts and, beside them, buildings with their current use). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. With `--buildings` it also copies each parcel's Catastro current use onto its buildings, which `detail` reads as shop evidence ([ADR-022](decisions/ADR-022-catastro-use.md)). [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Without a source plugin for the map, heights stay on the OSM estimate. `source merge` combines the overrides of several plugins by priority ([ADR-018](decisions/ADR-018-source-plugins.md)).
+
+`overture fetch --map DIR [--out RAW]` uses the network: it writes `overture_places.parquet` and `overture_buildings.parquet` (default `data/raw/`), clipped to the map bbox, each with a `.source.json` (release, query, SHA-256, records per dataset and licence, attribution). It never overwrites without `--overwrite`. `overture match --scene --map --out` is offline: `heights_overrides.overture.json` (Overture heights by footprint intersection over union, each with its dataset, licence and origin), `overture_places.json` (confident, open places with an allowed licence, mapped to a shop, amenity or office tag) and `overture_match_report.json`. `heights --secondary-overrides` ranks the Overture values below an OSM `height` and the authoritative overrides, above OSM `building:levels`. [ADR-021](decisions/ADR-021-overture-evidence.md).
 
 ## 4. Generate
 
@@ -216,6 +225,7 @@ This directory is the base for `detail`. The wall is not added here.
 | Input | `--scene`, `--heights`, `--base` of the `generate` (requires `phase_03_exit.passed` and matching hashes) |
 | Output | A new directory: GLBs, `scene_detail.json`, `detail_report.json` |
 | Fidelity | Generic templates. Not a photographed facade |
+| Places | `--places overture_places.json` (`run` passes it when the `overture` plugin runs): the Overture places inside a building are its shop evidence `overture`, ranked by `config/sources.json` `evidence`: by default only a building with no OSM or Catastro evidence takes them ([ADR-021](decisions/ADR-021-overture-evidence.md)) |
 | Core | `--core-radius-m` (the `next:` line and `run` read it from `map.json`). A building outside the core square is a scenic shell: walls and a flat roof, three shared wall materials, no openings, interior, shop or collider. Urban elements outside it are dropped and the ground colliders end at its edge. `scene_detail.json` gets `core` and each building `tier` ([ADR-017](decisions/ADR-017-playable-core.md)) |
 
 `--base` stays the original `generate` even after a later copy has the wall.
@@ -270,7 +280,7 @@ Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.
 
 `onward-generator signs place`. It reads the `name` of each `highway` in the geo scene (local metres) and hangs a plate on the facade that faces the junction. A street with no name gets no plate. Sidewalks, paths, `footway`, and `service` ways do not count. A building whose observed height is under 3.4 m does not count. The plate is visual. The collider does not change. At most 64, the ones closest to the origin. On a map with a playable core, only walls whose midpoint is inside the core get a plate (ADR-017). The text uses DejaVu Sans Bold 2.37, vendored in `assets/fonts/dejavu` and loaded by path, so the plate does not depend on system fonts. The name is normalised to Unicode NFC before drawing, so a decomposed accent draws as one letter (`í`, `ñ`). The plate is not the official design of any city.
 
-The same command draws the shop signs and window vinyls that `detail` recorded in `facade.shops` (`docs/07-detail.md`): one fascia or blade sign per shop and a vinyl strip on some shop windows. All labels go into one atlas (`shop_sign_atlas_0`, a second page only when the first is full, roughly 40 shops; never more than two) plus `shop_sign_edge` for rims and brackets. A building whose glass `materials apply` boarded up keeps its sign and loses its vinyls. They are visual only. `signs_report.json` has `shop_signs` (count, kinds, pages, triangles, labels skipped because the atlas was full).
+The same command draws the shop signs and window vinyls that `detail` recorded in `facade.shops` (`docs/07-detail.md`): one fascia or blade sign per shop and a vinyl on some shop windows: an opaque strip on dark glass, or black letters on a transparent background on the frameless `shop_glass` of a shop interior. The boards and strips go into one atlas (`shop_sign_atlas_0`, a second page only when the first is full, roughly 40 shops; never more than two), the decals into their own transparent pages (`shop_decal_atlas_0`, same limits), plus `shop_sign_edge` for rims and brackets. A building whose glass `materials apply` boarded up keeps its sign and loses its vinyls. They are visual only. `signs_report.json` has `shop_signs` (count, kinds, pages, triangles, labels skipped because the atlas was full).
 
 | | |
 | --- | --- |

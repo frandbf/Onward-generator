@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/overture.schema.json",
+  "title": "Overture places and buildings as third-party evidence (ADR-021)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "places", "buildings"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "places": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_confidence", "operating_status", "accept_missing_status", "categories"],
+      "properties": {
+        "min_confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "A place below this Overture confidence is not evidence" },
+        "operating_status": { "type": "array", "items": { "enum": ["open", "temporarily_closed", "permanently_closed"] }, "uniqueItems": true },
+        "accept_missing_status": { "type": "boolean", "description": "Whether a place with no operating_status counts" },
+        "categories": {
+          "type": "object",
+          "description": "taxonomy.primary or basic_category value → one OSM-style tag (shop, amenity, office or craft). taxonomy.primary is looked up first",
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1,
+            "propertyNames": { "enum": ["shop", "amenity", "office", "craft"] },
+            "additionalProperties": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+          }
+        }
+      }
+    },
+    "buildings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_iou", "skip_datasets", "origins", "default_origin", "confidence"],
+      "properties": {
+        "min_iou": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Intersection over union an Overture footprint needs with an OSM footprint to lend it a height" },
+        "skip_datasets": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Datasets whose height or floor count is not lent: OpenStreetMap values are already in the OSM extract, and a copy would shadow building:levels" },
+        "origins": { "type": "object", "additionalProperties": { "enum": ["observed", "estimated", "ai_generated"] }, "description": "Overture sources[].dataset → origin of its height or floor count" },
+        "default_origin": { "enum": ["observed", "estimated", "ai_generated"] },
+        "confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observed", "estimated", "ai_generated"],
+          "properties": {
+            "observed": { "type": "number", "minimum": 0, "maximum": 1 },
+            "estimated": { "type": "number", "minimum": 0, "maximum": 1 },
+            "ai_generated": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

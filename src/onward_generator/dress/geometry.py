@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from onward_generator.io import sha256_file
+
 
 def _object_stamp(obj: Mapping[str, Any]) -> dict[str, Any]:
     rec: dict[str, Any] = {
@@ -44,7 +46,7 @@ def fingerprint_digest(fingerprint: Mapping[str, Any]) -> str:
 def file_sha256(path: Path) -> str | None:
     if not path.is_file():
         return None
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return sha256_file(path)
 
 
 def compare_fingerprints(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:

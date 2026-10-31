@@ -13,13 +13,13 @@ from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
 from onward_generator.detail.interiors import (
     GLASS_VIEW,
+    SHOP_GLASS,
     Interior,
     InteriorPlan,
     _inner_walls,
     _lands_on_roof,
     assemble_interior,
     build_interior,
-    fits_triangle_budget,
     glass_penetrations,
     interior_visual,
     light_anchors,
@@ -29,7 +29,7 @@ from onward_generator.detail.interiors import (
     visual_triangles,
 )
 from onward_generator.detail.modules import recess
-from onward_generator.detail.scene import InteriorBudget, interior_quota
+from onward_generator.detail.scene import InteriorBudget, _select_interiors, interior_quota
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects
 from onward_generator.materials.openings import GLASS_ALPHA, boarded_rgba, window_png, window_rgba
@@ -94,8 +94,10 @@ def test_see_through_window_opens_the_wall_and_keeps_a_pane() -> None:
         room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment]),
     )
     assert built.defects == 0
-    assert built.spec["glass_panes"] == 2
-    assert len(built.glass_colliders) == 2
+    # The window keeps its pane; the shopfront is shop glass, open with no pane.
+    assert [h.back for h in layout.holes] == [GLASS_VIEW, SHOP_GLASS, "glass_dark"]
+    assert (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (1, 1)
+    assert len(built.glass_colliders) == 1
     concrete = [mesh for _name, mesh in built.colliders]
 
     def at(s: float, z: float, depth: float) -> np.ndarray:
@@ -119,8 +121,7 @@ def test_see_through_window_opens_the_wall_and_keeps_a_pane() -> None:
     assert any(_inside(mesh, sill) for mesh in concrete) and not any(_inside(mesh, sill) for mesh in built.glass_colliders)
     assert any(_inside(mesh, pier) for mesh in concrete) and not any(_inside(mesh, pier) for mesh in built.glass_colliders)
     shop_point = at(19.2, 1.2, thickness / 2)
-    assert not any(_inside(mesh, shop_point) for mesh in concrete)
-    assert sum(_inside(mesh, shop_point) for mesh in built.glass_colliders) == 1
+    assert not any(_inside(mesh, shop_point) for mesh in [*concrete, *built.glass_colliders])
     door_point = at(11.6, 1.0, thickness / 2)
     assert not any(_inside(mesh, door_point) for mesh in [*concrete, *built.glass_colliders])
     blocked = at(7.6, 16.7, thickness / 2)
@@ -189,7 +190,8 @@ def test_default_interiors_are_five_to_eight_within_eight_thousand_triangles() -
     ],
 )
 def test_triangle_budget_admits_up_to_the_limit(used: int, cost: int, limit: int, fits: bool) -> None:
-    assert fits_triangle_budget(used, cost, limit) is fits
+    budget = InteriorBudget("", {"triangles": limit}, {"triangles": used})
+    assert (budget.refuse("triangles", cost) is None) is fits
 
 
 def test_interior_visual_triangles_count_every_material_and_no_collider() -> None:
@@ -477,3 +479,15 @@ def test_only_a_roof_flight_within_15_cm_of_the_roof_lands_on_it() -> None:
     assert _lands_on_roof(roof, 0.0, 0.15) and _lands_on_roof(roof, 0.15, 0.0)
     assert not _lands_on_roof(roof, 0.0, 0.1501) and not _lands_on_roof(roof, 0.0, 1.0)
     assert not _lands_on_roof(storey, 3.0, 3.0)
+
+
+def test_an_included_building_that_also_matches_the_rule_keeps_the_first_place() -> None:
+    # Seed 3 sorts osm-way-b before osm-way-a, so a repeated osm-way-a at the end would lose its include_ids priority.
+    base = load_detail_config()
+    cfg = replace(base, seed=3, interiors=replace(base.interiors, min_buildings=1, max_buildings=1, include_ids=("osm-way-a",)))
+    room = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)])
+    heights = {"category": "residential_multi", "estimated_levels": 3}
+    candidates = [("osm-way-a", heights, room), ("osm-way-b", heights, room)]
+    assert _select_interiors(candidates, cfg, []) == ["osm-way-a", "osm-way-b"]
+    excluded = replace(cfg, interiors=replace(cfg.interiors, exclude_ids=frozenset({"osm-way-a"})))
+    assert _select_interiors(candidates, excluded, []) == ["osm-way-b"]

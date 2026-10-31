@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import statistics
 from collections import Counter
@@ -11,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from onward_generator.heights.config import HeightConfig, load_height_config
+from onward_generator.heights.config import FileRef, HeightConfig, Override, load_height_config
 from onward_generator.heights.estimator import (
     HeightClass,
     HeightResult,
@@ -21,6 +20,7 @@ from onward_generator.heights.estimator import (
     estimate_heights,
 )
 from onward_generator.io import atomic_write_json, prepare_outputs
+from onward_generator.io import sha256_file as _sha256
 
 HEIGHTS_SCHEMA = "onward_generator.building_heights"
 REPORT_SCHEMA = "onward_generator.building_heights_report"
@@ -28,14 +28,6 @@ SCHEMA_VERSION = "0.1.0"
 HEIGHTS_FILE = "heights.json"
 REPORT_FILE = "heights_report.json"
 MAX_SCENE_BYTES = 256 * 1024 * 1024
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _percent(part: int, total: int) -> float:
@@ -53,6 +45,19 @@ def _stats(values: list[float]) -> dict[str, float] | None:
         "median": round(statistics.median(ordered), 2),
         "p90": round(deciles[-1], 2),
         "max": ordered[-1],
+    }
+
+
+THIRD_PARTY = frozenset({HeightSource.THIRD_PARTY_HEIGHT, HeightSource.THIRD_PARTY_LEVELS})
+
+
+def _overrides_ref(file: FileRef | None, overrides: Mapping[str, Override]) -> dict[str, Any] | None:
+    """The file, its entry count, and one attribution line per (source, licence) of ``overrides``."""
+    if file is None:
+        return None
+    return file.to_dict() | {
+        "count": len(overrides),
+        "sources": [{"text": s, "license": lic} for s, lic in sorted({(o.source, o.license) for o in overrides.values()})],
     }
 
 
@@ -75,22 +80,18 @@ class HeightRun:
 
     def _header(self) -> dict[str, Any]:
         cfg = self.config
-        return {
+        header = {
             "schema_version": SCHEMA_VERSION,
             "scene": dict(self.scene_ref),
             "config": {"version": cfg.version, **(cfg.file.to_dict() if cfg.file else {"path": None, "sha256": None})},
-            "overrides": cfg.overrides_file.to_dict()
-            | {
-                "count": len(cfg.overrides),
-                "sources": [
-                    {"text": s, "license": lic}
-                    for s, lic in sorted({(o.source, o.license) for o in cfg.overrides.values()})
-                ],
-            }
-            if cfg.overrides_file
-            else None,
+            "overrides": _overrides_ref(cfg.overrides_file, cfg.overrides),
             "attribution": dict(self.attribution) if self.attribution else None,
         }
+        if cfg.secondary_overrides_file is not None:
+            used = {b.id for b in self.result.buildings if b.height_source in THIRD_PARTY}
+            ref = _overrides_ref(cfg.secondary_overrides_file, {k: v for k, v in cfg.secondary_overrides.items() if k in used}) or {}
+            header["secondary_overrides"] = ref | {"count": len(cfg.secondary_overrides), "used": len(used)}
+        return header
 
     def heights_dict(self) -> dict[str, Any]:
         return {

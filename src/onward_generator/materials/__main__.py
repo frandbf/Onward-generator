@@ -11,6 +11,7 @@ from onward_generator.dress.catalog import CatalogError
 from onward_generator.materials.apply import MaterialsError, apply_materials
 from onward_generator.materials.plan import PlanError
 from onward_generator.materials.polyhaven import DEFAULT_CACHE, DownloadError
+from onward_generator.materials.trim_style import AUTO, FACADE_MODES
 from onward_generator.next_step import after_materials, emit
 
 
@@ -31,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
     apply_p.add_argument("--overwrite", action="store_true")
     apply_p.add_argument("--no-tile-cache", action="store_true", help="bake every photo tile again instead of reading the tile cache")
     apply_p.add_argument("--seed", type=int, default=48152)
+    apply_p.add_argument(
+        "--facades", choices=FACADE_MODES, default="trim",
+        help="trim: one regional trim-sheet atlas for the facades (ADR-020); legacy: one material per facade part",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
+        "--facade-style", default=AUTO,
+        help="a style of config/facade_styles.json, or auto (from the map centre)",  # pragma: no mutate: help text only
+    )
     return parser
 
 
@@ -46,6 +55,8 @@ def _run_apply(args: argparse.Namespace) -> int:
         overwrite=args.overwrite,
         seed=args.seed,
         tile_cache=not args.no_tile_cache,
+        facades=args.facades,
+        facade_style=args.facade_style,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -57,6 +68,10 @@ def _run_apply(args: argparse.Namespace) -> int:
         print(f"  {row['catalog_id']}: {row['asset_id']} ({row['albedo_mode']})")
     for row in skipped:
         print(f"  skip {row.get('catalog_id') or row.get('id')}: {row['reason']}")
+    facades = report.get("facades")
+    if facades:
+        detail = f"materials={','.join(facades['materials'])}" if facades["mode"] == "trim" else f"reason={facades['reason']}"
+        print(f"facades: {facades['mode']} style={facades['style']} ({facades['style_origin']}) {detail}")
     print(f"wrote {Path(args.out).expanduser()}")
     emit(after_materials(Path(args.out)))
     return 0

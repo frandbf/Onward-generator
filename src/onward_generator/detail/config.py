@@ -14,6 +14,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.detail.s3db import tint_base, tint_materials
 from onward_generator.generation.config import Material
 
 # A blank party wall keeps its wall's albedo under this prefix, so the export can give it its own lightmap scale.
@@ -93,6 +94,20 @@ class HipRoof:
 
 
 @dataclass(frozen=True, slots=True)
+class PitchedRoof:
+    """A roof the OSM ``roof:*`` tags describe (``detail/roofs.py``). Observed, never from the template."""
+
+    shape: str  # drawn: gabled | hipped | pyramidal | skillion | dome
+    tag: str  # the OSM roof:shape value
+    material: str
+    rise_m: float | None  # roof:height or roof:levels × storey; None leaves it to roof:angle or the default pitch
+    rise_rule: str  # roof:height | roof:levels | roof:angle | default_pitch
+    angle_deg: float | None
+    direction_deg: float | None  # roof:direction, the compass bearing the slope faces
+    across: bool  # roof:orientation=across
+
+
+@dataclass(frozen=True, slots=True)
 class Template:
     name: str
     applies_to: frozenset[str]
@@ -106,6 +121,7 @@ class Template:
     parapet_thickness_m: float
     flat_roof_materials: tuple[str, ...]
     hip: HipRoof | None
+    pitched: PitchedRoof | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +162,9 @@ class ShopInteriors:
     max_triangles: int
     max_collision_triangles: int
     max_area_m2: float
+    band_depth_m: float
+    """A shop above ``max_area_m2`` has its room cut to this depth behind the door's wall."""
+    min_room_area_m2: float
     categories: tuple[ShopCategory, ...]
     generic: ShopCategory
 
@@ -226,6 +245,8 @@ class DetailConfig:
     shops: ShopSigns
     shop_evidence_keys: tuple[str, ...]
     shop_evidence_distance_m: float
+    shop_catastro_uses: Mapping[str, str]
+    """Catastro ``currentUse`` codes that give a building a commercial ground floor, and the generic name of its shop (ADR-022)."""
     facade_palettes: Mapping[str, tuple[str, ...]]
     interiors: Interiors
     urban_observed: Mapping[str, Mapping[str, frozenset[str]]]
@@ -295,7 +316,8 @@ def _shop_interiors(d: Mapping[str, Any]) -> ShopInteriors:
         for c in d["categories"]
     )
     generic = ShopCategory("generic", MappingProxyType({}), d["generic"]["wall"], d["generic"]["floor"])
-    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]), categories, generic)
+    return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]),
+                         float(d["band_depth_m"]), float(d["min_room_area_m2"]), categories, generic)
 
 
 def _template(name: str, d: Mapping[str, Any]) -> Template:
@@ -372,7 +394,7 @@ def _semantic(cfg: DetailConfig) -> list[str]:
                 problems.append(f"/interiors/shops/{c.name}: material {m!r} must be defined in /materials and start with 'interior_'")
     if cfg.recess_depth_m >= cfg.interiors.wall_thickness_m:
         problems.append("/openings/recess_depth_m must be thinner than /interiors/wall_thickness_m")
-    for name in ("frame_stone", "glass_dark", "glass_view", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
+    for name in ("frame_stone", "glass_dark", "glass_view", "shop_glass", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
                  "tree_canopy", "interior_wall", "interior_floor", "stair"):
         if name not in mats:
             problems.append(f"/materials: required material {name!r} is missing")
@@ -412,6 +434,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         shops=_shops(doc["shops"]),
         shop_evidence_keys=tuple(doc["doors"]["shop_evidence_keys"]),
         shop_evidence_distance_m=float(doc["doors"]["shop_evidence_distance_m"]),
+        shop_catastro_uses=MappingProxyType(dict(sorted(doc["doors"]["shop_catastro_uses"].items()))),
         facade_palettes=MappingProxyType({use: tuple(doc["facade_palettes"][use]) for use in FACADE_USES}),
         interiors=Interiors(
             enabled=bool(i["enabled"]),
@@ -442,9 +465,9 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         budget=MappingProxyType({k: int(v) for k, v in doc["budget"].items() if k != "note"}),
         closeup_focus=tuple(float(v) for v in doc["preview"]["closeup_focus_m"]),  # type: ignore[arg-type]
         closeup_elevation_deg=float(doc["preview"]["closeup_elevation_deg"]),
-        materials=MappingProxyType(_with_party(
+        materials=MappingProxyType(_with_party(_with_tints(
             {name: Material(tuple(m["color"]), float(m["roughness"])) for name, m in sorted(doc["materials"].items())}  # type: ignore[arg-type]
-        )),
+        ))),
         landmarks=_landmarks(doc.get("landmarks")),
         document=MappingProxyType(json.loads(json.dumps(doc))),
         path=path,
@@ -454,6 +477,13 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
     if problems:
         raise DetailConfigError(path or "<document>", problems)
     return cfg
+
+
+def _with_tints(materials: dict[str, Material]) -> dict[str, Material]:
+    """Each material and the palette tints of the wall and roof bases among them (``building:colour``,
+    ``roof:colour``; docs/07-detail.md, ADR-023): the base's roughness under the palette colour."""
+    tints = tint_materials({name: m.color for name, m in materials.items()})
+    return materials | {name: Material(colour, materials[tint_base(name)].roughness) for name, colour in tints.items()}
 
 
 def _with_party(materials: dict[str, Material]) -> dict[str, Material]:

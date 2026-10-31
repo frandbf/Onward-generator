@@ -8,7 +8,7 @@ from pathlib import Path
 from pytest import approx
 
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, pack_glb, read_glb
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.overgrow.fit import measure
 from onward_generator.overgrow.kenney_scale import (
@@ -41,7 +41,7 @@ def test_positions_scale_and_the_texture_uri_stays() -> None:
     )
     doc, blob = read_glb(data)
     doc["images"] = [{"uri": "Textures/concrete.png", "name": "concrete"}]
-    data = _pack(doc, blob)
+    data = pack_glb(doc, blob)
     scaled = scale_glb_positions(data, 3.2)
     length_m, depth_m, height_m = bounds_yz_up(scaled)
     assert length_m == approx(3.2)
@@ -129,18 +129,3 @@ def test_installed_kenney_boxes_match_the_street_and_the_files() -> None:
     assert removed["height_m"] == 0.834
     assert "street_scale" not in removed
 
-
-def _pack(doc: dict, blob: bytes) -> bytes:
-    import json as json_lib
-    import struct
-
-    json_chunk = json_lib.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    json_chunk += b" " * (-len(json_chunk) % 4)
-    total = 12 + 8 + len(json_chunk) + 8 + len(blob)
-    return b"".join((
-        struct.pack("<4sII", b"glTF", 2, total),
-        struct.pack("<I4s", len(json_chunk), b"JSON"),
-        json_chunk,
-        struct.pack("<I4s", len(blob), b"BIN\x00"),
-        blob,
-    ))

@@ -48,7 +48,7 @@ def encode_png_rgba(pixels: np.ndarray) -> bytes:
     same bytes for the pinned Pillow version.
     """
     _check_rgba(pixels)
-    return _save_png(pixels, PNG_LEVEL)
+    return encode_png(pixels, PNG_LEVEL)
 
 
 def encode_opaque_png(pixels: np.ndarray) -> bytes:
@@ -61,7 +61,7 @@ def encode_opaque_png(pixels: np.ndarray) -> bytes:
     _check_rgba(pixels)
     if not (pixels[..., 3] == 255).all():
         raise ValueError("an opaque tile has alpha 255 everywhere")
-    return _save_png(pixels[..., :3], TILE_PNG_LEVEL)
+    return encode_png(pixels[..., :3], TILE_PNG_LEVEL)
 
 
 def _check_rgba(pixels: np.ndarray) -> None:
@@ -69,7 +69,8 @@ def _check_rgba(pixels: np.ndarray) -> None:
         raise ValueError("pixels must be an HxWx4 uint8 array")
 
 
-def _save_png(pixels: np.ndarray, level: int) -> bytes:
+def encode_png(pixels: np.ndarray, level: int) -> bytes:
+    """``pixels`` (h, w, 3 or 4, uint8) as a PNG at zlib ``level``, with fixed save options and no metadata."""
     from PIL import Image
 
     image = Image.fromarray(np.ascontiguousarray(pixels))

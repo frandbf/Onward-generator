@@ -22,6 +22,9 @@ from onward_generator.next_step import (
     geo_command,
     heights_command,
     invoke,
+    layout_command,
+    overgrow_command,
+    signs_command,
     stage_path,
 )
 
@@ -116,7 +119,8 @@ def test_catastro_commands_download_then_split_beside_geo(tmp_path: Path) -> Non
     gml = tmp_path / "raw" / "catastro.gml"
     assert catastro_command(scene, gml).argv == ("cadastre", "download", "--scene", str(scene), "--out", str(gml))
     assert cadastre_split_command(scene, gml).argv == (
-        "cadastre", "split", "--scene", str(scene), "--gml", str(gml), "--out", str(tmp_path / "cadastre"),
+        "cadastre", "split", "--scene", str(scene), "--gml", str(gml),
+        "--buildings", str(tmp_path / "raw" / "catastro_buildings.gml"), "--out", str(tmp_path / "cadastre"),
     )
     split_scene = tmp_path / "cadastre" / "geo_scene.json"
     split_scene.parent.mkdir()
@@ -149,3 +153,54 @@ def test_detail_command_without_a_core_has_no_core_flag(tmp_path: Path) -> None:
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     assert core_radius(scene) is None
     assert core_radius(tmp_path / "elsewhere" / "geo_scene.json") is None
+
+
+def test_layout_and_compact_overgrow_write_their_own_directories(tmp_path: Path) -> None:
+    root = tmp_path / "obelisco"
+    create_map(root, map_id="obelisco", name="Obelisco", latitude=LAT, longitude=LON, radius_m=400)
+    processed = root / "data" / "processed"
+    for path in (processed / "geo" / "geo_scene.json", processed / "heights" / "heights.json"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    (processed / "scene3d").mkdir()
+    playable = processed / "scene_playable"
+    layout = layout_command(playable)
+    assert layout is not None
+    assert layout.argv[-2:] == ("--out", str(processed / "layout" / "layout.json"))
+    assert overgrow_command(processed / "scene_signs_compact").argv[-2:] == ("--out", str(processed / "scene_phase3"))
+    assert overgrow_command(processed / "scene_signs").argv[-2:] == ("--out", str(processed / "scene_overgrow"))
+    assert signs_command(processed / "scene_materials_compact").argv[-2:] == ("--out", str(processed / "scene_signs_compact"))
+    assert signs_command(processed / "scene_materials").argv[-2:] == ("--out", str(processed / "scene_signs"))
+
+
+def _facades(root: Path, block: object) -> None:
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["facades"] = block
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+
+
+def test_materials_command_carries_the_maps_facade_block(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import MapError, facade_options
+    from onward_generator.next_step import materials_command
+
+    root = tmp_path / "madrid"
+    create_map(root, map_id="madrid", name="Madrid", latitude=40.40657, longitude=-3.719187, radius_m=150)
+    dress = root / "data" / "processed" / "scene_dress"
+    argv = list(materials_command(dress).argv)
+    assert "--facades" not in argv and "--facade-style" not in argv
+    assert argv[-2] == "--out"
+    _facades(root, {"mode": "legacy"})
+    argv = list(materials_command(dress).argv)
+    assert argv[argv.index("--download") + 1 : -2] == ["--facades", "legacy"]
+    _facades(root, {"style": "mediterranean"})
+    assert facade_options(root) == ["--facade-style", "mediterranean"]
+    _facades(root, {"mode": "trim", "style": "auto"})
+    assert facade_options(root) == ["--facades", "trim", "--facade-style", "auto"]
+    _facades(root, {})
+    assert facade_options(root) == []
+    for bad in ("trim", {"mode": 1}, {"mode": "trim", "colour": "red"}, ["trim"]):
+        _facades(root, bad)
+        with pytest.raises(MapError, match=r'^map\.json "facades" must be \{"mode": "trim" \| "legacy", "style": "<name>" \| "auto"\}$'):
+            facade_options(root)
+    assert facade_options(tmp_path / "elsewhere") == []
+    assert "--facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv

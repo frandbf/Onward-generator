@@ -75,6 +75,12 @@ def test_selection_refuses_a_model_that_is_not_installed(tmp_path: Path) -> None
         write_selection(out, ids)
 
 
+def test_a_selection_read_keeps_the_first_of_each_id_in_order(tmp_path: Path) -> None:
+    out = tmp_path / "prop_selection.json"
+    out.write_text(json.dumps({"ids": ["b", "a", "b", "c", "a"]}), encoding="utf-8")
+    assert read_selection(out) == ["b", "a", "c"]
+
+
 def test_installed_selection_matches_the_normalized_manifest() -> None:
     ids = choose_ids(LIBRARY, [], all_installed=True)
     manifest = json.loads((LIBRARY / "manifest.json").read_text(encoding="utf-8"))

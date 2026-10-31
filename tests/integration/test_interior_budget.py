@@ -203,7 +203,7 @@ def test_the_counted_interior_is_the_one_drawn_with_its_window_cuts(residential_
             node = next(o for o in d.objects if o.id == f"interior/{bid}")
             assert record["visual_triangles"] == sum(p.mesh.triangle_count for p in node.visual)
             building = next(o for o in d.objects if o.id == f"building/{bid}")
-            assert record["through_windows"] == len(building.glass_colliders) > 0
+            assert record["through_windows"] == len(building.glass_colliders) + record["open_shopfronts"] > 0
             heights = {round(float(z), 6) for p in node.visual for z in p.mesh.vertices[:, 2]}
             for pane in building.glass_colliders:
                 # The room wall is cut where each pane is: its sill and its head are vertices of the interior.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The Unity steps of `onward-generator run`, on the host: tool, scene, launcher, then the Quest question.
 #
-#   build_map.sh [--platform macos|linux|auto] [--listing MODE] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]
+#   build_map.sh [--platform macos|linux|auto] [--listing MODE] [--bake draft|final] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]
 #
 # With no map, the newest export package of any map is used: the one task map just wrote.
 # A map takes the card name given to task map ("Map name"), its id (map_name) or its folder,
@@ -13,6 +13,8 @@
 # through tools/docker/python.sh. Unity and adb are the host's (tools/unity/lib.sh).
 # --listing MODE, or ONWARD_QUEST_LISTING=MODE, picks how push installs the map:
 # local (default, today's install), local-thumb, named, named-thumb. See docs/12-export.md.
+# --bake PROFILE, or ONWARD_BAKE=PROFILE, picks the lightmap bake of the scene step:
+# draft (default, for iteration) or final (release builds). See docs/12-export.md.
 set -euo pipefail
 
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,10 +22,11 @@ TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$TOOL_DIR/../lib.sh"
 REPO="$(cd "$TOOL_DIR/../../.." && pwd)"
 
-usage() { echo "usage: $0 [--platform macos|linux|auto] [--listing ${QUEST_LISTINGS// /|}] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]" >&2; exit 2; }
+usage() { echo "usage: $0 [--platform macos|linux|auto] [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}] [MAP_NAME|MAP_ID|maps/<id>|PACKAGE_DIR]" >&2; exit 2; }
 
 platform=()
 listing="${ONWARD_QUEST_LISTING:-local}"
+bake="${ONWARD_BAKE:-${BAKE_PROFILES%% *}}"
 args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,11 +34,15 @@ while [[ $# -gt 0 ]]; do
     --platform=*) platform=("$1"); shift ;;
     --listing) [[ $# -ge 2 ]] || usage; listing="$2"; shift 2 ;;
     --listing=*) listing="${1#--listing=}"; shift ;;
+    --bake) [[ $# -ge 2 ]] || usage; bake="$2"; shift 2 ;;
+    --bake=*) bake="${1#--bake=}"; shift ;;
     *) args+=("$1"); shift ;;
   esac
 done
 check_quest_listing "$listing"
 export ONWARD_QUEST_LISTING="$listing"
+check_bake_profile "$bake"
+export ONWARD_BAKE="$bake"
 set -- ${args[@]+"${args[@]}"}
 if [[ $# -gt 1 ]]; then
   # A command copied with its trailing comment arrives as extra words when the copy turned spaces into U+00A0.
@@ -88,7 +95,11 @@ else
   steps=(tool)
   [[ -f "$package/build/scene_report.json" ]] || steps+=(scene)
   steps+=(launcher)
-  echo "→ Unity: ${steps[*]}"
+  if [[ " ${steps[*]} " == *" scene "* ]]; then
+    echo "→ Unity: ${steps[*]} (bake $bake)"
+  else
+    echo "→ Unity: ${steps[*]}"
+  fi
   started=$SECONDS
   "$TOOL_DIR/run_export.sh" ${platform[@]+"${platform[@]}"} "$package" "${steps[@]}"
   echo "✓ Unity $(elapsed "$started")"
