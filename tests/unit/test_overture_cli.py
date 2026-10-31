@@ -1,15 +1,19 @@
-"""``onward-generator overture fetch`` command line (offline)."""
+"""``onward-generator overture fetch|match`` command lines (offline)."""
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import pytest
 
 from onward_generator.cli import build_parser, main
+from onward_generator.maps.workspace import create_map
 from onward_generator.overture import __main__ as cli
-from onward_generator.overture.acquire import FetchRecord
+from onward_generator.overture.acquire import FetchRecord, fetch_map
+from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
+from tests.overture_fixture import BLOCK, building, local_connect, place, scene, source, write_buildings, write_places
 
 
 def _record(theme: str, rows: int, licenses: list[dict]) -> FetchRecord:
@@ -47,6 +51,76 @@ def test_fetch_failures_exit_one(tmp_path: Path, capsys: pytest.CaptureFixture[s
     assert cli.main(["fetch"]) == 2
 
 
+@pytest.fixture
+def fetched(tmp_path: Path) -> tuple[Path, Path]:
+    root = tmp_path / "map"
+    create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150)
+    places = write_places(tmp_path / "r" / "places.parquet", [place("p", 5, 5), place("q", 15, 5, confidence=0.1)])
+    buildings = write_buildings(tmp_path / "r" / "buildings.parquet", [
+        building("b", BLOCK["osm-way-1"], height=9.0, floors=3), building("c", BLOCK["osm-way-2"], height=None, floors=2,
+                                                                         sources=[source("Microsoft ML Buildings", "ODbL-1.0")]),
+    ])
+    fetch_map(root, release="2026-10-21.0", sources={"places": str(places), "buildings": str(buildings)}, connect=local_connect)
+    scene_path = tmp_path / "geo_scene.json"
+    scene_path.write_text(json.dumps(scene(BLOCK)), encoding="utf-8")
+    return root, scene_path
+
+
+def test_match_writes_places_a_report_and_a_summary(fetched: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, scene_path = fetched
+    out = tmp_path / "out"
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out)]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "places=1 of 2"
+    assert lines[1:] == [f"wrote {out.resolve() / name}" for name in (cli.PLACES_FILE, cli.REPORT_FILE)]
+    report = json.loads((out / cli.REPORT_FILE).read_text(encoding="utf-8"))
+    assert report["scene"]["path"] == str(scene_path.resolve()) and report["scene"]["schema_version"] == "0.2.0"
+    assert len(report["scene"]["sha256"]) == 64
+    assert report["places"]["counts"] == {"rows": 2, "kept": 1, "skipped": {"low_confidence": 1}}
+    assert json.loads((out / cli.PLACES_FILE).read_text(encoding="utf-8"))["counts"]["kept"] == 1
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out)]) == 1
+    assert "refusing to overwrite" in capsys.readouterr().err
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--overwrite"]) == 0
+    inside = out / cli.PLACES_FILE
+    inside.write_text(scene_path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert cli.main(["match", "--scene", str(inside), "--map", str(root), "--out", str(out), "--overwrite"]) == 1
+    assert "output would overwrite an input file" in capsys.readouterr().err
+
+
+def test_match_refuses_bad_inputs(fetched: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, scene_path = fetched
+    out = str(tmp_path / "out")
+    assert cli.main(["match", "--scene", str(tmp_path / "none.json"), "--map", str(root), "--out", out]) == 1
+    assert "scene not found" in capsys.readouterr().err
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps({"schema": "x"}), encoding="utf-8")
+    assert cli.main(["match", "--scene", str(other), "--map", str(root), "--out", out]) == 1
+    assert capsys.readouterr().err == "overture: input is not a onward_generator.geo_scene\n"
+    bad_cfg = tmp_path / "cfg.json"
+    bad_cfg.write_text("{}", encoding="utf-8")
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", out, "--config", str(bad_cfg)]) == 1
+    assert "cfg.json" in capsys.readouterr().err
+    (root / "data" / "raw" / "overture_places.parquet.source.json").unlink()
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", out]) == 1
+    assert "missing provenance sidecar" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+
+
+def test_match_stops_when_the_scene_changes_while_read(fetched: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    root, scene_path = fetched
+    real = cli.read_places
+
+    def touching(*args: object, **kwargs: object) -> object:
+        result = real(*args, **kwargs)  # type: ignore[arg-type]
+        scene_path.write_text(scene_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(cli, "read_places", touching)
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(tmp_path / "out")]) == 1
+    assert capsys.readouterr().err == "overture: scene file changed while being read\n"
+
+
 def _actions(parser: argparse.ArgumentParser) -> dict[str, tuple]:
     return {a.dest: (tuple(a.option_strings), a.default, a.required, a.help, a.nargs) for a in parser._actions if a.dest != "help"}
 
@@ -59,6 +133,7 @@ def test_the_overture_parser_is_described_as_documented() -> None:
     assert sub.required is True and sub.dest == "command"
     assert {c.dest: c.help for c in sub._choices_actions} == {
         "fetch": "clip Overture places and buildings to the map bbox (network)",
+        "match": "Overture places as POIs for a geo scene (offline)",
     }
     assert _actions(sub.choices["fetch"]) == {
         "map": (("--map",), None, True, "map directory containing map.json", None),
@@ -67,13 +142,26 @@ def test_the_overture_parser_is_described_as_documented() -> None:
                 "directory for overture_places.parquet and overture_buildings.parquet (default: the map's data/raw, where overture match reads them)", None),
         "overwrite": (("--overwrite",), False, False, "replace data/raw/overture_*.parquet", 0),
     }
+    assert _actions(sub.choices["match"]) == {
+        "scene": (("--scene",), None, True, "geo_scene.json (after cadastre split when Catastro is on)", None),
+        "map": (("--map",), None, True, "map directory holding data/raw/overture_*.parquet", None),
+        "out": (("--out",), None, True, "output directory", None),
+        "config": (("--config",), None, False, "Overture configuration (default: config/overture.default.json)", None),
+        "overwrite": (("--overwrite",), False, False, None, 0),
+    }
     assert sub.choices["fetch"].get_default("handler") is cli._fetch
+    assert sub.choices["match"].get_default("handler") is cli._match
 
 
-def test_the_main_parser_lists_overture() -> None:
+def test_the_main_parser_lists_overture_and_the_new_flags() -> None:
+    from onward_generator.detail.__main__ import build_parser as detail_parser
+
     sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
     assert {c.dest: c.help for c in sub._choices_actions}["overture"] == (
-        "Overture Maps places and buildings: fetch (see: overture --help)"
+        "Overture Maps places and buildings: fetch | match (see: overture --help)"
+    )
+    assert _actions(detail_parser())["places"] == (
+        ("--places",), None, False, "overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)", None,
     )
 
 

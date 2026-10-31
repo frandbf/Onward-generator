@@ -28,6 +28,8 @@ from onward_generator.sources.registry import (
 )
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
+pytestmark = pytest.mark.usefixtures("without_overture")  # these tests pin the national plugins; ADR-021 adds overture everywhere
+
 
 @pytest.fixture(autouse=True)
 def catastro_only(monkeypatch: pytest.MonkeyPatch) -> None:

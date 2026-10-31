@@ -35,6 +35,15 @@ def _no_tile_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def without_overture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The registry without the world-wide ``overture`` plugin (ADR-021), for tests that pin the national plugins' stages."""
+    from onward_generator.sources import registry
+    from onward_generator.sources.world.overture import OverturePlugin
+
+    monkeypatch.setattr(registry, "PLUGINS", tuple(p for p in registry.PLUGINS if not isinstance(p, OverturePlugin)))
+
+
+@pytest.fixture
 def synthetic_source() -> SourceDataset:
     return register_local_source(
         OSM_FIXTURE,

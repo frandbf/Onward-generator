@@ -108,6 +108,16 @@ def heights_command(scene: Path, overrides: Path | None = None) -> StageCommand:
     return invoke("heights", "--scene", show(scene), *extra, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
 
 
+def overture_fetch_command(root: Path) -> StageCommand:
+    """``overture fetch``: Overture places and buildings for the map bbox into ``data/raw`` (network, ADR-021)."""
+    return invoke("overture", "fetch", "--map", show(root), "--out", show(root / "data" / "raw"))
+
+
+def overture_match_command(scene: Path, root: Path) -> StageCommand:
+    """``overture match``: third-party POIs for the scene (offline, ADR-021)."""
+    return invoke("overture", "match", "--scene", show(scene), "--map", show(root), "--out", show(stage_path(scene, "overture")))
+
+
 def catastro_command(scene: Path, gml: Path) -> StageCommand:
     """``cadastre download``: the one Catastro request (network)."""
     return invoke("cadastre", "download", "--scene", show(scene), "--out", show(gml))
@@ -142,14 +152,15 @@ def core_radius(start: Path) -> float | None:
     return float(value) if value else None
 
 
-def detail_command(scene: Path, heights: Path, base: Path) -> StageCommand:
-    """``detail``, with the map's playable core when ``map.json`` has one."""
+def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None) -> StageCommand:
+    """``detail``, with the map's playable core when ``map.json`` has one, and Overture places when given."""
     core = core_radius(scene)
     return invoke(
         "detail",
         "--scene", show(scene),
         "--heights", show(heights),
         "--base", show(base),
+        *(("--places", show(places)) if places is not None else ()),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *(("--core-radius-m", f"{core:g}") if core is not None else ()),
     )

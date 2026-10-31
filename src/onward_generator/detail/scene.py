@@ -17,7 +17,7 @@ from typing import Any
 
 import numpy as np
 from shapely import Point, STRtree, union_all
-from shapely.geometry import shape
+from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator import __version__
@@ -73,6 +73,7 @@ from onward_generator.geo.attributes import parse_metres as _metres
 from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
 from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
+from onward_generator.sources.world.overture import PLUGIN_ID as OVERTURE_ID
 from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
@@ -111,6 +112,12 @@ class DetailedScene:
     inputs: dict[str, Any]
     stats: dict[str, Any] = field(default_factory=dict)
     core: dict[str, Any] | None = None  # ADR-017: half-side and building counts, None without a core
+    extra_attribution: list[dict[str, Any]] = field(default_factory=list)  # third-party POIs that gave a shop (ADR-021)
+
+    @property
+    def attribution(self) -> list[dict[str, Any]]:
+        """The phase 03 attribution, then one line per third-party dataset whose places this scene used."""
+        return [*self.base.attribution, *self.extra_attribution]
 
     @property
     def critical(self) -> list[Issue]:
@@ -157,7 +164,7 @@ class DetailedScene:
                           "template_config_version": self.config.version, "seed": self.config.seed},
             "fidelity": {"facades": "generic_templates", "interiors": "generic_simplified", "note": FIDELITY_NOTE},
             "inputs": self.inputs,
-            "attribution": self.base.attribution,
+            "attribution": self.attribution,
             "frame": self.base.manifest()["frame"],
             "files": {"visual": "scene_visual.glb", "collision": "scene_collision.glb"},
             "core": self.core,
@@ -277,25 +284,28 @@ def _shop_evidence(features: list[Mapping[str, Any]], footprints: dict[str, Base
     return evidence
 
 
-def _catastro_shops(ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], evidence: Mapping[str, list[str]],
-                    templates: Mapping[str, Template], cfg: DetailConfig, ranking: Sequence[str],
-                    fits: Callable[[str], bool]) -> dict[str, Mapping[str, Any]]:
-    """The ``catastro_use`` of each building whose best-ranked shop evidence is its Catastro use (ADR-022).
+def _shop_sources(ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], evidence: Mapping[str, list[str]],
+                  templates: Mapping[str, Template], cfg: DetailConfig, ranking: Sequence[str],
+                  fits: Callable[[str], bool], places: Mapping[str, list[str]]) -> dict[str, str]:
+    """The source of each building's best-ranked shop evidence; a building with none is left out (ADR-022).
 
     ``ranking`` is ``config/sources.json`` ``evidence``. ``osm`` is a shop POI or a commercial building category;
     the Catastro use counts when its code is in ``shop_catastro_uses`` and a shop fits the building (``fits``):
     the use is the parcel's, and a part of it behind the others, or a strip too narrow for a room, holds no shop.
+    ``overture`` is an Overture place inside the building (``places``, ADR-021).
     A source with no evidence for the building passes its turn to the next.
     """
-    out: dict[str, Mapping[str, Any]] = {}
+    out: dict[str, str] = {}
     for bid in ids:
         use = feature_of[bid].get("catastro_use")
         found = {
             OSM_EVIDENCE: bool(evidence.get(bid)) or templates[bid].ground == "shopfront",
             CATASTRO_ID: use is not None and use["current_use"] in cfg.shop_catastro_uses and fits(bid),
+            OVERTURE_ID: bool(places.get(bid)),
         }
-        if use is not None and next((source for source in ranking if found.get(source)), None) == CATASTRO_ID:
-            out[bid] = use
+        winner = next((source for source in ranking if found.get(source)), None)
+        if winner is not None:
+            out[bid] = winner
     return out
 
 
@@ -408,7 +418,7 @@ def _roof_plans(
 
 def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str],
                      catastro: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
-    """Why a ground floor is a shopfront: the Catastro use of the parcel when it ranked first (``_catastro_shops``),
+    """Why a ground floor is a shopfront: the Catastro use of the parcel when it ranked first (``_shop_sources``),
     else the building category, else OSM POIs.
 
     The Catastro use is observed for the parcel; that its commerce is on the ground floor is estimated.
@@ -426,6 +436,39 @@ def _ground_evidence(ground: str, template: Template, category: str, poi_ids: li
         "rule": f"Catastro predominant use {catastro['current_use']}: commercial ground floor",
         "provider": catastro["provider"], "license": catastro["license"], "attribution": catastro["attribution"],
     }
+
+
+def third_party_ground(evidence: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The ground floor evidence of a building whose best-ranked evidence is Overture places (ADR-021): listed apart from OSM POIs."""
+    if evidence is None:
+        return None
+    return {"source": "overture_place", "overture_place_ids": evidence["osm_poi_ids"]}
+
+
+def place_feature(place: Mapping[str, Any]) -> dict[str, Any]:
+    """An ``overture match`` place as a POI feature of the local grid (``overture_places.json``)."""
+    x, y = place["point_m"]
+    return {"id": place["id"], "kind": "poi", "geometry": mapping(Point(x, y)), "tags": dict(place["tags"])}
+
+
+def place_source(place: Mapping[str, Any]) -> dict[str, Any]:
+    """Provenance of a third-party POI on the shop it gave: provider, dataset, licence and origin."""
+    return {
+        "provider": "overture", "gers_id": place["gers_id"], "dataset": place["dataset"], "license": place["license"],
+        "confidence": place["confidence"], "attribute_origin": "observed", "observed_by": "third_party",
+    }
+
+
+def _third_party_record(detailed: DetailedScene, objects: Sequence[DetailObject], places: Sequence[Mapping[str, Any]], buildings: set[str]) -> None:
+    """``counts.third_party_shops`` and one attribution line per (text, licence) of the places that gave a shop, sorted."""
+    place_of = {p["id"]: p for p in places}
+    used = [place_of[s["poi_id"]] for o in objects if o.type == "building" for s in o.record["facade"]["shops"] if s["poi_id"] in place_of]
+    detailed.stats["third_party_shops"] = {
+        "places": len(places), "buildings": len(buildings), "shops": len(used),
+        "by_dataset": dict(sorted(Counter(p["dataset"] for p in used).items())),
+    }
+    lines = {(p["attribution"]["text"], p["attribution"]["license"]): p["attribution"] for p in used}
+    detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
 
 
 def _shops_of(poi_ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], building_tags: Mapping[str, Any]) -> list[
@@ -622,9 +665,13 @@ def detail_scene(
     prototypes: Mapping[str, Prototype] | None = None,
     extra_urban: ExtraUrban | None = None,
     core_half_side_m: float | None = None,
+    places: Sequence[Mapping[str, Any]] = (),
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
-    outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge."""
+    outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
+
+    ``places`` are third-party POIs from ``overture_places.json`` (ADR-021): shop evidence ``overture``,
+    ranked by ``config/sources.json`` ``evidence`` (ADR-022)."""
     core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
     scene = json.loads(Path(scene_path).expanduser().read_text(encoding="utf-8"))
@@ -638,14 +685,21 @@ def detail_scene(
     ids = sorted(footprints)
     tree = STRtree([footprints[i] for i in ids])
     evidence = _shop_evidence(features, footprints, cfg)
+    place_evidence = _shop_evidence([place_feature(p) for p in places], footprints, cfg)
+    place_of = {p["id"]: p for p in places}
+    feature_of.update({p["id"]: place_feature(p) for p in places})
     facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
     heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
     templates = _templates(ids, height_of, cfg)
-    catastro = _catastro_shops(ids, feature_of, evidence, templates, cfg, load_source_config().evidence,
-                               lambda bid: _shop_fits(bid, ids, footprints, tree, cfg))
+    sources = _shop_sources(ids, feature_of, evidence, templates, cfg, load_source_config().evidence,
+                            lambda bid: _shop_fits(bid, ids, footprints, tree, cfg), place_evidence)
+    catastro = {bid: feature_of[bid]["catastro_use"] for bid, source in sources.items() if source == CATASTRO_ID}
+    third_party = {bid for bid, source in sources.items() if source == OVERTURE_ID}
     for bid in catastro:  # the POIs of a building whose Catastro use ranked above them are not its shops
         evidence.pop(bid, None)
+    for bid in third_party:  # its Overture places ranked first: they are its shops (ADR-021)
+        evidence[bid] = place_evidence[bid]
     roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
                              templates, heights_m, cfg)
     setbacks: Counter[str] = Counter()
@@ -853,6 +907,9 @@ def detail_scene(
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
                            interior.shop_doors if interior is not None else ()) if shop else []
+        for entry in shops:
+            if entry["poi_id"] in place_of:
+                entry["poi_source"] = place_source(place_of[entry["poi_id"]])
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
             "generation": {"method": "phase03_volume + generic facade template", "phase03": o.record.get("generation"),
@@ -886,6 +943,8 @@ def detail_scene(
                          "glass_panes": len(glass_colliders)},
             "checks": {"facade_open_edges": shell.defects, "roof_area_error_m2": round(shell.roof_area_error, 4)},
         }
+        if bid in third_party:
+            record["facade"]["ground_floor_evidence"] = third_party_ground(record["facade"]["ground_floor_evidence"])
         if storeys.origin == "interior_storey":
             record["height"] = {
                 **record["height"],
@@ -993,6 +1052,7 @@ def detail_scene(
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
     detailed.stats["wall_area_m2"] = wall_areas.to_record()
     detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}
+    _third_party_record(detailed, objects, places, third_party)
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))

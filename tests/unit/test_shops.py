@@ -342,33 +342,37 @@ def _use_case() -> tuple[dict[str, dict], dict[str, list[str]], dict[str, Any]]:
     return feature_of, {"e": ["osm-node-1"], "a": []}, templates
 
 
-def test_a_catastro_use_counts_only_where_osm_has_no_shop_evidence() -> None:
-    from onward_generator.detail.scene import _catastro_shops
+def _sources(ranking: tuple[str, ...], fits: Any = lambda bid: True, places: dict[str, list[str]] | None = None) -> dict[str, str]:
+    from onward_generator.detail.scene import _shop_sources
 
     feature_of, evidence, templates = _use_case()
-    out = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("osm", "es.catastro", "overture"), lambda bid: True)
-    assert out == {"a": {"current_use": "4_2_retail"}, "b": {"current_use": "4_1_office"}}  # e has a POI, f a commercial category
+    return _shop_sources(sorted(feature_of), feature_of, evidence, templates, CFG, ranking, fits, places or {})
+
+
+def test_a_catastro_use_counts_only_where_osm_has_no_shop_evidence() -> None:
+    # e has a POI, f a commercial category; c is residential and d has no use
+    assert _sources(("osm", "es.catastro", "overture")) == {"a": "es.catastro", "b": "es.catastro", "e": "osm", "f": "osm"}
 
 
 def test_the_evidence_ranking_decides_between_osm_and_the_catastro_use() -> None:
-    from onward_generator.detail.scene import _catastro_shops
-
-    feature_of, evidence, templates = _use_case()
-    ranked_first = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("es.catastro", "osm"), lambda bid: True)
-    assert sorted(ranked_first) == ["a", "b", "e", "f"]
-    assert _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("osm",), lambda bid: True) == {}
-    assert _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("overture", "es.catastro"), lambda bid: True) == {
-        "a": {"current_use": "4_2_retail"}, "b": {"current_use": "4_1_office"},
-        "e": {"current_use": "4_2_retail"}, "f": {"current_use": "4_1_office"},
-    }
+    assert _sources(("es.catastro", "osm")) == {"a": "es.catastro", "b": "es.catastro", "e": "es.catastro", "f": "es.catastro"}
+    assert _sources(("osm",)) == {"e": "osm", "f": "osm"}
+    assert _sources(("overture", "es.catastro")) == {"a": "es.catastro", "b": "es.catastro", "e": "es.catastro", "f": "es.catastro"}
 
 
 def test_a_catastro_use_where_no_shop_fits_gives_way_to_the_next_source() -> None:
-    from onward_generator.detail.scene import _catastro_shops
+    # no shop fits a, which has no OSM evidence either: it sells nothing
+    assert _sources(("es.catastro", "osm"), lambda bid: bid != "a") == {"b": "es.catastro", "e": "es.catastro", "f": "es.catastro"}
 
-    feature_of, evidence, templates = _use_case()
-    out = _catastro_shops(sorted(feature_of), feature_of, evidence, templates, CFG, ("es.catastro", "osm"), lambda bid: bid != "a")
-    assert sorted(out) == ["b", "e", "f"]  # no shop fits a, which has no OSM evidence either: it sells nothing
+
+def test_overture_places_take_their_rank_in_the_evidence() -> None:
+    places = {"a": ["overture-place-1"], "c": ["overture-place-2"], "e": ["overture-place-3"]}
+    # default ranking: a keeps its Catastro use, e its OSM POI; only c, residential with no POI, takes its place
+    assert _sources(("osm", "es.catastro", "overture"), places=places) == {
+        "a": "es.catastro", "b": "es.catastro", "c": "overture", "e": "osm", "f": "osm"}
+    assert _sources(("overture", "osm", "es.catastro"), places=places) == {
+        "a": "overture", "b": "es.catastro", "c": "overture", "e": "overture", "f": "osm"}
+    assert _sources(("osm", "es.catastro"), places=places) == {"a": "es.catastro", "b": "es.catastro", "e": "osm", "f": "osm"}
 
 
 def _fits(target: Polygon, *others: Polygon) -> bool:

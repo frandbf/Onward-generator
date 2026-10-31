@@ -19,6 +19,8 @@ from onward_generator.sources import lidar
 from onward_generator.sources.fr.lidar_hd import LidarHdPlugin, coverage
 from onward_generator.sources.plugin import SourceError
 
+pytestmark = pytest.mark.usefixtures("without_overture")  # these tests pin the national plugins; ADR-021 adds overture everywhere
+
 HD = LidarHdPlugin()
 LYON = (4.8357, 45.7640)
 ORIGIN = (643000.0, 5070000.0)  # EPSG:32631, central Lyon

@@ -22,6 +22,7 @@ from onward_generator.sources.es.catastro import CatastroPlugin
 from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
 from onward_generator.sources.fr.lidar_hd import LidarHdPlugin
 from onward_generator.sources.plugin import OVERRIDE_KINDS, SourceError, SourcePlugin
+from onward_generator.sources.world.overture import OverturePlugin
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_PATH = REPO_ROOT / "config" / "sources.json"
@@ -29,7 +30,7 @@ SCHEMA = "onward_generator.sources"
 OSM_EVIDENCE = "osm"
 """The evidence rank of the OSM shop, amenity, office and craft POIs and of a commercial building category."""
 
-PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin())
+PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), OverturePlugin())
 
 
 @dataclass(frozen=True, slots=True)

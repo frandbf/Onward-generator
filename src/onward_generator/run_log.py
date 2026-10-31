@@ -199,6 +199,11 @@ def _cadastre(out: Path) -> StageReport:
     return StageReport("  ".join(parts))
 
 
+def _overture_match(out: Path) -> StageReport:
+    places = _read(out / "overture_match_report.json")["places"]["counts"]
+    return StageReport(f"places {group(int(places['kept']))} of {group(int(places['rows']))}")
+
+
 def _heights(out: Path) -> StageReport:
     report = _read(out / "heights_report.json")
     counts = report["counts"]
@@ -354,6 +359,7 @@ _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "lidar_hd": _raster_download,
     "lidar_hd_heights": _raster_heights,
     "overrides": _overrides,
+    "overture-match": _overture_match,
     "heights": _heights,
     "generate": _generate,
     "detail": _detail,

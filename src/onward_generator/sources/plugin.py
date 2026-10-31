@@ -62,6 +62,8 @@ class SourceSteps:
     stages: tuple[SourceStage, ...]
     overrides: Path | None
     scene: Path | None = None
+    places: Path | None = None
+    """Third-party POIs that ``detail --places`` ranks as shop evidence by ``config/sources.json`` ``evidence`` (Overture, ADR-021)."""
 
 
 class SourcePlugin(Protocol):

@@ -20,6 +20,8 @@ from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin, asc_part
 from onward_generator.sources.plugin import SourceError
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
+pytestmark = pytest.mark.usefixtures("without_overture")  # these tests pin the national plugins; ADR-021 adds overture everywhere
+
 ORIGIN = (664343.0, 4205697.5)  # on the 2.5 m grid, near Murcia
 PNOA = PnoaNdsmPlugin()
 

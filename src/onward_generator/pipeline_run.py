@@ -58,7 +58,7 @@ from onward_generator.run_log import (
     use_color,
 )
 from onward_generator.sources.merge import MERGED_FILE
-from onward_generator.sources.plugin import SourceError, SourceStage
+from onward_generator.sources.plugin import SourceError, SourceStage, SourceSteps
 from onward_generator.sources.registry import check_licence, choices, describe, load_source_config
 
 Execute = Callable[[Sequence[str]], int]
@@ -124,13 +124,15 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     root = Path(directory)
     no_preview = () if preview else ("--no-preview",)
     geo_argv = list(geo_command(root).argv)
-    sources, scene, overrides = source_plan(root, _flag(geo_argv, "--out") / "geo_scene.json")
+    geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
+    sources, scene, overrides = source_plan(root, geo_scene)
+    places = places_plan(root, geo_scene)
     source_steps = [(stage.name, list(stage.argv)) for stage in sources]
     heights_argv = list(heights_command(scene, overrides).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = [*detail_command(scene, heights, scene3d).argv, *no_preview]
+    detail_argv = [*detail_command(scene, heights, scene3d, places).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -192,9 +194,26 @@ def source_plan(root: Path, scene: Path) -> tuple[list[SourceStage], Path, Path 
     by the priority in ``config/sources.json``. A plugin whose licence is not
     on the allowlist stops the plan before anything is fetched.
     """
-    config = load_source_config()
     stages: list[SourceStage] = []
     overrides: list[tuple[str, Path]] = []
+    for plugin_id, steps in _plugin_steps(root, scene):
+        stages.extend(steps.stages)
+        scene = steps.scene or scene
+        if steps.overrides is not None:
+            overrides.append((plugin_id, steps.overrides))
+    if len(overrides) < 2:
+        return stages, scene, overrides[0][1] if overrides else None
+    out = root / "data" / "processed" / "sources"
+    pairs = [part for plugin_id, path in overrides for part in ("--overrides", f"{plugin_id}={show(path)}")]
+    argv = invoke("source", "merge", *pairs, "--out", show(out)).argv
+    stages.append(SourceStage("overrides", argv, out / MERGED_FILE, tuple(path for _id, path in overrides)))
+    return stages, scene, out / MERGED_FILE
+
+
+def _plugin_steps(root: Path, scene: Path) -> list[tuple[str, SourceSteps]]:
+    """The steps of every plugin this map runs, in registry order, each reading the scene of the ones before it."""
+    config = load_source_config()
+    found: list[tuple[str, SourceSteps]] = []
     for choice in choices(load_map(root)):
         if not choice.runs:
             continue
@@ -203,17 +222,17 @@ def source_plan(root: Path, scene: Path) -> tuple[list[SourceStage], Path, Path 
         except SourceError as exc:
             raise PipelineError(str(exc)) from exc
         steps = choice.plugin.steps(root, scene)
-        stages.extend(steps.stages)
         scene = steps.scene or scene
-        if steps.overrides is not None:
-            overrides.append((choice.plugin.id, steps.overrides))
-    if len(overrides) < 2:
-        return stages, scene, overrides[0][1] if overrides else None
-    out = root / "data" / "processed" / "sources"
-    pairs = [part for plugin_id, path in overrides for part in ("--overrides", f"{plugin_id}={show(path)}")]
-    argv = invoke("source", "merge", *pairs, "--out", show(out)).argv
-    stages.append(SourceStage("overrides", argv, out / MERGED_FILE, tuple(path for _id, path in overrides)))
-    return stages, scene, out / MERGED_FILE
+        found.append((choice.plugin.id, steps))
+    return found
+
+
+def places_plan(root: Path, scene: Path) -> Path | None:
+    """The third-party places ``detail`` reads, from the last plugin that writes them (ADR-021)."""
+    places: Path | None = None
+    for _plugin_id, steps in _plugin_steps(root, scene):
+        places = steps.places or places
+    return places
 
 
 def _source_stages(root: Path) -> list[SourceStage]:

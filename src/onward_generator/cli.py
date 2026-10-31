@@ -244,7 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--preview", action="store_true", help="also draw the diagnostic PNGs of generate and detail (off by default; the export thumbnail is always drawn)")
     run.set_defaults(handler=_cmd_run)
     sub.add_parser("osm", help="download the OSM XML for one map (see: osm --help)", add_help=False)
-    sub.add_parser("overture", help="Overture Maps places and buildings: fetch (see: overture --help)", add_help=False)  # pragma: no mutate: main dispatches overture before this stub is parsed, so add_help is never read
+    sub.add_parser("overture", help="Overture Maps places and buildings: fetch | match (see: overture --help)", add_help=False)  # pragma: no mutate: main dispatches overture before this stub is parsed, so add_help is never read
     return parser
 
 

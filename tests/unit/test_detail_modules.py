@@ -313,6 +313,16 @@ def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:
     assert gltf_matrix(np.eye(4)) == np.eye(4).reshape(-1).tolist()
 
 
+def test_third_party_ground_evidence_lists_overture_places_apart() -> None:
+    from onward_generator.detail.scene import third_party_ground
+
+    assert third_party_ground(None) is None
+    assert third_party_ground({"source": "osm_poi", "osm_poi_ids": ["overture-place-a"]}) == {
+        "source": "overture_place", "overture_place_ids": ["overture-place-a"]}
+    assert third_party_ground({"source": "building_category", "category": "commercial", "osm_poi_ids": ["overture-place-b"]}) == {
+        "source": "overture_place", "overture_place_ids": ["overture-place-b"]}
+
+
 def test_shop_evidence_prefers_the_footprint_that_contains_the_point() -> None:
     from onward_generator.detail.scene import _shop_evidence
 
