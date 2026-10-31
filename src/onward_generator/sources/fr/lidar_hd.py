@@ -64,7 +64,7 @@ def wms_requests(bbox: BBox) -> list[TileRequest]:
                 ("CRS", CRS), ("BBOX", ",".join(f"{v:.2f}" for v in tile)),
                 ("WIDTH", str(columns)), ("HEIGHT", str(rows)), ("FORMAT", "image/x-bil;bits=32"),
             ],
-            safe=",:;/=",
+            safe=",:;/=",  # pragma: no mutate: letters are never escaped, so adding them to safe changes nothing
         )
         out.append(TileRequest(f"{WMS_URL}?{query}", tile, columns, rows))
     return out
@@ -83,7 +83,7 @@ def tile_metadata(bbox_wgs84: BBox, fetch: Fetch) -> dict[str, Any]:
             ("OUTPUTFORMAT", "application/json"), ("COUNT", "500"),
             ("BBOX", f"{south:.6f},{west:.6f},{north:.6f},{east:.6f},urn:ogc:def:crs:EPSG::4326"),
         ],
-        safe=",:",
+        safe=",:",  # pragma: no mutate: letters are never escaped, so adding them to safe changes nothing
     )
     keep = ("date_debut_acquisition", "date_fin_acquisition", "date_edition", "code_mission")
     try:
@@ -101,8 +101,8 @@ def tile_date(longitude: float, latitude: float, metadata: Mapping[str, Any]) ->
     point = Point(longitude, latitude)
     for tile in metadata.get("tiles", []):
         if shape(tile["geometry"]).covers(point):
-            start = str(tile.get("date_debut_acquisition") or "?").rstrip("Z")
-            end = str(tile.get("date_fin_acquisition") or "?").rstrip("Z")
+            start = str(tile.get("date_debut_acquisition") or "?").removesuffix("Z")
+            end = str(tile.get("date_fin_acquisition") or "?").removesuffix("Z")
             return f"acquired {start} to {end}"
     return "acquisition date unknown"
 
