@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -13,6 +14,12 @@ def _default_file_mode() -> int:
     umask = os.umask(0)
     os.umask(umask)
     return 0o666 & ~umask
+
+
+def sha256_file(path: Path) -> str:
+    """Hex SHA-256 of a file, read in chunks."""
+    with path.open("rb") as handle:
+        return hashlib.file_digest(handle, hashlib.sha256).hexdigest()
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:

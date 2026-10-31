@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import statistics
 from collections import Counter
@@ -21,6 +20,7 @@ from onward_generator.heights.estimator import (
     estimate_heights,
 )
 from onward_generator.io import atomic_write_json, prepare_outputs
+from onward_generator.io import sha256_file as _sha256
 
 HEIGHTS_SCHEMA = "onward_generator.building_heights"
 REPORT_SCHEMA = "onward_generator.building_heights_report"
@@ -28,14 +28,6 @@ SCHEMA_VERSION = "0.1.0"
 HEIGHTS_FILE = "heights.json"
 REPORT_FILE = "heights_report.json"
 MAX_SCENE_BYTES = 256 * 1024 * 1024
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _percent(part: int, total: int) -> float:

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator import io as out_io
-from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs, sha256_file
 
 
 def _leftovers(directory: Path) -> list[str]:
@@ -98,3 +98,14 @@ def test_prepare_outputs_failed_check_creates_nothing(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         prepare_outputs(out, ("in.glb",), overwrite=False, protected=(out / "in.glb",))
     assert not out.exists()
+
+
+def test_sha256_file_matches_hashlib_on_an_empty_and_a_multi_chunk_file(tmp_path: Path) -> None:
+    import hashlib
+
+    empty, big = tmp_path / "empty", tmp_path / "big"
+    empty.write_bytes(b"")
+    data = bytes(range(256)) * 9000  # larger than one read chunk
+    big.write_bytes(data)
+    assert sha256_file(empty) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert sha256_file(big) == hashlib.sha256(data).hexdigest()

@@ -70,6 +70,7 @@ from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
+from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
 from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
 from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
@@ -216,10 +217,6 @@ class InteriorBudget:
     def spend(self, built: Interior) -> None:
         self.used["triangles"] += built.visual_triangles
         self.used["collision_triangles"] += built.collision_triangles
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load_base(base_dir: str | Path, scene_path: str | Path, heights_path: str | Path, gen_config: GenerationConfig) -> tuple[GeneratedScene, dict[str, Any]]:

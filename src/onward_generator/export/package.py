@@ -27,7 +27,7 @@ from onward_generator.contracts import is_schema
 from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
-from onward_generator.io import atomic_write_bytes, atomic_write_json
+from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
 from onward_generator.perf.layout import (
     GAMEPLAY_VERSION,
     MIN_SPAWN_SEPARATION_M,
@@ -97,14 +97,6 @@ class PackageResult:
     directory: Path
     manifest: dict[str, Any]
     warnings: tuple[str, ...]
-
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 @cache

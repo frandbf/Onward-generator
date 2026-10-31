@@ -7,15 +7,14 @@ unchanged. ``map create`` fetches the file through ``osm.acquire``.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from onward_generator.domain.models import SourceDataset
+from onward_generator.io import sha256_file
 
 SUPPORTED_SUFFIXES: frozenset[str] = frozenset({".osm"})
-_CHUNK = 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,14 +35,6 @@ OPENSTREETMAP = LicenseInfo(
 
 class SourceError(ValueError):
     """Raised when a source file cannot be registered."""
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(_CHUNK):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def register_local_source(

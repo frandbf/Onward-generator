@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -14,6 +13,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.io import sha256_file as _sha256
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "heights.default.json"
@@ -89,10 +89,6 @@ class HeightConfig:
 
     def storey_height(self, category: str) -> float:
         return self.storey_height_m[category]
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @cache

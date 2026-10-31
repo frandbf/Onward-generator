@@ -89,7 +89,9 @@ def test_download_writes_osm_and_refuses_a_second_request(tmp_path: Path) -> Non
     target = root / "data" / "raw" / "obelisco.osm"
     assert target.read_bytes() == _XML
     assert record.sha256 == sha256_file(target)
-    sidecar = json.loads(target.with_name("obelisco.osm.source.json").read_text(encoding="utf-8"))
+    sidecar_text = target.with_name("obelisco.osm.source.json").read_text(encoding="utf-8")
+    sidecar = json.loads(sidecar_text)
+    assert sidecar_text == json.dumps(record.to_dict(), ensure_ascii=False, indent=2) + "\n"
     assert sidecar["license"] == "ODbL-1.0"
     assert sidecar["attribution"] == "© OpenStreetMap contributors"
     assert sidecar["relation_types"] == ["multipolygon"]

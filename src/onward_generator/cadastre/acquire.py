@@ -13,8 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
-import tempfile
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -27,6 +25,7 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.geo.sources import LicenseInfo, sha256_file
+from onward_generator.io import atomic_write_bytes
 from onward_generator.net import fetch_bytes
 
 WFS_BU_URL = "https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx"
@@ -284,15 +283,7 @@ def download_building_parts(
     data, counts = merge_tiles(payloads)
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-        os.chmod(tmp, 0o644)
-        os.replace(tmp, target)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
+    atomic_write_bytes(target, data)
     record = DownloadRecord(
         provider=CATASTRO_BU.provider,
         license=CATASTRO_BU.license,
