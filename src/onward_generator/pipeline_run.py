@@ -432,13 +432,12 @@ def _emit_captured(err: str, out: str) -> None:
         print(summary, flush=True)
 
 
-def output_ready(name: str, argv: Sequence[str], root: Path) -> bool:
+def output_ready(name: str, root: Path) -> bool:
     """True when this stage's file exists and is at least as new as the file it reads.
 
     A repeated earlier stage makes every later file stale, so the next run
     continues there instead of trusting a package or scene left from before.
     """
-    del argv
     if name == "map":
         return (root / "map.json").is_file()
     if name == "osm":
@@ -838,7 +837,7 @@ def run_map(
                 store_sources(root, sources)
             say(describe(choices(load_map(root))))
             steps = resume_steps(root, preview=preview)
-            done = [step for step, argv in steps if output_ready(step, argv, root)]
+            done = [step for step, _argv in steps if output_ready(step, root)]
             done.insert(0, "map")
             pending = [step for step, _argv in steps if step not in done]
             chosen = choose_start(

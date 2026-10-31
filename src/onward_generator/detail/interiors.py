@@ -161,11 +161,6 @@ class Interior:
         return sum(mesh.triangle_count for _, mesh in self.colliders) + sum(mesh.triangle_count for mesh in self.glass_colliders)
 
 
-def fits_triangle_budget(used: int, cost: int, limit: int) -> bool:
-    """Whether one more interior of ``cost`` triangles keeps the interiors at or under ``limit``."""
-    return used + cost <= limit
-
-
 def rectangularity(geometry: BaseGeometry) -> float:
     mrr = geometry.minimum_rotated_rectangle
     return float(geometry.area / mrr.area) if mrr.area > 0 else 0.0

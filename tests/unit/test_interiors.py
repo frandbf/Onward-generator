@@ -20,7 +20,6 @@ from onward_generator.detail.interiors import (
     _lands_on_roof,
     assemble_interior,
     build_interior,
-    fits_triangle_budget,
     glass_penetrations,
     interior_visual,
     light_anchors,
@@ -191,7 +190,8 @@ def test_default_interiors_are_five_to_eight_within_eight_thousand_triangles() -
     ],
 )
 def test_triangle_budget_admits_up_to_the_limit(used: int, cost: int, limit: int, fits: bool) -> None:
-    assert fits_triangle_budget(used, cost, limit) is fits
+    budget = InteriorBudget("", {"triangles": limit}, {"triangles": used})
+    assert (budget.refuse("triangles", cost) is None) is fits
 
 
 def test_interior_visual_triangles_count_every_material_and_no_collider() -> None:

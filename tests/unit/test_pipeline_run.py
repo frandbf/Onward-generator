@@ -557,7 +557,7 @@ def _finish_python_stages(root: Path) -> None:
     for _attempt in range(4):
         pending = False
         for name, argv in plan_steps(root):
-            if output_ready(name, argv, root):
+            if output_ready(name, root):
                 continue
             pending = True
             destination = Path(argv[argv.index("--out") + 1])
@@ -1051,7 +1051,7 @@ def test_an_incomplete_directory_is_rerun_with_overwrite(tmp_path: Path) -> None
     (out / "partial.json").write_text("{}", encoding="utf-8")
     prepared = prepare_from([("detail", ["detail", "--out", str(out)])], "detail", root)
     assert "--overwrite" in prepared[0][1]
-    assert not output_ready("detail", prepared[0][1], root)
+    assert not output_ready("detail", root)
 
 
 def test_turning_panoramax_on_rewrites_signs_and_keeps_the_package(tmp_path: Path) -> None:
@@ -1073,7 +1073,7 @@ def test_turning_panoramax_on_rewrites_signs_and_keeps_the_package(tmp_path: Pat
         push=lambda _path: 0,
     )
     assert code == 0
-    assert not output_ready("signs", [], root)
+    assert not output_ready("signs", root)
 
     def label(argv: list[str]) -> str:
         if argv[:2] == ["overgrow", "fit"]:
@@ -1368,25 +1368,25 @@ def test_catastro_and_cadastre_are_stale_after_their_input(tmp_path: Path) -> No
     now = (root / "map.json").stat().st_mtime
     _touch(processed / "geo" / "geo_scene.json", now)
     _touch(root / "data" / "raw" / "catastro.gml", now + 1)
-    assert not output_ready("catastro", [], root)  # downloaded before ADR-022: no buildings file yet
+    assert not output_ready("catastro", root)  # downloaded before ADR-022: no buildings file yet
     _touch(root / "data" / "raw" / "catastro_buildings.gml", now + 1)
     _touch(processed / "cadastre" / "geo_scene.json", now + 2)
     _touch(processed / "heights" / "heights.json", now + 3)
-    assert all(output_ready(name, [], root) for name in ("catastro", "cadastre", "heights"))
+    assert all(output_ready(name, root) for name in ("catastro", "cadastre", "heights"))
     _touch(processed / "cadastre" / "geo_scene.json", now + 4)
-    assert not output_ready("heights", [], root)
+    assert not output_ready("heights", root)
     _touch(root / "data" / "raw" / "catastro.gml", now + 5)
-    assert not output_ready("cadastre", [], root)
+    assert not output_ready("cadastre", root)
     _touch(processed / "cadastre" / "geo_scene.json", now + 5)
-    assert output_ready("cadastre", [], root)
+    assert output_ready("cadastre", root)
     _touch(root / "data" / "raw" / "catastro_buildings.gml", now + 5.5)
-    assert not output_ready("cadastre", [], root)
+    assert not output_ready("cadastre", root)
     _touch(processed / "geo" / "geo_scene.json", now + 6)
-    assert not output_ready("catastro", [], root)
+    assert not output_ready("catastro", root)
     store_sources(root, {"es.catastro": False})
-    assert output_ready("heights", [], root) is False  # heights now follows geo, which is newer
+    assert output_ready("heights", root) is False  # heights now follows geo, which is newer
     _touch(processed / "heights" / "heights.json", now + 7)
-    assert output_ready("heights", [], root)
+    assert output_ready("heights", root)
 
 
 def test_a_catastro_sidecar_alone_is_downloaded_again_with_overwrite(tmp_path: Path) -> None:
@@ -1452,9 +1452,9 @@ def test_heights_without_catastro_ignores_a_newer_split_scene(tmp_path: Path) ->
     _touch(processed / "geo" / "geo_scene.json", now)
     _touch(processed / "heights" / "heights.json", now + 1)
     _touch(processed / "cadastre" / "geo_scene.json", now + 2)
-    assert not output_ready("heights", [], root)
+    assert not output_ready("heights", root)
     store_sources(root, {"es.catastro": False})
-    assert output_ready("heights", [], root)
+    assert output_ready("heights", root)
 
 
 def test_run_passes_the_source_switches(monkeypatch: pytest.MonkeyPatch) -> None:

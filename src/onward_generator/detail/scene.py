@@ -50,7 +50,6 @@ from onward_generator.detail.interiors import (
     Interior,
     assemble_interior,
     cap_lights,
-    fits_triangle_budget,
     glass_penetrations,
     interior_visual,
     pierce_room_windows,
@@ -211,7 +210,7 @@ class InteriorBudget:
     def refuse(self, kind: str, cost: int) -> str | None:
         """``None`` when ``cost`` more ``kind`` triangles fit, else the ``triangle_budget`` reason."""
         used, limit = self.used[kind], self.limits[kind]
-        if fits_triangle_budget(used, cost, limit):
+        if used + cost <= limit:
             return None
         return f"triangle_budget: needs {cost} {kind.replace('_', ' ')}, {limit - used} left of {self.prefix}max_{kind} {limit}"
 

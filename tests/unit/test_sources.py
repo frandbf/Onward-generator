@@ -474,9 +474,9 @@ def test_plugin_stages_are_fresh_against_their_inputs_and_rerun_downloads_with_o
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
         os.utime(path, (1000 + index, 1000 + index))
-    assert output_ready("xx.lidar.heights", [], root)
+    assert output_ready("xx.lidar.heights", root)
     os.utime(raw, (2000, 2000))
-    assert not output_ready("xx.lidar.heights", [], root)
+    assert not output_ready("xx.lidar.heights", root)
 
 
 def test_without_a_map_there_are_no_plugin_stages(tmp_path: Path) -> None:
