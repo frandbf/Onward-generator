@@ -88,6 +88,12 @@ def _merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, 
     return out
 
 
+def exposure_probe(seg: Segment, cfg: DetailConfig) -> Polygon:
+    """The strip ``probe_m`` deep outside a segment, ``SNAP_M`` short of each end (a quarter of a short segment)."""
+    inset = min(SNAP_M, seg.length / 4)
+    return seg.plan_rect(inset, seg.length - inset, 0.0, cfg.probe_m)
+
+
 def refine_exposure(geometry: BaseGeometry, others: BaseGeometry, cfg: DetailConfig) -> tuple[BaseGeometry, list[Segment]]:
     """Split ring edges where street exposure changes; return the refined footprint and its segments.
 
@@ -111,8 +117,7 @@ def refine_exposure(geometry: BaseGeometry, others: BaseGeometry, cfg: DetailCon
                 exposed_ranges: list[tuple[float, float]] = []
                 if ri == 0 or cfg.courtyard_openings:
                     seg = Segment(pi, ri, ei, a, b, True)
-                    inset = min(SNAP_M, length / 4)
-                    probe = seg.plan_rect(inset, length - inset, 0.0, cfg.probe_m)
+                    probe = exposure_probe(seg, cfg)
                     covered: list[tuple[float, float]] = []
                     hit = probe.intersection(others) if not others.is_empty else Polygon()
                     for piece in polygons_of(hit):
@@ -143,6 +148,34 @@ def refine_exposure(geometry: BaseGeometry, others: BaseGeometry, cfg: DetailCon
         parts.append(Polygon(new_rings[0], new_rings[1:]))
     refined_geom = parts[0] if len(parts) == 1 else union_all(parts)
     return refined_geom, segments
+
+
+def setback_floor(seg: Segment, neighbours: list[tuple[BaseGeometry, float | None]], cfg: DetailConfig) -> float | None:
+    """The height above which a party wall is an outer wall of its own building, or ``None``.
+
+    ``neighbours`` are ``(footprint, roof)``, with ``roof`` the roof height of a sub-building of the
+    same parcel (ADR-016) and ``None`` for any other building. The probe is the one ``refine_exposure``
+    uses. When every footprint it meets is of the same parcel, the wall is that building's
+    facade above the highest of their roofs: a setback storey over a terrace, or a taller rear
+    wing. The terrace parapet may hide a sill, as on a real setback. A wall that meets another
+    parcel, or nothing, stays a blank party wall.
+    """
+    probe = exposure_probe(seg, cfg)
+    roofs: list[float] = []
+    for footprint, roof in neighbours:
+        if probe.intersection(footprint).area < 1e-4:  # pragma: no mutate: refine_exposure's corner-touch threshold; a contact of exactly 1e-4 m² is measure zero
+            continue
+        if roof is None:
+            return None
+        roofs.append(roof)
+    return max(roofs, default=None)
+
+
+def setback_floors(segments: list[Segment], neighbours: list[tuple[BaseGeometry, float | None]], height: float,
+                   cfg: DetailConfig) -> dict[int, float]:
+    """``setback_floor`` of every party wall that opens below ``height``, by segment index."""
+    floors = {seg.index: setback_floor(seg, neighbours, cfg) for seg in segments if not seg.exposed}
+    return {index: floor for index, floor in floors.items() if floor is not None and floor < height}
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,7 +323,10 @@ def layout_segment(
     others: BaseGeometry,
     cfg: DetailConfig,
     layout: Layout,
+    floor_m: float = 0.0,
 ) -> None:
+    """Lay the template's bays on one wall. With ``floor_m`` (a setback wall, ``setback_floor``),
+    a storey whose top is not above it is skipped and no opening starts below it."""
     length = seg.length
     usable = length - 2 * cfg.edge_margin_m
     if usable < template.narrow_window.width_m + cfg.min_pier_m:
@@ -304,6 +340,8 @@ def layout_segment(
     d = cfg.recess_depth_m
 
     def add(kind: str, centre: float, v0: float, o: Opening, back: str | None, column: int, storey: int, depth: float = d) -> bool:
+        if v0 < floor_m:
+            return False
         s0 = centre - o.width_m / 2
         plan = seg.plan_rect(s0, s0 + o.width_m, -depth, 0.0)
         if not footprint.buffer(1e-6).contains(plan):
@@ -321,6 +359,8 @@ def layout_segment(
 
     for i in range(storeys.count):
         z0 = i * storeys.height_m
+        if z0 + storeys.height_m <= floor_m:
+            continue
         for j, c in enumerate(centres):
             if i == 0:
                 if j == main_bay and main_door is not None:
@@ -402,6 +442,8 @@ class Shell:
     # Party walls with no opening: segment and its quad in ``parts[wall_material]``, for :func:`split_blank_walls`.
     blank_walls: list[tuple[Segment, Mesh]] = field(default_factory=list)
     wall_material: str = ""
+    # Party walls with openings (a setback wall, a fallback door): segment, its face, and the openings ``(s0, v0, s1, v1)``.
+    opened_walls: list[tuple[Segment, Mesh, list[tuple[float, float, float, float]]]] = field(default_factory=list)
 
 
 def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh, float] | None:
@@ -429,6 +471,13 @@ def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh
         vertices += [(ax, ay, height), (bx, by, height), apex]
         triangles.append((i, i + 1, i + 2))
     return Mesh(np.array(vertices, dtype=np.float64), np.array(triangles, dtype=np.int64)), rise
+
+
+def wall_frame(seg: Segment) -> np.ndarray:
+    """Wall face coordinates ``(s, v, 0)`` to the world: along the segment, up, and out."""
+    to_world = np.eye(4)  # pragma: no mutate: transform reads only the top 3x4 block, which every size above 3 fills alike
+    to_world[:3, 0], to_world[:3, 1], to_world[:3, 2], to_world[:3, 3] = seg.u, UP, seg.n_out, seg.point(0)
+    return to_world
 
 
 def _bake(parts: dict[str, list[Mesh]], proto: Prototype, matrix: np.ndarray) -> None:
@@ -497,6 +546,7 @@ def build_shell(
     rims: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
     counts: dict[str, int] = defaultdict(int)
     blank_walls: list[tuple[Segment, Mesh]] = []
+    opened_walls: list[tuple[Segment, Mesh, list[tuple[float, float, float, float]]]] = []
     for seg in segments:
         holes = holes_by_seg.get(seg.index, [])
         a0, b0, b1, a1 = seg.point(0, 0), seg.point(seg.length, 0), seg.point(seg.length, z_top), seg.point(0, z_top)
@@ -506,11 +556,11 @@ def build_shell(
             if not seg.exposed:
                 blank_walls.append((seg, wall))
             continue
-        face = face_with_openings(seg.length, 0.0, z_top, [(h.s0, h.v0, h.s0 + h.width, h.v0 + h.height) for h in holes])
-        face_mesh = cap(face, 0.0)
-        to_world = np.eye(4)
-        to_world[:3, 0], to_world[:3, 1], to_world[:3, 2], to_world[:3, 3] = seg.u, UP, seg.n_out, seg.point(0)
-        parts[wall_material].append(transform(face_mesh, to_world))
+        rects = [(h.s0, h.v0, h.s0 + h.width, h.v0 + h.height) for h in holes]
+        face_mesh = transform(cap(face_with_openings(seg.length, 0.0, z_top, rects), 0.0), wall_frame(seg))
+        parts[wall_material].append(face_mesh)
+        if not seg.exposed:
+            opened_walls.append((seg, face_mesh, rects))
         for h in holes:
             proto = recess(h.width, h.height, h.depth, h.back)
             m = seg.module_matrix(h.s0, h.v0)
@@ -539,7 +589,7 @@ def build_shell(
     return Shell(
         dict(parts), roof_info, z_top, defects, abs(roof_area - footprint_area), rims, balcony_colliders, dict(counts),
         roof_deck, height, parapet_collider,
-        blank_walls, wall_material,
+        blank_walls, wall_material, opened_walls,
     )
 
 
@@ -631,21 +681,27 @@ def split_blank_walls(shell: Shell, neighbours: list[tuple[BaseGeometry, float]]
     """Take the blank party walls out of ``parts[wall_material]``.
 
     The part against a neighbour's wall, up to the lower of the two tops, is never seen
-    and is dropped; the rest goes to ``party_material(wall_material)``. The collider is not touched.
+    and is dropped; the rest goes to ``party_material(wall_material)``. A party wall with
+    openings (a setback wall) loses the band under its lowest opening that a neighbour hides
+    along its whole length, and keeps the rest in its wall material. The collider is not touched.
     Call it after the shell's open-edge check, which counts the full walls.
     """
-    blank = {id(mesh) for _, mesh in shell.blank_walls}
-    shell.parts[shell.wall_material] = [m for m in shell.parts[shell.wall_material] if id(m) not in blank]
+    replaced = {id(mesh) for _, mesh in shell.blank_walls} | {id(mesh) for _, mesh, _ in shell.opened_walls}
+    shell.parts[shell.wall_material] = [m for m in shell.parts[shell.wall_material] if id(m) not in replaced]
     hidden = party = 0.0
     for seg, _ in shell.blank_walls:
         steps = cover_steps(seg.length, shell.z_top, wall_cover(seg, neighbours))
         covered = sum((t1 - t0) * h for t0, t1, h in steps)
         hidden += covered
         party += seg.length * shell.z_top - covered
-        to_world = np.eye(4)  # pragma: no mutate: transform reads only the top 3x4 block, which every size above 3 fills alike
-        to_world[:3, 0], to_world[:3, 1], to_world[:3, 2], to_world[:3, 3] = seg.u, UP, seg.n_out, seg.point(0)
         for face in visible_face(shell.z_top, steps):
-            shell.parts.setdefault(party_material(shell.wall_material), []).append(transform(cap(face, 0.0), to_world))
+            shell.parts.setdefault(party_material(shell.wall_material), []).append(transform(cap(face, 0.0), wall_frame(seg)))
+    for seg, _, rects in shell.opened_walls:
+        steps = cover_steps(seg.length, shell.z_top, wall_cover(seg, neighbours))
+        cut = min(min(h for _, _, h in steps), min(v0 for _, v0, _, _ in rects))
+        hidden += seg.length * cut
+        face = face_with_openings(seg.length, cut, shell.z_top, rects)
+        shell.parts[shell.wall_material].append(transform(cap(face, 0.0), wall_frame(seg)))
     return WallAreas(0.0, party, hidden)
 
 

@@ -115,6 +115,18 @@ def resolve_use(building_id: str, tags: Mapping[str, str], related: Sequence[tup
     return FacadeUse(FACADE_USES[rank], "estimated" if match == "poi_near" else "observed", source_id, tag, match)
 
 
+def appearance_key(building_id: str, feature: Mapping[str, Any]) -> str:
+    """The identity a building's wall, use and roof are drawn for (ADR-016).
+
+    The sub-buildings a Catastro split made of one parcel are one building: ``parcel:<refcat>``.
+    A sub-building without a parcel reference takes its OSM parent's id; any other building its own id.
+    """
+    refcat = (feature.get("subdivision") or {}).get("refcat")
+    if refcat:
+        return f"parcel:{refcat}"
+    return str((feature.get("parent") or {}).get("id") or building_id)
+
+
 def _first(tags: dict[str, str], key: str) -> str:
     raw = tags.get(key) or ""
     return raw.split(";")[0].strip().lower()

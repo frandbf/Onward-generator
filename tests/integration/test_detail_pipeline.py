@@ -111,7 +111,8 @@ def test_no_critical_errors_and_every_facade_is_labelled_generic(detailed) -> No
     assert detailed.manifest()["fidelity"]["facades"] == "generic_templates"
 
 
-def test_templates_roofs_and_landmark(detailed) -> None:
+def test_templates_roofs_and_landmark(detail_inputs: tuple[Path, Path, Path]) -> None:
+    detailed = _detail(detail_inputs)  # in the test, not the module fixture, so mutation testing runs it
     church = _obj(detailed, "building/osm-way-314").record
     assert church["facade"]["template"] == "landmark_placeholder" and church["facade"]["needs_custom_model"] is True
     assert church["facade"]["openings"] == {"landmark_door": 1}

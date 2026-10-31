@@ -38,12 +38,13 @@ from onward_generator.detail.facades import (
     interior_storey,
     layout_segment,
     refine_exposure,
+    setback_floors,
     split_blank_walls,
     stable_unit,
     storeys_for,
     wall_uv_frame,
 )
-from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
+from onward_generator.detail.grammar import FacadeUse, appearance_key, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
     Interior,
     assemble_interior,
@@ -313,24 +314,62 @@ def _facade_walls(
 
     A landmark (flagged by the heights stage from its tags) keeps its template walls. Every
     other building draws from the palette of its use.
-    Neighbours are the footprints within ``probe_m``.
+    The sub-buildings of one parcel (``appearance_key``, ADR-016) are one building: the first in id
+    order resolves the use from the evidence of them all and draws the wall for its key, and the
+    others take the same. Neighbours are the footprints of other keys within ``probe_m``.
     """
     related = _use_evidence(features, footprints, cfg)
+    key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
+    members: dict[str, list[str]] = defaultdict(list)
+    for bid in ids:
+        members[key_of[bid]].append(bid)
     out: dict[str, tuple[FacadeUse, str, str]] = {}
     for bid in ids:
+        key = key_of[bid]
+        first = members[key][0]
+        if first != bid:
+            out[bid] = out[first]
+            continue
         h = height_of[bid]
         tags = dict(feature_of[bid].get("tags") or {})
         if h.get("landmark"):
             use = FacadeUse("landmark", "observed", bid, None, "landmark")
             palette = cfg.templates[cfg.landmark_template].wall_materials
         else:
-            use = resolve_use(bid, tags, related.get(bid, []))
+            use = resolve_use(bid, tags, [r for m in members[key] for r in related.get(m, [])])
             palette = cfg.facade_palettes[use.use]
-        near = [ids[k] for k in tree.query(footprints[bid], predicate="dwithin", distance=cfg.probe_m)]
-        avoid = {out[n][1] for n in near if n in out}
-        wall, origin = choose_wall(tags, palette, cfg.seed, bid, avoid)
+        near = {ids[k] for m in members[key] for k in tree.query(footprints[m], predicate="dwithin", distance=cfg.probe_m)}
+        avoid = {out[n][1] for n in near if n in out}  # no other part of this parcel is drawn yet
+        wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid)
         out[bid] = (use, wall, origin)
     return out
+
+
+RoofPlan = tuple[Template, str, str, str | None]
+
+
+def _templates(ids: list[str], height_of: Mapping[str, Mapping[str, Any]], cfg: DetailConfig) -> dict[str, Template]:
+    """The facade template of each building, from its heights category; a landmark takes the landmark template."""
+    return {bid: cfg.template_for(str(height_of[bid].get("category")), bool(height_of[bid].get("landmark"))) for bid in ids}
+
+
+def _roof_plans(
+    ids: list[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, key_of: Mapping[str, str],
+    tags_of: Mapping[str, dict[str, str]], templates: Mapping[str, Template], heights_m: Mapping[str, float], cfg: DetailConfig,
+) -> dict[str, RoofPlan]:
+    """``choose_roof`` per building, drawn for its ``appearance_key`` so the parts of one parcel share a roof.
+
+    A part with a taller part of its own parcel within ``probe_m`` gets no estimated hip: its roof is
+    the terrace under the setback, flat behind its parapet.
+    """
+    plans: dict[str, RoofPlan] = {}
+    for bid in ids:
+        geom = footprints[bid]
+        near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m)]
+        terrace = any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
+        convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
+        plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace)
+    return plans
 
 
 def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str]) -> dict[str, Any] | None:
@@ -567,6 +606,12 @@ def detail_scene(
     tree = STRtree([footprints[i] for i in ids])
     evidence = _shop_evidence(features, footprints, cfg)
     facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
+    key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
+    heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
+    templates = _templates(ids, height_of, cfg)
+    roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
+                             templates, heights_m, cfg)
+    setbacks: Counter[str] = Counter()
 
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
     candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids if tier_of[bid] == CORE]
@@ -608,12 +653,14 @@ def detail_scene(
             objects.append(_scenic_building(o, geom, bool(h.get("landmark")), facade_walls[bid][0], cfg))
             emitted[o.id] = (objects[first_object:], issues[first_issue:])
             continue
-        height = float(o.record["height"]["height_m"])
+        height = heights_m[bid]
         landmark = bool(h.get("landmark"))
-        template = cfg.template_for(str(h.get("category")), landmark)
+        template = templates[bid]
         templates_used[template.name] += 1
-        others = union_all([footprints[ids[k]] for k in tree.query(geom.buffer(cfg.probe_m + 0.5)) if ids[k] != bid])
+        near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m) if ids[k] != bid]
+        others = union_all([footprints[n] for n in near])
         refined, segments = refine_exposure(geom, others, cfg)
+        floors = setback_floors(segments, [(footprints[n], heights_m[n] if key_of[n] == key_of[bid] else None) for n in near], height, cfg)
         if abs(refined.area - geom.area) > 1e-6 * max(1.0, geom.area):
             issues.append(Issue("refined_footprint_area_changed", "critical", bid, f"{refined.area - geom.area:.6f} m²"))
         storeys = storeys_for(height, h.get("estimated_levels"), landmark, cfg)
@@ -621,10 +668,7 @@ def detail_scene(
         main = exposed_frontage(segments)
         tags = dict(feature_of[bid].get("tags") or {})
         use, wall_material, wall_origin = facade_walls[bid]
-        convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
-        shell_template, roof_material, roof_origin, roof_shape = choose_roof(
-            tags, template, cfg.seed, bid, geom.area, convex=convex,
-        )
+        shell_template, roof_material, roof_origin, roof_shape = roof_plans[bid]
         shop = ground == "shopfront"
         door_kind, door_spec = entrance(landmark, shop, cfg)
         plain_door = (door_kind, cfg.recess_depth_m, door_spec)
@@ -634,9 +678,9 @@ def detail_scene(
         def run_layout(door_kind: str, door_depth: float, door_opening: Any, storeys_used: Storeys) -> Layout:
             layout = Layout()
             for seg in segments:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
-                if seg.exposed:
+                if seg.exposed or seg.index in floors:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                     layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
-                                   bid, refined, others, cfg, layout)  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
+                                   bid, refined, others, cfg, layout, floors.get(seg.index, 0.0))  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
             return layout
 
         interior = None
@@ -755,6 +799,10 @@ def detail_scene(
 
         for kind, n in shell.counts.items():
             counts[kind] += n
+        setback_holes = [x for x in layout.holes if x.segment in floors]
+        setbacks["walls"] += len(floors)
+        setbacks["opened"] += len({x.segment for x in setback_holes})
+        setbacks["openings"] += len(setback_holes)
         roof_types[str(shell.roof["type"])] += 1
         door_rules[door_rule] += 1
         seg_exposed = sum(s.length for s in segments if s.exposed)
@@ -902,6 +950,7 @@ def detail_scene(
     }
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
     detailed.stats["wall_area_m2"] = wall_areas.to_record()
+    detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))

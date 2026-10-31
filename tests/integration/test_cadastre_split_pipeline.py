@@ -36,11 +36,13 @@ PARTS = [
 SHOP = f"osm-way-{BLOCK}:1000002AA0000A_part1"
 
 
-def _gml(origin_en: tuple[float, float]) -> bytes:
+def _gml(origin_en: tuple[float, float], parts: list[tuple[str, int, tuple[float, float, float, float]]] | None = None) -> bytes:
+    """A Catastro GML of ``parts``: ``(localId, storeys, (x0, y0, x1, y1))``; by default ``PARTS`` over the block depth."""
     e0, n0 = origin_en
     members = []
-    for index, (local_id, floors, (x0, x1)) in enumerate(PARTS):
-        ring = [(x0, 6.0), (x1, 6.0), (x1, 22.0), (x0, 22.0), (x0, 6.0)]
+    boxes = parts if parts is not None else [(local_id, floors, (x0, 6.0, x1, 22.0)) for local_id, floors, (x0, x1) in PARTS]
+    for index, (local_id, floors, (x0, y0, x1, y1)) in enumerate(boxes):
+        ring = [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
         pos = " ".join(f"{e0 + x:.3f} {n0 + y:.3f}" for x, y in ring)
         members.append(
             f'<gml:featureMember><bu-ext2d:BuildingPart gml:id="ES.SDGC.BU.{local_id}">'
