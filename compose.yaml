@@ -1,7 +1,11 @@
 # Optional. See README "Docker (optional)". Use tools/docker/run.sh rather than calling this directly.
 services:
   dev:
-    build: .
+    build:
+      context: .
+      # tools/docker/inputs.sh, set by run.sh: run.sh rebuilds when the hash no longer matches.
+      labels:
+        org.onward-generator.inputs: "${ONWARD_IMAGE_INPUTS:-}"
     # tools/docker/image.sh: onward-generator:dev, or dev-<folder> in a linked git worktree.
     image: ${ONWARD_IMAGE:-onward-generator:dev}
     working_dir: /work

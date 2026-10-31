@@ -33,7 +33,7 @@ tools/docker/run.sh onward-generator doctor
 tools/docker/run.sh --build pytest -q
 ```
 
-`--build` rebuilds the image first; use it after a lock file changes. The wrapper also mounts `${XDG_CACHE_HOME:-~/.cache}/onward-generator`, so the texture tile cache (`docs/08-dress.md`) is kept between runs.
+The wrapper rebuilds the image by itself when it is missing or when the Dockerfile, a lock file or `pyproject.toml` changed since it was built: the image carries the SHA-256 of those files (`tools/docker/inputs.sh`) as the label `org.onward-generator.inputs`. Before this, a lock file change (DuckDB, for one) kept the old image and the run failed with `No module named 'duckdb'`. `--build` still forces a rebuild. The wrapper also mounts `${XDG_CACHE_HOME:-~/.cache}/onward-generator`, so the texture tile cache (`docs/08-dress.md`) is kept between runs.
 
 **Local virtual environment.**
 
