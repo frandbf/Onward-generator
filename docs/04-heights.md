@@ -11,6 +11,8 @@ The module does not import `geo` and does not modify the scene. It reads `geo_sc
   [--config config/heights.default.json] [--overrides <overrides.json>] [--overwrite]
 ```
 
+`--secondary-overrides <heights_overrides.overture.json>` adds third-party values from `overture match` (ADR-021) in a tier of their own, below an OSM `height` and the `--overrides` file. The file uses the same schema; an entry may add `origin` (`observed`, `estimated` or `ai_generated`). `run` passes it when the `overture` plugin runs, and stops at the plan when `config/sources.json` ranks `overture` above a plugin of the map that writes authoritative overrides, so the priority stays the only ranking.
+
 `--overrides` replaces `overrides_file` in the configuration. That is how Catastro overrides from `cadastre match` or `cadastre split` are applied (`docs/05-cadastre.md`). Outside Spain, and in Navarre and the Basque Country, there is no Catastro step. Source plugins (ADR-018) each write a `heights_overrides.<id>.json`; when a map has more than one, `source merge` ranks them by `config/sources.json` `priority` into one file, and `run` passes that one. The priority is the only place sources are ranked. Without a plugin for the map, heights stay on the OSM estimate.
 
 After `cadastre split` the scene is `data/processed/cadastre/geo_scene.json`. A block OSM drew as one polygon arrives as several sub-buildings (`parent` names the OSM building), each with its own Catastro storey count, so each gets its own `authoritative_levels` height instead of one estimate for the whole block. `heights_report.json` counts them in `counts.subdivided`: `osm_buildings_split`, `sub_buildings`, `levels_range` (`null` when nothing was split). Override ids may be an OSM id or `<osm id>:<localId>` (`config/heights.overrides.schema.json`). ADR-016.
@@ -24,6 +26,8 @@ The first step that produces a value wins:
 | 1a | `override` | measured | An override with `height_m`, from an authorised open dataset, with source and licence | the file's (0.9 by default) |
 | 1b | `explicit_height` | measured | An OSM `height` tag inside the bounds | 0.95 |
 | 1c′ | `authoritative_levels` | inferred | An override that only has `levels` (Catastro): `levels × storey height` for the category. If it differs from OSM `building:levels`, `override_levels_differ_from_osm` is recorded | the file's (Catastro: 0.6–0.85) |
+| 1d | `third_party_height` | inferred | A secondary override with `height_m` (Overture). The rule names its origin, dataset and licence | the file's (Overture: 0.8 observed, 0.6 estimated, 0.5 ai_generated) |
+| 1e | `third_party_levels` | inferred | A secondary override with only `levels`: `levels × storey height` | the file's |
 | 1c | `explicit_levels` | inferred | `building:levels × storey height` (3.0 m residential; 3.75 m commercial and public) | 0.75 |
 | — | `landmark_placeholder` | fallback | A landmark with no explicit value and no override: the category default, **flagged for manual review** | 0.1 |
 | 2 | `building_type` | inferred | Typical storeys for the category × storey height, clamped to the category range. Only when a tag identifies the type. `building=yes` alone is not enough | 0.4 |
@@ -100,7 +104,9 @@ Global bounds: 2.5–120 m.
 
 `overrides_file` (relative to the configuration file) points at JSON validated with `config/heights.overrides.schema.json`. `id`, `source`, and `license` are required, plus `height_m`, `levels`, or both. Duplicate ids and heights outside the bounds are refused.
 
-Issues: `override_not_in_scene`, and `override_differs_from_osm` when the override contradicts the OSM `height` by more than 10%.
+Secondary overrides (`--secondary-overrides`) follow the same validation. `heights.json` and the report record them under `secondary_overrides`: path, SHA-256, `count`, `used`, and the attribution `sources` of the entries a building used. `generate` adds those sources to the scene attribution. They feed the neighbourhood median only when `neighbourhood.reliable_sources` lists `third_party_height` or `third_party_levels`; the default does not.
+
+Issues: `override_not_in_scene` (for either file), and `override_differs_from_osm` when the override contradicts the OSM `height` by more than 10%.
 
 The default configuration has no overrides. Catastro overrides are produced by `cadastre match` and passed with `--overrides`.
 

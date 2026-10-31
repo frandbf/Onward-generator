@@ -1,4 +1,4 @@
-"""``overture match``: places as third-party POIs (offline)."""
+"""``overture match``: places as third-party POIs and buildings as secondary height overrides (offline)."""
 
 from __future__ import annotations
 
@@ -8,23 +8,28 @@ import json
 from pathlib import Path
 
 import pytest
-from shapely import Point, box
+from shapely import MultiPolygon, Point, box
 
+from onward_generator.heights import load_height_config
 from onward_generator.overture.acquire import FetchRecord
 from onward_generator.overture.match import (
     DEFAULT_CONFIG_PATH,
+    BuildingMatch,
     OvertureConfigError,
     load_config,
+    match_buildings,
     match_report,
+    overrides_document,
     place_tag,
     places_document,
     read_places,
     scene_frame,
 )
-from tests.overture_fixture import frame, place, scene, source, wgs84, write_places
+from tests.overture_fixture import BLOCK, building, frame, place, scene, source, wgs84, write_buildings, write_places
 
 CFG = load_config()
 ALLOWED = frozenset({"CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0", "CC-BY-4.0"})
+BUILDING_ALLOWED = ALLOWED | {"ODbL-1.0"}
 
 
 def _record(path: Path, rows: int = 0) -> FetchRecord:
@@ -51,7 +56,11 @@ def _write_config(tmp_path: Path, **changes: object) -> Path:
 def test_default_config_is_read_as_given() -> None:
     CFG = load_config()
     assert CFG.min_confidence == 0.7 and CFG.operating_status == frozenset({"open"}) and CFG.accept_missing_status is True
+    assert CFG.skip_datasets == frozenset({"OpenStreetMap"})
     assert CFG.categories["bakery"] == ("shop", "bakery") and CFG.categories["restaurant"] == ("amenity", "restaurant")
+    assert CFG.min_iou == 0.5 and CFG.default_origin == "estimated"
+    assert CFG.origins["Microsoft ML Buildings"] == "ai_generated" and CFG.origins["OpenStreetMap"] == "observed"
+    assert CFG.confidence == {"observed": 0.8, "estimated": 0.6, "ai_generated": 0.5}
     assert CFG.path == str(DEFAULT_CONFIG_PATH) and CFG.version == "0.1.0"
 
 
@@ -60,6 +69,8 @@ def test_default_config_is_read_as_given() -> None:
     ({"places__operating_status": ["gone"]}, "/places/operating_status/0"),
     ({"places__categories": {"bakery": {"shop": "bakery", "amenity": "cafe"}}}, "/places/categories/bakery"),
     ({"places__categories": {"bakery": {"building": "yes"}}}, "/places/categories/bakery"),
+    ({"buildings__min_iou": 0}, "/buildings/min_iou"),
+    ({"buildings__default_origin": "guess"}, "/buildings/default_origin"),
 ])
 def test_invalid_config_is_refused_with_its_path(tmp_path: Path, changes: dict, fragment: str) -> None:
     with pytest.raises(OvertureConfigError, match=fragment):
@@ -73,18 +84,18 @@ def test_unreadable_config_is_refused(tmp_path: Path) -> None:
 
 
 def test_every_config_problem_is_listed(tmp_path: Path) -> None:
-    path = _write_config(tmp_path, places__min_confidence=2, places__operating_status=["gone"])
+    path = _write_config(tmp_path, places__min_confidence=2, buildings__min_iou=0)
     with pytest.raises(OvertureConfigError) as caught:
         load_config(path)
     assert str(caught.value) == (
-        f"{path.resolve()}: /places/min_confidence: 2 is greater than the maximum of 1; "
-        "/places/operating_status/0: 'gone' is not one of ['open', 'temporarily_closed', 'permanently_closed']"
+        f"{path.resolve()}: /buildings/min_iou: 0 is less than or equal to the minimum of 0; "
+        "/places/min_confidence: 2 is greater than the maximum of 1"
     )
 
 
 def test_config_values_are_read_from_the_file(tmp_path: Path) -> None:
-    cfg = load_config(_write_config(tmp_path, places__accept_missing_status=False, places__min_confidence=0.3))
-    assert cfg.accept_missing_status is False and cfg.min_confidence == 0.3
+    cfg = load_config(_write_config(tmp_path, places__accept_missing_status=False, places__min_confidence=0.3, buildings__min_iou=0.8))
+    assert cfg.accept_missing_status is False and cfg.min_confidence == 0.3 and cfg.min_iou == 0.8
     assert cfg.path == str((tmp_path / "overture.json").resolve())
 
 
@@ -209,11 +220,174 @@ def test_places_document_counts_and_attributes(tmp_path: Path) -> None:
     assert doc["places"] == kept
 
 
-def test_match_report_names_the_scene_the_config_and_the_places() -> None:
-    places = {"counts": {"rows": 3, "kept": 1, "skipped": {}}, "licenses": [{"dataset": "meta"}], "places": []}
-    report = match_report(scene_ref={"path": "s"}, cfg=CFG, places=places)
-    assert report == {
-        "schema": "onward_generator.overture_match_report", "schema_version": "0.1.0", "scene": {"path": "s"},
-        "config": {"path": CFG.path, "version": "0.1.0"},
-        "places": {"counts": {"rows": 3, "kept": 1, "skipped": {}}, "licenses": [{"dataset": "meta"}]},
+def _buildings(tmp_path: Path, rows: list) -> Path:
+    return write_buildings(tmp_path / "buildings.parquet", rows)
+
+
+def test_buildings_match_by_intersection_over_union_one_to_one(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [
+        building("o1", box(0, 0, 10, 10), height=14.5, floors=None, facade="#aa8866", roof="#552211",  # IoU 1 with way-1
+                 sources=[source("Esri Community Maps", "CC-BY-4.0")]),
+        building("o1b", box(0.5, 0, 10, 10), height=30.0, floors=9),  # also way-1, IoU 0.95: loses, way-1 is taken
+        building("o2", box(12, 0, 19, 10), height=None, floors=3,  # IoU 0.7 with way-2
+                 sources=[source("Esri Community Maps", None), source("Microsoft ML Buildings", "ODbL-1.0", "/properties/num_floors")]),
+        building("o3", box(0, 20, 4.9, 30), height=9.0, floors=3),  # IoU 0.49 with way-3: below min_iou
+        building("o4", box(100, 100, 110, 110), height=8.0),  # meets no OSM footprint
+        building("o5", box(0, 20, 10, 30), height=None, floors=None),  # nothing to lend
+        building("o6", box(0, 20, 10, 30), height=None, floors=None),
+    ])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert [(m.building_id, m.gers_id) for m in matches] == [("osm-way-1", "o1"), ("osm-way-2", "o2")]
+    one, two = matches
+    assert one.iou == pytest.approx(1.0, abs=1e-3) and one.height_m == 14.5 and one.levels is None
+    assert one.dataset == "Esri Community Maps" and one.license == "CC-BY-4.0" and one.origin == "observed"
+    assert one.facade_color == "#aa8866" and one.roof_color == "#552211"
+    assert two.iou == pytest.approx(0.7, abs=1e-3) and two.height_m is None and two.levels == 3
+    assert one.building_id == "osm-way-1" and one.gers_id == "o1"
+    assert two.dataset == "Microsoft ML Buildings" and two.origin == "ai_generated"
+    assert skipped == {"no_height_or_floors": 2, "unmatched": 3}
+
+
+def test_the_height_source_names_the_dataset_and_unknown_datasets_are_estimated(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [
+        building("o1", box(0, 0, 10, 10), height=11.0, floors=4,
+                 sources=[source("Someone", "CC0-1.0"), source("Google Open Buildings", None, "/properties/height")]),
+        building("o2", box(12, 0, 22, 10), height=7.0, floors=2, sources=[source("Someone", "CC0-1.0")]),
+        building("o3", box(0, 20, 10, 30), height=8.0, floors=None, sources=[source("Nobody", None)]),
+    ])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    # o1: height from Google, floors from another dataset: only the height is kept, with Google's licence.
+    # o3: no licence stated or documented, so "unknown", which no allowlist has: not lent.
+    assert [(m.dataset, m.license, m.origin, m.height_m, m.levels) for m in matches] == [
+        ("Google Open Buildings", "CC-BY-4.0", "ai_generated", 11.0, None), ("Someone", "CC0-1.0", "estimated", 7.0, 2),
+    ]
+    assert skipped == {"licence_not_allowed": 1, "unmatched": 0}
+
+
+def test_a_building_whose_licence_is_not_allowed_lends_nothing(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [
+        building("o1", box(0, 0, 10, 10), height=9.0, floors=None, sources=[]),
+        building("o2", box(12, 0, 22, 10), height=9.0, floors=3, sources=[source("Microsoft ML Buildings", "ODbL-1.0")]),
+    ])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, ALLOWED)
+    assert matches == [] and skipped == {"licence_not_allowed": 2, "unmatched": 0}
+    lenient = match_buildings(path, scene(BLOCK), CFG, ALLOWED | {"unknown", "ODbL-1.0"})[0]
+    assert [(m.dataset, m.license, m.origin) for m in lenient] == [
+        ("unknown", "unknown", "estimated"), ("Microsoft ML Buildings", "ODbL-1.0", "ai_generated"),
+    ]
+
+
+def test_openstreetmap_values_are_not_lent_again(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [
+        building("o1", box(0, 0, 10, 10), height=11.0, floors=4, sources=[source("OpenStreetMap", "ODbL-1.0")]),
+        building("o1b", box(0, 0, 10, 10), height=11.0, floors=4, sources=[source("OpenStreetMap", "ODbL-1.0")]),
+        building("o2", box(12, 0, 22, 10), height=13.0, floors=4,
+                 sources=[source("OpenStreetMap", "ODbL-1.0"), source("Microsoft ML Buildings", "ODbL-1.0", "/properties/height")]),
+        building("o3", box(0, 20, 10, 30), height=13.0, floors=5,
+                 sources=[source("Microsoft ML Buildings", "ODbL-1.0"), source("OpenStreetMap", "ODbL-1.0", "/properties/height")]),
+    ])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert [(m.building_id, m.height_m, m.levels, m.dataset) for m in matches] == [
+        ("osm-way-2", 13.0, None, "Microsoft ML Buildings"), ("osm-way-3", None, 5, "Microsoft ML Buildings"),
+    ]
+    assert skipped == {"skipped_dataset": 2, "unmatched": 0}
+
+
+def test_a_height_outside_the_heights_bounds_keeps_only_the_floors(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [
+        building("o1", box(0, 0, 10, 10), height=2.4, floors=1),
+        building("o2", box(12, 0, 22, 10), height=121.0, floors=None),
+        building("o3", box(0, 20, 10, 30), height=120.0, floors=None),
+    ])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert [(m.building_id, m.height_m, m.levels) for m in matches] == [("osm-way-1", None, 1), ("osm-way-3", 120.0, None)]
+    assert skipped["height_out_of_bounds"] == 2
+    low = _buildings(tmp_path, [building("o1", box(0, 0, 10, 10), height=2.5, floors=None)])
+    assert [m.height_m for m in match_buildings(low, scene(BLOCK), CFG, BUILDING_ALLOWED)[0]] == [2.5]
+
+
+def test_iou_at_the_threshold_matches_and_a_point_footprint_does_not(tmp_path: Path) -> None:
+    from onward_generator.overture.match import _iou
+
+    path = _buildings(tmp_path, [
+        building("half", box(0, 0, 5, 10), height=9.0),  # IoU about 0.5 with way-1
+        building("dot", Point(15, 5), height=9.0),
+        building("dot2", Point(15, 5), height=9.0),
+        building("pair", MultiPolygon([box(12, 0, 22, 10), box(12, 20, 13, 21)]), height=11.0),
+        building("third", box(0, 20, 10, 35), height=12.0),  # IoU 2/3 with way-3
+    ])
+    exact = _iou(BLOCK["osm-way-1"], frame().to_local(wgs84(box(0, 0, 5, 10))))
+    matches, skipped = match_buildings(path, scene(BLOCK), dataclasses.replace(CFG, min_iou=exact), BUILDING_ALLOWED)
+    assert [(m.building_id, m.gers_id, m.iou) for m in matches] == [
+        ("osm-way-1", "half", 0.5), ("osm-way-2", "pair", 0.9901), ("osm-way-3", "third", 0.6667),
+    ]
+    assert skipped == {"no_footprint": 2, "unmatched": 0}
+    assert _iou(Point(0, 0), Point(0, 0)) == 0.0  # no area: no division by zero
+    assert _iou(box(0, 0, 0.5, 0.5), box(0, 0, 0.5, 1)) == 0.5  # a union under 1 m² still counts
+
+
+def test_a_tie_goes_to_the_first_row_then_the_lowest_id(tmp_path: Path) -> None:
+    loose = dataclasses.replace(CFG, min_iou=0.2)
+    path = _buildings(tmp_path, [
+        building("b", box(5, 0, 17, 10), height=9.0),  # IoU 0.294 with way-1 and with way-2
+        building("a", box(5, 0, 17, 10), height=7.0),
+    ])
+    matches, _ = match_buildings(path, scene(BLOCK), loose, BUILDING_ALLOWED)
+    assert [(m.building_id, m.gers_id) for m in matches] == [("osm-way-1", "a"), ("osm-way-2", "b")]
+
+
+def test_zero_height_or_floors_lend_nothing(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [building("o1", box(0, 0, 10, 10), height=0.0, floors=0),
+                                 building("o2", box(12, 0, 22, 10), height=1.0, floors=None)])
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert matches == [] and skipped == {"height_out_of_bounds": 1, "no_height_or_floors": 1, "unmatched": 0}
+
+
+def test_a_scene_without_buildings_matches_nothing(tmp_path: Path) -> None:
+    path = _buildings(tmp_path, [building("o1", box(0, 0, 10, 10)), building("o2", box(0, 0, 10, 10))])
+    matches, skipped = match_buildings(path, scene({}), CFG, BUILDING_ALLOWED)
+    assert matches == [] and skipped == {"no_footprint": 2, "unmatched": 0}
+
+
+def test_overrides_are_valid_secondary_overrides_for_heights(tmp_path: Path) -> None:
+    matches = [
+        BuildingMatch("osm-way-1", "o1", 0.91, 14.5, 4, "OpenStreetMap", "ODbL-1.0", "observed", None, None),
+        BuildingMatch("osm-way-2", "o2", 0.7, None, 3, "Microsoft ML Buildings", "ODbL-1.0", "ai_generated", "#fff", None),
+        BuildingMatch("osm-way-3", "o3", 0.6, 9.0, None, "Someone", "CC0-1.0", "estimated", None, None),
+    ]
+    doc = overrides_document(matches, _record(tmp_path / "b.parquet"), CFG)
+    assert doc["version"] == "0.1.0"
+    assert doc["overrides"][0] == {
+        "id": "osm-way-1", "height_m": 14.5, "levels": 4, "source": "Overture Maps buildings 2026-10-21.0: OpenStreetMap",
+        "license": "ODbL-1.0", "retrieved_at": "2026-10-30T12:00:00+00:00", "confidence": 0.8, "origin": "observed",
+        "note": "IoU 0.91 with Overture o1",
     }
+    assert "height_m" not in doc["overrides"][1] and doc["overrides"][1]["confidence"] == 0.5
+    assert "levels" not in doc["overrides"][2] and doc["overrides"][2]["confidence"] == 0.6
+    path = tmp_path / "heights_overrides.overture.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    cfg = load_height_config(secondary_overrides_path=path)
+    assert cfg.secondary_overrides["osm-way-2"].origin == "ai_generated" and cfg.overrides == {}
+
+
+def test_match_report_counts_by_origin_and_licence(tmp_path: Path) -> None:
+    matches = [
+        BuildingMatch("osm-way-1", "o1", 0.91, 14.5, 4, "OpenStreetMap", "ODbL-1.0", "observed", "#a", "#b"),
+        BuildingMatch("osm-way-2", "o2", 0.7, None, 3, "Microsoft ML Buildings", "ODbL-1.0", "ai_generated", None, None),
+        BuildingMatch("osm-way-3", "o3", 0.6, 9.0, None, "Microsoft ML Buildings", "ODbL-1.0", "ai_generated", None, None),
+    ]
+    places = {"counts": {"rows": 3, "kept": 1, "skipped": {}}, "licenses": [{"dataset": "meta"}]}
+    report = match_report(scene_ref={"path": "s"}, cfg=CFG, places=places, matches=matches, building_skips={"unmatched": 2},
+                          buildings_record=_record(tmp_path / "b.parquet", rows=5), osm_buildings=7)
+    assert report["schema"] == "onward_generator.overture_match_report" and report["scene"] == {"path": "s"}
+    assert report["schema_version"] == "0.1.0"
+    assert report["config"] == {"path": CFG.path, "version": "0.1.0"}
+    assert report["places"] == places
+    b = report["buildings"]
+    assert b["source"] == {"path": str(tmp_path / "b.parquet"), "sha256": "0" * 64, "release": "2026-10-21.0"}
+    assert b["counts"] == {"overture_rows": 5, "osm_buildings": 7, "matched": 3, "with_height": 2, "with_levels": 2,
+                           "by_origin": {"ai_generated": 2, "observed": 1}, "skipped": {"unmatched": 2}}
+    assert b["licenses"] == [{"dataset": "Microsoft ML Buildings", "license": "ODbL-1.0", "buildings": 2},
+                             {"dataset": "OpenStreetMap", "license": "ODbL-1.0", "buildings": 1}]
+    assert b["matches"][0]["tint_hints"] == {"facade_color": "#a", "roof_color": "#b"}
+    assert b["matches"][1] == matches[1].to_dict()

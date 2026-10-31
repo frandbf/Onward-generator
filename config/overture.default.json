@@ -299,5 +299,24 @@
         "shop": "clothes"
       }
     }
+  },
+  "buildings": {
+    "min_iou": 0.5,
+    "skip_datasets": [
+      "OpenStreetMap"
+    ],
+    "origins": {
+      "OpenStreetMap": "observed",
+      "Esri Community Maps": "observed",
+      "Instituto Geográfico Nacional (España)": "observed",
+      "Microsoft ML Buildings": "ai_generated",
+      "Google Open Buildings": "ai_generated"
+    },
+    "default_origin": "estimated",
+    "confidence": {
+      "observed": 0.8,
+      "estimated": 0.6,
+      "ai_generated": 0.5
+    }
   }
 }

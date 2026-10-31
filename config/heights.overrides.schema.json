@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://onward-generator.local/schemas/heights.overrides.schema.json",
   "title": "Authoritative building-height overrides",
-  "description": "Heights or floor counts from authoritative open data (cadastre, LiDAR, official surveys). Every entry needs a traceable source and licence. An entry with only `levels` is converted with the category storey height.",
+  "description": "Heights or floor counts from open data with a traceable source and licence: authoritative (cadastre, LiDAR, official surveys) through --overrides, or third-party (Overture) through --secondary-overrides. An entry with only `levels` is converted with the category storey height.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "overrides"],
@@ -23,6 +23,7 @@
           "license": { "type": "string", "minLength": 2 },
           "retrieved_at": { "type": "string" },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "origin": { "enum": ["observed", "estimated", "ai_generated"], "description": "How the source produced the value; overture match writes it from sources[].dataset (ADR-021)" },
           "note": { "type": "string" }
         }
       }

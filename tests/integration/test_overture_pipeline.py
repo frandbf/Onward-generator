@@ -1,7 +1,8 @@
-"""Overture places on the synthetic street block around MURCIA_CENTER: fetch (local parquet) → match → heights → generate → detail.
+"""Overture on the synthetic street block around MURCIA_CENTER: fetch (local parquet) → match → heights → generate → detail.
 
 Building 312 holds the OSM bakery POI 401; an Overture place inside it is ignored (OSM ranks first).
-An Overture place inside 313 gives that residential building a shop.
+An Overture place inside 313 gives that residential building a shop. Overture footprints equal to
+313 (height 13 m) and 311 (6 floors, ML) lend them heights over their OSM building:levels.
 """
 
 from __future__ import annotations
@@ -55,7 +56,8 @@ def _pipeline(tmp: Path) -> dict[str, Path]:
     survey = tmp / "survey.json"
     survey.write_text(json.dumps({"version": "0.1.0", "overrides": [
         {"id": "osm-way-315", "levels": 1, "source": "Synthetic survey", "license": "CC0-1.0"}]}), encoding="utf-8")
-    assert cli_main(["heights", "--scene", str(scene), "--overrides", str(survey), "--out", str(out["heights"])]) == 0
+    assert cli_main(["heights", "--scene", str(scene), "--overrides", str(survey),
+                     "--secondary-overrides", str(out["overture"] / "heights_overrides.overture.json"), "--out", str(out["heights"])]) == 0
     heights = out["heights"] / "heights.json"
     assert generate_main(["--scene", str(scene), "--heights", str(heights), "--out", str(out["base"]), "--no-preview"]) == 0
     assert detail_main(["--scene", str(scene), "--heights", str(heights), "--base", str(out["base"]), "--no-preview",
@@ -71,11 +73,25 @@ def _building(manifest: dict, bid: str) -> dict:
     return next(o for o in manifest["objects"] if o.get("type") == "building" and o["source_ids"][0] == bid)
 
 
-def test_match_writes_places_and_a_report(tmp_path: Path) -> None:
+def test_match_writes_overrides_places_and_a_report(tmp_path: Path) -> None:
     run = _pipeline(tmp_path)
     report = _json(run["overture"] / "overture_match_report.json")
     assert report["places"]["counts"] == {"rows": 4, "kept": 4, "skipped": {}}
-    assert not (run["overture"] / "heights_overrides.overture.json").exists()
+    assert report["buildings"]["counts"]["matched"] == 2 and report["buildings"]["counts"]["by_origin"] == {"ai_generated": 1, "observed": 1}
+    overrides = _json(run["overture"] / "heights_overrides.overture.json")["overrides"]
+    assert [(o["id"], o.get("height_m"), o.get("levels"), o["origin"]) for o in overrides] == [
+        ("osm-way-311", None, 6, "ai_generated"), ("osm-way-313", 13.0, None, "observed"),
+    ]
+
+
+def test_overture_heights_outrank_osm_levels(tmp_path: Path) -> None:
+    run = _pipeline(tmp_path)
+    heights = {b["building_id"]: b for b in _json(run["heights"] / "heights.json")["buildings"]}
+    assert heights["osm-way-313"]["height_source"] == "third_party_height" and heights["osm-way-313"]["height_m"] == 13.0
+    assert heights["osm-way-311"]["height_source"] == "third_party_levels" and heights["osm-way-311"]["estimated_levels"] == 6
+    assert heights["osm-way-312"]["height_source"] == "explicit_levels"
+    secondary = _json(run["heights"] / "heights.json")["secondary_overrides"]
+    assert secondary["used"] == 2 and {s["license"] for s in secondary["sources"]} == {"CC-BY-4.0", "ODbL-1.0"}
 
 
 def test_a_place_gives_a_shop_only_where_osm_has_none(tmp_path: Path) -> None:
@@ -103,6 +119,7 @@ def test_the_attribution_names_the_datasets_used(tmp_path: Path) -> None:
     assert texts[-2:] == ["Data from AllThePlaces; Overture Maps Foundation", "Data from Foursquare; Overture Maps Foundation"]
     assert "Data from Foursquare; Overture Maps Foundation" in texts
     assert "Data from meta; Overture Maps Foundation" not in texts  # the meta place sat in 312, where OSM ranks first
+    assert "Overture Maps buildings 2026-10-21.0: Microsoft ML Buildings" in texts
     assert "Synthetic survey" in texts
     doc, _ = read_glb((run["detail"] / "scene_visual.glb").read_bytes())
     extras = doc["asset"]["extras"] if "extras" in doc.get("asset", {}) else doc["extras"]

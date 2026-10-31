@@ -547,8 +547,9 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
     }
 
     attribution = [dict(scene.get("attribution") or {})]
-    for extra in (heights.get("overrides") or {}).get("sources", []):
-        attribution.append(dict(extra))
+    for key in ("overrides", "secondary_overrides"):
+        for extra in (heights.get(key) or {}).get("sources", []):
+            attribution.append(dict(extra))
     inputs = {
         "geo_scene": scene_ref,
         "heights": heights_ref,

@@ -200,8 +200,12 @@ def _cadastre(out: Path) -> StageReport:
 
 
 def _overture_match(out: Path) -> StageReport:
-    places = _read(out / "overture_match_report.json")["places"]["counts"]
-    return StageReport(f"places {group(int(places['kept']))} of {group(int(places['rows']))}")
+    report = _read(out / "overture_match_report.json")
+    places, buildings = report["places"]["counts"], report["buildings"]["counts"]
+    return StageReport(
+        f"places {group(int(places['kept']))} of {group(int(places['rows']))}  "
+        f"heights {group(int(buildings['matched']))} of {group(int(buildings['osm_buildings']))}"
+    )
 
 
 def _heights(out: Path) -> StageReport:

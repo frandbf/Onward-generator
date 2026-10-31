@@ -1,8 +1,12 @@
-"""``overture``: Overture Maps places, for any city (ADR-021), an adapter over ``onward_generator.overture``.
+"""``overture``: Overture Maps places and buildings, for any city (ADR-021), an adapter over ``onward_generator.overture``.
 
 Two stages: ``overture`` (``overture fetch``, the download) and ``overture-match``
-(``overture match``, offline, reading the latest scene). Its places go to
-``detail --places``, ranked as shop evidence by ``config/sources.json`` ``evidence`` (ADR-022).
+(``overture match``, offline, reading the latest scene). Its height overrides do
+not join the ADR-018 merge: a merged ``height_m`` is an authoritative override
+that outranks an OSM ``height``. They go to ``heights --secondary-overrides``,
+below an OSM ``height`` and the merged overrides, above OSM ``building:levels``.
+Its places go to ``detail --places``, ranked as shop evidence by ``config/sources.json``
+``evidence`` (ADR-022).
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ class OverturePlugin:
         attribution="Overture Maps Foundation, overturemaps.org",
         obligations=OBLIGATIONS,
     )
-    produces: frozenset[Kind] = frozenset({"use"})
+    produces: frozenset[Kind] = frozenset({"height_m", "levels", "use"})
 
     def covers(self, longitude: float, latitude: float) -> bool:
         return -180.0 <= longitude <= 180.0 and -90.0 <= latitude <= 90.0
@@ -49,5 +53,6 @@ class OverturePlugin:
                 SourceStage("overture-match", match, out / "overture_places.json", (scene, buildings)),
             ),
             overrides=None,
+            secondary_overrides=out / "heights_overrides.overture.json",
             places=out / "overture_places.json",
         )

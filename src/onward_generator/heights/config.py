@@ -49,6 +49,8 @@ class Override:
     confidence: float = 0.9
     retrieved_at: str | None = None
     note: str | None = None
+    origin: str | None = None
+    """``observed``, ``estimated`` or ``ai_generated``, when the source states it (Overture, ADR-021)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +84,9 @@ class HeightConfig:
     document: Mapping[str, Any]
     file: FileRef | None = None
     overrides_file: FileRef | None = None
+    secondary_overrides: Mapping[str, Override] = MappingProxyType({})
+    """Third-party values (Overture): below an OSM ``height`` and authoritative overrides, above ``building:levels``."""
+    secondary_overrides_file: FileRef | None = None
 
     @property
     def category_names(self) -> frozenset[str]:
@@ -156,10 +161,12 @@ def config_from_document(
     base_dir: Path | None = None,
     file: FileRef | None = None,
     overrides_path: str | Path | None = None,
+    secondary_overrides_path: str | Path | None = None,
 ) -> HeightConfig:
     """Validate a configuration document (schema + cross-field rules) and build the typed config.
 
-    ``overrides_path`` replaces the document's ``overrides_file``.
+    ``overrides_path`` replaces the document's ``overrides_file``. ``secondary_overrides_path`` adds
+    third-party overrides ranked below it (docs/04-heights.md).
     """
     origin = file.path if file else "<document>"
     problems = _schema_problems(doc, CONFIG_SCHEMA_PATH)
@@ -178,6 +185,10 @@ def config_from_document(
         if not resolved_overrides.is_absolute():
             resolved_overrides = (base_dir or Path.cwd()) / resolved_overrides
         overrides, overrides_ref = _load_overrides(resolved_overrides, bounds)
+    secondary: dict[str, Override] = {}
+    secondary_ref: FileRef | None = None
+    if secondary_overrides_path is not None:
+        secondary, secondary_ref = _load_overrides(Path(secondary_overrides_path).expanduser().resolve(), bounds)
 
     return HeightConfig(
         version=doc["version"],
@@ -200,15 +211,20 @@ def config_from_document(
         document=MappingProxyType(json.loads(json.dumps(doc))),
         file=file,
         overrides_file=overrides_ref,
+        secondary_overrides=MappingProxyType(secondary),
+        secondary_overrides_file=secondary_ref,
     )
 
 
-def load_height_config(path: str | Path | None = None, *, overrides_path: str | Path | None = None) -> HeightConfig:
+def load_height_config(
+    path: str | Path | None = None, *, overrides_path: str | Path | None = None, secondary_overrides_path: str | Path | None = None,
+) -> HeightConfig:
     """Load a configuration file (default: ``config/heights.default.json``)."""
     try:
         doc, resolved = read_json_document(path or DEFAULT_CONFIG_PATH)
     except ConfigLoadError as exc:
         raise HeightConfigError(path or DEFAULT_CONFIG_PATH, [exc.diagnostic.message]) from exc
     return config_from_document(
-        doc, base_dir=resolved.parent, file=FileRef(str(resolved), _sha256(resolved)), overrides_path=overrides_path
+        doc, base_dir=resolved.parent, file=FileRef(str(resolved), _sha256(resolved)), overrides_path=overrides_path,
+        secondary_overrides_path=secondary_overrides_path,
     )

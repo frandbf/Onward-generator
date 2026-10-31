@@ -59,7 +59,7 @@ from onward_generator.run_log import (
 )
 from onward_generator.sources.merge import MERGED_FILE
 from onward_generator.sources.plugin import SourceError, SourceStage, SourceSteps
-from onward_generator.sources.registry import check_licence, choices, describe, load_source_config
+from onward_generator.sources.registry import check_licence, check_secondary_rank, choices, describe, load_source_config
 
 Execute = Callable[[Sequence[str]], int]
 Ask = Callable[[], str]
@@ -126,9 +126,9 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     geo_argv = list(geo_command(root).argv)
     geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
     sources, scene, overrides = source_plan(root, geo_scene)
-    places = places_plan(root, geo_scene)
+    secondary, places = third_party_plan(root, geo_scene)
     source_steps = [(stage.name, list(stage.argv)) for stage in sources]
-    heights_argv = list(heights_command(scene, overrides).argv)
+    heights_argv = list(heights_command(scene, overrides, secondary).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
@@ -224,15 +224,23 @@ def _plugin_steps(root: Path, scene: Path) -> list[tuple[str, SourceSteps]]:
         steps = choice.plugin.steps(root, scene)
         scene = steps.scene or scene
         found.append((choice.plugin.id, steps))
+    primary = [plugin_id for plugin_id, steps in found if steps.overrides is not None]
+    secondary = [plugin_id for plugin_id, steps in found if steps.secondary_overrides is not None]
+    try:
+        check_secondary_rank(primary, secondary, config)
+    except SourceError as exc:
+        raise PipelineError(str(exc)) from exc
     return found
 
 
-def places_plan(root: Path, scene: Path) -> Path | None:
-    """The third-party places ``detail`` reads, from the last plugin that writes them (ADR-021)."""
+def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None]:
+    """The secondary overrides ``heights`` reads and the places ``detail`` reads, from the last plugin that writes each (ADR-021)."""
+    secondary: Path | None = None
     places: Path | None = None
     for _plugin_id, steps in _plugin_steps(root, scene):
+        secondary = steps.secondary_overrides or secondary
         places = steps.places or places
-    return places
+    return secondary, places
 
 
 def _source_stages(root: Path) -> list[SourceStage]:

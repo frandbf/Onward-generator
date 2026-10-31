@@ -103,9 +103,10 @@ def geo_command(directory: str | Path, retrieved_at: str | None = None) -> Stage
     return invoke(*parts)
 
 
-def heights_command(scene: Path, overrides: Path | None = None) -> StageCommand:
+def heights_command(scene: Path, overrides: Path | None = None, secondary: Path | None = None) -> StageCommand:
     extra = ("--overrides", show(overrides)) if overrides is not None else ()
-    return invoke("heights", "--scene", show(scene), *extra, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
+    third = ("--secondary-overrides", show(secondary)) if secondary is not None else ()
+    return invoke("heights", "--scene", show(scene), *extra, *third, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
 
 
 def overture_fetch_command(root: Path) -> StageCommand:
@@ -114,7 +115,7 @@ def overture_fetch_command(root: Path) -> StageCommand:
 
 
 def overture_match_command(scene: Path, root: Path) -> StageCommand:
-    """``overture match``: third-party POIs for the scene (offline, ADR-021)."""
+    """``overture match``: third-party height overrides and POIs for the scene (offline, ADR-021)."""
     return invoke("overture", "match", "--scene", show(scene), "--map", show(root), "--out", show(stage_path(scene, "overture")))
 
 

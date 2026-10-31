@@ -26,17 +26,17 @@ Overture Maps publishes, for the whole world, about 88 million places (Meta, Mic
 
 ## Measurement
 
-`run --no-unity`, 150 m radius, release 2026-10-21.0, 30 October 2026. Shopfront buildings count the core buildings whose ground floor is a shopfront, by the evidence that made it one. Heights compare `heights` with and without `--secondary-overrides` on the same scene.
+`run --no-unity`, 150 m radius, release 2026-10-21.0, 31 October 2026, default configuration: LiDAR plugins, shop rooms (ADR-019) and the Catastro use (ADR-022), with `evidence` `osm`, `es.catastro`, `overture`. Shopfront buildings count the core buildings whose ground floor is a shopfront, by the evidence that ranked first. Shops without Overture are the shops not made from a place. Heights compare `heights` with and without `--secondary-overrides` on the same scene.
 
-| Map | OSM shop POIs | Places (rows → kept) | Shopfront buildings: OSM POI / Overture place | Shops | Heights changed by Overture |
-| --- | --- | --- | --- | --- | --- |
-| Madrid, 40.40657, −3.719187 (Catastro) | 9 | 58 → 6 | 3 / 3 | 3 → 6 | 0 of 84 (Catastro covers all; 3 ML heights matched, ranked below) |
-| Murcia, 37.98407, −1.12863 (Catastro) | 124 | 722 → 242 | 57 / 56 | 87 → 170 | 0 of 547 (Catastro covers all; 9 ML heights matched, ranked below) |
-| Mexico City, Roma Norte, 19.4195, −99.1617 | 58 | 430 → 90 | 19 / 19 | 29 → 53 | 0 of 168 (every Overture height there is OpenStreetMap's own; 9 Google footprints have no height) |
+| Map | OSM shop POIs | Places (rows → kept) | Shopfront buildings: OSM / Catastro use / Overture place | Shops without → with Overture | Shop interiors (on an Overture building) | Heights changed by Overture |
+| --- | --- | --- | --- | --- | --- | --- |
+| Madrid, 40.40657, −3.719187 (Catastro, IGN MDSn) | 9 | 58 → 6 | 3 / 3 / 3 | 6 → 9 | 9 (3) | 0 of 84 (IGN MDSn 66 and Catastro 18 cover all; 3 ML heights matched, ranked below) |
+| Murcia, 37.98407, −1.12863 (Catastro, IGN MDSn) | 124 | 722 → 242 | 60 / 12 / 54 | 99 → 180 | 52 (22) | 0 of 547 (IGN MDSn 388 and Catastro 159 cover all; 9 ML heights matched, ranked below) |
+| Mexico City, Roma Norte, 19.4195, −99.1617 | 58 | 430 → 90 | 27 / 0 / 19 | 31 → 53 | 46 (19) | 0 of 168 (every Overture height there is OpenStreetMap's own; 9 Google footprints have no height) |
 
-Places dropped: below 0.7 confidence (34, 337, 263), no mapped category (17, 141, 77), closed (1, 2, 0). The licence mix of the places that gave a shop: Madrid BrightQuery, Foursquare, meta (one each); Murcia meta 49, BrightQuery 27, Microsoft 4, Foursquare 2, AllThePlaces 1; Mexico City meta 22, Foursquare 2. Of all fetched place rows: Madrid BrightQuery 33, meta 17, Microsoft 7, Foursquare 1; Murcia BrightQuery 369, meta 286, Microsoft 40, Foursquare 23, Uberall 2, AllThePlaces 1, DAC 1; Mexico City meta 403, Foursquare 16, Microsoft 8, AllThePlaces 3. Building rows: Madrid OpenStreetMap 38, IGN 9, Microsoft ML 5; Murcia OpenStreetMap 204, Microsoft ML 2; Mexico City OpenStreetMap 208, Google Open Buildings 9.
+Places dropped: below 0.7 confidence (34, 337, 263), no mapped category (17, 141, 77), closed (1, 2, 0). The licence mix of the places that gave a shop: Madrid BrightQuery, Foursquare, meta (one each); Murcia meta 48, BrightQuery 26, Microsoft 4, Foursquare 2, AllThePlaces 1; Mexico City meta 20, Foursquare 2. Of all fetched place rows: Madrid BrightQuery 33, meta 17, Microsoft 7, Foursquare 1; Murcia BrightQuery 369, meta 286, Microsoft 40, Foursquare 23, Uberall 2, AllThePlaces 1, DAC 1; Mexico City meta 403, Foursquare 16, Microsoft 8, AllThePlaces 3. Building rows: Madrid OpenStreetMap 38, IGN 9, Microsoft ML 5; Murcia OpenStreetMap 204, Microsoft ML 2; Mexico City OpenStreetMap 208, Google Open Buildings 9.
 
-So Overture adds shops in every city tried, about as many shopfront buildings as OSM had, and in these three maps no heights: where Catastro runs it outranks Overture, and elsewhere the Overture heights found were copies of OSM. The height tier is there for cities where Overture carries Esri, IGN or ML heights that OSM lacks.
+So Overture adds shops in every city tried, on about as many buildings as OSM (fewer where a Catastro use or a commercial category ranks above it), and in these three maps no heights: where Catastro runs it outranks Overture, and elsewhere the Overture heights found were copies of OSM. The height tier is there for cities where Overture carries Esri, IGN or ML heights that OSM lacks.
 
 ## Consequences
 

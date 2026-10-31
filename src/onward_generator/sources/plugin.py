@@ -62,6 +62,8 @@ class SourceSteps:
     stages: tuple[SourceStage, ...]
     overrides: Path | None
     scene: Path | None = None
+    secondary_overrides: Path | None = None
+    """Third-party overrides that ``heights --secondary-overrides`` ranks below an OSM ``height`` (Overture, ADR-021)."""
     places: Path | None = None
     """Third-party POIs that ``detail --places`` ranks as shop evidence by ``config/sources.json`` ``evidence`` (Overture, ADR-021)."""
 

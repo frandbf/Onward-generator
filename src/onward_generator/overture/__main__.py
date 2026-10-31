@@ -16,13 +16,16 @@ from onward_generator.overture.acquire import OvertureError, fetch_map, load_rec
 from onward_generator.overture.match import (
     OvertureConfigError,
     load_config,
+    match_buildings,
     match_report,
+    overrides_document,
     places_document,
     read_places,
     scene_frame,
 )
 from onward_generator.sources.registry import load_source_config
 
+OVERRIDES_FILE = "heights_overrides.overture.json"
 PLACES_FILE = "overture_places.json"
 REPORT_FILE = "overture_match_report.json"
 
@@ -44,23 +47,32 @@ def _match(args: argparse.Namespace) -> int:
     scene = json.loads(scene_path.read_bytes())
     if not is_schema(scene.get("schema"), "onward_generator.geo_scene"):
         raise OvertureError("input is not a onward_generator.geo_scene")
-    places_path = theme_target(args.map, "places")
-    places_record = load_record(places_path)
+    places_path, buildings_path = theme_target(args.map, "places"), theme_target(args.map, "buildings")
+    places_record, buildings_record = load_record(places_path), load_record(buildings_path)
     frame = scene_frame(scene)
     allowed = load_source_config().licence_allowlist
     places, place_skips = read_places(places_path, frame, cfg, allowed)
+    matches, building_skips = match_buildings(buildings_path, scene, cfg, allowed)
     if sha256_file(scene_path) != before:
         raise OvertureError("scene file changed while being read")
     places_doc = places_document(places, places_record, place_skips, frame)
     scene_ref = {"path": str(scene_path), "sha256": before, "schema_version": scene.get("schema_version")}
-    report = match_report(scene_ref=scene_ref, cfg=cfg, places=places_doc)
-    out_places, out_report = prepare_outputs(
-        args.out, (PLACES_FILE, REPORT_FILE), overwrite=args.overwrite, protected=(scene_path, places_path),
+    osm_buildings = sum(1 for f in scene["features"] if f.get("kind") == "building")
+    report = match_report(
+        scene_ref=scene_ref, cfg=cfg, places=places_doc, matches=matches, building_skips=building_skips,
+        buildings_record=buildings_record, osm_buildings=osm_buildings,
     )
+    out_overrides, out_places, out_report = prepare_outputs(
+        args.out, (OVERRIDES_FILE, PLACES_FILE, REPORT_FILE), overwrite=args.overwrite,
+        protected=(scene_path, places_path, buildings_path),
+    )
+    atomic_write_json(out_overrides, overrides_document(matches, buildings_record, cfg))
     atomic_write_json(out_places, places_doc)
     atomic_write_json(out_report, report)
-    print(f"places={len(places)} of {places_record.rows}")
-    for path in (out_places, out_report):
+    counts = report["buildings"]["counts"]
+    print(f"places={len(places)} of {places_record.rows} buildings matched={counts['matched']} of {osm_buildings} "
+          f"height={counts['with_height']} levels={counts['with_levels']}")
+    for path in (out_overrides, out_places, out_report):
         print(f"wrote {path}")
     return 0
 
@@ -74,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     fetch.add_argument("--out", help="directory for overture_places.parquet and overture_buildings.parquet (default: the map's data/raw, where overture match reads them)")
     fetch.add_argument("--overwrite", action="store_true", help="replace data/raw/overture_*.parquet")
     fetch.set_defaults(handler=_fetch)
-    match = sub.add_parser("match", help="Overture places as POIs for a geo scene (offline)")
+    match = sub.add_parser("match", help="Overture heights as overrides and places as POIs for a geo scene (offline)")
     match.add_argument("--scene", required=True, help="geo_scene.json (after cadastre split when Catastro is on)")
     match.add_argument("--map", required=True, help="map directory holding data/raw/overture_*.parquet")
     match.add_argument("--out", required=True, help="output directory")

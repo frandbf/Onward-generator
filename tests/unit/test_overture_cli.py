@@ -66,18 +66,19 @@ def fetched(tmp_path: Path) -> tuple[Path, Path]:
     return root, scene_path
 
 
-def test_match_writes_places_a_report_and_a_summary(fetched: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_match_writes_three_files_and_a_summary(fetched: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root, scene_path = fetched
     out = tmp_path / "out"
     assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out)]) == 0
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == "places=1 of 2"
-    assert lines[1:] == [f"wrote {out.resolve() / name}" for name in (cli.PLACES_FILE, cli.REPORT_FILE)]
+    assert lines[0] == "places=1 of 2 buildings matched=2 of 3 height=1 levels=2"
+    assert lines[1:] == [f"wrote {out.resolve() / name}" for name in (cli.OVERRIDES_FILE, cli.PLACES_FILE, cli.REPORT_FILE)]
     report = json.loads((out / cli.REPORT_FILE).read_text(encoding="utf-8"))
     assert report["scene"]["path"] == str(scene_path.resolve()) and report["scene"]["schema_version"] == "0.2.0"
     assert len(report["scene"]["sha256"]) == 64
-    assert report["places"]["counts"] == {"rows": 2, "kept": 1, "skipped": {"low_confidence": 1}}
+    assert report["buildings"]["counts"]["osm_buildings"] == 3
     assert json.loads((out / cli.PLACES_FILE).read_text(encoding="utf-8"))["counts"]["kept"] == 1
+    assert len(json.loads((out / cli.OVERRIDES_FILE).read_text(encoding="utf-8"))["overrides"]) == 2
     assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out)]) == 1
     assert "refusing to overwrite" in capsys.readouterr().err
     assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--overwrite"]) == 0
@@ -109,14 +110,14 @@ def test_match_refuses_bad_inputs(fetched: tuple[Path, Path], tmp_path: Path, ca
 def test_match_stops_when_the_scene_changes_while_read(fetched: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                                       capsys: pytest.CaptureFixture[str]) -> None:
     root, scene_path = fetched
-    real = cli.read_places
+    real = cli.match_buildings
 
     def touching(*args: object, **kwargs: object) -> object:
         result = real(*args, **kwargs)  # type: ignore[arg-type]
         scene_path.write_text(scene_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
         return result
 
-    monkeypatch.setattr(cli, "read_places", touching)
+    monkeypatch.setattr(cli, "match_buildings", touching)
     assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(tmp_path / "out")]) == 1
     assert capsys.readouterr().err == "overture: scene file changed while being read\n"
 
@@ -133,7 +134,7 @@ def test_the_overture_parser_is_described_as_documented() -> None:
     assert sub.required is True and sub.dest == "command"
     assert {c.dest: c.help for c in sub._choices_actions} == {
         "fetch": "clip Overture places and buildings to the map bbox (network)",
-        "match": "Overture places as POIs for a geo scene (offline)",
+        "match": "Overture heights as overrides and places as POIs for a geo scene (offline)",
     }
     assert _actions(sub.choices["fetch"]) == {
         "map": (("--map",), None, True, "map directory containing map.json", None),
@@ -156,9 +157,14 @@ def test_the_overture_parser_is_described_as_documented() -> None:
 def test_the_main_parser_lists_overture_and_the_new_flags() -> None:
     from onward_generator.detail.__main__ import build_parser as detail_parser
 
-    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    main_parser = build_parser()
+    sub = next(a for a in main_parser._actions if isinstance(a, argparse._SubParsersAction))
     assert {c.dest: c.help for c in sub._choices_actions}["overture"] == (
         "Overture Maps places and buildings: fetch | match (see: overture --help)"
+    )
+    assert _actions(sub.choices["heights"])["secondary_overrides"] == (
+        ("--secondary-overrides",), None, False,
+        "third-party overrides JSON (overture match), ranked below --overrides and an OSM height, above building:levels", None,
     )
     assert _actions(detail_parser())["places"] == (
         ("--places",), None, False, "overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)", None,

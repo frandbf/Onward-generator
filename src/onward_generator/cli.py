@@ -143,7 +143,7 @@ def _cmd_heights(args: argparse.Namespace) -> int:
     from onward_generator.heights import HeightConfigError, SceneError, load_height_config, run_heights, write_height_outputs
 
     try:
-        config = load_height_config(args.config, overrides_path=args.overrides)
+        config = load_height_config(args.config, overrides_path=args.overrides, secondary_overrides_path=args.secondary_overrides)
         run = run_heights(args.scene, config)
         heights_path, report_path = write_height_outputs(run, args.out, overwrite=args.overwrite)
     except (HeightConfigError, SceneError, FileExistsError, ValueError) as exc:
@@ -195,6 +195,10 @@ def build_parser() -> argparse.ArgumentParser:
     heights.add_argument("--out", required=True, help="output directory for heights.json and heights_report.json")
     heights.add_argument("--config", default=None, help="height configuration (default: config/heights.default.json)")
     heights.add_argument("--overrides", default=None, help="authoritative overrides JSON (replaces the config's overrides_file)")
+    heights.add_argument(
+        "--secondary-overrides",
+        help="third-party overrides JSON (overture match), ranked below --overrides and an OSM height, above building:levels",
+    )
     heights.add_argument("--overwrite", action="store_true", help="replace existing outputs")
     heights.set_defaults(handler=_cmd_heights)
 

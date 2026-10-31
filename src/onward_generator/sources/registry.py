@@ -85,6 +85,22 @@ def check_licence(plugin: SourcePlugin, config: SourceConfig) -> None:
         raise SourceError(f"{plugin.id}: licence {plugin.licence.spdx} is not in licence_allowlist (config/sources.json)")
 
 
+def check_secondary_rank(primary: Sequence[str], secondary: Sequence[str], config: SourceConfig) -> None:
+    """Keep ``priority`` the one ranking when a plugin's overrides are secondary (Overture, ADR-021).
+
+    ``heights`` reads secondary overrides below every authoritative override, so a plugin that writes
+    them must rank below every plugin of the map that writes authoritative ones.
+    """
+    rank = {plugin_id: index for index, plugin_id in enumerate(config.priority)}
+    for low in secondary:
+        above = sorted(plugin_id for plugin_id in primary if rank[plugin_id] > rank[low])
+        if above:
+            raise SourceError(
+                f"sources config: priority ranks {low} above {', '.join(above)}, "
+                f"but heights reads the secondary overrides of {low} below theirs"
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class SourceChoice:
     """What ``run`` does with one plugin for one map."""
