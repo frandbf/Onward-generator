@@ -351,3 +351,14 @@ def test_overrides_reports_the_winners_per_source(tmp_path: Path) -> None:
     report = {"buildings": 1250, "sources": [{"source": "es.pnoa_ndsm", "won": 1200}, {"source": "es.catastro", "won": 50}]}
     _write(out / "sources_report.json", report)
     assert summarize("overrides", ["source", "merge", "--out", str(out)]) == StageReport("1 250 buildings  es.pnoa_ndsm 1 200  es.catastro 50")
+
+
+def test_a_lidar_download_and_its_heights_report_tiles_and_measured_footprints(tmp_path: Path) -> None:
+    raw = tmp_path / "raw" / "es.pnoa_ndsm"
+    _write(raw.with_name("es.pnoa_ndsm.source.json"), {"license": "CC-BY-4.0", "tiles": [{"size_bytes": 2048}, {"size_bytes": 3072}]})
+    assert summarize("pnoa_ndsm", ["source", "fetch", "--out", str(raw)]) == StageReport("5 KiB  2 tiles  CC-BY-4.0")
+    out = tmp_path / "es.pnoa_ndsm"
+    _write(out / "es.pnoa_ndsm_report.json", {"counts": {"measured": 1066, "buildings": 1084}, "height_range_m": [3.5, 27.0]})
+    assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 1 066/1 084  3.5–27 m")
+    _write(out / "es.pnoa_ndsm_report.json", {"counts": {"measured": 0, "buildings": 3}, "height_range_m": None})
+    assert summarize("pnoa_heights", ["--out", str(out)]) == StageReport("measured 0/3")

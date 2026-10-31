@@ -297,6 +297,24 @@ def _bounds(out: Path) -> StageReport:
     return StageReport(f"wall {wall['height_m']:g} m  {group(wall['triangles'])} tris{core}")
 
 
+def _raster_download(out: Path) -> StageReport:
+    """A LiDAR plugin's download: the tiles kept in ``data/raw/<id>`` (ADR-018)."""
+    record = _read(out.with_name(out.name + ".source.json"))
+    size = sum(int(tile["size_bytes"]) for tile in record["tiles"])
+    return StageReport(f"{group(size // 1024)} KiB  {plural(len(record['tiles']), 'tile')}  {record['license']}")
+
+
+def _raster_heights(out: Path) -> StageReport:
+    """A LiDAR plugin's normalize: how many footprints got a measured height."""
+    report = _read(out / f"{out.name}_report.json")
+    counts = report["counts"]
+    parts = [f"measured {group(int(counts['measured']))}/{group(int(counts['buildings']))}"]
+    span = report["height_range_m"]
+    if span:
+        parts.append(f"{span[0]:g}–{span[1]:g} m")
+    return StageReport("  ".join(parts))
+
+
 def _overrides(out: Path) -> StageReport:
     report = _read(out / "sources_report.json")
     won = "  ".join(f"{entry['source']} {group(int(entry['won']))}" for entry in report["sources"])
@@ -331,6 +349,8 @@ _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "geo": _geo,
     "catastro": _catastro,
     "cadastre": _cadastre,
+    "pnoa_ndsm": _raster_download,
+    "pnoa_heights": _raster_heights,
     "overrides": _overrides,
     "heights": _heights,
     "generate": _generate,

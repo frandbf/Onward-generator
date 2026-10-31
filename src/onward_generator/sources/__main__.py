@@ -1,4 +1,4 @@
-"""``onward-generator source list|merge`` (ADR-018)."""
+"""``onward-generator source list|fetch|normalize|merge`` (ADR-018)."""
 
 from __future__ import annotations
 
@@ -11,9 +11,10 @@ from pathlib import Path
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_json, prepare_outputs
 from onward_generator.sources import registry
+from onward_generator.sources.lidar import RasterHeights, fetch_raster, normalize_raster
 from onward_generator.sources.merge import MERGED_FILE, REPORT_FILE, REPORT_SCHEMA, merge_overrides
 from onward_generator.sources.plugin import SourceError
-from onward_generator.sources.registry import CONFIG_PATH, load_source_config, plugin_by_id
+from onward_generator.sources.registry import CONFIG_PATH, check_licence, load_source_config, plugin_by_id
 
 
 def _list(args: argparse.Namespace) -> int:
@@ -64,6 +65,37 @@ def _merge(args: argparse.Namespace) -> int:
     return 0
 
 
+def _raster(plugin_id: str) -> RasterHeights:
+    plugin = plugin_by_id(plugin_id)
+    if not isinstance(plugin, RasterHeights):
+        raise SourceError(f"{plugin_id} has its own commands (see docs/05-cadastre.md), not source fetch/normalize")
+    return plugin
+
+
+def _fetch(args: argparse.Namespace) -> int:
+    plugin = _raster(args.id)
+    check_licence(plugin, load_source_config(Path(args.config)))
+    out = Path(args.out).expanduser().resolve()
+    record = fetch_raster(plugin, Path(args.scene).expanduser().resolve(), out, overwrite=args.overwrite)
+    size = sum(tile["size_bytes"] for tile in record["tiles"])
+    print(f"downloaded {size} bytes in {len(record['tiles'])} tile(s), bbox {record['bbox']} ({record['crs']}); licence {record['license']}")
+    print(f"wrote {out} and its .source.json sidecar")
+    return 0
+
+
+def _normalize(args: argparse.Namespace) -> int:
+    plugin = _raster(args.id)
+    report = normalize_raster(
+        plugin, Path(args.scene).expanduser().resolve(), Path(args.raw).expanduser().resolve(),
+        Path(args.out).expanduser().resolve(), overwrite=args.overwrite,
+    )
+    c = report["counts"]
+    print(f"buildings={c['buildings']} measured={c['measured']} no_data={c['no_data']} out_of_bounds={c['out_of_bounds']}")
+    print(f"wrote {report['outputs'][0]}")
+    print(f"wrote {report['outputs'][1]}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="onward-generator source", description="optional data-source plugins (ADR-018)")
     parser.add_argument("--config", default=str(CONFIG_PATH), help="licence allowlist and priority (default config/sources.json)")
@@ -72,6 +104,19 @@ def build_parser() -> argparse.ArgumentParser:
     listing.add_argument("--lat", type=float)
     listing.add_argument("--lon", type=float)
     listing.set_defaults(handler=_list)
+    fetch = sub.add_parser("fetch", help="download a raster plugin's data for the scene box into data/raw/<id> (network)")
+    fetch.add_argument("id")
+    fetch.add_argument("--scene", required=True)
+    fetch.add_argument("--out", required=True, help="directory under data/raw/; the sidecar is <out>.source.json")
+    fetch.add_argument("--overwrite", action="store_true")
+    fetch.set_defaults(handler=_fetch)
+    normalize = sub.add_parser("normalize", help="heights_overrides.<id>.json and a report from a fetched raster (offline)")
+    normalize.add_argument("id")
+    normalize.add_argument("--scene", required=True)
+    normalize.add_argument("--raw", required=True)
+    normalize.add_argument("--out", required=True)
+    normalize.add_argument("--overwrite", action="store_true")
+    normalize.set_defaults(handler=_normalize)
     merge = sub.add_parser("merge", help="merge plugin overrides by priority into one heights_overrides.json (offline)")
     merge.add_argument("--overrides", action="append", required=True, help="<plugin id>=<heights_overrides file>; repeat per plugin")
     merge.add_argument("--out", required=True)

@@ -53,6 +53,29 @@ The right fix is an override from an authorised source, not an invented number. 
 - Tried in order: same block and category, same block, within `radius_m` (75 m between footprints) and the same category, then radius alone. The first level with at least `min_samples` (3) wins.
 - The median is used, not the mean.
 
+## LiDAR heights
+
+Source plugins that read a LiDAR height model (nDSM: height above ground) write `height_m` overrides, so their heights are step 1a (`override`, class `measured`). They rank above Catastro storeys in `config/sources.json` `priority`; a footprint they cannot measure keeps the next source (ADR-018).
+
+```bash
+onward-generator source fetch es.pnoa_ndsm --scene <scene> --out maps/<id>/data/raw/es.pnoa_ndsm
+onward-generator source normalize es.pnoa_ndsm --scene <scene> --raw maps/<id>/data/raw/es.pnoa_ndsm --out maps/<id>/data/processed/es.pnoa_ndsm
+```
+
+`fetch` asks the service for the box around the scene's buildings plus 20 m (at most 6 km a side), on the raster's own cell grid, in tiles, and keeps every reply as received in `data/raw/<id>/tile_NNN.bin` with `data/raw/<id>.source.json` (URL, box, SHA-256 and size per tile, retrieval time, licence, attribution, the plugin's metadata). Replies are checked before anything is written; HTTP 429, 5xx and dropped connections are retried three times, the wait doubling from 8 s; one request per second. `normalize` checks every tile's SHA-256, joins the tiles and, for each footprint of the scene (in `run`, the Catastro split scene, so each sub-building is measured on its own):
+
+1. takes the cells whose centre lies inside the footprint shrunk by an **inner buffer** (1 m). The buffer keeps facade edges, eaves and trees that overhang the outline out of the sample. A footprint too narrow to keep the minimum number of cells after the buffer is sampled without it (`buffer_m: 0` in the report);
+2. keeps the **valid** cells: with data and at least 2 m (lower is ground or a courtyard, not a roof);
+3. writes the **median** (`percentile`, 50) when at least `min_cells` cells are valid and they are at least half of the cells sampled. The 25th and 75th percentiles go into the note: a wide spread is a pitched roof or a mixed footprint.
+
+A height outside the `heights` bounds (2.5–120 m) is not written (`out_of_bounds`); a footprint without enough valid cells is `no_data`. Both stay in `<id>_report.json` with the cell counts. The median of a pitched roof lies between eave and ridge, so it is above the wall height `levels × storey height` describes.
+
+| Plugin | Data | Cell | Buffer | `min_cells` | Confidence | Data date |
+| --- | --- | --- | --- | --- | --- | --- |
+| `es.pnoa_ndsm` | IGN MDSn, building class (trees already removed) | 2.5 m | 1 m | 3 | 0.8 | PNOA-LiDAR first coverage, 2008–2015 (per sheet, not per building) |
+
+On Madrid (40.40657, −3.719187, r150, Catastro split, 30 October 2026): 84 footprints, 66 measured (13.1–27.0 m), 18 `no_data` (small courtyard pieces and sub-buildings under 3 cells); 27 of the 66 were sampled without the buffer. Against Catastro `levels × storey height` on the same footprints the LiDAR height is a median 3.0 m higher (|Δ| median 3.0 m, p90 6.5 m, 34 of 66 within 3 m): a storey of 3 m misses the taller ground floor, the roof and the parapet. The largest differences (up to 20 m) are footprints Catastro gives 1–2 storeys that the LiDAR sees as tall (a low part under a taller volume, or a part OSM and Catastro outline differently). `fetch` took 3.4 s (one 99 KB tile), `normalize` 0.7 s. One map, one date: not a guarantee for another city.
+
 ## Configuration
 
 `config/heights.default.json`, validated with `config/heights.schema.json`. Every number is a modelling assumption.

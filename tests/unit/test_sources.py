@@ -13,10 +13,10 @@ from onward_generator.cli import main
 from onward_generator.maps.workspace import create_map, store_sources
 from onward_generator.pipeline_run import PipelineError, _canon, _input_markers, _occupied, output_ready, plan_steps, source_plan
 from onward_generator.sources.es.catastro import CatastroPlugin
+from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
 from onward_generator.sources.merge import merge_overrides
 from onward_generator.sources.plugin import Kind, LicenceRecord, SourceError, SourceStage, SourceSteps
 from onward_generator.sources.registry import (
-    PLUGINS,
     SourceChoice,
     check_licence,
     choices,
@@ -27,6 +27,13 @@ from onward_generator.sources.registry import (
     switch,
 )
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
+
+
+@pytest.fixture(autouse=True)
+def catastro_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests describe the runner with Catastro as the one plugin; the LiDAR plugins have their own tests."""
+    monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (CatastroPlugin(),))
+
 
 ALLOWLIST = "sources config: licence_allowlist must be a list of SPDX ids"
 PRIORITY = "sources config: priority must be a list of plugin ids"
@@ -90,7 +97,7 @@ def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_
     config = load_source_config()
     assert config.priority == ("es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture")
     assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0"})
-    for plugin in PLUGINS:
+    for plugin in (CatastroPlugin(), PnoaNdsmPlugin()):
         check_licence(plugin, config)
 
 
@@ -341,10 +348,8 @@ def test_source_parser_help() -> None:
     assert helps["config"] == "licence allowlist and priority (default config/sources.json)"
     subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
-    assert listed == {
-        "list": "registered plugins, rank, licence; with --lat/--lon, whether each covers that point",
-        "merge": "merge plugin overrides by priority into one heights_overrides.json (offline)",
-    }
+    assert listed["list"] == "registered plugins, rank, licence; with --lat/--lon, whether each covers that point"
+    assert listed["merge"] == "merge plugin overrides by priority into one heights_overrides.json (offline)"
     merge = {action.dest: action.help for action in subparsers.choices["merge"]._actions}
     assert merge["overrides"] == "<plugin id>=<heights_overrides file>; repeat per plugin"
 

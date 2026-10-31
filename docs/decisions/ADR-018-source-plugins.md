@@ -35,3 +35,7 @@ The generator works for any city from OpenStreetMap alone. Better data exists on
 - **Entry-point or import-scan discovery.** It makes the stage order depend on the environment, and nothing outside this repository needs to add a plugin.
 - **A rank per kind (`height_m`, `levels`).** Two lists can disagree: Overture `height_m` would outrank Catastro `levels` in `heights` even when Catastro ranks above Overture. One list and the levels-only borrowing rule keep the order the configuration states.
 - **Coverage from a capabilities request.** It makes the plan depend on the network and on service uptime. A static table can be reviewed and versioned.
+
+## Amendment — LiDAR height plugins (30 October 2026)
+
+`es.pnoa_ndsm` is the first raster plugin. The shared code is `sources.raster` (an ESRI ASCII grid and a raw float32 grid are a header and an array: numpy and shapely read them, so no GDAL, rasterio or tifffile dependency is added) and `sources.lidar` (`source fetch`, `source normalize`, the footprint median with an inner buffer). A raster plugin also satisfies `sources.lidar.RasterHeights`: its CRS, cell grid and requests, how to decode a reply, and the date of the data at a point. It runs after `cadastre`, on the split scene. Rule and measurements: `docs/04-heights.md#lidar-heights`.

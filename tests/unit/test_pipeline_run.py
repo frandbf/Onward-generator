@@ -55,6 +55,14 @@ from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
 @pytest.fixture(autouse=True)
+def catastro_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests describe the runner with Catastro as the one plugin; the LiDAR plugins have their own tests."""
+    from onward_generator.sources.es.catastro import CatastroPlugin
+
+    monkeypatch.setattr("onward_generator.sources.registry.PLUGINS", (CatastroPlugin(),))
+
+
+@pytest.fixture(autouse=True)
 def _unity_editor_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     """The developer's Editor may be open. These tests do not ask it to close."""
     monkeypatch.setattr("onward_generator.pipeline_run.unity_editor_open", lambda: False)

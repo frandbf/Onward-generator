@@ -71,6 +71,18 @@ The fixture `tests/fixtures/cadastre/synthetic_bu.gml` is synthetic (CC0-1.0) an
 
 Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
 
+### IGN MDSn (`es.pnoa_ndsm`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Instituto Geográfico Nacional (IGN) / CNIG |
+| Dataset | Modelo Digital de Superficies normalizado, clase edificación, primera cobertura, 2.5 m (MDSnE2,5), from PNOA-LiDAR first-coverage flights (series 2008–2015) |
+| Service | WCS 2.0 `https://wcs-mds.idee.es/mds`, coverage `mdsn_e025`, format `application/asc`, EPSG:25830. The capabilities state `AccessConstraints: CC BY 4.0 scne.es` and `Fees: No se aplican condiciones` |
+| Licence | CC BY 4.0 (Orden FOM/2807/2015; IGN licence conditions `https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf`) |
+| Attribution | `Obra derivada de MDSn 2008-2015 CC-BY 4.0 ign.es` |
+
+Obligations, from the IGN conditions: cite `<product> <date> CC-BY 4.0 <producer>`, visible next to the data; a derived product (heights per footprint are one) prefixes `Obra derivada de`. The date is the series period; the CNIG lists sheet dates of 2009, 2010 and 2012. Ceuta, Melilla and Alborán are not in the product. The tiles stay in `maps/<id>/data/raw/es.pnoa_ndsm/`, outside git. Checked 2026-10-30: capabilities, a real `GetCoverage` over Madrid, the CNIG product page and the datos.gob.es record `e00125901-spaignmds-normalizado`.
+
 ## Generated geometry
 
 Phase 04 does not use external models. Windows, balconies, roofs, street furniture, and interiors are procedural geometry from this code. `scene_detail.json` and `scene_visual.glb` inherit the base attributions (OpenStreetMap ODbL-1.0, and Catastro CC BY 4.0 when it was used) and state that the facades are generic templates, not a faithful reconstruction. They must not be presented as the real buildings.
