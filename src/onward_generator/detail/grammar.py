@@ -13,8 +13,8 @@ from typing import Any
 
 from onward_generator.detail.config import FACADE_USES, HipRoof, Template
 from onward_generator.detail.facades import stable_choice, stable_unit
+from onward_generator.detail.roofs import pitched_spec
 
-HIP_SHAPES = frozenset({"hipped", "gabled", "pyramidal", "skillion", "half-hipped", "gambrel", "round"})
 FLAT_SHAPES = frozenset({"flat"})
 
 # OSM roof:material → a material the detail catalogue already defines.
@@ -160,24 +160,27 @@ def choose_roof(
     area_m2: float,
     *,
     convex: bool = True,
+    storey_m: float = 3.0,
 ) -> tuple[Template, str, str, str | None]:
     """Return ``(template, roof_material, origin, roof:shape or None)``.
 
-    A hipped/gabled OSM tag forces a hip on footprints up to 800 m².
-    Without a tag, convex footprints of 160 m² or less may get an estimated hip.
-    Everything else keeps the template roof.
+    An OSM ``roof:shape`` the roof builder draws (``detail/roofs.py``) replaces the template roof on
+    any footprint; ``build_shell`` falls back to a flat roof when the shape does not fit it. ``flat``
+    keeps the template. Without a shape tag, convex footprints of 160 m² or less may get an estimated
+    hip. The roof material is the one ``roof:material`` names, else the template's.
     """
     shape = _first(tags, "roof:shape")
     tagged_material = ROOF_MATERIALS.get(_first(tags, "roof:material"))
-    if shape in HIP_SHAPES and area_m2 <= 800.0:
-        material = tagged_material or (template.hip.material if template.hip else "roof_tile")
-        hip = HipRoof(max(area_m2, 1.0), 30.0, 4.0, material)
-        return replace(template, parapet_m=0.0, hip=hip), material, "observed", shape
+    material = tagged_material or (template.hip.material if template.hip else "roof_tile")
+    pitched = pitched_spec(tags, material, storey_m)
+    if pitched is not None:
+        return replace(template, parapet_m=0.0, hip=None, pitched=pitched), material, "observed", shape
     if shape in FLAT_SHAPES:
         material = tagged_material or stable_choice(seed, template.flat_roof_materials, building_id, "roof")
         return template, material, "observed", shape
     if (
-        template.hip is None
+        not shape
+        and template.hip is None
         and template.parapet_m > 0
         and convex
         and area_m2 <= ESTIMATED_HIP_MAX_AREA_M2

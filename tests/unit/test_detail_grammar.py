@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from shapely import Polygon, affinity, box
 
-from onward_generator.detail.config import load_detail_config
+from onward_generator.detail.config import HipRoof, load_detail_config
 from onward_generator.detail.facades import _hip_roof
 from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.generation.mesh import upward_area
@@ -14,12 +16,14 @@ CFG = load_detail_config("config/detail.default.json")
 RESIDENTIAL = CFG.templates["generic_residential"]
 
 
-def test_osm_roof_shape_forces_hip() -> None:
-    template, material, origin, shape = choose_roof(
-        {"roof:shape": "gabled", "roof:material": "tiles"}, RESIDENTIAL, CFG.seed, "osm-way-1", 120.0,
-    )
-    assert origin == "observed" and shape == "gabled"
-    assert material == "roof_tile" and template.parapet_m == 0 and template.hip is not None
+def test_osm_roof_shape_replaces_the_template_roof_on_any_area() -> None:
+    for area in (120.0, 5000.0):
+        template, material, origin, shape = choose_roof(
+            {"roof:shape": "gabled", "roof:material": "tiles"}, RESIDENTIAL, CFG.seed, "osm-way-1", area,
+        )
+        assert origin == "observed" and shape == "gabled"
+        assert material == "roof_tile" and template.parapet_m == 0 and template.hip is None
+        assert template.pitched is not None and template.pitched.shape == "gabled" and template.pitched.material == "roof_tile"
 
 
 def test_missing_roof_tag_keeps_large_parapet() -> None:
@@ -138,7 +142,7 @@ def test_a_building_without_evidence_is_estimated_residential() -> None:
 
 def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
     """A near-convex footprint with a 4 cm reflex jog: a fan from the centroid folds one face under the roof."""
-    template, *_ = choose_roof({"roof:shape": "hipped"}, RESIDENTIAL, CFG.seed, "osm-way-1", 18.0)
+    template = replace(RESIDENTIAL, parapet_m=0.0, hip=HipRoof(18.0, 30.0, 4.0, "roof_tile"))
     plain = _hip_roof(box(0, 0, 5, 3.6), 30.0, template)
     assert plain is not None and upward_area(plain[0]) == pytest.approx(18.0)
     jog = Polygon([(0.04, 0), (5, 0), (5, 3.6), (0, 3.6), (0, 3.4), (0.04, 3.4)])  # the west wall steps in under its top
@@ -151,3 +155,30 @@ def test_a_hip_roof_needs_an_apex_that_sees_every_eave() -> None:
     edge_on = Polygon([(0.02, 0), (4, 0), (4, 1), (3.98, 1), (3.98, 2), (0, 2), (0, 1), (0.02, 1)])
     assert edge_on.centroid.y == 1.0 and edge_on.area >= 0.995 * edge_on.convex_hull.area
     assert _hip_roof(edge_on, 30.0, template) is None
+
+
+def test_a_tagged_roof_takes_its_rise_and_its_material() -> None:
+    template, material, origin, shape = choose_roof({"roof:shape": "gabled", "roof:material": "metal", "roof:height": "2"},
+                                                    RESIDENTIAL, CFG.seed, "b", 100.0, storey_m=3.5)
+    assert material == "roof_flat_grey" and template.pitched is not None and template.pitched.material == material
+    assert template.pitched.rise_m == 2.0 and origin == "observed" and shape == "gabled"
+    template, *_ = choose_roof({"roof:shape": "gabled", "roof:levels": "2"}, RESIDENTIAL, CFG.seed, "b", 100.0, storey_m=3.5)
+    assert template.pitched is not None and template.pitched.rise_m == 7.0 and template.pitched.material == "roof_tile"
+    # Without a storey height a roof level is 3 m.
+    template, *_ = choose_roof({"roof:shape": "gabled", "roof:levels": "1"}, RESIDENTIAL, CFG.seed, "b", 100.0)
+    assert template.pitched is not None and template.pitched.rise_m == 3.0
+    # A template with a hip lends the tagged roof its material, and the hip is dropped for the tagged shape.
+    hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 30.0, 4.0, "roof_flat_light"))
+    template, material, *_ = choose_roof({"roof:shape": "gabled"}, hipped, CFG.seed, "b", 100.0)
+    assert material == "roof_flat_light" and template.hip is None and template.pitched is not None
+    flat, material, origin, shape = choose_roof({"roof:shape": "flat", "roof:material": "metal"}, RESIDENTIAL, CFG.seed, "b", 100.0)
+    assert flat is RESIDENTIAL and material == "roof_flat_grey" and origin == "observed" and shape == "flat"
+    plain, material, origin, _ = choose_roof({"roof:material": "tiles"}, RESIDENTIAL, CFG.seed, "osm-way-311", 180.0)
+    assert plain is RESIDENTIAL and material == "roof_tile" and origin == "observed"
+
+
+def test_an_unknown_shape_tag_gets_no_estimated_hip() -> None:
+    hips = [choose_roof({}, RESIDENTIAL, CFG.seed, f"b{i}", 100.0)[2] for i in range(40)]
+    assert "estimated" in hips
+    tagged = [choose_roof({"roof:shape": "crosspitched"}, RESIDENTIAL, CFG.seed, f"b{i}", 100.0) for i in range(40)]
+    assert all(t is RESIDENTIAL and origin == "generated" and shape == "crosspitched" for t, _, origin, shape in tagged)

@@ -58,6 +58,35 @@ ROW_POIS: dict[int, tuple[tuple[float, float], dict[str, str]]] = {
 }
 
 
+# A block tagged with the Simple 3D Buildings scheme. 801 is gabled with a roof height and a metal roof; 802
+# (1 080 m², 12 m over 3 storeys) is hipped with one 4 m roof level; 803 is an L with a skillion facing south;
+# 805 has a roof shape nothing draws; 808 is tagged flat, 809 is a second gabled roof and 822 is half-hipped. 811–816 are small
+# untagged houses, some of which get the estimated hip, and 817–821 small untagged L-shapes. 806 is industrial (6 m storeys, 12 m).
+S3DB_BUILDINGS: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = {
+    801: ([(-40, 8), (-28, 8), (-28, 16), (-40, 16)], {"building": "house", "building:levels": "2", "roof:shape": "gabled",
+                                                       "roof:height": "3", "roof:material": "metal"}),
+    802: ([(-20, 8), (16, 8), (16, 38), (-20, 38)], {"building": "yes", "building:levels": "3", "height": "12", "roof:shape": "hipped",
+                                                     "roof:levels": "1"}),
+    803: ([(30, 8), (42, 8), (42, 14), (36, 14), (36, 20), (30, 20)], {"building": "yes", "building:levels": "2", "roof:shape": "skillion",
+                                                                     "roof:direction": "S", "roof:height": "2"}),
+    805: ([(-40, 30), (-30, 30), (-30, 40), (-40, 40)], {"building": "yes", "building:levels": "2", "roof:shape": "crosspitched"}),
+    808: ([(0, 50), (8, 50), (8, 56), (0, 56)], {"building": "yes", "building:levels": "2", "roof:shape": "flat"}),
+    809: ([(20, 50), (28, 50), (28, 56), (20, 56)], {"building": "yes", "building:levels": "2", "roof:shape": "gabled"}),
+    822: ([(36, 50), (44, 50), (44, 56), (36, 56)], {"building": "yes", "building:levels": "2", "roof:shape": "half-hipped"}),
+    **{811 + k: ([(-90 + 8 * k, 70), (-85 + 8 * k, 70), (-85 + 8 * k, 74), (-90 + 8 * k, 74)], {"building": "house", "building:levels": "1"})
+       for k in range(6)},
+    # Small untagged L-shapes: not convex, so no estimated hip; 817 is a shed (the minor template), flat when not convex.
+    **{817 + k: ([(-90 + 10 * k, 80), (-84 + 10 * k, 80), (-84 + 10 * k, 83), (-87 + 10 * k, 83), (-87 + 10 * k, 86), (-90 + 10 * k, 86)],
+                 {"building": "shed" if k == 0 else "house", "building:levels": "1"}) for k in range(5)},
+    806: ([(50, 8), (70, 8), (70, 28), (50, 28)], {"building": "industrial", "building:levels": "2"}),
+}
+# A gabled building of two separate outer rings: no single roof fits it.
+S3DB_RELATIONS = {
+    807: ([([(-40, 50), (-34, 50), (-34, 56), (-40, 56)], "outer"), ([(-30, 50), (-24, 50), (-24, 56), (-30, 56)], "outer")],
+          {"building": "yes", "building:levels": "2", "roof:shape": "gabled"}),
+}
+
+
 # A multipolygon building: (ring, role) members, role "outer" or "inner", and the relation tags.
 Relations = dict[int, tuple[list[tuple[list[tuple[float, float]], str]], dict[str, str]]]
 

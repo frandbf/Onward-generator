@@ -234,7 +234,7 @@ def one_storey_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, P
     return _detail_inputs(tmp_path_factory.mktemp("one_storey"), ONE_STOREY, ONE_STOREY_POIS)
 
 
-@pytest.mark.parametrize(("bid", "category", "roof"), [("osm-way-801", "bakery", "flat_parapet"), ("osm-way-802", "pharmacy", "hip")])
+@pytest.mark.parametrize(("bid", "category", "roof"), [("osm-way-801", "bakery", "flat_parapet"), ("osm-way-802", "pharmacy", "hipped")])
 def test_a_one_storey_shop_has_its_room_under_a_closed_roof(one_storey_inputs: tuple[Path, Path, Path], bid: str,
                                                            category: str, roof: str) -> None:
     d = _detail(one_storey_inputs)

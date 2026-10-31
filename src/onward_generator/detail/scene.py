@@ -44,7 +44,7 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
-from onward_generator.detail.grammar import FacadeUse, appearance_key, choose_roof, choose_wall, facade_use, resolve_use
+from onward_generator.detail.grammar import FLAT_SHAPES, FacadeUse, appearance_key, choose_roof, choose_wall, facade_use, resolve_use
 from onward_generator.detail.interiors import (
     MIN_ROOM_M2,
     Interior,
@@ -400,8 +400,11 @@ def _templates(ids: list[str], height_of: Mapping[str, Mapping[str, Any]], cfg: 
 def _roof_plans(
     ids: list[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, key_of: Mapping[str, str],
     tags_of: Mapping[str, dict[str, str]], templates: Mapping[str, Template], heights_m: Mapping[str, float], cfg: DetailConfig,
+    storeys_m: Mapping[str, float],
 ) -> dict[str, RoofPlan]:
     """``choose_roof`` per building, drawn for its ``appearance_key`` so the parts of one parcel share a roof.
+
+    ``storeys_m`` is each building's storey height, the height of one ``roof:levels``.
 
     A part with a taller part of its own parcel within ``probe_m`` gets no estimated hip: its roof is
     the terrace under the setback, flat behind its parapet.
@@ -412,7 +415,8 @@ def _roof_plans(
         near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m)]
         terrace = any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
         convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
-        plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace)
+        plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace,
+                                 storey_m=storeys_m[bid])
     return plans
 
 
@@ -700,8 +704,10 @@ def detail_scene(
         evidence.pop(bid, None)
     for bid in third_party:  # its Overture places ranked first: they are its shops (ADR-021)
         evidence[bid] = place_evidence[bid]
+    # One roof:levels is a storey of the building, a landmark's too: its single facade band is not a storey.
+    storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
-                             templates, heights_m, cfg)
+                             templates, heights_m, cfg, storey_heights)
     setbacks: Counter[str] = Counter()
 
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
@@ -713,6 +719,7 @@ def detail_scene(
     counts: Counter[str] = Counter()
     templates_used: Counter[str] = Counter()
     roof_types: Counter[str] = Counter()
+    roof_shapes: Counter[str] = Counter()
     door_rules: Counter[str] = Counter()
     interiors_built: list[str] = []
     shop_interiors: list[str] = []
@@ -762,6 +769,8 @@ def detail_scene(
         shop_tags = {**tags, CATASTRO_USE_TAG: catastro[bid]["current_use"]} if bid in catastro else tags
         use, wall_material, wall_origin = facade_walls[bid]
         shell_template, roof_material, roof_origin, roof_shape = roof_plans[bid]
+        if roof_shape and roof_shape not in FLAT_SHAPES and shell_template.pitched is None:
+            issues.append(Issue("roof_shape_unsupported", "info", bid, f"roof:shape={roof_shape} is not drawn; the template roof stays"))
         shop = ground == "shopfront"
         door_kind, door_spec = entrance(landmark, shop, cfg)
         plain_door = (door_kind, cfg.recess_depth_m, door_spec)
@@ -837,6 +846,8 @@ def detail_scene(
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
+        if "fallback" in shell.roof:
+            issues.append(Issue("roof_shape_fallback", "info", bid, f"roof:shape={roof_shape} drawn flat: {shell.roof['fallback']}"))
         if shell.defects:
             issues.append(Issue("facade_mesh_not_watertight", "critical", bid, f"{shell.defects} open or non-manifold edges"))
         if shell.roof_area_error > max(0.02, 1e-3 * geom.area):
@@ -898,6 +909,8 @@ def detail_scene(
         setbacks["opened"] += len({x.segment for x in setback_holes})
         setbacks["openings"] += len(setback_holes)
         roof_types[str(shell.roof["type"])] += 1
+        if roof_shape:
+            roof_shapes[f"{roof_shape}:{shell.roof['type']}"] += 1
         door_rules[door_rule] += 1
         seg_exposed = sum(s.length for s in segments if s.exposed)
         exposed_m += seg_exposed
@@ -1053,6 +1066,7 @@ def detail_scene(
     detailed.stats["wall_area_m2"] = wall_areas.to_record()
     detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}
     _third_party_record(detailed, objects, places, third_party)
+    detailed.stats["roof_shapes"] = dict(sorted(roof_shapes.items()))
     shells = [facade_walls[bid] for bid in ids if tier_of[bid] == CORE]
     detailed.stats["facade_uses"] = dict(sorted(Counter(u.use for u, _, _ in shells).items()))
     detailed.stats["wall_materials"] = dict(sorted(Counter(w for _, w, _ in shells).items()))

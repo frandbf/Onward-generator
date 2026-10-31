@@ -24,6 +24,7 @@ from shapely.geometry.polygon import orient
 
 from onward_generator.detail.config import PARTY_PREFIX, DetailConfig, Opening, Template
 from onward_generator.detail.modules import Prototype, balcony, frame_matrix, recess, recess_rim
+from onward_generator.detail.roofs import BuiltRoof, build_roof
 from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
 
 SNAP_M = 0.05
@@ -505,6 +506,9 @@ def build_shell(
     roof_info: dict[str, object] = {}
     parapet = template.parapet_m
     hip = _hip_roof(polygons[0], height, template) if len(polygons) == 1 and parapet == 0 else None
+    pitched: BuiltRoof | str | None = None
+    if template.pitched is not None:
+        pitched = build_roof(polygons[0], height, template.pitched) if len(polygons) == 1 else "footprint_not_a_simple_polygon"
     inner: BaseGeometry | None = None
     if parapet > 0:
         inner = refined.buffer(-template.parapet_thickness_m, join_style="mitre", mitre_limit=2.0)
@@ -528,6 +532,14 @@ def build_shell(
         if z_top > height + 1e-6:
             parapet_collider = prism(strip, height, z_top, bottom=True)
         roof_info = {"type": "flat_parapet", "parapet_m": parapet, "parapet_thickness_m": template.parapet_thickness_m}
+    elif isinstance(pitched, BuiltRoof):
+        assert template.pitched is not None
+        roof_material = template.pitched.material
+        parts[roof_material].append(pitched.roof)
+        if pitched.gables.triangle_count:
+            parts[wall_material].append(pitched.gables)
+        roof_area = upward_area(pitched.roof)
+        roof_info = dict(pitched.record)
     elif hip is not None:
         mesh, rise = hip
         material = template.hip.material if template.hip else roof_material
@@ -541,6 +553,8 @@ def build_shell(
         roof_area = upward_area(roof_mesh)
         roof_deck = refined
         roof_info = {"type": "flat"}
+        if isinstance(pitched, str):
+            roof_info["fallback"] = pitched
     roof_info["material"] = roof_material
 
     rims: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []

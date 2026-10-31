@@ -268,7 +268,7 @@ def _plans(footprints: dict[str, Polygon], keys: dict[str, str], heights: dict[s
     ids = sorted(footprints)
     cfg = replace(CFG, seed=seed)
     return _roof_plans(ids, footprints, STRtree([footprints[i] for i in ids]), keys, {i: {} for i in ids},
-                       dict.fromkeys(ids, TEMPLATE), heights, cfg)
+                       dict.fromkeys(ids, TEMPLATE), heights, cfg, dict.fromkeys(ids, 3.0))
 
 
 def _hip_seed(key: str) -> int:
