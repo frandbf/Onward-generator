@@ -49,6 +49,38 @@ def asc_part(body: bytes) -> bytes:
     raise SourceError("WCS multipart response has no application/asc part")
 
 
+def in_mdsn(longitude: float, latitude: float) -> bool:
+    from shapely import Point
+
+    point = Point(longitude, latitude)
+    return any(t.name in TERRITORIES and t.polygon.covers(point) for t in load_zones().territories)
+
+
+def wcs_requests(bbox: BBox) -> list[TileRequest]:
+    out = []
+    for tile, columns, rows in tiles(snap_bbox(bbox, CELL_M), CELL_M, MAX_CELLS):
+        xmin, ymin, xmax, ymax = tile
+        crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{CRS.split(':')[1]}"
+        query = urllib.parse.urlencode(
+            [
+                ("service", "WCS"), ("version", "2.0.1"), ("request", "GetCoverage"), ("CoverageId", COVERAGE),
+                ("format", "application/asc"),
+                ("subset", f"x({xmin:.2f},{xmax:.2f})"), ("subset", f"y({ymin:.2f},{ymax:.2f})"),
+                ("subsettingCRS", crs_uri), ("outputCRS", crs_uri),
+            ],
+            safe="(),:/",
+        )
+        out.append(TileRequest(f"{WCS_URL}?{query}", tile, columns, rows))
+    return out
+
+
+def decode_asc(body: bytes, request: Mapping[str, Any]) -> Grid:
+    grid = parse_ascii_grid(asc_part(body))
+    if grid.values.shape != (request["rows"], request["columns"]):
+        raise SourceError(f"WCS grid is {grid.values.shape}, asked for {(request['rows'], request['columns'])}")
+    return grid
+
+
 @dataclass(frozen=True, slots=True)
 class PnoaNdsmPlugin:
     id: str = "es.pnoa_ndsm"
@@ -70,36 +102,16 @@ class PnoaNdsmPlugin:
     rule: HeightRule = HeightRule(buffer_m=1.0, percentile=50.0, min_cells=3, min_valid_share=0.5, min_value=2.0, confidence=0.8)
 
     def covers(self, longitude: float, latitude: float) -> bool:
-        from shapely import Point
-
-        point = Point(longitude, latitude)
-        return any(t.name in TERRITORIES and t.polygon.covers(point) for t in load_zones().territories)
+        return in_mdsn(longitude, latitude)
 
     def steps(self, root: Path, scene: Path) -> SourceSteps:
         return raster_steps(self, root, scene)
 
     def requests(self, bbox: BBox) -> list[TileRequest]:
-        out = []
-        for tile, columns, rows in tiles(snap_bbox(bbox, CELL_M), CELL_M, MAX_CELLS):
-            xmin, ymin, xmax, ymax = tile
-            crs_uri = f"http://www.opengis.net/def/crs/EPSG/0/{CRS.split(':')[1]}"
-            query = urllib.parse.urlencode(
-                [
-                    ("service", "WCS"), ("version", "2.0.1"), ("request", "GetCoverage"), ("CoverageId", COVERAGE),
-                    ("format", "application/asc"),
-                    ("subset", f"x({xmin:.2f},{xmax:.2f})"), ("subset", f"y({ymin:.2f},{ymax:.2f})"),
-                    ("subsettingCRS", crs_uri), ("outputCRS", crs_uri),
-                ],
-                safe="(),:/",
-            )
-            out.append(TileRequest(f"{WCS_URL}?{query}", tile, columns, rows))
-        return out
+        return wcs_requests(bbox)
 
     def decode(self, body: bytes, request: Mapping[str, Any]) -> Grid:
-        grid = parse_ascii_grid(asc_part(body))
-        if grid.values.shape != (request["rows"], request["columns"]):
-            raise SourceError(f"WCS grid is {grid.values.shape}, asked for {(request['rows'], request['columns'])}")
-        return grid
+        return decode_asc(body, request)
 
     def metadata(self, bbox_wgs84: BBox, fetch: Fetch) -> dict[str, Any]:
         return {"series": SERIES, "coverage": COVERAGE, "service": WCS_URL}
