@@ -55,6 +55,11 @@ PANE_INSET_M = 0.01
 # Openings the player can stand on either side of. One quad, material glass_view.
 # The adapter draws both faces with PP_Sprite_Lit. Do not add a second quad.
 GLASS_VIEW = "glass_view"
+# A shop's display window: frameless glass, the same single quad, and no pane collider, so a shot
+# crosses it. The wall collider is open on it above the stallriser. The adapter draws it with the
+# SDK glass material when the project has one, else PP_Sprite_Lit like ``glass_view``.
+SHOP_GLASS = "shop_glass"
+SEE_THROUGH = frozenset({GLASS_VIEW, SHOP_GLASS})
 ROOM_GLASS = frozenset({"window", "narrow_window", "shopfront", "balcony_door"})
 WallCut = tuple[np.ndarray, np.ndarray, float, float]
 # Light anchors (ADR-013). Modelling assumptions, not observations: one light under the
@@ -491,8 +496,8 @@ def pierce_room_windows(
     """Put one see-through pane in glass the player can reach from the room.
 
     A window, shopfront, or balcony door below the accessible ceiling becomes
-    a hole of ``thickness`` with a single ``glass_view`` quad when that opening
-    lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
+    a hole of ``thickness`` with a single see-through quad (``shop_glass`` on a shopfront,
+    ``glass_view`` on the rest) when that opening lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
     the opening is removed. Glass above the ceiling stays ``glass_dark``, and so does glass in a wall
     of a footprint part outside ``hosts`` (the parts that hold a room; ``None`` checks no part).
     Returns how many openings were pierced and how many were removed.
@@ -518,18 +523,18 @@ def pierce_room_windows(
         if not on_inner or not footprint.buffer(1e-6).contains(recess):
             omitted += 1
             continue
-        kept.append(replace(hole, depth=thickness, back=GLASS_VIEW))
+        kept.append(replace(hole, depth=thickness, back=SHOP_GLASS if hole.kind == "shopfront" else GLASS_VIEW))
         opened += 1
     layout.holes = kept
     return opened, omitted
 
 
 def glass_penetrations(layout: Layout, segments: Sequence[Segment]) -> list[tuple[Segment, Hole]]:
-    """See-through openings ``pierce_room_windows`` kept. One pane each, both directions."""
+    """See-through openings ``pierce_room_windows`` kept. The wall collider opens on each of them."""
     return [
         (segments[hole.segment], hole)
         for hole in layout.holes
-        if hole.back == GLASS_VIEW and hole.kind in ROOM_GLASS
+        if hole.back in SEE_THROUGH and hole.kind in ROOM_GLASS
     ]
 
 
@@ -537,7 +542,7 @@ def room_window_cuts(layout: Layout, segments: Sequence[Segment]) -> list[WallCu
     """Inner-wall spans of the room panes ``pierce_room_windows`` kept."""
     cuts: list[WallCut] = []
     for hole in layout.holes:
-        if hole.back != GLASS_VIEW or hole.kind not in ROOM_GLASS:
+        if hole.back not in SEE_THROUGH or hole.kind not in ROOM_GLASS:
             continue
         seg = segments[hole.segment]
         cuts.append((
@@ -608,7 +613,8 @@ def _pierced_walls(
     thickness: float,
     z_top: float,
 ) -> tuple[list[tuple[str, Mesh]], list[Mesh]]:
-    """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per opening.
+    """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per
+    ``glass_view`` opening. A ``shop_glass`` opening gets no pane: a shot crosses it, and so can a body.
 
     Bands split on the door heads and on every opening edge, so a band is either fully
     open or fully solid. The band above an opening keeps the full ring: a downward
@@ -645,7 +651,7 @@ def _pierced_walls(
         if poly.is_empty or float(poly.area) < 1e-4:
             continue
         walls_out.append((f"walls_{index}", prism(poly, za, zb, bottom=True)))
-    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations]
+    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations if hole.back == GLASS_VIEW]
     return walls_out, panes
 
 
@@ -840,6 +846,7 @@ def assemble_interior(
         "accessible_floors": k,
         "roof_access": roof_well is not None,
         "glass_panes": len(glass),
+        "open_shopfronts": sum(1 for _, hole in penetrations if hole.back == SHOP_GLASS),
     }
     if plan.rooms and plan.rooms[0].category is not None:
         spec["shop"] = _shop_record(plan.rooms[0].category)

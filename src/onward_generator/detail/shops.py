@@ -6,7 +6,9 @@ bay one sign: a fascia board over the window or a blade sign on a bracket beside
 it. The choice is ``sha256(seed, building, shop, shop_sign) < fascia_share``. A
 shopfront carries a vinyl strip with the name of the nearest shop when
 ``sha256(seed, building, segment, column, vinyl) < vinyl_share``, on a ``glass_dark``
-back or on the see-through ``glass_view`` pane of a shop interior.
+back or on the see-through pane of a shop interior (``shop_glass``, or ``glass_view``).
+Each vinyl records the ``glass`` it sits on: ``signs`` draws black letters with no
+background on ``shop_glass`` and an opaque strip on the rest.
 
 The name is the OSM ``name`` tag (observed). Without it, a generic Spanish word
 for the ``shop``/``amenity``/``office``/``craft`` value is used (estimated). The
@@ -26,7 +28,7 @@ from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCateg
 from onward_generator.detail.facades import Hole, Segment, stable_unit
 
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
-VINYL_BACKS = frozenset({"glass_dark", "glass_view"})
+VINYL_BACKS = frozenset({"glass_dark", "glass_view", "shop_glass"})
 # One shop: its POI id (``None`` for the building itself), its tags, and its point in local metres.
 Shop = tuple[str | None, Mapping[str, Any], tuple[float, float] | None]
 
@@ -84,8 +86,9 @@ def _vinyl(seg: Segment, hole: Hole, cfg: DetailConfig) -> dict[str, Any]:
     sc = cfg.shops
     half = sc.vinyl_height_m / 2
     z = min(max(sc.vinyl_centre_m, hole.v0 + half), hole.v0 + hole.height - half)
-    return _board(seg, hole.s0 + hole.width / 2, z, VINYL_INSET_M - hole.depth, seg.n_out,
-                  hole.width * sc.vinyl_width_share, sc.vinyl_height_m, 0.0)
+    board = _board(seg, hole.s0 + hole.width / 2, z, VINYL_INSET_M - hole.depth, seg.n_out,
+                   hole.width * sc.vinyl_width_share, sc.vinyl_height_m, 0.0)
+    return {**board, "glass": hole.back}
 
 
 def _fronts(holes: Sequence[Hole], segments: Sequence[Segment], entrances: Sequence[Hole]) -> dict[Hole, tuple[float, ...]]:

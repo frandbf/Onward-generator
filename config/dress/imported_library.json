@@ -769,6 +769,21 @@
       "note": "Diffuse 1k, already in the repository. Calm enough for a wall slot."
     },
     {
+      "id": "ph_wood_planks",
+      "name": "wood_planks",
+      "provider": "polyhaven",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "credit": "wood_planks by Amal Kumar from Poly Haven, licensed under CC0 1.0.",
+      "source_url": "https://polyhaven.com/a/wood_planks",
+      "surface": "floor",
+      "bound": false,
+      "path": "assets/textures/wood_planks/wood_planks_diff_1k.jpg",
+      "sha256": "3b0669f683e4bf10f5a55a381cfa9669a7b8dfd921901829daa3b35acc2bbdec",
+      "bytes": 609525,
+      "note": "Diffuse 1k, already in the repository. Shop interior wood floor (materials/apply.py SHOP_INTERIOR_TEXTURES); no plan slot."
+    },
+    {
       "id": "kenney_fantasy_door_metal_frame",
       "name": "door_metal_frame",
       "provider": "kenney",

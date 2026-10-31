@@ -32,7 +32,7 @@ from onward_generator.dress.surfaces import _load_features, _tags_of
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
-from onward_generator.materials.openings import boarded_png, window_png
+from onward_generator.materials.openings import boarded_png, shop_glass_png, window_png
 from onward_generator.materials.plan import TexturePlan, load_texture_plan
 from onward_generator.materials.polyhaven import (
     DEFAULT_CACHE,
@@ -71,9 +71,21 @@ WALL_COLOR_IDS = frozenset({
 })
 WHITE = (1.0, 1.0, 1.0, 1.0)
 MAX_PHOTO_PX = 1024
-UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "door_wood"})
-# The see-through pane keeps its RGBA window image. The contact atlas is opaque.
-ATLAS_SKIP = frozenset({"glass_view"})
+UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "shop_glass", "door_wood"})
+# The see-through panes keep their RGBA images. The contact atlas is opaque.
+ATLAS_SKIP = frozenset({"glass_view", "shop_glass"})
+# Shop interiors (docs/07-detail.md, *Shop interiors*): one library photograph per shared material,
+# not a plan slot. Walls keep their category tint over a greyscale plaster; floors show the photograph.
+# ``(library id, albedo mode, metres per repeat)``.
+SHOP_WALL_TEXTURE = ("ph_plastered_wall", "greyscale_modulation", 2.0)
+SHOP_INTERIOR_TEXTURES: dict[str, tuple[str, str, float]] = {
+    "interior_shop_bakery": SHOP_WALL_TEXTURE,
+    "interior_shop_pharmacy": SHOP_WALL_TEXTURE,
+    "interior_shop_bar": SHOP_WALL_TEXTURE,
+    "interior_shop_generic": SHOP_WALL_TEXTURE,
+    "interior_shop_tile": ("acg_tiles139", "color_albedo", 2.0),
+    "interior_shop_wood": ("ph_wood_planks", "color_albedo", 2.0),
+}
 # Interior surfaces are not plan slots. They reuse a photograph the plan already chose.
 INTERIOR_PHOTO_SLOTS: dict[str, tuple[str, ...]] = {
     "interior_wall": ("plain_facades", "historic_facades", "ochre_facades"),
@@ -146,6 +158,33 @@ def share_interior_photos(
                 "asset_id": record.asset_id,
             })
             break
+    return shared
+
+
+def share_shop_interior_photos(
+    used: Collection[str],
+    photo_tiles: dict[str, tuple[Any, str]],
+    materials: dict[str, Material],
+    tile_m: dict[str, float],
+) -> list[dict[str, Any]]:
+    """Give each used shop interior material of ``SHOP_INTERIOR_TEXTURES`` its library photograph.
+
+    A floor in ``color_albedo`` gets a white base colour; a wall in ``greyscale_modulation`` keeps its tint.
+    """
+    from onward_generator.materials.library_plan import texture_record
+
+    shared: list[dict[str, Any]] = []
+    for target, (library_id, mode, metres) in SHOP_INTERIOR_TEXTURES.items():
+        if target not in used:
+            continue
+        record = texture_record(library_id)
+        photo_tiles[target] = (decode_jpeg_rgb(Path(record.path).read_bytes()), mode)
+        tile_m[target] = metres
+        if mode == "color_albedo":
+            materials[target] = Material(WHITE, materials[target].roughness)
+        shared.append({"color_id": target, "library_id": library_id, "albedo_mode": mode, "tile_m": metres,
+                       "provider": record.provider, "license": record.license, "sha256": record.sha256,
+                       "repo_path": _rel(Path(record.path))})
     return shared
 
 
@@ -427,6 +466,8 @@ def apply_materials(
             })
     interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
     facade_shared = share_facade_photos(records, used, photo_tiles)
+    shop_tile_m: dict[str, float] = {}
+    shop_shared = share_shop_interior_photos(used, photo_tiles, materials, shop_tile_m)
 
     after_hashes = _base_hashes(base)
     if after_hashes != before_hashes:
@@ -457,6 +498,7 @@ def apply_materials(
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
     for row in interior_shared:
         tile_m[str(row["color_id"])] = float(row["tile_m"])
+    tile_m.update(shop_tile_m)
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
         tile_m["cobblestone_paving"] = float(cobble_entry.technical["tile_m"])
@@ -468,6 +510,10 @@ def apply_materials(
             png_jobs[color_id] = window_png
             prev = materials.get(color_id) or Material(WHITE, 0.15)
             materials[color_id] = Material(WHITE, prev.roughness)
+            continue
+        if color_id == "shop_glass":
+            png_jobs[color_id] = shop_glass_png
+            materials[color_id] = Material(WHITE, materials[color_id].roughness)
             continue
         if color_id == "glass_boarded":
             png_jobs[color_id] = boarded_png
@@ -540,6 +586,7 @@ def apply_materials(
             "window": "project-generated frame, not a photograph",
             "interior": interior_shared,
             "facade_shared": facade_shared,
+            "shop_interior": shop_shared,
         },
         "geometry": compare,
         "input_hashes": before_hashes,

@@ -36,6 +36,23 @@ def window_png(size: int = 256) -> bytes:
     return encode_png_rgba(window_rgba(size))
 
 
+# A shop's display window: no frame and no mullion, a pale tint the room shows through.
+SHOP_GLASS_RGB = (196, 212, 220)
+SHOP_GLASS_ALPHA = 51  # 20 % of 255
+
+
+def shop_glass_rgba(size: int) -> np.ndarray:
+    """One flat tint over the whole pane. A flat image needs no more than a few pixels."""
+    image = np.empty((size, size, 4), dtype=np.uint8)
+    image[..., :3] = SHOP_GLASS_RGB
+    image[..., 3] = SHOP_GLASS_ALPHA
+    return image
+
+
+def shop_glass_png(size: int = 16) -> bytes:
+    return encode_png_rgba(shop_glass_rgba(size))
+
+
 def boarded_rgba(size: int = 256) -> np.ndarray:
     """Plywood sheets over the same frame. Project-generated, not a photograph."""
     image = window_rgba(size)

@@ -55,6 +55,14 @@ SDK_SPAWN_POINTS = 8
 
 PAYLOAD = (("visual", "scene_visual.glb"), ("collision", "scene_collision.glb"), ("layout", "layout.json"))
 
+# Shop display windows (docs/07-detail.md, *Shop interiors*). The pane has no collider: the walk-through is a known risk.
+SHOP_GLASS_CHECKLIST = (
+    "Escaparates de tienda: vidrio sin marco, visible desde la calle y desde dentro (anotar qué material de vidrio registró el adaptador).",
+    "Un disparo atraviesa el escaparate de una tienda sin impacto en el vidrio.",
+    "Riesgo abierto: el escaparate no tiene colisión sobre el zócalo de 0,25 m. Anotar si el jugador entra a la tienda por él.",
+    "El nombre de la tienda en el escaparate se lee en letras negras desde la calle y no tapa el interior.",
+    "Los interiores de tienda muestran suelo y paredes con textura.",
+)
 QUEST_CHECKLIST = (
     "El mapa aparece en el flujo autorizado de selección o carga.",
     "El escenario carga sin errores críticos.",
@@ -70,6 +78,7 @@ QUEST_CHECKLIST = (
     "Se ve un flyover sobre la plaza.",
     "La ficha del mapa dice entorno urbano, no desierto.",
     "La iluminación y los materiales son correctos en el dispositivo.",
+    *SHOP_GLASS_CHECKLIST,
     "La tasa de fotogramas se mantiene en 72 fps (medir con OVR Metrics Tool, docs/09-perf.md).",
     "La memoria y el tiempo de carga quedan medidos y documentados.",
 )

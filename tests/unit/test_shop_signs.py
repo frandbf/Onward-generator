@@ -211,7 +211,7 @@ def test_one_node_per_building_with_one_atlas_material() -> None:
         ("fascia", 10), ("vinyl", 2), ("vinyl", 2), ("blade", 20), ("vinyl", 2), ("vinyl", 2),
     ]
     assert signs.rows[0] == {"building": "b1", "shop": "shop/b1/n1", "kind": "fascia", "name": "Panadería",
-                             "name_origin": "estimated", "page": 0, "triangles": 10}
+                             "name_origin": "estimated", "page": 0, "material": "shop_sign_atlas_0", "triangles": 10}
     assert sum(p.mesh.triangle_count for n in signs.nodes for p in n.primitives) == 38
     assert signs.skipped == 0
     b1_atlas, b1_edge = signs.nodes[0].primitives
@@ -261,3 +261,39 @@ def test_a_second_page_gets_its_own_material_and_a_third_is_dropped(monkeypatch:
     assert decode_png_rgba(signs.images["shop_sign_atlas_1"]).shape == (256, ATLAS_PX, 4)
     assert decode_png_rgba(signs.images["shop_sign_atlas_0"]).shape == (128, ATLAS_PX, 4)
     assert [p.material for p in signs.nodes[0].primitives] == ["shop_sign_atlas_1", "shop_sign_edge"]
+
+
+# --- Decals on shop glass -----------------------------------------------------------------
+
+
+def _glass_manifest() -> dict:
+    cfg = replace(CFG, shops=replace(CFG.shops, fascia_share=1.0, vinyl_share=1.0))
+    fronts = [replace(_front(1.0, 0), back="shop_glass"), _front(5.0, 1)]
+    shops = plan_shops("b1", [("n1", {"shop": "bakery"}, (2.0, -1.0))], fronts, [SEG], cfg)
+    return {"objects": [{"id": "building/b1", "type": "building", "source_ids": ["b1"], "facade": {"shops": shops}}]}
+
+
+def test_a_vinyl_on_shop_glass_is_a_black_decal_on_its_own_transparent_page() -> None:
+    assert Label("decal", "Bar", 10, 10).colours() == ((16, 16, 18), (16, 16, 18))
+    assert (Label("decal", "Bar", 10, 10).material, Label("vinyl", "Bar", 10, 10).material) == ("shop_decal_atlas_{}", "shop_sign_atlas_{}")
+    signs = shop_signs(_glass_manifest())
+    assert [(r["kind"], r["material"], r["page"], r["triangles"]) for r in signs.rows] == [
+        ("fascia", "shop_sign_atlas_0", 0, 10), ("vinyl", "shop_decal_atlas_0", 0, 2), ("vinyl", "shop_sign_atlas_0", 0, 2),
+    ]
+    assert sorted(signs.materials) == ["shop_decal_atlas_0", "shop_sign_atlas_0", "shop_sign_edge"]
+    assert signs.materials["shop_decal_atlas_0"].color == (1.0, 1.0, 1.0, 1.0)
+    [node] = signs.nodes
+    assert [p.material for p in node.primitives] == ["shop_decal_atlas_0", "shop_sign_atlas_0", "shop_sign_edge"]
+    decal = node.primitives[0]
+    assert decal.mesh.triangle_count == 2 and _area(decal.mesh) == pytest.approx(2.4 * 0.26)
+    page = decode_png_rgba(signs.images["shop_decal_atlas_0"])
+    assert page.shape == (64, ATLAS_PX, 4)
+    # Black letters and nothing else: every drawn pixel is the ink colour, opaque in the letters, clear around them.
+    drawn = page[..., 3] > 0
+    assert drawn.any() and (page[..., 3] == 255).any() and (page[..., 3] == 0).sum() > drawn.sum()
+    assert np.all(page[drawn][:, :3] == (16, 16, 18))
+    label = label_rgba(Label("decal", "Panadería", 480, 52))
+    assert np.all(label[:PAD_PX, :, 3] == 0) and np.all(label[:, :PAD_PX, 3] == 0)
+    # The strip on the dark glass keeps its opaque background on the board page.
+    strip = label_rgba(Label("vinyl", "Panadería", 480, 52))
+    assert np.all(strip[..., 3] == 255) and tuple(strip[0, 0, :3]) == VINYL_COLOURS[0]

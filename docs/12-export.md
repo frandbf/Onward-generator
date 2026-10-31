@@ -139,6 +139,18 @@ Nothing here is marked as passed. Write each result in the package's `quest_acce
 
 A mode that hides the map or breaks Hunt is reverted by step 5; nothing else needs to be undone except removing a `named*` pair by hand.
 
+## See-through materials
+
+The adapter builds every material with `PP_Opaque_Simple_Lit` and its albedo, except these, which are transparent and drawn on both faces. The C# could not be compiled on the Linux host that wrote this change; the first `task unity` run is its build check.
+
+| glTF material | Unity material |
+| --- | --- |
+| `glass_view` (interior windows) | `PP_Sprite_Lit`, the framed window PNG on `_MainTex` |
+| `shop_glass` (shop display windows, `docs/07-detail.md`) | A copy of the first material named exactly `GlassVfx`, then `Glass`, under `Assets/OnwardCustomContent` (`AssetDatabase.FindAssets("<name> t:Material")`, file name compared again). `_Cull` is set to Off when the copy has it. The scene log says which: `[OnwardAdapter] shop_glass: SDK material <path> (shader <name>); _Cull set to Off`, or `...; no _Cull property: check from inside a shop that the glass shows`, or `shop_glass: no SDK material named GlassVfx or Glass under Assets/OnwardCustomContent; PP_Sprite_Lit with the generated tint`. The SDK asset is never edited. Whether the v1.15 package ships such a material was not checked on this host |
+| `shop_decal_atlas_<page>` (shop names on shop glass) | `PP_Sprite_Lit`, the RGBA page on `_MainTex`, render queue one above the shop glass so the letters draw over it from the street |
+
+Each of them gets white vertex colours (`PP_Sprite_Lit` multiplies by vertex alpha). The shop glass and the decals cast no shadow (`ShadowCastingMode.Off`, on a combined renderer, or on a per-node renderer whose materials are all shop glass or decals), so the baked sun does not darken the shop behind the window. `glass_view` keeps its shadow, as before.
+
 ## Lighting
 
 Everything is baked. No realtime light reaches the Quest.

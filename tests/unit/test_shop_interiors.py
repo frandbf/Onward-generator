@@ -227,13 +227,15 @@ def test_a_shop_room_paints_its_walls_and_floor_and_keeps_a_white_ceiling() -> N
 # --- Vinyls --------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("back", "count"), [("glass_dark", 1), ("glass_view", 1), ("glass_boarded", 0), ("door_wood", 0)])
+@pytest.mark.parametrize(("back", "count"), [("glass_dark", 1), ("glass_view", 1), ("shop_glass", 1), ("glass_boarded", 0), ("door_wood", 0)])
 def test_vinyls_go_on_dark_and_see_through_glass_only(back: str, count: int) -> None:
-    assert frozenset({"glass_dark", "glass_view"}) == VINYL_BACKS
+    assert frozenset({"glass_dark", "glass_view", "shop_glass"}) == VINYL_BACKS
     front = Hole("shopfront", 0, 1.0, 0.25, 3.0, 2.3, 0.3, back, 0, 0)
     cfg = config_from_document(_doc(shops__vinyl_share=1.0))
     [record] = plan_shops("b1", [(None, {}, None)], [front], [SEG], cfg)
     assert len(record["vinyls"]) == count
+    # Each vinyl names the glass it sits on, so ``signs`` draws a decal on shop glass.
+    assert [v["glass"] for v in record["vinyls"]] == [back] * count
 
 
 # --- Light cap -----------------------------------------------------------------------------

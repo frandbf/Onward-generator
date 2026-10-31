@@ -180,6 +180,7 @@
     "frame_stone": { "color": [0.90, 0.88, 0.83, 1.0], "roughness": 0.8 },
     "glass_dark": { "color": [0.16, 0.20, 0.24, 1.0], "roughness": 0.15 },
     "glass_view": { "color": [0.16, 0.20, 0.24, 1.0], "roughness": 0.15 },
+    "shop_glass": { "color": [0.80, 0.87, 0.90, 1.0], "roughness": 0.1 },
     "door_wood": { "color": [0.36, 0.24, 0.16, 1.0], "roughness": 0.7 },
     "railing_metal": { "color": [0.16, 0.16, 0.17, 1.0], "roughness": 0.5 },
     "urban_metal": { "color": [0.22, 0.24, 0.24, 1.0], "roughness": 0.5 },

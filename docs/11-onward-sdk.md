@@ -33,6 +33,7 @@ The SDK enum has no plaster, brick, or cobble. Those floors and walls are Concre
 | Name contains `water` | Water | Penetrates and lowers damage |
 | Name contains `green` or `grass` | Grass | Impenetrable |
 | Node name contains `#glass` | Glass + `AISeeThrough` | The see-through pane. The concrete wall is cut on the same opening, so a shot from either side meets this volume and not the wall. The type is the SDK enum `Glass` (1), not `GlassUnpenetratable` (8) and not `GlassVfx` (9) |
+| A shop's display window (`shop_glass`) | none | No collider at all: the wall collider is open on the pane above the 0.25 m stallriser, so a shot crosses it from either side. The guide documents no player-only collision layer, so a body can step through too, into the closed shop room (`docs/07-detail.md`, *Shop interiors*). That risk is open on the headset checklist |
 | Door, wall, sill, header, pier, cobble, asphalt, sidewalk | Concrete | Impenetrable. The guide's default |
 
 `AISeeThrough` belongs only on a collider that can actually be seen through. A concrete wall with that flag lets the AI shoot through the facade. The visual shader does not decide penetration. `glass_dark` and `glass_boarded` stay concrete because they are not openings.
@@ -82,7 +83,7 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 
 ## Quest budget
 
-Figures from the guide, not from the Editor: about 150 draw calls, about 250 000 triangles, about 1 GB of textures, counting players. Share `PP_Opaque_Simple_Lit`. This texture set has no normals, so it is not promoted to `PP_Opaque_Lit`. Interior panes below the accessible ceiling use the SDK shader `PP_Sprite_Lit` (`_MainTex` only). No new shader is added and the SDK graphs are not edited. Transparency on Quest is expensive. That cost is a known limit, not a measurement from this package.
+Figures from the guide, not from the Editor: about 150 draw calls, about 250 000 triangles, about 1 GB of textures, counting players. Share `PP_Opaque_Simple_Lit`. This texture set has no normals, so it is not promoted to `PP_Opaque_Lit`. Interior panes below the accessible ceiling use the SDK shader `PP_Sprite_Lit` (`_MainTex` only). A shop's display window (`shop_glass`) uses a copy of the SDK's own glass material when the project has an asset named `GlassVfx` or `Glass` under `Assets/OnwardCustomContent` (the guide does not name one; the adapter looks and logs what it found), else `PP_Sprite_Lit`; the shop-name decals use `PP_Sprite_Lit`. No new shader is added and the SDK graphs are not edited. Transparency on Quest is expensive. That cost is a known limit, not a measurement from this package.
 
 Occlusion culling and static batching are what the guide recommends. v01 was measured on the headset and did not lower draw calls (ADR-005). They stay off.
 

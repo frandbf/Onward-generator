@@ -28,7 +28,12 @@ from onward_generator.dress.surfaces import osm_material_override
 from onward_generator.generation.config import Material, load_generation_config
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.materials.apply import apply_materials, rematerialize_brick_walls, share_facade_photos
+from onward_generator.materials.apply import (
+    apply_materials,
+    rematerialize_brick_walls,
+    share_facade_photos,
+    share_shop_interior_photos,
+)
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.materials.plan import PlanError, load_texture_plan
 from onward_generator.materials.polyhaven import DownloadError, TextureRecord, ensure_diffuse_1k, resolve_polyhaven_id
@@ -138,7 +143,8 @@ def _node(name: str, material: str, extras: dict[str, Any]) -> Node:
     return Node(name, (Primitive(_mesh(), material),), extras)
 
 
-def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False, party: bool = False) -> Path:
+def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon: bool = False, party: bool = False,
+                shop: bool = False) -> Path:
     _ = MURCIA_CENTER
     detail = root / "base"
     detail.mkdir()
@@ -191,6 +197,13 @@ def _write_base(root: Path, *, brick: bool = False, cobble: bool = True, salmon:
             "building/osm-way-brick", "plaster_ochre",
             {"type": "building", "source_ids": ["osm-way-brick"], "object_id": "building/osm-way-brick"},
         ))
+    if shop:
+        # A bakery and a bar: two wall tints, a tiled and a wooden floor, and a frameless display window.
+        for name, colour in (("interior_shop_bakery", (0.94, 0.80, 0.54, 1.0)), ("interior_shop_bar", (0.70, 0.38, 0.26, 1.0)),
+                             ("interior_shop_tile", (0.86, 0.82, 0.74, 1.0)), ("interior_shop_wood", (0.55, 0.37, 0.22, 1.0)),
+                             ("shop_glass", (0.80, 0.87, 0.90, 1.0))):
+            materials[name] = Material(colour, 0.6)
+            nodes.append(_node(f"interior/{name}", name, {"type": "interior", "source_ids": ["osm-way-1"], "object_id": f"interior/{name}"}))
     if party:
         # A party wall beside its wall on the same mesh, so both get the same UV phase. Salmon is used only as a party wall.
         extra = {"building/osm-way-1": "party_plaster_ochre", "building/osm-way-white": "party_plaster_white",
@@ -429,6 +442,54 @@ def test_salmon_walls_borrow_a_plaster_photo_in_greyscale_under_their_own_tint(t
     assert (tile[..., 0] == tile[..., 1]).all() and (tile[..., 1] == tile[..., 2]).all()
     # The photograph is concrete_wall_001 (180, 178, 170), not the procedural tile.
     assert abs(int(tile.mean()) - 178) <= 2
+
+
+def test_shop_interiors_take_shared_library_photographs_and_the_display_window_a_flat_tint(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    out = tmp_path / "shop"
+    report = apply_materials(_write_base(tmp_path, shop=True), out, cache_dir=cache, plan_path=_polyhaven_plan(tmp_path / "plan.json"))
+    rows = {row["color_id"]: row for row in report["textures"]["shop_interior"]}
+    assert {k: (r["library_id"], r["albedo_mode"], r["tile_m"]) for k, r in rows.items()} == {
+        "interior_shop_bakery": ("ph_plastered_wall", "greyscale_modulation", 2.0),
+        "interior_shop_bar": ("ph_plastered_wall", "greyscale_modulation", 2.0),
+        "interior_shop_tile": ("acg_tiles139", "color_albedo", 2.0),
+        "interior_shop_wood": ("ph_wood_planks", "color_albedo", 2.0),
+    }
+    assert rows["interior_shop_wood"]["license"] == "CC0-1.0" and rows["interior_shop_wood"]["repo_path"] == (
+        "assets/textures/wood_planks/wood_planks_diff_1k.jpg")
+    assert rows["interior_shop_wood"]["provider"] == "polyhaven" and rows["interior_shop_tile"]["provider"] == "ambientcg"
+    assert rows["interior_shop_wood"]["sha256"] == "3b0669f683e4bf10f5a55a381cfa9669a7b8dfd921901829daa3b35acc2bbdec"
+    data = (out / "scene_visual.glb").read_bytes()
+    doc, _ = read_glb(data)
+    mats = {m["name"]: m["pbrMetallicRoughness"] for m in doc["materials"]}
+    # A wall keeps its category tint over a grey plaster; a floor shows its photograph under white.
+    assert mats["interior_shop_bakery"]["baseColorFactor"] == pytest.approx([0.94, 0.80, 0.54, 1.0])
+    assert mats["interior_shop_tile"]["baseColorFactor"] == mats["interior_shop_wood"]["baseColorFactor"] == [1.0, 1.0, 1.0, 1.0]
+    assert mats["interior_shop_wood"]["roughnessFactor"] == 0.6
+    # Shared, not one per shop: the two walls use one texture.
+    assert mats["interior_shop_bakery"]["baseColorTexture"]["index"] == mats["interior_shop_bar"]["baseColorTexture"]["index"]
+    assert mats["interior_shop_bakery"]["baseColorTexture"]["index"] != mats["interior_shop_tile"]["baseColorTexture"]["index"]
+    images = images_by_material(data)
+    wall = decode_png_rgba(images["interior_shop_bakery"])
+    assert wall.shape == (1024, 1024, 4) and (wall[..., 0] == wall[..., 2]).all()
+    wood = decode_png_rgba(images["interior_shop_wood"])[..., :3].astype(int)
+    assert wood[..., 0].mean() > wood[..., 2].mean() + 20  # the brown photograph, not a grey procedural tile
+    # The display window: a flat pale tint at 20 % alpha, no frame, on 0-1 UVs, out of the opaque atlas.
+    glass = decode_png_rgba(images["shop_glass"])
+    assert glass.shape == (16, 16, 4) and (glass == [196, 212, 220, 51]).all()
+    assert mats["shop_glass"]["baseColorFactor"] == [1.0, 1.0, 1.0, 1.0]
+    [pane] = [p for n in nodes_from_glb(data)[0] if n.name == "interior/shop_glass" for p in n.primitives]
+    assert pane.uvs.min() == 0.0 and pane.uvs.max() == 1.0
+    assert doc["extras"]["atlas"]["tiles"] == len(mats) - 1  # every material but the shop glass
+
+
+def test_share_shop_interior_photos_leaves_a_scene_without_shops_alone() -> None:
+    photos: dict[str, Any] = {}
+    materials = {"interior_wall": Material((0.9, 0.9, 0.9, 1.0), 0.9)}
+    tile_m: dict[str, float] = {}
+    assert share_shop_interior_photos({"interior_wall"}, photos, materials, tile_m) == []
+    assert photos == {} and tile_m == {} and materials == {"interior_wall": Material((0.9, 0.9, 0.9, 1.0), 0.9)}
 
 
 def test_brick_walls_keep_their_uvs_and_their_party_walls() -> None:

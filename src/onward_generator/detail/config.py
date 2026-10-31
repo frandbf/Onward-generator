@@ -372,7 +372,7 @@ def _semantic(cfg: DetailConfig) -> list[str]:
                 problems.append(f"/interiors/shops/{c.name}: material {m!r} must be defined in /materials and start with 'interior_'")
     if cfg.recess_depth_m >= cfg.interiors.wall_thickness_m:
         problems.append("/openings/recess_depth_m must be thinner than /interiors/wall_thickness_m")
-    for name in ("frame_stone", "glass_dark", "glass_view", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
+    for name in ("frame_stone", "glass_dark", "glass_view", "shop_glass", "door_wood", "railing_metal", "urban_metal", "tree_trunk",
                  "tree_canopy", "interior_wall", "interior_floor", "stair"):
         if name not in mats:
             problems.append(f"/materials: required material {name!r} is missing")
