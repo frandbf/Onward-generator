@@ -31,7 +31,10 @@ flowchart LR
   osm --> geo[geo]
   geo -.-> catastro[catastro download]
   catastro -.-> cadastre[cadastre split]
+  cadastre -.-> plugins[other source plugins]
+  plugins -.-> merge[source merge]
   cadastre -.-> heights
+  merge -.-> heights
   geo --> heights[heights]
   heights --> generate[generate]
   generate --> detail[detail]
@@ -51,7 +54,7 @@ flowchart LR
   unity --> quest[Quest]
 ```
 
-`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. `catastro` and `cadastre` run by default when the map is in mainland Spain (EPSG:25830, latitude 35.85°–43.8°) and fits one Catastro request; `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
+`dress style`, `props place`, and `materials apply` can be skipped. If they are skipped, `bounds` reads `detail` directly. The dashed source stages come from source plugins (ADR-018): `run` adds the stages of every registered plugin that covers the map centre and is not switched off (`run --no-source <id>`), and prints them on a `sources` line. `onward-generator source list` shows the plugins. `catastro` and `cadastre` (`es.catastro`) run by default in the territories the DG Catastro WFS serves (`docs/05-cadastre.md#coverage`); `run --no-catastro` skips them. Then `heights` and every later stage read `data/processed/cadastre/geo_scene.json`, where block footprints are split into one building per Catastro construction (ADR-016). When more than one plugin writes height overrides, `overrides` (`source merge`) ranks them by `config/sources.json` `priority` into `data/processed/sources/heights_overrides.json`, and `heights` reads that file. `panoramax apply` runs only when `map.json` has `"panoramax": true`. A map with the key absent, or with the key `false`, keeps the order above with `signs` reading `scene_materials`. `overgrow fit` is not skipped. If a prop is the wrong size or in the wrong place, `bounds` does not start.
 
 ## 0. Unity project — once
 
@@ -101,7 +104,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Centre, radius, or card name | `map create` and, if the area changed, everything from `geo` | the other maps |
 | OSM extract | `geo` and everything after it | the map folder |
 | Catastro split | `cadastre` (or `catastro` for a new download), then `heights` and everything after it | `geo` |
-| Heights or Catastro | `heights`, then `generate` and everything after it | `geo` |
+| Heights, Catastro or another source plugin | the plugin's stages and `overrides` when it runs, then `heights`, `generate` and everything after it | `geo` |
 | Volumes | `generate` and everything after it | `geo`, `heights` |
 | Facades | `detail` and everything after it | `generate` |
 | Generated trees and benches | `dress style` and everything after it | `detail` |
@@ -192,7 +195,7 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 | Output | `heights.json`, `heights_report.json` |
 | Classes | measured, inferred, fallback, needs_manual_review |
 
-`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Heights stay on the OSM estimate.
+`cadastre download` uses the network (one Catastro WFS request). `cadastre match` writes storey overrides. `cadastre split` writes a new scene with one building per Catastro construction and its overrides; `run` uses it in Spain. [05-cadastre.md](05-cadastre.md), [ADR-016](decisions/ADR-016-catastro-split.md). Outside Spain there is no Catastro. Without a source plugin for the map, heights stay on the OSM estimate. `source merge` combines the overrides of several plugins by priority ([ADR-018](decisions/ADR-018-source-plugins.md)).
 
 ## 4. Generate
 

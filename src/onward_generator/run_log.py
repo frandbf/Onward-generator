@@ -297,6 +297,12 @@ def _bounds(out: Path) -> StageReport:
     return StageReport(f"wall {wall['height_m']:g} m  {group(wall['triangles'])} tris{core}")
 
 
+def _overrides(out: Path) -> StageReport:
+    report = _read(out / "sources_report.json")
+    won = "  ".join(f"{entry['source']} {group(int(entry['won']))}" for entry in report["sources"])
+    return StageReport(f"{group(int(report['buildings']))} buildings  {won}")
+
+
 def _layout(out: Path) -> StageReport:
     layout = _read(out)
     parts: list[str] = []
@@ -325,6 +331,7 @@ _STAGES: dict[str, Callable[[Path], StageReport]] = {
     "geo": _geo,
     "catastro": _catastro,
     "cadastre": _cadastre,
+    "overrides": _overrides,
     "heights": _heights,
     "generate": _generate,
     "detail": _detail,

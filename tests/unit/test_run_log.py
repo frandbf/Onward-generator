@@ -344,3 +344,10 @@ def test_cadastre_reports_the_split(tmp_path: Path) -> None:
     split.update(status_quarantined=2, quarantined_m2=1234.56)
     _write(out / "cadastre_match_report.json", {"counts": {"cadastre_parts": 0}, "split": {"counts": split}})
     assert summarize("cadastre", ["--out", str(out)]) == StageReport("parts 0  split 0 → 0  kept whole 2 (1 235 m²)")
+
+
+def test_overrides_reports_the_winners_per_source(tmp_path: Path) -> None:
+    out = tmp_path / "sources"
+    report = {"buildings": 1250, "sources": [{"source": "es.pnoa_ndsm", "won": 1200}, {"source": "es.catastro", "won": 50}]}
+    _write(out / "sources_report.json", report)
+    assert summarize("overrides", ["source", "merge", "--out", str(out)]) == StageReport("1 250 buildings  es.pnoa_ndsm 1 200  es.catastro 50")

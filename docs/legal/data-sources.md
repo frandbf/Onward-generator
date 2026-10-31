@@ -67,6 +67,10 @@ Sources checked on 2026-10-18:
 
 The fixture `tests/fixtures/cadastre/synthetic_bu.gml` is synthetic (CC0-1.0) and contains no Catastro data.
 
+## Source plugins
+
+Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+
 ## Generated geometry
 
 Phase 04 does not use external models. Windows, balconies, roofs, street furniture, and interiors are procedural geometry from this code. `scene_detail.json` and `scene_visual.glb` inherit the base attributions (OpenStreetMap ODbL-1.0, and Catastro CC BY 4.0 when it was used) and state that the facades are generic templates, not a faithful reconstruction. They must not be presented as the real buildings.

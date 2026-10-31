@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from shapely import box
 
 from onward_generator.ai.providers import Provider
-from onward_generator.cadastre.zones import catastro_zone
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
 from onward_generator.export.package import ExportError, load_export_config
@@ -23,6 +23,7 @@ from onward_generator.geo.aoi import AoiError, load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_for_origin
 from onward_generator.io import atomic_write_json
 from onward_generator.materials.library_plan import select_texture_plan
+from onward_generator.sources.registry import choices, plugin_by_id
 from onward_generator.tiers import MIN_CORE_HALF_SIDE_M
 
 MAP_SCHEMA = "onward_generator.map"
@@ -155,27 +156,35 @@ def store_panoramax(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
-def catastro_enabled(directory: str | Path) -> bool:
-    """True when ``run`` splits buildings with Catastro for this map (ADR-016).
+def source_enabled(directory: str | Path, plugin_id: str) -> bool:
+    """True when ``run`` uses the source plugin ``plugin_id`` for this map (ADR-018).
 
-    The map centre must be in a territory the DG Catastro WFS serves
-    (``config/catastro_zones.json``). A map without the key uses it;
-    ``"catastro": false`` (``run --no-catastro``) turns it off.
+    The map centre must be inside the plugin's coverage, and ``map.json`` must
+    not switch it off (``run --no-source <id>``; for ``es.catastro`` also the
+    older ``"catastro": false``). A map without a switch uses every plugin
+    that covers it.
     """
     try:
         document = load_map(directory)
     except MapError:
         return False
-    center = document["center"]
-    inside = catastro_zone(float(center["longitude"]), float(center["latitude"])) is not None
-    return inside and document.get("catastro") is not False
+    return any(choice.runs for choice in choices(document) if choice.plugin.id == plugin_id)
 
 
-def store_catastro(directory: str | Path, enabled: bool) -> None:
-    """Record ``run --catastro`` or ``--no-catastro`` on an existing map. Does not rewrite scenes."""
+def store_sources(directory: str | Path, switches: Mapping[str, bool]) -> None:
+    """Record ``run --source`` / ``--no-source`` in ``map.json`` ``sources``. Does not rewrite scenes.
+
+    Writing ``es.catastro`` drops the older ``catastro`` key, so one switch decides.
+    """
+    for plugin_id in switches:
+        plugin_by_id(plugin_id)
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
-    document["catastro"] = bool(enabled)
+    stored = dict(document.get("sources") or {})
+    stored.update({plugin_id: bool(enabled) for plugin_id, enabled in switches.items()})
+    document["sources"] = dict(sorted(stored.items()))
+    if "es.catastro" in switches:
+        document.pop("catastro", None)
     atomic_write_json(root / "map.json", document)
 
 

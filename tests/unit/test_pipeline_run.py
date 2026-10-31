@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import build_parser, main
-from onward_generator.maps.workspace import create_map, store_catastro
+from onward_generator.maps.workspace import create_map, store_sources
 from onward_generator.next_step import (
     cadastre_split_command,
     catastro_command,
@@ -1189,7 +1189,7 @@ def test_a_new_map_prints_the_header_and_folds_setup_into_the_total(
     )
     out = capsys.readouterr().out
     assert code == 2
-    assert out.startswith(f"Murcia  maps/murcia\n{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 90 m  margin 5 m  lightmap 12.5 t/m\n\n\033[31mFAILED\033[0m geo")
+    assert out.startswith(f"Murcia  maps/murcia\n{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 90 m  margin 5 m  lightmap 12.5 t/m\n\nsources  es.catastro\n\033[31mFAILED\033[0m geo")
     assert "(map setup 0.0 s)" in out
     assert "\033[31m✗\033[0m Python" in out
 
@@ -1327,7 +1327,7 @@ def _murcia(tmp_path: Path) -> Path:
 
 def test_catastro_off_keeps_the_osm_scene_for_heights(tmp_path: Path) -> None:
     root = _murcia(tmp_path)
-    store_catastro(root, False)
+    store_sources(root, {"es.catastro": False})
     steps = dict(plan_steps(root))
     assert "catastro" not in steps and "cadastre" not in steps
     scene = Path(steps["geo"][steps["geo"].index("--out") + 1]) / "geo_scene.json"
@@ -1366,7 +1366,7 @@ def test_catastro_and_cadastre_are_stale_after_their_input(tmp_path: Path) -> No
     assert not output_ready("cadastre", [], root)
     _touch(processed / "geo" / "geo_scene.json", now + 6)
     assert not output_ready("catastro", [], root)
-    store_catastro(root, False)
+    store_sources(root, {"es.catastro": False})
     assert output_ready("heights", [], root) is False  # heights now follows geo, which is newer
     _touch(processed / "heights" / "heights.json", now + 7)
     assert output_ready("heights", [], root)
@@ -1382,23 +1382,22 @@ def test_a_catastro_sidecar_alone_is_downloaded_again_with_overwrite(tmp_path: P
     assert "--overwrite" in dict(prepare_from(steps, "catastro", root))["catastro"]
 
 
-def test_run_stores_the_catastro_switch(tmp_path: Path) -> None:
+def test_run_stores_the_source_switches(tmp_path: Path) -> None:
     root = _ready_map(tmp_path)
 
-    def run(catastro: bool | None) -> None:
+    def run(sources: dict[str, bool] | None) -> dict:
         code = run_map(
             map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
-            radius_m=400, margin_m=30, out=str(root), catastro=catastro,
+            radius_m=400, margin_m=30, out=str(root), sources=sources,
             execute=lambda argv: 0, interactive=False, no_unity=True,
         )
         assert code == 0
+        return json.loads((root / "map.json").read_text(encoding="utf-8"))
 
-    run(None)
-    assert "catastro" not in json.loads((root / "map.json").read_text(encoding="utf-8"))
-    run(False)
-    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is False
-    run(True)
-    assert json.loads((root / "map.json").read_text(encoding="utf-8"))["catastro"] is True
+    assert "sources" not in run(None)
+    assert "sources" not in run({})
+    assert run({"es.catastro": False})["sources"] == {"es.catastro": False}
+    assert run({"es.catastro": True})["sources"] == {"es.catastro": True}
 
 
 @pytest.mark.parametrize(
@@ -1420,11 +1419,11 @@ def test_a_new_map_stores_the_catastro_switch_before_planning(
 
     code = run_map(
         map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
-        radius_m=90, margin_m=5, out="maps/murcia", catastro=catastro, execute=execute, interactive=False,
+        radius_m=90, margin_m=5, out="maps/murcia", sources={"es.catastro": catastro}, execute=execute, interactive=False,
         no_unity=True,
     )
     assert code == 2
-    assert json.loads(Path("maps/murcia/map.json").read_text(encoding="utf-8"))["catastro"] is catastro
+    assert json.loads(Path("maps/murcia/map.json").read_text(encoding="utf-8"))["sources"] == {"es.catastro": catastro}
     assert [argv[0] for argv in seen] == steps
 
 
@@ -1436,33 +1435,57 @@ def test_heights_without_catastro_ignores_a_newer_split_scene(tmp_path: Path) ->
     _touch(processed / "heights" / "heights.json", now + 1)
     _touch(processed / "cadastre" / "geo_scene.json", now + 2)
     assert not output_ready("heights", [], root)
-    store_catastro(root, False)
+    store_sources(root, {"es.catastro": False})
     assert output_ready("heights", [], root)
 
 
-def test_run_passes_the_catastro_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_passes_the_source_switches(monkeypatch: pytest.MonkeyPatch) -> None:
     received: dict[str, object] = {}
     monkeypatch.setattr("onward_generator.pipeline_run.run_map", lambda **kwargs: received.update(kwargs) or 0)
     argv = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]
     assert main(argv) == 0
-    assert received["catastro"] is None
+    assert received["sources"] == {}
     assert main([*argv, "--no-catastro"]) == 0
-    assert received["catastro"] is False
+    assert received["sources"] == {"es.catastro": False}
     assert main([*argv, "--catastro"]) == 0
-    assert received["catastro"] is True
+    assert received["sources"] == {"es.catastro": True}
+    assert main([*argv, "--no-source", "es.catastro"]) == 0
+    assert received["sources"] == {"es.catastro": False}
+    assert main([*argv, "--source", "es.catastro"]) == 0
+    assert received["sources"] == {"es.catastro": True}
 
 
-def test_run_help_describes_the_catastro_switch() -> None:
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (["--source", "xx.nothing"], "unknown source 'xx.nothing'"),
+        (["--source", "es.catastro", "--no-source", "es.catastro"], "--source and --no-source both name es.catastro"),
+        (["--catastro", "--no-source", "es.catastro"], "--source and --no-source both name es.catastro"),
+    ],
+)
+def test_run_refuses_unknown_or_contradictory_sources(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], extra: list[str], message: str,
+) -> None:
+    monkeypatch.setattr("onward_generator.pipeline_run.run_map", lambda **kwargs: pytest.fail("run_map must not start"))
+    argv = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON), *extra]
+    assert main(argv) == 2
+    assert message in capsys.readouterr().err
+
+
+def test_run_help_describes_the_source_switches() -> None:
     parser = build_parser()
     subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     run = subparsers.choices["run"]
     helps = {action.dest: action.help for action in run._actions}
     assert helps["catastro"] == (
-        "split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country); "
-        "--no-catastro turns it off for this map"
+        "same as --source es.catastro / --no-source es.catastro: split OSM blocks into Catastro constructions "
+        "(default on in Spain outside Navarre and the Basque Country)"
     )
+    assert helps["source"] == "use this source plugin for the map when it covers the centre (stored in map.json; see: source list)"
+    assert helps["no_source"] == "do not use this source plugin for the map (stored in map.json)"
     listed = {choice.dest: choice.help for choice in subparsers._choices_actions}
     assert listed["cadastre"] == "Catastro INSPIRE floors: download | match | split (see: cadastre --help)"
+    assert listed["source"] == "optional data-source plugins: list | merge (see: source --help)"
 
 
 def test_cadastre_help_lists_split() -> None:
@@ -1493,7 +1516,7 @@ def test_run_passes_the_preview_choice_to_a_new_and_a_resumed_map(
         return run_map(
             map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
             radius_m=90, margin_m=30, out="maps/murcia", execute=execute, interactive=False,
-            catastro=False, start=start, **chosen,
+            sources={"es.catastro": False}, start=start, **chosen,
         )
 
     assert run(None) == 3

@@ -1,0 +1,86 @@
+"""The interface every optional data source implements (ADR-018).
+
+A source plugin is a dataset that only covers part of the world: a national
+cadastre, a LiDAR height model. The generic core (OSM, ``geo``, ``heights``)
+never depends on one. ``run`` asks every registered plugin whether it covers
+the map centre and adds the stages of those that do and are not switched off.
+
+A plugin never imports the exporter. It writes into ``data/raw`` (the
+download and its ``.source.json``) and ``data/processed`` (an overrides file,
+and for a plugin that subdivides footprints a new ``geo_scene.json``).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal, Protocol
+
+Kind = Literal["footprints", "height_m", "levels"]
+"""What a plugin contributes. ``footprints``: it writes a new scene that later stages read.
+``height_m`` and ``levels``: it writes a ``heights_overrides.<id>.json`` (``config/heights.overrides.schema.json``)."""
+
+OVERRIDE_KINDS: frozenset[Kind] = frozenset({"height_m", "levels"})
+
+
+class SourceError(ValueError):
+    """A plugin, its configuration or its output is invalid."""
+
+
+@dataclass(frozen=True, slots=True)
+class LicenceRecord:
+    """The licence a plugin's data is used under. ``spdx`` is checked against the allowlist before any fetch."""
+
+    spdx: str
+    name: str
+    url: str
+    attribution: str
+    obligations: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceStage:
+    """One ``run`` stage of a plugin: a CLI call and the file that shows it finished.
+
+    ``download`` marks the stage that writes a raw file and its ``.source.json``;
+    a repeated download passes ``--overwrite`` when either exists. ``inputs`` are
+    the files the marker must be at least as new as.
+    """
+
+    name: str
+    argv: tuple[str, ...]
+    marker: Path
+    inputs: tuple[Path, ...]
+    download: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSteps:
+    """A plugin's stages for one map. ``scene`` is the scene later stages read, when the plugin writes one."""
+
+    stages: tuple[SourceStage, ...]
+    overrides: Path | None
+    scene: Path | None = None
+
+
+class SourcePlugin(Protocol):
+    """A dataset that covers part of the world. See ADR-018."""
+
+    @property
+    def id(self) -> str:
+        """``<country code>.<dataset>``, for example ``es.catastro``. Used in map.json, ``--source`` and the priority."""
+        ...
+
+    @property
+    def licence(self) -> LicenceRecord: ...
+
+    @property
+    def produces(self) -> frozenset[Kind]: ...
+
+    def covers(self, longitude: float, latitude: float) -> bool:
+        """True when the map centre is inside the plugin's coverage. A static table in the repository, no network."""
+        ...
+
+    def steps(self, root: Path, scene: Path) -> SourceSteps:
+        """The stages for the map at ``root``, reading ``scene`` (the latest scene before this plugin)."""
+        ...
