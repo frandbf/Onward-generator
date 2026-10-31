@@ -39,7 +39,7 @@ def asc_part(body: bytes) -> bytes:
         return stripped
     if not stripped.startswith(b"--"):
         raise SourceError(f"WCS response is neither a grid nor multipart: {stripped[:120]!r}")
-    boundary = stripped.split(b"\n", 1)[0].strip()
+    boundary = stripped.partition(b"\n")[0].strip()
     for part in stripped.split(boundary):
         head, sep, payload = part.partition(b"\r\n\r\n")
         if not sep:

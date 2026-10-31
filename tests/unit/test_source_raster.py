@@ -156,3 +156,64 @@ def test_a_footprint_outside_the_grid_has_no_cells() -> None:
 def test_a_footprint_the_buffer_erases_falls_back_to_the_outline() -> None:
     result = footprint_height(_flat(10.0), box(105, 205, 106.5, 215), **{**RULE, "min_cells": 1})
     assert result.buffer_m == 0.0 and result.cells == 10
+
+
+def test_parse_ascii_grid_reads_padded_headers_and_a_header_only_grid() -> None:
+    grid = parse_ascii_grid(b"ncols        2\nnrows        1\nxllcorner    440140.0\nyllcorner    4474110.0\ncellsize     2.5\n 0.000 19.500\n")
+    assert grid.bbox == (440140.0, 4474110.0, 440145.0, 4474112.5)
+    assert grid.values.tolist() == [[0.0, 19.5]]
+    empty = parse_ascii_grid(b"ncols 0\nnrows 0\nxllcorner 1\nyllcorner 2\ncellsize 1\n")
+    assert empty.values.shape == (0, 0) and empty.bbox == (1.0, 2.0, 1.0, 2.0)
+
+
+def test_parse_float32_keeps_float32_and_a_value_at_the_nodata_limit() -> None:
+    values = np.array([[-1000.0, -1000.5]], dtype="<f4")
+    grid = parse_float32(values.tobytes(), (0.0, 0.0, 2.0, 1.0), 2, 1, nodata_below=-1000.0)
+    assert grid.values.dtype == np.float32
+    assert grid.values[0, 0] == -1000.0 and np.isnan(grid.values[0, 1])
+
+
+def test_snap_bbox_ignores_float_noise_below_a_millionth_of_a_cell_only() -> None:
+    assert snap_bbox((4.9999996, 0.0, 6.0000004, 1.0), 1.0) == (5.0, 0.0, 6.0, 1.0)
+    assert snap_bbox((4.999998, 0.0, 6.000002, 1.0), 1.0) == (4.0, 0.0, 7.0, 1.0)
+
+
+def test_tiles_step_by_the_cell_size() -> None:
+    assert tiles((100.0, 200.0, 110.0, 205.0), 2.5, 2) == [
+        ((100.0, 200.0, 105.0, 205.0), 2, 2), ((105.0, 200.0, 110.0, 205.0), 2, 2),
+    ]
+    cut = tiles((100.0, 200.0, 110.0, 210.0), 2.5, 2)
+    assert [bbox for bbox, _c, _r in cut] == [
+        (100.0, 205.0, 105.0, 210.0), (105.0, 205.0, 110.0, 210.0),
+        (100.0, 200.0, 105.0, 205.0), (105.0, 200.0, 110.0, 205.0),
+    ]
+
+
+def test_mosaic_places_tiles_by_cell_size_far_from_the_origin() -> None:
+    a = Grid(np.array([[1.0, 2.0]], dtype=np.float32), 1000.0, 5005.0, 2.5)
+    b = Grid(np.array([[3.0]], dtype=np.float32), 1005.0, 5002.5, 2.5)
+    grid = mosaic([a, b])
+    assert grid.values.dtype == np.float32
+    assert grid.bbox == (1000.0, 5000.0, 1007.5, 5005.0)
+    assert grid.values.shape == (2, 3)
+    assert grid.values[0, :2].tolist() == [1.0, 2.0] and grid.values[1, 2] == 3.0
+    assert np.isnan(grid.values[0, 2]) and np.isnan(grid.values[1, :2]).all()
+
+
+def test_a_footprint_on_the_first_column_and_row_reads_them() -> None:
+    grid = Grid(np.arange(16, dtype=np.float32).reshape(4, 4) + 10, 1000.0, 5010.0, 2.5)
+    result = footprint_height(grid, box(1000.0, 5005.0, 1005.0, 5010.0), **{**RULE, "buffer_m": 0.0})
+    assert result.cells == 4 and result.height_m == 12.5  # cells 10, 11, 14, 15
+
+
+def test_footprint_height_rounds_to_centimetres_and_keeps_the_buffer_at_exactly_min_cells() -> None:
+    grid = _flat(12.345)
+    result = footprint_height(grid, box(105, 205, 115, 215), **RULE)
+    assert result.height_m == 12.35
+    exact = footprint_height(_flat(9.0), box(105, 205, 109, 209), **{**RULE, "min_cells": 4})
+    assert exact.cells == 4 and exact.buffer_m == 1.0
+
+
+def test_a_footprint_without_enough_data_still_reports_the_buffer_used() -> None:
+    result = footprint_height(_flat(0.0), box(105, 205, 115, 215), **RULE)
+    assert (result.height_m, result.buffer_m, result.cells) == (None, 1.0, 64)

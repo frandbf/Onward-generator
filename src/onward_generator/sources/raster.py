@@ -18,6 +18,7 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.sources.plugin import SourceError
 
 BBox = tuple[float, float, float, float]
+HEADER_KEYS = frozenset({"ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"})
 
 
 @dataclass(frozen=True)
@@ -40,13 +41,12 @@ def parse_ascii_grid(data: bytes) -> Grid:
 
     NODATA cells become NaN.
     """
-    lines = data.decode("ascii").splitlines()
+    tokens = data.decode("ascii").split()  # pragma: no mutate: codec names are case-insensitive
     header: dict[str, float] = {}
     index = 0
-    while index < len(lines) and lines[index][:1].isalpha():
-        key, _, value = lines[index].strip().partition(" ")
-        header[key.lower()] = float(value)
-        index += 1
+    while index < len(tokens) and tokens[index].lower() in HEADER_KEYS:
+        header[tokens[index].lower()] = float(tokens[index + 1])
+        index += 2
     try:
         columns, rows, cell = int(header["ncols"]), int(header["nrows"]), header["cellsize"]
     except KeyError as exc:
@@ -54,12 +54,12 @@ def parse_ascii_grid(data: bytes) -> Grid:
     half = cell / 2
     west = header["xllcorner"] if "xllcorner" in header else header["xllcenter"] - half
     south = header["yllcorner"] if "yllcorner" in header else header["yllcenter"] - half
-    values = np.array(" ".join(lines[index:]).split(), dtype=np.float32)
+    values = np.array(tokens[index:], dtype=np.float32)
     if values.size != rows * columns:
         raise SourceError(f"ASCII grid has {values.size} values, header says {rows} x {columns}")
     grid = values.reshape(rows, columns)
     if "nodata_value" in header:
-        grid[grid == np.float32(header["nodata_value"])] = np.nan
+        grid[grid == np.float32(header["nodata_value"])] = np.nan  # pragma: no mutate: None also stores NaN in a float array
     return Grid(grid, west, south + rows * cell, cell)
 
 
@@ -71,7 +71,7 @@ def parse_float32(data: bytes, bbox: BBox, columns: int, rows: int, *, nodata_be
     if len(data) != rows * columns * 4:
         raise SourceError(f"float32 grid has {len(data)} bytes, expected {rows} x {columns} x 4")
     grid = np.frombuffer(data, dtype="<f4").reshape(rows, columns).astype(np.float32)
-    grid[grid < nodata_below] = np.nan
+    grid[grid < nodata_below] = np.nan  # pragma: no mutate: None also stores NaN in a float array
     return Grid(grid, bbox[0], bbox[3], (bbox[2] - bbox[0]) / columns)
 
 
@@ -108,13 +108,14 @@ def mosaic(grids: Sequence[Grid]) -> Grid:
     if not grids:
         raise SourceError("no raster tiles")
     cell = grids[0].cell
-    if any(not math.isclose(g.cell, cell, rel_tol=1e-9) for g in grids):
+    if any(not math.isclose(g.cell, cell) for g in grids):
         raise SourceError("raster tiles have different cell sizes")
     west = min(g.west for g in grids)
     north = max(g.north for g in grids)
     east = max(g.bbox[2] for g in grids)
     south = min(g.bbox[1] for g in grids)
-    out = np.full((round((north - south) / cell), round((east - west) / cell)), np.nan, dtype=np.float32)
+    shape = (round((north - south) / cell), round((east - west) / cell))
+    out = np.full(shape, np.float32("nan"))
     for g in grids:
         row, column = round((north - g.north) / cell), round((g.west - west) / cell)
         rows, columns = g.values.shape
@@ -172,13 +173,13 @@ def footprint_height(
 def _cells(grid: Grid, area: BaseGeometry) -> np.ndarray:
     """The values of the cells whose centre lies inside ``area``."""
     if area.is_empty:
-        return np.empty(0, dtype=np.float32)
+        return np.empty(0)
     rows, columns = grid.values.shape
     minx, miny, maxx, maxy = area.bounds
     c0 = max(0, math.floor((minx - grid.west) / grid.cell))
-    c1 = min(columns, math.ceil((maxx - grid.west) / grid.cell))
+    c1 = min(columns, math.ceil((maxx - grid.west) / grid.cell))  # pragma: no mutate: a larger upper bound only widens the window contains_xy filters; the cells are the same
     r0 = max(0, math.floor((grid.north - maxy) / grid.cell))
-    r1 = min(rows, math.ceil((grid.north - miny) / grid.cell))
+    r1 = min(rows, math.ceil((grid.north - miny) / grid.cell))  # pragma: no mutate: a larger upper bound only widens the window contains_xy filters; the cells are the same
     cx = grid.west + (np.arange(c0, c1) + 0.5) * grid.cell
     cy = grid.north - (np.arange(r0, r1) + 0.5) * grid.cell
     gx, gy = np.meshgrid(cx, cy)

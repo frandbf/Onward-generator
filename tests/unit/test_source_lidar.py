@@ -441,3 +441,70 @@ def test_run_in_spain_downloads_the_ndsm_after_the_split_and_merges_it_above_cat
     assert scene == split and overrides == processed / "sources" / "heights_overrides.json"
     steps = dict(plan_steps(root))
     assert steps["heights"][steps["heights"].index("--overrides") + 1] == str(overrides)
+
+
+class Recording(PnoaNdsmPlugin):
+    """The PNOA plugin, recording what fetch and normalize hand to its hooks."""
+
+    def metadata(self, bbox_wgs84: Any, fetch: Any) -> dict[str, Any]:
+        CALLS.append(("metadata", bbox_wgs84, fetch))
+        return {"series": "x", "probe": 1}
+
+    def data_date(self, longitude: float, latitude: float, metadata: Any) -> str:
+        CALLS.append(("date", longitude, latitude, metadata))
+        return "then"
+
+
+CALLS: list[Any] = []
+
+
+def test_fetch_and_normalize_hand_the_plugin_degrees_its_fetch_and_its_metadata(tmp_path: Path, scene_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    CALLS.clear()
+    plugin = Recording()
+    service = FakeService()
+    monkeypatch.setattr(lidar, "http_fetch", lambda given: service if given is plugin else pytest.fail("wrong plugin"))
+    raw = tmp_path / "a" / "b" / "raw"
+    record = lidar.fetch_raster(plugin, scene_file, raw)
+    assert record["retrieved_at"].endswith("+00:00")
+    ((name, bbox, fetch),) = CALLS
+    assert name == "metadata" and fetch is service
+    assert bbox[0] == pytest.approx(-1.1288, abs=0.002) and bbox[1] == pytest.approx(37.9837, abs=0.002)
+    assert bbox[0] < bbox[2] and bbox[1] < bbox[3]
+    CALLS.clear()
+    lidar.normalize_raster(plugin, scene_file, raw, tmp_path / "o")
+    dates = [call for call in CALLS if call[0] == "date"]
+    assert len(dates) == 3
+    _, longitude, latitude, metadata = dates[1]
+    assert longitude == pytest.approx(-1.1287, abs=0.002) and latitude == pytest.approx(37.9838, abs=0.002)
+    assert metadata == {"series": "x", "probe": 1}
+
+
+def test_the_sidecar_records_the_full_licence(tmp_path: Path, scene_file: Path) -> None:
+    raw = _fetched(tmp_path, scene_file)
+    record = json.loads(lidar.sidecar_path(raw).read_text(encoding="utf-8"))
+    assert record["provider"] == PNOA.source_label
+    assert record["license_name"] == PNOA.licence.name
+    assert record["license_url"] == PNOA.licence.url
+    assert record["obligations"] == PNOA.licence.obligations
+
+
+def test_footprints_of_a_scene_without_features_are_none() -> None:
+    assert lidar.footprints({"frame": _scene()["frame"]}, "EPSG:25830") == []
+
+
+def test_a_report_without_a_measured_footprint_has_no_height_range(tmp_path: Path) -> None:
+    scene = tmp_path / "s.json"
+    scene.write_text(json.dumps(_scene(_feature("osm-way-1", 30, 0, 40, 10))), encoding="utf-8")
+    raw = _fetched(tmp_path, scene)
+    report = lidar.normalize_raster(PNOA, scene, raw, tmp_path / "o")
+    assert report["height_range_m"] is None
+    assert report["scene"]["schema_version"] == "0.2.0"
+
+
+def test_asc_part_keeps_a_blank_line_inside_the_grid_part_and_cuts_a_long_error() -> None:
+    reply = b"--wcs\r\nContent-Type: application/asc\r\n\r\nncols 1\r\n\r\n5\r\n--wcs--"
+    assert asc_part(reply) == b"ncols 1\r\n\r\n5"
+    long = b"<" + b"x" * 300
+    with pytest.raises(SourceError) as caught:
+        asc_part(long)
+    assert str(caught.value) == f"WCS response is neither a grid nor multipart: {long[:120]!r}"

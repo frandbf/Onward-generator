@@ -153,7 +153,7 @@ def load_scene(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     """A geo scene and its reference (path, SHA-256, version)."""
     if not path.is_file():
         raise SourceError(f"scene not found: {path}")
-    scene = json.loads(path.read_text(encoding="utf-8"))
+    scene = json.loads(path.read_bytes())
     if not is_schema(scene.get("schema"), "onward_generator.geo_scene"):
         raise SourceError("input is not a onward_generator.geo_scene")
     frame = scene.get("frame") or {}
@@ -190,7 +190,7 @@ def scene_bbox(scene: Mapping[str, Any], crs: str, margin_m: float = MARGIN_M) -
 
 
 def to_wgs84(bbox: BBox, crs: str) -> BBox:
-    xmin, ymin, xmax, ymax = Transformer.from_crs(crs, "EPSG:4326", always_xy=True).transform_bounds(*bbox)
+    xmin, ymin, xmax, ymax = Transformer.from_crs(crs, "EPSG:4326", always_xy=True).transform_bounds(*bbox)  # pragma: no mutate: only the code's case survives (pyproj ignores it); the axis order is held by the tests
     return (xmin, ymin, xmax, ymax)
 
 
@@ -232,25 +232,23 @@ def fetch_raster(
     bbox = scene_bbox(scene, plugin.raster_crs)
     retrieved = (now or datetime.now(tz=UTC)).isoformat(timespec="seconds")
     metadata = plugin.metadata(to_wgs84(bbox, plugin.raster_crs), get)
-    tiles: list[dict[str, Any]] = []
-    bodies: list[bytes] = []
+    replies: list[tuple[dict[str, Any], bytes]] = []
     for index, request in enumerate(plugin.requests(bbox)):
         body = get(request.url)
         entry = {"file": f"tile_{index:03d}.bin", **asdict(request), "bbox": list(request.bbox)}
         plugin.decode(body, entry)  # refuse an error page before anything is written
         entry.update(sha256=hashlib.sha256(body).hexdigest(), size_bytes=len(body))
-        tiles.append(entry)
-        bodies.append(body)
+        replies.append((entry, body))
     out.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(dir=out.parent, prefix=f".{out.name}."))
+    staging = Path(tempfile.mkdtemp(dir=out.parent, prefix=f".{out.name}."))  # pragma: no mutate: only where the staging directory lives before the rename; the result is the same
     try:
-        for entry, body in zip(tiles, bodies, strict=True):
+        for entry, body in replies:
             (staging / entry["file"]).write_bytes(body)
         if out.exists():
             shutil.rmtree(out)
         staging.rename(out)
     except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(staging)
         raise
     record = {
         "source": plugin.id,
@@ -265,7 +263,7 @@ def fetch_raster(
         "scene": scene_ref,
         "retrieved_at": retrieved,
         "user_agent": USER_AGENT,
-        "tiles": tiles,
+        "tiles": [entry for entry, _body in replies],
         "metadata": metadata,
     }
     atomic_write_json(side, record)
@@ -277,7 +275,7 @@ def load_raster(plugin: RasterHeights, raw: Path) -> tuple[dict[str, Any], Grid]
     side = sidecar_path(raw)
     if not side.is_file():
         raise SourceError(f"missing provenance sidecar {side}; download with `source fetch {plugin.id}`")
-    record = json.loads(side.read_text(encoding="utf-8"))
+    record = json.loads(side.read_bytes())
     if record.get("source") != plugin.id:
         raise SourceError(f"{side} was written by {record.get('source')!r}, not {plugin.id}")
     grids = []
@@ -305,7 +303,7 @@ def measure(
 ) -> list[BuildingHeight]:
     """One result per scene building: ``measured``, ``out_of_bounds`` or ``no_data``."""
     rule = plugin.rule
-    to_degrees = Transformer.from_crs(plugin.raster_crs, "EPSG:4326", always_xy=True).transform
+    to_degrees = Transformer.from_crs(plugin.raster_crs, "EPSG:4326", always_xy=True).transform  # pragma: no mutate: only the code's case survives (pyproj ignores it); the axis order is held by the date test
     results = []
     for building_id, footprint in footprints(scene, plugin.raster_crs):
         sample = footprint_height(
@@ -374,7 +372,7 @@ def normalize_raster(plugin: RasterHeights, scene_path: Path, raw: Path, out: Pa
     scene, scene_ref = load_scene(scene_path)
     record, grid = load_raster(plugin, raw)
     config = load_height_config()
-    results = measure(plugin, scene, grid, record.get("metadata") or {}, (config.bounds_min_m, config.bounds_max_m))
+    results = measure(plugin, scene, grid, record["metadata"], (config.bounds_min_m, config.bounds_max_m))
     if sha256_file(scene_path) != scene_ref["sha256"]:
         raise SourceError("scene changed while being read")
     out_overrides, out_report = prepare_outputs(
