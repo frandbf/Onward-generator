@@ -34,7 +34,7 @@ Returns `0` when the phase 03 → 04 check passes (no critical error) and `1` ot
 | `surface/ground` | The rest of the site | 0 | Generated |
 | `collider/walkable_crossing` | Walkable crossings (`Partition.crossings`): 4 m strips square to each vehicular segment between junctions, set back past the kerb of the widest street at each junction (half its width + 1 m + 2 m), and evenly between so no stretch exceeds 50 m. Each is clipped to the carriageway. Still part of `surface/carriageway`; only the collider is split. The adapter bakes it into the navmesh (ADR-015) | top −0.15 | Generated |
 | `surface/zebra_crossing` | White bars of a Spanish *paso de cebra* on the crossing strips that OSM marks (see "Zebra paint" below): 0.5 m wide, 0.5 m apart, parallel to the street, each as long as the 4 m strip is wide, laid from kerb to kerb 0.5 m clear of each kerb. One quad (two triangles) per bar, material `road_marking`, no collider | −0.14 (1 cm over the carriageway) | Placement observed (OSM crossing), bar layout generated |
-| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. `collider/carriageway` is the carriageway minus the crossings, snapped again to `precision_m`: the cut adds vertices a fraction of a millimetre apart, which the 0.1 mm weld would merge. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point, or two pieces of one slab that share a corner, are opened by a 1 cm disk and the result is snapped again to 1 mm, so the slab stays manifold. When the snap closes the cut again (two pieces that leave the corner almost parallel), the disk doubles until it does not. A ring vertex that falls in the same 0.1 mm weld cell as its neighbour is removed before extrusion (`short_edge_collapsed`); the weld would otherwise merge the pair and count the neighbouring edge twice | top 0 / −0.15 | Generated |
+| `collider/walkable`, `collider/carriageway` | Closed slabs, 1 m thick. `collider/carriageway` is the carriageway minus the crossings, snapped again to `precision_m`: the cut adds vertices a fraction of a millimetre apart, which the 0.1 mm weld would merge. A hole under 0.0001 m² (a there-and-back spike) is removed before extrusion. A hole that only touches the boundary at a point, or two pieces of one slab that share a corner, are opened by a 1 cm disk and the result is snapped again to 1 mm, so the slab stays manifold. When the snap closes the cut again (two pieces that leave the corner almost parallel), the disk doubles until it does not. Every ring vertex of every part is then checked against the 0.1 mm weld (`weld_safe`), repeating until nothing changes: a vertex closer than 0.1 mm to its neighbour, or in the same cell, is removed (`short_edge_collapsed`), and two corners that are not neighbours but share a cell (a hole beside the outline, two parts, a ring passing beside itself) are opened by the same 1 cm disk | top 0 / −0.15 | Generated |
 
 The site is the area of interest plus its margin. A building that is not completely inside that polygon is omitted (`building_outside_map`) and does not extend the ground. Footprints that remain inside the site are unioned with it.
 
@@ -79,7 +79,7 @@ Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 | `surface_overlap` above 0.5 m² | critical |
 | `building_missing_height`, `building_invalid_footprint`, `non_finite_vertices` | critical |
 | `surface_gap` above 0.5 m², `overlapping_buildings`, `duplicate_building_skipped`, `footprint_repaired` | warning |
-| `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `short_edge_collapsed`, `feature_not_generated`, `building_outside_map` | info |
+| `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `short_edge_collapsed`, `footprint_weld_cleaned`, `feature_not_generated`, `building_outside_map` | info |
 
 ### Large maps with Catastro
 
@@ -91,6 +91,7 @@ The check stays all or nothing: one critical issue fails the phase. Each failure
 | A sub-building that still does not extrude closed | `cadastre split` keeps that OSM footprint unsplit and reports its area; above 5% of the building area the split fails (step 8) |
 | `collider/walkable_crossing` open where two crossings meet at a corner almost parallel | The ground slabs: the 1 cm cut is snapped and widened (table above) |
 | `collider/walkable` open where the site corner keeps two vertices in one 0.1 mm weld cell | The slab drops that vertex before extrusion (`short_edge_collapsed`) |
+| A slab or a building whose ring vertices the 0.1 mm weld would merge, neighbours or not | `weld_safe` checks every vertex before extrusion. A building records `footprint_weld_cleaned` (info), and one with nothing left is `building_invalid_footprint` |
 | A hip roof over a footprint with a reflex jog of a few centimetres (`roof_area_mismatch` in `detail`) | `detail` keeps that roof flat ([07-detail.md](07-detail.md), Roofs) |
 
 Outputs are deterministic byte for byte and are not overwritten without `--overwrite`.

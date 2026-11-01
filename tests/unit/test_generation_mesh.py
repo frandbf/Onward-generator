@@ -27,6 +27,7 @@ from onward_generator.generation.mesh import (
     signed_volume,
     upward_area,
     walls,
+    weld_safe,
 )
 from onward_generator.generation.preview import _splat, render, render_rgb
 from onward_generator.generation.surfaces import AreaFeature, LinearWay, SurfaceClass, build_partition
@@ -386,3 +387,58 @@ def test_invalid_generation_config(mutate, fragment: str) -> None:
     with pytest.raises(GenerationConfigError) as exc:
         config_from_document(d)
     assert any(fragment in p for p in exc.value.problems), exc.value.problems
+
+
+def test_neighbours_across_a_cell_boundary_collapse_and_the_slab_closes() -> None:
+    """Under 1 um apart in two cells: walls skipped that edge and cap kept it, which left 4 defects."""
+    polygon = Polygon([(0, 0), (10, 0), (10.00005, 10.0000496), (10.0000504, 10.0000504), (0, 10)])
+    assert collapse_short_edges(polygon)[1] == 1
+    assert closed_manifold_defects(prism(polygon, -1.0, 0.0, bottom=True)) == 0
+
+
+def test_neighbours_a_full_cell_apart_stay() -> None:
+    polygon = Polygon([(0, 0), (10, 0), (10.00005, 10), (10.00005, 10.00015), (0, 10)])
+    assert collapse_short_edges(polygon) == (polygon, 0)
+
+
+# Valid outlines whose corners share a weld cell without being neighbours: prism alone cannot close them.
+WELD_CASES = {
+    "hole_corner_beside_an_outer_corner": Polygon([(0, 0), (10, 0), (10, 5), (10, 10), (0, 10)], [[(9.99998, 5), (8, 4), (8, 6)]]),
+    "corners_of_two_parts_in_one_cell": MultiPolygon([box(0, 0, 5, 5), Polygon([(5.00002, 5.00002), (9, 5), (9, 9), (5, 9)])]),
+    "ring_passing_beside_itself": Polygon([(0, 0), (5, 5.00002), (10, 0), (10, 10), (5, 5.00004), (0, 10)]),
+}
+
+
+@pytest.mark.parametrize("geometry", WELD_CASES.values(), ids=WELD_CASES.keys())
+def test_weld_safe_leaves_a_slab_that_closes(geometry: Polygon | MultiPolygon) -> None:
+    assert geometry.is_valid
+    assert closed_manifold_defects(prism(geometry, -1.0, 0.0, bottom=True)) > 0  # the reason this case exists
+    safe, removed, opened = weld_safe(geometry)
+    assert safe.is_valid and (removed > 0 or opened)
+    mesh = prism(safe, -1.0, 0.0, bottom=True)
+    assert closed_manifold_defects(mesh) == 0
+    assert signed_volume(mesh) == pytest.approx(geometry.area, abs=0.01)
+
+
+def test_weld_safe_returns_a_clean_outline_as_the_same_object() -> None:
+    clean = Polygon([(0, 0), (10, 0), (10, 10), (0, 10)], [[(4, 4), (6, 4), (6, 6), (4, 6)]])
+    assert weld_safe(clean) == (clean, 0, False)
+    assert weld_safe(clean)[0] is clean
+
+
+def test_weld_safe_collapses_neighbours_without_opening_anything() -> None:
+    safe, removed, opened = weld_safe(Polygon([(0, 0), (10, 0), (10, 10), (10.000007, 10.000002), (0, 10)]))
+    assert (removed, opened) == (1, False) and len(safe.exterior.coords) == 5
+
+
+def test_weld_safe_finds_every_shared_cell_and_keeps_corners_a_cell_apart() -> None:
+    outline = [(0, 0), (10, 0), (10, 5), (10, 10), (0, 10)]
+    near = Polygon(outline, [[(9.99998, 5), (8, 4), (8, 6)]])
+    far = Polygon(outline, [[(9.9997, 5), (8, 4), (8, 6)]])  # 0.3 mm: three cells away
+    assert weld_safe(near)[2] is True
+    assert weld_safe(far) == (far, 0, False)
+
+
+def test_weld_safe_empties_an_outline_smaller_than_the_weld() -> None:
+    safe, removed, opened = weld_safe(Polygon([(0, 0), (0.00002, 0), (0.00002, 0.00002)]))
+    assert safe.is_empty and removed == 3 and not opened

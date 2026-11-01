@@ -19,6 +19,7 @@ from shapely.geometry.polygon import orient
 _EMPTY_V = np.zeros((0, 3), dtype=np.float64)
 _EMPTY_T = np.zeros((0, 3), dtype=np.int64)
 _QUANT = 1e-4  # 0.1 mm: vertex identity for topology checks
+WELD_SAFE_PASSES = 4  # pragma: no mutate: the loop ends as soon as a pass changes nothing; every known case needs at most two
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,19 +125,28 @@ def _weld_key(point: tuple[float, float], quantum: float) -> tuple[int, int]:
     return int(np.round(point[0] / quantum)), int(np.round(point[1] / quantum))
 
 
+def _too_close(a: tuple[float, float], b: tuple[float, float], quantum: float) -> bool:
+    """One vertex to the weld: the same cell, or closer than a cell across a cell boundary.
+
+    The second case matters because :func:`walls` skips an edge under ``min_edge``
+    while :func:`cap` keeps it, whichever cells its ends fall in.
+    """
+    return _weld_key(a, quantum) == _weld_key(b, quantum) or float(np.hypot(a[0] - b[0], a[1] - b[1])) < quantum
+
+
 def _collapse_ring(coords: Sequence[tuple[float, float]], quantum: float) -> tuple[list[tuple[float, float]] | None, int]:
-    """Drop consecutive vertices that fall in one weld cell. ``None`` when fewer than three remain."""
+    """Drop consecutive vertices the weld would merge. ``None`` when fewer than three remain."""
     points = [(float(p[0]), float(p[1])) for p in coords]
-    if len(points) >= 2 and _weld_key(points[0], quantum) == _weld_key(points[-1], quantum):
+    if len(points) >= 2 and _too_close(points[0], points[-1], quantum):
         points = points[:-1]
     kept: list[tuple[float, float]] = []
     removed = 0
     for point in points:
-        if kept and _weld_key(kept[-1], quantum) == _weld_key(point, quantum):
+        if kept and _too_close(kept[-1], point, quantum):
             removed += 1
             continue
         kept.append(point)
-    if len(kept) >= 2 and _weld_key(kept[0], quantum) == _weld_key(kept[-1], quantum):
+    if len(kept) >= 2 and _too_close(kept[0], kept[-1], quantum):
         kept.pop()
         removed += 1
     if len(kept) < 3:
@@ -279,9 +289,28 @@ def open_point_contacts(geometry: BaseGeometry, gap_m: float = 0.01, precision_m
     return geometry
 
 
+def _weld_contacts(geometry: BaseGeometry, quantum: float = _QUANT) -> list[BaseGeometry]:
+    """Corners that are not neighbours on a ring but share a weld cell, in any ring of any part.
+
+    They do not touch, so no intersection finds them, but the weld makes them one
+    vertex and its edges belong to two walls. Removing either corner would change
+    the outline, so each is opened like a contact. Runs of one cell along a ring
+    count once: those are :func:`collapse_short_edges` work.
+    """
+    cells: dict[tuple[int, int], list[tuple[float, float]]] = {}
+    for polygon in polygons_of(geometry):
+        for ring in (polygon.exterior, *polygon.interiors):
+            points = [(float(x), float(y)) for x, y in list(ring.coords)[:-1]]
+            for index, point in enumerate(points):
+                key = _weld_key(point, quantum)
+                if key != _weld_key(points[index - 1], quantum):
+                    cells.setdefault(key, []).append(point)
+    return [shapely.Point(found[0]) for found in cells.values() if len(found) > 1]
+
+
 def _point_contacts(geometry: BaseGeometry, gap_m: float) -> list[BaseGeometry]:
-    """Where two rings of ``geometry`` touch at a point or along less than ``gap_m``."""
-    cuts = []
+    """Where two rings of ``geometry`` touch at a point or along less than ``gap_m``, or share a weld cell."""
+    cuts = _weld_contacts(geometry)
     parts = polygons_of(geometry)
     tree = shapely.STRtree(parts)
     for polygon in parts:
@@ -405,6 +434,28 @@ def open_edge_defects(
             continue
         defects += 1
     return defects
+
+
+def weld_safe(geometry: BaseGeometry) -> tuple[BaseGeometry, int, bool]:
+    """``geometry`` with no two ring vertices the 0.1 mm weld would merge, in any ring of any part.
+
+    Every vertex is checked before extrusion: neighbours on a ring collapse into
+    one (:func:`collapse_short_edges`) and corners that only share a cell are
+    opened (:func:`open_point_contacts`). Opening snaps to 1 mm, and a collapse can
+    bring two corners together, so the two repeat until neither changes anything.
+    Returns the geometry, the vertices removed, and whether a contact was opened.
+    A geometry with nothing to fix comes back as the same object.
+    """
+    collapsed = 0
+    opened = False
+    for _ in range(WELD_SAFE_PASSES):
+        geometry, removed = collapse_short_edges(geometry)
+        collapsed += removed
+        cut = open_point_contacts(geometry)
+        if cut is geometry:
+            break
+        geometry, opened = cut, True
+    return geometry, collapsed, opened
 
 
 def transform(mesh: Mesh, matrix: np.ndarray) -> Mesh:
