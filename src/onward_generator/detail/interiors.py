@@ -277,8 +277,11 @@ def plan_interior(
     """Return a plan, or the reason the building cannot host the generic interior.
 
     ``max_floors`` caps the furnished floors below ``interiors.floors``: a shop takes 1, so it has no stair.
-    The stair interior leaves the top storey solid. A shop may use every storey, so a one-storey shop
-    has its room under the roof. A courtyard stays a hole in the room. A footprint of several parts is
+    The stair interior leaves the top storey solid, except that a one-storey building has its room under
+    the roof. A shop may use every storey. With ``roof_access`` the roof comes first: when the well of the
+    climb does not fit beside the wells of the furnished floors, the building gives up furnished floors,
+    down to the ground floor alone, before it gives up the roof. A building of three storeys or more with
+    no room for any stair is ``no_room_for_stair``. A courtyard stays a hole in the room. A footprint of several parts is
     refused unless ``several_parts``; the room is then in the part that holds the door, and
     ``plan_shop_rooms`` adds the others.
 
@@ -291,7 +294,10 @@ def plan_interior(
     parts = polygons_of(refined)
     if len(parts) != 1 and not several_parts:
         return "footprint_not_a_simple_polygon"
-    floors = min(ic.floors, levels - 1) if max_floors is None else min(max_floors, levels)
+    if max_floors is not None:
+        floors = min(max_floors, levels)
+    else:
+        floors = min(ic.floors, max(levels - 1, 1)) if levels > 0 else 0
     if floors < 1:
         return "not_enough_levels"
     host = min(parts, key=Point(segment.a).distance)
@@ -308,7 +314,7 @@ def plan_interior(
         return problem
     door_zone = _door_zone(segment, door, ic)
 
-    if floors < 2:
+    if max_floors is not None and floors < 2:  # a shop has no stair
         return InteriorPlan(building_id, inner, floors, storey_m, door, segment, (), depth_m=depth_m)
 
     # Of the buildings that can hold a third floor, half do: sha256(seed, id).
@@ -316,32 +322,51 @@ def plan_interior(
     if floors >= 3 and stable_unit(cfg.seed, building_id, "interior_floors") >= 0.5:
         wanted = 2
     geometry = stair_geometry(storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
-    landing = ic.stair.landing_m
+    best: tuple[Flight, ...] | None = None
+    for furnished in range(wanted, 0, -1):
+        flights = _storey_flights(inner, door_zone, geometry, ic.stair.landing_m, furnished)
+        if flights is None:
+            continue
+        best = flights if best is None else best
+        climb = _roof_climb(inner, door_zone, flights, geometry, furnished, height, storey_m, ic) if roof_access else None
+        if climb is not None:
+            best = (*flights, *climb)
+            break
+    if not best and wanted >= 2:
+        return "no_room_for_stair"
+    return InteriorPlan(building_id, inner, sum(f.role == "storey" for f in best or ()) + 1, storey_m, door, segment, best or (), depth_m=depth_m)
+
+
+def _storey_flights(inner: Polygon, door_zone: Polygon, geometry: StairGeometry, landing: float, furnished: int) -> tuple[Flight, ...] | None:
+    """A flight between each pair of the ``furnished`` floors, or ``None`` when one does not fit."""
     flights: list[Flight] = []
     blocked: list[Polygon] = []
-    for level in range(wanted - 1):
+    for level in range(furnished - 1):
         placed = _seek_flight(inner, door_zone, blocked, geometry, landing)
         if placed is None:
-            break
+            return None
         matrix, well = placed
         flights.append(Flight(geometry, matrix, well, level, "storey"))
         blocked.append(well)
-    if not flights:
-        return "no_room_for_stair"
-    furnished = len(flights) + 1
-    if roof_access:
-        start_z = (furnished - 1) * storey_m
-        steps = _roof_steps(start_z, height, storey_m)
-        if steps:
-            placed = _seek_flight(inner, door_zone, blocked, geometry, landing)
-            if placed is not None:
-                matrix, well = placed
-                climb = Flight(geometry, matrix, well, furnished - 1, "roof")
-                flights.append(climb)
-                for _ in range(steps - 1):
-                    climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
-                    flights.append(climb)
-    return InteriorPlan(building_id, inner, furnished, storey_m, door, segment, tuple(flights), depth_m=depth_m)
+    return tuple(flights)
+
+
+def _roof_climb(inner: Polygon, door_zone: Polygon, flights: Sequence[Flight], geometry: StairGeometry, furnished: int,
+                height: float, storey_m: float, ic: Any) -> tuple[Flight, ...] | None:
+    """The switchback from the top furnished floor to the roof deck, in one well, or ``None``."""
+    steps = _roof_steps((furnished - 1) * storey_m, height, storey_m)
+    if not steps:
+        return None
+    placed = _seek_flight(inner, door_zone, [f.well for f in flights], geometry, ic.stair.landing_m)
+    if placed is None:
+        return None
+    matrix, well = placed
+    climb = Flight(geometry, matrix, well, furnished - 1, "roof")
+    out = [climb]
+    for _ in range(steps - 1):
+        climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
+        out.append(climb)
+    return tuple(out)
 
 
 def _bay_boundary(a: Hole, b: Hole) -> float:

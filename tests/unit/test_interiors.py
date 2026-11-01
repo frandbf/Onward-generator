@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from shapely import Point, Polygon
+from shapely import Point, Polygon, box
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
@@ -168,12 +168,15 @@ def test_window_off_the_inner_wall_is_omitted() -> None:
     assert layout.holes == []
 
 
-def test_default_interiors_are_five_to_eight_within_eight_thousand_triangles() -> None:
+def test_by_default_every_building_of_up_to_five_storeys_is_a_candidate() -> None:
     cfg = load_detail_config()
-    assert (cfg.interiors.min_buildings, cfg.interiors.max_buildings, cfg.interiors.max_triangles) == (5, 8, 8000)
+    assert (cfg.interiors.min_buildings, cfg.interiors.max_buildings) == (1000, 1000)
+    assert (cfg.interiors.max_triangles, cfg.interiors.max_collision_triangles) == (24000, 72000)
     rule = cfg.interiors.rule
-    assert (rule.min_levels, rule.min_area_m2, rule.max_area_m2, rule.min_rectangularity) == (3, 80.0, 500.0, 0.8)
-    assert {interior_quota(replace(cfg, seed=seed)) for seed in range(40)} == {5, 6, 7, 8}
+    assert (rule.min_levels, rule.max_levels, rule.min_area_m2, rule.max_area_m2, rule.min_rectangularity) == (1, 5, 20.0, 2000.0, 0.0)
+    assert rule.categories == {"residential_multi", "residential_small", "unknown", "commercial", "public", "industrial", "minor"}
+    assert interior_quota(cfg) == 1000
+    assert {interior_quota(replace(cfg, interiors=replace(cfg.interiors, min_buildings=5, max_buildings=8), seed=seed)) for seed in range(40)} == {5, 6, 7, 8}
 
 
 @pytest.mark.parametrize(
@@ -385,11 +388,11 @@ def test_the_visual_pass_is_what_the_built_interior_draws_and_its_colliders_are_
 def test_interior_budgets_name_the_limit_they_refuse_on() -> None:
     cfg = load_detail_config()
     stairs, shops = InteriorBudget.of_stairs(cfg), InteriorBudget.of_shops(cfg)
-    assert (stairs.prefix, stairs.limits) == ("", {"triangles": 8000, "collision_triangles": 24000})
+    assert (stairs.prefix, stairs.limits) == ("", {"triangles": 24000, "collision_triangles": 72000})
     assert (shops.prefix, shops.limits) == ("shops.", {"triangles": 6000, "collision_triangles": 72000})
     assert stairs.used == shops.used == {"triangles": 0, "collision_triangles": 0}
-    assert stairs.refuse("triangles", 8000) is None and stairs.refuse("collision_triangles", 24000) is None
-    assert stairs.refuse("triangles", 8001) == "triangle_budget: needs 8001 triangles, 8000 left of max_triangles 8000"
+    assert stairs.refuse("triangles", 24000) is None and stairs.refuse("collision_triangles", 72000) is None
+    assert stairs.refuse("triangles", 24001) == "triangle_budget: needs 24001 triangles, 24000 left of max_triangles 24000"
     assert shops.refuse("collision_triangles", 72001) == (
         "triangle_budget: needs 72001 collision triangles, 72000 left of shops.max_collision_triangles 72000")
     built = Interior(InteriorPlan("b", Polygon(), 1, 3.0, _window(0, 0), Segment(0, 0, 0, (0.0, 0.0), (1.0, 0.0), True), ()),
@@ -400,9 +403,9 @@ def test_interior_budgets_name_the_limit_they_refuse_on() -> None:
     stairs.spend(built)
     stairs.spend(built)
     assert stairs.used == {"triangles": 10, "collision_triangles": 20} and shops.used["triangles"] == 0
-    assert stairs.refuse("triangles", 7991) == "triangle_budget: needs 7991 triangles, 7990 left of max_triangles 8000"
-    assert stairs.refuse("collision_triangles", 23981) == (
-        "triangle_budget: needs 23981 collision triangles, 23980 left of max_collision_triangles 24000")
+    assert stairs.refuse("triangles", 23991) == "triangle_budget: needs 23991 triangles, 23990 left of max_triangles 24000"
+    assert stairs.refuse("collision_triangles", 71981) == (
+        "triangle_budget: needs 71981 collision triangles, 71980 left of max_collision_triangles 72000")
 
 
 def _normals(mesh: Mesh) -> np.ndarray:
@@ -487,7 +490,71 @@ def test_an_included_building_that_also_matches_the_rule_keeps_the_first_place()
     cfg = replace(base, seed=3, interiors=replace(base.interiors, min_buildings=1, max_buildings=1, include_ids=("osm-way-a",)))
     room = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)])
     heights = {"category": "residential_multi", "estimated_levels": 3}
-    candidates = [("osm-way-a", heights, room), ("osm-way-b", heights, room)]
+    candidates = [("osm-way-a", 3, heights, room), ("osm-way-b", 3, heights, room)]
     assert _select_interiors(candidates, cfg, []) == ["osm-way-a", "osm-way-b"]
     excluded = replace(cfg, interiors=replace(cfg.interiors, exclude_ids=frozenset({"osm-way-a"})))
     assert _select_interiors(candidates, excluded, []) == ["osm-way-b"]
+
+
+def _plan(footprint: Polygon, height: float, storey: float, levels: int, **options: object) -> InteriorPlan | str:
+    door = Hole("interior_door", 0, 1.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0)
+    return plan_interior("b", footprint, door, Segment(0, 0, 0, (0.0, 0.0), (footprint.bounds[2], 0.0), True), height, storey, levels,
+                         load_detail_config(), **options)
+
+
+def test_the_roof_comes_before_the_furnished_floors() -> None:
+    # Room for one well: without the roof it holds the stair between two furnished floors, with the roof it holds the climb.
+    narrow = Polygon([(0, 0), (10, 0), (10, 3), (0, 3)])
+    plan = _plan(narrow, 15.0, 3.0, 5)
+    assert isinstance(plan, InteriorPlan)
+    assert plan.floors == 1 and [f.role for f in plan.flights] == ["roof"] * 5
+    furnished = _plan(narrow, 15.0, 3.0, 5, roof_access=False)
+    assert isinstance(furnished, InteriorPlan) and furnished.floors >= 2 and {f.role for f in furnished.flights} == {"storey"}
+
+
+def test_without_roof_access_the_furnished_floors_stay() -> None:
+    wide = Polygon([(0, 0), (24, 0), (24, 18), (0, 18)])
+    plan = _plan(wide, 15.0, 3.0, 5, roof_access=False)
+    assert isinstance(plan, InteriorPlan) and plan.flights and {f.role for f in plan.flights} == {"storey"}
+
+
+def test_a_storey_that_does_not_divide_the_height_has_no_climb() -> None:
+    wide = Polygon([(0, 0), (24, 0), (24, 18), (0, 18)])
+    plan = _plan(wide, 16.0, 3.0, 4)
+    assert isinstance(plan, InteriorPlan) and all(f.role == "storey" for f in plan.flights)
+
+
+def test_a_tall_building_with_room_for_no_stair_is_refused_and_a_low_one_keeps_its_room() -> None:
+    tiny = Polygon([(0, 0), (7, 0), (7, 5), (0, 5)])
+    assert _plan(tiny, 15.0, 3.0, 5) == "no_room_for_stair"
+    low = _plan(tiny, 3.0, 3.0, 1)
+    assert isinstance(low, InteriorPlan) and (low.floors, low.flights) == (1, ())
+
+
+@pytest.mark.parametrize(
+    ("levels", "category", "area", "landmark", "taken"),
+    [
+        (1, "minor", 100.0, False, True),
+        (5, "residential_multi", 100.0, False, True),
+        (6, "residential_multi", 100.0, False, False),
+        (3, "religious", 100.0, False, False),
+        (3, "public", 100.0, True, False),
+        (3, "public", 19.9, False, False),
+        (3, "public", 20.0, False, True),
+        (3, "industrial", 2000.0, False, True),
+        (3, "industrial", 2000.1, False, False),
+    ],
+)
+def test_the_default_rule_reads_the_drawn_storeys_category_and_area(levels: int, category: str, area: float, landmark: bool, taken: bool) -> None:
+    side = area**0.5
+    room = Polygon([(0.0, 0.0), (side, 0.0), (side, side), (0.0, side)])
+    candidates = [("b", levels, {"category": category, "landmark": landmark, "estimated_levels": 99}, room)]
+    assert _select_interiors(candidates, load_detail_config(), []) == (["b"] if taken else [])
+
+
+def test_the_rule_takes_a_courtyard_but_not_two_separate_parts() -> None:
+    cfg = load_detail_config()
+    heights = {"category": "unknown"}
+    ring = Polygon([(0, 0), (20, 0), (20, 20), (0, 20)], [[(8, 8), (12, 8), (12, 12), (8, 12)]])
+    parts = box(0, 0, 10, 10).union(box(20, 0, 30, 10))
+    assert _select_interiors([("ring", 3, heights, ring), ("parts", 3, heights, parts)], cfg, []) == ["ring"]

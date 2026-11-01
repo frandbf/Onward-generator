@@ -19,9 +19,10 @@ from onward_generator.detail import scene as scene_module
 from onward_generator.detail.config import DEFAULT_CONFIG_PATH
 from onward_generator.detail.scene import InteriorBudget
 from onward_generator.generation import load_generation_config
+from tests.detail_fixture import selective_interiors
 
 GEN = load_generation_config()
-DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+DOC = selective_interiors(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
 
 
 def _cfg(**changes: object):

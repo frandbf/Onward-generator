@@ -13,16 +13,17 @@ from shapely import Point
 from shapely.geometry import shape
 
 from onward_generator.cli import main
-from onward_generator.detail import DetailError, config_from_document, detail_scene, load_base, load_detail_config
+from onward_generator.detail import DetailError, config_from_document, detail_scene, load_base
 from onward_generator.detail.config import DEFAULT_CONFIG_PATH
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.generation import load_generation_config
 from onward_generator.generation.gltf import build_glb, read_glb
 from onward_generator.generation.mesh import Mesh, closed_manifold_defects, signed_volume, transform
+from tests.detail_fixture import selective_interiors
 
 GEN = load_generation_config()
-CFG = load_detail_config()
-DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+DOC = selective_interiors(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+CFG = config_from_document(DOC)
 
 
 def _detail(inputs: tuple[Path, Path, Path], cfg=CFG):

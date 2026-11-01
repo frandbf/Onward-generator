@@ -128,6 +128,7 @@ class Template:
 class InteriorRule:
     categories: frozenset[str]
     min_levels: int
+    max_levels: int
     min_area_m2: float
     max_area_m2: float
     min_rectangularity: float
@@ -447,7 +448,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
             max_collision_triangles=int(i["max_collision_triangles"]),
             include_ids=tuple(i["include_ids"]),
             exclude_ids=frozenset(i["exclude_ids"]),
-            rule=InteriorRule(frozenset(i["rule"]["categories"]), int(i["rule"]["min_levels"]), float(i["rule"]["min_area_m2"]),
+            rule=InteriorRule(frozenset(i["rule"]["categories"]), int(i["rule"]["min_levels"]), int(i["rule"]["max_levels"]), float(i["rule"]["min_area_m2"]),
                               float(i["rule"]["max_area_m2"]), float(i["rule"]["min_rectangularity"])),
             floors=int(i["floors"]),
             wall_thickness_m=float(i["wall_thickness_m"]),

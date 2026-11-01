@@ -515,11 +515,12 @@ def interior_quota(cfg: DetailConfig) -> int:
     return low + int(stable_unit(cfg.seed, "interiors", "quota") * span)
 
 
-def _select_interiors(candidates: list[tuple[str, Mapping[str, Any], BaseGeometry]], cfg: DetailConfig, issues: list[Issue]) -> list[str]:
+def _select_interiors(candidates: list[tuple[str, int, Mapping[str, Any], BaseGeometry]], cfg: DetailConfig, issues: list[Issue]) -> list[str]:
+    """Interior queue. ``candidates`` are ``(id, storeys drawn, heights record, footprint)``: the rule reads the storeys the facade shows."""
     ic = cfg.interiors
     if interior_quota(cfg) == 0:
         return []
-    known = {bid for bid, _, _ in candidates}
+    known = {bid for bid, _, _, _ in candidates}
     ordered: list[str] = []
     for bid in ic.include_ids:
         if bid in known:
@@ -528,10 +529,9 @@ def _select_interiors(candidates: list[tuple[str, Mapping[str, Any], BaseGeometr
             issues.append(Issue("interior_include_unknown", "warning", bid, "include_ids entry is not a generated building"))
     rule = ic.rule
     ruled = []
-    for bid, h, geom in candidates:
-        levels = h.get("estimated_levels") or 0
-        if (h.get("category") in rule.categories and not h.get("landmark") and levels >= rule.min_levels
-                and rule.min_area_m2 <= geom.area <= rule.max_area_m2 and geom.geom_type == "Polygon" and not geom.interiors
+    for bid, levels, h, geom in candidates:
+        if (h.get("category") in rule.categories and not h.get("landmark") and rule.min_levels <= levels <= rule.max_levels
+                and rule.min_area_m2 <= geom.area <= rule.max_area_m2 and geom.geom_type == "Polygon"
                 and rectangularity(geom) >= rule.min_rectangularity):
             ruled.append(bid)
     ruled.sort(key=lambda b: hashlib.sha256(f"{cfg.seed}:interior:{b}".encode()).hexdigest())
@@ -807,7 +807,8 @@ def detail_scene(
     setbacks: Counter[str] = Counter()
 
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
-    candidates = [(bid, height_of[bid], footprints[bid]) for bid in ids if tier_of[bid] == CORE]
+    candidates = [(bid, storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).count, height_of[bid], footprints[bid])  # pragma: no mutate: storeys_for reads its third argument only for its truth
+                  for bid in ids if tier_of[bid] == CORE]
     interior_queue = _select_interiors(candidates, cfg, issues)
     interiors_left = interior_quota(cfg)
 
@@ -889,6 +890,8 @@ def detail_scene(
         # A shop above max_area_m2 has its room cut to a band behind the door's wall, closed by a back wall.
         sells = shop and ic.enabled and ic.shops.enabled
         depth = ic.shops.band_depth_m if shop and geom.area > ic.shops.max_area_m2 else None
+        if main is None and not shop and bid in interior_queue and interiors_left > 0:
+            issues.append(Issue("interior_not_generated", "info", bid, "no_street_frontage"))
         if main is not None and (sells or (not shop and bid in interior_queue and interiors_left > 0)):
             raised = interior_storey(height, storeys, h.get("height_source") or o.record["height"].get("height_source"))
             attempt_height, attempt_storeys = raised if raised is not None else (height, storeys)
@@ -896,7 +899,7 @@ def detail_scene(
             door = next((x for x in trial.holes if x.kind == "interior_door"), None)
             plan = plan_interior(
                 bid, refined, door, main, attempt_height, attempt_storeys.height_m, attempt_storeys.count, cfg,
-                roof_access=shell_template.parapet_m > 0,
+                roof_access=shell_template.pitched is None and shell_template.hip is None,
                 max_floors=1 if shop else None,
                 several_parts=shop,
                 depth_m=depth,
