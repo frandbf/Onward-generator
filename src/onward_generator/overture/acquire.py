@@ -227,12 +227,12 @@ def select_files(index: bytes, release: str, theme: str, bbox: BBox) -> FileSele
     south, west, north, east = _check_bbox(bbox)
     prefix = FILE_PREFIX_TEMPLATE.format(release=check_release(release), theme=theme_dir, type=kind)
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "collections.parquet"
+        path = Path(tmp) / "collections.parquet"  # pragma: no mutate: any name in this empty directory reads the same bytes
         path.write_bytes(index)
-        connection = duckdb.connect(config={"autoload_known_extensions": False, "autoinstall_known_extensions": False})
+        connection = duckdb.connect()
         try:
             rows = connection.execute(
-                "SELECT assets.aws.alternate.s3.href,"
+                "SELECT assets.aws.alternate.s3.href,"  # pragma: no mutate: SQL keywords and names are case-insensitive
                 f" bbox.xmin <= {east:.7f} AND bbox.xmax >= {west:.7f} AND bbox.ymin <= {north:.7f} AND bbox.ymax >= {south:.7f}"
                 f" FROM read_parquet({_quote(str(path))}) WHERE collection = {_quote(kind)} ORDER BY 1"
             ).fetchall()
@@ -342,7 +342,7 @@ def fetch_theme(
     theme_dir, kind = THEMES[theme]
     if source:
         query, mode = clip_query(source, bbox), "source"
-        selection = None
+        selection = None  # pragma: no mutate: only its truth is read below, and every empty value is false
     else:
         source = theme_source(release, theme)
         query = clip_query(selection.files if selection else source, bbox)

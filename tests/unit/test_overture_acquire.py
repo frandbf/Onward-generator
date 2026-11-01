@@ -458,6 +458,12 @@ def test_fetch_theme_records_the_selected_files(tmp_path: Path) -> None:
     assert (given.file_selection, given.files, given.files_in_theme, given.query) == ("source", [], None, clip_query(remote, BBOX))
 
 
+def test_fetch_theme_records_a_read_of_every_file_as_a_glob(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(acquire, "theme_source", lambda release, theme: str(_places(tmp_path)))
+    record = fetch_theme("places", BBOX, tmp_path / "o.parquet", release=REL, connect=local_connect, now=NOW)
+    assert (record.file_selection, record.files, record.files_in_theme) == ("glob", [], None)
+
+
 def test_clip_query_reads_a_list_of_files() -> None:
     query = clip_query(["s3://b/x.parquet", "s3://b/it's.parquet"], BBOX)
     assert query.startswith("SELECT * FROM read_parquet(['s3://b/x.parquet', 's3://b/it''s.parquet'], hive_partitioning = false)\n")
