@@ -546,8 +546,8 @@ def test_a_tall_building_with_room_for_no_stair_is_refused_and_a_low_one_keeps_i
     ],
 )
 def test_the_default_rule_reads_the_drawn_storeys_category_and_area(levels: int, category: str, area: float, landmark: bool, taken: bool) -> None:
-    side = area**0.5
-    room = Polygon([(0.0, 0.0), (side, 0.0), (side, side), (0.0, side)])
+    depth = area / 10.0  # a 10 m wide rectangle has exactly this area, where a square root would round past the limit
+    room = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, depth), (0.0, depth)])
     candidates = [("b", levels, {"category": category, "landmark": landmark, "estimated_levels": 99}, room)]
     assert _select_interiors(candidates, load_detail_config(), []) == (["b"] if taken else [])
 
