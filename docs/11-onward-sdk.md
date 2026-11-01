@@ -87,7 +87,7 @@ Figures from the guide, not from the Editor: about 150 draw calls, about 250 000
 
 Occlusion culling and static batching are what the guide recommends. v01 was measured on the headset and did not lower draw calls (ADR-005). They stay off.
 
-Textures are 1k. The adapter reads each PNG from the GLB with `Texture2D.LoadImage` into an uncompressed RGBA32 texture asset with mipmaps (`LoadPng` in `OnwardMapAdapter.cs`). They are not compressed for the Quest yet. Importing them as ASTC is planned. If the headset shows them pixelated, the guide asks to move the shader precision from Half to Single. That is checked on the Quest. The SDK shader is not changed in advance.
+Textures are 1k, and the facade trim atlas is 2048 × 4096 (ADR-020). The adapter imports each PNG from the GLB through a `TextureImporter` as ASTC 6×6 on Android, with mipmaps (`LoadPng` in `OnwardMapAdapter.cs`); `albedo_compression: none` in `adapter_options.json` keeps the old uncompressed RGBA32 asset ([12-export.md](12-export.md#albedo-textures)). The ASTC path is not yet checked on the Quest. If the headset shows them pixelated, the guide asks to move the shader precision from Half to Single. That is checked on the Quest. The SDK shader is not changed in advance.
 
 ## Unity project (not edited per map)
 

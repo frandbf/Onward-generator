@@ -183,6 +183,8 @@ class SourcePlugin(Protocol):
 | 7 | **Plugin LoD2:** Madrid OBJ por edificio, NRW/Berlín, swissBUILDINGS3D, 3DBAG, PLATEAU | Tejados inferidos (`hip`) por geometría de cubierta observada | Por país o ciudad | Bajo a medio. Madrid CC BY 4.0 con "Origen de los datos: Ayuntamiento de Madrid" | **L** (presupuesto de triángulos, simplificación, casar con la huella OSM) | Solo tejados: importar los OBJ de un distrito de Madrid, recortar a la huella OSM, simplificar a N triángulos por edificio y conservar los muros nuestros (ventanas, colliders). |
 | 8 | **Árboles desde el dosel de Meta (1 m) y los inventarios municipales** | Árboles solo de `natural=tree` (Madrid OSM 70 888; el inventario municipal es mucho mayor [no verificado]) | Dosel global; inventario por ciudad | Bajo. CC BY 4.0, AI-generated | **M** | Detectar máximos locales del CHM en parques y aceras sin árbol OSM. Instancias del árbol existente con altura del CHM, `ai_generated`, y tope por presupuesto. |
 
+**Continuación (31 de octubre de 2026):** la tipología del edificio, la compresión ASTC del albedo, los huecos planos en plantas altas y el presupuesto de triángulos por visibilidad están en [2026-10-31-facades-typology-budget.md](2026-10-31-facades-typology-budget.md).
+
 **Fuera del top 8, pero razonables más adelante:**
 - Copernicus GLO-30 para el horizonte o la pendiente: 30 m no sirven para la calle y hoy los mapas son planos.
 - Impostores para el horizonte de ADR-014.

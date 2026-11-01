@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 import shapely
@@ -13,6 +15,7 @@ from onward_generator.generation import GenerationError, generate_scene, load_ge
 from onward_generator.generation.config import DEFAULT_CONFIG_PATH, config_from_document
 from onward_generator.generation.gltf import read_glb
 from onward_generator.generation.markings import ZEBRA_LIFT_M
+from onward_generator.generation.scene import GeneratedScene
 from onward_generator.generation.surfaces import SurfaceClass, crossing_sites
 from onward_generator.geo.pipeline import GeoResult, write_outputs
 from onward_generator.heights import run_heights, write_height_outputs
@@ -144,6 +147,34 @@ def test_missing_height_is_critical(inputs: tuple[Path, Path], tmp_path: Path) -
     report = generate_scene(scene, edited, CFG).report()
     assert not report["phase_03_exit"]["passed"]
     assert [i["object_id"] for i in report["issues"] if i["severity"] == "critical"] == ["osm-way-102"]
+
+
+def _with_footprint_edit(scene_path: Path, tmp_path: Path, edit: Callable[[dict[str, Any]], None]) -> Path:
+    scene = json.loads(scene_path.read_text(encoding="utf-8"))
+    edit(next(f for f in scene["features"] if f["id"] == "osm-way-101")["geometry"])
+    out = tmp_path / "edited_scene.json"
+    out.write_text(json.dumps(scene), encoding="utf-8")
+    return out
+
+
+def _weld_issues(generated: GeneratedScene) -> list[str]:
+    return [f"{i.severity}: {i.message}" for i in generated.issues if i.code == "footprint_weld_cleaned" and i.object_id == "osm-way-101"]
+
+
+def test_a_footprint_vertex_under_the_weld_is_removed_before_extrusion(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    def add_neighbour(geometry: dict[str, Any]) -> None:
+        ring = geometry["coordinates"][0]
+        ring.insert(1, [ring[0][0] + 0.000007, ring[0][1] + 0.000002])
+
+    edited = _with_footprint_edit(inputs[0], tmp_path, add_neighbour)
+    heights, _ = write_height_outputs(run_heights(edited), tmp_path / "edited_heights")
+    generated = generate_scene(edited, heights, CFG)
+    assert _weld_issues(generated) == ["info: 1 vertices removed, contact opened: False"]
+    assert generated.report()["phase_03_exit"]["passed"], generated.report()["issues"]
+
+
+def test_a_clean_footprint_records_no_weld_issue(inputs: tuple[Path, Path]) -> None:
+    assert _weld_issues(generate_scene(*inputs, CFG)) == []
 
 
 def test_degrees_are_refused(inputs: tuple[Path, Path], tmp_path: Path) -> None:

@@ -12,6 +12,7 @@ another service must not land in user output or a review file.
 
 from __future__ import annotations
 
+import http.client
 import ssl
 import time
 import urllib.error
@@ -88,8 +89,9 @@ def fetch_bytes(
     Only ``https`` URLs on ``allowed_hosts`` are requested. HTTP 429 is
     retried ``retry_429`` times, doubling the wait from ``retry_delay_s`` up
     to 90 s. HTTP 500, 502, 503 and 504, a timeout, a refused or reset
-    connection and any other network error are retried ``retry_transient``
-    times with the same doubling wait. Every failure raises ``error`` with the
+    connection, a response cut off mid-transfer (``http.client.IncompleteRead``)
+    and any other network error are retried ``retry_transient`` times with the
+    same doubling wait. Every failure raises ``error`` with the
     cause chained. With
     ``error_body`` the message of an HTTP error ends with up to 400 bytes
     of the response body; without it the message names only status and URL.
@@ -118,7 +120,7 @@ def fetch_bytes(
             else:
                 detail = exc.read(400).decode(errors="replace").strip() if error_body else ""
                 raise error(f"HTTP {exc.code} for {safe}" + (f": {detail}" if detail else "")) from exc
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as exc:
             if transient >= retry_transient:
                 reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
                 raise error(f"request to {safe} failed: {reason}") from exc

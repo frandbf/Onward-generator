@@ -1,8 +1,12 @@
 """Overture Maps places and buildings clipped to one map (ADR-021). The only Overture network code.
 
-``overture fetch`` resolves the release from the Overture STAC catalogue, then
-asks DuckDB to read the release GeoParquet on S3 with a bbox predicate on the
-``bbox`` struct, so only the row groups that touch the map are transferred. Each
+``overture fetch`` resolves the release from the Overture STAC catalogue, picks
+from the release's STAC index (``collections.parquet``, one row per file with
+its bbox) the few files whose bbox meets the map, then asks DuckDB to read only
+those GeoParquet files on S3 with a bbox predicate on the ``bbox`` struct, so
+only the row groups that touch the map are transferred. Without the index every
+file of the theme would be opened: 512 building files, each footer read over
+the network. Each
 theme is written as a new parquet file under ``data/raw/`` with a
 ``.source.json`` sidecar: release, source, query, SHA-256, row count, the
 licence of every record by dataset, and the attribution lines. Nothing is
@@ -15,9 +19,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+import tempfile
 import time
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import asdict, dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -36,6 +42,9 @@ STAC_CATALOG_URL = "https://stac.overturemaps.org/catalog.json"
 STAC_HOSTS = frozenset({"stac.overturemaps.org"})
 S3_REGION = "us-west-2"
 SOURCE_TEMPLATE = "s3://overturemaps-us-west-2/release/{release}/theme={theme}/type={type}/*.parquet"
+FILE_PREFIX_TEMPLATE = "s3://overturemaps-us-west-2/release/{release}/theme={theme}/type={type}/"
+STAC_INDEX_TEMPLATE = "https://stac.overturemaps.org/{release}/collections.parquet"
+"""One row per release file: ``collection`` (the type), ``bbox`` and the S3 href under ``assets.aws.alternate.s3``."""
 THEMES: Mapping[str, tuple[str, str]] = {"places": ("places", "place"), "buildings": ("buildings", "building")}
 USER_AGENT = f"onward-generator/{__version__} (local map generator)"
 STAC_MAX_BYTES = 8 * 1024 * 1024
@@ -110,6 +119,12 @@ class FetchRecord:
     size_bytes: int
     duckdb_version: str
     path: str
+    files: list[str] = field(default_factory=list)
+    """The files read: those of the STAC index that meet the bbox, or empty when ``source`` itself was read."""
+    file_selection: str = "unrecorded"
+    """``stac_index``, ``glob`` (no index: every file of the theme), ``source`` (a given path), or ``unrecorded`` (a sidecar written before this field)."""
+    files_in_theme: int | None = None
+    """How many files the index lists for the theme; ``None`` without the index."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -174,17 +189,71 @@ def _quote(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
-def clip_query(source: str, bbox: BBox) -> str:
-    """Every column of the rows whose bbox meets ``bbox``, ordered by id so the file is reproducible."""
+def _check_bbox(bbox: BBox) -> BBox:
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise OvertureError(f"invalid bbox {bbox}: south/west must be below north/east")
+    return bbox
+
+
+def clip_query(source: str | Sequence[str], bbox: BBox) -> str:
+    """Every column of the rows whose bbox meets ``bbox``, ordered by id so the file is reproducible.
+
+    ``source`` is one path or glob, or a list of files.
+    """
+    south, west, north, east = _check_bbox(bbox)
+    read = _quote(source) if isinstance(source, str) else "[" + ", ".join(_quote(f) for f in source) + "]"
     return (
-        f"SELECT * FROM read_parquet({_quote(source)}, hive_partitioning = false)\n"
+        f"SELECT * FROM read_parquet({read}, hive_partitioning = false)\n"
         f"WHERE bbox.xmin <= {east:.7f} AND bbox.xmax >= {west:.7f}"
         f" AND bbox.ymin <= {north:.7f} AND bbox.ymax >= {south:.7f}\n"
         "ORDER BY id"
     )
+
+
+@dataclass(frozen=True, slots=True)
+class FileSelection:
+    files: list[str]
+    """Files whose bbox meets the map, sorted; one file (read with no matching row) when none does."""
+    in_theme: int
+
+
+def select_files(index: bytes, release: str, theme: str, bbox: BBox) -> FileSelection:
+    """The files of ``theme`` in a release STAC index (``collections.parquet``) whose bbox meets ``bbox``.
+
+    Every href must be a parquet file of that release, theme and type on the Overture bucket.
+    """
+    theme_dir, kind = THEMES[theme]
+    south, west, north, east = _check_bbox(bbox)
+    prefix = FILE_PREFIX_TEMPLATE.format(release=check_release(release), theme=theme_dir, type=kind)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "collections.parquet"  # pragma: no mutate: any name in this empty directory reads the same bytes
+        path.write_bytes(index)
+        connection = duckdb.connect()
+        try:
+            rows = connection.execute(
+                "SELECT assets.aws.alternate.s3.href,"  # pragma: no mutate: SQL keywords and names are case-insensitive
+                f" bbox.xmin <= {east:.7f} AND bbox.xmax >= {west:.7f} AND bbox.ymin <= {north:.7f} AND bbox.ymax >= {south:.7f}"
+                f" FROM read_parquet({_quote(str(path))}) WHERE collection = {_quote(kind)} ORDER BY 1"
+            ).fetchall()
+        except duckdb.Error as exc:
+            raise OvertureError(f"the STAC index of {release} cannot be read: {exc}") from exc
+        finally:
+            connection.close()
+    hrefs = [str(href) for href, _ in rows]
+    if not hrefs:
+        raise OvertureError(f"the STAC index of {release} lists no {kind} files under {prefix}")
+    bad = [h for h in hrefs if not (h.startswith(prefix) and h.endswith(".parquet") and "/" not in h[len(prefix):])]
+    if bad:
+        raise OvertureError(f"the STAC index of {release} lists a {kind} file outside {prefix}: {bad[0]}")
+    meeting = [str(href) for href, meets in rows if meets]
+    # With no file near the map, read one file: the bbox predicate returns no row and the schema is kept.
+    return FileSelection(files=meeting or hrefs[:1], in_theme=len(hrefs))
+
+
+def stac_index(release: str, fetch: Callable[[str], bytes] | None = None) -> bytes:
+    """The release's ``collections.parquet`` from the Overture STAC host."""
+    return (fetch or _stac_fetch)(STAC_INDEX_TEMPLATE.format(release=check_release(release)))
 
 
 def _remote_connection() -> duckdb.DuckDBPyConnection:
@@ -260,17 +329,24 @@ def fetch_theme(
     *,
     release: str,
     source: str | None = None,
+    selection: FileSelection | None = None,
     connect: Connect = _remote_connection,
     now: datetime | None = None,
     sleep: Sleep = time.sleep,
 ) -> FetchRecord:
     """Write the rows of one theme that meet ``bbox`` to ``target`` and its sidecar.
 
-    ``source`` defaults to the release on S3; tests pass a local parquet.
+    ``source`` defaults to the release on S3; tests pass a local parquet. ``selection``
+    (from the STAC index) reads only its files instead of every file of the theme.
     """
     theme_dir, kind = THEMES[theme]
-    source = source or theme_source(release, theme)
-    query = clip_query(source, bbox)
+    if source:
+        query, mode = clip_query(source, bbox), "source"
+        selection = None  # pragma: no mutate: only its truth is read below, and every empty value is false
+    else:
+        source = theme_source(release, theme)
+        query = clip_query(selection.files if selection else source, bbox)
+        mode = "stac_index" if selection else "glob"
     retrieved = (now or datetime.now(tz=UTC)).isoformat(timespec="seconds")
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f".{target.name}.tmp")  # pragma: no mutate: any name beside the target works; only the target and its sidecar remain
@@ -304,6 +380,9 @@ def fetch_theme(
         size_bytes=target.stat().st_size,
         duckdb_version=duckdb.__version__,
         path=str(target),
+        files=list(selection.files) if selection else [],
+        file_selection=mode,
+        files_in_theme=selection.in_theme if selection else None,
     )
     atomic_write_json(sidecar_path(target), record.to_dict())
     return record
@@ -335,10 +414,19 @@ def fetch_map(
     except OsmDownloadError as exc:
         raise OvertureError(str(exc)) from exc
     chosen = check_release(release) if release else latest_release(stac)
-    return [
-        fetch_theme(theme, bbox, target, release=chosen, source=(sources or {}).get(theme), connect=connect, now=now, sleep=sleep)
-        for theme, target in targets.items()
-    ]
+    given = sources or {}
+    index: bytes | None = None
+    if any(theme not in given for theme in THEMES):
+        try:
+            index = stac_index(chosen, stac)
+        except OvertureError as exc:
+            print(f"overture: no STAC index for {chosen} ({exc}); reading every file of each theme, which is slow", file=sys.stderr)
+    records = []
+    for theme, target in targets.items():
+        selection = select_files(index, chosen, theme, bbox) if index is not None and theme not in given else None
+        records.append(fetch_theme(theme, bbox, target, release=chosen, source=given.get(theme), selection=selection,
+                                   connect=connect, now=now, sleep=sleep))
+    return records
 
 
 def load_record(parquet: Path) -> FetchRecord:

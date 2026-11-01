@@ -23,7 +23,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator.detail.config import PARTY_PREFIX, DetailConfig, Opening, Template
-from onward_generator.detail.modules import Prototype, balcony, frame_matrix, recess, recess_rim
+from onward_generator.detail.modules import Prototype, balcony, flat_opening, frame_matrix, recess, recess_rim
 from onward_generator.detail.roofs import BuiltRoof, build_roof
 from onward_generator.detail.s3db import tint_base
 from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
@@ -196,6 +196,18 @@ class Hole:
 
     def uv_rect(self) -> Polygon:
         return rect_uv(self.s0, self.v0, self.s0 + self.width, self.v0 + self.height)
+
+
+# Openings that may be drawn flush with the wall from ``relief_storeys`` up (ADR-025). Doors,
+# shopfronts and shop doors stay recessed: they are at street level, where the reveal reads.
+FLAT_KINDS = frozenset({"window", "narrow_window", "balcony_door"})
+# Backs a flat opening may have: an opaque panel. A see-through pane an interior pierces keeps its hole through the wall.
+FLAT_BACKS = frozenset({"glass_dark"})
+
+
+def is_flat(hole: Hole, relief_storeys: int) -> bool:
+    """Whether ``hole`` is drawn flat: a window or balcony door on storey ``relief_storeys`` or above, with an opaque back."""
+    return hole.kind in FLAT_KINDS and hole.back in FLAT_BACKS and hole.storey >= relief_storeys
 
 
 # A 2.4 m door plus the 0.35 m lintel needs 2.75 m. Interior storeys are at least 2.8 m.
@@ -446,6 +458,8 @@ class Shell:
     wall_material: str = ""
     # Party walls with openings (a setback wall, a fallback door): segment, its face, and the openings ``(s0, v0, s1, v1)``.
     opened_walls: list[tuple[Segment, Mesh, list[tuple[float, float, float, float]]]] = field(default_factory=list)
+    # ``relief_storeys`` and the openings drawn flat and recessed (ADR-025): ``facade.relief`` of the record.
+    relief: dict[str, int] = field(default_factory=dict)
 
 
 def _hip_roof(polygon: Polygon, height: float, template: Template) -> tuple[Mesh, float] | None:
@@ -560,6 +574,7 @@ def build_shell(
 
     rims: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
     counts: dict[str, int] = defaultdict(int)
+    relief = {"relief_storeys": cfg.relief_storeys, "flat_openings": 0, "recessed_openings": 0}
     blank_walls: list[tuple[Segment, Mesh]] = []
     opened_walls: list[tuple[Segment, Mesh, list[tuple[float, float, float, float]]]] = []
     for seg in segments:
@@ -577,10 +592,12 @@ def build_shell(
         if not seg.exposed:
             opened_walls.append((seg, face_mesh, rects))
         for h in holes:
-            proto = recess(h.width, h.height, h.depth, h.back)
+            flat = is_flat(h, cfg.relief_storeys)
+            proto = flat_opening(h.width, h.height, str(h.back)) if flat else recess(h.width, h.height, h.depth, h.back)
             m = seg.module_matrix(h.s0, h.v0)
             _bake(parts, proto, m)
             counts[h.kind] += 1
+            relief["flat_openings" if flat else "recessed_openings"] += 1
             if h.back is None:
                 for p, q in recess_rim(h.width, h.height, h.depth, include_bottom=h.v0 > 0):
                     rims.append((tuple((m @ [*p, 1.0])[:3]), tuple((m @ [*q, 1.0])[:3])))  # type: ignore[arg-type]
@@ -604,7 +621,7 @@ def build_shell(
     return Shell(
         dict(parts), roof_info, z_top, defects, abs(roof_area - footprint_area), rims, balcony_colliders, dict(counts),
         roof_deck, height, parapet_collider,
-        blank_walls, wall_material, opened_walls,
+        blank_walls, wall_material, opened_walls, relief,
     )
 
 

@@ -37,16 +37,15 @@ from onward_generator.generation.mesh import (
     Mesh,
     cap,
     closed_manifold_defects,
-    collapse_short_edges,
     drop_degenerate_holes,
     merge,
     open_base_defects,
-    open_point_contacts,
     polygons_of,
     prism,
     signed_volume,
     upward_area,
     walls,
+    weld_safe,
 )
 from onward_generator.generation.surfaces import (
     CROSSING_WIDTH_M,
@@ -323,6 +322,13 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
             issues.append(Issue("building_missing_height", "critical", fid, "no positive height in heights.json"))
             continue
         height = float(h["height_m"])
+        # Every ring vertex, before extrusion: the checks below weld on the same 0.1 mm grid.
+        geom, removed, opened = weld_safe(geom)
+        if removed or opened:
+            issues.append(Issue("footprint_weld_cleaned", "info", fid, f"{removed} vertices removed, contact opened: {opened}"))
+        if geom.is_empty:
+            issues.append(Issue("building_invalid_footprint", "critical", fid, "nothing left once vertices closer than 0.1 mm are merged"))
+            continue
         wall_mesh, d1 = walls(geom, 0.0, height).drop_degenerate()
         roof_mesh, d2 = cap(geom, height).drop_degenerate()
         degenerate += d1 + d2
@@ -330,6 +336,7 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
         roof_error = abs(upward_area(roof_mesh) - geom.area)
         collider_fp = make_valid(geom.simplify(config.collider_simplify_m, preserve_topology=True))
         collider_fp = union_all(polygons_of(collider_fp)) if not collider_fp.is_empty else geom
+        collider_fp, _, _ = weld_safe(collider_fp)  # simplifying can bring two corners together again
         collider = prism(collider_fp, 0.0, height, bottom=True)
         collider_defects = closed_manifold_defects(collider)
         volume = signed_volume(collider)
@@ -592,8 +599,7 @@ def ground_slabs(partition: Partition, config: GenerationConfig, clip: BaseGeome
         geom, dropped_holes = drop_degenerate_holes(geom)
         if dropped_holes:
             issues.append(Issue("degenerate_hole_dropped", "info", cid, f"{dropped_holes} holes below 0.0001 m² removed before the slab"))
-        geom = open_point_contacts(geom)
-        geom, collapsed = collapse_short_edges(geom)
+        geom, collapsed, _ = weld_safe(geom)
         if collapsed:
             issues.append(Issue(
                 "short_edge_collapsed", "info", cid,

@@ -12,7 +12,8 @@
     "edge_margin_m": 0.6,
     "min_pier_m": 0.5,
     "head_clearance_m": 0.35,
-    "recess_depth_m": 0.15
+    "recess_depth_m": 0.15,
+    "relief_storeys": 2
   },
   "templates": {
     "generic_residential": {

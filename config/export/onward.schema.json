@@ -61,6 +61,10 @@
             "facade": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
           }
         },
+        "albedo_compression": {
+          "description": "Android format of the albedo textures the adapter imports: astc_6x6 (default), or none for uncompressed RGBA32 as before",
+          "enum": ["astc_6x6", "none"]
+        },
         "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
         "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
         "fog_enabled": { "type": "boolean" },

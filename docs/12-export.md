@@ -41,7 +41,7 @@ The command writes nothing when:
 | `onward_export.json` | Manifest `onward_generator.onward_export_package` 0.1.0: `package_id`, adapter and target (Unity 2021.3.23f1, SDK 1.15, Quest), title and description with attribution, the declared fidelity, SHA-256 and origin of every file, input hashes, `lightmap_estimate` (below), `tiers` (below), and warnings |
 | `scene_visual.glb`, `scene_collision.glb` | Exact copies of the scene directory |
 | `layout.json` | A copy of the gameplay layout |
-| `adapter_options.json` | Combine by a 100 m cell, no static batching, no occlusion culling (variant v02, ADR-005). Onward lightmap guide: texels per metre from the map (default 10, at most 40), 2048 px, non-directional, and `lightmap_scales`: one `scaleInLightmap` per visual material (below). The samples and bounces come from the bake profile ([below](#bake-profiles)): `final` uses 256/512/512 samples and 2–4 bounces, `draft` (the default) 32/128/128 and 1–2. ASTC 8×8 on Android |
+| `adapter_options.json` | Combine by a 100 m cell, no static batching, no occlusion culling (variant v02, ADR-005). Onward lightmap guide: texels per metre from the map (default 10, at most 40), 2048 px, non-directional, and `lightmap_scales`: one `scaleInLightmap` per visual material (below). The samples and bounces come from the bake profile ([below](#bake-profiles)): `final` uses 256/512/512 samples and 2–4 bounces, `draft` (the default) 32/128/128 and 1–2. Lightmaps ASTC 8×8 on Android. `albedo_compression`: the Android format of the albedo textures, `astc_6x6` (default) or `none` for uncompressed RGBA32 as before ([below](#albedo-textures)) |
 | `thumbnail.png` | 512×256, a view of the mesh and that map's title |
 | `quest_acceptance.md` | The headset checklist: Free Roam, Uplink, Hunt, ambience, impact, flyover, and the urban card |
 
@@ -138,6 +138,17 @@ Nothing here is marked as passed. Write each result in the package's `quest_acce
 5. `ONWARD_QUEST_LISTING=local task unity -- "<map>"` (or plain `task unity`) restores today's install of the local slot.
 
 A mode that hides the map or breaks Hunt is reverted by step 5; nothing else needs to be undone except removing a `named*` pair by hand.
+
+## Albedo textures
+
+The adapter makes one texture per glTF image of `scene_visual.glb`. Materials that share an image (`build_glb` keeps identical bytes once, so the three trim materials of ADR-020 and a party wall and its wall) share that texture.
+
+- **`astc_6x6` (default).** The PNG bytes are written into the project as `Textures/T<nn>.png` and imported with a `TextureImporter`: sRGB, mipmaps, alpha from the image, no power-of-two rescale, Repeat wrap when the GLB has more than one image (Clamp for a single shared atlas, as before), `maxTextureSize` at least 4096 and at least the image's larger side (the importer's default 2048 would halve the 2048 × 4096 facade atlas), and an Android override to ASTC 6×6. ASTC 6×6 is 16 bytes per 6×6 block, 3.56 bits per texel against 32 for RGBA32: the facade atlas goes from 42.7 MiB to 4.8 MiB with its mips. It is finer than the lightmaps' 8×8 because the albedo carries the windows, doors and cornices of the atlas. The Onward guide (appendix C) recommends ASTC.
+- **`none`.** The old path: `Texture2D.LoadImage` into an uncompressed RGBA32 `Textures/T<nn>.asset` with mipmaps. Set `build.albedo_compression` to `none` in the export configuration to roll back a headset regression without a code change.
+
+A package written before this option has no `albedo_compression` and gets ASTC 6×6. The scene log says `[OnwardAdapter] Albedo: <n> of <m> images, Android <format>.` `perf measure` reports `texture_memory` per GLB: every embedded image with its full mip chain as RGBA32 and as ASTC 6×6 (`rgba32_mips_bytes`/`_mib`, `astc_6x6_mips_bytes`/`_mib`); these are estimates from the image sizes, not a headset figure.
+
+The ASTC path was written on a Linux host without Unity and is unverified in Unity and on the headset. To check: `task unity` on the macOS host builds; the atlas texture in the Unity project is 2048 × 4096 with format ASTC 6×6 on Android, not 2048 × 2048; the seams and gutters of the trim atlas at a distance; the string course and the window cells up close; the shop decals' letters; and texture memory in OVR Metrics against a `none` package of the same map.
 
 ## See-through materials
 

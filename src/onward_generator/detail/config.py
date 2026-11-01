@@ -236,6 +236,8 @@ class DetailConfig:
     min_pier_m: float
     head_clearance_m: float
     recess_depth_m: float
+    relief_storeys: int
+    """Storey index (0 at the ground) from which windows and balcony doors are drawn flat (ADR-025)."""
     templates: Mapping[str, Template]
     landmark_template: str
     main_door: Opening
@@ -425,6 +427,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         min_pier_m=float(op["min_pier_m"]),
         head_clearance_m=float(op["head_clearance_m"]),
         recess_depth_m=float(op["recess_depth_m"]),
+        relief_storeys=int(op["relief_storeys"]),
         templates=MappingProxyType({name: _template(name, t) for name, t in doc["templates"].items()}),
         landmark_template=doc["landmark_template"],
         main_door=_opening(doc["doors"]["main"]),

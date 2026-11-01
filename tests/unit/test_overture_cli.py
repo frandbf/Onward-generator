@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 from pathlib import Path
 
@@ -22,6 +23,13 @@ def _record(theme: str, rows: int, licenses: list[dict]) -> FetchRecord:
         bbox=[0, 0, 1, 1], bbox_order="south,west,north,east", retrieved_at="t", rows=rows, licenses=licenses, attribution=[],
         sha256="0" * 64, size_bytes=99, duckdb_version="1.5.6", path=f"/m/data/raw/overture_{theme}.parquet",
     )
+
+
+def test_fetch_prints_how_many_files_it_read(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    record = dataclasses.replace(_record("buildings", 0, []), files=["s3://a", "s3://b"], files_in_theme=512)
+    monkeypatch.setattr(cli, "fetch_map", lambda *a, **k: [record])
+    assert cli.main(["fetch", "--map", "maps/x"]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "overture buildings 2026-10-21.0: 0 rows, 99 bytes; licences none; files 2 of 512"
 
 
 def test_fetch_prints_rows_and_licences(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:

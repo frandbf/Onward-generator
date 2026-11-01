@@ -40,3 +40,7 @@ OSM and Catastro provide the footprint, the height, and the storey count. They d
 ## Amendment — Simple 3D Buildings tags (31 October 2026)
 
 [ADR-023](ADR-023-simple-3d-buildings.md) replaces the tagged hip of this decision. `roof:shape` is drawn on any area as its own shape, with a recorded flat fallback. `building:part` is extruded from `height` or its levels, and `building:colour` and `roof:colour` tint shared materials.
+
+## Amendment — flat upper openings (31 October 2026)
+
+[ADR-025](ADR-025-flat-upper-openings.md) pulls the first lever named above. Windows and balcony doors from storey `openings.relief_storeys` up (default 2) are one quad flush with the wall, with no reveals; doors, shopfronts and pierced windows keep theirs. On Madrid r150 `frame_stone` fell from 36 854 to 19 606 triangles and the export from 142 408 to 125 160, with the same draws.

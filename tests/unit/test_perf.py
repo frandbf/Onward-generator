@@ -10,12 +10,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from onward_generator.dress.atlas import encode_png_rgba
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
 from onward_generator.generation.mesh import box
 from onward_generator.perf.__main__ import main as perf_main
 from onward_generator.perf.device import drawcall_trace, load_times, summarize_csv
-from onward_generator.perf.measure import combine_groups, measure_glb
+from onward_generator.perf.measure import combine_groups, measure_glb, png_size, texture_bytes, texture_memory
 
 MATERIALS = {"a": Material((0.5, 0.5, 0.5, 1.0), 0.9), "b": Material((0.8, 0.2, 0.2, 1.0), 0.9)}
 
@@ -49,6 +50,7 @@ def test_measure_glb_counts_instances_and_primitives(small_glb: Path) -> None:
     assert m["triangles"] == 5 * 12 and m["unique_triangles"] == 3 * 12
     assert m["primitives_by_material"] == {"a": 3, "b": 2}
     assert m["textures"] == 0 and m["lights"] == 0 and not m["has_lightmap_uv"]
+    assert m["texture_memory"]["rgba32_mips_bytes"] == 0
 
 
 def test_combine_groups_merges_per_cell_and_material(small_glb: Path) -> None:
@@ -156,3 +158,68 @@ def test_cli_drawcalls_validates_labels(tmp_path: Path, capsys: pytest.CaptureFi
     assert "LABEL=PATH" in capsys.readouterr().err
     assert perf_main(["drawcalls", f"a={path}", f"a={path}", "--out", str(tmp_path / "y.json")]) == 1
     assert perf_main(["drawcalls", f"a={path}", "--out", str(out)]) == 1  # no silent overwrite
+
+
+@pytest.mark.parametrize(("width", "height", "fmt", "expected"), [
+    # The ADR-020 facade atlas: 42.7 MiB as RGBA32, 4.8 MiB as ASTC 6x6.
+    (2048, 4096, "rgba32", 44_739_244),
+    (2048, 4096, "astc_6x6", 4_988_080),
+    (1024, 1024, "rgba32", 5_592_404),
+    (1024, 1024, "astc_6x6", 626_288),
+    # Levels 7x3, 3x1, 1x1: whole 6x6 blocks per level, so 2 + 1 + 1 blocks.
+    (7, 3, "astc_6x6", 64),
+    (7, 3, "rgba32", (21 + 3 + 1) * 4),
+    (3, 7, "rgba32", (21 + 3 + 1) * 4),
+    (1, 1, "astc_6x6", 16),
+])
+def test_texture_bytes_counts_the_full_mip_chain(width: int, height: int, fmt: str, expected: int) -> None:
+    assert texture_bytes(width, height, fmt) == expected
+
+
+@pytest.mark.parametrize(("width", "height", "fmt", "match"), [
+    (0, 4, "rgba32", "must be positive"),
+    (4, 0, "rgba32", "must be positive"),
+    (4, 4, "dxt1", "unknown texture format"),
+])
+def test_texture_bytes_rejects_bad_input(width: int, height: int, fmt: str, match: str) -> None:
+    with pytest.raises(ValueError, match=match):
+        texture_bytes(width, height, fmt)
+
+
+def _png(width: int, height: int) -> bytes:
+    return encode_png_rgba(np.zeros((height, width, 4), dtype=np.uint8))
+
+
+def test_png_size_reads_the_header_and_refuses_other_bytes() -> None:
+    assert png_size(_png(7, 3)) == (7, 3)
+    assert png_size(_png(7, 3)[:24]) == (7, 3)  # signature, IHDR length and type, width, height
+    with pytest.raises(ValueError, match="not a PNG"):
+        png_size(b"\xff\xd8\xff\xe0" + bytes(40))
+    with pytest.raises(ValueError, match="not a PNG"):
+        png_size(_png(7, 3)[:23])
+    no_header = bytearray(_png(7, 3))
+    no_header[12:16] = b"IDAT"
+    with pytest.raises(ValueError, match="not a PNG"):
+        png_size(bytes(no_header))
+
+
+def test_measure_glb_estimates_texture_memory_per_format(tmp_path: Path) -> None:
+    cube = box(0, 2, 0, 2, 0, 3)
+    path = tmp_path / "scene_visual.glb"
+    path.write_bytes(build_glb([Node("building/1", (Primitive(cube, "a"), Primitive(cube, "b")))], MATERIALS,
+                               repeat_images={"a": _png(1024, 1024), "b": _png(7, 3)}))
+    memory = measure_glb(path)["texture_memory"]
+    assert memory == {
+        "rgba32_mips_bytes": 5_592_404 + 100, "rgba32_mips_mib": 5.3,
+        "astc_6x6_mips_bytes": 626_288 + 64, "astc_6x6_mips_mib": 0.6,
+    }
+
+
+def test_texture_memory_names_an_image_that_is_not_a_png() -> None:
+    doc = {"images": [{"bufferView": 0}], "bufferViews": [{"byteLength": 24}]}
+    with pytest.raises(ValueError, match="image 0: not a PNG"):
+        texture_memory(doc, bytes(24))
+    # A view with no byteOffset starts at 0 (glTF default).
+    assert texture_memory(doc, _png(7, 3))["astc_6x6_mips_bytes"] == 64
+    assert texture_memory({}, b"") == {"rgba32_mips_bytes": 0, "rgba32_mips_mib": 0.0,
+                                       "astc_6x6_mips_bytes": 0, "astc_6x6_mips_mib": 0.0}

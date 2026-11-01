@@ -89,7 +89,7 @@ from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, cor
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
 BASE_MANIFEST = "scene3d.json"
 BASE_REPORT = "generation_report.json"
 FIDELITY_NOTE = "Generic template chosen by rules; it does not represent the real facade of this building."
@@ -809,6 +809,7 @@ def detail_scene(
     roof_types: Counter[str] = Counter()
     roof_shapes: Counter[str] = Counter()
     door_rules: Counter[str] = Counter()
+    flat_openings = 0
     interiors_built: list[str] = []
     shop_interiors: list[str] = []
     budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
@@ -992,6 +993,7 @@ def detail_scene(
 
         for kind, n in shell.counts.items():
             counts[kind] += n
+        flat_openings += shell.relief["flat_openings"]
         setback_holes = [x for x in layout.holes if x.segment in floors]
         setbacks["walls"] += len(floors)
         setbacks["opened"] += len({x.segment for x in setback_holes})
@@ -1028,6 +1030,7 @@ def detail_scene(
                 "exposed_length_m": round(seg_exposed, 3),
                 "party_wall_length_m": round(sum(s.length for s in segments if not s.exposed), 3),
                 "openings": dict(sorted(shell.counts.items())),
+                "relief": dict(shell.relief),
                 "shops": shops,
                 "skipped": dict(sorted(layout.skipped.items())),
                 "materials": {"wall": wall_material, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags, cfg.materials), wall_origin),
@@ -1156,6 +1159,7 @@ def detail_scene(
         "placed": sum(len(anchors["rooms"]) for _, anchors in lit) - len(dropped_lights),
         "dropped": dropped_lights,
     }
+    detailed.stats["flat_openings"] = flat_openings
     detailed.stats["doors"] = dict(sorted(door_rules.items()))
     detailed.stats["wall_area_m2"] = wall_areas.to_record()
     detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}

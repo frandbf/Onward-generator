@@ -8,6 +8,8 @@ known from the device run (``device.py``).
 from __future__ import annotations
 
 import hashlib
+import math
+import struct
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -15,13 +17,65 @@ from typing import Any
 from onward_generator.generation.gltf import read_glb
 
 UINT16_MAX_VERTICES = 65535
+MIB = 1 << 20
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+TEXTURE_FORMATS: dict[str, tuple[int, int, int]] = {
+    # Block width, block height and bytes per block on the GPU.
+    "rgba32": (1, 1, 4),  # What the adapter loaded before ASTC, and still loads with albedo_compression "none".
+    "astc_6x6": (6, 6, 16),  # The adapter's default Android albedo format (docs/12-export.md).
+}
+
+
+def texture_bytes(width: int, height: int, fmt: str) -> int:
+    """GPU bytes of a ``width`` x ``height`` texture with its full mip chain, as Unity stores it.
+
+    Each level halves both sides (rounded down, at least 1) down to 1 x 1; a block
+    format rounds each level up to whole blocks.
+    """
+    if fmt not in TEXTURE_FORMATS:
+        raise ValueError(f"unknown texture format {fmt!r}; known: {sorted(TEXTURE_FORMATS)}")
+    if width < 1 or height < 1:
+        raise ValueError(f"texture size must be positive, got {width} x {height}")
+    block_w, block_h, block_bytes = TEXTURE_FORMATS[fmt]
+    total = 0
+    while True:
+        total += math.ceil(width / block_w) * math.ceil(height / block_h) * block_bytes
+        if width == 1 and height == 1:
+            return total
+        width, height = max(1, width // 2), max(1, height // 2)
+
+
+def png_size(data: bytes) -> tuple[int, int]:
+    """Width and height from a PNG's IHDR chunk, without decoding the image."""
+    if len(data) < 24 or data[:8] != PNG_SIGNATURE or data[12:16] != b"IHDR":
+        raise ValueError("not a PNG image")
+    width, height = struct.unpack(">II", data[16:24])  # pragma: no mutate: the PNG spec caps sides at 2**31 - 1, so I and i read alike
+    return width, height
+
+
+def texture_memory(doc: dict[str, Any], bin_chunk: bytes) -> dict[str, Any]:
+    """Every embedded image of a GLB on the headset, with mips, in each format of ``TEXTURE_FORMATS``."""
+    sizes = []
+    for index, image in enumerate(doc.get("images", [])):
+        view = doc["bufferViews"][image["bufferView"]]
+        start = view.get("byteOffset", 0)
+        try:
+            sizes.append(png_size(bin_chunk[start : start + view["byteLength"]]))
+        except ValueError as exc:
+            raise ValueError(f"image {index}: {exc}") from exc
+    out: dict[str, Any] = {}
+    for fmt in TEXTURE_FORMATS:
+        total = sum(texture_bytes(w, h, fmt) for w, h in sizes)
+        out[f"{fmt}_mips_bytes"] = total
+        out[f"{fmt}_mips_mib"] = round(total / MIB, 1)
+    return out
 
 
 def measure_glb(path: str | Path) -> dict[str, Any]:
-    """Counts for one GLB: nodes, meshes, primitives, triangles, vertices, materials, textures, lights."""
+    """Counts for one GLB: nodes, meshes, primitives, triangles, vertices, materials, textures, texture memory, lights."""
     p = Path(path).expanduser()
     raw = p.read_bytes()
-    doc, _ = read_glb(raw)
+    doc, bin_chunk = read_glb(raw)
     accessors = doc.get("accessors", [])
     meshes = doc.get("meshes", [])
     materials = [m.get("name", f"material_{i}") for i, m in enumerate(doc.get("materials", []))]
@@ -65,6 +119,7 @@ def measure_glb(path: str | Path) -> dict[str, Any]:
         "primitives_by_material": dict(sorted(by_material_prims.items())),
         "textures": len(doc.get("textures", [])),
         "images": len(doc.get("images", [])),
+        "texture_memory": texture_memory(doc, bin_chunk),
         "lights": len(doc.get("extensions", {}).get("KHR_lights_punctual", {}).get("lights", [])),
         "vertex_attributes": attributes,
         "has_lightmap_uv": "TEXCOORD_1" in attributes,

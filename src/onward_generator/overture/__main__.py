@@ -33,7 +33,8 @@ REPORT_FILE = "overture_match_report.json"
 def _fetch(args: argparse.Namespace) -> int:
     for record in fetch_map(args.map, release=args.release, overwrite=args.overwrite, out=args.out):
         licences = ", ".join(f"{c['dataset']} {c['license']} {c['records']}" for c in record.licenses) or "none"
-        print(f"overture {record.theme} {record.release}: {record.rows} rows, {record.size_bytes} bytes; licences {licences}")
+        files = f"; files {len(record.files)} of {record.files_in_theme}" if record.files_in_theme is not None else ""
+        print(f"overture {record.theme} {record.release}: {record.rows} rows, {record.size_bytes} bytes; licences {licences}{files}")
         print(f"wrote {record.path}")
     return 0
 

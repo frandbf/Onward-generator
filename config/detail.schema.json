@@ -93,10 +93,11 @@
       "properties": { "min_m": { "$ref": "#/$defs/len" }, "max_m": { "$ref": "#/$defs/len" }, "fallback_m": { "$ref": "#/$defs/len" } }
     },
     "openings": {
-      "type": "object", "additionalProperties": false, "required": ["edge_margin_m", "min_pier_m", "head_clearance_m", "recess_depth_m"],
+      "type": "object", "additionalProperties": false, "required": ["edge_margin_m", "min_pier_m", "head_clearance_m", "recess_depth_m", "relief_storeys"],
       "properties": {
         "edge_margin_m": { "$ref": "#/$defs/len0" }, "min_pier_m": { "$ref": "#/$defs/len" },
-        "head_clearance_m": { "$ref": "#/$defs/len0" }, "recess_depth_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 }
+        "head_clearance_m": { "$ref": "#/$defs/len0" }, "recess_depth_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 },
+        "relief_storeys": { "type": "integer", "minimum": 0, "maximum": 1000, "description": "Storey index (0 at the ground) from which windows and balcony doors are drawn flush with the wall (ADR-025)." }
       }
     },
     "templates": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/template" } },
