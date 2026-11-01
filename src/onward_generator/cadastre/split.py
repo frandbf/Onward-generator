@@ -24,6 +24,8 @@ from onward_generator.cadastre.match import SOURCE_LABEL
 from onward_generator.generation.mesh import cap, merge, open_base_defects, walls
 
 SPLIT_METHOD = "catastro_split"
+SCENE_VERSION = "0.3.0"
+"""The ``onward_generator.geo_scene`` version of a split scene: 0.3.0 adds ``catastro_use.construction_year``."""
 GRID_M = 0.001
 """Coordinates are snapped to 1 mm, the precision ``geo`` writes."""
 NOTCH_M = 0.01
@@ -336,7 +338,8 @@ def attach_uses(
 ) -> dict[str, int]:
     """Write ``catastro_use`` on every building whose parcel has a Catastro use; return the count of each code.
 
-    The use is observed: it is Catastro's predominant use of the parcel. A footprint left whole gets it only
+    The use and the parcel's construction year (``null`` when Catastro leaves it nil) are observed: they
+    are Catastro's predominant use and ``dateOfConstruction`` of the parcel. A footprint left whole gets it only
     when that parcel covers at least ``use_min_share`` of it. ``parts`` are in the scene CRS.
     """
     e0, n0 = scene["frame"]["origin_projected"]
@@ -357,6 +360,7 @@ def attach_uses(
             "share": round(parcel[1], 4),
             "dwellings": use.dwellings,
             "building_units": use.building_units,
+            "construction_year": use.construction_year,
             "attribute_origin": "observed",
             "source": USE_SOURCE,
             "provider": record.provider,
@@ -434,6 +438,7 @@ def subdivided_scene(
     """
     return {
         **scene,
+        "schema_version": SCENE_VERSION,
         "features": [dict(f) for f in features],
         "subdivision": {
             "method": SPLIT_METHOD,

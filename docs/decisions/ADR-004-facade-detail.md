@@ -44,3 +44,13 @@ OSM and Catastro provide the footprint, the height, and the storey count. They d
 ## Amendment — flat upper openings (31 October 2026)
 
 [ADR-025](ADR-025-flat-upper-openings.md) pulls the first lever named above. Windows and balcony doors from storey `openings.relief_storeys` up (default 2) are one quad flush with the wall, with no reveals; doors, shopfronts and pierced windows keep theirs. On Madrid r150 `frame_stone` fell from 36 854 to 19 606 triangles and the export from 142 408 to 125 160, with the same draws.
+
+## Amendment — Interiors in buildings of up to five storeys, with the roof first (1 November 2026)
+
+Decision 6 limited interiors to 5–8 selected buildings within 8 000 drawn triangles. The new default is every building of up to five storeys that has room for one, not a shop, with a way up to a flat roof: `interiors.rule` (`max_levels` 5, `min_levels` 1, every category but `religious`, 20–2 000 m²), a quota of 1 000 so the rule decides, and budgets of 24 000 drawn and 72 000 collision triangles.
+
+- **The roof comes first.** A building gives up furnished floors, down to the ground floor, before it gives up the climb. Furnished floors stay at most three: a fifth-storey room adds a light and a floor nobody asked for, and the climb passes the storeys above them inside a solid.
+- **One and two storeys.** They had no stair. A one-storey building has its room under the roof and a climb from it.
+- **Flat roofs without a parapet** now have access, so their edge is open. A player can walk off it, as off any roof in the game.
+- **Cost.** Madrid r120 has 16 stair interiors and 93 054 visual triangles, Murcia r90 has 6 and 25 828 (`docs/07-detail.md`). [ADR-025](ADR-025-flat-upper-openings.md) freed about 12 % of the exported triangles on Madrid r150, which pays for this on a map of this size. There is no sourced limit for collision triangles (ADR-005), so 72 000 is what the stair interiors of these maps need with margin, not a limit from a guide.
+- **Open.** The 24 baked lights (ADR-013) leave 13 rooms of Madrid r120 without their own light. Whether those rooms read as too dark, how long the bake takes with this many rooms, and the frame time inside a building are headset questions, and shops still have no way up.

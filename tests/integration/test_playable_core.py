@@ -110,9 +110,11 @@ def test_a_scenic_building_is_a_plain_shell_without_a_collider(cored: Any, ring_
         "shops": [],
         "materials": {"wall": wall, "wall_origin": "generated", "roof": SCENIC_ROOF, "roof_origin": "generated"},
         "use": facade["use"],
+        "typology": facade["typology"],
         "door": "none",
     }
     assert facade["use"]["use"] == "retail"
+    assert facade["typology"]["origin"] == "estimated"
     assert record["interior"] is False
     assert record["generation"]["method"] == "phase03_volume + scenic shell"
     assert record["generation"]["seed"] == CFG.seed

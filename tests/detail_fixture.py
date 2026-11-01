@@ -161,3 +161,11 @@ def write_block_osm(
     lines.append("</osm>")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def selective_interiors(doc: dict) -> dict:
+    """``detail`` configuration with the narrower interior rule the budget and selection tests are written against."""
+    doc["interiors"].update(min_buildings=5, max_buildings=8, max_triangles=8000, max_collision_triangles=24000)
+    doc["interiors"]["rule"] = {"categories": ["residential_multi", "unknown"], "min_levels": 3, "max_levels": 50,
+                                "min_area_m2": 80.0, "max_area_m2": 500.0, "min_rectangularity": 0.8}
+    return doc

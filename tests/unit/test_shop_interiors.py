@@ -161,10 +161,12 @@ def test_a_shop_plan_has_one_floor_and_no_stair() -> None:
     assert not isinstance(tall, str) and tall.floors > 1 and tall.flights
     two = plan_interior("block", FOOTPRINT, DOOR, SEG, 18.0, 3.0, 6, CFG, max_floors=2)
     assert not isinstance(two, str) and (two.floors, len(two.flights)) == (2, 1 + sum(f.role == "roof" for f in two.flights))
-    # A shop may use its only storey; the stair interior always leaves the top storey solid.
+    # A shop may use its only storey and has no stair; a one-storey home has its room under the roof and a climb to it.
     low = plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, max_floors=1)
     assert not isinstance(low, str) and (low.floors, low.flights) == (1, ())
-    assert plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG) == "not_enough_levels"
+    home = plan_interior("low", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG)
+    assert not isinstance(home, str) and home.floors == 1 and [f.role for f in home.flights] == ["roof"]
+    assert plan_interior("none", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 0, CFG) == "not_enough_levels"
     assert plan_interior("none", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 0, CFG, max_floors=1) == "not_enough_levels"
     four = plan_interior("block", FOOTPRINT, DOOR, SEG, 12.0, 3.0, 4, CFG, max_floors=3)
     assert not isinstance(four, str) and four.floors >= 2

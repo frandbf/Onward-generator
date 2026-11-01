@@ -15,16 +15,17 @@ import pytest
 from shapely import Point
 from shapely.geometry import shape
 
-from onward_generator.detail import config_from_document, detail_scene, load_base, load_detail_config
+from onward_generator.detail import config_from_document, detail_scene, load_base
 from onward_generator.detail.config import DEFAULT_CONFIG_PATH
 from onward_generator.detail.interiors import LIGHT_BELOW_CEILING_M
 from onward_generator.detail.shops import VINYL_INSET_M
 from onward_generator.generation import load_generation_config
+from tests.detail_fixture import selective_interiors
 from tests.integration.test_detail_pipeline import _inside
 
 GEN = load_generation_config()
-CFG = load_detail_config()
-DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+DOC = selective_interiors(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+CFG = config_from_document(DOC)
 SHOP = "osm-way-312"
 
 

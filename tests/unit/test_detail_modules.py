@@ -240,7 +240,7 @@ def _mutated(path: list[str | int], value: object) -> dict:
         (["facade_palettes", "office"], ["stone_warm", "missing_stone"], "/facade_palettes/office: material 'missing_stone' is not defined"),
         (["facade_palettes", "retail"], [], "should be non-empty"),
         (["openings", "recess_depth_m"], 0.4, "thinner than"),
-        (["interiors", "rule", "min_area_m2"], 500.0, "below max_area_m2"),
+        (["interiors", "rule", "min_area_m2"], 2000.0, "below max_area_m2"),
         (["templates", "generic_residential", "narrow_window", "height_m"], 2.0, "minimum storey"),
         (["seed"], -1, "minimum"),
         (["interiors", "stair", "max_riser_m"], 0.3, "maximum"),
@@ -293,9 +293,9 @@ def test_interior_collision_budgets_are_required_and_read_as_given(path: list[st
         cfg = config_from_document(_mutated([*path, "max_collision_triangles"], value))
         read = cfg.interiors if path == ["interiors"] else cfg.interiors.shops
         assert read.max_collision_triangles == value
-        assert (cfg.interiors.max_triangles, cfg.interiors.shops.max_triangles) == (8000, 6000)
+        assert (cfg.interiors.max_triangles, cfg.interiors.shops.max_triangles) == (24000, 6000)
     defaults = config_from_document(copy.deepcopy(DOC)).interiors
-    assert (defaults.max_collision_triangles, defaults.shops.max_collision_triangles) == (24000, 72000)
+    assert (defaults.max_collision_triangles, defaults.shops.max_collision_triangles) == (72000, 72000)
 
 
 def test_gltf_instancing_shares_meshes_and_converts_matrices() -> None:

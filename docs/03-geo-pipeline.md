@@ -68,6 +68,8 @@ An explicit value is never replaced by an inference. A value that cannot be pars
 
 `geo_scene.json` (`schema: onward_generator.geo_scene`, `schema_version: 0.2.0`):
 
+A scene split by `cadastre split` is 0.3.0: it adds `catastro_use.construction_year` ([05-cadastre.md](05-cadastre.md)).
+
 ```json
 {
   "schema": "onward_generator.geo_scene",

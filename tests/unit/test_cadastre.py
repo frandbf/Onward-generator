@@ -134,9 +134,10 @@ def test_download_of_buildings_fetches_the_building_type(tmp_path: Path) -> None
 def test_parse_building_uses_and_report_bad_ones() -> None:
     uses, issues = parse_building_uses(BUILDINGS_FIXTURE)
     assert uses == {
-        "0000001AA0000A": BuildingUse("0000001AA0000A", "4_2_retail", 8, 9),
-        "0000003AA0000A": BuildingUse("0000003AA0000A", "4_1_office", None, None),
-        "0000004AA0000A": BuildingUse("0000004AA0000A", "1_residential", 55, 58),
+        "0000001AA0000A": BuildingUse("0000001AA0000A", "4_2_retail", 8, 9, 1976),
+        # A nil beginning and a nil dateOfConstruction are both no year.
+        "0000003AA0000A": BuildingUse("0000003AA0000A", "4_1_office", None, None, None),
+        "0000004AA0000A": BuildingUse("0000004AA0000A", "1_residential", 55, 58, None),
     }
     assert list(uses) == sorted(uses)
     assert [(i.code, i.local_id, i.message) for i in issues] == [
@@ -153,8 +154,39 @@ def test_parse_building_uses_reads_a_zero_count_and_reports_a_missing_use_elemen
     assert nil_use in BUILDINGS_FIXTURE.read_bytes()
     edited.write_bytes(BUILDINGS_FIXTURE.read_bytes().replace(b">8<", b">0<").replace(nil_use, b""))
     uses, issues = parse_building_uses(edited)
-    assert uses["0000001AA0000A"] == BuildingUse("0000001AA0000A", "4_2_retail", 0, 9)
+    assert uses["0000001AA0000A"] == BuildingUse("0000001AA0000A", "4_2_retail", 0, 9, 1976)
     assert ("malformed_building", "0000005AA0000A", "missing currentUse") in [(i.code, i.local_id, i.message) for i in issues]
+
+
+_DATE_1976 = (b"<bu-core2d:beginning>1976-01-01T00:00:00</bu-core2d:beginning>"
+              b"<bu-core2d:end>1976-01-01T00:00:00</bu-core2d:end>")
+
+
+@pytest.mark.parametrize(("event", "year"), [
+    (b"<bu-core2d:beginning>1890-06-30</bu-core2d:beginning>", 1890),
+    (b"<bu-core2d:anyPoint>1931-01-01T00:00:00</bu-core2d:anyPoint>", 1931),
+    (b"<bu-core2d:end>2004-01-01T00:00:00</bu-core2d:end>", 2004),
+    (b'<bu-core2d:beginning xsi:nil="true"></bu-core2d:beginning><bu-core2d:end>1988-01-01T00:00:00</bu-core2d:end>', 1988),
+    (b"<bu-core2d:beginning>  </bu-core2d:beginning>", None),
+    (b"", None),
+])
+def test_parse_building_uses_reads_the_first_filled_date_of_construction(tmp_path: Path, event: bytes, year: int | None) -> None:
+    edited = tmp_path / "dated.gml"
+    assert _DATE_1976 in BUILDINGS_FIXTURE.read_bytes()
+    edited.write_bytes(BUILDINGS_FIXTURE.read_bytes().replace(_DATE_1976, event))
+    uses, issues = parse_building_uses(edited)
+    assert uses["0000001AA0000A"].construction_year == year
+    assert "malformed_construction_date" not in [i.code for i in issues]
+
+
+@pytest.mark.parametrize("text", [b"1976", b"circa 1976-01-01", b"76-01-01", b"1976-1-1"])
+def test_a_construction_date_that_is_not_a_date_keeps_the_use_without_a_year(tmp_path: Path, text: bytes) -> None:
+    edited = tmp_path / "bad_date.gml"
+    edited.write_bytes(BUILDINGS_FIXTURE.read_bytes().replace(_DATE_1976, b"<bu-core2d:beginning>" + text + b"</bu-core2d:beginning>"))
+    uses, issues = parse_building_uses(edited)
+    assert uses["0000001AA0000A"] == BuildingUse("0000001AA0000A", "4_2_retail", 8, 9, None)
+    assert [(i.code, i.local_id, i.message) for i in issues if i.code == "malformed_construction_date"] == [
+        ("malformed_construction_date", "0000001AA0000A", f"dateOfConstruction beginning {text.decode()!r} is not a date")]
 
 
 def test_parse_building_uses_refuses_what_is_not_a_clean_feature_collection(tmp_path: Path) -> None:
@@ -455,7 +487,7 @@ def test_cli_split_attaches_the_catastro_use_of_each_parcel(
     out = tmp_path / "cad"
     assert main(_split_args(scene_path, downloaded, out, "--buildings", str(downloaded_uses))) == 0
     printed = capsys.readouterr().out.splitlines()
-    assert printed[0] == "buildings=3 uses attached=5 {'1_residential': 1, '4_2_retail': 4}"
+    assert printed[0] == "buildings=3 uses attached=5 {'1_residential': 1, '4_2_retail': 4} with construction year=4"
     scene = json.loads((out / "geo_scene.json").read_text(encoding="utf-8"))
     uses = {f["id"]: f["catastro_use"] for f in scene["features"] if "catastro_use" in f}
     assert sorted(uses) == [
@@ -464,6 +496,12 @@ def test_cli_split_attaches_the_catastro_use_of_each_parcel(
     ]
     assert uses["osm-way-101:0000001AA0000A_part2"]["current_use"] == "4_2_retail"
     assert (uses["osm-relation-201"]["use"], uses["osm-relation-201"]["dwellings"]) == ("residential", 55)
+    # The parcel's dateOfConstruction rides on the use: 1976 for the retail parcel, null where Catastro left it nil.
+    assert {bid: u["construction_year"] for bid, u in uses.items()} == {
+        "osm-relation-201": None, "osm-way-101:0000001AA0000A_part1": 1976, "osm-way-101:0000001AA0000A_part2": 1976,
+        "osm-way-108:0000001AA0000A_part1": 1976, "osm-way-108:0000001AA0000A_part2": 1976,
+    }
+    assert scene["schema_version"] == "0.3.0"
     block = scene["subdivision"]["uses"]
     record = load_download_record(downloaded_uses)
     assert block == {
@@ -472,7 +510,7 @@ def test_cli_split_attaches_the_catastro_use_of_each_parcel(
         "attribution": "Dirección General del Catastro, INSPIRE Buildings (BU)", "retrieved_at": "2026-10-18T12:00:00+00:00",
         "sha256": record.sha256, "url": record.url, "buildings": 3,
         "issues": [i.to_dict() for i in parse_building_uses(downloaded_uses)[1]],
-        "attached": {"1_residential": 1, "4_2_retail": 4},
+        "attached": {"1_residential": 1, "4_2_retail": 4}, "with_construction_year": 4,
     }
 
 

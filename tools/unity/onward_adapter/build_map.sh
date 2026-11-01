@@ -15,6 +15,9 @@
 # local (default, today's install), local-thumb, named, named-thumb. See docs/12-export.md.
 # --bake PROFILE, or ONWARD_BAKE=PROFILE, picks the lightmap bake of the scene step:
 # draft (default, for iteration) or final (release builds). See docs/12-export.md.
+# Naming a profile the package was not baked with bakes it again: run_export.sh archive moves the
+# old build and its Unity scene aside first, so nothing is overwritten. With no profile named,
+# a package keeps the bake it has.
 set -euo pipefail
 
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +30,7 @@ usage() { echo "usage: $0 [--platform macos|linux|auto] [--listing ${QUEST_LISTI
 platform=()
 listing="${ONWARD_QUEST_LISTING:-local}"
 bake="${ONWARD_BAKE:-${BAKE_PROFILES%% *}}"
+bake_named="${ONWARD_BAKE:+yes}"
 args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,8 +38,8 @@ while [[ $# -gt 0 ]]; do
     --platform=*) platform=("$1"); shift ;;
     --listing) [[ $# -ge 2 ]] || usage; listing="$2"; shift 2 ;;
     --listing=*) listing="${1#--listing=}"; shift ;;
-    --bake) [[ $# -ge 2 ]] || usage; bake="$2"; shift 2 ;;
-    --bake=*) bake="${1#--bake=}"; shift ;;
+    --bake) [[ $# -ge 2 ]] || usage; bake="$2"; bake_named=yes; shift 2 ;;
+    --bake=*) bake="${1#--bake=}"; bake_named=yes; shift ;;
     *) args+=("$1"); shift ;;
   esac
 done
@@ -87,6 +91,21 @@ else
   fi
 fi
 echo "→ Package: ${package#"$REPO"/}"
+
+# The profile in build/scene_report.json. A report from before the bake profiles has none, and those were the final bake.
+baked_profile() {
+  local profile
+  profile="$(sed -n 's/.*"lightmap_bake" *: *{[^}]*"profile" *: *"\([a-z]*\)".*/\1/p' "$package/build/scene_report.json" | head -n 1)"
+  printf '%s\n' "${profile:-final}"
+}
+
+if [[ -n "$bake_named" && -f "$package/build/scene_report.json" ]]; then
+  baked="$(baked_profile)"
+  if [[ "$baked" != "$bake" ]]; then
+    echo "→ Unity: this package is baked as $baked and you asked for $bake. Archiving that build to bake again."
+    "$TOOL_DIR/run_export.sh" ${platform[@]+"${platform[@]}"} "$package" archive
+  fi
+fi
 
 launcher="$package/build/launcher"
 if [[ -f "$launcher/unity-export.local.content3" && -f "$launcher/unity-export.local.info3" ]]; then
