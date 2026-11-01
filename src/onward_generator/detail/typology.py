@@ -13,7 +13,7 @@ import json
 import math
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -23,7 +23,7 @@ from shapely import STRtree, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.config.loader import ConfigLoadError, read_json_document
-from onward_generator.detail.config import DetailConfig
+from onward_generator.detail.config import DetailConfig, Template
 from onward_generator.detail.facades import refine_exposure, storeys_for
 from onward_generator.detail.grammar import FacadeUse
 from onward_generator.generation.scene import Issue
@@ -60,6 +60,17 @@ class UseRule:
 
 
 @dataclass(frozen=True, slots=True)
+class FacadeStyle:
+    """How a typology or an era tunes a facade template (ADR-027). ``None`` leaves that value to the template."""
+
+    bay_factor: float = 1.0
+    window_width_factor: float = 1.0
+    window_height_factor: float = 1.0
+    balcony_share: float | None = None
+    palette: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class TypologyConfig:
     version: str
     era_tags: tuple[str, ...]
@@ -81,6 +92,8 @@ class TypologyConfig:
     open_min_area_m2: float
     slab_min_elongation: float
     point_min_compactness: float
+    typology_styles: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    era_styles: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     path: str | None = None
     sha256: str | None = None
 
@@ -112,6 +125,7 @@ def typology_config_from_document(doc: Mapping[str, Any], *, path: str | None = 
         closed_min_share=float(closed["min_share"]), closed_min_storeys=int(closed["min_storeys"]), closed_max_storeys=int(closed["max_storeys"]),
         open_min_storeys=int(open_["min_storeys"]), open_max_storeys=int(open_["max_storeys"]), open_min_area_m2=float(open_["min_area_m2"]),
         slab_min_elongation=float(open_["slab_min_elongation"]), point_min_compactness=float(open_["point_min_compactness"]),
+        typology_styles=doc["facades"]["typologies"], era_styles=doc["facades"]["eras"],
         path=path, sha256=sha256,
     )
 
@@ -289,6 +303,28 @@ def typology_record(x: TypologyInputs, era: Era | None, use: FacadeUse, key: str
         },
         "era": era.to_record() if era is not None else None,
     }
+
+
+def facade_style(typology: str, period: str | None, cfg: TypologyConfig) -> FacadeStyle:
+    """The style of a building: its typology's values, with its era's over them. The era is the stronger evidence."""
+    values = {**cfg.typology_styles.get(typology, {}), **(cfg.era_styles.get(period, {}) if period else {})}
+    return FacadeStyle(
+        bay_factor=float(values.get("bay_factor", 1.0)),
+        window_width_factor=float(values.get("window_width_factor", 1.0)),
+        window_height_factor=float(values.get("window_height_factor", 1.0)),
+        balcony_share=None if "balcony_share" not in values else float(values["balcony_share"]),
+        palette=tuple(values.get("palette", ())),
+    )
+
+
+def styled_template(template: Template, style: FacadeStyle) -> Template:
+    """``template`` with its bays, windows and balconies tuned by ``style``. Layout still checks that each one fits."""
+    window = replace(template.window, width_m=template.window.width_m * style.window_width_factor,
+                     height_m=template.window.height_m * style.window_height_factor)
+    balcony = template.balcony
+    if balcony is not None and style.balcony_share is not None:
+        balcony = replace(balcony, share=style.balcony_share)
+    return replace(template, bay_m=template.bay_m * style.bay_factor, window=window, balcony=balcony)
 
 
 def building_typologies(

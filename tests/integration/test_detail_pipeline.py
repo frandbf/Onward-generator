@@ -252,9 +252,10 @@ def test_each_building_lays_out_its_own_ground_floor_entrance_and_balconies(deta
         assert ("landmark_door" in found) is (bid == "osm-way-314"), (bid, found)  # only the landmark has one
     assert openings["osm-way-312"].get("shopfront", 0) > 0
     assert openings["osm-way-314"] == {"landmark_door": 1}  # main_door_only: no ground-floor windows either
-    # Balcony placement hashes the building id with the seed (golden values for the default seed).
+    # Balcony placement hashes the building id with the seed, at the share of each building's facade style
+    # (ADR-027): 311 and 313 draw at the lower share of their typology (golden values for the default seed).
     assert {bid: found.get("balcony", 0) for bid, found in openings.items()} == {
-        "osm-way-311": 12, "osm-way-312": 8, "osm-way-313": 10, "osm-way-314": 0, "osm-way-315": 0,
+        "osm-way-311": 6, "osm-way-312": 8, "osm-way-313": 2, "osm-way-314": 0, "osm-way-315": 0,
     }
 
 
