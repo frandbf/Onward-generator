@@ -17,6 +17,7 @@ from onward_generator.generation.mesh import (
     Mesh,
     cap,
     closed_manifold_defects,
+    collapse_short_edges,
     drop_degenerate_holes,
     merge,
     open_base_defects,
@@ -124,12 +125,36 @@ def test_a_there_and_back_hole_is_dropped_and_the_slab_closes() -> None:
     tip = (5.0, 5.0)
     spike = [tip, (tip[0] + 2e-15, tip[1]), (12.0, 14.0), tip]
     geom = Polygon(shell, [spike])
-    assert closed_manifold_defects(prism(geom, -1.0, 0.0, bottom=True)) > 0
+    # Extrusion drops the duplicate tip, the hole no longer has three corners, and the slab closes.
+    assert closed_manifold_defects(prism(geom, -1.0, 0.0, bottom=True)) == 0
     cleaned, dropped = drop_degenerate_holes(geom)
     assert dropped == 1 and not list(polygons_of(cleaned)[0].interiors)
     slab = prism(cleaned, -1.0, 0.0, bottom=True)
     assert closed_manifold_defects(slab) == 0
     assert signed_volume(slab) == pytest.approx(geom.area)
+
+
+def test_a_vertex_in_the_same_weld_cell_is_removed_and_the_slab_closes() -> None:
+    """MadridTextura32: the site corner kept two vertices 7.5 µm apart.
+
+    The 0.1 mm weld merged them, the walkable slab reported 8 defects, and the
+    volume still matched. The duplicate is removed before the walls are built.
+    """
+    corner = (-125.0, -125.0)
+    jog = (corner[0], corner[1] + 7.5e-6)
+    polygon = Polygon([corner, jog, (-110.0, -125.0), (-110.0, -110.0), (-125.0, -110.0)])
+    collapsed, removed = collapse_short_edges(polygon)
+    assert removed == 1 and collapsed is not polygon
+    assert len(list(collapsed.exterior.coords)) == 5
+    slab = prism(polygon, -1.0, 0.0, bottom=True)
+    assert closed_manifold_defects(slab) == 0
+    assert signed_volume(slab) == pytest.approx(collapsed.area)
+
+
+def test_an_edge_longer_than_the_weld_is_kept() -> None:
+    polygon = Polygon([(0, 0), (0.001, 0), (0.001, 1), (0, 1)])
+    same, removed = collapse_short_edges(polygon)
+    assert removed == 0 and same is polygon
 
 
 def test_a_courtyard_hole_is_kept() -> None:

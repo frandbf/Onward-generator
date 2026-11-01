@@ -193,6 +193,34 @@ def test_read_places_skips_a_place_that_is_not_a_point(tmp_path: Path) -> None:
     assert [p["gers_id"] for p in kept] == ["y"] and skipped == {"not_a_point": 2}
 
 
+def test_a_wkb_blob_column_is_read_as_a_place(tmp_path: Path) -> None:
+    """A release can store geometry as WKB bytes. ST_AsWKB rejects that BLOB."""
+    path = write_places(
+        tmp_path / "p.parquet",
+        [place("p1", 5.12345, 5.54321, sources=[source("Foursquare", "Apache-2.0")])],
+        geometry_blob=True,
+    )
+    kept, skipped = read_places(path, frame(), STRICT, ALLOWED)
+    exact = frame().to_local(wgs84(Point(5.12345, 5.54321)))
+    assert skipped == {} and kept[0]["gers_id"] == "p1"
+    assert kept[0]["point_m"] == [round(exact.x, 3), round(exact.y, 3)]
+
+
+def test_a_geometry_column_of_another_type_is_refused(tmp_path: Path) -> None:
+    import duckdb
+
+    path = tmp_path / "places.parquet"
+    connection = duckdb.connect()
+    try:
+        connection.execute("CREATE TABLE t (id VARCHAR, geometry INTEGER)")
+        connection.execute("INSERT INTO t VALUES ('x', 1)")
+        connection.execute(f"COPY t TO '{path}' (FORMAT parquet)")
+    finally:
+        connection.close()
+    with pytest.raises(ValueError, match=r"^places.parquet: geometry is INTEGER, expected BLOB or GEOMETRY$"):
+        read_places(path, frame(), STRICT, ALLOWED)
+
+
 def test_a_place_without_a_dataset_or_licence_is_unknown(tmp_path: Path) -> None:
     path = write_places(tmp_path / "p.parquet", [place("u", 1.0, 1.0, sources=[{"property": "", "dataset": None, "license": None}])])
     assert read_places(path, frame(), CFG, ALLOWED) == ([], {"licence_not_allowed": 1})
@@ -222,6 +250,17 @@ def test_places_document_counts_and_attributes(tmp_path: Path) -> None:
 
 def _buildings(tmp_path: Path, rows: list) -> Path:
     return write_buildings(tmp_path / "buildings.parquet", rows)
+
+
+def test_a_wkb_blob_column_still_matches_a_footprint(tmp_path: Path) -> None:
+    path = write_buildings(
+        tmp_path / "buildings.parquet",
+        [building("o1", box(0, 0, 10, 10), height=14.5, floors=None, sources=[source("Esri Community Maps", "CC-BY-4.0")])],
+        geometry_blob=True,
+    )
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert [(m.building_id, m.gers_id, m.height_m) for m in matches] == [("osm-way-1", "o1", 14.5)]
+    assert skipped == {"unmatched": 0}
 
 
 def test_buildings_match_by_intersection_over_union_one_to_one(tmp_path: Path) -> None:

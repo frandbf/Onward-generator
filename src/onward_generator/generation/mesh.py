@@ -80,6 +80,7 @@ def polygons_of(geometry: BaseGeometry) -> list[Polygon]:
 
 def cap(geometry: BaseGeometry, z: float, *, up: bool = True) -> Mesh:
     """Flat triangulation (constrained Delaunay, no Steiner points) of polygons at height ``z``."""
+    geometry, _ = collapse_short_edges(geometry)
     vertices: list[tuple[float, float]] = []
     index: dict[tuple[float, float], int] = {}
     triangles: list[tuple[int, int, int]] = []
@@ -118,8 +119,81 @@ def _ring_walls(coords: Sequence[tuple[float, float]], z0: float, z1: float, inw
     return Mesh(np.array(vertices, dtype=np.float64), np.array(triangles, dtype=np.int64))
 
 
+def _weld_key(point: tuple[float, float], quantum: float) -> tuple[int, int]:
+    """The 0.1 mm cell :func:`closed_manifold_defects` welds this point into."""
+    return int(np.round(point[0] / quantum)), int(np.round(point[1] / quantum))
+
+
+def _collapse_ring(coords: Sequence[tuple[float, float]], quantum: float) -> tuple[list[tuple[float, float]] | None, int]:
+    """Drop consecutive vertices that fall in one weld cell. ``None`` when fewer than three remain."""
+    points = [(float(p[0]), float(p[1])) for p in coords]
+    if len(points) >= 2 and _weld_key(points[0], quantum) == _weld_key(points[-1], quantum):
+        points = points[:-1]
+    kept: list[tuple[float, float]] = []
+    removed = 0
+    for point in points:
+        if kept and _weld_key(kept[-1], quantum) == _weld_key(point, quantum):
+            removed += 1
+            continue
+        kept.append(point)
+    if len(kept) >= 2 and _weld_key(kept[0], quantum) == _weld_key(kept[-1], quantum):
+        kept.pop()
+        removed += 1
+    if len(kept) < 3:
+        return None, removed + len(kept)
+    return kept, removed
+
+
+def collapse_short_edges(geometry: BaseGeometry, quantum: float = _QUANT) -> tuple[BaseGeometry, int]:
+    """Remove ring vertices the slab weld would merge with their neighbour.
+
+    A boolean cut can leave two corners a few micrometres apart. The weld treats
+    them as one vertex, so the edge between them and the edge beside it are each
+    counted twice and the closed slab fails. Dropping the duplicate first leaves
+    one edge. A ring that no longer has three corners is omitted. The geometry
+    is returned unchanged when nothing was removed.
+    """
+    if geometry.is_empty or quantum <= 0:
+        return geometry, 0
+    parts = polygons_of(geometry)
+    if not parts:
+        return geometry, 0
+    rebuilt: list[Polygon] = []
+    removed = 0
+    changed = False
+    for polygon in parts:
+        exterior, n = _collapse_ring(list(polygon.exterior.coords), quantum)
+        removed += n
+        this = n > 0 or exterior is None
+        holes: list[list[tuple[float, float]]] = []
+        for ring in polygon.interiors:
+            hole, k = _collapse_ring(list(ring.coords), quantum)
+            removed += k
+            if hole is None or k:
+                this = True
+            if hole is not None:
+                holes.append(hole)
+        if this:
+            changed = True
+        if exterior is None:
+            continue
+        rebuilt.append(Polygon(exterior, holes) if this else polygon)
+    if not changed:
+        return geometry, 0
+    if not rebuilt:
+        return Polygon(), removed
+    result: BaseGeometry = rebuilt[0] if len(rebuilt) == 1 else MultiPolygon(rebuilt)
+    if not result.is_valid:
+        polygons = polygons_of(shapely.make_valid(result))
+        if not polygons:
+            return Polygon(), removed
+        result = polygons[0] if len(polygons) == 1 else MultiPolygon(polygons)
+    return result, removed
+
+
 def walls(geometry: BaseGeometry, z0: float, z1: float, *, inward: bool = False, min_edge: float = 1e-6) -> Mesh:
     """Vertical faces along every ring. Outward (default) faces away from the polygon interior."""
+    geometry, _ = collapse_short_edges(geometry)
     parts = []
     for polygon in polygons_of(geometry):
         p = orient(polygon, sign=1.0)  # exterior CCW, holes CW
@@ -234,6 +308,7 @@ def _point_contact(touch: BaseGeometry, gap_m: float) -> bool:
 
 def prism(geometry: BaseGeometry, z0: float, z1: float, *, bottom: bool) -> Mesh:
     """Extrusion with a top cap; with ``bottom`` the result is closed."""
+    geometry, _ = collapse_short_edges(geometry)
     parts = [walls(geometry, z0, z1), cap(geometry, z1, up=True)]
     if bottom:
         parts.append(cap(geometry, z0, up=False))

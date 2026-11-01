@@ -121,11 +121,41 @@ def _license(source: Mapping[str, Any] | None) -> tuple[str, str]:
 
 
 def _rows(parquet: Path, columns: str) -> list[tuple[Any, ...]]:
+    """Rows of ``parquet``. ``ST_AsWKB(geometry)`` in ``columns`` becomes the WKB expression for this file.
+
+    DuckDB reads a GeoParquet geometry as ``GEOMETRY`` and a plain WKB column as ``BLOB``.
+    ``ST_AsWKB`` accepts only ``GEOMETRY``, so a release that stores the bytes directly
+    used to fail the match. A ``BLOB`` column is already WKB and is selected as it is.
+    """
     connection = duckdb.connect()
     try:
-        return connection.execute(f"SELECT {columns} FROM read_parquet(?) ORDER BY id", [str(parquet)]).fetchall()
+        selected = columns.replace("ST_AsWKB(geometry)", _wkb_sql(connection, parquet))
+        try:
+            return connection.execute(f"SELECT {selected} FROM read_parquet(?) ORDER BY id", [str(parquet)]).fetchall()
+        except duckdb.Error as exc:
+            raise ValueError(f"{parquet.name}: {exc}") from exc
     finally:
         connection.close()
+
+
+def _wkb_sql(connection: duckdb.DuckDBPyConnection, parquet: Path) -> str:
+    """SQL expression that yields WKB for the ``geometry`` column of ``parquet``."""
+    try:
+        relation = connection.execute("DESCRIBE SELECT * FROM read_parquet(?)", [str(parquet)])
+    except duckdb.Error as exc:
+        raise ValueError(f"{parquet.name}: cannot read geometry ({exc})") from exc
+    header = [item[0] for item in relation.description]
+    rows = relation.fetchall()
+    name_at, type_at = header.index("column_name"), header.index("column_type")
+    kind = next((str(row[type_at]) for row in rows if row[name_at] == "geometry"), None)
+    if kind is None:
+        raise ValueError(f"{parquet.name}: no geometry column")
+    folded = kind.upper()
+    if folded == "BLOB":
+        return "geometry"  # pragma: no mutate: SQL folds this identifier; the BLOB test still reads the column
+    if folded.startswith("GEOMETRY"):
+        return "ST_AsWKB(geometry)"  # pragma: no mutate: SQL names are case-insensitive
+    raise ValueError(f"{parquet.name}: geometry is {kind}, expected BLOB or GEOMETRY")
 
 
 def place_tag(taxonomy_primary: str | None, basic_category: str | None, cfg: OvertureConfig) -> tuple[str, str, str] | None:

@@ -46,6 +46,8 @@ DEVICE_CONTENT_DIR = "/sdcard/Android/data/com.downpourinteractive.onward/files/
 # named-thumb: named plus ThumbnailUrl pointing at its png.
 CANDIDATE_LISTINGS = ("local-thumb", "named", "named-thumb")
 NAMED_ID_PREFIX = "onwardgen."
+# The Quest listing card stores Description in at most this many characters.
+LISTING_DESCRIPTION_MAX = 600
 # Custom Content Guide: "Thumbnail: 512px wide by 256px tall. No exceptions."
 THUMBNAIL_SIZE = (512, 256)
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -77,11 +79,57 @@ def _check_title(title: str) -> None:
         raise Info3Error("title must be 1–80 characters")
 
 
+def _credit_lines(clause: str) -> list[str]:
+    return [part.strip() for part in clause.rstrip(".").split("; ") if part.strip()]
+
+
+def fit_listing_description(description: str, *, limit: int = LISTING_DESCRIPTION_MAX) -> str:
+    """The listing text, at most ``limit`` characters.
+
+    A package description is the map sentence plus `` Data: `` and one credit
+    per source. Sources already named in the sentence are not repeated. Credits
+    that do not fit are left off the card; the package ``attribution`` list
+    keeps every one. A text with no credit clause is cut at ``limit``.
+    """
+    text = description.strip()
+    if not text:
+        raise Info3Error("description must be 1–600 characters")
+    if len(text) <= limit:
+        return text
+    head, marker, tail = text.rpartition(" Data: ")
+    if not marker:
+        return text[:limit].rstrip()
+    sentence, earlier, earlier_tail = head.rpartition(" Data: ")
+    if earlier:
+        stated = _credit_lines(earlier_tail)
+    else:
+        sentence, stated = head, []
+    ordered: list[str] = []
+    for credit in stated + _credit_lines(tail):
+        if credit not in ordered:
+            ordered.append(credit)
+
+    def render(chosen: list[str]) -> str:
+        if not chosen:
+            return sentence.rstrip()
+        return f"{sentence.rstrip()} Data: {'; '.join(chosen)}."
+
+    chosen: list[str] = []
+    for credit in ordered:
+        if len(render(chosen + [credit])) <= limit:
+            chosen.append(credit)
+    result = render(chosen)
+    if len(result) > limit:
+        result = result[:limit].rstrip()
+    if not result:
+        raise Info3Error("description must be 1–600 characters")
+    return result
+
+
 def apply_local_listing(info3_path: str | Path, *, title: str, description: str, environment: str | None = None) -> dict[str, Any]:
     path = Path(info3_path).expanduser()
     _check_title(title)
-    if not description.strip() or len(description) > 600:
-        raise Info3Error("description must be 1–600 characters")
+    description = fit_listing_description(description)
     doc = _read_info3(path)
     item = doc["WorkshopItem"]
     item["MapName"] = LOCAL_CARD_NAME
