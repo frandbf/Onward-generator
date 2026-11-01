@@ -139,3 +139,38 @@ def test_default_jobs_uses_every_core_in_ci_and_half_locally() -> None:
     assert mutate.default_jobs({"CI": "true"}, 4) == 4
     assert mutate.default_jobs({}, 20) == 10
     assert mutate.default_jobs({}, 1) == 1
+
+
+def test_only_a_change_of_case_counts_as_only_case() -> None:
+    assert mutate.only_case_differs('    return "foo"', '    return "FOO"')
+    assert not mutate.only_case_differs('    return "foo"', '    return "XXfooXX"')
+    assert not mutate.only_case_differs('    return "foo"', '    return "foo"')
+    assert not mutate.only_case_differs("    if a < b:", "    if a <= b:")
+
+
+CASE = """def x_name__mutmut_orig():
+    return "foo"
+def x_name__mutmut_1():
+    return "XXfooXX"
+def x_name__mutmut_2():
+    return "FOO"
+"""
+
+
+def test_on_changed_lines_leaves_out_a_mutant_that_only_changes_case(tmp_path, monkeypatch) -> None:
+    mutated = tmp_path / "mutants" / "src" / "onward_generator" / "m.py"
+    mutated.parent.mkdir(parents=True)
+    mutated.write_text(CASE, encoding="utf-8")
+    monkeypatch.setattr(mutate, "REPO", tmp_path)
+    target = mutate.Function("src/onward_generator/m.py", "onward_generator.m", "x_name", 1, 2, 1, frozenset({2}))
+    assert mutate.on_changed_lines([target]) == ["onward_generator.m.x_name__mutmut_1"]
+    assert mutate.mutant_edits(CASE, "x_name", 1)[2] == (2, '    return "foo"', '    return "FOO"')
+
+
+def test_fastest_tests_run_first_and_ties_keep_a_stable_order() -> None:
+    spec = importlib.util.spec_from_file_location("mutmut_only", ROOT / "tools" / "mutate" / "mutmut_only.py")
+    assert spec and spec.loader
+    shim = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(shim)
+    durations = {"slow": 20.0, "fast": 0.1, "tie_b": 1.0, "tie_a": 1.0}
+    assert shim.fastest_first({"slow", "tie_b", "unknown", "fast", "tie_a"}, durations) == ["unknown", "fast", "tie_a", "tie_b", "slow"]

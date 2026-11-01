@@ -49,8 +49,10 @@ jobs:
     # Pull requests only: a fork PR is rebased on main and mutated before it is
     # rebase-merged, so the push to main carries the same tree and would repeat it.
     if: github.event_name != 'push'
+    # Tests that fail stop mutmut before its first mutant, after minutes of setup. Wait for them.
+    needs: linux
     runs-on: ubuntu-latest
-    # Measured 9-13 min with source changes; well under 1 min without.
+    # Measured 6-28 min with source changes, most of it the traced run of the whole suite; under 1 min without.
     timeout-minutes: 30
     env:
       BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
