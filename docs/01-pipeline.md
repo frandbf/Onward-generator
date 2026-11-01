@@ -355,7 +355,7 @@ Version 0.3.0 is the default for a new map:
 
 Routes follow the sidewalk or the axis of a pedestrian way. The street axis is shifted by half the carriageway plus half the sidewalk to each side. The carriageway has no spawns. Ammunition (4 points at 6 m), escort (2 at 8 m), evacuation (1 at 8 m), and hard drives (3 at 8 m) sit inside the largest remaining free ground, and each opens a circle of that separation. It is not a grid. If the ground cannot hold the points, the step fails.
 
-The ambience is `Suburban Day`, profile Urban/Day/`UrbanDay1`, far clip 1000, and flyover. A layout 0.2.0 remains valid and carries only Free Roam, Uplink, and Hunt. It is not rewritten just because 0.3.0 exists.
+The ambience is `Suburban Day`, profile Urban/Day/`UrbanDay1`, far clip 1000, and flyover. `run --time-of-day night` uses Urban/Night/`UrbanNight1`, leaves the birds out and adds `street_lights_m`, one baked light per street lamp ([ADR-026](decisions/ADR-026-time-of-day.md)). A layout 0.2.0 remains valid and carries only Free Roam, Uplink, and Hunt. It is not rewritten just because 0.3.0 exists.
 
 The local card instantiates Free Roam, Hunt, and Uplink. The other modes stay in the layout. See [11-onward-sdk.md](11-onward-sdk.md).
 

@@ -107,6 +107,10 @@ def _config_validator() -> Draft202012Validator:
     return Draft202012Validator(schema)
 
 
+ENVIRONMENT_PROFILES = frozenset({("Day", "UrbanDay1"), ("Night", "UrbanNight1")})
+"""The SDK v1.15 ``ETimeOfDay`` and ``EProfileId`` a playable layout may carry (ADR-026)."""
+
+
 def load_export_config(path: str | Path | None = None) -> tuple[dict[str, Any], Path]:
     try:
         doc, resolved = read_json_document(path or EXPORT_CONFIG_DEFAULT)
@@ -168,8 +172,13 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
                 problems.extend(hunt_spawn_problems(ai, routes, separation_m=float(separation)))
         if doc.get("audio_global") != "Suburban Day":
             problems.append("layout: audio_global must be the SDK clip Suburban Day")
-        if doc.get("environment") != "Urban" or doc.get("time_of_day") != "Day" or doc.get("profile") != "UrbanDay1":
-            problems.append("layout: environment must be Urban / Day / UrbanDay1")
+        if doc.get("environment") != "Urban" or (doc.get("time_of_day"), doc.get("profile")) not in ENVIRONMENT_PROFILES:
+            problems.append("layout: environment must be Urban / Day / UrbanDay1 or Urban / Night / UrbanNight1")
+        lights = doc.get("street_lights_m", [])
+        if not isinstance(lights, list) or len(lights) % 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in lights):
+            problems.append("layout: street_lights_m must be flat x, y, z triples")
+        elif lights and doc.get("time_of_day") != "Night":
+            problems.append("layout: street_lights_m is only for a night map")
         if doc.get("far_clip_m") != 1000 or doc.get("flyover") != 1:
             problems.append("layout: far_clip_m must be 1000 and flyover must be 1")
         if doc.get("schema_version") == GAMEPLAY_VERSION:

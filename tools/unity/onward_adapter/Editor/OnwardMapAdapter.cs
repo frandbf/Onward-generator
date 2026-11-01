@@ -150,6 +150,8 @@ namespace OnwardGenerator
             public string environment;
             public string time_of_day;
             public string profile;
+            // ADR-026: flat x, y, z triples in local metres; a night map only.
+            public float[] street_lights_m;
             public float far_clip_m;
             public int flyover;
         }
@@ -701,6 +703,7 @@ namespace OnwardGenerator
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
                 ApplyFog(opt);
+                ApplyNight(light, pkg.Layout);
 
                 float tallest = 0f;
                 foreach (MeshCollider collider in collisionRoot.GetComponentsInChildren<MeshCollider>())
@@ -710,6 +713,7 @@ namespace OnwardGenerator
                 AddGameplay(pkg.Layout, tallest);
                 var probes = new List<Vector3>();
                 AddInteriorLights(visual, opt, probes);
+                AddStreetLights(pkg.Layout);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
                 EditorSceneManager.SaveScene(scene, scenePath);
 
@@ -792,7 +796,7 @@ namespace OnwardGenerator
                     description,
                     LevelDescriptor.EMapEnvironment.Desert,
                     LevelDescriptor.EMapSize.Medium,
-                    LevelDescriptor.ETimeOfDay.Day,
+                    TimeOfDayOf(pkg.Layout),
                     "unity-export.local",
                     "0.1",
                     BuildTarget.Android,
@@ -2258,6 +2262,48 @@ namespace OnwardGenerator
         private const float OutdoorProbeSpacingM = 12f;
         private const int OutdoorProbeColumnsMax = 1500;
         private static readonly float[] OutdoorProbeHeightsM = { 1f, 6f };
+
+        // ADR-026. A layout without a time of day (the measurement fixture) is a day map.
+        private static LevelDescriptor.ETimeOfDay TimeOfDayOf(Layout layout) =>
+            string.IsNullOrEmpty(layout.time_of_day)
+                ? LevelDescriptor.ETimeOfDay.Day
+                : (LevelDescriptor.ETimeOfDay)Enum.Parse(typeof(LevelDescriptor.ETimeOfDay), layout.time_of_day);
+
+        // ADR-026. The sun becomes a faint moon and the ambient a dark flat blue, so the bake does not
+        // light the city from a bright sky. Whether the runtime keeps these is checked on the headset.
+        private static void ApplyNight(Light sun, Layout layout)
+        {
+            if (TimeOfDayOf(layout) != LevelDescriptor.ETimeOfDay.Night) return;
+            sun.name = "Moon";
+            sun.color = new Color(0.62f, 0.72f, 1f);
+            sun.intensity = 0.12f;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.035f, 0.045f, 0.08f);
+            RenderSettings.reflectionIntensity = 0.15f;
+            Debug.Log($"{LogPrefix} Night: moon {sun.intensity}, flat ambient.");
+        }
+
+        // ADR-026. One baked point light under each street lamp's head, warm and with soft baked shadows.
+        private static void AddStreetLights(Layout layout)
+        {
+            float[] lights = layout.street_lights_m;
+            if (lights == null || lights.Length == 0) return;
+            var root = new GameObject("StreetLights");
+            for (int i = 0; i + 2 < lights.Length; i += 3)
+            {
+                var go = new GameObject("StreetLight_" + (i / 3).ToString(CultureInfo.InvariantCulture));
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = Local(lights[i], lights[i + 1], lights[i + 2]);
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.lightmapBakeType = LightmapBakeType.Baked;
+                light.color = new Color(1f, 0.78f, 0.52f);
+                light.intensity = 1.6f;
+                light.range = 16f;
+                light.shadows = LightShadows.Soft;
+            }
+            Debug.Log($"{LogPrefix} Street lights: {lights.Length / 3} baked.");
+        }
 
         // One baked point light per furnished room, in node order, up to interior_lights_max.
         // The probes of every room are collected even past the cap.

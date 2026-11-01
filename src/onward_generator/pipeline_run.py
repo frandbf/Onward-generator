@@ -23,10 +23,12 @@ from onward_generator.maps.workspace import (
     MapError,
     load_map,
     map_directory,
+    map_time_of_day,
     panoramax_enabled,
     store_brief,
     store_panoramax,
     store_sources,
+    store_time_of_day,
 )
 from onward_generator.next_step import (
     STAGE_DIRS,
@@ -86,6 +88,7 @@ def map_create_argv(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
+    time_of_day: str | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float = 150.0,
     overwrite: bool = False,
@@ -110,6 +113,8 @@ def map_create_argv(
         argv.append("--ai")
     if panoramax:
         argv.append("--panoramax")
+    if time_of_day:
+        argv.extend(["--time-of-day", time_of_day])
     if overwrite:
         argv.append("--overwrite")
     return argv
@@ -160,6 +165,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         "--base", show(scene3d),
         "--detail", show(playable),
         "--playable",
+        "--time-of-day", map_time_of_day(root),
         "--out", show(layout_path),
     ).argv)
     export_argv = list(export_invocation(
@@ -748,6 +754,7 @@ def run_map(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
+    time_of_day: str | None = None,
     sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float = 150.0,
@@ -831,6 +838,7 @@ def run_map(
                     brief=brief,
                     ambient_ai=ambient_ai,
                     panoramax=panoramax,
+                    time_of_day=time_of_day,
                     lightmap_texels_per_m=lightmap_texels_per_m,
                     core_radius_m=core_radius_m,
                     overwrite=overwrite,
@@ -862,6 +870,8 @@ def run_map(
                 store_panoramax(root, True)
             if sources:
                 store_sources(root, sources)
+            if time_of_day and store_time_of_day(root, time_of_day):
+                say(f"time of day is now {time_of_day}: run again with --from layout, then bake a new package")
             say(describe(choices(load_map(root))))
             steps = resume_steps(root, preview=preview)
             done = [step for step, _argv in steps if output_ready(step, root)]

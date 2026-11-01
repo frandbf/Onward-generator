@@ -32,6 +32,8 @@ _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,39}$")
 _RADIUS_MIN_M = 50.0
 _RADIUS_MAX_M = 1500.0
 _MARGIN_MAX_M = 500.0
+TIMES_OF_DAY = ("day", "night")
+TIME_OF_DAY_DEFAULT = "day"
 _TEXELS_DEFAULT = 10.0
 # The playable core (ADR-017): a square of this half-side around the centre keeps full detail.
 CORE_RADIUS_DEFAULT_M = 150.0
@@ -59,6 +61,7 @@ def create_map(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
+    time_of_day: str = TIME_OF_DAY_DEFAULT,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
     core_radius_m: float = CORE_RADIUS_DEFAULT_M,
     overwrite: bool = False,
@@ -118,6 +121,7 @@ def create_map(
         "brief": brief,
         "ambient_ai": ambient_ai,
         "panoramax": bool(panoramax),
+        "time_of_day": _time_of_day(time_of_day),
         "center": {"latitude": latitude, "longitude": longitude},
         "radius_m": radius_m,
         "margin_m": margin_m,
@@ -347,6 +351,30 @@ def _seed(latitude: float, longitude: float, seed: int | None) -> int:
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed <= 4_294_967_295:
         raise MapError("seed must be an integer from 0 to 4294967295")
     return seed
+
+
+def map_time_of_day(directory: str | Path) -> str:
+    """The map's ``time_of_day``; a map from before the setting, or a folder without a map, is a day map."""
+    path = Path(directory).expanduser() / "map.json"
+    if not path.is_file():
+        return TIME_OF_DAY_DEFAULT
+    return str(load_map(path.parent).get("time_of_day", TIME_OF_DAY_DEFAULT))
+
+
+def store_time_of_day(directory: str | Path, time_of_day: str) -> bool:
+    """Record the time of day on an existing map. True when it changed, so the layout is out of date."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    changed = document.get("time_of_day", TIME_OF_DAY_DEFAULT) != _time_of_day(time_of_day)
+    document["time_of_day"] = time_of_day
+    atomic_write_json(root / "map.json", document)
+    return changed
+
+
+def _time_of_day(value: str) -> str:
+    if value not in TIMES_OF_DAY:
+        raise MapError(f"time_of_day must be one of {', '.join(TIMES_OF_DAY)}, not {value!r}")
+    return value
 
 
 def store_brief(directory: str | Path, brief: str | None = None, *, ambient_ai: bool | None = None) -> None:
