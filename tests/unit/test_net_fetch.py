@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import io
 import ssl
 import urllib.error
@@ -211,6 +212,39 @@ def test_fetch_bytes_retries_a_network_error(failure: Exception) -> None:
     assert _fetch(opener, retry_transient=2, retry_delay_s=10.0, sleep=waits.append) == b"done"
     assert len(seen) == 3
     assert waits == [10.0, 20.0]
+
+
+class CutOffResponse(FakeResponse):
+    """A response whose connection closes mid-transfer, as Overpass did on a real run."""
+
+    def read(self, size: int = -1, /) -> bytes:
+        raise http.client.IncompleteRead(b"x" * 98169)
+
+
+def _cut_off_then(*bodies: bytes) -> tuple[Callable[[urllib.request.Request, float], FakeResponse], list[int]]:
+    responses = [CutOffResponse(b""), *(FakeResponse(body) for body in bodies)]
+    seen: list[int] = []
+
+    def opener(request: urllib.request.Request, timeout: float) -> FakeResponse:
+        seen.append(1)
+        return responses[len(seen) - 1]
+
+    return opener, seen
+
+
+def test_fetch_bytes_retries_a_response_cut_off_mid_transfer() -> None:
+    waits: list[float] = []
+    opener, seen = _cut_off_then(b"whole")
+    assert _fetch(opener, retry_transient=1, retry_delay_s=10.0, sleep=waits.append) == b"whole"
+    assert len(seen) == 2
+    assert waits == [10.0]
+
+
+def test_fetch_bytes_reports_a_cut_off_response_as_the_caller_error() -> None:
+    opener, seen = _cut_off_then()
+    with pytest.raises(FetchFailed, match=r"^request to https://example.org/data failed: IncompleteRead\(98169 bytes read\)$"):
+        _fetch(opener, retry_transient=0)
+    assert len(seen) == 1
 
 
 def test_fetch_bytes_gives_up_after_transient_retries() -> None:
