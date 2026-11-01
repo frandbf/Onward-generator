@@ -16,6 +16,7 @@ from onward_generator.export.info3 import (
     LOCAL_ID,
     Info3Error,
     apply_local_listing,
+    fit_listing_description,
     candidate_listing,
     check_listing_thumbnail,
     device_thumbnail_url,
@@ -81,13 +82,41 @@ def test_local_listing_text_and_limits(tmp_path: Path) -> None:
     for title, description in (("", "D"), ("  ", "D"), ("M" * 81, "D")):
         with pytest.raises(Info3Error, match="^title must be 1–80 characters$"):
             apply_local_listing(path, title=title, description=description)
-    for description in ("", " ", "d" * 601):
+    for description in ("", " "):
         with pytest.raises(Info3Error, match="^description must be 1–600 characters$"):
             apply_local_listing(path, title="T", description=description)
+    fitted = apply_local_listing(path, title="T", description="d" * 601)
+    assert fitted["WorkshopItem"]["Description"] == "d" * 600
     with pytest.raises(Info3Error, match="'Mars' is not a LevelDescriptor.EMapEnvironment name"):
         apply_local_listing(path, title="T", description="D", environment="Mars")
     untouched = apply_local_listing(path, title="T", description="D")
     assert untouched["WorkshopItem"]["EnvironmentType"] == 3
+
+
+def test_a_long_credit_list_keeps_the_sources_that_fit() -> None:
+    """MadridTextura32: the package sentence plus every source credit is 753 characters."""
+    lead = (
+        "MadridTextura32: generated map centred at 40.44304, -3.69939. "
+        "Generic facades; not a faithful reconstruction. Data: © OpenStreetMap contributors (ODbL-1.0)."
+    )
+    credits = (
+        "© OpenStreetMap contributors (ODbL-1.0); "
+        "Dirección General del Catastro, INSPIRE BU BuildingPart.numberOfFloorsAboveGround (CC-BY-4.0); "
+        "IGN MDSn 2.5 m building class (PNOA-LiDAR 1st coverage, 2008-2015) (CC-BY-4.0); "
+        "IGN MDSn 2.5 m building class (PNOA-LiDAR 1st coverage, 2008-2015); "
+        "levels: Dirección General del Catastro, INSPIRE BU BuildingPart.numberOfFloorsAboveGround (CC-BY-4.0); "
+        "Data from BrightQuery; Overture Maps Foundation (CDLA-Permissive-2.0); "
+        "Data from Microsoft; Overture Maps Foundation (CDLA-Permissive-2.0); "
+        "Data from meta; Overture Maps Foundation (CDLA-Permissive-2.0)"
+    )
+    text = f"{lead} Data: {credits}."
+    assert len(text) > 600
+    fitted = fit_listing_description(text)
+    assert len(fitted) <= 600
+    assert "© OpenStreetMap contributors (ODbL-1.0)" in fitted
+    assert "CC-BY-4.0" in fitted
+    assert fitted.count("Data:") == 1
+    assert "Data from meta" not in fitted
 
 
 def test_slot_ids_and_thumbnail_url() -> None:

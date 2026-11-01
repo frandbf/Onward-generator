@@ -24,6 +24,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
+from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
@@ -250,7 +251,7 @@ def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes) -> None:
 
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
-    return f"{config['map']['description']} Data: {credits}."
+    return fit_listing_description(f"{config['map']['description']} Data: {credits}.")
 
 
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
