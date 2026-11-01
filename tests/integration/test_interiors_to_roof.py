@@ -68,3 +68,57 @@ def test_the_ceiling_is_read_from_the_rule(low_inputs: tuple[Path, Path, Path]) 
     assert narrower.stats["interiors"] == ["osm-way-702"]
 
 
+# A pitched roof stays closed, whichever way it comes: a tagged shape or the template's own hip.
+PITCHED = {
+    711: ([(-30, ROAD_Y), (-15, ROAD_Y), (-15, 18), (-30, 18)], {"building": "apartments", "building:levels": "3", "roof:shape": "gabled"}),
+    712: ([(-10, ROAD_Y), (0, ROAD_Y), (0, 14), (-10, 14)], {"building": "shed"}),
+}
+# 722 is walled in by its neighbours, so it has no wall for a door.
+ENCLOSED = {
+    721: ([(-30, ROAD_Y), (-10, ROAD_Y), (-10, 12), (-30, 12)], {"building": "apartments", "building:levels": "3"}),
+    722: ([(-24, 12), (-16, 12), (-16, 20), (-24, 20)], {"building": "apartments", "building:levels": "3"}),
+    723: ([(-30, 12), (-24, 12), (-24, 20), (-30, 20)], {"building": "apartments", "building:levels": "3"}),
+    724: ([(-16, 12), (-10, 12), (-10, 20), (-16, 20)], {"building": "apartments", "building:levels": "3"}),
+    725: ([(-30, 20), (-10, 20), (-10, 26), (-30, 26)], {"building": "apartments", "building:levels": "3"}),
+}
+WALLED = "osm-way-722"
+OPEN_IDS = ("osm-way-721", "osm-way-723", "osm-way-724", "osm-way-725")
+
+
+@pytest.mark.parametrize("way", [711, 712])
+def test_a_pitched_roof_has_no_climb(tmp_path: Path, way: int) -> None:
+    detailed = _detail(_detail_inputs(tmp_path, PITCHED, {}))
+    record = next((o.record for o in detailed.objects if o.id == f"interior/osm-way-{way}"), None)
+    assert record is not None and record["roof_access"] is False
+    assert not any(c["to"] == "roof" for c in record["connections"])
+
+
+@pytest.fixture(scope="module")
+def enclosed_inputs(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    return _detail_inputs(tmp_path_factory.mktemp("enclosed"), ENCLOSED, {})
+
+
+def _frontage_issues(detailed: Any) -> list[tuple[str, str | None, str]]:
+    return [(i.code, i.severity, i.object_id, i.message) for i in detailed.issues if i.message == "no_street_frontage"]
+
+
+def _interiors(**changes: Any) -> Any:
+    return replace(CFG, interiors=replace(CFG.interiors, **changes))
+
+
+def test_a_building_with_no_street_wall_says_why_it_has_no_interior(enclosed_inputs: tuple[Path, Path, Path]) -> None:
+    detailed = _detail(enclosed_inputs)
+    assert _frontage_issues(detailed) == [("interior_not_generated", "info", WALLED, "no_street_frontage")]
+    assert WALLED not in detailed.stats["interiors"]
+
+
+def test_the_last_place_in_the_quota_still_reports_it(enclosed_inputs: tuple[Path, Path, Path]) -> None:
+    detailed = _detail(enclosed_inputs, _interiors(min_buildings=1, max_buildings=1, exclude_ids=frozenset(OPEN_IDS)))
+    assert _frontage_issues(detailed) == [("interior_not_generated", "info", WALLED, "no_street_frontage")]
+
+
+def test_a_spent_quota_or_an_excluded_building_reports_nothing(enclosed_inputs: tuple[Path, Path, Path]) -> None:
+    spent = _detail(enclosed_inputs, _interiors(min_buildings=1, max_buildings=1, include_ids=("osm-way-721",)))
+    assert spent.stats["interiors"] == ["osm-way-721"] and _frontage_issues(spent) == []
+    excluded = _detail(enclosed_inputs, _interiors(exclude_ids=frozenset({WALLED})))
+    assert _frontage_issues(excluded) == []

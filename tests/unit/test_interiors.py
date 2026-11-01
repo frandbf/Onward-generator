@@ -16,6 +16,7 @@ from onward_generator.detail.interiors import (
     SHOP_GLASS,
     Interior,
     InteriorPlan,
+    _door_zone,
     _inner_walls,
     _lands_on_roof,
     assemble_interior,
@@ -527,6 +528,7 @@ def test_a_storey_that_does_not_divide_the_height_has_no_climb() -> None:
 def test_a_tall_building_with_room_for_no_stair_is_refused_and_a_low_one_keeps_its_room() -> None:
     tiny = Polygon([(0, 0), (7, 0), (7, 5), (0, 5)])
     assert _plan(tiny, 15.0, 3.0, 5) == "no_room_for_stair"
+    assert _plan(tiny, 9.0, 3.0, 3) == "no_room_for_stair"  # three storeys want two floors, so a stair
     low = _plan(tiny, 3.0, 3.0, 1)
     assert isinstance(low, InteriorPlan) and (low.floors, low.flights) == (1, ())
 
@@ -558,3 +560,13 @@ def test_the_rule_takes_a_courtyard_but_not_two_separate_parts() -> None:
     ring = Polygon([(0, 0), (20, 0), (20, 20), (0, 20)], [[(8, 8), (12, 8), (12, 12), (8, 12)]])
     parts = box(0, 0, 10, 10).union(box(20, 0, 30, 10))
     assert _select_interiors([("ring", 3, heights, ring), ("parts", 3, heights, parts)], cfg, []) == ["ring"]
+
+
+def test_no_stair_well_blocks_the_door() -> None:
+    cfg = load_detail_config()
+    door = Hole("interior_door", 0, 1.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0)
+    segment = Segment(0, 0, 0, (0.0, 0.0), (10.0, 0.0), True)
+    plan = plan_interior("b", Polygon([(0, 0), (10, 0), (10, 3), (0, 3)]), door, segment, 15.0, 3.0, 5, cfg, roof_access=False)
+    assert isinstance(plan, InteriorPlan) and plan.flights
+    zone = _door_zone(segment, door, cfg.interiors)
+    assert all(flight.well.disjoint(zone) for flight in plan.flights)
