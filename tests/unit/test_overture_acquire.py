@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -362,3 +363,172 @@ def test_remote_connection_loads_httpfs_and_sets_the_s3_region(monkeypatch: pyte
     monkeypatch.setattr(acquire.duckdb, "connect", lambda: Fake(missing=True))
     acquire._remote_connection()
     assert statements[:3] == ["LOAD httpfs", "INSTALL httpfs", "LOAD httpfs"]
+
+
+# The release STAC index (collections.parquet): one row per file, with its bbox and S3 href.
+REL = "2026-10-21.0"
+PLACE_PREFIX = f"s3://overturemaps-us-west-2/release/{REL}/theme=places/type=place/"
+BUILDING_PREFIX = f"s3://overturemaps-us-west-2/release/{REL}/theme=buildings/type=building/"
+
+
+def _index(rows: list[tuple[str, str, tuple[float, float, float, float]]]) -> bytes:
+    """``(collection, href, (xmin, ymin, xmax, ymax))`` rows in the column shape of the Overture index."""
+    connection = duckdb.connect()
+    connection.execute(
+        "CREATE TABLE t (collection VARCHAR, bbox STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE),"
+        " assets STRUCT(aws STRUCT(alternate STRUCT(s3 STRUCT(href VARCHAR)))))"
+    )
+    for collection, href, (xmin, ymin, xmax, ymax) in rows:
+        connection.execute(
+            "INSERT INTO t VALUES (?, {'xmin': ?, 'ymin': ?, 'xmax': ?, 'ymax': ?}, {'aws': {'alternate': {'s3': {'href': ?}}}})",
+            [collection, xmin, ymin, xmax, ymax, href],
+        )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "i.parquet"
+        connection.execute(f"COPY t TO '{path}' (FORMAT parquet)")
+        return path.read_bytes()
+
+
+# BBOX is south 37.98, west -1.135, north 37.99, east -1.12.
+INDEX_ROWS = [
+    ("building", BUILDING_PREFIX + "part-00002.parquet", (-2.0, 35.0, 1.5, 40.7)),  # holds the map
+    ("building", BUILDING_PREFIX + "part-00001.parquet", (-1.12, 37.99, 3.0, 39.0)),  # touches the north-east corner
+    ("building", BUILDING_PREFIX + "part-00003.parquet", (10.0, 40.0, 20.0, 50.0)),  # far away
+    ("building", BUILDING_PREFIX + "part-00004.parquet", (-1.13, 37.991, -1.125, 37.995)),  # just north of the map
+    ("place", PLACE_PREFIX + "part-00000.parquet", (-74.0, -20.0, 4.0, 40.0)),
+    ("place", PLACE_PREFIX + "part-00001.parquet", (5.0, -20.0, 40.0, 40.0)),
+]
+
+
+def test_select_files_keeps_the_files_whose_bbox_meets_the_map() -> None:
+    index = _index(INDEX_ROWS)
+    buildings = acquire.select_files(index, REL, "buildings", BBOX)
+    assert buildings.files == [BUILDING_PREFIX + "part-00001.parquet", BUILDING_PREFIX + "part-00002.parquet"]
+    assert buildings.in_theme == 4
+    places = acquire.select_files(index, REL, "places", BBOX)
+    assert places.files == [PLACE_PREFIX + "part-00000.parquet"] and places.in_theme == 2
+
+
+def test_select_files_reads_one_file_when_none_meets_the_map() -> None:
+    index = _index([r for r in INDEX_ROWS if r[0] == "place"])
+    far = acquire.select_files(index, REL, "places", (60.0, 100.0, 61.0, 101.0))
+    assert far.files == [PLACE_PREFIX + "part-00000.parquet"] and far.in_theme == 2
+
+
+def test_select_files_refuses_an_index_it_cannot_trust() -> None:
+    with pytest.raises(OvertureError, match=r"lists no building files under s3://.*/theme=buildings/type=building/"):
+        acquire.select_files(_index([r for r in INDEX_ROWS if r[0] == "place"]), REL, "buildings", BBOX)
+    for href in (
+        "s3://elsewhere/release/x/part.parquet",
+        BUILDING_PREFIX + "part-1.txt",
+        BUILDING_PREFIX + "sub/part.parquet",
+        "s3://overturemaps-us-west-2/release/2026-09-23.1/theme=buildings/type=building/part.parquet",
+    ):
+        with pytest.raises(OvertureError, match="lists a building file outside") as caught:
+            acquire.select_files(_index([("building", href, (-2.0, 35.0, 1.5, 40.7))]), REL, "buildings", BBOX)
+        assert str(caught.value).endswith(href)
+    with pytest.raises(OvertureError, match=f"the STAC index of {REL} cannot be read"):
+        acquire.select_files(b"not parquet", REL, "places", BBOX)
+    with pytest.raises(OvertureError, match="invalid bbox"):
+        acquire.select_files(_index(INDEX_ROWS), REL, "places", (37.99, -1.135, 37.98, -1.12))
+    with pytest.raises(OvertureError, match="not an Overture release"):
+        acquire.select_files(_index(INDEX_ROWS), "latest", "places", BBOX)
+
+
+def test_stac_index_asks_the_release_collections_parquet() -> None:
+    seen: list[str] = []
+    assert acquire.stac_index(REL, lambda url: seen.append(url) or b"x") == b"x"
+    assert seen == [f"https://stac.overturemaps.org/{REL}/collections.parquet"]
+    with pytest.raises(OvertureError, match="not an Overture release"):
+        acquire.stac_index("../x", lambda url: b"")
+
+
+def test_fetch_theme_records_the_selected_files(tmp_path: Path) -> None:
+    remote = str(_places(tmp_path))
+    selection = acquire.FileSelection(files=[remote], in_theme=16)
+    target = tmp_path / "raw" / "overture_places.parquet"
+    record = fetch_theme("places", BBOX, target, release=REL, selection=selection, connect=local_connect, now=NOW)
+    assert record.rows == 3 and record.files == [remote] and record.files_in_theme == 16
+    assert record.file_selection == "stac_index"
+    assert record.source == theme_source(REL, "places") and record.query == clip_query([remote], BBOX)
+    assert load_record(target) == record
+    given = fetch_theme(
+        "places", BBOX, tmp_path / "o.parquet", release=REL, source=remote, selection=selection, connect=local_connect, now=NOW
+    )
+    assert (given.file_selection, given.files, given.files_in_theme, given.query) == ("source", [], None, clip_query(remote, BBOX))
+
+
+def test_clip_query_reads_a_list_of_files() -> None:
+    query = clip_query(["s3://b/x.parquet", "s3://b/it's.parquet"], BBOX)
+    assert query.startswith("SELECT * FROM read_parquet(['s3://b/x.parquet', 's3://b/it''s.parquet'], hive_partitioning = false)\n")
+
+
+class _S3Recorder:
+    """Local reads go to DuckDB; a COPY from s3:// is recorded and fails, so nothing reaches the network."""
+
+    def __init__(self) -> None:
+        self.s3_queries: list[str] = []
+
+    def __call__(self) -> duckdb.DuckDBPyConnection:
+        real = local_connect()
+        outer = self
+
+        class Wrapped:
+            def execute(self, sql: str, *args: object) -> object:
+                if sql.startswith("COPY") and "s3://" in sql:
+                    outer.s3_queries.append(sql)
+                    raise duckdb.IOException("offline")
+                return real.execute(sql, *args)
+
+            def close(self) -> None:
+                real.close()
+
+        return Wrapped()  # type: ignore[return-value]
+
+
+def test_fetch_map_reads_only_the_files_the_stac_index_selects(tmp_path: Path) -> None:
+    root = _map(tmp_path)
+    index = _index(
+        [
+            ("building", BUILDING_PREFIX + "part-00002.parquet", (-2.0, 35.0, 1.5, 40.7)),
+            ("building", BUILDING_PREFIX + "part-00003.parquet", (10.0, 40.0, 20.0, 50.0)),
+        ]
+    )
+    asked: list[str] = []
+
+    def stac(url: str) -> bytes:
+        asked.append(url)
+        return index
+
+    recorder = _S3Recorder()
+    with pytest.raises(OvertureError, match="failed after 4 attempts: offline"):
+        fetch_map(root, release=REL, sources={"places": str(_places(tmp_path))}, connect=recorder, stac=stac, sleep=lambda s: None)
+    assert asked == [f"https://stac.overturemaps.org/{REL}/collections.parquet"]
+    assert theme_target(root, "places").exists()  # the given source was read before buildings
+    query = clip_query([BUILDING_PREFIX + "part-00002.parquet"], inclusion_bbox(root))
+    assert recorder.s3_queries[0].startswith(f"COPY ({query}) TO ") and len(recorder.s3_queries) == 4
+
+
+def test_fetch_map_reads_every_file_when_the_index_is_missing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _map(tmp_path)
+
+    def stac(url: str) -> bytes:
+        raise OvertureError("HTTP 404")
+
+    recorder = _S3Recorder()
+    with pytest.raises(OvertureError, match="failed after 4 attempts"):
+        fetch_map(root, release=REL, connect=recorder, stac=stac, sleep=lambda s: None)
+    assert capsys.readouterr().err == (f"overture: no STAC index for {REL} (HTTP 404); reading every file of each theme, which is slow\n")
+    query = clip_query(theme_source(REL, "places"), inclusion_bbox(root))
+    assert recorder.s3_queries[0].startswith(f"COPY ({query}) TO ")
+
+
+def test_a_sidecar_written_before_the_file_selection_still_loads(tmp_path: Path) -> None:
+    target = tmp_path / "raw" / "overture_places.parquet"
+    fetch_theme("places", BBOX, target, release=REL, source=str(_places(tmp_path)), connect=local_connect, now=NOW)
+    old = json.loads(sidecar_path(target).read_text(encoding="utf-8"))
+    for key in ("files", "file_selection", "files_in_theme"):
+        del old[key]
+    sidecar_path(target).write_text(json.dumps(old), encoding="utf-8")
+    record = load_record(target)
+    assert (record.files, record.file_selection, record.files_in_theme) == ([], "unrecorded", None)

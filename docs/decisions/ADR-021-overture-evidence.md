@@ -45,3 +45,11 @@ So Overture adds shops in every city tried, on about as many buildings as OSM (f
 - A buildings extract is ODbL (OSM and Microsoft) plus CC BY 4.0 (Esri, Google, IGN): a scene that uses an Overture height inherits those attributions. A place keeps its record's licence: CDLA Permissive 2.0, Apache 2.0 (Foursquare, with its NOTICE) or CC0. `docs/legal/data-sources.md` records them.
 - After `cadastre split`, the Catastro sub-buildings rarely match an Overture footprint (their outlines are cut from Catastro parts), so in Spain Overture mostly fills unsplit buildings, below the Catastro storeys.
 - Tests never use the network: the S3 glob is replaced by a synthetic parquet written at test time (`tests/overture_fixture.py`).
+
+## Amendment — Read only the files that meet the map (1 November 2026)
+
+`overture fetch` opened every file of a theme with a glob, 512 for buildings and 16 for places, reading each Parquet footer over the network. It took 1 min 30 s on a good link and more than 10 minutes on another, silently. It now reads the release's STAC index first, `https://stac.overturemaps.org/<release>/collections.parquet` (about 150 KiB, one row per file with its `bbox` and S3 href), and gives DuckDB only the files whose bbox meets the map. Every href must be a Parquet file of that release, theme and type on the Overture bucket, or the fetch fails.
+
+Measured on Murcia (37.99521, −1.137511, r90, margin 5 m): 1 of 512 building files and 1 of 16 place files, 13 s instead of 1 min 30 s, and both output files are byte-identical to the glob read (same SHA-256).
+
+The sidecar gains `files`, `file_selection` (`stac_index`; `glob` when the index cannot be fetched, with a warning, since it is only slower; `source` for a given path; `unrecorded` in an older sidecar) and `files_in_theme`. `overture fetch` prints `files 1 of 512`. If no file meets the map, one file is read so the output keeps its schema with no rows.
