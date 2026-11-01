@@ -6,7 +6,7 @@ Local metres around MURCIA_CENTER: a 128 m square site with a 6 m street along y
 from __future__ import annotations
 
 import pytest
-from shapely import LineString, box
+from shapely import LineString, Polygon, box
 
 from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.scene import ground_slabs
@@ -62,6 +62,21 @@ def test_a_clip_keeps_the_part_of_each_slab_inside_it() -> None:
     # A clip on the street alone leaves no ground slab and keeps the street.
     on_street = ground_slabs(partition, CONFIG, clip=box(-50, -1, -40, 1))[0]
     assert [o.id for o in on_street] == ["collider/carriageway"]
+
+
+def test_a_site_corner_finer_than_the_weld_still_closes() -> None:
+    """The walkable slab is the site minus the carriageway, and that cut is not snapped.
+
+    Two vertices of the site corner can fall in one 0.1 mm weld cell. The slab
+    drops the duplicate and stays closed.
+    """
+    corner = (-64.0, -64.0)
+    site = Polygon([corner, (corner[0], corner[1] + 7.5e-6), (64, -64), (64, 64), (-64, 64)])
+    objects, issues = ground_slabs(build_partition(site, [], [], [], CONFIG), CONFIG)
+    assert [i.code for i in issues] == ["short_edge_collapsed"]
+    assert issues[0].severity == "info" and issues[0].object_id == "collider/walkable"
+    assert objects[0].record["checks"]["manifold_defects"] == 0
+    assert objects[0].record["collider"]["closed"] is True
 
 
 def test_a_slab_that_does_not_close_is_critical(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -37,6 +37,7 @@ from onward_generator.generation.mesh import (
     Mesh,
     cap,
     closed_manifold_defects,
+    collapse_short_edges,
     drop_degenerate_holes,
     merge,
     open_base_defects,
@@ -585,11 +586,21 @@ def ground_slabs(partition: Partition, config: GenerationConfig, clip: BaseGeome
             continue
         # A zero-area spike is stored as a hole and would be extruded twice.
         # A hole that only touches the outer ring shares one vertex; open that
-        # point so the slab weld does not count the corner twice.
+        # point so the slab weld does not count the corner twice. Two corners
+        # that fall in one 0.1 mm weld cell are one vertex; drop the duplicate
+        # or the neighbouring edge is counted twice.
         geom, dropped_holes = drop_degenerate_holes(geom)
         if dropped_holes:
             issues.append(Issue("degenerate_hole_dropped", "info", cid, f"{dropped_holes} holes below 0.0001 m² removed before the slab"))
         geom = open_point_contacts(geom)
+        geom, collapsed = collapse_short_edges(geom)
+        if collapsed:
+            issues.append(Issue(
+                "short_edge_collapsed", "info", cid,
+                f"{collapsed} vertices on the same 0.1 mm weld cell removed before the slab",
+            ))
+        if geom.is_empty:
+            continue
         mesh = prism(geom, -thickness, top, bottom=True)
         defects = closed_manifold_defects(mesh)
         expected = geom.area * (top + thickness)
