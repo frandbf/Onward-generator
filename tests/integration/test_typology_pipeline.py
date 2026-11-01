@@ -97,6 +97,6 @@ def test_the_style_reaches_the_facade_and_a_residential_palette(tmp_path_factory
     record = next(o.record for o in after.objects if o.id == "building/osm-way-701")
     style = record["facade"]["typology"]["facade_style"]
     assert tuple(style["palette"]) == ("brick_red", "plaster_cream", "plaster_white") and style["window_width_factor"] == 1.25
-    assert record["materials"]["wall"] in style["palette"]
+    assert record["facade"]["materials"]["wall"] in style["palette"]
     plain_style = next(o.record for o in before.objects if o.id == "building/osm-way-701")["facade"]["typology"]["facade_style"]
     assert plain_style["palette"] != style["palette"]
