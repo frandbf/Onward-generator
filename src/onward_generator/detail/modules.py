@@ -67,6 +67,15 @@ def recess(width: float, height: float, depth: float, back: str | None, frame_ma
     return Prototype(_key("recess", w, h, d, back or "open"), tuple(parts))
 
 
+def flat_opening(width: float, height: float, back: str) -> Prototype:
+    """An opening drawn flush with the wall: one quad in the back material, no reveals (ADR-025).
+
+    It fills the wall's hole exactly, so the two share every edge of the opening and the shell stays closed.
+    """
+    w, h = width, height
+    return Prototype(_key("flat", w, h, back), ((back, quad((0, 0, 0), (w, 0, 0), (w, 0, h), (0, 0, h))),))
+
+
 def recess_rim(width: float, height: float, depth: float, *, include_bottom: bool) -> list[tuple[tuple[float, float, float], tuple[float, float, float]]]:
     """The open back rim of a through-opening, as module-frame segments."""
     w, h, d = width, height, depth
