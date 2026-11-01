@@ -16,10 +16,10 @@ from onward_generator.export.info3 import (
     LOCAL_ID,
     Info3Error,
     apply_local_listing,
-    fit_listing_description,
     candidate_listing,
     check_listing_thumbnail,
     device_thumbnail_url,
+    fit_listing_description,
     listing_item_id,
     write_candidate_listing,
 )
