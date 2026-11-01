@@ -55,13 +55,17 @@ def _bbox(geom: BaseGeometry) -> dict[str, float]:
     return {"xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax}
 
 
-def _write(path: Path, columns: str, rows: Sequence[Sequence[Any]]) -> Path:
+def _write(path: Path, columns: str, rows: Sequence[Sequence[Any]], *, geometry_blob: bool = False) -> Path:
+    """Write ``rows``. ``geometry_blob`` stores the last column as WKB bytes, the way a release can expose it."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    if geometry_blob:
+        columns = columns.replace("geometry GEOMETRY", "geometry BLOB")
     connection = duckdb.connect()
     try:
         connection.execute(f"CREATE TABLE t ({columns})")
         width = len(rows[0]) if rows else 0
-        marks = ", ".join(["?"] * (width - 1) + ["ST_GeomFromWKB(?)"])
+        last = "?" if geometry_blob else "ST_GeomFromWKB(?)"
+        marks = ", ".join(["?"] * (width - 1) + [last])
         for row in rows:
             connection.execute(f"INSERT INTO t VALUES ({marks})", list(row))
         connection.execute(f"COPY t TO '{path}' (FORMAT parquet)")
@@ -95,12 +99,12 @@ def building(
     ]
 
 
-def write_places(path: Path, rows: Sequence[Sequence[Any]]) -> Path:
-    return _write(path, PLACE_COLUMNS, rows)
+def write_places(path: Path, rows: Sequence[Sequence[Any]], *, geometry_blob: bool = False) -> Path:
+    return _write(path, PLACE_COLUMNS, rows, geometry_blob=geometry_blob)
 
 
-def write_buildings(path: Path, rows: Sequence[Sequence[Any]]) -> Path:
-    return _write(path, BUILDING_COLUMNS, rows)
+def write_buildings(path: Path, rows: Sequence[Sequence[Any]], *, geometry_blob: bool = False) -> Path:
+    return _write(path, BUILDING_COLUMNS, rows, geometry_blob=geometry_blob)
 
 
 def scene(buildings: Mapping[str, BaseGeometry]) -> dict[str, Any]:
