@@ -167,6 +167,94 @@ def test_build_map_validates_the_listing_first(setup: tuple[Path, Path, dict[str
     assert not Path(env["FAKE_DEVICE"] + ".calls").exists()
 
 
+def _baked_package(package: Path, report: dict[str, object]) -> None:
+    (package / "build" / "scene_report.json").write_text(json.dumps(report, separators=(",", ":")), encoding="utf-8")
+
+
+def _build_map_with_a_recording_export(tmp_path: Path) -> tuple[Path, Path]:
+    """build_map.sh and lib.sh beside a run_export.sh that records its steps, as if Unity had built everything."""
+    tools = tmp_path / "repo" / "tools" / "unity"
+    (tools / "onward_adapter").mkdir(parents=True)
+    shutil.copy2(SCRIPT.with_name("build_map.sh"), tools / "onward_adapter" / "build_map.sh")
+    shutil.copy2(SCRIPT.parent.parent / "lib.sh", tools / "lib.sh")
+    (tools / "report_timings.py").write_text("", encoding="utf-8")
+    calls = tmp_path / "steps"
+    fake = tools / "onward_adapter" / "run_export.sh"
+    fake.write_text(f"""#!/usr/bin/env bash
+echo "$* bake=$ONWARD_BAKE" >> "{calls}"
+package="$1"; shift
+for step in "$@"; do
+  [[ "$step" != archive ]] || mv "$package/build" "$package.archived"
+  [[ "$step" != launcher ]] || {{ mkdir -p "$package/build/launcher"; touch "$package/build/launcher/unity-export.local.content3" "$package/build/launcher/unity-export.local.info3"; }}
+done
+""", encoding="utf-8")
+    fake.chmod(0o755)
+    return tools / "onward_adapter" / "build_map.sh", calls
+
+
+def _steps(build_map: Path, package: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["bash", str(build_map), *args, str(package)], env=env, capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL)
+
+
+@pytest.mark.parametrize(("args", "extra"), [(("--bake", "final"), {}), (("--bake=final",), {}), ((), {"ONWARD_BAKE": "final"})])
+def test_naming_another_bake_archives_the_build_and_bakes_again(
+    setup: tuple[Path, Path, dict[str, str]], tmp_path: Path, args: tuple[str, ...], extra: dict[str, str],
+) -> None:
+    package, _folder, env = setup
+    _baked_package(package, {"seconds": {"scene": 1.0}, "lightmap_bake": {"profile": "draft", "lightmapper": "ProgressiveGPU"}})
+    build_map, calls = _build_map_with_a_recording_export(tmp_path)
+    result = _steps(build_map, package, env | extra, *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "baked as draft and you asked for final" in result.stdout
+    assert calls.read_text(encoding="utf-8").splitlines() == [f"{package} archive bake=final", f"{package} tool scene launcher bake=final"]
+    assert (package.parent / "pkg.archived" / "scene_report.json").is_file()
+
+
+@pytest.mark.parametrize(
+    ("args", "extra", "report"),
+    [
+        ((), {}, {"lightmap_bake": {"profile": "final"}}),  # no profile named: a final build is not downgraded
+        ((), {}, {"lightmap_bake": {"profile": "draft"}}),
+        (("--bake", "final"), {}, {"lightmap_bake": {"profile": "final"}}),
+        ((), {"ONWARD_BAKE": "draft"}, {"lightmap_bake": {"profile": "draft"}}),
+        (("--bake", "final"), {}, {"lightmap_bake": {"lightmapper": "x"}}),  # before the profiles: the final bake
+    ],
+)
+def test_a_package_keeps_its_bake_otherwise(
+    setup: tuple[Path, Path, dict[str, str]], tmp_path: Path, args: tuple[str, ...], extra: dict[str, str], report: dict[str, object],
+) -> None:
+    package, _folder, env = setup
+    _baked_package(package, report)
+    build_map, calls = _build_map_with_a_recording_export(tmp_path)
+    result = _steps(build_map, package, env | extra, *args)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "already has the Quest build" in result.stdout and not calls.exists()
+
+
+def test_archive_moves_the_build_and_the_unity_scene_and_deletes_nothing(setup: tuple[Path, Path, dict[str, str]], tmp_path: Path) -> None:
+    package, _folder, env = setup
+    project = tmp_path / "project"
+    scene = project / "Assets" / "OnwardAdapter" / "murcia_abc"
+    scene.mkdir(parents=True)
+    (scene / "murcia_abc.unity").write_text("scene", encoding="utf-8")
+    (scene.parent / "murcia_abc.meta").write_text("meta", encoding="utf-8")
+    other = scene.parent / "other_package"
+    other.mkdir()
+    result = _run(package, env | {"PROJECT": str(project)}, "archive")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not (package / "build").exists() and not scene.exists() and not (scene.parent / "murcia_abc.meta").exists()
+    assert other.is_dir()
+    moved = list(package.parent.glob("pkg.build-*"))
+    assert len(moved) == 1 and (moved[0] / "launcher" / f"{LOCAL_ID}.content3").read_bytes() == BUNDLE
+    archive = project / "OnwardAdapterArchive"
+    assert [p.name.split("-")[0] for p in sorted(archive.iterdir())] == ["murcia_abc", "murcia_abc"]
+    assert next(archive.glob("*/murcia_abc.unity")).read_text(encoding="utf-8") == "scene"
+    assert next(archive.glob("*.meta")).read_text(encoding="utf-8") == "meta"
+    # Nothing left to archive is a failure, not a silent pass.
+    again = _run(package, env | {"PROJECT": str(project)}, "archive")
+    assert again.returncode == 1 and "nothing to archive" in again.stdout
+
+
 def test_inspect_copies_listings_only(setup: tuple[Path, Path, dict[str, str]]) -> None:
     package, folder, env = setup
     (folder / "12345.info3").write_text('{"WorkshopItem": {}}', encoding="utf-8")

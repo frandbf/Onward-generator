@@ -2,7 +2,7 @@
 # Phase 07: Onward export adapter (onward_unity 0.1.0).
 #
 #   run_export.sh [--platform macos|linux|auto] PACKAGE_DIR step... [--listing MODE] [--bake draft|final]
-#   steps: tool scene launcher push inspect
+#   steps: tool scene launcher push inspect archive
 #
 # PACKAGE_DIR is written by `onward-generator export package`; its files are
 # verified (Python and C#) before every Unity step. Outputs go to
@@ -17,6 +17,8 @@
 # fewer samples and bounces for iteration. "final" is the release bake. Unity gets it
 # as -onwardBake (docs/12-export.md, "Bake profiles").
 # "inspect" is read-only: it lists the game's folder and copies its .info3 files.
+# "archive" clears the way for a new bake and deletes nothing: build/ moves beside the package as
+# PACKAGE_DIR.build-<time>, and the package's Unity scene to OnwardAdapterArchive/, outside Assets.
 set -euo pipefail
 
 TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,7 +33,7 @@ PYTHON="${PYTHON:-$REPO/.venv/bin/python}"
 DEVICE_DIR="/sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent"
 
 log() { printf '[export] %s\n' "$*"; }
-usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|launcher|push|inspect)... [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}]" >&2; exit 2; }
+usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|launcher|push|inspect|archive)... [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}]" >&2; exit 2; }
 
 [[ $# -ge 2 ]] || usage
 PACKAGE="$(cd "$1" && pwd)"
@@ -222,11 +224,26 @@ step_inspect() {
   log "device inspect: $out ($(ls "$out" | wc -l | tr -d ' ') files)"
 }
 
+step_archive() {
+  [[ -e "$BUILD" ]] || { log "$BUILD does not exist; nothing to archive"; exit 1; }
+  local stamp folder
+  stamp="$(date +%Y%m%dT%H%M%S)"
+  folder="$PROJECT/Assets/OnwardAdapter/$PACKAGE_ID"
+  if [[ -e "$folder" ]]; then
+    mkdir -p "$PROJECT/OnwardAdapterArchive"
+    mv "$folder" "$PROJECT/OnwardAdapterArchive/$PACKAGE_ID-$stamp"
+    [[ ! -e "$folder.meta" ]] || mv "$folder.meta" "$PROJECT/OnwardAdapterArchive/$PACKAGE_ID-$stamp.meta"
+    log "Unity scene archived: $PROJECT/OnwardAdapterArchive/$PACKAGE_ID-$stamp"
+  fi
+  mv "$BUILD" "$PACKAGE.build-$stamp"
+  log "build archived: $PACKAGE.build-$stamp"
+}
+
 mkdir -p "$LOG_DIR"
 [[ -x "$UNITY" ]] || { log "Unity $UNITY_VERSION not found at $UNITY"; exit 1; }
 for step in ${STEPS[@]+"${STEPS[@]}"}; do
   case "$step" in
-    tool|scene|launcher|push|inspect) "step_$step" ;;
+    tool|scene|launcher|push|inspect|archive) "step_$step" ;;
     *) usage ;;
   esac
 done
