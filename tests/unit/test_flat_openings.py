@@ -165,6 +165,7 @@ def test_flat_opening_faces_out_and_fills_the_hole() -> None:
     normal = mesh.face_normals()
     assert np.allclose(normal / np.linalg.norm(normal, axis=1)[:, None], [0.0, -1.0, 0.0])  # module frame: outward is −Y
     assert proto.key != flat_opening(1.1, 1.5, "door_wood").key != flat_opening(1.0, 1.5, "glass_dark").key
+    assert proto.key == "flat:1.100:1.500:glass_dark"
 
 
 def test_a_pierced_window_above_the_threshold_keeps_its_through_hole() -> None:
