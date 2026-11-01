@@ -19,7 +19,6 @@ from shapely.geometry.polygon import orient
 _EMPTY_V = np.zeros((0, 3), dtype=np.float64)
 _EMPTY_T = np.zeros((0, 3), dtype=np.int64)
 _QUANT = 1e-4  # 0.1 mm: vertex identity for topology checks
-WELD_SAFE_PASSES = 4  # pragma: no mutate: the loop ends as soon as a pass changes nothing; every known case needs at most two
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,14 +130,12 @@ def _too_close(a: tuple[float, float], b: tuple[float, float], quantum: float) -
     The second case matters because :func:`walls` skips an edge under ``min_edge``
     while :func:`cap` keeps it, whichever cells its ends fall in.
     """
-    return _weld_key(a, quantum) == _weld_key(b, quantum) or float(np.hypot(a[0] - b[0], a[1] - b[1])) < quantum
+    return _weld_key(a, quantum) == _weld_key(b, quantum) or float(np.hypot(a[0] - b[0], a[1] - b[1])) < quantum  # pragma: no mutate: exactly one cell apart closes either way
 
 
 def _collapse_ring(coords: Sequence[tuple[float, float]], quantum: float) -> tuple[list[tuple[float, float]] | None, int]:
     """Drop consecutive vertices the weld would merge. ``None`` when fewer than three remain."""
-    points = [(float(p[0]), float(p[1])) for p in coords]
-    if len(points) >= 2 and _too_close(points[0], points[-1], quantum):
-        points = points[:-1]
+    points = [(float(p[0]), float(p[1])) for p in coords[:-1]]  # a ring repeats its first vertex last
     kept: list[tuple[float, float]] = []
     removed = 0
     for point in points:
@@ -146,7 +143,7 @@ def _collapse_ring(coords: Sequence[tuple[float, float]], quantum: float) -> tup
             removed += 1
             continue
         kept.append(point)
-    if len(kept) >= 2 and _too_close(kept[0], kept[-1], quantum):
+    if len(kept) >= 2 and _too_close(kept[0], kept[-1], quantum):  # pragma: no mutate: with two left the ring is dropped either way
         kept.pop()
         removed += 1
     if len(kept) < 3:
@@ -305,7 +302,7 @@ def _weld_contacts(geometry: BaseGeometry, quantum: float = _QUANT) -> list[Base
                 key = _weld_key(point, quantum)
                 if key != _weld_key(points[index - 1], quantum):
                     cells.setdefault(key, []).append(point)
-    return [shapely.Point(found[0]) for found in cells.values() if len(found) > 1]
+    return [shapely.Point(found[0]) for found in cells.values() if len(found) > 1]  # pragma: no mutate: any corner of the cell centres the same 1 cm cut
 
 
 def _point_contacts(geometry: BaseGeometry, gap_m: float) -> list[BaseGeometry]:
@@ -440,22 +437,14 @@ def weld_safe(geometry: BaseGeometry) -> tuple[BaseGeometry, int, bool]:
     """``geometry`` with no two ring vertices the 0.1 mm weld would merge, in any ring of any part.
 
     Every vertex is checked before extrusion: neighbours on a ring collapse into
-    one (:func:`collapse_short_edges`) and corners that only share a cell are
-    opened (:func:`open_point_contacts`). Opening snaps to 1 mm, and a collapse can
-    bring two corners together, so the two repeat until neither changes anything.
-    Returns the geometry, the vertices removed, and whether a contact was opened.
-    A geometry with nothing to fix comes back as the same object.
+    one (:func:`collapse_short_edges`), then corners that only share a cell are
+    opened (:func:`open_point_contacts`). Opening snaps to 1 mm, so it leaves
+    nothing to collapse. Returns the geometry, the vertices removed, and whether a
+    contact was opened. A geometry with nothing to fix comes back as the same object.
     """
-    collapsed = 0
-    opened = False
-    for _ in range(WELD_SAFE_PASSES):
-        geometry, removed = collapse_short_edges(geometry)
-        collapsed += removed
-        cut = open_point_contacts(geometry)
-        if cut is geometry:
-            break
-        geometry, opened = cut, True
-    return geometry, collapsed, opened
+    collapsed, removed = collapse_short_edges(geometry)
+    opened = open_point_contacts(collapsed)
+    return opened, removed, opened is not collapsed
 
 
 def transform(mesh: Mesh, matrix: np.ndarray) -> Mesh:

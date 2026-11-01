@@ -15,6 +15,7 @@ from onward_generator.generation.config import DEFAULT_CONFIG_PATH, GenerationCo
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import (
     Mesh,
+    _weld_contacts,
     cap,
     closed_manifold_defects,
     collapse_short_edges,
@@ -394,6 +395,22 @@ def test_neighbours_across_a_cell_boundary_collapse_and_the_slab_closes() -> Non
     polygon = Polygon([(0, 0), (10, 0), (10.00005, 10.0000496), (10.0000504, 10.0000504), (0, 10)])
     assert collapse_short_edges(polygon)[1] == 1
     assert closed_manifold_defects(prism(polygon, -1.0, 0.0, bottom=True)) == 0
+
+
+def test_the_last_vertex_of_a_ring_collapses_into_the_first() -> None:
+    polygon = Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0.00002, 0.00001)])
+    collapsed, removed = collapse_short_edges(polygon)
+    assert removed == 1 and list(collapsed.exterior.coords) == [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]
+
+
+def test_a_contact_at_the_last_vertex_of_a_ring_is_found() -> None:
+    polygon = Polygon([(0, 0), (10, 0), (10, 5), (10, 10), (0, 10)], [[(8, 4), (8, 6), (9.99998, 5)]])
+    found = _weld_contacts(polygon)
+    assert len(found) == 1 and found[0].distance(Point(10, 5)) < 1e-4
+
+
+def test_a_run_of_one_cell_along_a_ring_is_not_a_contact() -> None:
+    assert _weld_contacts(Polygon([(0, 0), (10, 0), (10, 10), (10.000007, 10.000002), (0, 10)])) == []
 
 
 def test_neighbours_a_full_cell_apart_stay() -> None:
