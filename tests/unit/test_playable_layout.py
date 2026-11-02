@@ -261,6 +261,9 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
         ({**doc, "street_lights_m": [1.0, 2.0, 4.2]}, "only for a night map"),
     ):
         assert any(message in problem for problem in _check_layout(bad)), bad
+    assert "layout: environment must be Urban / Day / UrbanDay1 or Urban / Night / UrbanNight1" in _check_layout({**doc, "environment": "Desert"})
+    assert "layout: street_lights_m must be flat x, y, z triples" in _check_layout({**night, "street_lights_m": "x"})
+    assert "layout: street_lights_m is only for a night map" in _check_layout({**doc, "street_lights_m": [1.0, 2.0, 4.2]})
     doc["schema_version"] = GAMEPLAY_VERSION
     assert any("modes must be" in problem for problem in _check_layout(doc))
     doc["modes"] = dict(MODE_CODES)
@@ -536,3 +539,19 @@ def test_street_lights_stop_at_the_cap_keeping_the_nearest() -> None:
 
 def test_the_time_of_day_names_exist_in_the_sdk_enums() -> None:
     assert TIME_OF_DAY_SETTINGS == {"day": ("Day", "UrbanDay1"), "night": ("Night", "UrbanNight1")}
+
+
+def test_street_lights_round_to_the_centimetre_and_sort_by_distance_to_the_focus() -> None:
+    near_the_focus = _lamp(90.123, 1.456)
+    far_from_it = _lamp(10.0, 0.0)
+    lights = street_lights({"objects": [far_from_it, near_the_focus]}, (100.0, 0.0))
+    assert lights == [91.12, 1.46, 4.2, 11.0, 0.0, 4.2]
+
+
+def test_a_lamp_with_no_yaw_points_along_x_and_a_height_in_its_position_is_ignored() -> None:
+    lamp = {"type": "urban_element", "kind": "street_lamp", "position_m": [5.0, 6.0, 99.0]}
+    assert street_lights({"objects": [lamp]}, (0.0, 0.0)) == [6.0, 6.0, 4.2]
+
+
+def test_a_manifest_with_no_objects_has_no_street_lights() -> None:
+    assert street_lights({}, (0.0, 0.0)) == []
