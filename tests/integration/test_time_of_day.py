@@ -106,6 +106,7 @@ def test_the_adapter_reads_the_time_of_day_and_lights_the_lamps() -> None:
     assert "LevelDescriptor.ETimeOfDay.Day,\n" not in source and "TimeOfDayOf(pkg.Layout)," in source
     assert "ApplyNight(light, pkg.Layout);" in source and "AddStreetLights(pkg.Layout);" in source
     assert "public float[] street_lights_m;" in source
+    assert "public float[] audio_roof_wind_m;" in source and "layout.audio_roof_wind_m" in source
 
 
 def test_run_passes_the_time_of_day_to_map_create_only_when_named() -> None:

@@ -75,6 +75,7 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 ## Sound and flyover
 
 - Global: `Suburban Day`. Local: `Birds Park` on the plaza, `Wind Rooftop` on a landmark roof.
+- `audio_roof_wind_m`: `Wind Rooftop` 1.5 m above the roofs a stair reaches, at most 8, nearest the focus first and at least 25 m apart. A local source has a fixed radius in the SDK. Whether this one is also heard from the street is checked on the headset.
 - Default reverb `SmoothOutdoor`. Inside a nave volume, `ReflectiveIndoorLarge`.
 - `OnwardCustomAudioSource` is not used. It requires a custom clip, and the guide warns about uncompressed memory.
 - `LightningSystem` is not placed on a day map. The guide says a daytime flash looks wrong because it reuses the night-vision effect.
