@@ -1,0 +1,799 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://kenney.nl/assets/mini-shop, CC0 1.0. street_scale 2.5: mannequin 0.719 file units to 1.80 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_shop_assets.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-02",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "kenney_shop_bottle_return",
+      "file": "bottle-return.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bottle return, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly bottle return from Mini Shop, clean flat colours, about 2.73 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bottle",
+        "return"
+      ],
+      "triangles": 350,
+      "length_m": 1.125,
+      "depth_m": 1.203,
+      "height_m": 2.731,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_cash_register_self",
+      "file": "cash-register-self.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cash register self, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly cash register self from Mini Shop, clean flat colours, about 2.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cash",
+        "register",
+        "self"
+      ],
+      "triangles": 512,
+      "length_m": 2.25,
+      "depth_m": 1.375,
+      "height_m": 1.732,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_cash_register",
+      "file": "cash-register.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cash register, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly cash register from Mini Shop, clean flat colours, about 2.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cash",
+        "register"
+      ],
+      "triangles": 329,
+      "length_m": 2.25,
+      "depth_m": 2.125,
+      "height_m": 1.477,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_character_employee",
+      "file": "character-employee.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "character employee, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly character employee from Mini Shop, clean flat colours, about 1.92 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "character",
+        "employee"
+      ],
+      "triangles": 794,
+      "length_m": 1.918,
+      "depth_m": 1.046,
+      "height_m": 1.808,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_clothing_rack",
+      "file": "clothing-rack.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "clothing rack, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly clothing rack from Mini Shop, clean flat colours, about 2.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "clothing",
+        "rack"
+      ],
+      "triangles": 694,
+      "length_m": 2.0,
+      "depth_m": 1.255,
+      "height_m": 2.07,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_clothing_table",
+      "file": "clothing-table.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "clothing table, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly clothing table from Mini Shop, clean flat colours, about 2.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "clothing",
+        "table"
+      ],
+      "triangles": 373,
+      "length_m": 2.2,
+      "depth_m": 1.45,
+      "height_m": 1.488,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_column",
+      "file": "column.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "column, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly column from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "column"
+      ],
+      "triangles": 198,
+      "length_m": 1.814,
+      "depth_m": 1.814,
+      "height_m": 2.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_display_bread",
+      "file": "display-bread.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "display bread, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly display bread from Mini Shop, clean flat colours, about 1.75 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "display",
+        "bread"
+      ],
+      "triangles": 462,
+      "length_m": 1.75,
+      "depth_m": 1.5,
+      "height_m": 1.25,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_display_cans",
+      "file": "display-cans.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "display cans, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly display cans from Mini Shop, clean flat colours, about 2.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "display",
+        "cans"
+      ],
+      "triangles": 1228,
+      "length_m": 2.0,
+      "depth_m": 2.0,
+      "height_m": 2.25,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_display_flowers",
+      "file": "display-flowers.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "display flowers, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly display flowers from Mini Shop, clean flat colours, about 2.00 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "display",
+        "flowers"
+      ],
+      "triangles": 1712,
+      "length_m": 2.0,
+      "depth_m": 2.001,
+      "height_m": 1.58,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_display_fruit",
+      "file": "display-fruit.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "display fruit, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly display fruit from Mini Shop, clean flat colours, about 1.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "display",
+        "fruit"
+      ],
+      "triangles": 650,
+      "length_m": 1.5,
+      "depth_m": 1.5,
+      "height_m": 1.29,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_display_small",
+      "file": "display-small.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "display small, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly display small from Mini Shop, clean flat colours, about 2.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "display",
+        "small"
+      ],
+      "triangles": 278,
+      "length_m": 0.978,
+      "depth_m": 0.708,
+      "height_m": 2.081,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_fence_door_rotate",
+      "file": "fence-door-rotate.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fence door rotate, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly fence door rotate from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fence",
+        "door",
+        "rotate"
+      ],
+      "triangles": 348,
+      "length_m": 2.5,
+      "depth_m": 0.468,
+      "height_m": 0.948,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_fence",
+      "file": "fence.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fence, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly fence from Mini Shop, clean flat colours, about 1.48 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fence"
+      ],
+      "triangles": 106,
+      "length_m": 1.484,
+      "depth_m": 0.468,
+      "height_m": 0.86,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_floor_wood",
+      "file": "floor-wood.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor wood, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly floor wood from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor",
+        "wood"
+      ],
+      "triangles": 32,
+      "length_m": 2.5,
+      "depth_m": 2.5,
+      "height_m": 0.033,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_floor",
+      "file": "floor.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly floor from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor"
+      ],
+      "triangles": 24,
+      "length_m": 2.5,
+      "depth_m": 2.5,
+      "height_m": 0.031,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_freezer",
+      "file": "freezer.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "freezer, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly freezer from Mini Shop, clean flat colours, about 2.00 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "freezer"
+      ],
+      "triangles": 172,
+      "length_m": 2.0,
+      "depth_m": 1.5,
+      "height_m": 0.844,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_freezers_standing",
+      "file": "freezers-standing.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "freezers standing, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly freezers standing from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "freezers",
+        "standing"
+      ],
+      "triangles": 196,
+      "length_m": 2.5,
+      "depth_m": 1.2,
+      "height_m": 2.25,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_gacha_machine",
+      "file": "gacha-machine.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "gacha machine, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly gacha machine from Mini Shop, clean flat colours, about 2.44 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "gacha",
+        "machine"
+      ],
+      "triangles": 744,
+      "length_m": 1.084,
+      "depth_m": 1.119,
+      "height_m": 2.443,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_hand_truck",
+      "file": "hand-truck.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "hand truck, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly hand truck from Mini Shop, clean flat colours, about 1.37 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "hand",
+        "truck"
+      ],
+      "triangles": 334,
+      "length_m": 0.933,
+      "depth_m": 0.92,
+      "height_m": 1.366,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_mannequin",
+      "file": "mannequin.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mannequin, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly mannequin from Mini Shop, clean flat colours, about 1.80 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mannequin"
+      ],
+      "triangles": 374,
+      "length_m": 1.446,
+      "depth_m": 0.883,
+      "height_m": 1.797,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_shelf_bags",
+      "file": "shelf-bags.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shelf bags, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly shelf bags from Mini Shop, clean flat colours, about 2.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shelf",
+        "bags"
+      ],
+      "triangles": 1116,
+      "length_m": 2.0,
+      "depth_m": 1.75,
+      "height_m": 2.158,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_shelf_boxes",
+      "file": "shelf-boxes.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shelf boxes, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly shelf boxes from Mini Shop, clean flat colours, about 2.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shelf",
+        "boxes"
+      ],
+      "triangles": 724,
+      "length_m": 2.0,
+      "depth_m": 1.75,
+      "height_m": 2.125,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_shelf_end",
+      "file": "shelf-end.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shelf end, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly shelf end from Mini Shop, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shelf",
+        "end"
+      ],
+      "triangles": 492,
+      "length_m": 2.0,
+      "depth_m": 1.0,
+      "height_m": 2.625,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_shopping_basket",
+      "file": "shopping-basket.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shopping basket, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly shopping basket from Mini Shop, clean flat colours, about 0.88 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shopping",
+        "basket"
+      ],
+      "triangles": 296,
+      "length_m": 0.875,
+      "depth_m": 0.875,
+      "height_m": 0.625,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_shopping_cart",
+      "file": "shopping-cart.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shopping cart, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly shopping cart from Mini Shop, clean flat colours, about 1.33 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shopping",
+        "cart"
+      ],
+      "triangles": 480,
+      "length_m": 0.875,
+      "depth_m": 1.332,
+      "height_m": 0.965,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_wall_corner",
+      "file": "wall-corner.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall corner, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly wall corner from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "corner"
+      ],
+      "triangles": 110,
+      "length_m": 2.0,
+      "depth_m": 2.0,
+      "height_m": 2.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_wall_door_rotate",
+      "file": "wall-door-rotate.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall door rotate, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly wall door rotate from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "door",
+        "rotate"
+      ],
+      "triangles": 332,
+      "length_m": 2.5,
+      "depth_m": 1.5,
+      "height_m": 2.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_wall_window",
+      "file": "wall-window.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall window, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly wall window from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "window"
+      ],
+      "triangles": 162,
+      "length_m": 2.5,
+      "depth_m": 1.5,
+      "height_m": 2.5,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_shop_wall",
+      "file": "wall.glb",
+      "category": "furniture",
+      "role": "shop_fixture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall, inside a room. Mini Shop, Kenney.",
+      "description": "Low-poly wall from Mini Shop, clean flat colours, about 2.50 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall"
+      ],
+      "triangles": 48,
+      "length_m": 2.5,
+      "depth_m": 1.5,
+      "height_m": 2.5,
+      "collider": "none"
+    }
+  ]
+}

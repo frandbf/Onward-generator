@@ -1,0 +1,3703 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://kenney.nl/assets/furniture-kit, CC0 1.0. street_scale 2.03: doorway 1.01 file units to 2.05 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_shop_assets.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-02",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "kenney_furniture_bathroomCabinet",
+      "file": "bathroomCabinet.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathroom cabinet, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathroom cabinet from Furniture Kit, clean flat colours, about 0.79 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathroom",
+        "cabinet"
+      ],
+      "triangles": 64,
+      "length_m": 0.467,
+      "depth_m": 0.264,
+      "height_m": 0.792,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bathroomCabinetDrawer",
+      "file": "bathroomCabinetDrawer.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathroom cabinet drawer, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathroom cabinet drawer from Furniture Kit, clean flat colours, about 0.96 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathroom",
+        "cabinet",
+        "drawer"
+      ],
+      "triangles": 508,
+      "length_m": 0.873,
+      "depth_m": 0.65,
+      "height_m": 0.958,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bathroomMirror",
+      "file": "bathroomMirror.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathroom mirror, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathroom mirror from Furniture Kit, clean flat colours, about 0.88 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathroom",
+        "mirror"
+      ],
+      "triangles": 72,
+      "length_m": 0.612,
+      "depth_m": 0.293,
+      "height_m": 0.882,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bathroomSink",
+      "file": "bathroomSink.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathroom sink, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathroom sink from Furniture Kit, clean flat colours, about 1.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathroom",
+        "sink"
+      ],
+      "triangles": 316,
+      "length_m": 0.69,
+      "depth_m": 0.589,
+      "height_m": 1.137,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bathroomSinkSquare",
+      "file": "bathroomSinkSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathroom sink square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathroom sink square from Furniture Kit, clean flat colours, about 1.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathroom",
+        "sink",
+        "square"
+      ],
+      "triangles": 234,
+      "length_m": 0.873,
+      "depth_m": 0.609,
+      "height_m": 1.177,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bathtub",
+      "file": "bathtub.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bathtub, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bathtub from Furniture Kit, clean flat colours, about 2.42 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bathtub"
+      ],
+      "triangles": 602,
+      "length_m": 2.416,
+      "depth_m": 1.137,
+      "height_m": 0.853,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bear",
+      "file": "bear.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bear, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bear from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bear"
+      ],
+      "triangles": 134,
+      "length_m": 0.791,
+      "depth_m": 0.502,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bedBunk",
+      "file": "bedBunk.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed bunk, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bed bunk from Furniture Kit, clean flat colours, about 2.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "bunk"
+      ],
+      "triangles": 580,
+      "length_m": 1.159,
+      "depth_m": 2.223,
+      "height_m": 1.725,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bedDouble",
+      "file": "bedDouble.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed double, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bed double from Furniture Kit, clean flat colours, about 2.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "double"
+      ],
+      "triangles": 264,
+      "length_m": 1.941,
+      "depth_m": 2.284,
+      "height_m": 0.761,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bedSingle",
+      "file": "bedSingle.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed single, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bed single from Furniture Kit, clean flat colours, about 2.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "single"
+      ],
+      "triangles": 214,
+      "length_m": 1.159,
+      "depth_m": 2.284,
+      "height_m": 0.761,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bench",
+      "file": "bench.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bench, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bench from Furniture Kit, clean flat colours, about 0.95 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bench"
+      ],
+      "triangles": 170,
+      "length_m": 0.812,
+      "depth_m": 0.406,
+      "height_m": 0.954,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_benchCushion",
+      "file": "benchCushion.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bench cushion, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bench cushion from Furniture Kit, clean flat colours, about 0.93 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bench",
+        "cushion"
+      ],
+      "triangles": 196,
+      "length_m": 0.812,
+      "depth_m": 0.406,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_benchCushionLow",
+      "file": "benchCushionLow.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bench cushion low, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bench cushion low from Furniture Kit, clean flat colours, about 0.85 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bench",
+        "cushion",
+        "low"
+      ],
+      "triangles": 138,
+      "length_m": 0.853,
+      "depth_m": 0.447,
+      "height_m": 0.406,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bookcaseClosed",
+      "file": "bookcaseClosed.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase closed, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bookcase closed from Furniture Kit, clean flat colours, about 1.73 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "closed"
+      ],
+      "triangles": 372,
+      "length_m": 0.812,
+      "depth_m": 0.507,
+      "height_m": 1.725,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bookcaseClosedDoors",
+      "file": "bookcaseClosedDoors.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase closed doors, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bookcase closed doors from Furniture Kit, clean flat colours, about 1.73 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "closed",
+        "doors"
+      ],
+      "triangles": 296,
+      "length_m": 0.812,
+      "depth_m": 0.507,
+      "height_m": 1.725,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bookcaseClosedWide",
+      "file": "bookcaseClosedWide.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase closed wide, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bookcase closed wide from Furniture Kit, clean flat colours, about 1.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "closed",
+        "wide"
+      ],
+      "triangles": 372,
+      "length_m": 1.624,
+      "depth_m": 0.507,
+      "height_m": 1.604,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bookcaseOpen",
+      "file": "bookcaseOpen.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase open, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bookcase open from Furniture Kit, clean flat colours, about 1.79 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "open"
+      ],
+      "triangles": 320,
+      "length_m": 0.812,
+      "depth_m": 0.507,
+      "height_m": 1.786,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_bookcaseOpenLow",
+      "file": "bookcaseOpenLow.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase open low, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly bookcase open low from Furniture Kit, clean flat colours, about 0.81 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "open",
+        "low"
+      ],
+      "triangles": 184,
+      "length_m": 0.812,
+      "depth_m": 0.507,
+      "height_m": 0.812,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_books",
+      "file": "books.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "books, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly books from Furniture Kit, clean flat colours, about 0.30 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "books"
+      ],
+      "triangles": 62,
+      "length_m": 0.305,
+      "depth_m": 0.192,
+      "height_m": 0.211,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cabinetBed",
+      "file": "cabinetBed.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabinet bed, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cabinet bed from Furniture Kit, clean flat colours, about 0.54 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabinet",
+        "bed"
+      ],
+      "triangles": 72,
+      "length_m": 0.54,
+      "depth_m": 0.436,
+      "height_m": 0.473,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cabinetBedDrawer",
+      "file": "cabinetBedDrawer.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabinet bed drawer, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cabinet bed drawer from Furniture Kit, clean flat colours, about 0.54 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabinet",
+        "bed",
+        "drawer"
+      ],
+      "triangles": 182,
+      "length_m": 0.54,
+      "depth_m": 0.441,
+      "height_m": 0.534,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cabinetBedDrawerTable",
+      "file": "cabinetBedDrawerTable.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabinet bed drawer table, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cabinet bed drawer table from Furniture Kit, clean flat colours, about 0.54 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabinet",
+        "bed",
+        "drawer",
+        "table"
+      ],
+      "triangles": 140,
+      "length_m": 0.54,
+      "depth_m": 0.441,
+      "height_m": 0.534,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cabinetTelevision",
+      "file": "cabinetTelevision.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabinet television, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cabinet television from Furniture Kit, clean flat colours, about 1.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabinet",
+        "television"
+      ],
+      "triangles": 154,
+      "length_m": 1.624,
+      "depth_m": 0.507,
+      "height_m": 0.629,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cabinetTelevisionDoors",
+      "file": "cabinetTelevisionDoors.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabinet television doors, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cabinet television doors from Furniture Kit, clean flat colours, about 1.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabinet",
+        "television",
+        "doors"
+      ],
+      "triangles": 210,
+      "length_m": 1.624,
+      "depth_m": 0.528,
+      "height_m": 0.629,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cardboardBoxClosed",
+      "file": "cardboardBoxClosed.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cardboard box closed, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cardboard box closed from Furniture Kit, clean flat colours, about 0.57 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cardboard",
+        "box",
+        "closed"
+      ],
+      "triangles": 60,
+      "length_m": 0.431,
+      "depth_m": 0.431,
+      "height_m": 0.57,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_cardboardBoxOpen",
+      "file": "cardboardBoxOpen.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cardboard box open, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly cardboard box open from Furniture Kit, clean flat colours, about 0.76 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cardboard",
+        "box",
+        "open"
+      ],
+      "triangles": 60,
+      "length_m": 0.755,
+      "depth_m": 0.431,
+      "height_m": 0.57,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_ceilingFan",
+      "file": "ceilingFan.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ceiling fan, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly ceiling fan from Furniture Kit, clean flat colours, about 1.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ceiling",
+        "fan"
+      ],
+      "triangles": 214,
+      "length_m": 0.923,
+      "depth_m": 1.066,
+      "height_m": 0.271,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chair",
+      "file": "chair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair from Furniture Kit, clean flat colours, about 0.95 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair"
+      ],
+      "triangles": 170,
+      "length_m": 0.406,
+      "depth_m": 0.406,
+      "height_m": 0.954,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chairCushion",
+      "file": "chairCushion.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair cushion, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair cushion from Furniture Kit, clean flat colours, about 0.93 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "cushion"
+      ],
+      "triangles": 198,
+      "length_m": 0.406,
+      "depth_m": 0.406,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chairDesk",
+      "file": "chairDesk.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair desk, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair desk from Furniture Kit, clean flat colours, about 1.23 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "desk"
+      ],
+      "triangles": 588,
+      "length_m": 0.68,
+      "depth_m": 0.638,
+      "height_m": 1.233,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chairModernCushion",
+      "file": "chairModernCushion.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair modern cushion, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair modern cushion from Furniture Kit, clean flat colours, about 0.93 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "modern",
+        "cushion"
+      ],
+      "triangles": 92,
+      "length_m": 0.406,
+      "depth_m": 0.406,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chairModernFrameCushion",
+      "file": "chairModernFrameCushion.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair modern frame cushion, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair modern frame cushion from Furniture Kit, clean flat colours, about 0.93 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "modern",
+        "frame",
+        "cushion"
+      ],
+      "triangles": 284,
+      "length_m": 0.406,
+      "depth_m": 0.406,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_chairRounded",
+      "file": "chairRounded.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair rounded, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly chair rounded from Furniture Kit, clean flat colours, about 0.92 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "rounded"
+      ],
+      "triangles": 280,
+      "length_m": 0.406,
+      "depth_m": 0.406,
+      "height_m": 0.924,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_coatRack",
+      "file": "coatRack.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coat rack, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly coat rack from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coat",
+        "rack"
+      ],
+      "triangles": 132,
+      "length_m": 0.909,
+      "depth_m": 0.273,
+      "height_m": 0.568,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_coatRackStanding",
+      "file": "coatRackStanding.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coat rack standing, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly coat rack standing from Furniture Kit, clean flat colours, about 1.56 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coat",
+        "rack",
+        "standing"
+      ],
+      "triangles": 190,
+      "length_m": 0.554,
+      "depth_m": 0.554,
+      "height_m": 1.563,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_computerKeyboard",
+      "file": "computerKeyboard.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "computer keyboard, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly computer keyboard from Furniture Kit, clean flat colours, about 0.57 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "computer",
+        "keyboard"
+      ],
+      "triangles": 32,
+      "length_m": 0.573,
+      "depth_m": 0.24,
+      "height_m": 0.056,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_computerMouse",
+      "file": "computerMouse.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "computer mouse, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly computer mouse from Furniture Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "computer",
+        "mouse"
+      ],
+      "triangles": 71,
+      "length_m": 0.101,
+      "depth_m": 0.173,
+      "height_m": 0.048,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_computerScreen",
+      "file": "computerScreen.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "computer screen, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly computer screen from Furniture Kit, clean flat colours, about 0.80 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "computer",
+        "screen"
+      ],
+      "triangles": 72,
+      "length_m": 0.797,
+      "depth_m": 0.211,
+      "height_m": 0.597,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_desk",
+      "file": "desk.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "desk, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly desk from Furniture Kit, clean flat colours, about 1.49 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "desk"
+      ],
+      "triangles": 198,
+      "length_m": 1.491,
+      "depth_m": 0.796,
+      "height_m": 0.78,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_deskCorner",
+      "file": "deskCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "desk corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly desk corner from Furniture Kit, clean flat colours, about 1.98 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "desk",
+        "corner"
+      ],
+      "triangles": 250,
+      "length_m": 1.978,
+      "depth_m": 1.978,
+      "height_m": 0.78,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_doorway",
+      "file": "doorway.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "doorway, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly doorway from Furniture Kit, clean flat colours, about 2.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "doorway"
+      ],
+      "triangles": 188,
+      "length_m": 0.987,
+      "depth_m": 0.23,
+      "height_m": 2.049,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_doorwayFront",
+      "file": "doorwayFront.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "doorway front, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly doorway front from Furniture Kit, clean flat colours, about 2.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "doorway",
+        "front"
+      ],
+      "triangles": 156,
+      "length_m": 0.987,
+      "depth_m": 0.23,
+      "height_m": 2.049,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_doorwayOpen",
+      "file": "doorwayOpen.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "doorway open, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly doorway open from Furniture Kit, clean flat colours, about 2.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "doorway",
+        "open"
+      ],
+      "triangles": 28,
+      "length_m": 0.987,
+      "depth_m": 0.181,
+      "height_m": 2.049,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_dryer",
+      "file": "dryer.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dryer, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly dryer from Furniture Kit, clean flat colours, about 0.95 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "dryer"
+      ],
+      "triangles": 262,
+      "length_m": 0.792,
+      "depth_m": 0.771,
+      "height_m": 0.954,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_floorCorner",
+      "file": "floorCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly floor corner from Furniture Kit, clean flat colours, about 1.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor",
+        "corner"
+      ],
+      "triangles": 16,
+      "length_m": 1.117,
+      "depth_m": 1.117,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_floorCornerRound",
+      "file": "floorCornerRound.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor corner round, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly floor corner round from Furniture Kit, clean flat colours, about 1.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor",
+        "corner",
+        "round"
+      ],
+      "triangles": 60,
+      "length_m": 1.117,
+      "depth_m": 1.117,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_floorFull",
+      "file": "floorFull.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor full, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly floor full from Furniture Kit, clean flat colours, about 2.03 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor",
+        "full"
+      ],
+      "triangles": 12,
+      "length_m": 2.03,
+      "depth_m": 2.03,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_floorHalf",
+      "file": "floorHalf.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "floor half, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly floor half from Furniture Kit, clean flat colours, about 2.03 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "floor",
+        "half"
+      ],
+      "triangles": 12,
+      "length_m": 1.015,
+      "depth_m": 2.03,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_hoodLarge",
+      "file": "hoodLarge.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "hood large, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly hood large from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "hood",
+        "large"
+      ],
+      "triangles": 36,
+      "length_m": 0.873,
+      "depth_m": 0.578,
+      "height_m": 0.75,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_hoodModern",
+      "file": "hoodModern.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "hood modern, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly hood modern from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "hood",
+        "modern"
+      ],
+      "triangles": 28,
+      "length_m": 0.873,
+      "depth_m": 0.578,
+      "height_m": 0.811,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenBar",
+      "file": "kitchenBar.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen bar, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen bar from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "bar"
+      ],
+      "triangles": 76,
+      "length_m": 0.873,
+      "depth_m": 0.426,
+      "height_m": 0.853,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenBarEnd",
+      "file": "kitchenBarEnd.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen bar end, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen bar end from Furniture Kit, clean flat colours, about 0.85 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "bar",
+        "end"
+      ],
+      "triangles": 152,
+      "length_m": 0.206,
+      "depth_m": 0.426,
+      "height_m": 0.853,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenBlender",
+      "file": "kitchenBlender.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen blender, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen blender from Furniture Kit, clean flat colours, about 0.46 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "blender"
+      ],
+      "triangles": 246,
+      "length_m": 0.276,
+      "depth_m": 0.222,
+      "height_m": 0.462,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinet",
+      "file": "kitchenCabinet.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet"
+      ],
+      "triangles": 114,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetCornerInner",
+      "file": "kitchenCabinetCornerInner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet corner inner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet corner inner from Furniture Kit, clean flat colours, about 0.93 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "corner",
+        "inner"
+      ],
+      "triangles": 54,
+      "length_m": 0.934,
+      "depth_m": 0.934,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetCornerRound",
+      "file": "kitchenCabinetCornerRound.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet corner round, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet corner round from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "corner",
+        "round"
+      ],
+      "triangles": 194,
+      "length_m": 0.913,
+      "depth_m": 0.913,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetDrawer",
+      "file": "kitchenCabinetDrawer.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet drawer, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet drawer from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "drawer"
+      ],
+      "triangles": 174,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetUpper",
+      "file": "kitchenCabinetUpper.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet upper, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet upper from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "upper"
+      ],
+      "triangles": 80,
+      "length_m": 0.873,
+      "depth_m": 0.447,
+      "height_m": 0.792,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetUpperCorner",
+      "file": "kitchenCabinetUpperCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet upper corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet upper corner from Furniture Kit, clean flat colours, about 0.79 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "upper",
+        "corner"
+      ],
+      "triangles": 204,
+      "length_m": 0.436,
+      "depth_m": 0.426,
+      "height_m": 0.792,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetUpperDouble",
+      "file": "kitchenCabinetUpperDouble.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet upper double, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet upper double from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "upper",
+        "double"
+      ],
+      "triangles": 234,
+      "length_m": 0.873,
+      "depth_m": 0.447,
+      "height_m": 0.792,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCabinetUpperLow",
+      "file": "kitchenCabinetUpperLow.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen cabinet upper low, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen cabinet upper low from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "cabinet",
+        "upper",
+        "low"
+      ],
+      "triangles": 64,
+      "length_m": 0.873,
+      "depth_m": 0.447,
+      "height_m": 0.396,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenCoffeeMachine",
+      "file": "kitchenCoffeeMachine.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen coffee machine, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen coffee machine from Furniture Kit, clean flat colours, about 0.49 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "coffee",
+        "machine"
+      ],
+      "triangles": 166,
+      "length_m": 0.385,
+      "depth_m": 0.488,
+      "height_m": 0.36,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenFridge",
+      "file": "kitchenFridge.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen fridge, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen fridge from Furniture Kit, clean flat colours, about 1.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "fridge"
+      ],
+      "triangles": 250,
+      "length_m": 0.873,
+      "depth_m": 0.593,
+      "height_m": 1.868,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenFridgeBuiltIn",
+      "file": "kitchenFridgeBuiltIn.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen fridge built in, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen fridge built in from Furniture Kit, clean flat colours, about 1.76 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "fridge",
+        "built",
+        "in"
+      ],
+      "triangles": 268,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 1.764,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenFridgeLarge",
+      "file": "kitchenFridgeLarge.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen fridge large, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen fridge large from Furniture Kit, clean flat colours, about 1.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "fridge",
+        "large"
+      ],
+      "triangles": 436,
+      "length_m": 1.056,
+      "depth_m": 0.823,
+      "height_m": 1.868,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenFridgeSmall",
+      "file": "kitchenFridgeSmall.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen fridge small, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen fridge small from Furniture Kit, clean flat colours, about 1.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "fridge",
+        "small"
+      ],
+      "triangles": 152,
+      "length_m": 0.873,
+      "depth_m": 0.593,
+      "height_m": 1.219,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenMicrowave",
+      "file": "kitchenMicrowave.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen microwave, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen microwave from Furniture Kit, clean flat colours, about 0.59 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "microwave"
+      ],
+      "triangles": 152,
+      "length_m": 0.589,
+      "depth_m": 0.467,
+      "height_m": 0.365,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenSink",
+      "file": "kitchenSink.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen sink, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen sink from Furniture Kit, clean flat colours, about 0.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "sink"
+      ],
+      "triangles": 318,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 0.995,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenStove",
+      "file": "kitchenStove.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen stove, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen stove from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "stove"
+      ],
+      "triangles": 830,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_kitchenStoveElectric",
+      "file": "kitchenStoveElectric.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "kitchen stove electric, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly kitchen stove electric from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "kitchen",
+        "stove",
+        "electric"
+      ],
+      "triangles": 338,
+      "length_m": 0.873,
+      "depth_m": 0.913,
+      "height_m": 0.913,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampRoundFloor",
+      "file": "lampRoundFloor.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp round floor, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp round floor from Furniture Kit, clean flat colours, about 1.75 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "round",
+        "floor"
+      ],
+      "triangles": 76,
+      "length_m": 0.309,
+      "depth_m": 0.356,
+      "height_m": 1.746,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampRoundTable",
+      "file": "lampRoundTable.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp round table, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp round table from Furniture Kit, clean flat colours, about 0.64 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "round",
+        "table"
+      ],
+      "triangles": 76,
+      "length_m": 0.309,
+      "depth_m": 0.356,
+      "height_m": 0.638,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampSquareCeiling",
+      "file": "lampSquareCeiling.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp square ceiling, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp square ceiling from Furniture Kit, clean flat colours, about 0.47 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "square",
+        "ceiling"
+      ],
+      "triangles": 60,
+      "length_m": 0.244,
+      "depth_m": 0.244,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampSquareFloor",
+      "file": "lampSquareFloor.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp square floor, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp square floor from Furniture Kit, clean flat colours, about 1.75 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "square",
+        "floor"
+      ],
+      "triangles": 60,
+      "length_m": 0.244,
+      "depth_m": 0.244,
+      "height_m": 1.746,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampSquareTable",
+      "file": "lampSquareTable.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp square table, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp square table from Furniture Kit, clean flat colours, about 0.59 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "square",
+        "table"
+      ],
+      "triangles": 60,
+      "length_m": 0.244,
+      "depth_m": 0.244,
+      "height_m": 0.589,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_lampWall",
+      "file": "lampWall.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp wall, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lamp wall from Furniture Kit, clean flat colours, about 0.46 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp",
+        "wall"
+      ],
+      "triangles": 42,
+      "length_m": 0.46,
+      "depth_m": 0.305,
+      "height_m": 0.188,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_laptop",
+      "file": "laptop.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "laptop, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly laptop from Furniture Kit, clean flat colours, about 0.54 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "laptop"
+      ],
+      "triangles": 68,
+      "length_m": 0.536,
+      "depth_m": 0.487,
+      "height_m": 0.328,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeChair",
+      "file": "loungeChair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge chair, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge chair from Furniture Kit, clean flat colours, about 0.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "chair"
+      ],
+      "triangles": 128,
+      "length_m": 0.995,
+      "depth_m": 0.832,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeChairRelax",
+      "file": "loungeChairRelax.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge chair relax, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge chair relax from Furniture Kit, clean flat colours, about 1.37 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "chair",
+        "relax"
+      ],
+      "triangles": 188,
+      "length_m": 0.995,
+      "depth_m": 1.37,
+      "height_m": 1.279,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeDesignChair",
+      "file": "loungeDesignChair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge design chair, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge design chair from Furniture Kit, clean flat colours, about 1.48 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "design",
+        "chair"
+      ],
+      "triangles": 116,
+      "length_m": 1.481,
+      "depth_m": 0.832,
+      "height_m": 0.812,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeDesignSofa",
+      "file": "loungeDesignSofa.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge design sofa, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge design sofa from Furniture Kit, clean flat colours, about 2.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "design",
+        "sofa"
+      ],
+      "triangles": 116,
+      "length_m": 2.274,
+      "depth_m": 0.832,
+      "height_m": 0.812,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeDesignSofaCorner",
+      "file": "loungeDesignSofaCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge design sofa corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge design sofa corner from Furniture Kit, clean flat colours, about 2.74 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "design",
+        "sofa",
+        "corner"
+      ],
+      "triangles": 176,
+      "length_m": 2.74,
+      "depth_m": 2.74,
+      "height_m": 0.812,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeSofa",
+      "file": "loungeSofa.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge sofa, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge sofa from Furniture Kit, clean flat colours, about 1.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "sofa"
+      ],
+      "triangles": 128,
+      "length_m": 1.989,
+      "depth_m": 0.832,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeSofaCorner",
+      "file": "loungeSofaCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge sofa corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge sofa corner from Furniture Kit, clean flat colours, about 1.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "sofa",
+        "corner"
+      ],
+      "triangles": 190,
+      "length_m": 1.989,
+      "depth_m": 1.989,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeSofaLong",
+      "file": "loungeSofaLong.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge sofa long, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge sofa long from Furniture Kit, clean flat colours, about 1.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "sofa",
+        "long"
+      ],
+      "triangles": 186,
+      "length_m": 1.989,
+      "depth_m": 1.665,
+      "height_m": 0.934,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_loungeSofaOttoman",
+      "file": "loungeSofaOttoman.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lounge sofa ottoman, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly lounge sofa ottoman from Furniture Kit, clean flat colours, about 0.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lounge",
+        "sofa",
+        "ottoman"
+      ],
+      "triangles": 84,
+      "length_m": 0.893,
+      "depth_m": 0.914,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_paneling",
+      "file": "paneling.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "paneling, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly paneling from Furniture Kit, clean flat colours, about 1.21 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "paneling"
+      ],
+      "triangles": 40,
+      "length_m": 1.015,
+      "depth_m": 0.061,
+      "height_m": 1.207,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_pillow",
+      "file": "pillow.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pillow, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly pillow from Furniture Kit, clean flat colours, about 0.47 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pillow"
+      ],
+      "triangles": 50,
+      "length_m": 0.467,
+      "depth_m": 0.18,
+      "height_m": 0.451,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_pillowBlue",
+      "file": "pillowBlue.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pillow blue, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly pillow blue from Furniture Kit, clean flat colours, about 0.47 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pillow",
+        "blue"
+      ],
+      "triangles": 50,
+      "length_m": 0.467,
+      "depth_m": 0.129,
+      "height_m": 0.261,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_pillowBlueLong",
+      "file": "pillowBlueLong.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pillow blue long, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly pillow blue long from Furniture Kit, clean flat colours, about 1.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pillow",
+        "blue",
+        "long"
+      ],
+      "triangles": 50,
+      "length_m": 1.049,
+      "depth_m": 0.18,
+      "height_m": 0.451,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_pillowLong",
+      "file": "pillowLong.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pillow long, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly pillow long from Furniture Kit, clean flat colours, about 0.79 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pillow",
+        "long"
+      ],
+      "triangles": 50,
+      "length_m": 0.785,
+      "depth_m": 0.18,
+      "height_m": 0.451,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_plantSmall1",
+      "file": "plantSmall1.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plant small 1, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly plant small 1 from Furniture Kit, clean flat colours, about 0.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plant",
+        "small"
+      ],
+      "triangles": 102,
+      "length_m": 0.192,
+      "depth_m": 0.192,
+      "height_m": 0.284,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_plantSmall2",
+      "file": "plantSmall2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plant small 2, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly plant small 2 from Furniture Kit, clean flat colours, about 0.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plant",
+        "small"
+      ],
+      "triangles": 158,
+      "length_m": 0.192,
+      "depth_m": 0.192,
+      "height_m": 0.284,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_plantSmall3",
+      "file": "plantSmall3.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plant small 3, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly plant small 3 from Furniture Kit, clean flat colours, about 0.29 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plant",
+        "small"
+      ],
+      "triangles": 98,
+      "length_m": 0.199,
+      "depth_m": 0.172,
+      "height_m": 0.294,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_pottedPlant",
+      "file": "pottedPlant.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "potted plant, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly potted plant from Furniture Kit, clean flat colours, about 1.33 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "potted",
+        "plant"
+      ],
+      "triangles": 60,
+      "length_m": 0.43,
+      "depth_m": 0.49,
+      "height_m": 1.328,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_radio",
+      "file": "radio.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "radio, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly radio from Furniture Kit, clean flat colours, about 0.64 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "radio"
+      ],
+      "triangles": 432,
+      "length_m": 0.639,
+      "depth_m": 0.198,
+      "height_m": 0.463,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_rugDoormat",
+      "file": "rugDoormat.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rug doormat, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly rug doormat from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rug",
+        "doormat"
+      ],
+      "triangles": 204,
+      "length_m": 0.871,
+      "depth_m": 0.481,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_rugRectangle",
+      "file": "rugRectangle.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rug rectangle, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly rug rectangle from Furniture Kit, clean flat colours, about 3.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rug",
+        "rectangle"
+      ],
+      "triangles": 28,
+      "length_m": 3.187,
+      "depth_m": 1.868,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_rugRound",
+      "file": "rugRound.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rug round, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly rug round from Furniture Kit, clean flat colours, about 1.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rug",
+        "round"
+      ],
+      "triangles": 188,
+      "length_m": 1.868,
+      "depth_m": 1.868,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_rugRounded",
+      "file": "rugRounded.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rug rounded, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly rug rounded from Furniture Kit, clean flat colours, about 3.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rug",
+        "rounded"
+      ],
+      "triangles": 204,
+      "length_m": 3.187,
+      "depth_m": 1.868,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_rugSquare",
+      "file": "rugSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rug square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly rug square from Furniture Kit, clean flat colours, about 1.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rug",
+        "square"
+      ],
+      "triangles": 28,
+      "length_m": 1.836,
+      "depth_m": 1.868,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_shower",
+      "file": "shower.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shower, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly shower from Furniture Kit, clean flat colours, about 2.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shower"
+      ],
+      "triangles": 810,
+      "length_m": 1.14,
+      "depth_m": 1.181,
+      "height_m": 2.221,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_showerRound",
+      "file": "showerRound.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shower round, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly shower round from Furniture Kit, clean flat colours, about 2.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shower",
+        "round"
+      ],
+      "triangles": 960,
+      "length_m": 1.14,
+      "depth_m": 1.14,
+      "height_m": 2.221,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_sideTable",
+      "file": "sideTable.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "side table, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly side table from Furniture Kit, clean flat colours, about 1.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "side",
+        "table"
+      ],
+      "triangles": 118,
+      "length_m": 1.085,
+      "depth_m": 0.447,
+      "height_m": 0.78,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_sideTableDrawers",
+      "file": "sideTableDrawers.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "side table drawers, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly side table drawers from Furniture Kit, clean flat colours, about 1.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "side",
+        "table",
+        "drawers"
+      ],
+      "triangles": 238,
+      "length_m": 1.085,
+      "depth_m": 0.451,
+      "height_m": 0.78,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_speaker",
+      "file": "speaker.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "speaker, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly speaker from Furniture Kit, clean flat colours, about 1.29 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "speaker"
+      ],
+      "triangles": 228,
+      "length_m": 0.3,
+      "depth_m": 0.3,
+      "height_m": 1.292,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_speakerSmall",
+      "file": "speakerSmall.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "speaker small, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly speaker small from Furniture Kit, clean flat colours, about 0.60 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "speaker",
+        "small"
+      ],
+      "triangles": 220,
+      "length_m": 0.3,
+      "depth_m": 0.27,
+      "height_m": 0.605,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stairs",
+      "file": "stairs.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stairs, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stairs from Furniture Kit, clean flat colours, about 3.70 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stairs"
+      ],
+      "triangles": 308,
+      "length_m": 3.702,
+      "depth_m": 1.604,
+      "height_m": 2.719,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stairsCorner",
+      "file": "stairsCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stairs corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stairs corner from Furniture Kit, clean flat colours, about 3.60 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stairs",
+        "corner"
+      ],
+      "triangles": 312,
+      "length_m": 3.601,
+      "depth_m": 2.894,
+      "height_m": 2.719,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stairsOpen",
+      "file": "stairsOpen.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stairs open, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stairs open from Furniture Kit, clean flat colours, about 3.70 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stairs",
+        "open"
+      ],
+      "triangles": 558,
+      "length_m": 3.702,
+      "depth_m": 1.604,
+      "height_m": 2.719,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stairsOpenSingle",
+      "file": "stairsOpenSingle.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stairs open single, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stairs open single from Furniture Kit, clean flat colours, about 3.70 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stairs",
+        "open",
+        "single"
+      ],
+      "triangles": 326,
+      "length_m": 3.702,
+      "depth_m": 1.604,
+      "height_m": 2.719,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stoolBar",
+      "file": "stoolBar.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stool bar, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stool bar from Furniture Kit, clean flat colours, about 0.88 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stool",
+        "bar"
+      ],
+      "triangles": 176,
+      "length_m": 0.539,
+      "depth_m": 0.467,
+      "height_m": 0.883,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_stoolBarSquare",
+      "file": "stoolBarSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stool bar square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly stool bar square from Furniture Kit, clean flat colours, about 0.82 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stool",
+        "bar",
+        "square"
+      ],
+      "triangles": 142,
+      "length_m": 0.312,
+      "depth_m": 0.3,
+      "height_m": 0.822,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_table",
+      "file": "table.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table from Furniture Kit, clean flat colours, about 1.71 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table"
+      ],
+      "triangles": 120,
+      "length_m": 1.708,
+      "depth_m": 0.908,
+      "height_m": 0.663,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCloth",
+      "file": "tableCloth.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table cloth, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table cloth from Furniture Kit, clean flat colours, about 1.71 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "cloth"
+      ],
+      "triangles": 144,
+      "length_m": 1.708,
+      "depth_m": 0.908,
+      "height_m": 0.663,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCoffee",
+      "file": "tableCoffee.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table coffee, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table coffee from Furniture Kit, clean flat colours, about 1.34 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "coffee"
+      ],
+      "triangles": 124,
+      "length_m": 1.342,
+      "depth_m": 0.812,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCoffeeGlass",
+      "file": "tableCoffeeGlass.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table coffee glass, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table coffee glass from Furniture Kit, clean flat colours, about 1.34 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "coffee",
+        "glass"
+      ],
+      "triangles": 140,
+      "length_m": 1.342,
+      "depth_m": 0.812,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCoffeeGlassSquare",
+      "file": "tableCoffeeGlassSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table coffee glass square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table coffee glass square from Furniture Kit, clean flat colours, about 0.81 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "coffee",
+        "glass",
+        "square"
+      ],
+      "triangles": 140,
+      "length_m": 0.812,
+      "depth_m": 0.812,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCoffeeSquare",
+      "file": "tableCoffeeSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table coffee square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table coffee square from Furniture Kit, clean flat colours, about 0.81 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "coffee",
+        "square"
+      ],
+      "triangles": 124,
+      "length_m": 0.812,
+      "depth_m": 0.812,
+      "height_m": 0.467,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCross",
+      "file": "tableCross.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table cross, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table cross from Furniture Kit, clean flat colours, about 1.73 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "cross"
+      ],
+      "triangles": 178,
+      "length_m": 1.73,
+      "depth_m": 0.908,
+      "height_m": 0.705,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableCrossCloth",
+      "file": "tableCrossCloth.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table cross cloth, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table cross cloth from Furniture Kit, clean flat colours, about 1.73 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "cross",
+        "cloth"
+      ],
+      "triangles": 202,
+      "length_m": 1.73,
+      "depth_m": 0.908,
+      "height_m": 0.705,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableGlass",
+      "file": "tableGlass.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table glass, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table glass from Furniture Kit, clean flat colours, about 1.71 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "glass"
+      ],
+      "triangles": 144,
+      "length_m": 1.708,
+      "depth_m": 0.908,
+      "height_m": 0.663,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_tableRound",
+      "file": "tableRound.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table round, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly table round from Furniture Kit, clean flat colours, about 1.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table",
+        "round"
+      ],
+      "triangles": 80,
+      "length_m": 1.406,
+      "depth_m": 1.624,
+      "height_m": 0.744,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_televisionAntenna",
+      "file": "televisionAntenna.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "television antenna, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly television antenna from Furniture Kit, clean flat colours, about 0.54 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "television",
+        "antenna"
+      ],
+      "triangles": 44,
+      "length_m": 0.537,
+      "depth_m": 0.162,
+      "height_m": 0.209,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_televisionModern",
+      "file": "televisionModern.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "television modern, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly television modern from Furniture Kit, clean flat colours, about 1.39 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "television",
+        "modern"
+      ],
+      "triangles": 72,
+      "length_m": 1.39,
+      "depth_m": 0.261,
+      "height_m": 0.923,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_televisionVintage",
+      "file": "televisionVintage.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "television vintage, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly television vintage from Furniture Kit, clean flat colours, about 0.83 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "television",
+        "vintage"
+      ],
+      "triangles": 280,
+      "length_m": 0.832,
+      "depth_m": 0.548,
+      "height_m": 0.548,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_toaster",
+      "file": "toaster.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "toaster, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly toaster from Furniture Kit, clean flat colours, about 0.38 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "toaster"
+      ],
+      "triangles": 220,
+      "length_m": 0.382,
+      "depth_m": 0.203,
+      "height_m": 0.264,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_toilet",
+      "file": "toilet.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "toilet, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly toilet from Furniture Kit, clean flat colours, about 0.97 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "toilet"
+      ],
+      "triangles": 230,
+      "length_m": 0.634,
+      "depth_m": 0.969,
+      "height_m": 0.915,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_toiletSquare",
+      "file": "toiletSquare.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "toilet square, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly toilet square from Furniture Kit, clean flat colours, about 0.92 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "toilet",
+        "square"
+      ],
+      "triangles": 228,
+      "length_m": 0.616,
+      "depth_m": 0.786,
+      "height_m": 0.915,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_trashcan",
+      "file": "trashcan.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "trashcan, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly trashcan from Furniture Kit, clean flat colours, about 0.87 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "trashcan"
+      ],
+      "triangles": 68,
+      "length_m": 0.422,
+      "depth_m": 0.475,
+      "height_m": 0.869,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wall",
+      "file": "wall.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall"
+      ],
+      "triangles": 12,
+      "length_m": 2.03,
+      "depth_m": 0.102,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallCorner",
+      "file": "wallCorner.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall corner, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall corner from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "corner"
+      ],
+      "triangles": 28,
+      "length_m": 1.117,
+      "depth_m": 1.117,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallCornerRond",
+      "file": "wallCornerRond.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall corner rond, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall corner rond from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "corner",
+        "rond"
+      ],
+      "triangles": 116,
+      "length_m": 1.117,
+      "depth_m": 1.117,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallDoorway",
+      "file": "wallDoorway.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall doorway, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall doorway from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "doorway"
+      ],
+      "triangles": 60,
+      "length_m": 2.03,
+      "depth_m": 0.181,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallDoorwayWide",
+      "file": "wallDoorwayWide.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall doorway wide, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall doorway wide from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "doorway",
+        "wide"
+      ],
+      "triangles": 60,
+      "length_m": 2.03,
+      "depth_m": 0.181,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallHalf",
+      "file": "wallHalf.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall half, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall half from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "half"
+      ],
+      "triangles": 12,
+      "length_m": 1.015,
+      "depth_m": 0.102,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallWindow",
+      "file": "wallWindow.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall window, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall window from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "window"
+      ],
+      "triangles": 108,
+      "length_m": 2.03,
+      "depth_m": 0.181,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_wallWindowSlide",
+      "file": "wallWindowSlide.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wall window slide, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly wall window slide from Furniture Kit, clean flat colours, about 2.62 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wall",
+        "window",
+        "slide"
+      ],
+      "triangles": 152,
+      "length_m": 2.03,
+      "depth_m": 0.181,
+      "height_m": 2.618,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_washer",
+      "file": "washer.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "washer, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly washer from Furniture Kit, clean flat colours, about 0.95 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "washer"
+      ],
+      "triangles": 720,
+      "length_m": 0.792,
+      "depth_m": 0.792,
+      "height_m": 0.954,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_furniture_washerDryerStacked",
+      "file": "washerDryerStacked.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "washer dryer stacked, inside a room. Furniture Kit, Kenney.",
+      "description": "Low-poly washer dryer stacked from Furniture Kit, clean flat colours, about 1.91 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "washer",
+        "dryer",
+        "stacked"
+      ],
+      "triangles": 992,
+      "length_m": 0.792,
+      "depth_m": 0.792,
+      "height_m": 1.908,
+      "collider": "none"
+    }
+  ]
+}

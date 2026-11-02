@@ -1,0 +1,206 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://polyhaven.com, CC0 1.0. Size from the /info dimensions.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_shop_assets.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-02",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "Shelf_01",
+      "file": "Shelf_01.glb",
+      "category": "furniture",
+      "role": "shelf",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shelf 01, inside a shop. Poly Haven.",
+      "description": "Worn wooden shelf unit with weathered paint, tall and narrow.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shelf"
+      ],
+      "triangles": 182,
+      "length_m": 1.003,
+      "depth_m": 0.257,
+      "height_m": 2.08,
+      "collider": "none"
+    },
+    {
+      "id": "wooden_display_shelves_01",
+      "file": "wooden_display_shelves_01.glb",
+      "category": "furniture",
+      "role": "shelf",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wooden display shelves 01, inside a shop. Poly Haven.",
+      "description": "Wooden display shelves for a shop, open at the front.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wooden",
+        "display",
+        "shelves"
+      ],
+      "triangles": 1797,
+      "length_m": 1.078,
+      "depth_m": 0.372,
+      "height_m": 1.556,
+      "collider": "none"
+    },
+    {
+      "id": "steel_frame_shelves_01",
+      "file": "steel_frame_shelves_01.glb",
+      "category": "furniture",
+      "role": "shelf",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "steel frame shelves 01, inside a shop. Poly Haven.",
+      "description": "Tall steel frame shelving with wooden boards, wide bay.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "steel",
+        "frame",
+        "shelves"
+      ],
+      "triangles": 1706,
+      "length_m": 1.097,
+      "depth_m": 0.502,
+      "height_m": 2.14,
+      "collider": "none"
+    },
+    {
+      "id": "steel_frame_shelves_02",
+      "file": "steel_frame_shelves_02.glb",
+      "category": "furniture",
+      "role": "shelf",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "steel frame shelves 02, inside a shop. Poly Haven.",
+      "description": "Tall steel frame shelving with wooden boards, narrow bay.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "steel",
+        "frame",
+        "shelves"
+      ],
+      "triangles": 1706,
+      "length_m": 0.593,
+      "depth_m": 0.502,
+      "height_m": 2.141,
+      "collider": "none"
+    },
+    {
+      "id": "CashRegister_01",
+      "file": "CashRegister_01.glb",
+      "category": "furniture",
+      "role": "cash_register",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cash register 01, inside a shop. Poly Haven.",
+      "description": "Old mechanical cash register for a shop counter.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cash",
+        "register"
+      ],
+      "triangles": 1789,
+      "length_m": 0.623,
+      "depth_m": 0.592,
+      "height_m": 0.618,
+      "collider": "none"
+    },
+    {
+      "id": "wooden_crate_01",
+      "file": "wooden_crate_01.glb",
+      "category": "furniture",
+      "role": "crate",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wooden crate 01, inside a shop. Poly Haven.",
+      "description": "Low open wooden crate with slatted sides.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wooden",
+        "crate"
+      ],
+      "triangles": 1790,
+      "length_m": 0.817,
+      "depth_m": 0.402,
+      "height_m": 0.343,
+      "collider": "none"
+    },
+    {
+      "id": "standing_chalkboard_01",
+      "file": "standing_chalkboard_01.glb",
+      "category": "furniture",
+      "role": "sign",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "standing chalkboard 01, inside a shop. Poly Haven.",
+      "description": "Standing folding chalkboard for a shop menu or price list.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "standing",
+        "chalkboard"
+      ],
+      "triangles": 1685,
+      "length_m": 0.92,
+      "depth_m": 0.759,
+      "height_m": 1.509,
+      "collider": "none"
+    }
+  ]
+}
