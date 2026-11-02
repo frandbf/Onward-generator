@@ -19,6 +19,7 @@ from onward_generator.detail.grammar import FacadeUse
 from onward_generator.detail.typology import (
     DEFAULT_CONFIG_PATH,
     Era,
+    FacadeStyle,
     Morphology,
     TypologyConfigError,
     TypologyInputs,
@@ -26,10 +27,12 @@ from onward_generator.detail.typology import (
     building_typologies,
     classify,
     era_period,
+    facade_style,
     load_typology_config,
     morphology,
     parse_year,
     shared_wall_share,
+    styled_template,
     typology_config_from_document,
     typology_record,
 )
@@ -336,3 +339,44 @@ def test_a_landmark_part_makes_its_parcel_a_landmark_and_the_catastro_use_counts
     height_of["p:2"] = {"category": "unknown"}
     out, _ = _typologies(footprints, keys, {"p:1": 6.0, "p:2": 6.0}, features, height_of)
     assert (out["p:2"]["typology"], out["p:2"]["rule"]) == ("industrial_shed", "industrial_shed:use")
+
+
+# --- facade style (ADR-027) ---
+
+
+def test_the_era_goes_over_the_typology_and_an_unknown_keeps_the_template() -> None:
+    core = facade_style("historic_core", None, TCFG)
+    assert (core.bay_factor, core.window_width_factor, core.window_height_factor, core.balcony_share) == (0.9, 0.9, 1.2, 0.6)
+    assert core.palette == ("plaster_cream", "plaster_ochre", "stone_warm")
+    old = facade_style("historic_core", "pre_1900", TCFG)
+    assert (old.bay_factor, old.window_height_factor, old.balcony_share) == (0.9, 1.25, 0.6)
+    assert facade_style("other", None, TCFG) == FacadeStyle()
+    assert facade_style("other", "1940_1959", TCFG) == FacadeStyle()
+    sixties = facade_style("open_block", "1960_1979", TCFG)
+    assert sixties.palette[0] == "brick_red" and sixties.window_width_factor == 1.25 and sixties.balcony_share == 0.2
+
+
+def test_a_style_scales_the_template_and_leaves_the_rest() -> None:
+    template = CFG.templates["generic_residential"]
+    styled = styled_template(template, FacadeStyle(bay_factor=1.1, window_width_factor=1.25, window_height_factor=0.9, balcony_share=0.2))
+    assert styled.bay_m == pytest.approx(template.bay_m * 1.1)
+    assert styled.window.width_m == pytest.approx(template.window.width_m * 1.25) and styled.window.height_m == pytest.approx(template.window.height_m * 0.9)
+    assert styled.window.sill_m == template.window.sill_m and styled.narrow_window == template.narrow_window
+    assert styled.balcony.share == 0.2 and styled.balcony.door == template.balcony.door
+    assert styled.wall_materials == template.wall_materials and styled.name == template.name
+    assert styled_template(template, FacadeStyle()) == template
+    none = styled_template(CFG.templates["generic_public"], FacadeStyle(balcony_share=0.5))
+    assert none.balcony is None
+
+
+def test_every_palette_names_a_material_and_a_factor_out_of_range_is_refused() -> None:
+    doc = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    for group in doc["facades"].values():
+        for style in group.values():
+            assert set(style.get("palette", ())) <= set(CFG.materials)
+    bad = copy.deepcopy(doc)
+    bad["facades"]["typologies"]["tower"]["bay_factor"] = 2.0
+    bad["facades"]["eras"]["victorian"] = {}
+    with pytest.raises(TypologyConfigError) as err:
+        typology_config_from_document(bad)
+    assert len(err.value.problems) == 2

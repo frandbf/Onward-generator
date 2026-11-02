@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -85,3 +86,31 @@ def test_the_command_line_uses_the_config_it_is_given(detail_inputs: tuple[Path,
     bad = tmp_path / "bad.json"
     bad.write_text("{}", encoding="utf-8")
     assert main([*args, "--out", str(tmp_path / "other"), "--typology-config", str(bad)]) == 1
+
+
+def test_the_style_reaches_the_facade_and_a_residential_palette(tmp_path_factory: pytest.TempPathFactory) -> None:
+    outline = [(-30, 6), (-15, 6), (-15, 18), (-30, 18)]
+    tags = {"building": "apartments", "building:levels": "5"}
+    plain = {701: (outline, tags)}
+    dated = {701: (outline, {**tags, "start_date": "1965"})}
+    before = _detail(_detail_inputs(tmp_path_factory.mktemp("plain"), plain, {}))
+    after = _detail(_detail_inputs(tmp_path_factory.mktemp("sixties"), dated, {}))
+    record = next(o.record for o in after.objects if o.id == "building/osm-way-701")
+    style = record["facade"]["typology"]["facade_style"]
+    assert tuple(style["palette"]) == ("brick_red", "plaster_cream", "plaster_white") and style["window_width_factor"] == 1.25
+    assert record["facade"]["materials"]["wall"] in style["palette"]
+    plain_style = next(o.record for o in before.objects if o.id == "building/osm-way-701")["facade"]["typology"]["facade_style"]
+    assert plain_style["palette"] != style["palette"]
+
+
+def test_a_style_palette_paints_homes_only(detail_inputs: tuple[Path, Path, Path]) -> None:
+    # stone_light is in no palette of a use, so finding it means the style's palette was read.
+    styles = {name: {"palette": ["stone_light"]} for name in ("closed_block", "open_block", "row_house", "detached_house", "other", "civic", "landmark", "historic_core")}
+    tcfg = replace(load_typology_config(), typology_styles=styles)
+    detailed = _detail(detail_inputs, typology=tcfg)
+    walls = {r["source_ids"][0]: (r["facade"]["use"]["use"], r["facade"]["materials"]["wall"]) for r in _records(detailed)}
+    homes = {bid: wall for bid, (use, wall) in walls.items() if use == "residential"}
+    others = {bid: wall for bid, (use, wall) in walls.items() if use != "residential"}
+    assert homes and set(homes.values()) == {"stone_light"}
+    assert others and "stone_light" not in others.values()
+    assert "stone_light" not in {r["facade"]["materials"]["wall"] for r in _records(_detail(detail_inputs))}

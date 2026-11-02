@@ -10,7 +10,7 @@ import argparse
 import sys
 
 from onward_generator.ai.providers import OllamaProvider, ProviderError
-from onward_generator.maps.workspace import MapError, create_map, load_map, map_directory, refresh_texture_plan
+from onward_generator.maps.workspace import TIME_OF_DAY_DEFAULT, TIMES_OF_DAY, MapError, create_map, load_map, map_directory, refresh_texture_plan
 from onward_generator.materials.plan import PlanError
 from onward_generator.next_step import emit, geo_command
 from onward_generator.osm.acquire import OsmDownloadError, download_map_osm, osm_target
@@ -33,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--seed", type=int, default=None, help="deterministic seed; default derives from the centre")
     create.add_argument("--description", default=None, help="card description, max 600 characters")
     create.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
+    create.add_argument("--time-of-day", choices=TIMES_OF_DAY, default=TIME_OF_DAY_DEFAULT, help="day or night: light, Onward profile and street lamps (ADR-026)")  # pragma: no mutate: help text
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     create.add_argument("--core-radius-m", type=float, default=150.0, help="half-side of the playable core square, metres (default 150; 0 or at least the radius plays the whole map; ADR-017)")
     create.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
@@ -66,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
                 brief=args.brief,
                 ambient_ai=args.ai,
                 panoramax=args.panoramax,
+                time_of_day=args.time_of_day,
                 lightmap_texels_per_m=args.lightmap_texels_per_m,
                 core_radius_m=args.core_radius_m,
                 overwrite=args.overwrite,

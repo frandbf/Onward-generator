@@ -1,6 +1,6 @@
 # ADR-024 — Record a building typology and construction era
 
-Status: proposed · 1 November 2026. Second increment of the [facades, typology and triangle budget plan](../plans/2026-10-31-facades-typology-budget.md). Builds on [ADR-016](ADR-016-catastro-split.md), [ADR-018](ADR-018-source-plugins.md) and [ADR-022](ADR-022-catastro-use.md). It changes nothing that is drawn.
+Status: proposed · 1 November 2026. Second increment of the [facades, typology and triangle budget plan](../plans/2026-10-31-facades-typology-budget.md). Builds on [ADR-016](ADR-016-catastro-split.md), [ADR-018](ADR-018-source-plugins.md) and [ADR-022](ADR-022-catastro-use.md). It changes nothing that is drawn; [ADR-027](ADR-027-typology-facades.md) uses the record.
 
 ## Context
 

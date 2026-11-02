@@ -579,17 +579,42 @@ def spread_routes(routes: list[dict[str, Any]], count: int, origin: tuple[float,
     return chosen
 
 
-def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any]) -> dict[str, Any]:
-    """Spawns, Hunt anchors, SDK audio names and the urban day profile.
+TIME_OF_DAY_SETTINGS: Mapping[str, tuple[str, str]] = {"day": ("Day", "UrbanDay1"), "night": ("Night", "UrbanNight1")}
+"""``time_of_day`` → SDK ``ETimeOfDay`` and ``EProfileId`` names (``LevelDescriptor.cs``, SDK v1.15)."""
+STREET_LIGHTS_MAX = 64
+"""As many as the schema allows interior lights. A baked light costs bake time, not frame time."""
+LAMP_HEAD_REACH_M = 1.0
+LAMP_LIGHT_HEIGHT_M = 4.2
+"""Under the head of the ``street_lamp`` prototype (``detail/modules.py``): 1 m along its arm, just below 4.25 m."""
+
+
+def street_lights(detail_manifest: Mapping[str, Any], focus: tuple[float, float]) -> list[float]:
+    """Flat ``x, y, z`` triples of a light under each street lamp's head, nearest the focus first, at most ``STREET_LIGHTS_MAX``."""
+    heads: list[tuple[float, float]] = []
+    for element in detail_manifest.get("objects", []):
+        if element.get("type") == "urban_element" and element.get("kind") == "street_lamp":
+            x, y = element["position_m"][:2]
+            yaw = math.radians(float(element.get("yaw_deg", 0.0)))
+            heads.append((x + LAMP_HEAD_REACH_M * math.cos(yaw), y + LAMP_HEAD_REACH_M * math.sin(yaw)))
+    heads.sort(key=lambda head: (math.dist(head, focus), head))
+    return [value for x, y in heads[:STREET_LIGHTS_MAX] for value in (round(x, 2), round(y, 2), LAMP_LIGHT_HEIGHT_M)]
+
+
+def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day") -> dict[str, Any]:
+    """Spawns, Hunt anchors, SDK audio names and the urban profile of ``time_of_day``.
 
     The measurement fixture stays ``perf_layout``. This document is what a
     playable package exports. There is one AI point per route, on that route's
     start. The gap is 8 m when the sidewalks hold 32 starts, and otherwise the
     largest 0.1 m step that still does, down to 5.1 m. The SDK only patrols a
     bot that spawns within 5 m of a start, and a second bot on the same start is
-    the pile seen in game. Audio names are copied from the SDK v1.15 library.
+    the pile seen in game. Audio names are copied from the SDK v1.15 library. A night map has no
+    birds and a light under each street lamp (ADR-026).
     Rules that the adapter applies from the same guide live in ``docs/11-onward-sdk.md``.
     """
+    if time_of_day not in TIME_OF_DAY_SETTINGS:
+        raise LayoutError(f"time_of_day must be one of {', '.join(sorted(TIME_OF_DAY_SETTINGS))}, not {time_of_day!r}")
+    sdk_time, profile = TIME_OF_DAY_SETTINGS[time_of_day]
     doc = gameplay_layout(base, detail_manifest)
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
@@ -663,11 +688,12 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "navigation": navigation_estimate(islands),
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": "Suburban Day",
-        "audio_birds_m": [round(uplink[0], 2), round(uplink[1], 2)],
+        "audio_birds_m": list(uplink) if time_of_day == "day" else [],
         "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
         "environment": "Urban",
-        "time_of_day": "Day",
-        "profile": "UrbanDay1",
+        "time_of_day": sdk_time,
+        "profile": profile,
+        "street_lights_m": street_lights(detail_manifest, focus) if time_of_day == "night" else [],
         "far_clip_m": 1000,
         "flyover": 1,
     })

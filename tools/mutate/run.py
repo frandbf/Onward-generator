@@ -117,8 +117,8 @@ def touched(source: str, path: str, lines: set[int]) -> list[Function]:
     return result
 
 
-def mutant_lines(mutated_source: str, mangled: str, def_line: int) -> dict[int, int]:
-    """Mutant number → line of the original file its edit falls on.
+def mutant_edits(mutated_source: str, mangled: str, def_line: int) -> dict[int, tuple[int, str, str]]:
+    """Mutant number → (line of the original file its edit falls on, that line, the line as mutated).
 
     mutmut writes the original function as ``<mangled>__mutmut_orig`` and each
     mutant as ``<mangled>__mutmut_<n>``: same text except the edit. The first
@@ -132,7 +132,7 @@ def mutant_lines(mutated_source: str, mangled: str, def_line: int) -> dict[int, 
     original = bodies.pop(f"{mangled}__mutmut_orig", None)
     if original is None:
         return {}
-    lines: dict[int, int] = {}
+    edits: dict[int, tuple[int, str, str]] = {}
     for name, body in bodies.items():
         number = MUTANT_SUFFIX.search(name)
         if number is None or not body:
@@ -140,10 +140,22 @@ def mutant_lines(mutated_source: str, mangled: str, def_line: int) -> dict[int, 
         # The def line carries the mutant's own name; give it the original's so only the edit differs.
         body = [body[0].replace(name, f"{mangled}__mutmut_orig", 1), *body[1:]]
         ops = difflib.SequenceMatcher(a=original, b=body, autojunk=False).get_opcodes()
-        first = next((i1 for tag, i1, _i2, _j1, _j2 in ops if tag != "equal"), None)
-        if first is not None:
-            lines[int(number.group(1))] = def_line + first
-    return lines
+        changed = next(((i1, j1) for tag, i1, _i2, j1, _j2 in ops if tag != "equal"), None)
+        if changed is not None:
+            first, at = changed
+            edits[int(number.group(1))] = (def_line + first, original[first], body[at] if at < len(body) else "")
+    return edits
+
+
+def mutant_lines(mutated_source: str, mangled: str, def_line: int) -> dict[int, int]:
+    """Mutant number → line of the original file its edit falls on."""
+    return {number: edit[0] for number, edit in mutant_edits(mutated_source, mangled, def_line).items()}
+
+
+def only_case_differs(original: str, mutated: str) -> bool:
+    """``"foo"`` → ``"FOO"``. mutmut also writes ``"XXfooXX"`` for the same literal, and a test that
+    holds the string kills both, so this one costs a run and tells nothing more."""
+    return original != mutated and original.casefold() == mutated.casefold()
 
 
 def _git(*args: str) -> str:
@@ -165,7 +177,7 @@ def changed_functions(base: str) -> list[Function]:
 
 
 def on_changed_lines(targets: list[Function]) -> list[str]:
-    """Names of the generated mutants whose edit falls on a changed line."""
+    """Names of the generated mutants whose edit falls on a changed line, less those differing only in case."""
     names: list[str] = []
     sources: dict[str, str] = {}
     for f in targets:
@@ -174,8 +186,8 @@ def on_changed_lines(targets: list[Function]) -> list[str]:
             sources[f.path] = mutated.read_text(encoding="utf-8") if mutated.is_file() else ""
         if not sources[f.path]:
             continue
-        for number, line in sorted(mutant_lines(sources[f.path], f.mangled, f.def_line).items()):
-            if line in f.changed:
+        for number, (line, original, mutated) in sorted(mutant_edits(sources[f.path], f.mangled, f.def_line).items()):
+            if line in f.changed and not only_case_differs(original, mutated):
                 names.append(f"{f.module}.{f.mangled}__mutmut_{number}")
     return names
 
@@ -215,8 +227,8 @@ def default_jobs(env: Mapping[str, str] | None = None, cores: int | None = None)
     return cores if env.get("CI") else max(1, cores // 2)
 
 
-def _mutmut(*args: str, only: str = "", reuse: bool = False) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "MUTMUT_ONLY_MUTATE": only, "MUTMUT_REUSE_MUTANTS": "1" if reuse else ""}
+def _mutmut(*args: str, only: str = "") -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "MUTMUT_ONLY_MUTATE": only}
     return subprocess.run([sys.executable, str(SHIM), *args], cwd=REPO, capture_output=True, text=True, env=env)
 
 
@@ -255,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     # The generate step above already made the mutants; this run only tests them.
-    run = _mutmut("run", "--max-children", str(args.jobs), *selected, only=only, reuse=not args.whole_functions)
+    run = _mutmut("run", "--max-children", str(args.jobs), *selected, only=only)
     if run.returncode != 0:
         print(run.stdout[-4000:], run.stderr[-4000:], sep="\n", file=sys.stderr)
         print(f"mutate: mutmut run failed with exit {run.returncode}", file=sys.stderr)

@@ -13,7 +13,7 @@ from onward_generator.generation.config import GenerationConfigError, load_gener
 from onward_generator.generation.scene import GenerationError
 from onward_generator.io import atomic_write_json, prepare_outputs
 from onward_generator.perf.device import drawcall_trace, load_times, summarize_csv
-from onward_generator.perf.layout import LayoutError, gameplay_layout, load_detail_manifest, playable_layout
+from onward_generator.perf.layout import TIME_OF_DAY_SETTINGS, LayoutError, gameplay_layout, load_detail_manifest, playable_layout
 from onward_generator.perf.measure import combine_groups, measure_scene_dir
 
 MEASURE_SCHEMA = "onward_generator.perf_measure"
@@ -46,6 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
     lay.add_argument("--generation-config", default=None)
     lay.add_argument("--out", required=True, help="output JSON")
     lay.add_argument("--playable", action="store_true", help="write the Hunt/audio/urban layout instead of the measurement fixture")
+    lay.add_argument(
+        "--time-of-day", choices=sorted(TIME_OF_DAY_SETTINGS), default="day",
+        help="playable layout only: day or night (ADR-026)",  # pragma: no mutate: help text
+    )
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
@@ -91,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = load_detail_manifest(args.detail)
             if args.playable:
                 heights = json.loads(Path(args.heights).expanduser().read_text(encoding="utf-8"))
-                doc = playable_layout(base, manifest, heights)
+                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day)
             else:
                 doc = gameplay_layout(base, manifest)
         else:

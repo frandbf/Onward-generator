@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "description": "Building typology rules for detail (ADR-024). The rules run in order and the first that matches names the typology. Every threshold is a modelling assumption, not an observation. The typology is recorded only: it does not change geometry, materials or templates yet.",
+  "description": "Building typology rules for detail (ADR-024). The rules run in order and the first that matches names the typology. Every threshold is a modelling assumption, not an observation. facades tunes the template and, for a residential use, the wall palette per typology, then per era, which wins (ADR-027).",
   "era_tags": ["building:start_date", "start_date", "construction_date"],
   "minor_categories": ["minor"],
   "civic": {
@@ -20,5 +20,22 @@
   "historic_core_periods": ["pre_1900", "1900_1939"],
   "house": { "max_storeys": 3, "max_area_m2": 250.0 },
   "closed_block": { "min_share": 0.3, "min_storeys": 2, "max_storeys": 12 },
-  "open_block": { "min_storeys": 4, "max_storeys": 12, "min_area_m2": 150.0, "slab_min_elongation": 2.0, "point_min_compactness": 0.6 }
+  "open_block": { "min_storeys": 4, "max_storeys": 12, "min_area_m2": 150.0, "slab_min_elongation": 2.0, "point_min_compactness": 0.6 },
+  "facades": {
+    "typologies": {
+      "historic_core": { "bay_factor": 0.9, "window_width_factor": 0.9, "window_height_factor": 1.2, "balcony_share": 0.6, "palette": ["plaster_cream", "plaster_ochre", "stone_warm"] },
+      "open_block": { "bay_factor": 1.1, "window_width_factor": 1.25, "window_height_factor": 0.9, "balcony_share": 0.2 },
+      "tower": { "bay_factor": 1.1, "window_width_factor": 1.25, "window_height_factor": 1.0, "balcony_share": 0.15 },
+      "row_house": { "balcony_share": 0.1 },
+      "detached_house": { "balcony_share": 0.0 },
+      "industrial_shed": { "bay_factor": 1.3, "window_width_factor": 1.3, "window_height_factor": 0.8, "balcony_share": 0.0 },
+      "civic": { "balcony_share": 0.0, "window_height_factor": 1.15 }
+    },
+    "eras": {
+      "pre_1900": { "window_height_factor": 1.25, "palette": ["plaster_cream", "plaster_ochre", "stone_warm"] },
+      "1900_1939": { "window_height_factor": 1.2, "palette": ["plaster_ochre", "plaster_cream", "plaster_salmon", "stone_warm"] },
+      "1960_1979": { "window_width_factor": 1.25, "window_height_factor": 0.9, "palette": ["brick_red", "plaster_cream", "plaster_white"] },
+      "2000_plus": { "window_width_factor": 1.3, "palette": ["plaster_white", "plaster_cream"] }
+    }
+  }
 }

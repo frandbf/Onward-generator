@@ -4,53 +4,306 @@
   "title": "Building typology rules (ADR-024)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "description", "era_tags", "minor_categories", "civic", "industrial", "tower_min_storeys", "attached_min_share",
-               "historic_core_periods", "house", "closed_block", "open_block"],
+  "required": [
+    "version",
+    "description",
+    "era_tags",
+    "minor_categories",
+    "civic",
+    "industrial",
+    "tower_min_storeys",
+    "attached_min_share",
+    "historic_core_periods",
+    "house",
+    "closed_block",
+    "open_block",
+    "facades"
+  ],
   "$defs": {
-    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-    "names": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true },
-    "storeys": { "type": "integer", "minimum": 1, "maximum": 200 },
-    "share": { "type": "number", "minimum": 0, "maximum": 1 },
-    "area": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "names": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/name"
+      },
+      "uniqueItems": true
+    },
+    "storeys": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "area": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000000
+    },
     "uses": {
-      "type": "object", "additionalProperties": false, "required": ["uses", "catastro_uses", "categories"],
-      "properties": { "uses": { "$ref": "#/$defs/names" }, "catastro_uses": { "$ref": "#/$defs/names" }, "categories": { "$ref": "#/$defs/names" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uses",
+        "catastro_uses",
+        "categories"
+      ],
+      "properties": {
+        "uses": {
+          "$ref": "#/$defs/names"
+        },
+        "catastro_uses": {
+          "$ref": "#/$defs/names"
+        },
+        "categories": {
+          "$ref": "#/$defs/names"
+        }
+      }
+    },
+    "factor": {
+      "type": "number",
+      "minimum": 0.7,
+      "maximum": 1.4
+    },
+    "facade_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bay_factor": {
+          "$ref": "#/$defs/factor"
+        },
+        "window_width_factor": {
+          "$ref": "#/$defs/factor"
+        },
+        "window_height_factor": {
+          "$ref": "#/$defs/factor"
+        },
+        "balcony_share": {
+          "$ref": "#/$defs/share"
+        },
+        "palette": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
     }
   },
   "properties": {
-    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "description": { "type": "string" },
-    "era_tags": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
-    "minor_categories": { "$ref": "#/$defs/names" },
-    "civic": { "$ref": "#/$defs/uses" },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "era_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "minor_categories": {
+      "$ref": "#/$defs/names"
+    },
+    "civic": {
+      "$ref": "#/$defs/uses"
+    },
     "industrial": {
-      "type": "object", "additionalProperties": false,
-      "required": ["uses", "catastro_uses", "categories", "shed_max_storeys", "shed_min_area_m2"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uses",
+        "catastro_uses",
+        "categories",
+        "shed_max_storeys",
+        "shed_min_area_m2"
+      ],
       "properties": {
-        "uses": { "$ref": "#/$defs/names" }, "catastro_uses": { "$ref": "#/$defs/names" }, "categories": { "$ref": "#/$defs/names" },
-        "shed_max_storeys": { "$ref": "#/$defs/storeys" }, "shed_min_area_m2": { "$ref": "#/$defs/area" }
+        "uses": {
+          "$ref": "#/$defs/names"
+        },
+        "catastro_uses": {
+          "$ref": "#/$defs/names"
+        },
+        "categories": {
+          "$ref": "#/$defs/names"
+        },
+        "shed_max_storeys": {
+          "$ref": "#/$defs/storeys"
+        },
+        "shed_min_area_m2": {
+          "$ref": "#/$defs/area"
+        }
       }
     },
-    "tower_min_storeys": { "$ref": "#/$defs/storeys" },
-    "attached_min_share": { "$ref": "#/$defs/share" },
+    "tower_min_storeys": {
+      "$ref": "#/$defs/storeys"
+    },
+    "attached_min_share": {
+      "$ref": "#/$defs/share"
+    },
     "historic_core_periods": {
-      "type": "array", "uniqueItems": true,
-      "items": { "enum": ["pre_1900", "1900_1939", "1940_1959", "1960_1979", "1980_1999", "2000_plus"] }
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "pre_1900",
+          "1900_1939",
+          "1940_1959",
+          "1960_1979",
+          "1980_1999",
+          "2000_plus"
+        ]
+      }
     },
     "house": {
-      "type": "object", "additionalProperties": false, "required": ["max_storeys", "max_area_m2"],
-      "properties": { "max_storeys": { "$ref": "#/$defs/storeys" }, "max_area_m2": { "$ref": "#/$defs/area" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_storeys",
+        "max_area_m2"
+      ],
+      "properties": {
+        "max_storeys": {
+          "$ref": "#/$defs/storeys"
+        },
+        "max_area_m2": {
+          "$ref": "#/$defs/area"
+        }
+      }
     },
     "closed_block": {
-      "type": "object", "additionalProperties": false, "required": ["min_share", "min_storeys", "max_storeys"],
-      "properties": { "min_share": { "$ref": "#/$defs/share" }, "min_storeys": { "$ref": "#/$defs/storeys" }, "max_storeys": { "$ref": "#/$defs/storeys" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_share",
+        "min_storeys",
+        "max_storeys"
+      ],
+      "properties": {
+        "min_share": {
+          "$ref": "#/$defs/share"
+        },
+        "min_storeys": {
+          "$ref": "#/$defs/storeys"
+        },
+        "max_storeys": {
+          "$ref": "#/$defs/storeys"
+        }
+      }
     },
     "open_block": {
-      "type": "object", "additionalProperties": false, "required": ["min_storeys", "max_storeys", "min_area_m2", "slab_min_elongation", "point_min_compactness"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_storeys",
+        "max_storeys",
+        "min_area_m2",
+        "slab_min_elongation",
+        "point_min_compactness"
+      ],
       "properties": {
-        "min_storeys": { "$ref": "#/$defs/storeys" }, "max_storeys": { "$ref": "#/$defs/storeys" }, "min_area_m2": { "$ref": "#/$defs/area" },
-        "slab_min_elongation": { "type": "number", "minimum": 1, "maximum": 100 },
-        "point_min_compactness": { "$ref": "#/$defs/share" }
+        "min_storeys": {
+          "$ref": "#/$defs/storeys"
+        },
+        "max_storeys": {
+          "$ref": "#/$defs/storeys"
+        },
+        "min_area_m2": {
+          "$ref": "#/$defs/area"
+        },
+        "slab_min_elongation": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "point_min_compactness": {
+          "$ref": "#/$defs/share"
+        }
+      }
+    },
+    "facades": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typologies",
+        "eras"
+      ],
+      "properties": {
+        "typologies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "landmark": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "civic": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "industrial_shed": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "tower": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "historic_core": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "row_house": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "detached_house": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "closed_block": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "open_block": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "other": {
+              "$ref": "#/$defs/facade_style"
+            }
+          }
+        },
+        "eras": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pre_1900": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "1900_1939": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "1940_1959": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "1960_1979": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "1980_1999": {
+              "$ref": "#/$defs/facade_style"
+            },
+            "2000_plus": {
+              "$ref": "#/$defs/facade_style"
+            }
+          }
+        }
       }
     }
   }

@@ -38,7 +38,8 @@ addopts = "-ra"
 # task mutate (tools/mutate/run.py) passes the changed functions; this is the copy mutmut tests against.
 source_paths = ["src/"]
 also_copy = ["config/", "assets/", "tests/", "tools/", "docs/", ".githooks/", "requirements.lock", "requirements-mutate.lock", "requirements-lint.lock", "README.md"]
-mutate_only_covered_lines = true
+# run.py picks the mutants on changed lines. A full run under coverage to prune them first cost more than running them.
+mutate_only_covered_lines = false
 
 [tool.ruff]
 # task lint. Line length is not enforced: the code was never formatted to one, and reformatting it all would bury real changes.

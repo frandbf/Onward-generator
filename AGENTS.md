@@ -69,7 +69,7 @@ A pull request is ready when every gate below passes. CI runs them on Linux in t
 - `task lint`: ruff, with the rules in `pyproject.toml`. Fix the finding; `task lint -- --fix` applies the safe fixes.
 - `task typecheck`: mypy on `src`. An error missing from `mypy-baseline.txt` fails. Fix it; never add it to the baseline. When you fix a listed error, run `task typecheck:baseline` and commit the shorter file.
 - `task test`: the whole suite.
-- `task mutate`: mutation testing of the lines the branch changed in `src/onward_generator`. A surviving mutant needs a test that kills it. Use `# pragma: no mutate: <reason>` only when the edit changes nothing a caller can see, and say why.
+- `task mutate`: mutation testing of the lines the branch changed in `src/onward_generator`, less the mutants that only change a string's case (`"XXfooXX"` covers the same literal). A surviving mutant needs a test that kills it. Use `# pragma: no mutate: <reason>` only when the edit changes nothing a caller can see, and say why.
 - `task guard`: one pull request does not edit both `src/` and a gate (the `[tool.ruff]`, `[tool.mypy]`, `[tool.mutmut]` and `[tool.pytest]` tables, `Taskfile.yml`, `.github/workflows/`, `.githooks/`, `tools/mutate/`, `tools/quality/`, the lint and mutate lock files, or new `mypy-baseline.txt` entries). Change a gate in its own pull request and explain why.
 
 Every suppression names its code and gives a reason: `# noqa: CODE - reason`, `# type: ignore[code]`, `# pragma: no mutate: reason`. `tests/unit/test_quality_gates.py` and ruff check this. Do not weaken or delete an assertion to make a gate pass.

@@ -11,7 +11,7 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +75,7 @@ from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
-from onward_generator.detail.typology import TypologyConfig, building_typologies, load_typology_config
+from onward_generator.detail.typology import TypologyConfig, building_typologies, facade_style, load_typology_config, styled_template
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -90,8 +90,8 @@ from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, cor
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
-SCHEMA_VERSION = "0.3.0"
-"""0.2.0: ``facade.relief`` and ``counts.flat_openings`` (ADR-025). 0.3.0: ``facade.typology`` and its counts (ADR-024)."""
+SCHEMA_VERSION = "0.4.0"
+"""0.2.0: ``facade.relief`` and ``counts.flat_openings`` (ADR-025). 0.3.0: ``facade.typology`` and its counts (ADR-024). 0.4.0: ``facade.typology.facade_style`` (ADR-027)."""
 BASE_MANIFEST = "scene3d.json"
 BASE_REPORT = "generation_report.json"
 FIDELITY_NOTE = "Generic template chosen by rules; it does not represent the real facade of this building."
@@ -366,11 +366,13 @@ def _use_evidence(
 def _facade_walls(
     ids: list[str], footprints: dict[str, BaseGeometry], tree: STRtree, feature_of: Mapping[str, Mapping[str, Any]],
     height_of: Mapping[str, Mapping[str, Any]], features: list[Mapping[str, Any]], cfg: DetailConfig,
+    style_palettes: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, tuple[FacadeUse, str, str]]:
     """``(use, wall, wall origin)`` per building, in id order so a wall can avoid its neighbours' walls.
 
     A landmark (flagged by the heights stage from its tags) keeps its template walls. Every
-    other building draws from the palette of its use.
+    other building draws from the palette of its use, or a residential one from ``style_palettes``
+    (ADR-027) when that holds one for it.
     The sub-buildings of one parcel (``appearance_key``, ADR-016) are one building: the first in id
     order resolves the use from the evidence of them all and draws the wall for its key, and the
     others take the same. Neighbours are the footprints of other keys within ``probe_m``.
@@ -395,6 +397,8 @@ def _facade_walls(
         else:
             use = resolve_use(bid, tags, [r for m in members[key] for r in related.get(m, [])])
             palette = cfg.facade_palettes[use.use]
+            if use.use == "residential" and style_palettes and style_palettes.get(bid):
+                palette = tuple(style_palettes[bid])
         near = {ids[k] for m in members[key] for k in tree.query(footprints[m], predicate="dwithin", distance=cfg.probe_m)}
         avoid = {out[n][1] for n in near if n in out}  # no other part of this parcel is drawn yet
         wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid, cfg.materials)
@@ -792,6 +796,9 @@ def detail_scene(
     ranking = load_source_config().evidence
     typologies = building_typologies(ids, footprints, tree, key_of, feature_of, height_of, heights_m,
                                      {bid: facade_walls[bid][0] for bid in ids}, ranking, cfg, tcfg, issues)
+    facade_styles = {bid: facade_style(t["typology"], t["inputs"]["period"], tcfg) for bid, t in typologies.items()}
+    # The use comes from the walls above; drawing them again with the palettes of the styles keeps the neighbour rule.
+    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg, {bid: style.palette for bid, style in facade_styles.items()})
     sources = _shop_sources(ids, feature_of, evidence, templates, cfg, ranking,
                             lambda bid: _shop_fits(bid, ids, footprints, tree, cfg), place_evidence)
     catastro = {bid: feature_of[bid]["catastro_use"] for bid, source in sources.items() if source == CATASTRO_ID}
@@ -852,7 +859,7 @@ def detail_scene(
             continue
         height = heights_m[bid]
         landmark = bool(h.get("landmark"))
-        template = templates[bid]
+        template = styled_template(templates[bid], facade_styles[bid])
         templates_used[template.name] += 1
         near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m) if ids[k] != bid]
         others = union_all([footprints[n] for n in near])
@@ -1085,7 +1092,7 @@ def detail_scene(
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     for x in objects:
         if x.type == "building":
-            x.record["facade"]["typology"] = typologies[x.record["source_ids"][0]]
+            x.record["facade"]["typology"] = {**typologies[x.record["source_ids"][0]], "facade_style": asdict(facade_styles[x.record["source_ids"][0]])}
     issues = issues[:leading_issues] + [x for o in building_objs for x in emitted[o.id][1]]
     dropped_lights = cap_lights(lit, cfg.interiors.lights_max)
     issues.extend(Issue("interior_light_dropped", "info", room, f"over interiors.lights_max {cfg.interiors.lights_max}")
