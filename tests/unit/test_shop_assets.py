@@ -143,6 +143,28 @@ def test_a_file_with_another_shape_is_not_rescaled() -> None:
     assert vertices.max() == 40.0
 
 
+def test_a_file_too_small_by_one_factor_grows_to_the_api_size() -> None:
+    vertices = np.array([[0.0, 0.0, 0.0], [0.5, 1.0, 2.0]])
+    _apply_scale(vertices, [5000.0, 10000.0, 20000.0])
+    assert np.ptp(vertices, axis=0).tolist() == pytest.approx([5.0, 10.0, 20.0])
+
+
+def test_ratios_exactly_at_the_tolerance_are_still_one_factor() -> None:
+    vertices = np.array([[0.0, 0.0, 0.0], [10.0, 10.0, 10.5]])
+    assert "times the API" in _apply_scale(vertices, [1000.0, 1000.0, 1000.0])
+
+
+def test_api_dimensions_that_are_not_three_leave_the_file_alone() -> None:
+    vertices = np.array([[0.0, 0.0, 0.0], [10.0, 20.0, 5.0]])
+    assert _apply_scale(vertices, [1000.0, 2000.0]) == "glTF bbox kept in metres"
+
+
+def test_a_file_with_no_size_is_not_divided_by_zero() -> None:
+    vertices = np.zeros((2, 3))
+    assert _apply_scale(vertices, [1000.0, 1000.0, 1000.0]) == "glTF bbox kept in metres"
+    assert vertices.max() == 0.0
+
+
 def test_a_flat_file_is_not_divided_by_zero() -> None:
     vertices = np.array([[0.0, 0.0, 0.0], [20.0, 20.0, 0.0]])
     assert _apply_scale(vertices, [1000.0, 1000.0, 0.0]) == "glTF bbox kept in metres"
