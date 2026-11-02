@@ -34,6 +34,7 @@ def layouts(detail_inputs: tuple[Path, Path, Path]) -> dict[str, dict]:
 def test_a_night_layout_changes_only_the_profile_the_birds_and_the_lights(layouts: dict[str, dict]) -> None:
     day, night = layouts["day"], layouts["night"]
     assert (day["time_of_day"], day["profile"], day["street_lights_m"]) == ("Day", "UrbanDay1", [])
+    assert isinstance(day["audio_roof_wind_m"], list)
     assert (night["time_of_day"], night["profile"]) == ("Night", "UrbanNight1")
     assert day["audio_birds_m"] == day["uplink_m"] and night["audio_birds_m"] == []
     lamps = [o for o in layouts["manifest"]["objects"] if o.get("kind") == "street_lamp"]

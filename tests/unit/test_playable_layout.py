@@ -563,7 +563,7 @@ def _climbable(index: int, x: float, y: float, *, access: bool = True, height: f
     return [
         {"id": f"building/{bid}", "type": "building", "height": {"height_m": height}},
         {"id": f"interior/{bid}", "type": "interior", "source_ids": [bid], "roof_access": access,
-         "connections": [{"start_m": [0.0, 0.0]}, {"start_m": [x, y]}]},
+         "connections": [{"start_m": [0.0, 0.0]}, {"start_m": [-1.0, -1.0]}, {"start_m": [x, y]}]},
     ]
 
 
@@ -571,6 +571,11 @@ def test_roof_wind_sits_above_the_last_flight_of_a_reachable_roof() -> None:
     manifest = {"objects": [*_climbable(1, 40.0, 0.0, height=9.0), *_climbable(2, 10.0, 0.0), *_climbable(3, 90.0, 0.0, access=False)]}
     assert roof_wind(manifest, (0.0, 0.0)) == [10.0, 0.0, 13.5, 40.0, 0.0, 10.5]
     assert roof_wind({}, (0.0, 0.0)) == []
+
+
+def test_roof_wind_goes_nearest_the_focus_first_and_is_rounded() -> None:
+    manifest = {"objects": [*_climbable(1, 10.123, 5.678, height=9.123), *_climbable(2, 90.0, 0.0)]}
+    assert roof_wind(manifest, (100.0, 0.0)) == [90.0, 0.0, 13.5, 10.12, 5.68, 10.62]
 
 
 def test_roof_wind_keeps_its_spacing_and_its_cap() -> None:
