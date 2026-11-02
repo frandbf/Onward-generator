@@ -688,7 +688,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "navigation": navigation_estimate(islands),
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": "Suburban Day",
-        "audio_birds_m": [round(uplink[0], 2), round(uplink[1], 2)] if time_of_day == "day" else [],
+        "audio_birds_m": list(uplink) if time_of_day == "day" else [],
         "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
         "environment": "Urban",
         "time_of_day": sdk_time,

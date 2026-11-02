@@ -157,3 +157,32 @@ def test_run_stores_a_new_time_of_day_on_an_existing_map_and_says_what_to_do(tmp
     assert hint not in capsys.readouterr().out
     assert _run_map(root, lambda argv: 1) == 1
     assert map_time_of_day(root) == "night"
+
+
+def test_perf_layout_writes_the_time_it_is_given_and_day_otherwise(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    scene, heights, base = detail_inputs
+    detail = tmp_path / "detail"
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
+    args = ["perf", "layout", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--detail", str(detail), "--playable"]
+
+    def layout(name: str, *extra: str) -> dict:
+        out = tmp_path / f"{name}.json"
+        assert main([*args, "--out", str(out), *extra]) == 0
+        return json.loads(out.read_text(encoding="utf-8"))
+
+    night = layout("night", "--time-of-day", "night")
+    assert (night["time_of_day"], night["profile"]) == ("Night", "UrbanNight1") and night["street_lights_m"]
+    assert night["routes"] and night["ai_m"]  # the whole layout, from the same base and manifest
+    day = layout("default")
+    assert (day["time_of_day"], day["profile"], day["street_lights_m"]) == ("Day", "UrbanDay1", [])
+    assert main([*args, "--out", str(tmp_path / "x.json"), "--time-of-day", "dusk"]) == 2
+    assert not (tmp_path / "x.json").exists()
+
+
+def test_map_create_stores_the_time_of_day_it_is_given(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    args = ["map", "create", "--lat", "37.625", "--lon", "-0.986", "--radius-m", "300"]
+    assert main([*args, "--name", "Noche", "--time-of-day", "night"]) == 0
+    assert map_time_of_day(tmp_path / "maps" / "noche") == "night"
+    assert main([*args, "--name", "Dia"]) == 0
+    assert map_time_of_day(tmp_path / "maps" / "dia") == "day"

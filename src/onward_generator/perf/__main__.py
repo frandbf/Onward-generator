@@ -46,7 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
     lay.add_argument("--generation-config", default=None)
     lay.add_argument("--out", required=True, help="output JSON")
     lay.add_argument("--playable", action="store_true", help="write the Hunt/audio/urban layout instead of the measurement fixture")
-    lay.add_argument("--time-of-day", choices=sorted(TIME_OF_DAY_SETTINGS), default="day", help="playable layout only: day or night (ADR-026)")
+    lay.add_argument(
+        "--time-of-day", choices=sorted(TIME_OF_DAY_SETTINGS), default="day",
+        help="playable layout only: day or night (ADR-026)",  # pragma: no mutate: help text
+    )
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
