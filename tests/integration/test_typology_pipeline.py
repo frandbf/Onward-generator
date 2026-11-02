@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -100,3 +101,16 @@ def test_the_style_reaches_the_facade_and_a_residential_palette(tmp_path_factory
     assert record["facade"]["materials"]["wall"] in style["palette"]
     plain_style = next(o.record for o in before.objects if o.id == "building/osm-way-701")["facade"]["typology"]["facade_style"]
     assert plain_style["palette"] != style["palette"]
+
+
+def test_a_style_palette_paints_homes_only(detail_inputs: tuple[Path, Path, Path]) -> None:
+    # stone_light is in no palette of a use, so finding it means the style's palette was read.
+    styles = {name: {"palette": ["stone_light"]} for name in ("closed_block", "open_block", "row_house", "detached_house", "other", "civic", "landmark", "historic_core")}
+    tcfg = replace(load_typology_config(), typology_styles=styles)
+    detailed = _detail(detail_inputs, typology=tcfg)
+    walls = {r["source_ids"][0]: (r["facade"]["use"]["use"], r["facade"]["materials"]["wall"]) for r in _records(detailed)}
+    homes = {bid: wall for bid, (use, wall) in walls.items() if use == "residential"}
+    others = {bid: wall for bid, (use, wall) in walls.items() if use != "residential"}
+    assert homes and set(homes.values()) == {"stone_light"}
+    assert others and "stone_light" not in others.values()
+    assert "stone_light" not in {r["facade"]["materials"]["wall"] for r in _records(_detail(detail_inputs))}

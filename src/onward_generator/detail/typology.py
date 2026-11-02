@@ -307,7 +307,7 @@ def typology_record(x: TypologyInputs, era: Era | None, use: FacadeUse, key: str
 
 def facade_style(typology: str, period: str | None, cfg: TypologyConfig) -> FacadeStyle:
     """The style of a building: its typology's values, with its era's over them. The era is the stronger evidence."""
-    values = {**cfg.typology_styles.get(typology, {}), **(cfg.era_styles.get(period, {}) if period else {})}
+    values = {**cfg.typology_styles.get(typology, {}), **cfg.era_styles.get(period or "", {})}
     return FacadeStyle(
         bay_factor=float(values.get("bay_factor", 1.0)),
         window_width_factor=float(values.get("window_width_factor", 1.0)),

@@ -11,7 +11,7 @@ ADR-024 recorded a typology and an era per building and changed nothing drawn. A
 1. **`facades` in `config/typology.default.json`,** validated by its schema, with `bay_factor`, `window_width_factor`, `window_height_factor` (0.7–1.4), `balcony_share` and a wall `palette`, per typology and per era.
 2. **The era goes over the typology,** because it is an observation and the typology is an estimate.
 3. **A template copy per building** (`styled_template`). Layout's checks are unchanged, so an opening that does not fit still falls back.
-4. **Palettes only for a residential use.** A shop, an office or a school keeps the palette of its use. Observed OSM colours and materials still win, and a landmark keeps its template.
+4. **Palettes only for a residential use.** A shop, an office or a school keeps the palette of its use. Observed OSM colours and materials still win, and a landmark keeps its walls; its template has no windows to tune.
 5. **Recorded:** `facade.typology.facade_style`; `scene_detail` and `detail_report` 0.4.0.
 
 ## Rejected alternatives

@@ -859,7 +859,7 @@ def detail_scene(
             continue
         height = heights_m[bid]
         landmark = bool(h.get("landmark"))
-        template = styled_template(templates[bid], facade_styles[bid]) if not h.get("landmark") else templates[bid]
+        template = styled_template(templates[bid], facade_styles[bid])
         templates_used[template.name] += 1
         near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m) if ids[k] != bid]
         others = union_all([footprints[n] for n in near])
