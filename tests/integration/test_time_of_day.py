@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -180,6 +181,8 @@ def test_perf_layout_writes_the_time_it_is_given_and_day_otherwise(detail_inputs
 
 
 def test_map_create_stores_the_time_of_day_it_is_given(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    downloaded = SimpleNamespace(size_bytes=12, sha256="abc", path="noche.osm")
+    monkeypatch.setattr("onward_generator.maps.__main__.download_map_osm", lambda *_args, **_kwargs: downloaded)
     monkeypatch.chdir(tmp_path)
     args = ["map", "create", "--lat", "37.625", "--lon", "-0.986", "--radius-m", "300"]
     assert main([*args, "--name", "Noche", "--time-of-day", "night"]) == 0
