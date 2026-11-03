@@ -368,7 +368,7 @@ def store_time_of_day(directory: str | Path, time_of_day: str) -> bool:
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
     changed = document.get("time_of_day", TIME_OF_DAY_DEFAULT) != _time_of_day(time_of_day)
-    _storm(bool(document.get("storm", False)), time_of_day)
+    _storm(bool(document.get("storm")), time_of_day)
     document["time_of_day"] = time_of_day
     atomic_write_json(root / "map.json", document)
     return changed
@@ -385,14 +385,14 @@ def map_storm(directory: str | Path) -> bool:
     path = Path(directory).expanduser() / "map.json"
     if not path.is_file():
         return False
-    return bool(load_map(path.parent).get("storm", False))
+    return bool(load_map(path.parent).get("storm"))
 
 
 def store_storm(directory: str | Path, storm: bool) -> bool:
     """Record the storm on an existing map. True when it changed, so the layout is out of date."""
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
-    changed = bool(document.get("storm", False)) != _storm(storm, str(document.get("time_of_day", TIME_OF_DAY_DEFAULT)))
+    changed = bool(document.get("storm")) != _storm(storm, str(document.get("time_of_day")))
     document["storm"] = storm
     atomic_write_json(root / "map.json", document)
     return changed

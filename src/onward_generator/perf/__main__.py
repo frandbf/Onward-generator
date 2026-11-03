@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--time-of-day", choices=sorted(TIME_OF_DAY_SETTINGS), default="day",
         help="playable layout only: day or night (ADR-026)",  # pragma: no mutate: help text
     )
-    lay.add_argument("--storm", action="store_true", help="playable night layout only: lightning and thunder (ADR-028)")
+    lay.add_argument("--storm", action="store_true", help="playable night layout only: lightning and thunder (ADR-028)")  # pragma: no mutate: help text
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")

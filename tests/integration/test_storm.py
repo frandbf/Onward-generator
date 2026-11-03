@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -42,8 +43,9 @@ def test_a_storm_adds_only_the_lightning_to_a_night_layout(detail_inputs: tuple[
     assert {**storm, "lightning": 0} == calm
     assert _check_layout(storm) == []
     assert playable_layout(generated, manifest, levels)["lightning"] == 0
-    with pytest.raises(LayoutError, match="storm needs a night map"):
+    with pytest.raises(LayoutError) as refused:
         playable_layout(generated, manifest, levels, storm=True)
+    assert str(refused.value) == "storm needs a night map: a daytime flash looks wrong (ADR-028)"
 
 
 def _night_layout() -> dict[str, object]:
@@ -81,8 +83,9 @@ def test_a_map_has_no_storm_by_default_or_from_before_the_setting(tmp_path: Path
 
 
 def test_a_day_map_cannot_have_a_storm(tmp_path: Path) -> None:
-    with pytest.raises(MapError, match="storm needs a night map"):
+    with pytest.raises(MapError) as refused:
         _map(tmp_path, storm=True)
+    assert str(refused.value) == "storm needs a night map: a daytime flash looks wrong (ADR-028)"
     root = _map(tmp_path)
     with pytest.raises(MapError, match="storm needs a night map"):
         store_storm(root, True)
@@ -102,6 +105,18 @@ def test_a_storm_map_cannot_turn_to_day_and_keep_the_storm(tmp_path: Path) -> No
     with pytest.raises(MapError, match="storm needs a night map"):
         store_time_of_day(root, "day")
     assert map_time_of_day(root) == "night"
+    assert store_time_of_day(root, "night") is False
+
+
+def test_map_create_stores_the_storm_it_is_given(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    downloaded = SimpleNamespace(size_bytes=12, sha256="abc", path="tormenta.osm")
+    monkeypatch.setattr("onward_generator.maps.__main__.download_map_osm", lambda *_args, **_kwargs: downloaded)
+    monkeypatch.chdir(tmp_path)
+    args = ["map", "create", "--lat", "37.625", "--lon", "-0.986", "--radius-m", "300", "--time-of-day", "night"]
+    assert main([*args, "--name", "Tormenta", "--storm"]) == 0
+    assert map_storm(tmp_path / "maps" / "tormenta") is True
+    assert main([*args, "--name", "Calma"]) == 0
+    assert map_storm(tmp_path / "maps" / "calma") is False
 
 
 def test_run_passes_the_storm_to_map_create_only_when_named() -> None:
@@ -143,8 +158,35 @@ def test_an_existing_map_stores_the_change_whatever_the_order_of_the_rules(
 ) -> None:
     root = _map(tmp_path, **before)
     _run_map(root, lambda _argv: 0, **options)
-    assert (map_time_of_day(root), map_storm(root)) == after
+    assert (load_map(root)["time_of_day"], load_map(root)["storm"]) == after
     assert "not started" not in capsys.readouterr().out
+
+
+def test_run_says_when_the_layout_is_out_of_date(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _map(tmp_path, time_of_day="night")
+    _run_map(root, lambda _argv: 0, storm=True)
+    assert "storm is on: run again with --from layout, then bake a new package\n" in capsys.readouterr().out
+    _run_map(root, lambda _argv: 0, storm=False)
+    assert "no storm now: run again with --from layout, then bake a new package\n" in capsys.readouterr().out
+    _run_map(root, lambda _argv: 0, storm=False)
+    assert "no storm now" not in capsys.readouterr().out
+
+
+def test_a_new_map_is_created_with_the_storm(tmp_path: Path) -> None:
+    seen: list[list[str]] = []
+
+    def execute(argv: list[str]) -> int:
+        seen.append(argv)
+        return 1
+
+    root = tmp_path / "new"
+    run_map(map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150, margin_m=30, out=str(root),
+            execute=execute, interactive=False, time_of_day="night", storm=True)
+    assert "--storm" in seen[0]
+    seen.clear()
+    run_map(map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150, margin_m=30, out=str(root),
+            execute=execute, interactive=False, storm=None)
+    assert "--storm" not in seen[0]
 
 
 @pytest.mark.parametrize(
@@ -168,3 +210,18 @@ def test_the_adapter_places_the_lightning_prefab_only_when_the_layout_asks() -> 
     assert "public int lightning;" in source
     assert "if (layout.lightning != 0)" in source and 'InstantiatePrefab("LightningSystem.prefab")' in source
     assert "storm.LightningChance = 1f;" in source and "storm.LightningChanceLight = 1f;" in source
+
+
+def test_perf_layout_writes_the_lightning_only_when_asked(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    scene, heights, base = detail_inputs
+    detail = tmp_path / "detail"
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
+    args = ["perf", "layout", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--detail", str(detail), "--playable", "--time-of-day", "night"]
+
+    def layout(name: str, *extra: str) -> dict:
+        out = tmp_path / f"{name}.json"
+        assert main([*args, "--out", str(out), *extra]) == 0
+        return json.loads(out.read_text(encoding="utf-8"))
+
+    assert layout("storm", "--storm")["lightning"] == 1
+    assert layout("calm")["lightning"] == 0
