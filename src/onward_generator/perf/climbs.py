@@ -101,8 +101,11 @@ def _yaw(nx: float, ny: float) -> float:
     return round(math.degrees(math.atan2(nx, ny)), 1)
 
 
-def ladder_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float) -> dict[str, float] | None:
-    """A ladder on the longest wall with clear ground at its foot and roof behind it. The ladder faces the wall."""
+def ladder_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float, parapet_m: float = 0.0) -> dict[str, float] | None:
+    """A ladder on the longest wall with clear ground at its foot and roof behind it. The ladder faces the wall.
+
+    ``parapet_m`` is what the ladder has to rise above the roof, so its top rungs stand clear of the parapet.
+    """
     roof = footprint.buffer(COVER_TOLERANCE_M)
     for wall in _walls(footprint):
         foot = _strip(wall, LADDER_WIDTH_M, CABIN_WALL_GAP_M, CABIN_WALL_GAP_M + LADDER_FOOT_M)
@@ -112,7 +115,8 @@ def ladder_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, he
             roof_x, roof_y = _along(wall, -LANDING_DEPTH_M / 2)
             return {
                 "x": round(x, CENTRE_DIGITS), "y": round(y, CENTRE_DIGITS), "yaw": _yaw(-wall[2], -wall[3]),
-                "height_m": round(height_m, CENTRE_DIGITS), "roof_x": round(roof_x, CENTRE_DIGITS), "roof_y": round(roof_y, CENTRE_DIGITS),
+                "height_m": round(height_m, CENTRE_DIGITS), "parapet_m": parapet_m,
+                "roof_x": round(roof_x, CENTRE_DIGITS), "roof_y": round(roof_y, CENTRE_DIGITS),
             }
     return None
 
@@ -183,7 +187,7 @@ def place_climbs(
 
     for source, building, footprint in ranked:
         if len(ladders) < LADDERS_MAX and storeys(building) <= LADDER_MAX_STOREYS and not building.get("interior"):
-            site = ladder_on(footprint, free, keep_out, float(building["height"]["height_m"]))
+            site = ladder_on(footprint, free, keep_out, float(building["height"]["height_m"]), float(building["roof"].get("parapet_m", 0.0)))
             if site is not None and spaced(site):
                 ladders.append(site)
                 used.add(source)

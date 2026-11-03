@@ -126,7 +126,7 @@ def test_templates_roofs_and_landmark(detail_inputs: tuple[Path, Path, Path]) ->
     assert shed["facade"]["template"] == "generic_minor" and shed["roof"]["type"] == "hip"
     assert 0 < shed["roof"]["rise_m"] <= 2.5
     flat = _obj(detailed, "building/osm-way-311").record
-    assert flat["roof"]["type"] == "flat_parapet" and flat["roof"]["parapet_m"] == 1.0
+    assert flat["roof"]["type"] == "flat_parapet" and flat["roof"]["parapet_m"] == 0.7
 
 
 def test_party_walls_have_no_openings(detailed) -> None:

@@ -158,7 +158,7 @@ def _area(mesh: Mesh) -> float:
 
 def test_build_shell_lists_its_blank_party_walls() -> None:
     shell = _shell(box(10, 0, 20, 8))
-    assert shell.wall_material == WALL and shell.z_top == pytest.approx(7.0)  # 6 m and a 1 m parapet
+    assert shell.wall_material == WALL and shell.z_top == pytest.approx(6.7)  # 6 m and a 0.7 m parapet
     assert [(seg.a, seg.b) for seg, _ in shell.blank_walls] == [((10.0, 0.0), (10.0, 8.0))]
     assert all(any(mesh is quad for mesh in shell.parts[WALL]) for _, quad in shell.blank_walls)
     assert _shell(Polygon()).blank_walls == []
@@ -169,22 +169,22 @@ def test_split_blank_walls_drops_the_hidden_part_and_keeps_the_rest_as_party() -
     shell = _shell(neighbour)
     walls_before = merge(shell.parts[WALL])
     areas = split_blank_walls(shell, [(neighbour, 4.0)])
-    assert areas == WallAreas(0.0, pytest.approx(8 * 3.0), pytest.approx(8 * 4.0))
+    assert areas == WallAreas(0.0, pytest.approx(8 * 2.7), pytest.approx(8 * 4.0))
     # The wall material keeps every face but the party wall at x = 10.
     tri, normal = _faces(merge(shell.parts[WALL]))
     assert not np.any(np.all(np.isclose(tri[:, :, 0], 10.0), axis=1) & np.isclose(normal[:, 0], 1.0))
-    assert _area(walls_before) - _area(merge(shell.parts[WALL])) == pytest.approx(8 * 7.0)
+    assert _area(walls_before) - _area(merge(shell.parts[WALL])) == pytest.approx(8 * 6.7)
     # The party material holds the wall above the neighbour's 4 m top, facing out (+x).
     party = merge(shell.parts[party_material(WALL)])
     tri, normal = _faces(party)
     assert np.allclose(tri[:, :, 0], 10.0) and np.allclose(normal, [1.0, 0.0, 0.0])
-    assert tri[:, :, 2].min() == pytest.approx(4.0) and tri[:, :, 2].max() == pytest.approx(7.0)
+    assert tri[:, :, 2].min() == pytest.approx(4.0) and tri[:, :, 2].max() == pytest.approx(6.7)
     assert tri[:, :, 1].min() == pytest.approx(0.0) and tri[:, :, 1].max() == pytest.approx(8.0)
-    assert _area(party) == pytest.approx(8 * 3.0)
+    assert _area(party) == pytest.approx(8 * 2.7)
 
 
 def test_split_blank_walls_sums_every_party_wall() -> None:
-    # Neighbours east (y 2–8 of the 8 m wall, 3 m top) and west (whole wall, 5 m top); z_top is 7 m.
+    # Neighbours east (y 2–8 of the 8 m wall, 3 m top) and west (whole wall, 5 m top); z_top is 6.7 m.
     east, west = box(10, 2, 20, 8), box(-10, 0, 0, 8)
     footprint = box(0, 0, 10, 8)
     refined, segments = refine_exposure(footprint, east.union(west), CFG)
@@ -192,14 +192,14 @@ def test_split_blank_walls_sums_every_party_wall() -> None:
     assert len(shell.blank_walls) == 2
     areas = split_blank_walls(shell, [(east, 3.0), (west, 5.0)])
     hidden = 6 * 3.0 + 8 * 5.0
-    assert areas == WallAreas(0.0, pytest.approx(2 * 8 * 7.0 - hidden), pytest.approx(hidden))
-    assert _area(merge(shell.parts[party_material(WALL)])) == pytest.approx(2 * 8 * 7.0 - hidden)
+    assert areas == WallAreas(0.0, pytest.approx(2 * 8 * 6.7 - hidden), pytest.approx(hidden))
+    assert _area(merge(shell.parts[party_material(WALL)])) == pytest.approx(2 * 8 * 6.7 - hidden)
 
 
 def test_a_taller_neighbour_hides_the_whole_party_wall() -> None:
     neighbour = box(10, 0, 20, 8)
     shell = _shell(neighbour)
-    assert split_blank_walls(shell, [(neighbour, 20.0)]) == WallAreas(0.0, 0.0, pytest.approx(8 * 7.0))
+    assert split_blank_walls(shell, [(neighbour, 20.0)]) == WallAreas(0.0, 0.0, pytest.approx(8 * 6.7))
     assert party_material(WALL) not in shell.parts
 
 
@@ -207,8 +207,8 @@ def test_a_party_wall_with_no_neighbour_wall_stays_whole() -> None:
     # The neighbour is 0.5 m away: a blind party wall for the facade rules, but nothing hides it.
     neighbour = box(10.5, 0, 20, 8)
     shell = _shell(neighbour)
-    assert split_blank_walls(shell, [(neighbour, 20.0)]) == WallAreas(0.0, pytest.approx(8 * 7.0), 0.0)
-    assert _area(merge(shell.parts[party_material(WALL)])) == pytest.approx(8 * 7.0)
+    assert split_blank_walls(shell, [(neighbour, 20.0)]) == WallAreas(0.0, pytest.approx(8 * 6.7), 0.0)
+    assert _area(merge(shell.parts[party_material(WALL)])) == pytest.approx(8 * 6.7)
 
 
 def test_split_blank_walls_without_party_walls_changes_nothing() -> None:

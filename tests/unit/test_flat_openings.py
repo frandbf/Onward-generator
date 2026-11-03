@@ -38,7 +38,7 @@ WALL = "plaster_ochre"
 ROOF = "roof_flat_grey"
 FOOTPRINT = Polygon([(0, 0), (14, 0), (14, 9), (0, 9)])
 # The 14 × 9 m, five-storey building below, built by the code before ADR-025: every opening recessed.
-RECESSED_SHA256 = "245540f4fcf59544275243a94c12a5da27d51c6a30a333ffe58c3338342d6130"
+RECESSED_SHA256 = "d35fecc6af15745dacb67381fe71666b6de06a275a86a5063736f376b9508eea"
 
 
 def _hole(kind: str = "window", storey: int = 2, back: str | None = "glass_dark", v0: float | None = None) -> Hole:

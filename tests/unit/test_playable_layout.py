@@ -600,13 +600,13 @@ def _layout_with(**climbs: object) -> list[str]:
 
 
 def test_the_package_checks_the_ladders_and_lifts() -> None:
-    ladder = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "roof_x": 1.0, "roof_y": 3.0}
+    ladder = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "parapet_m": 0.7, "roof_x": 1.0, "roof_y": 3.0}
     lift = {**ladder, "roof_yaw": 180.0}
     assert _layout_with() == [] and _layout_with(ladders=[ladder] * 3, lifts=[lift] * 3) == []
     assert _layout_with(ladders=[ladder] * 4) == ["layout: ladders must be a list of at most 3"]
     assert _layout_with(lifts=[lift] * 4) == ["layout: lifts must be a list of at most 3"]
     assert _layout_with(lifts="x") == ["layout: lifts must be a list of at most 3"]
-    needs_ladder = "layout: each of ladders needs x, y, yaw, height_m, roof_x, roof_y and a positive height"
+    needs_ladder = "layout: each of ladders needs x, y, yaw, height_m, parapet_m, roof_x, roof_y and a positive height"
     needs_lift = "layout: each of lifts needs x, y, yaw, height_m, roof_x, roof_y, roof_yaw and a positive height"
     assert _layout_with(lifts=[ladder]) == [needs_lift]
     assert _layout_with(ladders=[ladder, {**ladder, "x": True}, "x"]) == [needs_ladder]

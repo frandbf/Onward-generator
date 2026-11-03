@@ -618,7 +618,7 @@ def test_apply_trim_reports_its_key_png_and_materials(small_table: Path) -> None
     ]
 
 
-SMALL_ATLAS_SHA256 = "b1757ac438582a5d27f0ac13c75bc893abc740bfb22bbd2b06640c0f7c319ed3"
+SMALL_ATLAS_SHA256 = "220fd5b12c6e486304d2cad2e52857428f02459a22bf7690ad0570b6067dfbfb"
 
 
 def test_the_cache_key_is_the_hash_of_its_inputs() -> None:

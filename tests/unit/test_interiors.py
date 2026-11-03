@@ -521,6 +521,12 @@ def test_a_climb_takes_turns_in_two_wells_and_reuses_the_last_storey_well() -> N
     assert all(a.well.equals(b.well) for a, b in zip(roof, roof[2:], strict=False))
 
 
+def test_a_player_can_fire_over_the_parapet_of_every_template() -> None:
+    """A roof may get a climb at the layout stage, after the walls are built, so every template keeps the firing height (ADR-029)."""
+    parapets = {t.parapet_m for t in load_detail_config().templates.values()}
+    assert parapets == {0.0, 0.7}
+
+
 def test_only_a_roof_flight_within_15_cm_of_the_roof_lands_on_it() -> None:
     _, _, _, _, plan = _split_plan()
     roof = next(f for f in plan.flights if f.role == "roof")

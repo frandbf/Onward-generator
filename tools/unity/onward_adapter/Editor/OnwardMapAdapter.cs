@@ -122,7 +122,7 @@ namespace OnwardGenerator
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
         [Serializable] private class Route { public XY[] points; }
         // ADR-029. roof_yaw is read only for a lift.
-        [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float roof_x; public float roof_y; public float roof_yaw; }
+        [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float parapet_m; public float roof_x; public float roof_y; public float roof_yaw; }
 
         [Serializable]
         private class Layout
@@ -2309,7 +2309,11 @@ namespace OnwardGenerator
             go.transform.rotation = Quaternion.Euler(0f, site.yaw, 0f);
             go.transform.position = Local(site.x, site.y, 0f);
             var ladder = go.GetComponentInChildren<Ladder>();
-            go.transform.position = Local(site.x, site.y, site.height_m - ladder.VaultTargetUpper.position.y);
+            // The top rungs stand above the parapet as the prefab's stand above a bare edge; the player still lands on the roof.
+            go.transform.position = Local(site.x, site.y, site.height_m + site.parapet_m - ladder.VaultTargetUpper.position.y);
+            Vector3 landing = ladder.VaultTargetUpper.position;
+            ladder.VaultTargetUpper.position = new Vector3(landing.x, site.height_m, landing.z);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(ladder.VaultTargetUpper);
             FillRungsToGround(ladder);
             PrefabUtility.RecordPrefabInstancePropertyModifications(ladder);
 

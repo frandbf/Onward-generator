@@ -31,7 +31,7 @@ from onward_generator.materials.trim_style import (
 )
 
 # The cornice strip stands for a parapet of this height, the zocalo for ``zocalo_m``.
-CORNICE_REF_M = 1.0
+CORNICE_REF_M = 0.7
 # The string course at the foot of every storey, and the light edge on top of it.
 COURSE_M = 0.12
 COURSE_EDGE_M = 0.03

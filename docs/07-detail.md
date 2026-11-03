@@ -103,9 +103,9 @@ A mismatch raises `DetailError` and writes nothing.
 
 | Template | Categories | Ground floor | Roof |
 | --- | --- | --- | --- |
-| `generic_residential` | `residential_multi`, `residential_small`, `unknown` | door and windows; balconies on 35% of upper bays | `flat_parapet` (1 m parapet) |
-| `generic_commercial` | `commercial` | `shopfront` | `flat_parapet` (1 m parapet) |
-| `generic_public` | `public`, `industrial` | door and windows; no balconies | `flat_parapet` (1.2 m parapet) |
+| `generic_residential` | `residential_multi`, `residential_small`, `unknown` | door and windows; balconies on 35% of upper bays | `flat_parapet` (0.7 m parapet) |
+| `generic_commercial` | `commercial` | `shopfront` | `flat_parapet` (0.7 m parapet) |
+| `generic_public` | `public`, `industrial` | door and windows; no balconies | `flat_parapet` (0.7 m parapet) |
 | `generic_minor` | `minor` | door and windows | `hip` in `roof_tile` when convex and ≤ 200 m²; otherwise `flat` |
 | `landmark_placeholder` | `religious` and any `landmark` | door only (2.4 × 4 m) | `flat` |
 
