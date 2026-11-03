@@ -155,7 +155,7 @@ namespace OnwardGenerator
             public float[] audio_roof_wind_m;
             public float far_clip_m;
             public int flyover;
-            // ADR-028: 1 places the SDK's LightningSystem with its prefab values; a night map only.
+            // ADR-028: 1 places the SDK's LightningSystem, certain in every match; a night map only.
             public int lightning;
         }
 
@@ -2178,7 +2178,15 @@ namespace OnwardGenerator
                 MapQuad quad = UnityEngine.Object.FindObjectOfType<MapQuad>();
                 if (quad != null) system.FindMapQuad(quad);
             }
-            if (layout.lightning != 0) InstantiatePrefab("LightningSystem.prefab").name = "Lightning";
+            if (layout.lightning != 0)
+            {
+                GameObject lightning = InstantiatePrefab("LightningSystem.prefab");
+                lightning.name = "Lightning";
+                // ADR-028: the prefab's 0.1 is a chance per match. ExampleScene sets both to 1.
+                var storm = lightning.GetComponent<LightningSystem>();
+                storm.LightningChance = 1f;
+                storm.LightningChanceLight = 1f;
+            }
         }
 
         // SDK v1.15 validators, not the Quest menu. Free Roam is already in AddGameplay.

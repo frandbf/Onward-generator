@@ -166,4 +166,5 @@ def test_the_adapter_places_the_lightning_prefab_only_when_the_layout_asks() -> 
     """No Unity here: this pins the wiring. Whether it compiles and looks right is the headset checklist of ADR-028."""
     source = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
     assert "public int lightning;" in source
-    assert 'if (layout.lightning != 0) InstantiatePrefab("LightningSystem.prefab")' in source
+    assert "if (layout.lightning != 0)" in source and 'InstantiatePrefab("LightningSystem.prefab")' in source
+    assert "storm.LightningChance = 1f;" in source and "storm.LightningChanceLight = 1f;" in source
