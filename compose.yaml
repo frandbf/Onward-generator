@@ -13,7 +13,14 @@ services:
       - .:/work
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     # Passed through so tools can tell a CI runner from a workstation (task mutate --jobs).
+    # git refuses a repository whose files another user owns ("dubious ownership"), and a repository
+    # on an external macOS volume shows another owner inside the container: task guard and task mutate
+    # then failed before checking anything. Trust the mounted repositories, and only inside the container;
+    # "*" also covers the main .git that run.sh mounts at its own path for a worktree.
     environment:
       - CI
+      - GIT_CONFIG_COUNT=1
+      - GIT_CONFIG_KEY_0=safe.directory
+      - GIT_CONFIG_VALUE_0=*
     # Host network so the pipeline reaches loopback Ollama (127.0.0.1:11434) as it does natively.
     network_mode: host

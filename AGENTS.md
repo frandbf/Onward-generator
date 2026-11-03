@@ -76,6 +76,8 @@ Every suppression names its code and gives a reason: `# noqa: CODE - reason`, `#
 
 `git config core.hooksPath .githooks` runs lint, typecheck and the tests before each push.
 
+With commits made straight on `main`, as on the frandbf repository, `task guard` and `task mutate` compare `main` with itself and check nothing. Run them against what is not pushed yet: `task guard BASE=origin/main` and `task mutate BASE=origin/main`, after committing and before `git push`.
+
 ## Scope control
 
 Do not implement future work prematurely.
