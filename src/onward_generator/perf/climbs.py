@@ -27,7 +27,7 @@ LIFT_MIN_STOREYS = 3
 LIFT_MAX_STOREYS = 6
 """A higher roof overlooks every street of the map, and a lift would carry a squad there in seconds."""
 STOREY_M = 3.0
-"""Only when the heights give no estimated levels."""
+"""To read a measured height as storeys."""
 FLAT_ROOFS = ("flat", "flat_parapet")
 """A player cannot land on a pitched roof, and a cabin cannot stand on one."""
 
@@ -63,9 +63,13 @@ Wall = tuple[float, float, float, float, float]
 
 
 def storeys(building: Mapping[str, Any]) -> int:
+    """The levels, or what the height implies when that is more.
+
+    A measured height and a cadastral level count can disagree: a roof of 22.9 m with 3 levels is a
+    22.9 m climb, and the rules are about the climb.
+    """
     height = building["height"]
-    levels = height.get("estimated_levels")
-    return int(levels) if levels else max(1, round(float(height["height_m"]) / STOREY_M))
+    return max(int(height.get("estimated_levels") or 1), round(float(height["height_m"]) / STOREY_M))
 
 
 def _walls(footprint: Polygon) -> list[Wall]:
