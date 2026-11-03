@@ -8,7 +8,7 @@ import pytest
 from shapely import LineString, MultiLineString, Point, Polygon, STRtree, box
 from shapely.geometry.base import BaseGeometry
 
-from onward_generator.export.package import _check_layout
+from onward_generator.export.package import _check_climbs, _check_layout
 from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
@@ -30,6 +30,7 @@ from onward_generator.perf.layout import (
     _patrol_lines,
     _routes,
     _sample_route,
+    climb_keep_out,
     component_holding,
     extra_spawn_block,
     fit_spawn_separation,
@@ -568,8 +569,8 @@ def _climbable(index: int, x: float, y: float, *, access: bool = True, height: f
 
 
 def test_roof_wind_sits_above_the_last_flight_of_a_reachable_roof() -> None:
-    manifest = {"objects": [*_climbable(1, 40.0, 0.0, height=9.0), *_climbable(2, 10.0, 0.0), *_climbable(3, 90.0, 0.0, access=False)]}
-    assert roof_wind(manifest, (0.0, 0.0)) == [10.0, 0.0, 13.5, 40.0, 0.0, 10.5]
+    manifest = {"objects": [*_climbable(1, 50.0, 0.0, height=9.0), *_climbable(2, 10.0, 0.0), *_climbable(3, 90.0, 0.0, access=False)]}
+    assert roof_wind(manifest, (0.0, 0.0)) == [10.0, 0.0, 13.5, 50.0, 0.0, 10.5]
     assert roof_wind({}, (0.0, 0.0)) == []
 
 
@@ -579,11 +580,52 @@ def test_roof_wind_goes_nearest_the_focus_first_and_is_rounded() -> None:
 
 
 def test_roof_wind_keeps_its_spacing_and_its_cap() -> None:
-    near = {"objects": [*_climbable(1, 0.0, 0.0), *_climbable(2, 24.9, 0.0), *_climbable(3, 25.0, 0.0)]}
-    assert roof_wind(near, (0.0, 0.0))[::3] == [0.0, 25.0]
-    many = {"objects": [row for k in range(ROOF_WIND_MAX + 3) for row in _climbable(k, 30.0 * k, 0.0)]}
-    assert roof_wind(many, (0.0, 0.0))[::3] == [30.0 * k for k in range(ROOF_WIND_MAX)]
+    near = {"objects": [*_climbable(1, 0.0, 0.0), *_climbable(2, 34.9, 0.0), *_climbable(3, 35.0, 0.0)]}
+    assert roof_wind(near, (0.0, 0.0))[::3] == [0.0, 35.0]
+    many = {"objects": [row for k in range(ROOF_WIND_MAX + 3) for row in _climbable(k, 40.0 * k, 0.0)]}
+    assert roof_wind(many, (0.0, 0.0))[::3] == [40.0 * k for k in range(ROOF_WIND_MAX)]
+
+
+def test_roof_wind_also_covers_the_roofs_a_ladder_or_a_lift_reaches() -> None:
+    manifest = {"objects": _climbable(1, 90.0, 0.0)}
+    assert roof_wind(manifest, (0.0, 0.0), [(40.0, 0.0, 8.0), (41.0, 0.0, 8.0)]) == [40.0, 0.0, 9.5, 90.0, 0.0, 13.5]
 
 
 def test_a_manifest_with_no_objects_has_no_street_lights() -> None:
     assert street_lights({}, (0.0, 0.0)) == []
+
+
+def _layout_with(**climbs: object) -> list[str]:
+    return [p for p in _check_climbs(climbs)]
+
+
+def test_the_package_checks_the_ladders_and_lifts() -> None:
+    ladder = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "roof_x": 1.0, "roof_y": 3.0}
+    lift = {**ladder, "roof_yaw": 180.0}
+    assert _layout_with() == [] and _layout_with(ladders=[ladder] * 3, lifts=[lift] * 3) == []
+    assert _layout_with(ladders=[ladder] * 4) == ["layout: ladders must be a list of at most 3"]
+    assert _layout_with(lifts=[lift] * 4) == ["layout: lifts must be a list of at most 3"]
+    assert _layout_with(lifts="x") == ["layout: lifts must be a list of at most 3"]
+    needs_ladder = "layout: each of ladders needs x, y, yaw, height_m, roof_x, roof_y and a positive height"
+    needs_lift = "layout: each of lifts needs x, y, yaw, height_m, roof_x, roof_y, roof_yaw and a positive height"
+    assert _layout_with(lifts=[ladder]) == [needs_lift]
+    assert _layout_with(ladders=[ladder, {**ladder, "x": True}, "x"]) == [needs_ladder]
+    assert _layout_with(ladders=["x"]) == [needs_ladder]
+    assert _layout_with(ladders="x", lifts="x") == ["layout: ladders must be a list of at most 3", "layout: lifts must be a list of at most 3"]
+    assert _layout_with(ladders=[{**ladder, "height_m": 0}]) == [needs_ladder]
+    assert _layout_with(ladders=[{**ladder, "height_m": 0.1}]) == []
+
+
+def test_the_climb_keep_out_covers_points_street_doors_and_routes() -> None:
+    manifest = {"objects": [
+        {"type": "interior", "connections": [{"from": "exterior", "position_m": [100.0, 0.0]}, {"from": "room", "position_m": [200.0, 0.0]}]},
+        {"type": "interior"},
+        {"type": "building", "connections": [{"from": "exterior", "position_m": [300.0, 0.0]}]},
+    ]}
+    routes = [{"points": [{"x": 0.0, "y": 50.0}, {"x": 10.0, "y": 50.0}]}]
+    keep_out = climb_keep_out([(0.0, 0.0)], routes, manifest)
+    for inside in ((2.9, 0.0), (100.0, 2.9), (5.0, 51.4)):
+        assert keep_out.contains(Point(inside)), inside
+    for outside in ((3.1, 0.0), (100.0, 3.1), (5.0, 51.6), (200.0, 0.0), (300.0, 0.0)):
+        assert not keep_out.contains(Point(outside)), outside
+    assert climb_keep_out([(0.0, 0.0)], [], {}).contains(Point(2.9, 0.0))

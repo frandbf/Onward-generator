@@ -31,7 +31,7 @@ The command writes nothing when:
 - the project is invalid or does not have `"export": {"adapter": "onward", "enabled": true}`;
 - the phase-04 automatic checks failed, a GLB is missing, or the ODbL attribution is missing;
 - the layout is neither `onward_generator.perf_layout` nor `onward_generator.gameplay_layout`, or it lacks 8 spawn points per team (the SDK prefab count), Uplink, a map quad, a positive `level_size_m`, or the damage volume;
-- a `gameplay_layout` lacks 32 AI points (one per route, 1 m from the start, separated by `ai_separation_m` or 8 m), 4 boxes, routes of 2 points, `Suburban Day`, Urban/Day/`UrbanDay1` or Urban/Night/`UrbanNight1` ([ADR-026](decisions/ADR-026-time-of-day.md)), far clip 1000, and flyover;
+- a `gameplay_layout` lacks 32 AI points (one per route, 1 m from the start, separated by `ai_separation_m` or 8 m), 4 boxes, routes of 2 points, `Suburban Day`, Urban/Day/`UrbanDay1` or Urban/Night/`UrbanNight1` ([ADR-026](decisions/ADR-026-time-of-day.md)), far clip 1000, flyover, a `lightning` of 0 or 1 that is 1 only at night, and at most 3 `ladders` and 3 `lifts`;
 - a `gameplay_layout` 0.3.0 lacks the mode codes, the second spawn block for each team, the two Escort starts, the Evac point, or 3 Retrieval hard drives;
 - the adapter configuration does not match its schema;
 - the output directory already exists. Packages are never overwritten. The next one is `pkg_02`.

@@ -121,6 +121,8 @@ namespace OnwardGenerator
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
         [Serializable] private class Route { public XY[] points; }
+        // ADR-029. roof_yaw is read only for a lift.
+        [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float roof_x; public float roof_y; public float roof_yaw; }
 
         [Serializable]
         private class Layout
@@ -155,6 +157,10 @@ namespace OnwardGenerator
             public float[] audio_roof_wind_m;
             public float far_clip_m;
             public int flyover;
+            // ADR-028: 1 places the SDK's LightningSystem, certain in every match; a night map only.
+            public int lightning;
+            public Climb[] ladders;
+            public Climb[] lifts;
         }
 
         private sealed class Package
@@ -712,6 +718,7 @@ namespace OnwardGenerator
                 if (IsSchema(pkg.Layout.schema, "gameplay_layout"))
                     BakeNavigation(root, collisionRoot, pkg.Layout);
                 AddGameplay(pkg.Layout, tallest);
+                AddClimbs(pkg.Layout, root);
                 var probes = new List<Vector3>();
                 AddInteriorLights(visual, opt, probes);
                 AddStreetLights(pkg.Layout);
@@ -2176,6 +2183,16 @@ namespace OnwardGenerator
                 MapQuad quad = UnityEngine.Object.FindObjectOfType<MapQuad>();
                 if (quad != null) system.FindMapQuad(quad);
             }
+            if (layout.lightning != 0)
+            {
+                GameObject lightning = InstantiatePrefab("LightningSystem.prefab");
+                lightning.name = "Lightning";
+                // ADR-028: the prefab's 0.1 is a chance per match. ExampleScene sets both to 1.
+                var storm = lightning.GetComponent<LightningSystem>();
+                storm.LightningChance = 1f;
+                storm.LightningChanceLight = 1f;
+                PrefabUtility.RecordPrefabInstancePropertyModifications(storm);
+            }
         }
 
         // SDK v1.15 validators, not the Quest menu. Free Roam is already in AddGameplay.
@@ -2261,6 +2278,130 @@ namespace OnwardGenerator
             var source = go.GetComponent<OnwardAudioSource>();
             source.AudioSourceType = OnwardAudioType.LocalAmbience;
             source.AudioSourceName = clip;
+        }
+
+        // ---- Ladders and lifts (ADR-029) ----
+        // After the navigation bake: bots do not climb, and neither the rungs nor the cabins enter the navmesh.
+        private const float ElevatorPivotM = 1.52f; // ExampleScene: the cabin's 3 m helper cube is centred on the pivot.
+        private const float LadderRailWidthM = 0.5f;
+
+        private static void AddClimbs(Layout layout, string root)
+        {
+            Climb[] ladders = layout.ladders ?? new Climb[0];
+            Climb[] lifts = layout.lifts ?? new Climb[0];
+            if (ladders.Length == 0 && lifts.Length == 0) return;
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(LitShaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {LitShaderPath}.");
+            var material = new Material(shader) { name = "M_climb" };
+            material.SetColor("_BaseColor", new Color(0.22f, 0.23f, 0.25f, 1f));
+            AssetDatabase.CreateAsset(material, $"{root}/M_climb.mat");
+            for (int i = 0; i < ladders.Length; i++) AddLadder(ladders[i], i, material, root);
+            for (int i = 0; i < lifts.Length; i++) AddLift(lifts[i], i, material, root);
+            Debug.Log($"{LogPrefix} Climbs: {ladders.Length} ladders, {lifts.Length} lifts.");
+        }
+
+        // The prefab's top keeps its shape, so the vault works as the SDK made it: the ladder rises until
+        // VaultTargetUpper is on the roof, and rungs at the same spacing fill the way down to the ground.
+        private static void AddLadder(Climb site, int index, Material material, string root)
+        {
+            GameObject go = InstantiatePrefab("Ladder.prefab");
+            go.name = "Ladder_" + index.ToString(CultureInfo.InvariantCulture);
+            go.transform.rotation = Quaternion.Euler(0f, site.yaw, 0f);
+            go.transform.position = Local(site.x, site.y, 0f);
+            var ladder = go.GetComponentInChildren<Ladder>();
+            go.transform.position = Local(site.x, site.y, site.height_m - ladder.VaultTargetUpper.position.y);
+            FillRungsToGround(ladder);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(ladder);
+
+            GameObject perch = InstantiatePrefab("AreaLadderPerch.prefab");
+            perch.name = go.name + "_Perch";
+            perch.transform.position = Local(site.roof_x, site.roof_y, site.height_m);
+
+            // The prefab has no mesh, so this is what the player sees. No collider: the SDK's rungs do the climbing.
+            float top = ladder.Rungs.Max(r => r.Transform.position.y);
+            var boxes = new List<CombineInstance>
+            {
+                Box(new Vector3(-LadderRailWidthM / 2f, top / 2f, 0f), new Vector3(0.05f, top, 0.08f)),
+                Box(new Vector3(LadderRailWidthM / 2f, top / 2f, 0f), new Vector3(0.05f, top, 0.08f)),
+            };
+            foreach (float y in ladder.Rungs.Where(r => r.Transform.position.y > 0f).Select(r => (float)Math.Round(r.Transform.position.y, 2)).Distinct())
+                boxes.Add(Box(new Vector3(0f, y, 0f), new Vector3(LadderRailWidthM, 0.04f, 0.04f)));
+            AddClimbLook(go.name + "_Look", Local(site.x, site.y, 0f), go.transform.rotation, boxes, material, root);
+        }
+
+        private static void FillRungsToGround(Ladder ladder)
+        {
+            const float sameRungM = 0.01f;
+            const float lowestRungM = 0.15f;
+            float[] heights = ladder.Rungs.Select(r => r.Transform.position.y).OrderBy(y => y).ToArray();
+            float bottom = heights[0];
+            float[] levels = heights.Where((y, k) => k == 0 || y - heights[k - 1] > sameRungM).ToArray();
+            if (levels.Length < 2) throw new InvalidOperationException("Ladder prefab needs at least two rung heights.");
+            float step = (levels[levels.Length - 1] - levels[0]) / (levels.Length - 1);
+            bool ascending = ladder.Rungs[0].Transform.position.y <= ladder.Rungs[ladder.Rungs.Count - 1].Transform.position.y;
+            List<Ladder.LadderRung> lowest = ladder.Rungs.Where(r => r.Transform.position.y - bottom <= sameRungM).ToList();
+            int added = 0;
+            for (float y = bottom - step; y >= lowestRungM; y -= step)
+            {
+                foreach (Ladder.LadderRung rung in lowest)
+                {
+                    GameObject copy = UnityEngine.Object.Instantiate(rung.Transform.gameObject, rung.Transform.parent);
+                    Vector3 p = rung.Transform.position;
+                    copy.transform.position = new Vector3(p.x, y, p.z);
+                    var extra = new Ladder.LadderRung { Transform = copy.transform };
+                    if (ascending) ladder.Rungs.Insert(0, extra); else ladder.Rungs.Add(extra);
+                    added++;
+                }
+            }
+            Debug.Log($"{LogPrefix} {ladder.name}: {added} rung transforms added, every {step:F3} m.");
+        }
+
+        // The two cabins of a pair point at each other, the only link in the SDK (ExampleScene).
+        private static void AddLift(Climb site, int index, Material material, string root)
+        {
+            string name = "Lift_" + index.ToString(CultureInfo.InvariantCulture);
+            Elevator street = PlaceCabin(name + "_Street", site.x, site.y, 0f, site.yaw, material, root);
+            Elevator roof = PlaceCabin(name + "_Roof", site.roof_x, site.roof_y, site.height_m, site.roof_yaw, material, root);
+            street.PairedElevator = roof;
+            roof.PairedElevator = street;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(street);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(roof);
+        }
+
+        private static Elevator PlaceCabin(string name, float x, float y, float floorM, float yaw, Material material, string root)
+        {
+            GameObject go = InstantiatePrefab("Elevator.prefab");
+            go.name = name;
+            go.transform.position = Local(x, y, floorM + ElevatorPivotM);
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            // Four posts and a roof around the cabin, outside its 3.01 x 3.13 x 3.03 m. The prefab's only mesh is a helper,
+            // so this marks the lift even if the game draws no cabin, and does not get in the way if it does.
+            var boxes = new List<CombineInstance>();
+            foreach (float px in new[] { -1.6f, 1.6f })
+                foreach (float pz in new[] { -1.65f, 1.65f })
+                    boxes.Add(Box(new Vector3(px, 1.6f, pz), new Vector3(0.1f, 3.2f, 0.1f)));
+            boxes.Add(Box(new Vector3(0f, 3.25f, 0f), new Vector3(3.4f, 0.1f, 3.5f)));
+            AddClimbLook(name + "_Look", Local(x, y, floorM), go.transform.rotation, boxes, material, root);
+            return go.GetComponent<Elevator>();
+        }
+
+        private static CombineInstance Box(Vector3 centre, Vector3 size) => new CombineInstance
+        {
+            mesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx"),
+            transform = Matrix4x4.TRS(centre, Quaternion.identity, size),
+        };
+
+        // One mesh and one material per access: a draw call each, lit by the probes and left out of the bake.
+        private static void AddClimbLook(string name, Vector3 position, Quaternion rotation, List<CombineInstance> boxes, Material material, string root)
+        {
+            var mesh = new Mesh { name = name };
+            mesh.CombineMeshes(boxes.ToArray(), true, true);
+            SetWhiteVertexColors(mesh);
+            AssetDatabase.CreateAsset(mesh, $"{root}/Meshes/{name}.asset");
+            var go = new GameObject(name);
+            go.transform.SetPositionAndRotation(position, rotation);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
 
         // ---- Interior lights and light probes (ADR-013) ------------------------------------

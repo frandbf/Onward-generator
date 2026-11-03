@@ -975,8 +975,6 @@ def detail_scene(
                 cut_roof_deck(shell, built.roof_well)
             colliders = [m for _, m in built.colliders]
             glass_colliders = list(built.glass_colliders)
-            if shell.parapet_collider is not None and built.roof_well is not None:
-                colliders.append(shell.parapet_collider)
             interior_record = built.spec | {
                 "kind": "shop" if shop else "residential",
                 "checks": built.checks,
@@ -1002,6 +1000,9 @@ def detail_scene(
                 interiors_left -= 1
         elif base_collider is not None:
             colliders = [base_collider]
+        # Any flat roof may get a ladder or a lift at the layout stage (ADR-029), and a parapet a player can walk or shoot through is not cover.
+        if shell.parapet_collider is not None:
+            colliders.append(shell.parapet_collider)
         balcony_collider = merge(shell.balcony_colliders)
         if balcony_collider.triangle_count:
             defects = closed_manifold_defects(balcony_collider)

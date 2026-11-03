@@ -23,11 +23,13 @@ from onward_generator.maps.workspace import (
     MapError,
     load_map,
     map_directory,
+    map_storm,
     map_time_of_day,
     panoramax_enabled,
     store_brief,
     store_panoramax,
     store_sources,
+    store_storm,
     store_time_of_day,
 )
 from onward_generator.next_step import (
@@ -89,6 +91,7 @@ def map_create_argv(
     ambient_ai: bool = False,
     panoramax: bool = False,
     time_of_day: str | None = None,
+    storm: bool = False,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float = 150.0,
     overwrite: bool = False,
@@ -115,6 +118,8 @@ def map_create_argv(
         argv.append("--panoramax")
     if time_of_day:
         argv.extend(["--time-of-day", time_of_day])
+    if storm:
+        argv.append("--storm")
     if overwrite:
         argv.append("--overwrite")
     return argv
@@ -166,6 +171,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         "--detail", show(playable),
         "--playable",
         "--time-of-day", map_time_of_day(root),
+        *(["--storm"] if map_storm(root) else []),
         "--out", show(layout_path),
     ).argv)
     export_argv = list(export_invocation(
@@ -755,6 +761,7 @@ def run_map(
     ambient_ai: bool = False,
     panoramax: bool = False,
     time_of_day: str | None = None,
+    storm: bool | None = None,
     sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float = 150.0,
@@ -839,6 +846,7 @@ def run_map(
                     ambient_ai=ambient_ai,
                     panoramax=panoramax,
                     time_of_day=time_of_day,
+                    storm=bool(storm),
                     lightmap_texels_per_m=lightmap_texels_per_m,
                     core_radius_m=core_radius_m,
                     overwrite=overwrite,
@@ -870,8 +878,13 @@ def run_map(
                 store_panoramax(root, True)
             if sources:
                 store_sources(root, sources)
+            # Off first and on last: --time-of-day day --no-storm and --time-of-day night --storm are both valid.
+            if storm is False and store_storm(root, False):
+                say("no storm now: run again with --from layout, then bake a new package")
             if time_of_day and store_time_of_day(root, time_of_day):
                 say(f"time of day is now {time_of_day}: run again with --from layout, then bake a new package")
+            if storm and store_storm(root, True):
+                say("storm is on: run again with --from layout, then bake a new package")
             say(describe(choices(load_map(root))))
             steps = resume_steps(root, preview=preview)
             done = [step for step, _argv in steps if output_ready(step, root)]
@@ -885,7 +898,7 @@ def run_map(
                 interactive=prompting,
                 ask=ask,
             )
-        except PipelineError as exc:
+        except (MapError, PipelineError) as exc:
             print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
             return 1
         if not chosen:

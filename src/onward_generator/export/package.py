@@ -29,6 +29,7 @@ from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, mat
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
+from onward_generator.perf.climbs import LADDERS_MAX, LIFTS_MAX
 from onward_generator.perf.layout import (
     GAMEPLAY_VERSION,
     MIN_SPAWN_SEPARATION_M,
@@ -182,10 +183,38 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
         roof_wind = doc.get("audio_roof_wind_m", [])
         if not isinstance(roof_wind, list) or len(roof_wind) % 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in roof_wind):
             problems.append("layout: audio_roof_wind_m must be flat x, y, z triples")
+        lightning = doc.get("lightning", 0)
+        if type(lightning) is not int or lightning not in (0, 1):
+            problems.append("layout: lightning must be 0 or 1")
+        elif lightning and doc.get("time_of_day") != "Night":
+            problems.append("layout: lightning is only for a night map")
+        problems.extend(_check_climbs(doc))
         if doc.get("far_clip_m") != 1000 or doc.get("flyover") != 1:
             problems.append("layout: far_clip_m must be 1000 and flyover must be 1")
         if doc.get("schema_version") == GAMEPLAY_VERSION:
             problems.extend(_check_match_modes(doc, point))
+    return problems
+
+
+def _check_climbs(doc: Mapping[str, Any]) -> list[str]:
+    """Ladders and lifts (ADR-029). A layout from before them has neither."""
+    problems = []
+    for key, limit, fields in (
+        ("ladders", LADDERS_MAX, ("x", "y", "yaw", "height_m", "roof_x", "roof_y")),
+        ("lifts", LIFTS_MAX, ("x", "y", "yaw", "height_m", "roof_x", "roof_y", "roof_yaw")),
+    ):
+        sites = doc.get(key, [])
+        if not isinstance(sites, list) or len(sites) > limit:
+            problems.append(f"layout: {key} must be a list of at most {limit}")
+            continue
+        for site in sites:
+            if (
+                not isinstance(site, dict)
+                or any(isinstance(site.get(f), bool) or not isinstance(site.get(f), (int, float)) for f in fields)
+                or site["height_m"] <= 0
+            ):
+                problems.append(f"layout: each of {key} needs {', '.join(fields)} and a positive height")
+                break
     return problems
 
 

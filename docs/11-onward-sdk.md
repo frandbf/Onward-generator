@@ -75,12 +75,16 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 ## Sound and flyover
 
 - Global: `Suburban Day`. Local: `Birds Park` on the plaza, `Wind Rooftop` on a landmark roof.
-- `audio_roof_wind_m`: `Wind Rooftop` 1.5 m above the roofs a stair reaches, at most 8, nearest the focus first and at least 25 m apart. A local source has a fixed radius in the SDK. Whether this one is also heard from the street is checked on the headset.
+- `audio_roof_wind_m`: `Wind Rooftop` 1.5 m above the roofs a stair reaches, and those a ladder or a lift reaches, at most 8, nearest the focus first and at least 35 m apart. 35 m is the fixed radius of this clip in the SDK, and a source has no field to change it. Under a building lower than 33.5 m it is also heard in the street; the game's volume curve decides how loud.
 - Default reverb `SmoothOutdoor`. Inside a nave volume, `ReflectiveIndoorLarge`.
 - `OnwardCustomAudioSource` is not used. It requires a custom clip, and the guide warns about uncompressed memory.
-- `LightningSystem` is not placed on a day map. The guide says a daytime flash looks wrong because it reuses the night-vision effect.
+- `LightningSystem` is placed only with `run --storm`, on a night map, with `LightningChance` and `LightningChanceLight` at 1 as in `ExampleScene` ([ADR-028](decisions/ADR-028-storm.md)). It is refused on a day map: the guide says a daytime flash looks wrong because it reuses the night-vision effect.
 - Urban flyover, jets and helicopters, boats at 0, `PhaseChance` 1. Phase duration stays on the prefab (300 s): one pass per phase, not the 30 s test value.
 - The system must reference the MapQuad (`FindMapQuad`). The flight ceiling is the top of that volume.
+
+## Ladders and lifts
+
+`ladders` and `lifts` in the layout, at most 3 of each ([ADR-029](decisions/ADR-029-ladders-and-lifts.md)). A ladder goes on a building of at most 3 storeys with no interior, a lift pair on one of 3 to 6 storeys, both with a flat roof and no stair to it. The AI does not climb: both are placed after the navigation bake. Each ladder has an `AreaLadderPerch` on its landing, so bots do not pile up at the base.
 
 ## Quest budget
 
@@ -113,11 +117,8 @@ The guide describes more. Assault, Escort, Evac, and Retrieval are described by 
 | Piece | When |
 | --- | --- |
 | Fire Fight, Spec Ops, Gun Game, OITC | Still out. Fire Fight is not named in `GameVariantTypes`. This document does not claim they load |
-| Stairs and `AreaLadderPerch` | When a volume has a real climb. The AI does not climb. The perch is the area at the top so bots do not pile up at the base |
-| Lifts | A linked pair, not one prefab |
 | Glass with `PP_Transparent_*` and `AISeeThrough` | After the cost is measured on Quest |
 | `OnwardCustomAudioSource` | Only with a clearly licensed clip, few at a time |
-| Lightning | Only on a night profile, and only after lowering `lightning chance` in a test |
 | Workshop publish | Ideal title 6–18 characters (max 24), description about 250 (max 500), thumbnail 512×256, environment and time of day consistent with the scene. This pipeline does not publish |
 
 ## Card and modes
