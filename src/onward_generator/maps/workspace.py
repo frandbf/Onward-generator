@@ -62,6 +62,7 @@ def create_map(
     ambient_ai: bool = False,
     panoramax: bool = False,
     time_of_day: str = TIME_OF_DAY_DEFAULT,
+    storm: bool = False,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
     core_radius_m: float = CORE_RADIUS_DEFAULT_M,
     overwrite: bool = False,
@@ -122,6 +123,7 @@ def create_map(
         "ambient_ai": ambient_ai,
         "panoramax": bool(panoramax),
         "time_of_day": _time_of_day(time_of_day),
+        "storm": _storm(storm, time_of_day),
         "center": {"latitude": latitude, "longitude": longitude},
         "radius_m": radius_m,
         "margin_m": margin_m,
@@ -366,6 +368,7 @@ def store_time_of_day(directory: str | Path, time_of_day: str) -> bool:
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
     changed = document.get("time_of_day", TIME_OF_DAY_DEFAULT) != _time_of_day(time_of_day)
+    _storm(bool(document.get("storm", False)), time_of_day)
     document["time_of_day"] = time_of_day
     atomic_write_json(root / "map.json", document)
     return changed
@@ -375,6 +378,30 @@ def _time_of_day(value: str) -> str:
     if value not in TIMES_OF_DAY:
         raise MapError(f"time_of_day must be one of {', '.join(TIMES_OF_DAY)}, not {value!r}")
     return value
+
+
+def map_storm(directory: str | Path) -> bool:
+    """Whether the map has a storm; a map from before the setting, or a folder without a map, has none."""
+    path = Path(directory).expanduser() / "map.json"
+    if not path.is_file():
+        return False
+    return bool(load_map(path.parent).get("storm", False))
+
+
+def store_storm(directory: str | Path, storm: bool) -> bool:
+    """Record the storm on an existing map. True when it changed, so the layout is out of date."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    changed = bool(document.get("storm", False)) != _storm(storm, str(document.get("time_of_day", TIME_OF_DAY_DEFAULT)))
+    document["storm"] = storm
+    atomic_write_json(root / "map.json", document)
+    return changed
+
+
+def _storm(storm: bool, time_of_day: str) -> bool:
+    if storm and time_of_day != "night":
+        raise MapError("storm needs a night map: a daytime flash looks wrong (ADR-028)")
+    return storm
 
 
 def store_brief(directory: str | Path, brief: str | None = None, *, ambient_ai: bool | None = None) -> None:

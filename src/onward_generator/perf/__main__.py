@@ -50,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--time-of-day", choices=sorted(TIME_OF_DAY_SETTINGS), default="day",
         help="playable layout only: day or night (ADR-026)",  # pragma: no mutate: help text
     )
+    lay.add_argument("--storm", action="store_true", help="playable night layout only: lightning and thunder (ADR-028)")
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
@@ -95,7 +96,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = load_detail_manifest(args.detail)
             if args.playable:
                 heights = json.loads(Path(args.heights).expanduser().read_text(encoding="utf-8"))
-                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day)
+                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm)
             else:
                 doc = gameplay_layout(base, manifest)
         else:

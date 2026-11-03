@@ -78,7 +78,7 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 - `audio_roof_wind_m`: `Wind Rooftop` 1.5 m above the roofs a stair reaches, at most 8, nearest the focus first and at least 25 m apart. A local source has a fixed radius in the SDK. Whether this one is also heard from the street is checked on the headset.
 - Default reverb `SmoothOutdoor`. Inside a nave volume, `ReflectiveIndoorLarge`.
 - `OnwardCustomAudioSource` is not used. It requires a custom clip, and the guide warns about uncompressed memory.
-- `LightningSystem` is not placed on a day map. The guide says a daytime flash looks wrong because it reuses the night-vision effect.
+- `LightningSystem` is placed only with `run --storm`, on a night map, with its prefab values ([ADR-028](decisions/ADR-028-storm.md)). It is refused on a day map: the guide says a daytime flash looks wrong because it reuses the night-vision effect.
 - Urban flyover, jets and helicopters, boats at 0, `PhaseChance` 1. Phase duration stays on the prefab (300 s): one pass per phase, not the 30 s test value.
 - The system must reference the MapQuad (`FindMapQuad`). The flight ceiling is the top of that volume.
 
@@ -117,7 +117,6 @@ The guide describes more. Assault, Escort, Evac, and Retrieval are described by 
 | Lifts | A linked pair, not one prefab |
 | Glass with `PP_Transparent_*` and `AISeeThrough` | After the cost is measured on Quest |
 | `OnwardCustomAudioSource` | Only with a clearly licensed clip, few at a time |
-| Lightning | Only on a night profile, and only after lowering `lightning chance` in a test |
 | Workshop publish | Ideal title 6–18 characters (max 24), description about 250 (max 500), thumbnail 512×256, environment and time of day consistent with the scene. This pipeline does not publish |
 
 ## Card and modes

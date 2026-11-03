@@ -625,7 +625,7 @@ def roof_wind(detail_manifest: Mapping[str, Any], focus: tuple[float, float]) ->
     return [value for x, y, height in chosen for value in (round(x, 2), round(y, 2), round(height + ROOF_WIND_ABOVE_M, 2))]
 
 
-def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day") -> dict[str, Any]:
+def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False) -> dict[str, Any]:
     """Spawns, Hunt anchors, SDK audio names and the urban profile of ``time_of_day``.
 
     The measurement fixture stays ``perf_layout``. This document is what a
@@ -639,6 +639,8 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     """
     if time_of_day not in TIME_OF_DAY_SETTINGS:
         raise LayoutError(f"time_of_day must be one of {', '.join(sorted(TIME_OF_DAY_SETTINGS))}, not {time_of_day!r}")
+    if storm and time_of_day != "night":
+        raise LayoutError("storm needs a night map: a daytime flash looks wrong (ADR-028)")
     sdk_time, profile = TIME_OF_DAY_SETTINGS[time_of_day]
     doc = gameplay_layout(base, detail_manifest)
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
@@ -722,6 +724,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "street_lights_m": street_lights(detail_manifest, focus) if time_of_day == "night" else [],
         "far_clip_m": 1000,
         "flyover": 1,
+        "lightning": 1 if storm else 0,
     })
     return doc
 
