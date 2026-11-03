@@ -421,7 +421,8 @@ def trim_nodes(nodes: Sequence[Node], records: Mapping[str, Mapping[str, Any]], 
 
 
 # Bump when bake_trim_atlas or the PNG encoder changes the bytes for the same style, tints and photographs.
-TRIM_BAKE_VERSION = 2
+# 3: the cornice strip follows CORNICE_REF_M 0.7 (was 1.0); version 2 kept serving the old atlas from the cache.
+TRIM_BAKE_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)

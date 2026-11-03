@@ -17,6 +17,7 @@ from onward_generator.materials import trim as trim_module
 from onward_generator.materials.tile_cache import TileCache
 from onward_generator.materials.trim import (
     PLAIN_V,
+    TRIM_BAKE_VERSION,
     Bands,
     Look,
     TrimStats,
@@ -607,7 +608,7 @@ def test_apply_trim_reports_its_key_png_and_materials(small_table: Path) -> None
     key = trim_cache_key("mediterranean", atlas, tints, {s["key"]: s["sha256"] for s in report["atlas"]["sources"]})
     assert report["atlas"]["cache_key"] == key
     assert report["atlas"]["sha256"] == hashlib.sha256(result.png).hexdigest()
-    assert report["atlas"]["sha256"] == SMALL_ATLAS_SHA256
+    assert report["atlas"]["sha256"] == SMALL_ATLAS_SHA256_BY_BAKE[TRIM_BAKE_VERSION]
     # The record (3 storeys of 3 m, a parapet) cuts the 10 m wall into 46 triangles, not the fallback's 44.
     assert report["stats"]["wall_triangles_after"] == 46 + 6 + 4
     assert report["atlas"]["license"] == "project-generated from CC0 photographs"
@@ -618,7 +619,17 @@ def test_apply_trim_reports_its_key_png_and_materials(small_table: Path) -> None
     ]
 
 
-SMALL_ATLAS_SHA256 = "220fd5b12c6e486304d2cad2e52857428f02459a22bf7690ad0570b6067dfbfb"
+# The small atlas by TRIM_BAKE_VERSION. New bytes need a new version, or the cache keeps serving the old
+# atlas to every map: add an entry for the bumped version, never edit an existing one.
+SMALL_ATLAS_SHA256_BY_BAKE = {
+    2: "b1757ac438582a5d27f0ac13c75bc893abc740bfb22bbd2b06640c0f7c319ed3",
+    3: "220fd5b12c6e486304d2cad2e52857428f02459a22bf7690ad0570b6067dfbfb",
+}
+
+
+def test_each_bake_version_names_its_own_atlas_bytes() -> None:
+    assert TRIM_BAKE_VERSION == max(SMALL_ATLAS_SHA256_BY_BAKE) == 3
+    assert len(set(SMALL_ATLAS_SHA256_BY_BAKE.values())) == len(SMALL_ATLAS_SHA256_BY_BAKE)
 
 
 def test_the_cache_key_is_the_hash_of_its_inputs() -> None:
