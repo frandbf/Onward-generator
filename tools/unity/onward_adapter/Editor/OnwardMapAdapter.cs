@@ -2347,15 +2347,17 @@ namespace OnwardGenerator
             int added = 0;
             for (float y = bottom - step; y >= lowestRungM; y -= step)
             {
+                // One level at a time, in the prefab's order (Left, Right): inserting each rung at 0 would swap the pair.
+                var level = new List<Ladder.LadderRung>(lowest.Count);
                 foreach (Ladder.LadderRung rung in lowest)
                 {
                     GameObject copy = UnityEngine.Object.Instantiate(rung.Transform.gameObject, rung.Transform.parent);
                     Vector3 p = rung.Transform.position;
                     copy.transform.position = new Vector3(p.x, y, p.z);
-                    var extra = new Ladder.LadderRung { Transform = copy.transform };
-                    if (ascending) ladder.Rungs.Insert(0, extra); else ladder.Rungs.Add(extra);
-                    added++;
+                    level.Add(new Ladder.LadderRung { Transform = copy.transform });
                 }
+                if (ascending) ladder.Rungs.InsertRange(0, level); else ladder.Rungs.AddRange(level);
+                added += level.Count;
             }
             Debug.Log($"{LogPrefix} {ladder.name}: {added} rung transforms added, every {step:F3} m.");
         }
