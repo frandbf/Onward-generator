@@ -2875,8 +2875,11 @@ namespace OnwardGenerator
                 // A decal sits 1 cm in front of the shop glass: drawn after it, the letters stay on top from the street.
                 if (safe.StartsWith(ShopDecalPrefix, StringComparison.Ordinal))
                 {
+                    // The glass is in the transparent queue. Shader.renderQueue of the sprite graph reads 2000 in
+                    // batchmode, which put the decals under the glass tint; start from Transparent instead.
                     Material sdkGlass = FindSdkGlass();
-                    view.renderQueue = Math.Max(sprite.renderQueue, sdkGlass != null ? sdkGlass.renderQueue : sprite.renderQueue) + 1;
+                    view.renderQueue = Math.Max((int)RenderQueue.Transparent, sdkGlass != null ? sdkGlass.renderQueue : 0) + 1;
+                    Debug.Log($"{LogPrefix} {safe}: render queue {view.renderQueue} (sprite shader reports {sprite.renderQueue}).");
                 }
                 AssetDatabase.CreateAsset(view, path);
                 return view;

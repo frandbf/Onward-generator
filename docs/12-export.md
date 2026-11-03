@@ -158,7 +158,7 @@ The adapter builds every material with `PP_Opaque_Simple_Lit` and its albedo, ex
 | --- | --- |
 | `glass_view` (interior windows) | `PP_Sprite_Lit`, the framed window PNG on `_MainTex` |
 | `shop_glass` (shop display windows, `docs/07-detail.md`) | A copy of the first material named exactly `GlassVfx`, then `Glass`, under `Assets/OnwardCustomContent` (`AssetDatabase.FindAssets("<name> t:Material")`, file name compared again). `_Cull` is set to Off when the copy has it. The scene log says which: `[OnwardAdapter] shop_glass: SDK material <path> (shader <name>); _Cull set to Off`, or `...; no _Cull property: check from inside a shop that the glass shows`, or `shop_glass: no SDK material named GlassVfx or Glass under Assets/OnwardCustomContent; PP_Sprite_Lit with the generated tint`. The SDK asset is never edited. Whether the v1.15 package ships such a material was not checked on this host |
-| `shop_decal_atlas_<page>` (shop names on shop glass) | `PP_Sprite_Lit`, the RGBA page on `_MainTex`, render queue one above the shop glass so the letters draw over it from the street |
+| `shop_decal_atlas_<page>` (shop names on shop glass) | `PP_Sprite_Lit`, the RGBA page on `_MainTex`, render queue one above the shop glass so the letters draw over it from the street: `Transparent + 1` (3001), or one above the SDK glass material when that is higher; the scene log prints the queue |
 
 Each of them gets white vertex colours (`PP_Sprite_Lit` multiplies by vertex alpha). The shop glass and the decals cast no shadow (`ShadowCastingMode.Off`, on a combined renderer, or on a per-node renderer whose materials are all shop glass or decals), so the baked sun does not darken the shop behind the window. `glass_view` keeps its shadow, as before.
 
