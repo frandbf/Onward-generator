@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import replace
 
@@ -428,7 +429,7 @@ def test_interior_visual_puts_each_slab_well_and_stair_at_its_storey() -> None:
     cfg, footprint, segment, door, plan = _split_plan()
     s, slab, height = plan.storey_m, cfg.interiors.slab_m, 18.0
     roles = [f.role for f in plan.flights]
-    # Storey flights, then a switchback of several roof flights: only the last lands on the roof.
+    # Storey flights, then several roof flights: only the last lands on the roof.
     assert roles.count("storey") >= 1 and roles.count("roof") >= 2 and roles[-1] == "roof"
     matrices = [f.matrix.copy() for f in plan.flights]
     visual = interior_visual(plan, height, cfg, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
@@ -476,6 +477,50 @@ def test_an_interior_without_roof_access_closes_its_top_room() -> None:
     assert names.count("upper_solid") == 1 and "roof_deck" not in names
 
 
+@pytest.mark.parametrize("height", [3.0, 6.0, 9.0, 12.0, 15.0, 18.0])
+def test_no_flight_stands_in_the_head_room_of_the_flight_below(height: float) -> None:
+    cfg = load_detail_config()
+    footprint = Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 18.0), (0.0, 18.0)])
+    segment = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+    door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
+    plan = plan_interior("block-split", footprint, door, segment, height, 3.0, round(height / 3.0), cfg)
+    assert not isinstance(plan, str)
+    assert [f.level for f in plan.flights] == list(range(round(height / 3.0)))  # one flight per storey, to the roof
+    for lower, upper in itertools.pairwise(plan.flights):
+        assert not lower.well.intersects(upper.well)
+
+
+def test_a_climb_of_several_storeys_needs_a_second_well() -> None:
+    """A strip has room for one well: one storey climbs in it, and a taller roof stays closed rather than unclimbable."""
+    narrow = Polygon([(0, 0), (10, 0), (10, 3), (0, 3)])
+    cfg = load_detail_config()
+    one_floor = replace(cfg, interiors=replace(cfg.interiors, floors=1))
+    door = Hole("interior_door", 0, 1.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0)
+    segment = Segment(0, 0, 0, (0.0, 0.0), (10.0, 0.0), True)
+    low = plan_interior("b", narrow, door, segment, 3.0, 3.0, 1, one_floor)
+    assert isinstance(low, InteriorPlan) and [f.role for f in low.flights] == ["roof"]
+    tall = plan_interior("b", narrow, door, segment, 6.0, 3.0, 2, one_floor)
+    assert isinstance(tall, InteriorPlan) and tall.flights == ()
+    wide = Polygon([(0, 0), (10, 0), (10, 6), (0, 6)])
+    climbed = plan_interior("b", wide, door, segment, 6.0, 3.0, 2, one_floor)
+    assert isinstance(climbed, InteriorPlan) and [f.role for f in climbed.flights] == ["roof", "roof"]
+    assert not climbed.flights[0].well.intersects(climbed.flights[1].well)
+    # The door takes the wall the second well would need.
+    blocked = plan_interior("b", wide, replace(door, s0=4.0), segment, 6.0, 3.0, 2, one_floor)
+    assert isinstance(blocked, InteriorPlan) and blocked.flights == ()
+
+
+def test_a_climb_takes_turns_in_two_wells_and_reuses_the_last_storey_well() -> None:
+    wide = Polygon([(0, 0), (24, 0), (24, 18), (0, 18)])
+    plan = _plan(wide, 15.0, 3.0, 5)
+    assert isinstance(plan, InteriorPlan)
+    storey = [f for f in plan.flights if f.role == "storey"]
+    roof = [f for f in plan.flights if f.role == "roof"]
+    assert roof[1].well.equals(storey[-1].well)
+    assert not roof[0].well.intersects(storey[-1].well)
+    assert all(a.well.equals(b.well) for a, b in zip(roof, roof[2:], strict=False))
+
+
 def test_only_a_roof_flight_within_15_cm_of_the_roof_lands_on_it() -> None:
     _, _, _, _, plan = _split_plan()
     roof = next(f for f in plan.flights if f.role == "roof")
@@ -504,13 +549,17 @@ def _plan(footprint: Polygon, height: float, storey: float, levels: int, **optio
 
 
 def test_the_roof_comes_before_the_furnished_floors() -> None:
-    # Room for one well: without the roof it holds the stair between two furnished floors, with the roof it holds the climb.
-    narrow = Polygon([(0, 0), (10, 0), (10, 3), (0, 3)])
-    plan = _plan(narrow, 15.0, 3.0, 5)
+    # Room for two wells: without the roof they hold the stairs of three furnished floors, with the roof they hold one of those and the climb.
+    two_wells = Polygon([(0, 0), (10, 0), (10, 6), (0, 6)])
+    cfg = load_detail_config()
+    three = replace(cfg, seed=next(seed for seed in range(100) if stable_unit(seed, "b", "interior_floors") < 0.5))
+    door = Hole("interior_door", 0, 1.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0)
+    segment = Segment(0, 0, 0, (0.0, 0.0), (10.0, 0.0), True)
+    plan = plan_interior("b", two_wells, door, segment, 15.0, 3.0, 5, three)
     assert isinstance(plan, InteriorPlan)
-    assert plan.floors == 1 and [f.role for f in plan.flights] == ["roof"] * 5
-    furnished = _plan(narrow, 15.0, 3.0, 5, roof_access=False)
-    assert isinstance(furnished, InteriorPlan) and furnished.floors >= 2 and {f.role for f in furnished.flights} == {"storey"}
+    assert plan.floors == 2 and [f.role for f in plan.flights] == ["storey", "roof", "roof", "roof", "roof"]
+    furnished = plan_interior("b", two_wells, door, segment, 15.0, 3.0, 5, three, roof_access=False)
+    assert isinstance(furnished, InteriorPlan) and furnished.floors == 3 and [f.role for f in furnished.flights] == ["storey", "storey"]
 
 
 def test_without_roof_access_the_furnished_floors_stay() -> None:

@@ -4,8 +4,8 @@ An interior is generic and *not* a reconstruction of the real building: one open
 room per furnished floor, a through-door from the street, and a straight stair
 between each pair of floors. A see-through window is a hole in that wall plus one
 closed pane. A building tall enough for three floors gets the third when the seed
-says so. From the top floor a switchback continues to the
-flat roof. Slabs and colliders leave the doorway and the stairs walkable.
+says so. From the top floor more flights continue to the
+flat roof, taking turns in two wells. Slabs and colliders leave the doorway and the stairs walkable.
 
 A shop has one storey and one room per shop on its frontage: a partition wall at the
 bay boundary between two shops' shopfronts, one more room for each other footprint
@@ -211,16 +211,6 @@ def _seek_flight(
     return None
 
 
-def _return_flight(flight: Flight, rise: float, width: float, max_riser: float, tread: float) -> Flight:
-    """The same well, opposite direction, one level higher. A switchback."""
-    geometry = stair_geometry(rise, width, max_riser, tread)
-    x_axis = flight.matrix[:3, 0]
-    y_axis = flight.matrix[:3, 1]
-    origin = flight.matrix[:3, 3] + x_axis * flight.geometry.run_m + y_axis * flight.geometry.width_m
-    matrix = frame_matrix(origin, -x_axis, -y_axis)
-    return Flight(geometry, matrix, flight.well, flight.level + 1, "roof")
-
-
 def _roof_steps(start_z: float, height: float, storey: float) -> int:
     """How many storey-high flights reach the roof deck from ``start_z``."""
     gap = height - start_z
@@ -353,20 +343,25 @@ def _storey_flights(inner: Polygon, door_zone: Polygon, geometry: StairGeometry,
 
 def _roof_climb(inner: Polygon, door_zone: Polygon, flights: Sequence[Flight], geometry: StairGeometry, furnished: int,
                 height: float, storey_m: float, ic: Any) -> tuple[Flight, ...] | None:
-    """The switchback from the top furnished floor to the roof deck, in one well, or ``None``."""
+    """The flights from the top furnished floor to the roof deck, or ``None``.
+
+    They take turns in two wells. Two flights of neighbouring levels never share a well: the upper one
+    would stand in the head room of the lower one's top steps, and nobody could climb it. The second well
+    is the one of the last storey flight, two levels below the first flight that reuses it.
+    """
     steps = _roof_steps((furnished - 1) * storey_m, height, storey_m)
     if not steps:
         return None
     placed = _seek_flight(inner, door_zone, [f.well for f in flights], geometry, ic.stair.landing_m)
     if placed is None:
         return None
-    matrix, well = placed
-    climb = Flight(geometry, matrix, well, furnished - 1, "roof")
-    out = [climb]
-    for _ in range(steps - 1):
-        climb = _return_flight(climb, storey_m, ic.stair.width_m, ic.stair.max_riser_m, ic.stair.tread_m)
-        out.append(climb)
-    return tuple(out)
+    turns = [placed]
+    if steps > 1:
+        alternate = (flights[-1].matrix, flights[-1].well) if flights else _seek_flight(inner, door_zone, [placed[1]], geometry, ic.stair.landing_m)
+        if alternate is None:
+            return None
+        turns.append(alternate)
+    return tuple(Flight(geometry, *turns[step % len(turns)], furnished - 1 + step, "roof") for step in range(steps))
 
 
 def _bay_boundary(a: Hole, b: Hole) -> float:
