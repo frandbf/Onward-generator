@@ -65,7 +65,7 @@
           "description": "Android format of the albedo textures the adapter imports: astc_6x6 (default), or none for uncompressed RGBA32 as before",
           "enum": ["astc_6x6", "none"]
         },
-        "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
         "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
         "fog_enabled": { "type": "boolean" },
         "fog_start_m": { "type": "number", "minimum": 0, "maximum": 3000 },

@@ -125,7 +125,7 @@
     "door": { "width_m": 1.2, "height_m": 2.4 },
     "stair": { "width_m": 1.1, "max_riser_m": 0.185, "tread_m": 0.28, "landing_m": 1.0 },
     "door_clearance_m": 1.5,
-    "lights_max": 24,
+    "lights_max": 160,
     "shops": {
       "enabled": true,
       "max_triangles": 6000,

@@ -51,7 +51,7 @@ def test_shop_interior_config_is_read_as_given() -> None:
     assert MURCIA_CENTER == (-1.12863, 37.98407)
     cfg = config_from_document(_doc())
     rooms = cfg.interiors.shops
-    assert (rooms.enabled, rooms.max_triangles, rooms.max_area_m2, cfg.interiors.lights_max) == (True, 6000, 600.0, 24)
+    assert (rooms.enabled, rooms.max_triangles, rooms.max_area_m2, cfg.interiors.lights_max) == (True, 6000, 600.0, 160)
     assert (rooms.band_depth_m, rooms.min_room_area_m2) == (12.0, 9.0)
     assert [(c.name, c.wall, c.floor) for c in rooms.categories] == [
         ("bakery", "interior_shop_bakery", "interior_shop_tile"),
@@ -92,7 +92,7 @@ def test_inconsistent_shop_interior_config_is_rejected(changes: dict, problem: s
 @pytest.mark.parametrize(
     ("changes", "fragment"),
     [
-        ({"interiors__lights_max": 65}, "maximum"),
+        ({"interiors__lights_max": 257}, "maximum"),
         ({"interiors__lights_max": -1}, "minimum"),
         ({"interiors__shops__max_triangles": -1}, "minimum"),
         ({"interiors__shops__max_area_m2": 0}, "exclusiveMinimum|less than or equal"),
@@ -111,7 +111,7 @@ def test_invalid_shop_interior_config_is_rejected(changes: dict, fragment: str) 
 
 def test_shop_interior_config_is_required_and_its_limits_are_inclusive() -> None:
     config_from_document(_doc(interiors__lights_max=0, interiors__shops__max_triangles=0, interiors__shops__categories=[]))
-    config_from_document(_doc(interiors__lights_max=64))
+    config_from_document(_doc(interiors__lights_max=256))
     config_from_document(_doc(interiors__shops__band_depth_m=3, interiors__shops__min_room_area_m2=4))
     config_from_document(_doc(interiors__shops__band_depth_m=50, interiors__shops__min_room_area_m2=100))
     for key in ("band_depth_m", "min_room_area_m2"):

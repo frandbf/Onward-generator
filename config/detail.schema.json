@@ -199,7 +199,7 @@
           }
         },
         "door_clearance_m": { "$ref": "#/$defs/len" },
-        "lights_max": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
         "shops": {
           "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_collision_triangles", "max_area_m2", "band_depth_m", "min_room_area_m2", "categories", "generic"],
           "properties": {

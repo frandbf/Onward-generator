@@ -139,7 +139,7 @@ def test_every_interior_room_has_one_light_within_the_shared_cap(shops) -> None:
     ceiling = _obj(shops, f"interior/{SHOP}").record["rooms"][0]["ceiling_z_m"]
     assert shop_room["light_m"][2] == pytest.approx(ceiling - LIGHT_BELOW_CEILING_M)
     total = sum(len(r) for r in rooms.values())
-    assert shops.stats["interior_lights"] == {"max": 24, "placed": total, "dropped": []}
+    assert shops.stats["interior_lights"] == {"max": 160, "placed": total, "dropped": []}
     assert not [i for i in shops.issues if i.code == "interior_light_dropped"]
     node = next(n for n in shops.visual_nodes() if n.name == f"interior/{SHOP}")
     assert node.extras["light_anchors"]["rooms"] == [shop_room]
@@ -414,7 +414,7 @@ def test_a_stair_interior_still_refuses_a_footprint_of_several_parts(complex_inp
 
 
 def test_shop_rooms_share_the_light_cap_nearest_the_centre_first(complex_inputs: tuple[Path, Path, Path], complex_shops) -> None:
-    assert complex_shops.stats["interior_lights"] == {"max": 24, "placed": 6, "dropped": []}
+    assert complex_shops.stats["interior_lights"] == {"max": 160, "placed": 6, "dropped": []}
     capped = _detail(complex_inputs, _cfg(interiors__lights_max=3))
     # Lights near (-36, 18), (6, 11), (21, 10), (43.4, 12), (34.6, 12) and (-63, 11): the three farthest go dark.
     assert capped.stats["interior_lights"] == {

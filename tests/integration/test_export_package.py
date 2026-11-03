@@ -160,7 +160,7 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["adapter"].update(version="9.9.9"), "/adapter/version"),
     (lambda c: c["target"].update(sdk="1.16"), "/target/sdk"),
     (lambda c: c["build"].update(lightmap_max_size=3000), "/build/lightmap_max_size"),
-    (lambda c: c["build"].update(interior_lights_max=65), "/build/interior_lights_max"),
+    (lambda c: c["build"].update(interior_lights_max=257), "/build/interior_lights_max"),
     (lambda c: c["build"].update(interior_light_intensity=0), "/build/interior_light_intensity"),
     (lambda c: c["build"].update(fog_color="grey"), "/build/fog_color"),
     (lambda c: c["build"].update(albedo_compression="astc_8x8"), "/build/albedo_compression"),

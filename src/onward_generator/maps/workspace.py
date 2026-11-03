@@ -41,6 +41,11 @@ _TEXELS_MAX = 40.0
 # Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
 _FOG_BAND_M = 600.0
 _FOG_COLOR = "#C8CDD2"
+# Baked room lights the adapter places (ADR-013). Without these keys the adapter falls back to
+# 24 lights, which left most rooms of a map dark. Keep the cap equal to interiors.lights_max
+# in config/detail.default.json.
+_INTERIOR_LIGHTS_MAX = 160
+_INTERIOR_LIGHT_INTENSITY = 0.8
 
 
 class MapError(ValueError):
@@ -480,5 +485,7 @@ def _export_document(map_id: str, title: str, description: str, texels: float, w
             "fog_start_m": wall_m,
             "fog_end_m": wall_m + _FOG_BAND_M,
             "fog_color": _FOG_COLOR,
+            "interior_lights_max": _INTERIOR_LIGHTS_MAX,
+            "interior_light_intensity": _INTERIOR_LIGHT_INTENSITY,
         },
     }

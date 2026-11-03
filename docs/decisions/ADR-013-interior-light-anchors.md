@@ -52,3 +52,7 @@ A shop building now has one room per shop on its main frontage, one per other fo
 - Larger lightmaps are not needed: the lights change the lightmap contents, not their size.
 - One point light under the centre of a large room (up to 500 m²) leaves its far corners dimmer. The range is clamped at 12 m.
 - Not verified in Unity or on the headset. `docs/11-onward-sdk.md` records the guide rule as a lightmap and one baked directional light. This repository has no evidence on whether the Onward runtime or its post-processing profile accepts more baked lights and a `LightProbeGroup`, or overrides them. That is checked in Unity and on the headset (`docs/12-export.md`).
+
+## Amendment, 3 November 2026
+
+The default cap is now 160 in both `interiors.lights_max` and `build.interior_lights_max`, with a schema maximum of 256 for each. Measured on murcia2033 (r120): the cap of 24 lit 24 of 125 rooms and left 66 of 80 interiors fully dark, so most room windows showed an unlit room as a black square. 160 gives every room its light on that map. When the key is absent from the export configuration, the adapter still uses 24. Bake time with the higher count is measured per map in Unity; it has not been tested on the headset yet.
