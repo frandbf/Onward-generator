@@ -200,7 +200,7 @@ def _check_climbs(doc: Mapping[str, Any]) -> list[str]:
     """Ladders and lifts (ADR-029). A layout from before them has neither."""
     problems = []
     for key, limit, fields in (
-        ("ladders", LADDERS_MAX, ("x", "y", "yaw", "height_m", "roof_x", "roof_y")),
+        ("ladders", LADDERS_MAX, ("x", "y", "yaw", "height_m", "parapet_m", "roof_x", "roof_y")),
         ("lifts", LIFTS_MAX, ("x", "y", "yaw", "height_m", "roof_x", "roof_y", "roof_yaw")),
     ):
         sites = doc.get(key, [])

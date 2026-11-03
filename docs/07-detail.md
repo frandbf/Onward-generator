@@ -103,9 +103,9 @@ A mismatch raises `DetailError` and writes nothing.
 
 | Template | Categories | Ground floor | Roof |
 | --- | --- | --- | --- |
-| `generic_residential` | `residential_multi`, `residential_small`, `unknown` | door and windows; balconies on 35% of upper bays | `flat_parapet` (1 m parapet) |
-| `generic_commercial` | `commercial` | `shopfront` | `flat_parapet` (1 m parapet) |
-| `generic_public` | `public`, `industrial` | door and windows; no balconies | `flat_parapet` (1.2 m parapet) |
+| `generic_residential` | `residential_multi`, `residential_small`, `unknown` | door and windows; balconies on 35% of upper bays | `flat_parapet` (0.7 m parapet) |
+| `generic_commercial` | `commercial` | `shopfront` | `flat_parapet` (0.7 m parapet) |
+| `generic_public` | `public`, `industrial` | door and windows; no balconies | `flat_parapet` (0.7 m parapet) |
 | `generic_minor` | `minor` | door and windows | `hip` in `roof_tile` when convex and ≤ 200 m²; otherwise `flat` |
 | `landmark_placeholder` | `religious` and any `landmark` | door only (2.4 × 4 m) | `flat` |
 
@@ -215,7 +215,7 @@ Each interior has a through-door on the main facade, a straight stair (tread 0.2
 
 `floors` is the furnished count (default 3, and never more than the storeys minus one, except that a one-storey building has its room under the roof). A building that can hold three floors gets three when `sha256(seed, id, interior_floors) < 0.5`, and two otherwise.
 
-**The roof comes first.** Further flights, a switchback in one well, continue from the top furnished floor to the roof deck. The storeys they pass stay solid. The deck is the flat roof with that well cut out; where the template has a parapet, the parapet is a collider, and a flat roof without one has an open edge. When the well of the climb does not fit beside the wells of the furnished floors, the building gives up furnished floors, down to the ground floor alone, before it gives up the roof. It has no climb when no well fits (a footprint under about 7 m long has no room for a flight), when the height is not a whole number of storeys from the top floor, or when the roof is pitched: a hip or a tagged `roof:shape` is left closed. `roof_access` on the record says which. A building of three storeys or more with no room for any stair is `no_room_for_stair`; one or two storeys keep the room without a stair.
+**The roof comes first.** Further flights continue from the top furnished floor to the roof deck. They take turns in two wells, because a flight standing right above the one below it fills the head room of that flight's top steps and nobody can climb it. The second well is the one of the last storey flight; a building with no storey flight needs a free one. Each storey they pass is an empty floor between the two wells. The deck is the flat roof with that well cut out; where the template has a parapet, the parapet is a collider, and a flat roof without one has an open edge. When the well of the climb does not fit beside the wells of the furnished floors, the building gives up furnished floors, down to the ground floor alone, before it gives up the roof. It has no climb when no well fits (a footprint under about 7 m long has no room for a flight), when it would need a second well and has room for one only, when the height is not a whole number of storeys from the top floor, or when the roof is pitched: a hip or a tagged `roof:shape` is left closed. `roof_access` on the record says which. A building of three storeys or more with no room for any stair is `no_room_for_stair`; one or two storeys keep the room without a stair.
 
 | Map, `detail` on the same base | Interiors with a stair | Reach the roof | Stair interior triangles | Its collision | Scene visual | Scene collision | Lights placed, dropped |
 | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -45,9 +45,16 @@ def test_storeys_are_the_levels_or_what_the_height_implies_when_more(height: dic
     assert storeys({"height": height}) == expected
 
 
+def test_a_ladder_carries_the_parapet_of_its_roof() -> None:
+    walled = {**_building("b", 2), "roof": {"type": "flat_parapet", "parapet_m": 0.7}}
+    assert _place([walled], {"b": box(0, 0, 20, 10)})["ladders"][0]["parapet_m"] == 0.7
+    bare = {**_building("b", 2), "roof": {"type": "flat"}}
+    assert _place([bare], {"b": box(0, 0, 20, 10)})["ladders"][0]["parapet_m"] == 0.0
+
+
 def test_a_ladder_stands_at_the_middle_of_the_longest_wall_and_faces_it() -> None:
     site = ladder_on(box(0, 0, 20, 10), FREE.difference(box(0, 0, 20, 10)), NOTHING, 9.0)
-    assert site == {"x": 10.0, "y": -0.15, "yaw": 0.0, "height_m": 9.0, "roof_x": 10.0, "roof_y": 0.75}
+    assert site == {"x": 10.0, "y": -0.15, "yaw": 0.0, "height_m": 9.0, "parapet_m": 0.0, "roof_x": 10.0, "roof_y": 0.75}
 
 
 def test_a_ladder_moves_to_the_next_wall_when_the_ground_is_taken() -> None:
@@ -194,7 +201,7 @@ def test_yaw_is_rounded_to_a_tenth_of_a_degree() -> None:
 def test_sites_are_rounded_and_face_the_right_way_on_a_side_wall() -> None:
     footprint = box(0.123, 0.456, 10.789, 30.321)
     ladder = ladder_on(footprint, FREE.difference(footprint), NOTHING, 9.1234)
-    assert ladder == {"x": -0.03, "y": 15.39, "yaw": 90.0, "height_m": 9.12, "roof_x": 0.87, "roof_y": 15.39}
+    assert ladder == {"x": -0.03, "y": 15.39, "yaw": 90.0, "height_m": 9.12, "parapet_m": 0.0, "roof_x": 0.87, "roof_y": 15.39}
     lift = lift_on(footprint, FREE.difference(footprint), NOTHING, 15.1234)
     assert lift == {"x": -1.53, "y": 15.39, "yaw": -90.0, "height_m": 15.12, "roof_x": 2.32, "roof_y": 15.39, "roof_yaw": 90.0}
 

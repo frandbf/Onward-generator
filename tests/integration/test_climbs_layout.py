@@ -59,7 +59,7 @@ def test_the_layout_carries_the_climbs_and_blows_wind_on_their_roofs(detail_inpu
     generated, ref = load_base(base, scene, heights, load_generation_config())
     manifest = detail_scene(generated, ref, heights, scene, load_detail_config()).manifest()
     levels = json.loads(Path(heights).read_text(encoding="utf-8"))
-    site = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "roof_x": 500.0, "roof_y": 500.0}
+    site = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "parapet_m": 0.7, "roof_x": 500.0, "roof_y": 500.0}
     seen: list[tuple] = []
 
     def fake_place(*args: object) -> dict:

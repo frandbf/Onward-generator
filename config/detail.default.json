@@ -24,7 +24,7 @@
       "ground": "door_and_windows",
       "balcony": { "share": 0.35, "door_width_m": 1.0, "door_height_m": 2.2, "width_m": 1.6, "depth_m": 0.6, "slab_m": 0.15, "railing_m": 1.0 },
       "wall_materials": ["plaster_ochre", "plaster_cream"],
-      "roof": { "parapet_m": 1.0, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light", "roof_flat_grey"], "hip": null }
+      "roof": { "parapet_m": 0.7, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light", "roof_flat_grey"], "hip": null }
     },
     "generic_commercial": {
       "applies_to": ["commercial"],
@@ -34,7 +34,7 @@
       "ground": "shopfront",
       "balcony": null,
       "wall_materials": ["plaster_cream", "plaster_ochre"],
-      "roof": { "parapet_m": 1.0, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light"], "hip": null }
+      "roof": { "parapet_m": 0.7, "parapet_thickness_m": 0.25, "flat_materials": ["roof_flat_light"], "hip": null }
     },
     "generic_public": {
       "applies_to": ["public", "industrial"],
@@ -44,7 +44,7 @@
       "ground": "door_and_windows",
       "balcony": null,
       "wall_materials": ["stone_warm", "plaster_cream"],
-      "roof": { "parapet_m": 1.2, "parapet_thickness_m": 0.3, "flat_materials": ["roof_flat_grey"], "hip": null }
+      "roof": { "parapet_m": 0.7, "parapet_thickness_m": 0.3, "flat_materials": ["roof_flat_grey"], "hip": null }
     },
     "generic_minor": {
       "applies_to": ["minor"],

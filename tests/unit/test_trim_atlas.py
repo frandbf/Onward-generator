@@ -217,4 +217,4 @@ def test_bake_is_deterministic_opaque_and_padded() -> None:
     assert hashlib.sha256(image.tobytes()).hexdigest() == GOLDEN
 
 
-GOLDEN = "fc8dca3fc6656aff64dc8b9491916445c45f12995c65c023d2d5ddf16858cbad"
+GOLDEN = "e9af2f31b06d43236b1031c12fb6a1da86468d54536e32d8fe106e964ce0bee5"
