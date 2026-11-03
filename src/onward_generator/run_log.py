@@ -356,6 +356,9 @@ def _export(out: Path) -> StageReport:
     alerts = tuple(Alert("warning", str(text), 1) for text in warnings)
     tiers = manifest.get("tiers")
     draws = f"  draws {group(tiers['draws'])} at {tiers['cell_m']:g} m" if tiers else ""
+    views = manifest.get("view_draws")
+    if views:
+        draws += f"  per view {views['median']} median, {views['p90']} p90, {views['max']} max"
     return StageReport(f"{manifest['package_id']}{draws}", alerts=alerts)
 
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
+from shapely import box
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
@@ -37,7 +38,7 @@ from onward_generator.perf.layout import (
     SPAWN_SEPARATION_M,
     hunt_spawn_problems,
 )
-from onward_generator.tiers import core_of, tier_summary
+from onward_generator.tiers import core_of, tier_summary, view_draws
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPORT_CONFIG_DEFAULT = REPO_ROOT / "config" / "export" / "onward.default.json"
@@ -401,6 +402,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 scales=options["lightmap_scales"],
             ),
             "tiers": _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"])),
+            "view_draws": _view_draws(visual_bytes, detail_manifest, layout_doc, float(options["combine_cell_m"])),
             "warnings": warnings,
         }
         atomic_write_json(out / MANIFEST_FILE, manifest)
@@ -420,6 +422,18 @@ def _tiers(visual: bytes, detail_manifest: Mapping[str, Any], cell_m: float) -> 
     if core is None:
         return None
     return tier_summary(visual, detail_manifest.get("objects") or [], core, cell_m=cell_m or DEFAULT_CELL_M)
+
+
+def _view_draws(visual: bytes, detail_manifest: Mapping[str, Any], layout_doc: Mapping[str, Any], cell_m: float) -> dict[str, Any] | None:
+    """Draws per player view across the playable area: the core, else the layout's site (``tiers.view_draws``).
+
+    None when there is neither: a layout without ``site_bounds_m`` on a map without a core.
+    """
+    site = layout_doc.get("site_bounds_m")
+    area = core_of(detail_manifest) or (box(*(float(v) for v in site)) if site else None)
+    if area is None:
+        return None
+    return view_draws(visual, area, cell_m=cell_m or DEFAULT_CELL_M)
 
 
 def checklist(manifest: Mapping[str, Any]) -> str:

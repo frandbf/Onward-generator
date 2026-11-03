@@ -201,6 +201,14 @@ def test_lightmap_scales_are_resolved_per_visual_material(inputs: tuple[Path, Pa
     assert all(scales[name] == DEFAULT_CLASS_SCALES[surface_class(name)] for name in scales)
     lm = result.manifest["lightmap_estimate"]
     assert lm["texels_per_m"] == options["lightmap_texels_per_m"] and lm["max_size"] == options["lightmap_max_size"]
+    # Draws per view across the layout's site (this map has no core), out to the layout's far clip.
+    views = result.manifest["view_draws"]
+    assert views["views"] > 0 and 0 <= views["median"] <= views["p90"] <= views["max"]
+    assert (views["cell_m"], views["far_m"]) == (options["combine_cell_m"], 1000.0)
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"]["combine_cell_m"] = 50.0
+    (tmp_path / "cell.json").write_text(json.dumps(cfg), encoding="utf-8")
+    assert package(inputs, tmp_path / "cell", export_config=tmp_path / "cell.json").manifest["view_draws"]["cell_m"] == 50.0
     assert lm["texels"] > 0 and abs(lm["texels"] - sum(lm["texels_by_class"].values())) <= len(lm["texels_by_class"])
     cfg = load(EXPORT_CONFIG_DEFAULT)
     cfg["build"]["lightmap_class_scales"] = {"roof": 1.0, "facade": 0.5}

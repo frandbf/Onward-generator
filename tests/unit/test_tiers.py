@@ -6,7 +6,8 @@ Local coordinates are metres from MURCIA_CENTER (x east, y north, z up).
 from __future__ import annotations
 
 import pytest
-from shapely import box
+from shapely import Point, box
+from shapely.geometry import Polygon
 
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
@@ -23,6 +24,7 @@ from onward_generator.tiers import (
     core_square,
     scenic_wall,
     tier_summary,
+    view_draws,
 )
 
 CORE_100 = box(-100, -100, 100, 100)
@@ -165,3 +167,74 @@ def test_tier_summary_uses_the_centre_of_the_north_extent() -> None:
 def test_tier_summary_accepts_a_cell_under_a_metre() -> None:
     visual = _glb(("a", "ground", _floor(0, 0, 0.2, 0.2)), ("b", "ground", _floor(0.6, 0, 0.8, 0.2)))
     assert tier_summary(visual, [], CORE_100, cell_m=0.5)["draws"] == 2
+
+
+ONE_CAMERA = box(-1, -1, 1, 1)  # with step 10 m the grid has its one point at (-1, -1)
+
+
+def test_view_draws_counts_the_groups_in_front_of_the_camera() -> None:
+    visual = _glb(("east", "plaster", _floor(50, -5, 60, 5)))
+    seen = view_draws(visual, ONE_CAMERA, cell_m=100.0, step_m=10.0, yaws=4)
+    # Headings 0 (east), 90, 180, 270: only the first sees the group.
+    assert {k: seen[k] for k in ("views", "median", "p90", "max", "worst")} == {
+        "views": 4, "median": 0, "p90": 1, "max": 1, "worst": {"x_m": -1.0, "y_m": -1.0, "yaw_deg": 0.0}}
+    assert (seen["cell_m"], seen["fov_deg"], seen["far_m"], seen["step_m"], seen["yaws"]) == (100.0, 110.0, 1000.0, 10.0, 4)
+    north = view_draws(_glb(("north", "plaster", _floor(5, 50, 15, 60))), box(10, 0, 11, 1), cell_m=100.0, step_m=10.0, yaws=4)
+    assert north["worst"] == {"x_m": 10.0, "y_m": 0.0, "yaw_deg": 90.0}
+
+
+def test_view_draws_stops_at_the_far_clip_and_at_the_edge_of_the_field() -> None:
+    far = _glb(("far", "plaster", _floor(1500, -5, 1510, 5)))
+    assert view_draws(far, ONE_CAMERA, cell_m=100.0, step_m=10.0, yaws=4)["max"] == 0
+    assert view_draws(far, ONE_CAMERA, cell_m=100.0, step_m=10.0, yaws=4, far_m=2000.0)["max"] == 1
+    # 60 degrees off the heading: outside a 110 degree field, inside a 130 degree one.
+    side = _glb(("side", "plaster", _floor(49, 85, 51, 87)))
+    assert view_draws(side, box(0, 0, 0.5, 0.5), cell_m=100.0, step_m=10.0, yaws=1)["max"] == 0
+    assert view_draws(side, box(0, 0, 0.5, 0.5), cell_m=100.0, step_m=10.0, yaws=1, fov_deg=130.0)["max"] == 1
+
+
+def test_view_draws_counts_one_draw_per_cell_and_material() -> None:
+    visual = _glb(
+        ("a", "plaster", _floor(20, -5, 30, 5)), ("b", "plaster", _floor(40, -5, 50, 5)),  # one group: same cell, same material
+        ("c", "brick", _floor(20, 10, 30, 20)),                                              # another material
+        ("d", "plaster", _floor(120, -5, 130, 5)),                                           # the next cell
+    )
+    assert view_draws(visual, ONE_CAMERA, cell_m=100.0, step_m=10.0, yaws=1)["max"] == 3
+
+
+def test_view_draws_puts_cameras_on_a_grid_inside_the_area() -> None:
+    visual = _glb(("a", "plaster", _floor(0, 0, 1, 1)))
+    assert view_draws(visual, box(-50, -50, 50, 50), cell_m=100.0)["views"] == 5 * 5 * 16
+    # The column x = 25 starts outside (25, 0) and goes on inside (25, 25), (25, 50).
+    triangle = Polygon([(0, 0), (50, 50), (0, 50)])
+    assert view_draws(visual, triangle, cell_m=100.0, yaws=1)["views"] == 6  # (0,0) (0,25) (0,50) (25,25) (25,50) (50,50)
+    assert view_draws(visual, ONE_CAMERA, cell_m=0.5, step_m=10.0, yaws=1)["views"] == 1  # any positive cell
+    assert view_draws(visual, box(0, 0, 0.9, 0.4), cell_m=100.0, step_m=0.5, yaws=1)["views"] == 2  # and any positive step
+
+
+def test_view_draws_reports_the_median_and_p90_of_the_views() -> None:
+    # North-east of the camera: seen at headings 0 and 90, not at 180 and 270, so the views are 0, 0, 1, 1.
+    diagonal = _glb(("ne", "plaster", _floor(40, 40, 50, 50)))
+    seen = view_draws(diagonal, ONE_CAMERA, cell_m=100.0, step_m=10.0, yaws=4)
+    assert (seen["median"], seen["p90"], seen["max"]) == (1, 1, 1)
+
+
+def test_view_draws_names_the_first_busiest_view_in_grid_order() -> None:
+    wide = _glb(("east", "plaster", _floor(200, -50, 210, 50)))
+    # Both cameras see the group at heading 0 only: the tie goes to the west one.
+    assert view_draws(wide, box(0, 0, 10, 0.5), cell_m=1000.0, step_m=10.0, yaws=4)["worst"] == {"x_m": 0.0, "y_m": 0.0, "yaw_deg": 0.0}
+
+
+@pytest.mark.parametrize(("options", "message"), [
+    ({"cell_m": 0.0}, "positive"), ({"cell_m": 100.0, "step_m": 0.0}, "positive"), ({"cell_m": 100.0, "yaws": 0}, "at least 1"),
+])
+def test_view_draws_refuses_bad_options(options: dict, message: str) -> None:
+    with pytest.raises(CoreError, match=message):
+        view_draws(_glb(("a", "plaster", _floor(0, 0, 1, 1))), ONE_CAMERA, **options)
+
+
+def test_view_draws_refuses_an_area_with_no_camera() -> None:
+    # A thin ring: with a 15 m step the grid points (-10, -10), (5, -10), (-10, 5), (5, 5) all miss it.
+    ring = Point(0, 0).buffer(10).difference(Point(0, 0).buffer(9.9))
+    with pytest.raises(CoreError, match="^view_draws: no camera position falls inside the area$"):
+        view_draws(_glb(("a", "plaster", _floor(0, 0, 1, 1))), ring, cell_m=100.0, step_m=15.0)

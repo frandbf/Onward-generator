@@ -308,6 +308,11 @@ def test_export_hides_the_standing_unverified_adapter_warning(tmp_path: Path) ->
     assert summarize("export", ["--out", str(out)]) == StageReport("p")
     _write(out / "onward_export.json", {"package_id": "p", "tiers": {"draws": 1482, "cell_m": 100.0}})
     assert summarize("export", ["--out", str(out)]) == StageReport("p  draws 1 482 at 100 m")
+    _write(out / "onward_export.json", {"package_id": "p", "tiers": None, "view_draws": {"median": 95, "p90": 206, "max": 244}})
+    assert summarize("export", ["--out", str(out)]) == StageReport("p  per view 95 median, 206 p90, 244 max")
+    _write(out / "onward_export.json", {"package_id": "p", "tiers": {"draws": 347, "cell_m": 100.0},
+                                        "view_draws": {"median": 108, "p90": 269, "max": 321}})
+    assert summarize("export", ["--out", str(out)]) == StageReport("p  draws 347 at 100 m  per view 108 median, 269 p90, 321 max")
 
 
 def test_detail_prints_the_tiers_of_a_map_with_a_core(tmp_path: Path) -> None:
