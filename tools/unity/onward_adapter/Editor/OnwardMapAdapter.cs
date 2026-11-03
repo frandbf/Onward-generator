@@ -456,6 +456,38 @@ namespace OnwardGenerator
             material != null && (material.name == ViewGlassMaterial || IsShopOverlay(material));
 
         // Shop glass and its decals are see-through: they cast no shadow into the shop.
+        // Materials that draw the same: same albedo texture, colour, GI class and lightmap scale, and no
+        // material rule by name (glass, decals, the solid-colour envelope). Each maps to the first such
+        // index, so the combine puts them in one group per cell: one draw instead of several (Kenney props
+        // sharing a texture, for example). The look does not change.
+        private static int[] CanonicalMaterials(GMaterial[] docs, Material[] materials, Options opt)
+        {
+            var canonical = new int[docs.Length];
+            var first = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < docs.Length; i++)
+            {
+                canonical[i] = i;
+                GMaterial g = docs[i];
+                if (g == null || materials[i] == null) continue;
+                string n = g.name ?? "";
+                if (n == ViewGlassMaterial || n == ShopGlassMaterial || n.StartsWith(ShopDecalPrefix, StringComparison.Ordinal)
+                    || n.IndexOf("envelope", StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+                int texture = g.pbrMetallicRoughness != null && g.pbrMetallicRoughness.baseColorTexture != null
+                    ? g.pbrMetallicRoughness.baseColorTexture.index : -1;
+                float[] c = g.pbrMetallicRoughness?.baseColorFactor;
+                string colour = c == null ? "none" : string.Join(",", c.Select(v => v.ToString("F4", CultureInfo.InvariantCulture)));
+                string key = string.Join("|", texture.ToString(CultureInfo.InvariantCulture), colour,
+                    materials[i].shader != null ? materials[i].shader.name : "", ContributesGi(materials[i]) ? "gi" : "nogi",
+                    ScaleInLightmap(opt, docs, i).ToString("F4", CultureInfo.InvariantCulture));
+                if (first.TryGetValue(key, out int seen)) canonical[i] = seen;
+                else first[key] = i;
+            }
+            int merged = canonical.Where((target, index) => target != index).Count();
+            Debug.Log($"{LogPrefix} Material dedupe: {docs.Length} materials, {merged} drawn as an identical earlier one.");
+            return canonical;
+        }
+
         private static bool IsShopOverlay(GMaterial material) =>
             material != null && (material.name == ShopGlassMaterial || material.name.StartsWith(ShopDecalPrefix, StringComparison.Ordinal));
 
@@ -483,6 +515,7 @@ namespace OnwardGenerator
         private static int BuildCombinedVisual(Glb visual, Mesh[] meshes, int[][] meshMaterials, Material[] materials,
             Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt)
         {
+            int[] canonical = CanonicalMaterials(visual.Doc.materials, materials, opt);
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
             var probe = new GameObject("probe");
             try
@@ -499,7 +532,8 @@ namespace OnwardGenerator
                     int cx = Mathf.FloorToInt(c.x / cellM), cz = Mathf.FloorToInt(-c.z / cellM);
                     for (int s = 0; s < mesh.subMeshCount; s++)
                     {
-                        var key = (cx, cz, meshMaterials[node.mesh][s]);
+                        int k = meshMaterials[node.mesh][s];
+                        var key = (cx, cz, k >= 0 && k < canonical.Length ? canonical[k] : k);
                         if (!groups.TryGetValue(key, out List<CombineInstance> list)) groups[key] = list = new List<CombineInstance>();
                         list.Add(new CombineInstance { mesh = mesh, subMeshIndex = s, transform = m });
                     }
