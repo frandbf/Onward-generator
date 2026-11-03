@@ -600,6 +600,31 @@ def street_lights(detail_manifest: Mapping[str, Any], focus: tuple[float, float]
     return [value for x, y in heads[:STREET_LIGHTS_MAX] for value in (round(x, 2), round(y, 2), LAMP_LIGHT_HEIGHT_M)]
 
 
+ROOF_WIND_MAX = 8
+"""A local source per reachable roof would be many in a dense map; these are few at a time, like the other ambience."""
+ROOF_WIND_SPACING_M = 25.0
+"""Roofs closer than this share a source. An assumption: the SDK clip's radius is not known here."""
+ROOF_WIND_ABOVE_M = 1.5
+"""About the head of a player standing on the roof."""
+
+
+def roof_wind(detail_manifest: Mapping[str, Any], focus: tuple[float, float]) -> list[float]:
+    """Flat ``x, y, z`` triples of wind above the roofs a player can climb to, nearest the focus first."""
+    objects = detail_manifest.get("objects", [])
+    heights = {o["id"]: float(o["height"]["height_m"]) for o in objects if o.get("type") == "building"}
+    roofs: list[tuple[float, float, float]] = []
+    for interior in objects:
+        if interior.get("type") == "interior" and interior.get("roof_access"):
+            x, y = interior["connections"][-1]["start_m"]
+            roofs.append((x, y, heights[f"building/{interior['source_ids'][0]}"]))
+    roofs.sort(key=lambda roof: (math.dist(roof[:2], focus), roof))
+    chosen: list[tuple[float, float, float]] = []
+    for roof in roofs:
+        if len(chosen) < ROOF_WIND_MAX and all(math.dist(roof[:2], other[:2]) >= ROOF_WIND_SPACING_M for other in chosen):
+            chosen.append(roof)
+    return [value for x, y, height in chosen for value in (round(x, 2), round(y, 2), round(height + ROOF_WIND_ABOVE_M, 2))]
+
+
 def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day") -> dict[str, Any]:
     """Spawns, Hunt anchors, SDK audio names and the urban profile of ``time_of_day``.
 
@@ -690,6 +715,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "audio_global": "Suburban Day",
         "audio_birds_m": list(uplink) if time_of_day == "day" else [],
         "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
+        "audio_roof_wind_m": roof_wind(detail_manifest, focus),
         "environment": "Urban",
         "time_of_day": sdk_time,
         "profile": profile,

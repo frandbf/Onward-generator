@@ -41,7 +41,7 @@
             "minItems": 1,
             "uniqueItems": true,
             "items": {
-              "enum": ["facade", "block_edge", "curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"]
+              "enum": ["facade", "block_edge", "curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park", "interior"]
             }
           },
           "anchor": { "enum": ["ground", "facade", "flat"] },
@@ -53,8 +53,8 @@
             "type": "string", "minLength": 10, "maxLength": 140
           },
           "placement": {
-            "description": "Where it belongs. kit_only: a building or road kit piece that overgrow never places. wall_mounted: on a facade (anchor facade). street: may stand in the carriageway. kerb: sidewalk edge by the road. wall_foot: on the ground against a wall. boundary: along a lot or block edge. open_ground: yards, lots, plazas, parks. ground_cover: flat on the ground.",
-            "enum": ["kit_only", "wall_mounted", "street", "kerb", "wall_foot", "boundary", "open_ground", "ground_cover"]
+            "description": "Where it belongs. kit_only: a building or road kit piece that overgrow never places. interior: a prop for inside a room, which overgrow never places either. wall_mounted: on a facade (anchor facade). street: may stand in the carriageway. kerb: sidewalk edge by the road. wall_foot: on the ground against a wall. boundary: along a lot or block edge. open_ground: yards, lots, plazas, parks. ground_cover: flat on the ground.",
+            "enum": ["kit_only", "interior", "wall_mounted", "street", "kerb", "wall_foot", "boundary", "open_ground", "ground_cover"]
           },
           "grouping": {
             "description": "How copies sit together. run: end to end in a line (span may repeat it). grid: along and up a wall (cover may repeat it). cluster: a few loose copies. single: one copy.",

@@ -51,7 +51,7 @@ from onward_generator.overgrow.constants import (
 )
 from onward_generator.overgrow.fit import apply_fit_scale
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
-from onward_generator.overgrow.manifest import KIT_ONLY, check_manifest
+from onward_generator.overgrow.manifest import INTERIOR, KIT_ONLY, check_manifest
 from onward_generator.overgrow.normalize import cluster_decimate, rest_on_ground
 
 
@@ -191,7 +191,7 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
     for row in document.get("assets") or []:
         if not isinstance(row, dict) or not row.get("id") or not row.get("file"):
             continue
-        refusal = KIT_ONLY if row.get("placement") == KIT_ONLY else row.get("refused")
+        refusal = row["placement"] if row.get("placement") in (KIT_ONLY, INTERIOR) else row.get("refused")
         if refusal:
             rejects.append(LibraryReject(str(row["id"]), str(refusal)))
             continue

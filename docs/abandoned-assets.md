@@ -27,6 +27,23 @@ Two optional load corrections may follow `tags`. A person sets them; the GLB is 
 
 The library reads the whole scene of each GLB: every node with its transform (matrix, or translation, rotation and scale, inherited by children) and every triangle primitive. Until 2026-10-30 it kept only the first primitive of the first node, so 73 Kenney files loaded in part: the open dumpster was one quad, the bench only its legs. Primitives that share an albedo form one part of the prop; each part is its own material, `prop_<id>` then `prop_<id>__1` and so on, still albedo only on `PP_Opaque_Simple_Lit`. The `triangles` and sizes in the manifests were already measured on the whole file.
 
+## Interior props
+
+Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writes them, and the same downloads give the same files.
+
+| Catalogue | Rows | Triangles (largest) | Source | Scale |
+| --- | --- | --- | --- | --- |
+| `assets/kenney_mini_shop` | 30 | 1712 | Kenney Mini Shop | 2.5: mannequin 0.719 → 1.80 m |
+| `assets/kenney_furniture` | 140 | 992 | Kenney Furniture Kit | 2.03: doorway 1.01 → 2.05 m |
+| `assets/kenney_food` | 200 | 1376 | Kenney Food Kit | 0.3: banana 0.63 → 0.19 m |
+| `assets/polyhaven_shop` | 7 | 1797 | Poly Haven shelves, cash register, crate, chalkboard | The `/info` dimensions |
+
+- Every row is `placement: interior` and `surfaces: ["interior"]`. The library refuses it (`library_rejects` reason `interior`), so overgrow never puts a shelf on a street. **Nothing places these props yet:** they are on disk, not in a map.
+- One factor per pack keeps a pack's pieces in proportion, as for the street packs. The factor sits on one new root node and in `extras.street_scale`; children keep their transforms.
+- The Furniture Kit has base colour factors and no images. The library reads albedo images, so each factor is baked into a 4 × 4 PNG inside the GLB.
+- `steel_frame_shelves_01` is ten times too large in Poly Haven's file. `normalize` scales a file whose three sizes all differ from the API's by one factor, within 5 %.
+- The descriptions and tags are written by the tool from the file name and the box. No person has reviewed a rendered view (`semantics.basis`).
+
 ## Vehicles
 
 ### covered car

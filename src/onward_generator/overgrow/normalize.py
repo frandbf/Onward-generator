@@ -202,6 +202,10 @@ def write_normalized_glb(path: Path, asset_id: str, normalized: NormalizedMesh) 
     ))
 
 
+UNIFORM_RATIO_TOLERANCE = 1.05
+"""Three axes off by one factor, within 5 %, are a file in the wrong unit, not a different object."""
+
+
 def _apply_scale(vertices: np.ndarray, api_dimensions_mm: list[float] | None) -> str:
     extent = vertices.max(axis=0) - vertices.min(axis=0)
     if api_dimensions_mm:
@@ -213,6 +217,12 @@ def _apply_scale(vertices: np.ndarray, api_dimensions_mm: list[float] | None) ->
         if len(api_m) == 3 and float(extent.max()) > 80.0 and float(np.max(np.abs(api_m - got * 0.001))) < close:
             vertices *= 0.001
             return "glTF bbox was millimetres; divided by 1000 to match the API"
+        if len(api_m) == 3 and float(got.min()) > 0.0:
+            ratios = got / api_m
+            if float(ratios.max()) <= float(ratios.min()) * UNIFORM_RATIO_TOLERANCE:
+                factor = float(np.median(ratios))
+                vertices /= factor
+                return f"glTF bbox was {factor:.3g} times the API dimensions; scaled to match"
     return "glTF bbox kept in metres"
 
 

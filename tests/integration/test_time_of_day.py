@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -33,6 +34,7 @@ def layouts(detail_inputs: tuple[Path, Path, Path]) -> dict[str, dict]:
 def test_a_night_layout_changes_only_the_profile_the_birds_and_the_lights(layouts: dict[str, dict]) -> None:
     day, night = layouts["day"], layouts["night"]
     assert (day["time_of_day"], day["profile"], day["street_lights_m"]) == ("Day", "UrbanDay1", [])
+    assert isinstance(day["audio_roof_wind_m"], list)
     assert (night["time_of_day"], night["profile"]) == ("Night", "UrbanNight1")
     assert day["audio_birds_m"] == day["uplink_m"] and night["audio_birds_m"] == []
     lamps = [o for o in layouts["manifest"]["objects"] if o.get("kind") == "street_lamp"]
@@ -105,6 +107,7 @@ def test_the_adapter_reads_the_time_of_day_and_lights_the_lamps() -> None:
     assert "LevelDescriptor.ETimeOfDay.Day,\n" not in source and "TimeOfDayOf(pkg.Layout)," in source
     assert "ApplyNight(light, pkg.Layout);" in source and "AddStreetLights(pkg.Layout);" in source
     assert "public float[] street_lights_m;" in source
+    assert "public float[] audio_roof_wind_m;" in source and "layout.audio_roof_wind_m" in source
 
 
 def test_run_passes_the_time_of_day_to_map_create_only_when_named() -> None:
@@ -180,6 +183,8 @@ def test_perf_layout_writes_the_time_it_is_given_and_day_otherwise(detail_inputs
 
 
 def test_map_create_stores_the_time_of_day_it_is_given(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    downloaded = SimpleNamespace(size_bytes=12, sha256="abc", path="noche.osm")
+    monkeypatch.setattr("onward_generator.maps.__main__.download_map_osm", lambda *_args, **_kwargs: downloaded)
     monkeypatch.chdir(tmp_path)
     args = ["map", "create", "--lat", "37.625", "--lon", "-0.986", "--radius-m", "300"]
     assert main([*args, "--name", "Noche", "--time-of-day", "night"]) == 0

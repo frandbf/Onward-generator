@@ -179,6 +179,9 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
             problems.append("layout: street_lights_m must be flat x, y, z triples")
         elif lights and doc.get("time_of_day") != "Night":
             problems.append("layout: street_lights_m is only for a night map")
+        roof_wind = doc.get("audio_roof_wind_m", [])
+        if not isinstance(roof_wind, list) or len(roof_wind) % 3 or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in roof_wind):
+            problems.append("layout: audio_roof_wind_m must be flat x, y, z triples")
         if doc.get("far_clip_m") != 1000 or doc.get("flyover") != 1:
             problems.append("layout: far_clip_m must be 1000 and flyover must be 1")
         if doc.get("schema_version") == GAMEPLAY_VERSION:

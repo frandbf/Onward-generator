@@ -1,0 +1,5157 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://kenney.nl/assets/food-kit, CC0 1.0. street_scale 0.3: banana 0.63 file units to 0.19 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_shop_assets.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-02",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "kenney_food_advocado_half",
+      "file": "advocado-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "advocado half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly advocado half from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "advocado",
+        "half"
+      ],
+      "triangles": 98,
+      "length_m": 0.031,
+      "depth_m": 0.052,
+      "height_m": 0.064,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_apple_half",
+      "file": "apple-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "apple half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly apple half from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "apple",
+        "half"
+      ],
+      "triangles": 124,
+      "length_m": 0.029,
+      "depth_m": 0.059,
+      "height_m": 0.057,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_apple",
+      "file": "apple.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "apple, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly apple from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "apple"
+      ],
+      "triangles": 136,
+      "length_m": 0.059,
+      "depth_m": 0.059,
+      "height_m": 0.057,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_avocado",
+      "file": "avocado.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "avocado, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly avocado from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "avocado"
+      ],
+      "triangles": 44,
+      "length_m": 0.045,
+      "depth_m": 0.052,
+      "height_m": 0.064,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bacon_raw",
+      "file": "bacon-raw.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bacon raw, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bacon raw from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bacon",
+        "raw"
+      ],
+      "triangles": 40,
+      "length_m": 0.039,
+      "depth_m": 0.156,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bacon",
+      "file": "bacon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bacon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bacon from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bacon"
+      ],
+      "triangles": 40,
+      "length_m": 0.039,
+      "depth_m": 0.156,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bag_flat",
+      "file": "bag-flat.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bag flat, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bag flat from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bag",
+        "flat"
+      ],
+      "triangles": 114,
+      "length_m": 0.195,
+      "depth_m": 0.14,
+      "height_m": 0.057,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bag",
+      "file": "bag.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bag, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bag from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bag"
+      ],
+      "triangles": 46,
+      "length_m": 0.066,
+      "depth_m": 0.124,
+      "height_m": 0.18,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_banana",
+      "file": "banana.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "banana, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly banana from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "banana"
+      ],
+      "triangles": 104,
+      "length_m": 0.041,
+      "depth_m": 0.189,
+      "height_m": 0.059,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_barrel",
+      "file": "barrel.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "barrel, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly barrel from Food Kit, clean flat colours, about 0.23 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "barrel"
+      ],
+      "triangles": 308,
+      "length_m": 0.228,
+      "depth_m": 0.204,
+      "height_m": 0.204,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_beet",
+      "file": "beet.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "beet, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly beet from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "beet"
+      ],
+      "triangles": 100,
+      "length_m": 0.029,
+      "depth_m": 0.029,
+      "height_m": 0.08,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bottle_ketchup",
+      "file": "bottle-ketchup.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bottle ketchup, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bottle ketchup from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bottle",
+        "ketchup"
+      ],
+      "triangles": 96,
+      "length_m": 0.043,
+      "depth_m": 0.05,
+      "height_m": 0.118,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bottle_musterd",
+      "file": "bottle-musterd.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bottle musterd, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bottle musterd from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bottle",
+        "musterd"
+      ],
+      "triangles": 96,
+      "length_m": 0.043,
+      "depth_m": 0.05,
+      "height_m": 0.118,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bottle_oil",
+      "file": "bottle-oil.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bottle oil, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bottle oil from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bottle",
+        "oil"
+      ],
+      "triangles": 96,
+      "length_m": 0.042,
+      "depth_m": 0.042,
+      "height_m": 0.187,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bowl_broth",
+      "file": "bowl-broth.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bowl broth, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bowl broth from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bowl",
+        "broth"
+      ],
+      "triangles": 210,
+      "length_m": 0.158,
+      "depth_m": 0.174,
+      "height_m": 0.087,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bowl_cereal",
+      "file": "bowl-cereal.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bowl cereal, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bowl cereal from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bowl",
+        "cereal"
+      ],
+      "triangles": 120,
+      "length_m": 0.151,
+      "depth_m": 0.19,
+      "height_m": 0.126,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bowl_soup",
+      "file": "bowl-soup.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bowl soup, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bowl soup from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bowl",
+        "soup"
+      ],
+      "triangles": 132,
+      "length_m": 0.151,
+      "depth_m": 0.174,
+      "height_m": 0.064,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bowl",
+      "file": "bowl.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bowl, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bowl from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bowl"
+      ],
+      "triangles": 84,
+      "length_m": 0.151,
+      "depth_m": 0.174,
+      "height_m": 0.064,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_bread",
+      "file": "bread.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bread, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly bread from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bread"
+      ],
+      "triangles": 116,
+      "length_m": 0.133,
+      "depth_m": 0.11,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_broccoli",
+      "file": "broccoli.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "broccoli, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly broccoli from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "broccoli"
+      ],
+      "triangles": 220,
+      "length_m": 0.113,
+      "depth_m": 0.113,
+      "height_m": 0.127,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_burger_cheese_double",
+      "file": "burger-cheese-double.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "burger cheese double, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly burger cheese double from Food Kit, clean flat colours, about 0.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "burger",
+        "cheese",
+        "double"
+      ],
+      "triangles": 392,
+      "length_m": 0.113,
+      "depth_m": 0.113,
+      "height_m": 0.096,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_burger_cheese",
+      "file": "burger-cheese.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "burger cheese, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly burger cheese from Food Kit, clean flat colours, about 0.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "burger",
+        "cheese"
+      ],
+      "triangles": 226,
+      "length_m": 0.113,
+      "depth_m": 0.113,
+      "height_m": 0.066,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_burger_double",
+      "file": "burger-double.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "burger double, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly burger double from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "burger",
+        "double"
+      ],
+      "triangles": 468,
+      "length_m": 0.121,
+      "depth_m": 0.121,
+      "height_m": 0.108,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_burger",
+      "file": "burger.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "burger, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly burger from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "burger"
+      ],
+      "triangles": 294,
+      "length_m": 0.121,
+      "depth_m": 0.121,
+      "height_m": 0.087,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cabbage",
+      "file": "cabbage.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cabbage, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cabbage from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cabbage"
+      ],
+      "triangles": 140,
+      "length_m": 0.114,
+      "depth_m": 0.121,
+      "height_m": 0.092,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cake_birthday",
+      "file": "cake-birthday.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cake birthday, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cake birthday from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cake",
+        "birthday"
+      ],
+      "triangles": 1146,
+      "length_m": 0.192,
+      "depth_m": 0.192,
+      "height_m": 0.109,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cake_slicer",
+      "file": "cake-slicer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cake slicer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cake slicer from Food Kit, clean flat colours, about 0.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cake",
+        "slicer"
+      ],
+      "triangles": 36,
+      "length_m": 0.217,
+      "depth_m": 0.057,
+      "height_m": 0.021,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cake",
+      "file": "cake.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cake, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cake from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cake"
+      ],
+      "triangles": 750,
+      "length_m": 0.192,
+      "depth_m": 0.192,
+      "height_m": 0.082,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_can_open",
+      "file": "can-open.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "can open, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly can open from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "can",
+        "open"
+      ],
+      "triangles": 216,
+      "length_m": 0.09,
+      "depth_m": 0.09,
+      "height_m": 0.122,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_can_small",
+      "file": "can-small.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "can small, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly can small from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "can",
+        "small"
+      ],
+      "triangles": 154,
+      "length_m": 0.09,
+      "depth_m": 0.09,
+      "height_m": 0.048,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_can",
+      "file": "can.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "can, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly can from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "can"
+      ],
+      "triangles": 156,
+      "length_m": 0.09,
+      "depth_m": 0.09,
+      "height_m": 0.096,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_candy_bar_wrapper",
+      "file": "candy-bar-wrapper.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "candy bar wrapper, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly candy bar wrapper from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "candy",
+        "bar",
+        "wrapper"
+      ],
+      "triangles": 48,
+      "length_m": 0.088,
+      "depth_m": 0.035,
+      "height_m": 0.024,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_candy_bar",
+      "file": "candy-bar.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "candy bar, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly candy bar from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "candy",
+        "bar"
+      ],
+      "triangles": 72,
+      "length_m": 0.088,
+      "depth_m": 0.022,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_carrot",
+      "file": "carrot.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "carrot, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly carrot from Food Kit, clean flat colours, about 0.21 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "carrot"
+      ],
+      "triangles": 148,
+      "length_m": 0.103,
+      "depth_m": 0.103,
+      "height_m": 0.215,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_carton_small",
+      "file": "carton-small.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "carton small, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly carton small from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "carton",
+        "small"
+      ],
+      "triangles": 74,
+      "length_m": 0.069,
+      "depth_m": 0.069,
+      "height_m": 0.117,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_carton",
+      "file": "carton.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "carton, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly carton from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "carton"
+      ],
+      "triangles": 94,
+      "length_m": 0.069,
+      "depth_m": 0.069,
+      "height_m": 0.177,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cauliflower",
+      "file": "cauliflower.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cauliflower, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cauliflower from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cauliflower"
+      ],
+      "triangles": 152,
+      "length_m": 0.114,
+      "depth_m": 0.121,
+      "height_m": 0.092,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_celery_stick",
+      "file": "celery-stick.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "celery stick, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly celery stick from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "celery",
+        "stick"
+      ],
+      "triangles": 52,
+      "length_m": 0.014,
+      "depth_m": 0.026,
+      "height_m": 0.162,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cheese_cut",
+      "file": "cheese-cut.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cheese cut, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cheese cut from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cheese",
+        "cut"
+      ],
+      "triangles": 160,
+      "length_m": 0.115,
+      "depth_m": 0.079,
+      "height_m": 0.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cheese_slicer",
+      "file": "cheese-slicer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cheese slicer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cheese slicer from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cheese",
+        "slicer"
+      ],
+      "triangles": 44,
+      "length_m": 0.186,
+      "depth_m": 0.058,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cheese",
+      "file": "cheese.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cheese, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cheese from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cheese"
+      ],
+      "triangles": 576,
+      "length_m": 0.204,
+      "depth_m": 0.204,
+      "height_m": 0.066,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cherries",
+      "file": "cherries.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cherries, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cherries from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cherries"
+      ],
+      "triangles": 134,
+      "length_m": 0.026,
+      "depth_m": 0.049,
+      "height_m": 0.051,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_chinese",
+      "file": "chinese.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chinese, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly chinese from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chinese"
+      ],
+      "triangles": 162,
+      "length_m": 0.136,
+      "depth_m": 0.167,
+      "height_m": 0.17,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_chocolate_wrapper",
+      "file": "chocolate-wrapper.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chocolate wrapper, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly chocolate wrapper from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chocolate",
+        "wrapper"
+      ],
+      "triangles": 118,
+      "length_m": 0.088,
+      "depth_m": 0.061,
+      "height_m": 0.019,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_chocolate",
+      "file": "chocolate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chocolate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly chocolate from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chocolate"
+      ],
+      "triangles": 140,
+      "length_m": 0.088,
+      "depth_m": 0.044,
+      "height_m": 0.01,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_chopstic_decorative",
+      "file": "chopstic-decorative.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chopstic decorative, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly chopstic decorative from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chopstic",
+        "decorative"
+      ],
+      "triangles": 36,
+      "length_m": 0.006,
+      "depth_m": 0.135,
+      "height_m": 0.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_chopstick",
+      "file": "chopstick.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chopstick, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly chopstick from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chopstick"
+      ],
+      "triangles": 12,
+      "length_m": 0.006,
+      "depth_m": 0.135,
+      "height_m": 0.006,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cocktail",
+      "file": "cocktail.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cocktail, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cocktail from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cocktail"
+      ],
+      "triangles": 144,
+      "length_m": 0.078,
+      "depth_m": 0.108,
+      "height_m": 0.152,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_coconut_half",
+      "file": "coconut-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coconut half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly coconut half from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coconut",
+        "half"
+      ],
+      "triangles": 92,
+      "length_m": 0.075,
+      "depth_m": 0.075,
+      "height_m": 0.037,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_coconut",
+      "file": "coconut.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coconut, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly coconut from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coconut"
+      ],
+      "triangles": 76,
+      "length_m": 0.075,
+      "depth_m": 0.075,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cookie_chocolate",
+      "file": "cookie-chocolate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cookie chocolate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cookie chocolate from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cookie",
+        "chocolate"
+      ],
+      "triangles": 136,
+      "length_m": 0.036,
+      "depth_m": 0.042,
+      "height_m": 0.02,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cookie",
+      "file": "cookie.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cookie, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cookie from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cookie"
+      ],
+      "triangles": 68,
+      "length_m": 0.066,
+      "depth_m": 0.057,
+      "height_m": 0.015,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cooking_fork",
+      "file": "cooking-fork.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cooking fork, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cooking fork from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cooking",
+        "fork"
+      ],
+      "triangles": 36,
+      "length_m": 0.205,
+      "depth_m": 0.022,
+      "height_m": 0.022,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cooking_knife_chopping",
+      "file": "cooking-knife-chopping.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cooking knife chopping, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cooking knife chopping from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cooking",
+        "knife",
+        "chopping"
+      ],
+      "triangles": 80,
+      "length_m": 0.18,
+      "depth_m": 0.067,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cooking_knife",
+      "file": "cooking-knife.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cooking knife, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cooking knife from Food Kit, clean flat colours, about 0.21 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cooking",
+        "knife"
+      ],
+      "triangles": 39,
+      "length_m": 0.215,
+      "depth_m": 0.04,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cooking_spatula",
+      "file": "cooking-spatula.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cooking spatula, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cooking spatula from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cooking",
+        "spatula"
+      ],
+      "triangles": 72,
+      "length_m": 0.205,
+      "depth_m": 0.057,
+      "height_m": 0.022,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cooking_spoon",
+      "file": "cooking-spoon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cooking spoon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cooking spoon from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cooking",
+        "spoon"
+      ],
+      "triangles": 56,
+      "length_m": 0.2,
+      "depth_m": 0.052,
+      "height_m": 0.007,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_corn_dog",
+      "file": "corn-dog.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "corn dog, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly corn dog from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "corn",
+        "dog"
+      ],
+      "triangles": 64,
+      "length_m": 0.181,
+      "depth_m": 0.033,
+      "height_m": 0.028,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_corn",
+      "file": "corn.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "corn, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly corn from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "corn"
+      ],
+      "triangles": 128,
+      "length_m": 0.103,
+      "depth_m": 0.09,
+      "height_m": 0.095,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_croissant",
+      "file": "croissant.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "croissant, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly croissant from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "croissant"
+      ],
+      "triangles": 162,
+      "length_m": 0.104,
+      "depth_m": 0.143,
+      "height_m": 0.058,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cup_coffee",
+      "file": "cup-coffee.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cup coffee, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cup coffee from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cup",
+        "coffee"
+      ],
+      "triangles": 108,
+      "length_m": 0.065,
+      "depth_m": 0.086,
+      "height_m": 0.042,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cup_saucer",
+      "file": "cup-saucer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cup saucer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cup saucer from Food Kit, clean flat colours, about 0.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cup",
+        "saucer"
+      ],
+      "triangles": 116,
+      "length_m": 0.107,
+      "depth_m": 0.107,
+      "height_m": 0.011,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cup_tea",
+      "file": "cup-tea.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cup tea, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cup tea from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cup",
+        "tea"
+      ],
+      "triangles": 144,
+      "length_m": 0.071,
+      "depth_m": 0.088,
+      "height_m": 0.06,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cup",
+      "file": "cup.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cup, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cup from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cup"
+      ],
+      "triangles": 112,
+      "length_m": 0.069,
+      "depth_m": 0.088,
+      "height_m": 0.06,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cupcake",
+      "file": "cupcake.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cupcake, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cupcake from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cupcake"
+      ],
+      "triangles": 204,
+      "length_m": 0.107,
+      "depth_m": 0.092,
+      "height_m": 0.127,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cutting_board_japanese",
+      "file": "cutting-board-japanese.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cutting board japanese, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cutting board japanese from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cutting",
+        "board",
+        "japanese"
+      ],
+      "triangles": 104,
+      "length_m": 0.147,
+      "depth_m": 0.252,
+      "height_m": 0.024,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cutting_board_round",
+      "file": "cutting-board-round.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cutting board round, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cutting board round from Food Kit, clean flat colours, about 0.24 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cutting",
+        "board",
+        "round"
+      ],
+      "triangles": 156,
+      "length_m": 0.24,
+      "depth_m": 0.24,
+      "height_m": 0.018,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_cutting_board",
+      "file": "cutting-board.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "cutting board, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly cutting board from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "cutting",
+        "board"
+      ],
+      "triangles": 120,
+      "length_m": 0.174,
+      "depth_m": 0.246,
+      "height_m": 0.018,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_dim_sum",
+      "file": "dim-sum.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dim sum, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly dim sum from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "dim",
+        "sum"
+      ],
+      "triangles": 56,
+      "length_m": 0.048,
+      "depth_m": 0.056,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_donut_chocolate",
+      "file": "donut-chocolate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "donut chocolate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly donut chocolate from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "donut",
+        "chocolate"
+      ],
+      "triangles": 120,
+      "length_m": 0.074,
+      "depth_m": 0.085,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_donut_sprinkles",
+      "file": "donut-sprinkles.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "donut sprinkles, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly donut sprinkles from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "donut",
+        "sprinkles"
+      ],
+      "triangles": 180,
+      "length_m": 0.074,
+      "depth_m": 0.085,
+      "height_m": 0.028,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_donut",
+      "file": "donut.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "donut, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly donut from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "donut"
+      ],
+      "triangles": 108,
+      "length_m": 0.074,
+      "depth_m": 0.085,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_egg_cooked",
+      "file": "egg-cooked.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "egg cooked, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly egg cooked from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "egg",
+        "cooked"
+      ],
+      "triangles": 92,
+      "length_m": 0.124,
+      "depth_m": 0.115,
+      "height_m": 0.008,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_egg_cup",
+      "file": "egg-cup.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "egg cup, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly egg cup from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "egg",
+        "cup"
+      ],
+      "triangles": 84,
+      "length_m": 0.047,
+      "depth_m": 0.055,
+      "height_m": 0.045,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_egg_half",
+      "file": "egg-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "egg half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly egg half from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "egg",
+        "half"
+      ],
+      "triangles": 80,
+      "length_m": 0.035,
+      "depth_m": 0.04,
+      "height_m": 0.032,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_egg",
+      "file": "egg.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "egg, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly egg from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "egg"
+      ],
+      "triangles": 44,
+      "length_m": 0.035,
+      "depth_m": 0.04,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_eggplant",
+      "file": "eggplant.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "eggplant, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly eggplant from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "eggplant"
+      ],
+      "triangles": 124,
+      "length_m": 0.061,
+      "depth_m": 0.065,
+      "height_m": 0.122,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_fish_bones",
+      "file": "fish-bones.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fish bones, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly fish bones from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fish",
+        "bones"
+      ],
+      "triangles": 384,
+      "length_m": 0.093,
+      "depth_m": 0.191,
+      "height_m": 0.022,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_fish",
+      "file": "fish.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fish, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly fish from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fish"
+      ],
+      "triangles": 233,
+      "length_m": 0.059,
+      "depth_m": 0.186,
+      "height_m": 0.097,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_frappe",
+      "file": "frappe.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "frappe, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly frappe from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "frappe"
+      ],
+      "triangles": 320,
+      "length_m": 0.076,
+      "depth_m": 0.076,
+      "height_m": 0.15,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_fries_empty",
+      "file": "fries-empty.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fries empty, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly fries empty from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fries",
+        "empty"
+      ],
+      "triangles": 116,
+      "length_m": 0.049,
+      "depth_m": 0.08,
+      "height_m": 0.071,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_fries",
+      "file": "fries.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "fries, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly fries from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "fries"
+      ],
+      "triangles": 564,
+      "length_m": 0.055,
+      "depth_m": 0.08,
+      "height_m": 0.119,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_frikandel_speciaal",
+      "file": "frikandel-speciaal.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "frikandel speciaal, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly frikandel speciaal from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "frikandel",
+        "speciaal"
+      ],
+      "triangles": 308,
+      "length_m": 0.191,
+      "depth_m": 0.05,
+      "height_m": 0.033,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_frying_pan_lid",
+      "file": "frying-pan-lid.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "frying pan lid, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly frying pan lid from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "frying",
+        "pan",
+        "lid"
+      ],
+      "triangles": 156,
+      "length_m": 0.173,
+      "depth_m": 0.182,
+      "height_m": 0.033,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_frying_pan",
+      "file": "frying-pan.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "frying pan, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly frying pan from Food Kit, clean flat colours, about 0.31 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "frying",
+        "pan"
+      ],
+      "triangles": 200,
+      "length_m": 0.197,
+      "depth_m": 0.307,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ginger_bread_cutter",
+      "file": "ginger-bread-cutter.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ginger bread cutter, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ginger bread cutter from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ginger",
+        "bread",
+        "cutter"
+      ],
+      "triangles": 136,
+      "length_m": 0.088,
+      "depth_m": 0.081,
+      "height_m": 0.013,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ginger_bread",
+      "file": "ginger-bread.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ginger bread, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ginger bread from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ginger",
+        "bread"
+      ],
+      "triangles": 80,
+      "length_m": 0.078,
+      "depth_m": 0.071,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_glass_wine",
+      "file": "glass-wine.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "glass wine, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly glass wine from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "glass",
+        "wine"
+      ],
+      "triangles": 232,
+      "length_m": 0.068,
+      "depth_m": 0.059,
+      "height_m": 0.15,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_glass",
+      "file": "glass.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "glass, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly glass from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "glass"
+      ],
+      "triangles": 44,
+      "length_m": 0.048,
+      "depth_m": 0.055,
+      "height_m": 0.086,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_grapes",
+      "file": "grapes.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "grapes, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly grapes from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "grapes"
+      ],
+      "triangles": 592,
+      "length_m": 0.084,
+      "depth_m": 0.072,
+      "height_m": 0.127,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_honey",
+      "file": "honey.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "honey, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly honey from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "honey"
+      ],
+      "triangles": 140,
+      "length_m": 0.098,
+      "depth_m": 0.098,
+      "height_m": 0.095,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_hot_dog_raw",
+      "file": "hot-dog-raw.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "hot dog raw, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly hot dog raw from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "hot",
+        "dog",
+        "raw"
+      ],
+      "triangles": 92,
+      "length_m": 0.176,
+      "depth_m": 0.033,
+      "height_m": 0.029,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_hot_dog",
+      "file": "hot-dog.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "hot dog, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly hot dog from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "hot",
+        "dog"
+      ],
+      "triangles": 272,
+      "length_m": 0.176,
+      "depth_m": 0.061,
+      "height_m": 0.046,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ice_cream_cne",
+      "file": "ice-cream-cne.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ice cream cne, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ice cream cne from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ice",
+        "cream",
+        "cne"
+      ],
+      "triangles": 44,
+      "length_m": 0.055,
+      "depth_m": 0.064,
+      "height_m": 0.089,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ice_cream_cup",
+      "file": "ice-cream-cup.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ice cream cup, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ice cream cup from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ice",
+        "cream",
+        "cup"
+      ],
+      "triangles": 68,
+      "length_m": 0.06,
+      "depth_m": 0.07,
+      "height_m": 0.054,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ice_cream_scoop_chocolate",
+      "file": "ice-cream-scoop-chocolate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ice cream scoop chocolate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ice cream scoop chocolate from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ice",
+        "cream",
+        "scoop",
+        "chocolate"
+      ],
+      "triangles": 80,
+      "length_m": 0.071,
+      "depth_m": 0.081,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ice_cream_scoop_mint",
+      "file": "ice-cream-scoop-mint.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ice cream scoop mint, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ice cream scoop mint from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ice",
+        "cream",
+        "scoop",
+        "mint"
+      ],
+      "triangles": 56,
+      "length_m": 0.071,
+      "depth_m": 0.081,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_ice_cream",
+      "file": "ice-cream.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "ice cream, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly ice cream from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "ice",
+        "cream"
+      ],
+      "triangles": 80,
+      "length_m": 0.071,
+      "depth_m": 0.081,
+      "height_m": 0.139,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_knife_block",
+      "file": "knife-block.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "knife block, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly knife block from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "knife",
+        "block"
+      ],
+      "triangles": 157,
+      "length_m": 0.191,
+      "depth_m": 0.067,
+      "height_m": 0.199,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_leek",
+      "file": "leek.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "leek, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly leek from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "leek"
+      ],
+      "triangles": 172,
+      "length_m": 0.082,
+      "depth_m": 0.082,
+      "height_m": 0.254,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_lemon_half",
+      "file": "lemon-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lemon half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly lemon half from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lemon",
+        "half"
+      ],
+      "triangles": 116,
+      "length_m": 0.052,
+      "depth_m": 0.06,
+      "height_m": 0.034,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_lemon",
+      "file": "lemon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lemon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly lemon from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lemon"
+      ],
+      "triangles": 104,
+      "length_m": 0.052,
+      "depth_m": 0.06,
+      "height_m": 0.067,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_loaf_baguette",
+      "file": "loaf-baguette.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "loaf baguette, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly loaf baguette from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "loaf",
+        "baguette"
+      ],
+      "triangles": 122,
+      "length_m": 0.249,
+      "depth_m": 0.075,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_loaf_round",
+      "file": "loaf-round.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "loaf round, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly loaf round from Food Kit, clean flat colours, about 0.23 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "loaf",
+        "round"
+      ],
+      "triangles": 116,
+      "length_m": 0.232,
+      "depth_m": 0.154,
+      "height_m": 0.088,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_loaf",
+      "file": "loaf.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "loaf, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly loaf from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "loaf"
+      ],
+      "triangles": 116,
+      "length_m": 0.174,
+      "depth_m": 0.11,
+      "height_m": 0.133,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_lollypop",
+      "file": "lollypop.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lollypop, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly lollypop from Food Kit, clean flat colours, about 0.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lollypop"
+      ],
+      "triangles": 108,
+      "length_m": 0.012,
+      "depth_m": 0.056,
+      "height_m": 0.114,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_maki_roe",
+      "file": "maki-roe.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "maki roe, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly maki roe from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "maki",
+        "roe"
+      ],
+      "triangles": 56,
+      "length_m": 0.036,
+      "depth_m": 0.031,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_maki_salmon",
+      "file": "maki-salmon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "maki salmon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly maki salmon from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "maki",
+        "salmon"
+      ],
+      "triangles": 56,
+      "length_m": 0.036,
+      "depth_m": 0.031,
+      "height_m": 0.021,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_maki_vegetable",
+      "file": "maki-vegetable.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "maki vegetable, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly maki vegetable from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "maki",
+        "vegetable"
+      ],
+      "triangles": 56,
+      "length_m": 0.036,
+      "depth_m": 0.031,
+      "height_m": 0.021,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_cooked",
+      "file": "meat-cooked.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat cooked, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat cooked from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "cooked"
+      ],
+      "triangles": 116,
+      "length_m": 0.144,
+      "depth_m": 0.173,
+      "height_m": 0.019,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_patty",
+      "file": "meat-patty.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat patty, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat patty from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "patty"
+      ],
+      "triangles": 104,
+      "length_m": 0.09,
+      "depth_m": 0.103,
+      "height_m": 0.019,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_raw",
+      "file": "meat-raw.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat raw, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat raw from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "raw"
+      ],
+      "triangles": 110,
+      "length_m": 0.144,
+      "depth_m": 0.173,
+      "height_m": 0.019,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_ribs",
+      "file": "meat-ribs.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat ribs, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat ribs from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "ribs"
+      ],
+      "triangles": 164,
+      "length_m": 0.161,
+      "depth_m": 0.115,
+      "height_m": 0.018,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_sausage",
+      "file": "meat-sausage.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat sausage, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat sausage from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "sausage"
+      ],
+      "triangles": 320,
+      "length_m": 0.045,
+      "depth_m": 0.117,
+      "height_m": 0.022,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_meat_tenderizer",
+      "file": "meat-tenderizer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "meat tenderizer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly meat tenderizer from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "meat",
+        "tenderizer"
+      ],
+      "triangles": 322,
+      "length_m": 0.162,
+      "depth_m": 0.083,
+      "height_m": 0.035,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mincemeat_pie",
+      "file": "mincemeat-pie.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mincemeat pie, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mincemeat pie from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mincemeat",
+        "pie"
+      ],
+      "triangles": 164,
+      "length_m": 0.159,
+      "depth_m": 0.184,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mortar_pestle",
+      "file": "mortar-pestle.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mortar pestle, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mortar pestle from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mortar",
+        "pestle"
+      ],
+      "triangles": 56,
+      "length_m": 0.034,
+      "depth_m": 0.04,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mortar",
+      "file": "mortar.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mortar, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mortar from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mortar"
+      ],
+      "triangles": 92,
+      "length_m": 0.119,
+      "depth_m": 0.137,
+      "height_m": 0.063,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_muffin",
+      "file": "muffin.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "muffin, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly muffin from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "muffin"
+      ],
+      "triangles": 84,
+      "length_m": 0.091,
+      "depth_m": 0.079,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mug",
+      "file": "mug.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mug, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mug from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mug"
+      ],
+      "triangles": 232,
+      "length_m": 0.103,
+      "depth_m": 0.086,
+      "height_m": 0.082,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mushroom_half",
+      "file": "mushroom-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mushroom half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mushroom half from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mushroom",
+        "half"
+      ],
+      "triangles": 68,
+      "length_m": 0.019,
+      "depth_m": 0.043,
+      "height_m": 0.042,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mushroom",
+      "file": "mushroom.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mushroom, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mushroom from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mushroom"
+      ],
+      "triangles": 80,
+      "length_m": 0.037,
+      "depth_m": 0.043,
+      "height_m": 0.042,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mussel_open",
+      "file": "mussel-open.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mussel open, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mussel open from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mussel",
+        "open"
+      ],
+      "triangles": 90,
+      "length_m": 0.029,
+      "depth_m": 0.047,
+      "height_m": 0.024,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_mussel",
+      "file": "mussel.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mussel, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly mussel from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "mussel"
+      ],
+      "triangles": 38,
+      "length_m": 0.028,
+      "depth_m": 0.047,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_onion_half",
+      "file": "onion-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "onion half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly onion half from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "onion",
+        "half"
+      ],
+      "triangles": 108,
+      "length_m": 0.032,
+      "depth_m": 0.074,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_onion",
+      "file": "onion.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "onion, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly onion from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "onion"
+      ],
+      "triangles": 68,
+      "length_m": 0.064,
+      "depth_m": 0.074,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_orange",
+      "file": "orange.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "orange, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly orange from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "orange"
+      ],
+      "triangles": 120,
+      "length_m": 0.051,
+      "depth_m": 0.051,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pan_stew",
+      "file": "pan-stew.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pan stew, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pan stew from Food Kit, clean flat colours, about 0.23 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pan",
+        "stew"
+      ],
+      "triangles": 344,
+      "length_m": 0.197,
+      "depth_m": 0.229,
+      "height_m": 0.053,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pan",
+      "file": "pan.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pan, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pan from Food Kit, clean flat colours, about 0.23 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pan"
+      ],
+      "triangles": 236,
+      "length_m": 0.197,
+      "depth_m": 0.229,
+      "height_m": 0.053,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pancakes",
+      "file": "pancakes.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pancakes, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pancakes from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pancakes"
+      ],
+      "triangles": 512,
+      "length_m": 0.131,
+      "depth_m": 0.151,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_paprika_slice",
+      "file": "paprika-slice.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "paprika slice, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly paprika slice from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "paprika",
+        "slice"
+      ],
+      "triangles": 96,
+      "length_m": 0.048,
+      "depth_m": 0.048,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_paprika",
+      "file": "paprika.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "paprika, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly paprika from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "paprika"
+      ],
+      "triangles": 132,
+      "length_m": 0.05,
+      "depth_m": 0.05,
+      "height_m": 0.06,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_peanut_butter",
+      "file": "peanut-butter.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "peanut butter, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly peanut butter from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "peanut",
+        "butter"
+      ],
+      "triangles": 172,
+      "length_m": 0.071,
+      "depth_m": 0.071,
+      "height_m": 0.089,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pear_half",
+      "file": "pear-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pear half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pear half from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pear",
+        "half"
+      ],
+      "triangles": 126,
+      "length_m": 0.029,
+      "depth_m": 0.059,
+      "height_m": 0.081,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pear",
+      "file": "pear.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pear, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pear from Food Kit, clean flat colours, about 0.08 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pear"
+      ],
+      "triangles": 136,
+      "length_m": 0.059,
+      "depth_m": 0.059,
+      "height_m": 0.081,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pepper_mill",
+      "file": "pepper-mill.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pepper mill, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pepper mill from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pepper",
+        "mill"
+      ],
+      "triangles": 252,
+      "length_m": 0.047,
+      "depth_m": 0.047,
+      "height_m": 0.164,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pepper",
+      "file": "pepper.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pepper, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pepper from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pepper"
+      ],
+      "triangles": 100,
+      "length_m": 0.031,
+      "depth_m": 0.096,
+      "height_m": 0.023,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pie",
+      "file": "pie.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pie, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pie from Food Kit, clean flat colours, about 0.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pie"
+      ],
+      "triangles": 292,
+      "length_m": 0.285,
+      "depth_m": 0.285,
+      "height_m": 0.045,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pineapple",
+      "file": "pineapple.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pineapple, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pineapple from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pineapple"
+      ],
+      "triangles": 196,
+      "length_m": 0.072,
+      "depth_m": 0.073,
+      "height_m": 0.141,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pizza_box",
+      "file": "pizza-box.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pizza box, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pizza box from Food Kit, clean flat colours, about 0.29 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pizza",
+        "box"
+      ],
+      "triangles": 84,
+      "length_m": 0.283,
+      "depth_m": 0.286,
+      "height_m": 0.264,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pizza_cutter",
+      "file": "pizza-cutter.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pizza cutter, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pizza cutter from Food Kit, clean flat colours, about 0.16 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pizza",
+        "cutter"
+      ],
+      "triangles": 96,
+      "length_m": 0.161,
+      "depth_m": 0.076,
+      "height_m": 0.017,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pizza",
+      "file": "pizza.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pizza, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pizza from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pizza"
+      ],
+      "triangles": 1208,
+      "length_m": 0.253,
+      "depth_m": 0.253,
+      "height_m": 0.013,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate_broken",
+      "file": "plate-broken.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate broken, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate broken from Food Kit, clean flat colours, about 0.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate",
+        "broken"
+      ],
+      "triangles": 336,
+      "length_m": 0.268,
+      "depth_m": 0.268,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate_deep",
+      "file": "plate-deep.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate deep, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate deep from Food Kit, clean flat colours, about 0.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate",
+        "deep"
+      ],
+      "triangles": 140,
+      "length_m": 0.268,
+      "depth_m": 0.268,
+      "height_m": 0.043,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate_dinner",
+      "file": "plate-dinner.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate dinner, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate dinner from Food Kit, clean flat colours, about 0.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate",
+        "dinner"
+      ],
+      "triangles": 354,
+      "length_m": 0.268,
+      "depth_m": 0.268,
+      "height_m": 0.066,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate_rectangle",
+      "file": "plate-rectangle.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate rectangle, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate rectangle from Food Kit, clean flat colours, about 0.26 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate",
+        "rectangle"
+      ],
+      "triangles": 68,
+      "length_m": 0.258,
+      "depth_m": 0.216,
+      "height_m": 0.039,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate_sauerkraut",
+      "file": "plate-sauerkraut.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate sauerkraut, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate sauerkraut from Food Kit, clean flat colours, about 0.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate",
+        "sauerkraut"
+      ],
+      "triangles": 580,
+      "length_m": 0.268,
+      "depth_m": 0.268,
+      "height_m": 0.053,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_plate",
+      "file": "plate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly plate from Food Kit, clean flat colours, about 0.27 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plate"
+      ],
+      "triangles": 140,
+      "length_m": 0.268,
+      "depth_m": 0.268,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_popsicle_chocolate",
+      "file": "popsicle-chocolate.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "popsicle chocolate, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly popsicle chocolate from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "popsicle",
+        "chocolate"
+      ],
+      "triangles": 132,
+      "length_m": 0.028,
+      "depth_m": 0.06,
+      "height_m": 0.147,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_popsicle_stick",
+      "file": "popsicle-stick.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "popsicle stick, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly popsicle stick from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "popsicle",
+        "stick"
+      ],
+      "triangles": 36,
+      "length_m": 0.006,
+      "depth_m": 0.012,
+      "height_m": 0.102,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_popsicle",
+      "file": "popsicle.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "popsicle, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly popsicle from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "popsicle"
+      ],
+      "triangles": 78,
+      "length_m": 0.023,
+      "depth_m": 0.054,
+      "height_m": 0.147,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pot_lid",
+      "file": "pot-lid.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pot lid, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pot lid from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pot",
+        "lid"
+      ],
+      "triangles": 132,
+      "length_m": 0.197,
+      "depth_m": 0.188,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pot_stew_lid",
+      "file": "pot-stew-lid.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pot stew lid, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pot stew lid from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pot",
+        "stew",
+        "lid"
+      ],
+      "triangles": 176,
+      "length_m": 0.197,
+      "depth_m": 0.188,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pot_stew",
+      "file": "pot-stew.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pot stew, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pot stew from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pot",
+        "stew"
+      ],
+      "triangles": 370,
+      "length_m": 0.197,
+      "depth_m": 0.247,
+      "height_m": 0.108,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pot",
+      "file": "pot.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pot, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pot from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pot"
+      ],
+      "triangles": 228,
+      "length_m": 0.197,
+      "depth_m": 0.247,
+      "height_m": 0.108,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pudding",
+      "file": "pudding.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pudding, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pudding from Food Kit, clean flat colours, about 0.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pudding"
+      ],
+      "triangles": 56,
+      "length_m": 0.075,
+      "depth_m": 0.087,
+      "height_m": 0.06,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pumpkin_basic",
+      "file": "pumpkin-basic.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pumpkin basic, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pumpkin basic from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pumpkin",
+        "basic"
+      ],
+      "triangles": 80,
+      "length_m": 0.126,
+      "depth_m": 0.109,
+      "height_m": 0.09,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_pumpkin",
+      "file": "pumpkin.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pumpkin, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly pumpkin from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "pumpkin"
+      ],
+      "triangles": 188,
+      "length_m": 0.126,
+      "depth_m": 0.126,
+      "height_m": 0.069,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_radish",
+      "file": "radish.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "radish, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly radish from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "radish"
+      ],
+      "triangles": 166,
+      "length_m": 0.103,
+      "depth_m": 0.103,
+      "height_m": 0.173,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_rice_ball",
+      "file": "rice-ball.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rice ball, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly rice ball from Food Kit, clean flat colours, about 0.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rice",
+        "ball"
+      ],
+      "triangles": 104,
+      "length_m": 0.024,
+      "depth_m": 0.035,
+      "height_m": 0.039,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_rollingPin",
+      "file": "rollingPin.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rolling pin, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly rolling pin from Food Kit, clean flat colours, about 0.24 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rolling",
+        "pin"
+      ],
+      "triangles": 140,
+      "length_m": 0.244,
+      "depth_m": 0.049,
+      "height_m": 0.042,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_salad",
+      "file": "salad.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "salad, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly salad from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "salad"
+      ],
+      "triangles": 170,
+      "length_m": 0.151,
+      "depth_m": 0.174,
+      "height_m": 0.082,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sandwich",
+      "file": "sandwich.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sandwich, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sandwich from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sandwich"
+      ],
+      "triangles": 176,
+      "length_m": 0.13,
+      "depth_m": 0.13,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sausage_half",
+      "file": "sausage-half.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sausage half, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sausage half from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sausage",
+        "half"
+      ],
+      "triangles": 100,
+      "length_m": 0.056,
+      "depth_m": 0.041,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sausage",
+      "file": "sausage.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sausage, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sausage from Food Kit, clean flat colours, about 0.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sausage"
+      ],
+      "triangles": 92,
+      "length_m": 0.111,
+      "depth_m": 0.041,
+      "height_m": 0.036,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_shaker_pepper",
+      "file": "shaker-pepper.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shaker pepper, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly shaker pepper from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shaker",
+        "pepper"
+      ],
+      "triangles": 116,
+      "length_m": 0.028,
+      "depth_m": 0.028,
+      "height_m": 0.059,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_shaker_salt",
+      "file": "shaker-salt.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "shaker salt, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly shaker salt from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "shaker",
+        "salt"
+      ],
+      "triangles": 116,
+      "length_m": 0.028,
+      "depth_m": 0.028,
+      "height_m": 0.059,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_skewer_vegetables",
+      "file": "skewer-vegetables.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "skewer vegetables, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly skewer vegetables from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "skewer",
+        "vegetables"
+      ],
+      "triangles": 156,
+      "length_m": 0.179,
+      "depth_m": 0.033,
+      "height_m": 0.032,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_skewer",
+      "file": "skewer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "skewer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly skewer from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "skewer"
+      ],
+      "triangles": 116,
+      "length_m": 0.179,
+      "depth_m": 0.033,
+      "height_m": 0.028,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soda_bottle",
+      "file": "soda-bottle.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soda bottle, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soda bottle from Food Kit, clean flat colours, about 0.17 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soda",
+        "bottle"
+      ],
+      "triangles": 100,
+      "length_m": 0.054,
+      "depth_m": 0.047,
+      "height_m": 0.174,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soda_can_crushed",
+      "file": "soda-can-crushed.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soda can crushed, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soda can crushed from Food Kit, clean flat colours, about 0.07 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soda",
+        "can",
+        "crushed"
+      ],
+      "triangles": 212,
+      "length_m": 0.074,
+      "depth_m": 0.074,
+      "height_m": 0.054,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soda_can",
+      "file": "soda-can.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soda can, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soda can from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soda",
+        "can"
+      ],
+      "triangles": 164,
+      "length_m": 0.067,
+      "depth_m": 0.067,
+      "height_m": 0.105,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soda_glass",
+      "file": "soda-glass.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soda glass, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soda glass from Food Kit, clean flat colours, about 0.12 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soda",
+        "glass"
+      ],
+      "triangles": 124,
+      "length_m": 0.079,
+      "depth_m": 0.089,
+      "height_m": 0.124,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soda",
+      "file": "soda.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soda, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soda from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soda"
+      ],
+      "triangles": 188,
+      "length_m": 0.076,
+      "depth_m": 0.076,
+      "height_m": 0.13,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_soy",
+      "file": "soy.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "soy, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly soy from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "soy"
+      ],
+      "triangles": 68,
+      "length_m": 0.05,
+      "depth_m": 0.057,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_steamer",
+      "file": "steamer.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "steamer, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly steamer from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "steamer"
+      ],
+      "triangles": 492,
+      "length_m": 0.192,
+      "depth_m": 0.192,
+      "height_m": 0.18,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_strawberry",
+      "file": "strawberry.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "strawberry, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly strawberry from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "strawberry"
+      ],
+      "triangles": 156,
+      "length_m": 0.036,
+      "depth_m": 0.036,
+      "height_m": 0.055,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_styrofoam_dinner",
+      "file": "styrofoam-dinner.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "styrofoam dinner, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly styrofoam dinner from Food Kit, clean flat colours, about 0.38 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "styrofoam",
+        "dinner"
+      ],
+      "triangles": 240,
+      "length_m": 0.378,
+      "depth_m": 0.228,
+      "height_m": 0.247,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_styrofoam",
+      "file": "styrofoam.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "styrofoam, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly styrofoam from Food Kit, clean flat colours, about 0.38 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "styrofoam"
+      ],
+      "triangles": 152,
+      "length_m": 0.378,
+      "depth_m": 0.228,
+      "height_m": 0.247,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sub",
+      "file": "sub.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sub, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sub from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sub"
+      ],
+      "triangles": 574,
+      "length_m": 0.085,
+      "depth_m": 0.203,
+      "height_m": 0.067,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sundae",
+      "file": "sundae.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sundae, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sundae from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sundae"
+      ],
+      "triangles": 316,
+      "length_m": 0.067,
+      "depth_m": 0.077,
+      "height_m": 0.2,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sushi_egg",
+      "file": "sushi-egg.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sushi egg, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sushi egg from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sushi",
+        "egg"
+      ],
+      "triangles": 78,
+      "length_m": 0.035,
+      "depth_m": 0.052,
+      "height_m": 0.024,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_sushi_salmon",
+      "file": "sushi-salmon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sushi salmon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly sushi salmon from Food Kit, clean flat colours, about 0.06 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sushi",
+        "salmon"
+      ],
+      "triangles": 96,
+      "length_m": 0.032,
+      "depth_m": 0.06,
+      "height_m": 0.027,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_taco",
+      "file": "taco.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "taco, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly taco from Food Kit, clean flat colours, about 0.13 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "taco"
+      ],
+      "triangles": 174,
+      "length_m": 0.128,
+      "depth_m": 0.034,
+      "height_m": 0.079,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_tajine_lid",
+      "file": "tajine-lid.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "tajine lid, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly tajine lid from Food Kit, clean flat colours, about 0.24 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "tajine",
+        "lid"
+      ],
+      "triangles": 136,
+      "length_m": 0.227,
+      "depth_m": 0.238,
+      "height_m": 0.133,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_tajine",
+      "file": "tajine.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "tajine, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly tajine from Food Kit, clean flat colours, about 0.26 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "tajine"
+      ],
+      "triangles": 164,
+      "length_m": 0.246,
+      "depth_m": 0.258,
+      "height_m": 0.041,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_tomato_slice",
+      "file": "tomato-slice.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "tomato slice, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly tomato slice from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "tomato",
+        "slice"
+      ],
+      "triangles": 140,
+      "length_m": 0.054,
+      "depth_m": 0.054,
+      "height_m": 0.009,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_tomato",
+      "file": "tomato.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "tomato, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly tomato from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "tomato"
+      ],
+      "triangles": 132,
+      "length_m": 0.051,
+      "depth_m": 0.051,
+      "height_m": 0.043,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_turkey",
+      "file": "turkey.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "turkey, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly turkey from Food Kit, clean flat colours, about 0.28 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "turkey"
+      ],
+      "triangles": 368,
+      "length_m": 0.28,
+      "depth_m": 0.204,
+      "height_m": 0.113,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_utensil_fork",
+      "file": "utensil-fork.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "utensil fork, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly utensil fork from Food Kit, clean flat colours, about 0.15 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "utensil",
+        "fork"
+      ],
+      "triangles": 44,
+      "length_m": 0.151,
+      "depth_m": 0.025,
+      "height_m": 0.005,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_utensil_knife",
+      "file": "utensil-knife.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "utensil knife, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly utensil knife from Food Kit, clean flat colours, about 0.18 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "utensil",
+        "knife"
+      ],
+      "triangles": 18,
+      "length_m": 0.18,
+      "depth_m": 0.023,
+      "height_m": 0.005,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_utensil_spoon",
+      "file": "utensil-spoon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "utensil spoon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly utensil spoon from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "utensil",
+        "spoon"
+      ],
+      "triangles": 46,
+      "length_m": 0.144,
+      "depth_m": 0.036,
+      "height_m": 0.008,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_waffle",
+      "file": "waffle.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "waffle, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly waffle from Food Kit, clean flat colours, about 0.10 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "waffle"
+      ],
+      "triangles": 588,
+      "length_m": 0.096,
+      "depth_m": 0.096,
+      "height_m": 0.012,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_watermelon",
+      "file": "watermelon.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "watermelon, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly watermelon from Food Kit, clean flat colours, about 0.14 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "watermelon"
+      ],
+      "triangles": 1376,
+      "length_m": 0.137,
+      "depth_m": 0.137,
+      "height_m": 0.143,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_whipped_cream",
+      "file": "whipped-cream.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "whipped cream, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly whipped cream from Food Kit, clean flat colours, about 0.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "whipped",
+        "cream"
+      ],
+      "triangles": 80,
+      "length_m": 0.041,
+      "depth_m": 0.047,
+      "height_m": 0.029,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_whisk",
+      "file": "whisk.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "whisk, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly whisk from Food Kit, clean flat colours, about 0.22 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "whisk"
+      ],
+      "triangles": 150,
+      "length_m": 0.217,
+      "depth_m": 0.047,
+      "height_m": 0.047,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_whole_ham",
+      "file": "whole-ham.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "whole ham, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly whole ham from Food Kit, clean flat colours, about 0.19 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "whole",
+        "ham"
+      ],
+      "triangles": 128,
+      "length_m": 0.114,
+      "depth_m": 0.192,
+      "height_m": 0.132,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_wholer_ham",
+      "file": "wholer-ham.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wholer ham, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly wholer ham from Food Kit, clean flat colours, about 0.25 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wholer",
+        "ham"
+      ],
+      "triangles": 116,
+      "length_m": 0.102,
+      "depth_m": 0.249,
+      "height_m": 0.118,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_wine_red",
+      "file": "wine-red.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wine red, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly wine red from Food Kit, clean flat colours, about 0.21 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wine",
+        "red"
+      ],
+      "triangles": 132,
+      "length_m": 0.057,
+      "depth_m": 0.05,
+      "height_m": 0.21,
+      "collider": "none"
+    },
+    {
+      "id": "kenney_food_wine_white",
+      "file": "wine-white.glb",
+      "category": "furniture",
+      "role": "food",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wine white, inside a room. Food Kit, Kenney.",
+      "description": "Low-poly wine white from Food Kit, clean flat colours, about 0.20 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "wine",
+        "white"
+      ],
+      "triangles": 124,
+      "length_m": 0.061,
+      "depth_m": 0.053,
+      "height_m": 0.197,
+      "collider": "none"
+    }
+  ]
+}

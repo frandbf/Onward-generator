@@ -152,6 +152,7 @@ namespace OnwardGenerator
             public string profile;
             // ADR-026: flat x, y, z triples in local metres; a night map only.
             public float[] street_lights_m;
+            public float[] audio_roof_wind_m;
             public float far_clip_m;
             public int flyover;
         }
@@ -2147,6 +2148,12 @@ namespace OnwardGenerator
             }
             PlaceLocalAudio("Birds", "Birds Park", layout.audio_birds_m);
             PlaceLocalAudio("TowerWind", "Wind Rooftop", layout.audio_wind_m);
+            float[] roofWind = layout.audio_roof_wind_m ?? new float[0];
+            for (int i = 0; i + 2 < roofWind.Length; i += 3)
+            {
+                PlaceLocalAudio("RoofWind_" + (i / 3).ToString(CultureInfo.InvariantCulture), "Wind Rooftop",
+                    new[] { roofWind[i], roofWind[i + 1] }, roofWind[i + 2]);
+            }
             if (layout.audio_wind_m != null && layout.audio_wind_m.Length >= 2)
             {
                 GameObject reverb = InstantiatePrefab("AreaReverb.prefab");
@@ -2245,12 +2252,12 @@ namespace OnwardGenerator
             return go.transform;
         }
 
-        private static void PlaceLocalAudio(string objectName, string clip, float[] xy)
+        private static void PlaceLocalAudio(string objectName, string clip, float[] xy, float heightM = 2f)
         {
             if (xy == null || xy.Length < 2) return;
             GameObject go = InstantiatePrefab("OnwardAudioSource.prefab");
             go.name = objectName;
-            go.transform.position = Local(xy[0], xy[1], 2f);
+            go.transform.position = Local(xy[0], xy[1], heightM);
             var source = go.GetComponent<OnwardAudioSource>();
             source.AudioSourceType = OnwardAudioType.LocalAmbience;
             source.AudioSourceName = clip;

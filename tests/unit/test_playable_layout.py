@@ -19,6 +19,7 @@ from onward_generator.perf.layout import (
     MIN_SPAWN_SEPARATION_M,
     MODE_CODES,
     NAV_AGENT_RADIUS_M,
+    ROOF_WIND_MAX,
     ROUTE_POINTS,
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
@@ -39,6 +40,7 @@ from onward_generator.perf.layout import (
     patrol_seeds,
     patrol_spawns,
     playable_area,
+    roof_wind,
     scatter_points,
     spread_routes,
     street_lights,
@@ -264,6 +266,9 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
     assert "layout: environment must be Urban / Day / UrbanDay1 or Urban / Night / UrbanNight1" in _check_layout({**doc, "environment": "Desert"})
     assert "layout: street_lights_m must be flat x, y, z triples" in _check_layout({**night, "street_lights_m": "x"})
     assert "layout: street_lights_m is only for a night map" in _check_layout({**doc, "street_lights_m": [1.0, 2.0, 4.2]})
+    assert _check_layout({**doc, "audio_roof_wind_m": [1.0, 2.0, 3.0]}) == []
+    for bad in ([1.0, 2.0], "x", [1.0, 2.0, True]):
+        assert "layout: audio_roof_wind_m must be flat x, y, z triples" in _check_layout({**doc, "audio_roof_wind_m": bad})
     doc["schema_version"] = GAMEPLAY_VERSION
     assert any("modes must be" in problem for problem in _check_layout(doc))
     doc["modes"] = dict(MODE_CODES)
@@ -551,6 +556,33 @@ def test_street_lights_round_to_the_centimetre_and_sort_by_distance_to_the_focus
 def test_a_lamp_with_no_yaw_points_along_x_and_a_height_in_its_position_is_ignored() -> None:
     lamp = {"type": "urban_element", "kind": "street_lamp", "position_m": [5.0, 6.0, 99.0]}
     assert street_lights({"objects": [lamp]}, (0.0, 0.0)) == [6.0, 6.0, 4.2]
+
+
+def _climbable(index: int, x: float, y: float, *, access: bool = True, height: float = 12.0) -> list[dict]:
+    bid = f"b{index}"
+    return [
+        {"id": f"building/{bid}", "type": "building", "height": {"height_m": height}},
+        {"id": f"interior/{bid}", "type": "interior", "source_ids": [bid], "roof_access": access,
+         "connections": [{"start_m": [0.0, 0.0]}, {"start_m": [-1.0, -1.0]}, {"start_m": [x, y]}]},
+    ]
+
+
+def test_roof_wind_sits_above_the_last_flight_of_a_reachable_roof() -> None:
+    manifest = {"objects": [*_climbable(1, 40.0, 0.0, height=9.0), *_climbable(2, 10.0, 0.0), *_climbable(3, 90.0, 0.0, access=False)]}
+    assert roof_wind(manifest, (0.0, 0.0)) == [10.0, 0.0, 13.5, 40.0, 0.0, 10.5]
+    assert roof_wind({}, (0.0, 0.0)) == []
+
+
+def test_roof_wind_goes_nearest_the_focus_first_and_is_rounded() -> None:
+    manifest = {"objects": [*_climbable(1, 10.123, 5.678, height=9.123), *_climbable(2, 90.0, 0.0)]}
+    assert roof_wind(manifest, (100.0, 0.0)) == [90.0, 0.0, 13.5, 10.12, 5.68, 10.62]
+
+
+def test_roof_wind_keeps_its_spacing_and_its_cap() -> None:
+    near = {"objects": [*_climbable(1, 0.0, 0.0), *_climbable(2, 24.9, 0.0), *_climbable(3, 25.0, 0.0)]}
+    assert roof_wind(near, (0.0, 0.0))[::3] == [0.0, 25.0]
+    many = {"objects": [row for k in range(ROOF_WIND_MAX + 3) for row in _climbable(k, 30.0 * k, 0.0)]}
+    assert roof_wind(many, (0.0, 0.0))[::3] == [30.0 * k for k in range(ROOF_WIND_MAX)]
 
 
 def test_a_manifest_with_no_objects_has_no_street_lights() -> None:

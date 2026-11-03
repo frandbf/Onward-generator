@@ -25,6 +25,8 @@ SEMANTIC_FIELDS = ("description", "placement", "grouping", "condition", "tags")
 # Load corrections a person set on a row: a quarter turn, or a refusal such as unknown_scale.
 LOAD_FIELDS = ("yaw_deg", "refused")
 KIT_ONLY = "kit_only"
+INTERIOR = "interior"
+"""A prop for inside a room. Nothing places these yet, and overgrow must not put one on a street."""
 
 
 @cache
