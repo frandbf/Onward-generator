@@ -188,7 +188,7 @@ def test_walls_face_outward_whichever_way_the_ring_turns() -> None:
 
 
 def test_yaw_is_rounded_to_a_tenth_of_a_degree() -> None:
-    assert _yaw(0.3, 0.7) == 23.2
+    assert _yaw(0.31, 0.7) == 23.9
 
 
 def test_sites_are_rounded_and_face_the_right_way_on_a_side_wall() -> None:
@@ -240,3 +240,9 @@ def test_accesses_exactly_at_the_spacing_are_allowed_and_closer_lifts_are_not() 
     assert len(_place([_building("a", 2), _building("b", 2)], footprints)["ladders"]) == 2
     close = {"a": box(0, 100, 20, 110), "b": box(25, 100, 45, 110)}
     assert len(_place([_building("a", 4), _building("b", 4)], close)["lifts"]) == 1
+
+
+def test_a_tie_goes_to_the_lower_id() -> None:
+    footprints = {"z": box(-30, 100, -10, 110), "a": box(10, 100, 30, 110)}
+    placed = _place([_building("z", 2), _building("a", 2)], footprints)
+    assert [site["x"] for site in placed["ladders"]] == [20.0, -20.0]
