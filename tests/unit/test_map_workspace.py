@@ -42,7 +42,7 @@ def test_create_writes_an_isolated_square_around_the_centre(tmp_path: Path) -> N
         True, 200 + margin, 200 + margin + 600.0, "#C8CDD2")
     # The card names the room-light cap, equal to the detail cap, so the adapter does not fall back to 24 (ADR-013).
     detail = json.loads((Path(__file__).parents[2] / "config" / "detail.default.json").read_text(encoding="utf-8"))
-    assert (build["interior_lights_max"], build["interior_light_intensity"]) == (detail["interiors"]["lights_max"], 0.8)
+    assert (build["interior_lights_max"], build["interior_light_intensity"]) == (detail["interiors"]["lights_max"], 3.0)
     assert build["interior_lights_max"] == 160
     aoi = load_aoi_geojson(root / "reference" / "aoi.geojson")
     area = _polygon(aoi.polygon)

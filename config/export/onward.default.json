@@ -17,7 +17,7 @@
     "lightmap_directional": false,
     "albedo_compression": "astc_6x6",
     "interior_lights_max": 160,
-    "interior_light_intensity": 0.8,
+    "interior_light_intensity": 3.0,
     "fog_enabled": true,
     "fog_start_m": 160.0,
     "fog_end_m": 1000.0,

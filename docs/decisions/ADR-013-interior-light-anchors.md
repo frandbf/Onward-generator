@@ -56,3 +56,5 @@ A shop building now has one room per shop on its main frontage, one per other fo
 ## Amendment, 3 November 2026
 
 The default cap is now 160 in both `interiors.lights_max` and `build.interior_lights_max`, with a schema maximum of 256 for each. Measured on murcia2033 (r120): the cap of 24 lit 24 of 125 rooms and left 66 of 80 interiors fully dark, so most room windows showed an unlit room as a black square. 160 gives every room its light on that map. When the key is absent from the export configuration, the adapter still uses 24. Bake time with the higher count is measured per map in Unity; it has not been tested on the headset yet.
+
+The default intensity is now 3.0 in `config/export/onward.default.json` and in the card `map create` writes (0.8 when the key is absent). With inverse-square falloff, 0.8 left about 0.13 on the floor of a room lit from 0.3 m under its ceiling; 3.0 gives about 0.48. The Unity comparison is in the commit that made the change.

@@ -45,7 +45,7 @@ _FOG_COLOR = "#C8CDD2"
 # 24 lights, which left most rooms of a map dark. Keep the cap equal to interiors.lights_max
 # in config/detail.default.json.
 _INTERIOR_LIGHTS_MAX = 160
-_INTERIOR_LIGHT_INTENSITY = 0.8
+_INTERIOR_LIGHT_INTENSITY = 3.0
 
 
 class MapError(ValueError):
