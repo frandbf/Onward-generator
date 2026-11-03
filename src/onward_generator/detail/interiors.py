@@ -759,6 +759,12 @@ def interior_visual(
             visual["interior_wall"].append(walls(flight.well, z_floor - ic.slab_m, z_floor, inward=True))
         for material, mesh in stair(flight.geometry).parts:
             visual[material].append(transform(mesh, _lifted(flight, s)))
+    roof_underside = height - ic.slab_m
+    if _climbs_to_roof(plan) and top < roof_underside:
+        # The storeys the climb passes above the furnished rooms are empty floors. The shell is one-sided and
+        # faces out, so without this lining a player on those flights sees the street through the walls.
+        # It takes no cut: pierce_room_windows only opens glass below the furnished ceiling.
+        visual["interior_wall"].append(_inner_walls(plan.inner, top, roof_underside, ()))
     return visual
 
 

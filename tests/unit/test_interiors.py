@@ -27,6 +27,7 @@ from onward_generator.detail.interiors import (
     light_anchors,
     pierce_room_windows,
     plan_interior,
+    room_ceiling,
     room_window_cuts,
     visual_triangles,
 )
@@ -454,7 +455,15 @@ def test_interior_visual_puts_each_slab_well_and_stair_at_its_storey() -> None:
         tri = well.vertices[well.triangles]
         towards = centre - tri.mean(axis=1)[:, :2]
         assert (np.einsum("ij,ij->i", _normals(well)[:, :2], towards) > 0).all()  # the well walls face into the well
-    assert landed == 1 and walls_meshes == [] and floors == []
+    # Last, the lining of the empty storeys the climb passes, from the furnished ceiling to the roof slab.
+    [lining] = walls_meshes
+    furnished = room_ceiling(plan, height, slab)
+    assert furnished < height - slab
+    assert (lining.vertices[:, 2].min(), lining.vertices[:, 2].max()) == pytest.approx((furnished, height - slab))
+    tri = lining.vertices[lining.triangles]
+    inward = np.array([footprint.centroid.x, footprint.centroid.y]) - tri.mean(axis=1)[:, :2]
+    assert (np.einsum("ij,ij->i", _normals(lining)[:, :2], inward) > 0).all()  # it faces into the building
+    assert landed == 1 and floors == []
     # The door is cut through the room wall at its own span, from the inner face of the wall.
     [room_walls] = visual["interior_shop_bar"]
     corners = {(round(float(x), 6), round(float(y), 6), round(float(z), 6)) for x, y, z in room_walls.vertices}
@@ -464,6 +473,76 @@ def test_interior_visual_puts_each_slab_well_and_stair_at_its_storey() -> None:
     built = build_interior(plan, height, height, footprint, cfg)
     names = [n for n, _ in built.colliders]
     assert "upper_solid" not in names and "roof_slab" not in names and names.count("roof_deck") == 1
+
+
+def _first_hit(meshes: list[Mesh], origin: np.ndarray, direction: np.ndarray) -> tuple[float, float] | None:
+    """Distance to the nearest triangle along the ray and the cosine between its normal and the ray (Moller-Trumbore)."""
+    best: tuple[float, float] | None = None
+    for mesh in meshes:
+        v = mesh.vertices[mesh.triangles]
+        e1, e2 = v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]
+        p = np.cross(direction, e2)
+        det = np.einsum("ij,ij->i", e1, p)
+        ok = np.abs(det) > 1e-12
+        inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+        t_vec = origin - v[:, 0]
+        u = np.einsum("ij,ij->i", t_vec, p) * inv
+        q = np.cross(t_vec, e1)
+        w = (q @ direction) * inv
+        dist = np.einsum("ij,ij->i", e2, q) * inv
+        hit = ok & (u >= 0) & (w >= 0) & (u + w <= 1) & (dist > 1e-6)
+        for index in np.flatnonzero(hit):
+            if best is None or dist[index] < best[0]:
+                normal = np.cross(e1[index], e2[index])
+                best = (float(dist[index]), float(normal @ direction / np.linalg.norm(normal)))
+    return best
+
+
+def test_every_empty_storey_of_a_roof_climb_is_closed_from_inside() -> None:
+    """From each storey the climb passes above the furnished rooms, a level look meets an inward face, never a culled one.
+
+    The shell is one-sided and faces out: a ray that hits nothing of the interior, or hits a face from behind,
+    would show the street through the wall in the game.
+    """
+    cfg, _, _, _, plan = _split_plan()
+    height, slab = 18.0, cfg.interiors.slab_m
+    visual = interior_visual(plan, height, cfg, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
+    meshes = [mesh for parts in visual.values() for mesh in parts]
+    furnished = room_ceiling(plan, height, slab)
+    empty = [f for f in plan.flights if f.level * plan.storey_m >= furnished - 1e-6]
+    assert len(empty) >= 2
+    for flight in empty:
+        plate = plan.inner.difference(flight.well)
+        inside = plate.representative_point()
+        origin = np.array([inside.x, inside.y, flight.level * plan.storey_m + 1.6])
+        for k in range(16):
+            angle = 2 * math.pi * k / 16
+            direction = np.array([math.cos(angle), math.sin(angle), 0.0])
+            hit = _first_hit(meshes, origin, direction)
+            assert hit is not None, (flight.level, k)
+            assert hit[1] < 0, (flight.level, k)  # the face looks back at the ray
+
+
+def test_the_lining_skips_the_window_cuts_of_the_furnished_rooms() -> None:
+    """A room window lies below the lining: it cuts the room walls, and the lining stays whole on every edge."""
+    cfg, footprint, segment, _, plan = _split_plan()
+    height, slab, t = 18.0, cfg.interiors.slab_m, cfg.interiors.wall_thickness_m
+    furnished = room_ceiling(plan, height, slab)
+    window = (segment.point(3.0, depth_in=t), segment.point(5.0, depth_in=t), furnished - 2.0, furnished - 0.8)
+    visual = interior_visual(plan, height, cfg, [window], wall_material="interior_shop_bar")
+    lining = visual["interior_wall"][-1]
+    perimeter = sum(math.dist(a, b) for a, b in itertools.pairwise(plan.inner.exterior.coords))
+    v = lining.vertices[lining.triangles]
+    area = float(np.linalg.norm(np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]), axis=1).sum() / 2)
+    assert area == pytest.approx(perimeter * (height - slab - furnished))
+
+
+def test_a_climb_whose_rooms_reach_the_roof_adds_no_lining() -> None:
+    cfg, _, _, _, plan = _split_plan()
+    height = plan.floors * plan.storey_m  # the furnished rooms reach the roof slab: no empty storey to line
+    assert room_ceiling(plan, height, cfg.interiors.slab_m) == pytest.approx(height - cfg.interiors.slab_m)
+    visual = interior_visual(plan, height, cfg, wall_material="interior_shop_bar")
+    assert len(visual["interior_wall"]) == 2 * len(plan.flights)  # a soffit and a well per flight, nothing else
 
 
 def test_an_interior_without_roof_access_closes_its_top_room() -> None:
