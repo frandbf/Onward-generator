@@ -69,7 +69,7 @@ def storeys(building: Mapping[str, Any]) -> int:
     22.9 m climb, and the rules are about the climb.
     """
     height = building["height"]
-    return max(int(height.get("estimated_levels") or 0), round(float(height["height_m"]) / STOREY_M), 1)
+    return max(int(height.get("estimated_levels") or 1), round(float(height["height_m"]) / STOREY_M))
 
 
 def _walls(footprint: Polygon) -> list[Wall]:
