@@ -27,6 +27,7 @@ from shapely.ops import linemerge, nearest_points, polylabel
 from onward_generator.generation.mesh import polygons_of
 from onward_generator.generation.scene import GeneratedScene
 from onward_generator.generation.surfaces import LinearWay, SurfaceClass
+from onward_generator.perf.climbs import climbed_roofs, place_climbs
 from onward_generator.tiers import core_of
 
 LAYOUT_SCHEMA = "onward_generator.perf_layout"
@@ -602,17 +603,17 @@ def street_lights(detail_manifest: Mapping[str, Any], focus: tuple[float, float]
 
 ROOF_WIND_MAX = 8
 """A local source per reachable roof would be many in a dense map; these are few at a time, like the other ambience."""
-ROOF_WIND_SPACING_M = 25.0
-"""Roofs closer than this share a source. An assumption: the SDK clip's radius is not known here."""
+ROOF_WIND_SPACING_M = 35.0
+"""The radius of ``Wind Rooftop`` (``OnwardAudioDataStrings.cs``, SDK v1.15). A roof closer than this already hears a source."""
 ROOF_WIND_ABOVE_M = 1.5
 """About the head of a player standing on the roof."""
 
 
-def roof_wind(detail_manifest: Mapping[str, Any], focus: tuple[float, float]) -> list[float]:
-    """Flat ``x, y, z`` triples of wind above the roofs a player can climb to, nearest the focus first."""
+def roof_wind(detail_manifest: Mapping[str, Any], focus: tuple[float, float], climbed: Sequence[tuple[float, float, float]] = ()) -> list[float]:
+    """Flat ``x, y, z`` triples of wind above the roofs a player can reach by stair or by ``climbed``, nearest the focus first."""
     objects = detail_manifest.get("objects", [])
     heights = {o["id"]: float(o["height"]["height_m"]) for o in objects if o.get("type") == "building"}
-    roofs: list[tuple[float, float, float]] = []
+    roofs: list[tuple[float, float, float]] = list(climbed)
     for interior in objects:
         if interior.get("type") == "interior" and interior.get("roof_access"):
             x, y = interior["connections"][-1]["start_m"]
@@ -625,7 +626,26 @@ def roof_wind(detail_manifest: Mapping[str, Any], focus: tuple[float, float]) ->
     return [value for x, y, height in chosen for value in (round(x, 2), round(y, 2), round(height + ROOF_WIND_ABOVE_M, 2))]
 
 
-def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False) -> dict[str, Any]:
+CLIMB_KEEP_OUT_M = 3.0
+"""A cabin or a ladder's foot stays this far from a spawn, an objective, a box and an interior's door."""
+CLIMB_ROUTE_KEEP_OUT_M = 1.5
+"""The navmesh is baked without them, so a bot's route must not cross them."""
+
+
+def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
+    """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and the bots' routes."""
+    doors = [
+        tuple(connection["position_m"])
+        for interior in detail_manifest.get("objects", []) if interior.get("type") == "interior"
+        for connection in interior.get("connections", []) if connection.get("from") == "exterior"
+    ]
+    return union_all([
+        *[Point(p).buffer(CLIMB_KEEP_OUT_M) for p in (*points, *doors)],
+        *[LineString([(p["x"], p["y"]) for p in route["points"]]).buffer(CLIMB_ROUTE_KEEP_OUT_M) for route in routes],
+    ])
+
+
+def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False, footprints: Mapping[str, BaseGeometry] | None = None) -> dict[str, Any]:
     """Spawns, Hunt anchors, SDK audio names and the urban profile of ``time_of_day``.
 
     The measurement fixture stays ``perf_layout``. This document is what a
@@ -695,6 +715,10 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     def spawn_block(centre: tuple[float, float]) -> dict[str, Any]:
         return {"centre_m": [centre[0], centre[1]], "points_m": [_xy(x, y, focus) for x, y in _block(*centre)]}
 
+    gameplay_points = [uplink, *ai, *ammo, *escort, evac, *drives, *occupied_pts]
+    keep_out = climb_keep_out(gameplay_points, routes, detail_manifest)
+    climbs = place_climbs(detail_manifest, footprints or {}, free, keep_out, (attack, attack_b), (defend, defend_b))
+
     doc.update({
         "schema": GAMEPLAY_SCHEMA,
         "schema_version": GAMEPLAY_VERSION,
@@ -717,7 +741,8 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "audio_global": "Suburban Day",
         "audio_birds_m": list(uplink) if time_of_day == "day" else [],
         "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
-        "audio_roof_wind_m": roof_wind(detail_manifest, focus),
+        "audio_roof_wind_m": roof_wind(detail_manifest, focus, climbed_roofs(climbs)),
+        **climbs,
         "environment": "Urban",
         "time_of_day": sdk_time,
         "profile": profile,

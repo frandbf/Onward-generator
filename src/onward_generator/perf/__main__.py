@@ -8,6 +8,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from shapely.geometry import shape
+
 from onward_generator.detail.scene import DetailError, load_base
 from onward_generator.generation.config import GenerationConfigError, load_generation_config
 from onward_generator.generation.scene import GenerationError
@@ -96,7 +98,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = load_detail_manifest(args.detail)
             if args.playable:
                 heights = json.loads(Path(args.heights).expanduser().read_text(encoding="utf-8"))
-                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm)
+                scene = json.loads(Path(args.scene).expanduser().read_bytes())
+                footprints = {f["id"]: shape(f["geometry"]) for f in scene["features"]}
+                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm, footprints=footprints)
             else:
                 doc = gameplay_layout(base, manifest)
         else:
