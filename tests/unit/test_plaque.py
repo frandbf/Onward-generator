@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
-from io import BytesIO
 
 import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from onward_generator.signs.plaque import FONT_PATH, PLATE_H, PLATE_W, plaque_font, plaque_png, plaque_text
+from onward_generator.signs.plaque import FONT_PATH, PLATE_H, PLATE_W, plaque_font, plaque_rgba, plaque_text
 
 NAMES = ["María", "Peña", "Ávila", "Begoña", "Calle de María del Carmen"]
 # A code point DejaVu Sans does not map, so it draws the notdef glyph.
@@ -23,13 +22,7 @@ def _glyph(char: str, size: int = 64) -> bytes:
     return bytes(mask.size) + bytes(mask)
 
 
-def _pixels(png: bytes) -> np.ndarray:
-    with Image.open(BytesIO(png)) as image:
-        return np.asarray(image.convert("RGBA"))
-
-
-def _ink_box(png: bytes) -> tuple[int, int, int, int]:
-    pixels = _pixels(png)
+def _ink_box(pixels: np.ndarray) -> tuple[int, int, int, int]:
     ink = np.argwhere(np.any(pixels[:, :, :3] != pixels[0, 0, :3], axis=2))
     (top, left), (bottom, right) = ink.min(axis=0), ink.max(axis=0)
     return int(left), int(top), int(right) + 1, int(bottom) + 1
@@ -60,7 +53,7 @@ def test_decomposed_name_draws_the_same_plate(name: str) -> None:
     nfd = unicodedata.normalize("NFD", name)
     assert nfd != name
     assert plaque_text(nfd) == unicodedata.normalize("NFC", name)
-    assert plaque_png(nfd) == plaque_png(name)
+    assert np.array_equal(plaque_rgba(nfd), plaque_rgba(name))
 
 
 @pytest.mark.parametrize(("accent", "plain"), [("í", "i"), ("ñ", "n"), ("Á", "A"), ("é", "e")])
@@ -70,7 +63,7 @@ def test_accented_letter_differs_from_plain(accent: str, plain: str) -> None:
 
 @pytest.mark.parametrize(("accent", "plain"), [("María", "Maria"), ("Peña", "Pena"), ("Ávila", "Avila"), ("Begoña", "Begona")])
 def test_accented_name_differs_from_plain(accent: str, plain: str) -> None:
-    assert plaque_png(accent) != plaque_png(plain)
+    assert not np.array_equal(plaque_rgba(accent), plaque_rgba(plain))
 
 
 def test_whitespace_collapses_to_single_spaces() -> None:
@@ -79,10 +72,10 @@ def test_whitespace_collapses_to_single_spaces() -> None:
 
 @pytest.mark.parametrize("name", NAMES)
 def test_plate_size_and_text_stay_within_the_margins(name: str) -> None:
-    png = plaque_png(name)
-    assert _pixels(png).shape == (PLATE_H, PLATE_W, 4)
+    pixels = plaque_rgba(name)
+    assert pixels.shape == (PLATE_H, PLATE_W, 4)
     margin = max(PLATE_W // 40, 8)
-    left, top, right, bottom = _ink_box(png)
+    left, top, right, bottom = _ink_box(pixels)
     assert left >= margin and top >= margin
     assert right <= PLATE_W - margin and bottom <= PLATE_H - margin
 
@@ -96,7 +89,7 @@ def _ink_size(text: str, size: int) -> tuple[int, int]:
 
 
 def _plate_ink_size(name: str) -> tuple[int, int]:
-    left, top, right, bottom = _ink_box(plaque_png(name))
+    left, top, right, bottom = _ink_box(plaque_rgba(name))
     return right - left, bottom - top
 
 
@@ -134,4 +127,4 @@ def test_name_too_long_for_any_size_uses_the_smallest() -> None:
 
 
 def test_plate_is_deterministic() -> None:
-    assert plaque_png("Calle de María del Carmen") == plaque_png("Calle de María del Carmen")
+    assert np.array_equal(plaque_rgba("Calle de María del Carmen"), plaque_rgba("Calle de María del Carmen"))

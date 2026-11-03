@@ -20,8 +20,9 @@ from onward_generator.detail.shops import plan_shops
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.signs.place import _choose, _sign_for, _streets, _walls, place_signs
-from onward_generator.signs.plaque import plaque_png
+from onward_generator.signs.place import SIGN_ATLAS_PX, _choose, _sign_for, _streets, _walls, place_signs, plate_atlas
+from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
+from onward_generator.signs.shop import PAD_PX
 from tests.conftest import MURCIA_CENTER
 
 
@@ -92,20 +93,54 @@ def test_named_streets_get_a_plate_on_the_facing_wall(tmp_path: Path) -> None:
     assert "Sendero" not in names
     assert report["geometry"]["identical"] is True
     assert (out / "scene_collision.glb").read_bytes() == b"collision-bytes"
-    nodes, _ = nodes_from_glb((out / "scene_visual.glb").read_bytes())
-    sign = next(n for n in nodes if n.name.startswith("street_sign/"))
-    assert all(prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices) for prim in sign.primitives)
-    face = sign.primitives[0].uvs
-    assert abs(float(face[:, 0].min())) < 1e-4 and abs(float(face[:, 0].max()) - 1.0) < 1e-4
-    assert abs(float(face[:, 1].min())) < 1e-4 and abs(float(face[:, 1].max()) - 1.0) < 1e-4
+    data = (out / "scene_visual.glb").read_bytes()
+    nodes, _ = nodes_from_glb(data)
+    signs = [n for n in nodes if n.name.startswith("street_sign/")]
+    assert all(prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices) for sign in signs for prim in sign.primitives)
+    # Every plate face is on the one atlas page, in a 512 x 128 px slot of its own name.
+    assert {p.material for sign in signs for p in sign.primitives[:2]} == {"street_sign_atlas_0"}
+    assert {row["material"] for row in report["signs"]} == {"street_sign_atlas_0"}
+    assert "street_sign_atlas_0" in images_by_material(data)
+    _, materials = nodes_from_glb(data)
+    page = materials["street_sign_atlas_0"]
+    assert tuple(page.color) == pytest.approx((1.0, 1.0, 1.0, 1.0)) and page.roughness == pytest.approx(0.6)  # white: the image carries the colour
+    slots = {}
+    for sign in signs:
+        face, back = sign.primitives[0].uvs, sign.primitives[1].uvs
+        assert np.array_equal(face, back)
+        assert float(face[:, 0].max() - face[:, 0].min()) == pytest.approx(PLATE_W / SIGN_ATLAS_PX, abs=1e-6)
+        assert 0.0 <= float(face.min()) and float(face.max()) <= 1.0
+        slots.setdefault(sign.extras["name"], tuple(np.round(face.ravel(), 6)))
+    assert len(set(slots.values())) == len(slots) == 2
     assert (base / "scene_visual.glb").read_bytes() != (out / "scene_visual.glb").read_bytes()
 
 
+def test_each_plate_is_painted_into_its_slot_with_its_own_edge_around_it() -> None:
+    names = [f"Calle {n}" for n in range(5)]
+    pages, slots = plate_atlas(names)
+    [(material, pixels)] = pages.items()
+    assert material == "street_sign_atlas_0" and pixels.shape[1] == SIGN_ATLAS_PX
+    assert pixels.shape[0] & (pixels.shape[0] - 1) == 0  # a power of two
+    for name in names:
+        page, uv = slots[name]
+        assert page == material
+        x = round(float(uv[0, 0]) * SIGN_ATLAS_PX)
+        y = round((1 - float(uv[2, 1])) * pixels.shape[0])
+        plate = plaque_rgba(name)
+        assert np.array_equal(pixels[y:y + PLATE_H, x:x + PLATE_W], plate)
+        assert np.array_equal(pixels[y - PAD_PX, x:x + PLATE_W], plate[0])  # the padding repeats the plate's edge
+        assert np.array_equal(pixels[y + PLATE_H + PAD_PX - 1, x:x + PLATE_W], plate[-1])
+    many = [f"Calle {n}" for n in range(64)]
+    pages, slots = plate_atlas(many)
+    assert sorted(pages) == ["street_sign_atlas_0", "street_sign_atlas_1"]
+    assert len({(page, tuple(np.round(uv.ravel(), 6))) for page, uv in slots.values()}) == 64
+
+
 def test_accented_names_do_not_share_a_plate() -> None:
-    plain = plaque_png("Saenz")
-    accent = plaque_png("Sáenz Peña")
-    assert plain.startswith(b"\x89PNG")
-    assert accent != plain
+    plain = plaque_rgba("Saenz")
+    accent = plaque_rgba("Sáenz Peña")
+    assert plain.shape == accent.shape == (PLATE_H, PLATE_W, 4) and plain.dtype == np.uint8
+    assert not np.array_equal(accent, plain)
 
 
 def _shop_base(path: Path) -> None:

@@ -15,8 +15,6 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from onward_generator.dress.atlas import encode_png_rgba
-
 FONT_PATH = Path(__file__).resolve().parents[3] / "assets" / "fonts" / "dejavu" / "DejaVuSans-Bold.ttf"
 PLATE_W = 512
 PLATE_H = 128
@@ -26,7 +24,9 @@ _MAX_SIZE = 64
 _MIN_SIZE = 16
 
 
-def plaque_png(name: str, *, width: int = PLATE_W, height: int = PLATE_H) -> bytes:
+def plaque_rgba(name: str) -> np.ndarray:
+    """The plate's pixels, ``PLATE_H`` x ``PLATE_W`` x 4."""
+    width, height = PLATE_W, PLATE_H
     image = Image.new("RGBA", (width, height), _BLUE)
     draw = ImageDraw.Draw(image)
     margin = max(width // 40, 8)
@@ -36,7 +36,7 @@ def plaque_png(name: str, *, width: int = PLATE_W, height: int = PLATE_H) -> byt
     x = (width - (box[2] - box[0])) / 2 - box[0]
     y = (height - (box[3] - box[1])) / 2 - box[1]
     draw.text((x, y), text, fill=_WHITE, font=font)
-    return encode_png_rgba(np.asarray(image, dtype=np.uint8))
+    return np.asarray(image)
 
 
 def plaque_text(name: str) -> str:

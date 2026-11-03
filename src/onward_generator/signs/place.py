@@ -22,14 +22,15 @@ from shapely.geometry.base import BaseGeometry
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.dress.atlas import encode_png_rgba
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
-from onward_generator.signs.plaque import plaque_png
-from onward_generator.signs.shop import shop_signs
+from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
+from onward_generator.signs.shop import ATLAS_PX, PAD_PX, pack, page_height, shop_signs
 from onward_generator.tiers import core_of
 
 BUILDING_NODE = "building/"  # visual node name prefix; the rest is the building id
@@ -50,6 +51,10 @@ MIN_EDGE_M = 1.6
 MIN_WALL_M = 3.4
 MAX_SIGNS = 64
 EDGE_COLOR = (0.07, 0.14, 0.28, 1.0)
+# Every plate is drawn on a shared atlas page, one material per page: a draw per page and cell,
+# not one per street name. As wide as the shop sign pages; MAX_SIGNS plates fit on two pages.
+SIGN_ATLAS_PX = ATLAS_PX
+SIGN_ATLAS_MATERIAL = "street_sign_atlas_{}"
 OUTPUT_FILES = (
     "scene_visual.glb",
     "scene_collision.glb",
@@ -90,6 +95,29 @@ class Sign:
     name_origin: str = "osm"
 
 
+def plate_atlas(names: Sequence[str]) -> tuple[dict[str, np.ndarray], dict[str, tuple[str, np.ndarray]]]:
+    """Atlas pages of the plates and, per name, ``(page material, the face's four UVs)``.
+
+    Each plate keeps its 512 x 128 px and gets ``PAD_PX`` of its own edge colour around it, so a
+    mipmap does not bleed a neighbour's blue or letters into it.
+    """
+    spots = pack([(PLATE_W, PLATE_H)] * len(names))
+    lowest = {page: max(y for p, _, y in spots if p == page) for page, _, _ in spots}
+    pages = {SIGN_ATLAS_MATERIAL.format(page): np.zeros((page_height(y + PLATE_H + PAD_PX), SIGN_ATLAS_PX, 4), dtype=np.uint8)
+             for page, y in lowest.items()}
+    slots: dict[str, tuple[str, np.ndarray]] = {}
+    for name, (page, x, y) in zip(names, spots, strict=True):  # pragma: no mutate: pack returns one spot per size, so strict changes nothing a caller sees
+        material = SIGN_ATLAS_MATERIAL.format(page)
+        pixels = pages[material]
+        pixels[y - PAD_PX:y + PLATE_H + PAD_PX, x - PAD_PX:x + PLATE_W + PAD_PX] = np.pad(
+            plaque_rgba(name), ((PAD_PX, PAD_PX), (PAD_PX, PAD_PX), (0, 0)), mode="edge")
+        side_h = pixels.shape[0]
+        u0, u1 = x / SIGN_ATLAS_PX, (x + PLATE_W) / SIGN_ATLAS_PX
+        v1, v0 = 1 - y / side_h, 1 - (y + PLATE_H) / side_h
+        slots[name] = (material, np.array([[u0, v0], [u1, v0], [u1, v1], [u0, v1]]))
+    return pages, slots
+
+
 def material_id(name: str) -> str:
     digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
     return f"street_sign_{digest}"
@@ -119,7 +147,7 @@ def place_signs(
         raise SignsError(str(exc)) from exc
 
     streets = _streets(geo.get("features") or [])
-    # No street plate outside the playable core (ADR-017): each plate is a material, so a draw, of its own.
+    # No street plate outside the playable core (ADR-017): plates are for the player, and each cell holding one is a draw.
     # The walls come from the OSM scene, before any Catastro split, so they are kept by position.
     core = core_of(manifest)
     walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
@@ -129,20 +157,23 @@ def place_signs(
     images = images_by_material(visual_bytes)
     before = _geographic(manifest)
 
+    pages, slots = plate_atlas(sorted({sign.name for sign in signs}))
     sign_nodes: list[Node] = []
     for sign in signs:
         front, back, sides = _plate_meshes(sign)
+        page, uv = slots[sign.name]
         sign_nodes.append(Node(
             f"street_sign/{sign.material}",
             (
-                Primitive(front, sign.material),
-                Primitive(back, sign.material),
+                Primitive(front, page, uv),
+                Primitive(back, page, uv),
                 Primitive(sides, "street_sign_edge", _edge_uvs(sides)),
             ),
             {"name": sign.name, "name_origin": "osm", "wall": sign.feature_id},
         ))
-        materials.setdefault(sign.material, Material((1.0, 1.0, 1.0, 1.0), 0.6))
-        images[sign.material] = plaque_png(sign.name)
+    for page, pixels in pages.items():
+        materials.setdefault(page, Material((1.0, 1.0, 1.0, 1.0), 0.6))
+        images[page] = encode_png_rgba(pixels)
     materials.setdefault("street_sign_edge", Material(EDGE_COLOR, 0.7))
     boarded = {n.name[len(BUILDING_NODE):] for n in nodes if n.name.startswith(BUILDING_NODE)
                and any(p.material == "glass_boarded" for p in n.primitives)}
@@ -155,7 +186,6 @@ def place_signs(
         materials,
         extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows)},
         repeat_images=images,
-        unit_uv_materials={sign.material for sign in signs},
         preserve_uvs=True,
     )
     targets = prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite)
@@ -198,7 +228,7 @@ def place_signs(
             {
                 "name": sign.name,
                 "name_origin": sign.name_origin,
-                "material": sign.material,
+                "material": slots[sign.name][0],
                 "wall_feature": sign.feature_id,
                 "position_m": [round(float(v), 3) for v in sign.position],
             }

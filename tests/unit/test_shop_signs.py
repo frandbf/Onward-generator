@@ -20,11 +20,11 @@ from onward_generator.signs.shop import (
     VINYL_COLOURS,
     Item,
     Label,
-    _page_height,
     board_quads,
     label_for,
     label_rgba,
     pack,
+    page_height,
     shop_items,
     shop_signs,
 )
@@ -120,7 +120,7 @@ def test_pack_uses_the_exact_side() -> None:
 
 @pytest.mark.parametrize(("used", "height"), [(1, 16), (16, 16), (17, 32), (1025, 2048)])
 def test_page_height_is_a_power_of_two(used: int, height: int) -> None:
-    assert _page_height(used) == height
+    assert page_height(used) == height
 
 
 # --- Geometry ------------------------------------------------------------------------------

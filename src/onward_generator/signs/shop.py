@@ -165,7 +165,8 @@ def label_rgba(label: Label) -> np.ndarray:
     return np.asarray(image)
 
 
-def _page_height(used: int) -> int:
+def page_height(used: int) -> int:
+    """The smallest power of two, at least 16, that holds ``used`` rows."""
     height = 16
     while height < used:
         height *= 2
@@ -235,7 +236,7 @@ def shop_signs(manifest: Mapping[str, Any], boarded: Collection[str] = ()) -> Sh
     pages: dict[str, np.ndarray] = {}
     for name in sorted({spot[0] for spot in kept.values()}):
         used = max(spot[2] + lb.height_px + PAD_PX for lb, spot in kept.items() if spot[0] == name)
-        pages[name] = np.zeros((_page_height(used), ATLAS_PX, 4), dtype=np.uint8)
+        pages[name] = np.zeros((page_height(used), ATLAS_PX, 4), dtype=np.uint8)
     for lb, (name, x, y) in kept.items():
         pages[name][y - PAD_PX:y + lb.height_px + PAD_PX, x - PAD_PX:x + lb.width_px + PAD_PX] = label_rgba(lb)
 
