@@ -40,8 +40,8 @@ def _place(objects: list[dict], footprints: dict, *, free: object = None, keep_o
     return place_climbs({"objects": objects}, footprints, ground, keep_out, [ATTACK], [DEFEND])
 
 
-@pytest.mark.parametrize(("height", "expected"), [({"height_m": 12.0, "estimated_levels": 5}, 5), ({"height_m": 9.0}, 3), ({"height_m": 1.0}, 1), ({"height_m": 10.4, "estimated_levels": 0}, 3)])
-def test_storeys_come_from_the_levels_else_from_the_height(height: dict, expected: int) -> None:
+@pytest.mark.parametrize(("height", "expected"), [({"height_m": 12.0, "estimated_levels": 5}, 5), ({"height_m": 9.0}, 3), ({"height_m": 1.0}, 1), ({"height_m": 10.4, "estimated_levels": 0}, 3), ({"height_m": 22.9, "estimated_levels": 3}, 8)])
+def test_storeys_are_the_levels_or_what_the_height_implies_when_more(height: dict, expected: int) -> None:
     assert storeys({"height": height}) == expected
 
 
@@ -246,3 +246,8 @@ def test_a_tie_goes_to_the_lower_id() -> None:
     footprints = {"z": box(-30, 100, -10, 110), "a": box(10, 100, 30, 110)}
     placed = _place([_building("z", 2), _building("a", 2)], footprints)
     assert [site["x"] for site in placed["ladders"]] == [20.0, -20.0]
+
+
+def test_a_tall_roof_with_few_cadastral_levels_gets_neither_a_ladder_nor_a_lift() -> None:
+    tall = {**_building("b", 3), "height": {"height_m": 22.9, "estimated_levels": 3}}
+    assert _place([tall], {"b": box(0, 100, 20, 110)}) == {"ladders": [], "lifts": []}

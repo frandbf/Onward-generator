@@ -15,7 +15,7 @@ Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the h
 **Placement, in `perf/climbs.py`, at the layout stage, which already knows the spawns, routes and objectives:**
 
 1. A building gets one access. Its roof must be flat, it must not be a landmark or in the scenic tier, and no stair may reach it.
-2. Ladders: at most 3 storeys, no interior, at most 3 per map. Lifts: 3 to 6 storeys, at most 3 pairs per map. The upper limit and the lift cap are decisions of this ADR: a higher roof overlooks the whole map, and a pair is two choke points.
+2. Storeys are the estimated levels, or what the height implies at 3 m a storey when that is more: a real Madrid map has a 22.9 m roof with few cadastral levels. Ladders: at most 3 storeys, no interior, at most 3 per map. Lifts: 3 to 6 storeys, at most 3 pairs per map. The upper limit and the lift cap are decisions of this ADR: a higher roof overlooks the whole map, and a pair is two choke points.
 3. **Fairness.** No access within 30 m of a spawn. Buildings closest to equidistant between the teams go first, then the lowest. Accesses are at least 30 m apart.
 4. **No blocking.** The foot of a ladder and a cabin with 3 m clear in front stay on free ground, 3 m from spawns, objectives, boxes and interior doors, and 1.5 m from bot routes. So there may be no ladder or lift on a map with no room, and that is accepted.
 
