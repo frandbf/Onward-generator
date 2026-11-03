@@ -25,7 +25,7 @@ Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the h
 
 **Every flat parapet now has a collider**, not only those of a roof with a stair: any roof may get a ladder or a lift at the layout stage, which comes after detail, and a parapet that bullets cross is not cover. Roofs nobody reaches pay a few collision triangles.
 
-**A simple visible model.** Neither prefab has a mesh, and it is not known whether the game draws one. The adapter adds rails and rungs, or four posts and a roof outside the cabin's size: one mesh and one draw call each, no collider, lit by probes. If the game draws its own, these are redundant but not in the way.
+**A simple visible model.** The ladder in `ExampleScene` is a child of hand-placed cubes with `BoxCollider`, so the prefab draws nothing and a map must bring its own. The cabin has no model there either: its box, door and button are editor gizmos, and the SDK does not show whether the game spawns one at load. The adapter adds rails and rungs, or four posts and a roof outside the cabin's size: one mesh and one draw call each, no collider, lit by probes. Without colliders, bullets cross the ladder, unlike the example's; the script only asks for the rung transforms.
 
 ## Rejected alternatives
 
@@ -36,7 +36,7 @@ Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the h
 
 ## To check on the headset
 
-- Whether the game draws the ladder and the cabin, and so whether the added models are needed.
+- Whether the game spawns a cabin, a door and a button. If not, the four posts and the roof are all a player sees, and how a lift is called is unknown.
 - Climbing a ladder with added rungs, and the vault over a parapet of 1 m, which is higher than the top rung (0.57 m above the roof).
-- A lift between different heights. `ExampleScene` only shows the same height.
+- A lift between different heights. `Validate` only requires `PairedElevator`, so the SDK does not refuse it, but the travel is in the game and `ExampleScene` only shows the same height. If it fails, the lifts come out and the ladders stay.
 - Whether 3 and 3 are the right number for a match, and whether a roof overlooks a spawn: the rule measures distance, not line of sight.
