@@ -238,3 +238,16 @@ def test_a_wall_mounted_prop_hangs_on_its_wall(
     mid = (start + end) / 2
     assert round(float(back[1 - axis]), 3) == round(float(mid[1 - axis]), 3)
     assert planted.records[0]["position_m"][2] == 2.4
+
+
+def test_an_awning_clears_the_door_under_it() -> None:
+    building = box(-10.0, 6.0, 10.0, 20.0)
+    lane = LineString([(-30.0, 0.0), (30.0, 0.0)])
+    wall = _Edge("osm-way-1", 0, np.array([-10.0, 6.0]), np.array([10.0, 6.0]), np.array([0.0, -1.0]), 20.0)
+    planted = dress(
+        [_prop("awning_small", "awning", _mesh(1.9, 0.96, 0.9), anchor="facade", surfaces=("facade",))],
+        [wall], [], STRtree([building]), [lane], STRtree([lane]), square_zone(80.0), profile_for(100), 48152, [],
+        grass_mesh=None, grass_left=0, triangle_budget=60_000,
+    )
+    assert planted.placed_ids == ["awning_small"]
+    assert planted.records[0]["position_m"][2] == 2.5

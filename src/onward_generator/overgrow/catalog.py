@@ -128,7 +128,8 @@ PLACEMENT_RULES: tuple[PlacementRule, ...] = (
 
 RULES_BY_ID = {rule.id: rule for rule in PLACEMENT_RULES}
 
-FACADE_Z_M = {"aircon": 2.4, "camera": 3.1, "fire_escape": 0.0}
+# Height of a wall-mounted prop's base. An awning clears a 2.4 m door; other roles start at 1.2 m.
+FACADE_Z_M = {"aircon": 2.4, "awning": 2.5, "camera": 3.1, "fire_escape": 0.0}
 
 
 def rules_for(spec: AssetSpec) -> tuple[PlacementRule, ...]:
