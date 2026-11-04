@@ -50,6 +50,8 @@ HARDDRIVE_COUNT = 3
 BLOCK_GAP_M = 10.0
 AI_COUNT = 32
 AMMO_COUNT = 4
+# No ammo crate this close to a spawn point: a player would spawn inside or against it.
+AMMO_SPAWN_CLEAR_M = 3.0
 AI_SPACING_M = 8.0
 # One spawn per route. Starts closer than this share a spot, and Hunt then
 # drops several bots on what reads as a single position. A short sidewalk
@@ -632,6 +634,22 @@ CLIMB_ROUTE_KEEP_OUT_M = 1.5
 """The navmesh is baked without them, so a bot's route must not cross them."""
 
 
+def ammo_points(
+    area: BaseGeometry,
+    ai: Sequence[tuple[float, float]],
+    spawns: Sequence[tuple[float, float]],
+    origin: tuple[float, float],
+) -> list[tuple[float, float]]:
+    """``AMMO_COUNT`` crates, 3 m clear of the AI starts when there is room, and always ``AMMO_SPAWN_CLEAR_M`` from every spawn point.
+
+    The first crate goes to the pole of the ground, which is where the attackers' block was put.
+    """
+    spawn_clear = union_all([Point(p).buffer(_keep_out(AMMO_SPAWN_CLEAR_M), quad_segs=_BUFFER_RESOLUTION) for p in spawns])  # pragma: no mutate: shapely's default quad_segs is 16, the same polygon
+    open_ground = area.difference(spawn_clear)
+    region = open_ground.difference(union_all([Point(p).buffer(3.0) for p in ai]))
+    return scatter_points(region if not region.is_empty else open_ground, AMMO_COUNT, 6.0, origin)
+
+
 def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
     """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and the bots' routes."""
     doors = [
@@ -679,23 +697,20 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     islands = nav_islands(base, inside)
     routes, separation = hunt_routes(base, free, islands, component_holding(islands, uplink), AI_COUNT, focus)
     ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
-    occupied = union_all([Point(p).buffer(3.0) for p in ai])
-    ammo_region = area.difference(occupied)
-    ammo = scatter_points(ammo_region if not ammo_region.is_empty else area, AMMO_COUNT, 6.0, uplink)
+    attack = (float(doc["attackers"]["centre_m"][0]), float(doc["attackers"]["centre_m"][1]))
+    defend = (float(doc["defenders"]["centre_m"][0]), float(doc["defenders"]["centre_m"][1]))
+    attack_b = extra_spawn_block(area, attack, [attack, defend])
+    defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
+    spawn_pts = [point for centre in (attack, defend, attack_b, defend_b) for point in _block(*centre)]
+    occupied_pts = [uplink, *spawn_pts]
+
+    ammo = ammo_points(area, ai, spawn_pts, uplink)
 
     def with_yaw(block: dict[str, Any]) -> dict[str, Any]:
         return {
             "centre_m": block["centre_m"],
             "points_m": [_xy(p["x"], p["y"], focus) for p in block["points_m"]],
         }
-
-    attack = (float(doc["attackers"]["centre_m"][0]), float(doc["attackers"]["centre_m"][1]))
-    defend = (float(doc["defenders"]["centre_m"][0]), float(doc["defenders"]["centre_m"][1]))
-    attack_b = extra_spawn_block(area, attack, [attack, defend])
-    defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
-    occupied_pts = [uplink]
-    for centre in (attack, defend, attack_b, defend_b):
-        occupied_pts.extend(_block(*centre))
     open_ground = area.difference(union_all([Point(p).buffer(2.0) for p in occupied_pts]))
     if open_ground.is_empty:
         raise LayoutError("no ground left for Escort, Evac and Retrieval")

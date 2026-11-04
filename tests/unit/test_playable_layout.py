@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from shapely import LineString, MultiLineString, Point, Polygon, STRtree, box
+from shapely import LineString, MultiLineString, Point, Polygon, STRtree, box, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.export.package import _check_climbs, _check_layout
@@ -13,6 +13,8 @@ from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
+    AMMO_COUNT,
+    AMMO_SPAWN_CLEAR_M,
     BLOCK_GAP_M,
     GAMEPLAY_VERSION,
     GRID_M,
@@ -30,6 +32,7 @@ from onward_generator.perf.layout import (
     _patrol_lines,
     _routes,
     _sample_route,
+    ammo_points,
     climb_keep_out,
     component_holding,
     extra_spawn_block,
@@ -629,3 +632,44 @@ def test_the_climb_keep_out_covers_points_street_doors_and_routes() -> None:
     for outside in ((3.1, 0.0), (100.0, 3.1), (5.0, 51.6), (200.0, 0.0), (300.0, 0.0)):
         assert not keep_out.contains(Point(outside)), outside
     assert climb_keep_out([(0.0, 0.0)], [], {}).contains(Point(2.9, 0.0))
+
+
+
+def test_no_ammo_crate_lands_on_the_attackers_block() -> None:
+    plaza = box(0, 0, 40, 12)
+    # The attackers' block stands on the pole of the plaza, where the first crate used to go.
+    pole = (20.0, 6.0)
+    spawns = _block(*pole)
+    ammo = ammo_points(plaza, [], spawns, pole)
+    assert len(ammo) == AMMO_COUNT
+    assert min(math.dist(a, s) for a in ammo for s in spawns) >= AMMO_SPAWN_CLEAR_M
+    assert all(plaza.contains(Point(a)) for a in ammo)
+
+
+def test_ammo_keeps_clear_of_the_ai_starts_while_there_is_room() -> None:
+    plaza = box(0, 0, 40, 12)
+    ai = [(5.0, 6.0)]
+    ammo = ammo_points(plaza, ai, [(35.0, 6.0)], (20.0, 6.0))
+    assert min(math.dist(a, ai[0]) for a in ammo) >= 3.0
+    # A strip the AI circles fill still gets its crates, but never next to the spawn.
+    strip = box(0, 0, 60, 2)
+    crowded = ammo_points(strip, [(x, 1.0) for x in range(0, 61, 4)], [(58.0, 1.0)], (0.0, 1.0))
+    assert len(crowded) == AMMO_COUNT
+    assert all(math.dist(a, (58.0, 1.0)) >= AMMO_SPAWN_CLEAR_M for a in crowded)
+
+
+
+def test_ammo_crates_are_6_m_apart() -> None:
+    # 20 m holds four crates 6 m apart, not 7 m.
+    ammo = ammo_points(box(0, 0, 20, 1), [], [(40.0, 0.5)], (0.0, 0.5))
+    assert len(ammo) == AMMO_COUNT
+    assert min(math.dist(a, b) for i, a in enumerate(ammo) for b in ammo[i + 1:]) >= 6.0
+
+
+def test_ammo_needs_only_3_m_from_an_ai_start() -> None:
+    # Four 1 m squares, each with an AI start 2.9 m from its centre: only the far side of each square is 3 m clear.
+    squares = [box(x, 0, x + 1, 1) for x in (0.0, 20.0, 40.0, 60.0)]
+    ai = [(x + 0.5 - 2.9, 0.5) for x in (0.0, 20.0, 40.0, 60.0)]
+    ammo = ammo_points(union_all(squares), ai, [(100.0, 0.5)], (0.0, 0.5))
+    assert len(ammo) == AMMO_COUNT
+    assert min(math.dist(a, s) for a in ammo for s in ai) >= 3.0
