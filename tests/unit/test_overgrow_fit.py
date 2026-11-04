@@ -417,3 +417,16 @@ def test_fit_allows_a_wall_prop_exactly_at_the_gap(tmp_path: Path, monkeypatch: 
     monkeypatch.setattr("onward_generator.overgrow.fit.FACADE_GAP_M", 0.125)
     _checked, problems = _fit_scene(tmp_path, [_mounted("aircon", 0.125)])
     assert problems == []
+
+
+
+@pytest.mark.parametrize(
+    ("size", "scale"),
+    [((14.16, 13.41, 1.74), 2.5 / 14.16), ((1.95, 1.71, 0.41), 1.0), ((2.5, 1.0, 0.3), 1.0), ((1.0, 5.0, 0.3), 0.5)],
+)
+def test_a_plant_is_brought_down_to_2_5_m_across(size: tuple[float, float, float], scale: float) -> None:
+    assert fit_scale("plant", *size) == pytest.approx(scale)
+    mesh, applied = apply_fit_scale(_mesh(*size), "plant")
+    assert applied == pytest.approx(scale)
+    assert size_reason("plant", *measure(mesh)) is None
+    assert size_reason("plant", *size) == (None if scale == 1.0 else "wrong_size")

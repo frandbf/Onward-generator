@@ -31,6 +31,8 @@ WRECK_TARGET_LENGTH_M = 4.5
 # Pivot 0.9 m off the centreline: width 4 m leaves at least 1.2 m on the open side.
 PASSAGE_WIDTH_M = 4.0
 FIRE_ESCAPE_DEPTH_M = 1.6
+# The library's plants are 1.3 to 2.1 m across; a scanned patch of grass came in at 14 x 13 m.
+PLANT_MAX_M = 2.5
 FACADE_GAP_M = 0.15
 PASSAGE_M = 1.2
 BUILDING_OVERLAP_M2 = 0.25
@@ -72,6 +74,8 @@ def size_reason(role: str, length_m: float, width_m: float, height_m: float) -> 
             return "wrong_size"
     if role == "fire_escape" and width_m > FIRE_ESCAPE_DEPTH_M:
         return "too_deep"
+    if role == "plant" and max(length_m, width_m) > PLANT_MAX_M:
+        return "wrong_size"
     return None
 
 
@@ -81,6 +85,9 @@ def fit_scale(role: str, length_m: float, width_m: float, height_m: float) -> fl
         if width_m <= 0.0 or width_m <= FIRE_ESCAPE_DEPTH_M:
             return 1.0
         return FIRE_ESCAPE_DEPTH_M / width_m
+    if role == "plant":
+        # Never above 1: a plant within the band keeps its size.
+        return PLANT_MAX_M / max(length_m, width_m, PLANT_MAX_M)
     if role != "wreck" or size_reason(role, length_m, width_m, height_m) is None:
         return 1.0
     if min(length_m, width_m, height_m) <= 0.0:

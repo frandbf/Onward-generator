@@ -2,7 +2,7 @@
 
 The 49 normalized models in `assets/normalized`. Each picture is a view of the file, not a photograph of the original. Sizes are length × depth × height, in metres.
 
-The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth.
+The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. A plant wider than 2.5 m across is reduced to 2.5 m: `scanned_plants_grass` is 14.16 × 13.41 m in its file and covered a sidewalk and a parked truck on MurciaEjemplo; the other plants are 1.3 to 2.1 m. `fit` refuses a plant still wider than that. Other roles have no size band: their fitted sizes in the library were measured on 4 November 2026 and none was out of scale.
 
 ## Curated manifest fields
 
