@@ -684,7 +684,7 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
         for connection in interior.get("connections", []) if connection.get("from") == "exterior"
     ]
     props = [
-        Point(prop["position_m"][:2]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)
+        Point(prop["position_m"]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)
         for prop in objects if prop.get("type") == "overgrowth" and prop.get("kind") not in CLIMB_FLAT_GROWTH
     ]
     return union_all([
