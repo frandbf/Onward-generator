@@ -20,7 +20,16 @@ from onward_generator.detail.shops import plan_shops
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.mesh import Mesh
-from onward_generator.signs.place import SIGN_ATLAS_PX, _choose, _sign_for, _streets, _walls, place_signs, plate_atlas
+from onward_generator.signs.place import (
+    SIGN_ATLAS_PX,
+    _choose,
+    _footprints,
+    _sign_for,
+    _streets,
+    _walls,
+    place_signs,
+    plate_atlas,
+)
 from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
 from onward_generator.signs.shop import PAD_PX
 from tests.conftest import MURCIA_CENTER
@@ -285,3 +294,85 @@ def test_no_plate_goes_outside_the_playable_core(tmp_path: Path) -> None:
     assert kept and all(row["position_m"][0] <= 50.0 for row in kept)
     assert "osm-way-east" not in {row["wall_feature"] for row in kept}
     assert any(row["position_m"][0] > 50.0 for row in every)
+
+
+def _corner(ring: list[list[float]], *extra: dict) -> list[dict]:
+    return [
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, 0], [30, 0]]},
+                 {"highway": "residential", "name": "Calle Mayor"}, "osm-way-mayor"),
+        _feature("highway", {"type": "LineString", "coordinates": [[0, -30], [0, 30]]},
+                 {"highway": "residential", "name": "Calle Nueva"}, "osm-way-nueva"),
+        _feature("building", {"type": "Polygon", "coordinates": [ring]}, {"building": "yes", "height": "12"}, "osm-way-corner"),
+        *extra,
+    ]
+
+
+@pytest.mark.parametrize("clockwise", [False, True])
+def test_a_plate_hangs_outside_its_building_whichever_way_the_ring_runs(clockwise: bool) -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    features = _corner(ring[::-1] if clockwise else ring)
+    signs = _choose(_streets(features), _walls(features), 64)
+    assert {sign.name for sign in signs} == {"Calle Mayor", "Calle Nueva"}
+    for sign in signs:
+        x, y = float(sign.position[0]), float(sign.position[1])
+        # On the street side of the wall it faces, 7.5 cm out (the 6 cm gap plus half the 3 cm plate).
+        assert min(x, y) == pytest.approx(6.0 - 0.075)
+        assert float(sign.outward @ (sign.position[:2] - np.array([16.0, 16.0]))) > 0
+
+
+def _covered_corner() -> list[dict]:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    low = {"building": "yes", "height": "3"}  # too low for a plate of its own
+    return _corner(
+        ring,
+        # A kiosk 0.4 m in front of the corner's south wall: that wall has no street in front of it.
+        _feature("building", {"type": "Polygon", "coordinates": [[[6, 5.6], [26, 5.6], [26, 4], [6, 4], [6, 5.6]]]}, low, "osm-way-kiosk"),
+        # An L-shaped shed whose box, not its outline, covers the front of the corner's west wall.
+        _feature("building", {"type": "MultiPolygon", "coordinates": [
+            [[[-4, 2], [-2, 2], [-2, 28], [5.8, 28], [5.8, 30], [-4, 30], [-4, 2]]],
+        ]}, low, "osm-way-shed"),
+        # Across the street, a block whose south wall has a low wall 1.1 m out: there is still room for a plate.
+        _feature("building", {"type": "Polygon", "coordinates": [[[-26, 6], [-6, 6], [-6, 26], [-26, 26], [-26, 6]]]},
+                 {"building": "yes", "height": "12"}, "osm-way-west"),
+        _feature("building", {"type": "Polygon", "coordinates": [[[-26, 3.5], [-6, 3.5], [-6, 4.9], [-26, 4.9], [-26, 3.5]]]}, low, "osm-way-low-wall"),
+    )
+
+
+def test_a_plate_skips_a_wall_with_another_building_in_front() -> None:
+    features = _covered_corner()
+    assert len(_footprints(features)) == 5
+    open_wall = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64)}
+    covered = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features)))}
+    assert open_wall["Calle Mayor"].feature_id == "osm-way-corner"
+    assert covered["Calle Mayor"].feature_id == "osm-way-west"
+    assert covered["Calle Nueva"].feature_id == "osm-way-corner"
+    assert float(covered["Calle Nueva"].position[0]) == pytest.approx(6.0 - 0.075)
+
+
+def test_place_signs_reads_the_footprints_of_its_scene(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    scene.write_text(json.dumps({
+        "schema": "onward_generator.geo_scene",
+        "origin": {"longitude": MURCIA_CENTER[0], "latitude": MURCIA_CENTER[1]},
+        "features": _covered_corner(),
+    }), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    report = place_signs(base, scene, tmp_path / "scene_signs", max_signs=1)
+    assert [(row["name"], row["wall_feature"]) for row in report["signs"]] == [("Calle Mayor", "osm-way-west")]
+
+
+def test_a_street_without_a_crossing_gets_its_plate_at_its_midpoint() -> None:
+    features = [
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, 0], [30, 0]]},
+                 {"highway": "residential", "name": "Calle Sola"}, "osm-way-sola"),
+        _feature("building", {"type": "Polygon", "coordinates": [[[-10, 6], [10, 6], [10, 20], [-10, 20], [-10, 6]]]},
+                 {"building": "yes", "height": "12"}, "osm-way-block"),
+    ]
+    signs = _choose(_streets(features), _walls(features), 64)
+    assert [(sign.name, sign.feature_id) for sign in signs] == [("Calle Sola", "osm-way-block")]
+    assert np.allclose(signs[0].position, [0.0, 6.0 - 0.075, 2.55])
+    # A 3 m kiosk along the whole wall leaves the street without a plate.
+    features.append(_feature("building", {"type": "Polygon", "coordinates": [[[-10, 4], [10, 4], [10, 5.6], [-10, 5.6], [-10, 4]]]},
+                             {"building": "yes", "height": "3"}, "osm-way-kiosk"))
+    assert _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features))) == []

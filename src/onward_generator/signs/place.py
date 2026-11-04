@@ -16,9 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import LineString, Point, Polygon, STRtree, box
+from shapely import LineString, Point, Polygon, STRtree, box, get_parts
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
+from shapely.geometry.polygon import orient
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
@@ -49,6 +50,8 @@ MAX_JUNCTION_M = 80.0
 CLUSTER_M = 10.0
 MIN_EDGE_M = 1.6
 MIN_WALL_M = 3.4
+# A plate's wall must have open ground this far in front of it, not another building.
+FRONT_CLEAR_M = 0.5
 MAX_SIGNS = 64
 EDGE_COLOR = (0.07, 0.14, 0.28, 1.0)
 # Every plate is drawn on a shared atlas page, one material per page: a draw per page and cell,
@@ -151,7 +154,7 @@ def place_signs(
     # The walls come from the OSM scene, before any Catastro split, so they are kept by position.
     core = core_of(manifest)
     walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
-    signs = _choose(streets, walls, max_signs)
+    signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])))
     visual_bytes = (base / "scene_visual.glb").read_bytes()
     nodes, materials = nodes_from_glb(visual_bytes)
     images = images_by_material(visual_bytes)
@@ -287,6 +290,12 @@ def _streets(features: Sequence[Mapping[str, Any]]) -> list[_Street]:
     return streets
 
 
+def _footprints(features: Sequence[Mapping[str, Any]]) -> list[Polygon]:
+    """Every building polygon, the parts of a multipolygon apart."""
+    parts = (get_parts(shape(_geometry(feature))) for feature in features if feature.get("kind") == "building")
+    return [part for group in parts for part in group if isinstance(part, Polygon)]
+
+
 def _walls(features: Sequence[Mapping[str, Any]]) -> list[_Wall]:
     walls: list[_Wall] = []
     for feature in features:
@@ -300,6 +309,8 @@ def _walls(features: Sequence[Mapping[str, Any]]) -> list[_Wall]:
         for polygon in polygons:
             if not isinstance(polygon, Polygon) or polygon.exterior is None:
                 continue
+            # Counter-clockwise, so (dy, -dx) points out of the building whichever way the ring was drawn.
+            polygon = orient(polygon)
             coords = [np.array(p[:2], dtype=np.float64) for p in polygon.exterior.coords]
             for start, end in zip(coords, coords[1:]):
                 edge = end - start
@@ -311,7 +322,7 @@ def _walls(features: Sequence[Mapping[str, Any]]) -> list[_Wall]:
     return walls
 
 
-def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int) -> list[Sign]:
+def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int, buildings: STRtree | None = None) -> list[Sign]:
     if not streets or not walls:
         return []
     junctions = _junctions(streets)
@@ -321,7 +332,7 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int) 
     seen_names: set[str] = set()
     for point, names in junctions:
         for name in names:
-            sign = _sign_for(name, point, streets, walls, tree, used_edges)
+            sign = _sign_for(name, point, streets, walls, tree, used_edges, buildings)
             if sign is None or _too_close(sign, chosen):
                 continue
             chosen.append(sign)
@@ -330,7 +341,7 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int) 
         if street.name in seen_names:
             continue
         mid = street.line.interpolate(0.5, normalized=True)
-        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges)
+        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges, buildings)
         if sign is None or _too_close(sign, chosen):
             continue
         chosen.append(sign)
@@ -389,6 +400,7 @@ def _sign_for(
     walls: Sequence[_Wall],
     tree: STRtree,
     used_edges: set[tuple[str, int]],
+    buildings: STRtree | None = None,
 ) -> Sign | None:
     """The nearest wall within ``MAX_JUNCTION_M`` that faces ``point`` along the street.
 
@@ -421,6 +433,9 @@ def _sign_for(
         if along_street is None or float(np.linalg.norm(along_street - closest)) > MAX_JUNCTION_M:
             continue
         if (wall.feature_id, index) in used_edges:
+            continue
+        # A party wall, or a wall another footprint covers, has a building in front of it, not a street.
+        if buildings is not None and buildings.query(Point(*(closest + wall.outward * FRONT_CLEAR_M)), predicate="intersects").size:
             continue
         rank = distance
         if best is None or rank < best[0]:
