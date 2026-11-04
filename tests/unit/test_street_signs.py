@@ -480,6 +480,49 @@ def test_place_signs_keeps_the_plates_off_the_glass_of_its_base(tmp_path: Path) 
     assert mayor["position_m"][0] == pytest.approx(9.2)
 
 
+def test_glass_also_holds_the_shop_signs_it_is_given() -> None:
+    from onward_generator.signs.place import _glass
+
+    fascia = (box(6.3, 5.9, 9.2, 6.05), 2.6, 2.96)
+    signs_only = _glass([], [fascia])
+    assert signs_only is not None
+    assert signs_only.meets(box(8.0, 5.9, 8.5, 6.1), 2.32, 2.78) is True
+    assert signs_only.meets(box(8.0, 5.9, 8.5, 6.1), 2.0, 2.6) is False  # only touches its bottom
+    assert signs_only.meets(box(9.3, 5.9, 9.8, 6.1), 2.32, 2.78) is False
+    both = _glass([_pane(20.0, 22.0, 6.0, 2.0, 3.0)], [fascia])
+    assert both is not None
+    assert both.meets(box(8.0, 5.9, 8.5, 6.1), 2.32, 2.78) and both.meets(box(20.5, 5.9, 21.0, 6.1), 2.32, 2.78)
+    assert _glass([], []) is None
+
+
+def test_place_signs_keeps_a_plate_off_a_shop_sign(tmp_path: Path) -> None:
+    """On the headset the plate of Calle Platería hid most of a shop's fascia: the plates only knew the glass."""
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    scene = tmp_path / "geo_scene.json"
+    scene.write_text(json.dumps({
+        "schema": "onward_generator.geo_scene",
+        "origin": {"longitude": MURCIA_CENTER[0], "latitude": MURCIA_CENTER[1]},
+        "features": _corner(ring),
+    }), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    cfg = load_detail_config()
+    cfg = replace(cfg, shops=replace(cfg.shops, fascia_share=1.0, vinyl_share=0.0))
+    # A 2.5 m shopfront from x 6.5 on the south wall: its fascia runs x 6.35..9.15 at z 2.6..2.96, over the plate's band.
+    holes = [Hole("shopfront", 0, 0.5, 0.25, 2.5, 2.3, 0.15, "glass_dark", 0, 0)]
+    shops = plan_shops("osm-way-corner", [("osm-node-1", {"amenity": "pharmacy"}, (8.0, 7.0))], holes,
+                       [Segment(0, 0, 0, (6.0, 6.0), (26.0, 6.0), True)], cfg)
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    manifest["objects"].append({"id": "building/osm-way-corner", "type": "building", "source_ids": ["osm-way-corner"],
+                                "facade": {"shops": shops}})
+    (base / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+    report = place_signs(base, scene, tmp_path / "scene_signs")
+    mayor = next(row for row in report["signs"] if row["name"] == "Calle Mayor")
+    # Without the sign the plate hangs at x 6.7; it needs its centre 0.75 m past 9.2, so 10.2 in 0.5 m steps.
+    assert mayor["position_m"][0] == pytest.approx(10.2)
+    assert report["shop_signs"]["kinds"]["fascia"] == 1
+
+
 
 def _slide(start_x: float, *panes: Node, length: float = 4.0) -> list[float] | None:
     from onward_generator.signs.place import _clear_of_glass, _glass, _Wall

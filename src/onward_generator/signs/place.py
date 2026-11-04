@@ -23,6 +23,7 @@ from shapely.geometry.polygon import orient
 
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.atlas import encode_png_rgba
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
@@ -163,7 +164,8 @@ def place_signs(
     walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
     visual_bytes = (base / "scene_visual.glb").read_bytes()
     nodes, materials = nodes_from_glb(visual_bytes)
-    signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])), _glass(nodes))
+    # A plate covers neither glass nor the fascia or blade sign ``detail`` hung for a shop: Calle Platería once hid a shop's name.
+    signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])), _glass(nodes, sign_footprints(manifest)))
     images = images_by_material(visual_bytes)
     before = _geographic(manifest)
 
@@ -331,7 +333,7 @@ def _walls(features: Sequence[Mapping[str, Any]]) -> list[_Wall]:
 
 @dataclass(frozen=True, slots=True)
 class _Glass:
-    """The plan box and height band of every glass triangle of the visual scene."""
+    """The plan and height band of every glass triangle of the visual scene, and of every shop sign."""
 
     tree: STRtree
     low: np.ndarray
@@ -342,14 +344,21 @@ class _Glass:
         return bool(((self.low[hits] < top) & (self.high[hits] > bottom)).any())
 
 
-def _glass(nodes: Sequence[Node]) -> _Glass | None:
+def _glass(nodes: Sequence[Node], signs: Sequence[tuple[BaseGeometry, float, float]] = ()) -> _Glass | None:
+    """What a plate must not cover: the glass of ``nodes``, and ``signs`` as (plan, bottom z, top z)."""
     triangles = [p.mesh.vertices[p.mesh.triangles] for n in nodes for p in n.world_primitives() if p.material in GLASS_MATERIALS]
-    if not triangles:
+    plans: list[BaseGeometry] = [plan for plan, _, _ in signs]
+    low = [bottom for _, bottom, _ in signs]
+    high = [top for _, _, top in signs]
+    if triangles:
+        stacked = np.concatenate(triangles)
+        lows, highs = stacked.min(axis=1), stacked.max(axis=1)
+        plans += [box(*map(float, a), *map(float, b)) for a, b in zip(lows[:, :2], highs[:, :2])]
+        low += lows[:, 2].tolist()
+        high += highs[:, 2].tolist()
+    if not plans:
         return None
-    stacked = np.concatenate(triangles)
-    low, high = stacked.min(axis=1), stacked.max(axis=1)
-    plans = [box(*map(float, a), *map(float, b)) for a, b in zip(low[:, :2], high[:, :2])]
-    return _Glass(STRtree(plans), low[:, 2], high[:, 2])
+    return _Glass(STRtree(plans), np.array(low), np.array(high))
 
 
 def _choose(

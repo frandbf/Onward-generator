@@ -860,9 +860,9 @@ def _shopfront(*signs: dict) -> dict:
 
 
 def test_shop_signs_are_a_footprint_and_a_height_band() -> None:
-    from onward_generator.overgrow.urban import SIGN_CLEAR_M, shop_signs
+    from onward_generator.detail.shops import SIGN_CLEAR_M, sign_footprints
 
-    fascia, blade = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9), _fascia(5.0, 8.0, 3.0, kind="blade")))
+    fascia, blade = sign_footprints(_shopfront(_fascia(0.0, 8.0, 2.9), _fascia(5.0, 8.0, 3.0, kind="blade")))
     # A fascia runs along the wall (x), as deep as itself plus the clearance on each side.
     assert [round(v, 3) for v in fascia[0].bounds] == [round(v, 3) for v in (-1.0, 8.0 - 0.05 - SIGN_CLEAR_M, 1.0, 8.0 + 0.05 + SIGN_CLEAR_M)]
     assert (round(fascia[1], 3), round(fascia[2], 3)) == (2.7, 3.1)
@@ -870,7 +870,7 @@ def test_shop_signs_are_a_footprint_and_a_height_band() -> None:
     assert [round(v, 3) for v in blade[0].bounds] == [5.0 - 0.1, 7.0, 5.0 + 0.1, 9.0]
     # Each is the full rectangle: 2 m long, 0.1 m deep plus the clearance either side.
     assert round(fascia[0].area, 6) == round(blade[0].area, 6) == round(2.0 * (0.1 + 2 * SIGN_CLEAR_M), 6)
-    ((wide, _low, _high),) = shop_signs(_shopfront({**_fascia(0.0, 8.0, 2.9), "width_m": 3.0}))
+    ((wide, _low, _high),) = sign_footprints(_shopfront({**_fascia(0.0, 8.0, 2.9), "width_m": 3.0}))
     assert [round(v, 3) for v in wide.bounds][::2] == [-1.5, 1.5]
 
 
@@ -890,16 +890,16 @@ def _wall_spot(x: float = 0.0) -> Spot:
     [(2.9, True), (3.2, True), (3.59, True), (3.61, False), (2.29, False)],  # the fascia spans z - 0.2 .. z + 0.2
 )
 def test_a_wall_prop_may_not_cover_a_shop_sign(z: float, covered: bool) -> None:
-    from onward_generator.overgrow.urban import shop_signs
+    from onward_generator.detail.shops import sign_footprints
 
-    result = Dressing(signs=shop_signs(_shopfront(_fascia(0.0, 8.0, z))))
+    result = Dressing(signs=sign_footprints(_shopfront(_fascia(0.0, 8.0, z))))
     assert _covers_sign(_awning(), _wall_spot(), result) is covered
 
 
 def test_only_a_wall_prop_over_a_sign_counts() -> None:
-    from onward_generator.overgrow.urban import shop_signs
+    from onward_generator.detail.shops import sign_footprints
 
-    signs = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9)))
+    signs = sign_footprints(_shopfront(_fascia(0.0, 8.0, 2.9)))
     assert _covers_sign(_awning(), _wall_spot(5.0), Dressing(signs=signs)) is False  # further along the wall
     assert _covers_sign(_awning(), _wall_spot(), Dressing()) is False
     # A 3.5 m pole right under the fascia is a ground prop: only wall props are held to the signs.
@@ -908,10 +908,10 @@ def test_only_a_wall_prop_over_a_sign_counts() -> None:
 
 
 def test_a_wall_prop_over_a_sign_is_rejected_reported_and_the_search_goes_on() -> None:
-    from onward_generator.overgrow.urban import shop_signs
+    from onward_generator.detail.shops import sign_footprints
 
     awning = _awning()
-    signs = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9)))
+    signs = sign_footprints(_shopfront(_fascia(0.0, 8.0, 2.9)))
     spots = [_wall_spot() for _ in range(6)] + [_wall_spot(10.0)]
     spots = [replace(spot, key=f"facade:b:{n}") for n, spot in enumerate(spots)]
     result = Dressing(signs=signs)
@@ -936,13 +936,13 @@ def test_fit_fails_a_wall_prop_over_a_shop_sign(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("z", "covered"), [(3.75, False), (2.25, False), (3.74, True), (2.26, True)])
 def test_a_sign_that_only_touches_a_wall_prop_is_not_covered(z: float, covered: bool) -> None:
-    from onward_generator.overgrow.urban import shop_signs
+    from onward_generator.detail.shops import sign_footprints
 
     # Exact in binary: the 1 m awning hangs from 2.5 to 3.5 m, the 0.5 m fascia from z - 0.25 to z + 0.25.
     awning = Prop(AssetSpec("awning_0", "facade", "awning", ("facade",), "facade", "test"), _mesh(1.9, 0.96, 1.0),
                   np.zeros((24, 2), dtype=np.float32), b"")
     sign = {**_fascia(0.0, 8.0, z), "height_m": 0.5}
-    assert _covers_sign(awning, _wall_spot(), Dressing(signs=shop_signs(_shopfront(sign)))) is covered
+    assert _covers_sign(awning, _wall_spot(), Dressing(signs=sign_footprints(_shopfront(sign)))) is covered
 
 
 @pytest.mark.parametrize(("z", "problem"), [(3.75, False), (2.25, False), (3.74, True), (2.26, True)])

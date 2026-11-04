@@ -23,6 +23,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
+from shapely.geometry import LineString, Polygon
 
 from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCategory
 from onward_generator.detail.facades import Hole, Segment, stable_unit
@@ -31,6 +32,8 @@ CATASTRO_USE_TAG = "catastro:current_use"
 """The tag a shop of a Catastro-use building carries in place of an OSM POI's tags (ADR-022). Not an OSM tag."""
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
 VINYL_BACKS = frozenset({"glass_dark", "glass_view", "shop_glass"})
+# A shop sign's footprint reaches this far beyond its own depth, front and back.
+SIGN_CLEAR_M = 0.05
 # One shop: its POI id (``None`` for the building itself), its tags, and its point in local metres.
 Shop = tuple[str | None, Mapping[str, Any], tuple[float, float] | None]
 
@@ -158,3 +161,28 @@ def _nearest(point: Sequence[float], holes: Sequence[Hole], centre: Mapping[Hole
     """The hole whose centre is closest to ``point``; the first one on a tie."""
     distances = [math.dist(point, centre[h]) for h in holes]
     return holes[distances.index(min(distances))]
+
+
+def sign_footprints(manifest: Mapping[str, Any]) -> list[tuple[Polygon, float, float]]:
+    """(plan footprint, bottom z, top z) of every shop sign ``detail`` hung: a fascia along its wall, a blade out from it.
+
+    Neither a wall-mounted overgrow prop nor a street plate may cover one: an awning, 0.9 m tall from 2.5 m, hung
+    over a fascia, and the plate of Calle Platería hid most of a shop's name.
+    """
+    found = []
+    for building in manifest.get("objects") or []:
+        if not isinstance(building, dict) or building.get("type") != "building":
+            continue
+        for shop in (building.get("facade") or {}).get("shops") or []:
+            sign = shop.get("sign") if isinstance(shop, dict) else None
+            if not sign:
+                continue
+            centre = np.asarray(sign["centre_m"])
+            normal = np.asarray(sign["normal"])
+            width, depth = float(sign["width_m"]) / 2, float(sign["depth_m"]) / 2 + SIGN_CLEAR_M
+            # A fascia runs along the wall; a blade sign stands out of it, along the normal.
+            length_axis = np.array([-normal[1], normal[0]]) if sign["kind"] == "fascia" else normal  # pragma: no mutate: either way along the wall gives the same symmetric footprint
+            run = LineString([centre[:2] - length_axis * width, centre[:2] + length_axis * width])
+            half = float(sign["height_m"]) / 2
+            found.append((run.buffer(depth, cap_style="flat"), float(centre[2]) - half, float(centre[2]) + half))
+    return found

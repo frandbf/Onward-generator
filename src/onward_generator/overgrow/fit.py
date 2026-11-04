@@ -19,13 +19,14 @@ from shapely import Point, STRtree
 from shapely.geometry import LineString, Polygon, shape
 from shapely.geometry.polygon import orient
 
+from onward_generator.detail.shops import sign_footprints
 from onward_generator.generation.gltf import nodes_from_glb
 from onward_generator.generation.mesh import Mesh, box, merge, transform
 from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
 from onward_generator.overgrow.ground import RoadFloor, road_floor
-from onward_generator.overgrow.urban import FLAT_PROP_M, detail_elements, shop_signs
+from onward_generator.overgrow.urban import FLAT_PROP_M, detail_elements
 
 WRECK_LENGTH_M = (2.8, 6.5)
 WRECK_WIDTH_M = (1.4, 2.4)
@@ -183,7 +184,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     floor = road_floor(nodes)
     manifest = _manifest(directory / "scene_detail.json")
     urban = [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
-    signs = shop_signs(manifest)
+    signs = sign_footprints(manifest)
     problems: list[str] = []
     checked = 0
     solid: list[tuple[str, Polygon, float, float]] = []

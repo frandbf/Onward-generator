@@ -23,6 +23,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import yaw_matrix
+from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
@@ -58,7 +59,7 @@ from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
-from onward_generator.overgrow.urban import detail_elements, shop_signs
+from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
 from onward_generator.tiers import core_of
 
@@ -289,7 +290,7 @@ def overgrow(
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
         keep_out=detail_elements(manifest),
-        signs=shop_signs(manifest),
+        signs=sign_footprints(manifest),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)
