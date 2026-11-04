@@ -157,7 +157,7 @@ The adapter builds every material with `PP_Opaque_Simple_Lit` and its albedo, ex
 
 | glTF material | Unity material |
 | --- | --- |
-| `glass_view` (interior windows) | `PP_Sprite_Lit`, the framed window PNG on `_MainTex` |
+| `glass_view` (interior windows) | `PP_Sprite_Lit`, the framed window PNG on `_MainTex`, render queue `Transparent` (3000), set on the material. The sprite graph reports 2000 in batchmode; a pane left at the shader's queue was drawn among the opaque meshes, so on the headset the room behind some windows was drawn over the pane and the window read as an empty hole. The scene log prints `glass_view: render queue 3000 (sprite shader reports 2000)`. The same queue is set on `shop_glass` when it falls back to `PP_Sprite_Lit` |
 | `shop_glass` (shop display windows, `docs/07-detail.md`) | A copy of the first material named exactly `GlassVfx`, then `Glass`, under `Assets/OnwardCustomContent` (`AssetDatabase.FindAssets("<name> t:Material")`, file name compared again). `_Cull` is set to Off when the copy has it. The scene log says which: `[OnwardAdapter] shop_glass: SDK material <path> (shader <name>); _Cull set to Off`, or `...; no _Cull property: check from inside a shop that the glass shows`, or `shop_glass: no SDK material named GlassVfx or Glass under Assets/OnwardCustomContent; PP_Sprite_Lit with the generated tint`. The SDK asset is never edited. Whether the v1.15 package ships such a material was not checked on this host |
 | `shop_decal_atlas_<page>` (shop names on shop glass) | `PP_Sprite_Lit`, the RGBA page on `_MainTex`, render queue one above the shop glass so the letters draw over it from the street: `Transparent + 1` (3001), or one above the SDK glass material when that is higher; the scene log prints the queue |
 

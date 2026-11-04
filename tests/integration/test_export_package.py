@@ -362,6 +362,14 @@ def test_unity_adapter_knows_the_shop_glass_and_decal_material_names() -> None:
     assert 'SdkGlassNames = { "GlassVfx", "Glass" }' in source
 
 
+def test_unity_adapter_puts_the_sprite_glass_in_the_transparent_queue() -> None:
+    """The sprite graph reports queue 2000 in batchmode. A pane left there was drawn among the opaque meshes, the room
+    behind it over it, and on the headset a window read as a hole. The decals go one step later still."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert "view.renderQueue = (int)RenderQueue.Transparent;" in source
+    assert "view.renderQueue = Math.Max((int)RenderQueue.Transparent, sdkGlass != null ? sdkGlass.renderQueue : 0) + 1;" in source
+
+
 def test_unity_adapter_matches_the_package_contract() -> None:
     source = ADAPTER_CS.read_text(encoding="utf-8")
     cfg = load(EXPORT_CONFIG_DEFAULT)

@@ -2959,6 +2959,13 @@ namespace OnwardGenerator
                     view.renderQueue = Math.Max((int)RenderQueue.Transparent, sdkGlass != null ? sdkGlass.renderQueue : 0) + 1;
                     Debug.Log($"{LogPrefix} {safe}: render queue {view.renderQueue} (sprite shader reports {sprite.renderQueue}).");
                 }
+                else
+                {
+                    // The same batchmode reading left the panes at the shader's 2000, among the opaque meshes: on the
+                    // headset the room behind a window was drawn after its pane and over it, and the window read as a hole.
+                    view.renderQueue = (int)RenderQueue.Transparent;
+                    Debug.Log($"{LogPrefix} {safe}: render queue {view.renderQueue} (sprite shader reports {sprite.renderQueue}).");
+                }
                 AssetDatabase.CreateAsset(view, path);
                 return view;
             }
