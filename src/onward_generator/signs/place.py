@@ -435,7 +435,9 @@ def _sign_for(
         if (wall.feature_id, index) in used_edges:
             continue
         # A party wall, or a wall another footprint covers, has a building in front of it, not a street.
-        if buildings is not None and buildings.query(Point(*(closest + wall.outward * FRONT_CLEAR_M)), predicate="intersects").size:
+        # The whole strip counts: a Catastro part can sit a few centimetres inside the part that encloses it.
+        front = LineString([closest + wall.outward * 0.01, closest + wall.outward * FRONT_CLEAR_M])
+        if buildings is not None and buildings.query(front, predicate="intersects").size:
             continue
         rank = distance
         if best is None or rank < best[0]:

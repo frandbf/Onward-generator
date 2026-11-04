@@ -376,3 +376,15 @@ def test_a_street_without_a_crossing_gets_its_plate_at_its_midpoint() -> None:
     features.append(_feature("building", {"type": "Polygon", "coordinates": [[[-10, 4], [10, 4], [10, 5.6], [-10, 5.6], [-10, 4]]]},
                              {"building": "yes", "height": "3"}, "osm-way-kiosk"))
     assert _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features))) == []
+
+
+
+def test_a_part_just_inside_another_gets_no_plate() -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    # The enclosing part's south wall is 0.3 m in front of the corner's: the plate would hang inside it.
+    enclosing = _feature("building", {"type": "Polygon", "coordinates": [[[6, 5.7], [26, 5.7], [26, 26], [6, 26], [6, 5.7]]]},
+                         {"building": "yes", "height": "3"}, "osm-way-enclosing")
+    features = _corner(ring, enclosing)
+    signs = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features)))}
+    assert "Calle Mayor" not in signs
+    assert signs["Calle Nueva"].feature_id == "osm-way-corner"
