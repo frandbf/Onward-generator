@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely import LineString, STRtree
+from shapely import LineString, STRtree, box
 
 from onward_generator.cli import main
 from onward_generator.detail.config import load_detail_config
@@ -388,3 +388,170 @@ def test_a_part_just_inside_another_gets_no_plate() -> None:
     signs = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features)))}
     assert "Calle Mayor" not in signs
     assert signs["Calle Nueva"].feature_id == "osm-way-corner"
+
+
+def _pane(x0: float, x1: float, y: float, z0: float, z1: float, material: str = "glass_view") -> Node:
+    """A glass quad in the wall plane y, from x0 to x1 and z0 to z1."""
+    mesh = Mesh(np.array([[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]], dtype=np.float64), np.array([[0, 1, 2], [0, 2, 3]]))
+    return Node(f"building/pane/{x0}", (Primitive(mesh, material),))
+
+
+def test_glass_is_a_plan_box_and_a_height_band() -> None:
+    from onward_generator.signs.place import _glass
+
+    assert _glass([Node("ground", (Primitive(Mesh(np.zeros((3, 3)), np.array([[0, 1, 2]])), "ground"),))]) is None
+    glass = _glass([_pane(0.0, 2.0, 6.0, 2.0, 3.0), _pane(5.0, 6.0, 6.0, 0.0, 1.0, "shop_glass")])
+    assert glass is not None
+    near = box(0.5, 5.9, 1.5, 6.1)
+    assert glass.meets(near, 2.4, 2.7) is True
+    assert glass.meets(near, 3.0, 3.5) is False  # only touches its top
+    assert glass.meets(near, 1.5, 2.0) is False
+    assert glass.meets(box(5.2, 5.9, 5.8, 6.1), 0.5, 0.6) is True
+
+
+def _choose_on_corner(*panes: Node) -> dict:
+    from onward_generator.signs.place import _glass
+
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    features = _corner(ring)
+    return {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, None, _glass(list(panes)))}
+
+
+def test_a_plate_slides_along_its_wall_off_the_glass() -> None:
+    # Without glass Calle Mayor's plate hangs at the corner, its centre half a plate in: x 6.7 on the south wall (y = 6).
+    assert float(_choose_on_corner()["Calle Mayor"].position[0]) == pytest.approx(6.7)
+    # A window from x 5 to 8 at plate height: the centre must reach 8 + 0.7 + 0.05; in 0.5 m steps that is 9.2.
+    moved = _choose_on_corner(_pane(5.0, 8.0, 6.0, 2.0, 3.0))["Calle Mayor"]
+    assert float(moved.position[0]) == pytest.approx(9.2)
+    assert moved.feature_id == "osm-way-corner"
+    assert float(moved.position[1]) == pytest.approx(6.0 - 0.075)
+
+
+def test_glass_below_or_above_the_plate_does_not_move_it() -> None:
+    signs = _choose_on_corner(_pane(5.0, 8.0, 6.0, 0.0, 2.2), _pane(5.0, 8.0, 6.0, 3.0, 4.0, "shop_glass"))
+    assert float(signs["Calle Mayor"].position[0]) == pytest.approx(6.7)
+
+
+def test_a_wall_glazed_all_along_gives_its_turn_to_the_next_wall() -> None:
+    # Glass the whole south wall: Calle Mayor has no other wall on this corner, Calle Nueva keeps the west one.
+    signs = _choose_on_corner(_pane(5.0, 27.0, 6.0, 2.0, 3.0))
+    assert "Calle Mayor" not in signs
+    assert signs["Calle Nueva"].feature_id == "osm-way-corner"
+
+
+def test_a_sliding_plate_stays_on_its_wall() -> None:
+    from onward_generator.signs.place import PLATE_SLIDE_MAX_M, PLATE_SLIDE_STEP_M, _clear_of_glass, _glass, _Wall
+
+    wall = _Wall("w", np.array([0.0, 6.0]), np.array([4.0, 6.0]), np.array([0.0, -1.0]), 12.0)
+    along = np.array([1.0, 0.0])
+    # The 1.4 m plate may slide to x 3.3 at most, its end on the wall's; it needs its centre 0.75 m past the glass.
+    start = np.array([0.5, 6.0])
+    assert _clear_of_glass(wall, along, start, _glass([_pane(0.0, 2.0, 6.0, 2.0, 3.0)])) == pytest.approx([3.0, 6.0])
+    assert _clear_of_glass(wall, along, start, _glass([_pane(0.0, 2.6, 6.0, 2.0, 3.0)])) is None  # 3.35 is off the wall
+    # Sliding back towards a: with glass from x 1.8 on, the plate clears it at x 1.0, two steps back from 2.0.
+    back = _clear_of_glass(wall, along, np.array([2.0, 6.0]), _glass([_pane(1.8, 4.0, 6.0, 2.0, 3.0)]))
+    assert back == pytest.approx([1.0, 6.0])
+    assert _clear_of_glass(wall, along, start, None) == pytest.approx([0.5, 6.0])
+    # With no glass in reach the closest point stays, even on a wall shorter than the plate.
+    short = _Wall("s", np.array([0.0, 6.0]), np.array([1.0, 6.0]), np.array([0.0, -1.0]), 12.0)
+    far_glass = _glass([_pane(50.0, 51.0, 6.0, 2.0, 3.0)])
+    assert np.allclose(_clear_of_glass(short, along, np.array([0.5, 6.0]), far_glass), [0.5, 6.0])
+    assert (PLATE_SLIDE_STEP_M, PLATE_SLIDE_MAX_M) == (0.5, 4.0)
+
+
+
+def test_place_signs_keeps_the_plates_off_the_glass_of_its_base(tmp_path: Path) -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    scene = tmp_path / "geo_scene.json"
+    scene.write_text(json.dumps({
+        "schema": "onward_generator.geo_scene",
+        "origin": {"longitude": MURCIA_CENTER[0], "latitude": MURCIA_CENTER[1]},
+        "features": _corner(ring),
+    }), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    ground = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [0.0, 4.0, 0.0]], dtype=np.float64), np.array([[0, 1, 2]]))
+    (base / "scene_visual.glb").write_bytes(build_glb(
+        [Node("ground", (Primitive(ground, "ground"),)), _pane(5.0, 8.0, 6.0, 2.0, 3.0)],
+        {"ground": Material((0.4, 0.4, 0.4, 1.0), 1.0), "glass_view": Material((0.2, 0.3, 0.4, 1.0), 0.1)},
+    ))
+    report = place_signs(base, scene, tmp_path / "scene_signs")
+    mayor = next(row for row in report["signs"] if row["name"] == "Calle Mayor")
+    assert mayor["position_m"][0] == pytest.approx(9.2)
+
+
+
+def _slide(start_x: float, *panes: Node, length: float = 4.0) -> list[float] | None:
+    from onward_generator.signs.place import _clear_of_glass, _glass, _Wall
+
+    wall = _Wall("w", np.array([0.0, 6.0]), np.array([length, 6.0]), np.array([0.0, -1.0]), 12.0)
+    spot = _clear_of_glass(wall, np.array([1.0, 0.0]), np.array([start_x, 6.0]), _glass(list(panes)) if panes else None)
+    return None if spot is None else [round(float(v), 6) for v in spot]
+
+
+@pytest.mark.parametrize(
+    ("start", "panes", "length", "expected"),
+    [
+        (2.0, (), 4.0, [2.0, 6.0]),  # no glass: the spot itself
+        (2.0, (_pane(50.0, 51.0, 6.0, 2.0, 3.0),), 4.0, [2.0, 6.0]),  # glass out of reach: the spot itself
+        (2.0, (_pane(2.3, 4.0, 6.0, 2.0, 3.0),), 4.0, [1.5, 6.0]),  # one step back
+        (3.0, (_pane(2.9, 3.1, 6.0, 2.0, 3.0),), 6.0, [4.0, 6.0]),  # both ways clear at 1 m: forward first
+        (1.0, (_pane(0.0, 4.05, 6.0, 2.0, 3.0),), 10.0, [5.0, 6.0]),  # the full 4 m slide
+        (1.0, (_pane(0.0, 4.55, 6.0, 2.0, 3.0),), 10.0, None),  # 4.5 m would be needed
+        (1.2, (_pane(1.5, 4.0, 6.0, 2.0, 3.0),), 4.0, [0.7, 6.0]),  # back to the wall's start exactly
+        (1.0, (_pane(1.3, 4.0, 6.0, 2.0, 3.0),), 4.0, None),  # 0.5 would leave the wall
+        (2.8, (_pane(0.0, 2.5, 6.0, 2.0, 3.0),), 4.0, [3.3, 6.0]),  # forward to the wall's end exactly
+        (2.0, (_pane(1.0, 3.0, 6.0, 2.0, 2.35),), 6.0, [4.0, 6.0]),  # glass 2 cm under the plate still counts
+        (2.0, (_pane(1.0, 3.0, 6.0, 2.75, 3.5),), 6.0, [4.0, 6.0]),  # and 2 cm over it
+        (2.0, (_pane(1.0, 3.0, 6.0, 2.64, 3.5),), 6.0, [4.0, 6.0]),  # overlapping its top
+        (2.0, (_pane(2.72, 4.0, 6.0, 2.0, 3.0),), 4.0, [1.5, 6.0]),  # 2 cm past its forward end still counts
+        (2.0, (_pane(1.0, 1.28, 6.0, 2.0, 3.0),), 4.0, [2.5, 6.0]),  # and 2 cm past its back end
+        (2.0, (_pane(1.0, 3.0, 6.1, 2.0, 3.0),), 6.0, [4.0, 6.0]),  # a window set 0.1 m into the wall
+        (2.0, (_pane(1.0, 3.0, 6.16, 2.0, 3.0),), 6.0, [2.0, 6.0]),  # glass past the plate's 0.14 m reach
+
+    ],
+)
+def test_a_plate_slides_to_the_nearest_clear_stretch_of_its_wall(
+    start: float, panes: tuple[Node, ...], length: float, expected: list[float] | None,
+) -> None:
+    assert _slide(start, *panes, length=length) == expected
+
+
+
+def test_glass_on_a_wall_off_the_x_axis_is_seen_where_it_is() -> None:
+    from onward_generator.signs.place import _glass
+
+    # A pane in the wall x = 20, from y 2 to 4 and z 2 to 3: its plan box is x 20..20, y 2..4.
+    mesh = Mesh(np.array([[20.0, 2.0, 2.0], [20.0, 4.0, 2.0], [20.0, 4.0, 3.0], [20.0, 2.0, 3.0]], dtype=np.float64), np.array([[0, 1, 2], [0, 2, 3]]))
+    glass = _glass([Node("building/pane", (Primitive(mesh, "glass_view"),))])
+    assert glass is not None
+    assert glass.meets(box(19.9, 3.0, 20.1, 3.5), 2.4, 2.6) is True
+    assert glass.meets(box(19.9, 2.0 - 0.5, 20.1, 1.9), 2.4, 2.6) is False  # z 2..3 must not read as y
+    assert glass.meets(box(19.9, 4.1, 20.1, 4.5), 2.4, 2.6) is False
+
+
+
+def test_a_glazed_nearest_wall_hands_the_plate_to_the_one_across_the_street() -> None:
+    from onward_generator.signs.place import _glass
+
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    west = _feature("building", {"type": "Polygon", "coordinates": [[[-26, 7], [-6, 7], [-6, 26], [-26, 26], [-26, 7]]]},
+                    {"building": "yes", "height": "12"}, "osm-way-west")
+    features = _corner(ring, west)
+    glazed = _glass([_pane(5.0, 27.0, 6.0, 2.0, 3.0)])
+    signs = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, None, glazed)}
+    assert signs["Calle Mayor"].feature_id == "osm-way-west"
+
+
+def test_a_wall_holds_one_plate() -> None:
+    from onward_generator.signs.place import material_id
+
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    features = _corner(ring)
+    streets, walls = _streets(features), _walls(features)
+    tree = STRtree([LineString([wall.a, wall.b]) for wall in walls])
+    used: set[tuple[str, int]] = set()
+    first = _sign_for("Calle Mayor", np.array([0.0, 0.0]), streets, walls, tree, used)
+    assert first is not None and first.material == material_id("Calle Mayor")
+    assert len(used) == 1
+    assert _sign_for("Calle Mayor", np.array([0.0, 0.0]), streets, walls, tree, used) is None

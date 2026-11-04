@@ -52,6 +52,13 @@ MIN_EDGE_M = 1.6
 MIN_WALL_M = 3.4
 # A plate's wall must have open ground this far in front of it, not another building.
 FRONT_CLEAR_M = 0.5
+# Glass a plate may not hang over: the windows of rooms with an interior and the shopfronts.
+GLASS_MATERIALS = frozenset({"glass_view", "shop_glass"})
+# Kept between a plate and the glass, on every side.
+GLASS_CLEAR_M = 0.05
+# Over glass, a plate slides along its wall in these steps, at most this far, before the next wall is tried.
+PLATE_SLIDE_STEP_M = 0.5
+PLATE_SLIDE_MAX_M = 4.0
 MAX_SIGNS = 64
 EDGE_COLOR = (0.07, 0.14, 0.28, 1.0)
 # Every plate is drawn on a shared atlas page, one material per page: a draw per page and cell,
@@ -154,9 +161,9 @@ def place_signs(
     # The walls come from the scene ``detail`` built from (the Catastro split where it ran), so they are kept by position.
     core = core_of(manifest)
     walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
-    signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])))
     visual_bytes = (base / "scene_visual.glb").read_bytes()
     nodes, materials = nodes_from_glb(visual_bytes)
+    signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])), _glass(nodes))
     images = images_by_material(visual_bytes)
     before = _geographic(manifest)
 
@@ -322,7 +329,32 @@ def _walls(features: Sequence[Mapping[str, Any]]) -> list[_Wall]:
     return walls
 
 
-def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int, buildings: STRtree | None = None) -> list[Sign]:
+@dataclass(frozen=True, slots=True)
+class _Glass:
+    """The plan box and height band of every glass triangle of the visual scene."""
+
+    tree: STRtree
+    low: np.ndarray
+    high: np.ndarray
+
+    def meets(self, plan: BaseGeometry, bottom: float, top: float) -> bool:
+        hits = self.tree.query(plan, predicate="intersects")
+        return bool(((self.low[hits] < top) & (self.high[hits] > bottom)).any())
+
+
+def _glass(nodes: Sequence[Node]) -> _Glass | None:
+    triangles = [p.mesh.vertices[p.mesh.triangles] for n in nodes for p in n.world_primitives() if p.material in GLASS_MATERIALS]
+    if not triangles:
+        return None
+    stacked = np.concatenate(triangles)
+    low, high = stacked.min(axis=1), stacked.max(axis=1)
+    plans = [box(*map(float, a), *map(float, b)) for a, b in zip(low[:, :2], high[:, :2])]
+    return _Glass(STRtree(plans), low[:, 2], high[:, 2])
+
+
+def _choose(
+    streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int, buildings: STRtree | None = None, glass: _Glass | None = None,
+) -> list[Sign]:
     if not streets or not walls:
         return []
     junctions = _junctions(streets)
@@ -332,7 +364,7 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int, 
     seen_names: set[str] = set()
     for point, names in junctions:
         for name in names:
-            sign = _sign_for(name, point, streets, walls, tree, used_edges, buildings)
+            sign = _sign_for(name, point, streets, walls, tree, used_edges, buildings, glass)
             if sign is None or _too_close(sign, chosen):
                 continue
             chosen.append(sign)
@@ -341,7 +373,7 @@ def _choose(streets: Sequence[_Street], walls: Sequence[_Wall], max_signs: int, 
         if street.name in seen_names:
             continue
         mid = street.line.interpolate(0.5, normalized=True)
-        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges, buildings)
+        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges, buildings, glass)
         if sign is None or _too_close(sign, chosen):
             continue
         chosen.append(sign)
@@ -401,6 +433,7 @@ def _sign_for(
     tree: STRtree,
     used_edges: set[tuple[str, int]],
     buildings: STRtree | None = None,
+    glass: _Glass | None = None,
 ) -> Sign | None:
     """The nearest wall within ``MAX_JUNCTION_M`` that faces ``point`` along the street.
 
@@ -409,7 +442,7 @@ def _sign_for(
     can be that close, and they are tried in the order of ``walls``.
     """
     tangent = _tangent(name, point, streets)
-    best: tuple[float, int, _Wall, np.ndarray] | None = None
+    candidates: list[tuple[float, int, _Wall, np.ndarray]] = []
     x, y = float(point[0]), float(point[1])
     near = tree.query(box(x - MAX_JUNCTION_M, y - MAX_JUNCTION_M, x + MAX_JUNCTION_M, y + MAX_JUNCTION_M))
     for index in sorted(int(k) for k in near):
@@ -439,18 +472,47 @@ def _sign_for(
         front = LineString([closest + wall.outward * 0.01, closest + wall.outward * FRONT_CLEAR_M])
         if buildings is not None and buildings.query(front, predicate="intersects").size:
             continue
-        rank = distance
-        if best is None or rank < best[0]:
-            best = (rank, index, wall, closest)
-    if best is None:
-        return None
-    _, index, wall, closest = best
-    used_edges.add((wall.feature_id, index))
-    centre = np.array([closest[0], closest[1], MOUNT_Z_M], dtype=np.float64)
-    centre[:2] = closest + wall.outward * (WALL_GAP_M + PLATE_THICK_M * 0.5)
-    along = wall.b - wall.a
-    along = along / np.linalg.norm(along)
-    return Sign(name, material_id(name), centre, along, wall.outward, wall.feature_id)
+        candidates.append((distance, index, wall, closest))
+    # Nearest wall first; over glass the plate slides along it, and only then does the next wall get a turn.
+    # Wall indexes are unique, so the order never has to compare two walls.
+    for _distance, index, wall, closest in sorted(candidates):
+        along = (wall.b - wall.a) / np.linalg.norm(wall.b - wall.a)
+        spot = _clear_of_glass(wall, along, closest, glass)
+        if spot is None:
+            continue
+        used_edges.add((wall.feature_id, index))
+        centre = np.array([*(spot + wall.outward * (WALL_GAP_M + PLATE_THICK_M * 0.5)), MOUNT_Z_M])
+        return Sign(name, material_id(name), centre, along, wall.outward, wall.feature_id)
+    return None
+
+
+def _clear_of_glass(wall: _Wall, along: np.ndarray, closest: np.ndarray, glass: _Glass | None) -> np.ndarray | None:
+    """The point of the wall nearest ``closest`` where a plate covers no glass, within ``PLATE_SLIDE_MAX_M``.
+
+    The plate stays on its wall when it slides. ``None`` when every point in reach is over glass.
+    """
+    if glass is None:
+        return closest
+    start = float((closest - wall.a) @ along)
+    length = float(np.linalg.norm(wall.b - wall.a))
+    steps = int(PLATE_SLIDE_MAX_M / PLATE_SLIDE_STEP_M)
+    # The spot itself first (0 and -0), then a step forward, a step back, two forward, and so on.
+    for offset in [sign * PLATE_SLIDE_STEP_M * n for n in range(steps + 1) for sign in (1.0, -1.0)]:
+        position = start + offset
+        if offset and not PLATE_WIDTH_M / 2 <= position <= length - PLATE_WIDTH_M / 2:
+            continue
+        spot = wall.a + along * position
+        if not glass.meets(_plate_plan(spot, along), MOUNT_Z_M - PLATE_HEIGHT_M / 2 - GLASS_CLEAR_M,
+                           MOUNT_Z_M + PLATE_HEIGHT_M / 2 + GLASS_CLEAR_M):
+            return spot
+    return None
+
+
+def _plate_plan(spot: np.ndarray, along: np.ndarray) -> BaseGeometry:
+    """The plate's plan on the wall at ``spot``, ``GLASS_CLEAR_M`` larger on every side."""
+    run = LineString([spot - along * (PLATE_WIDTH_M / 2 + GLASS_CLEAR_M), spot + along * (PLATE_WIDTH_M / 2 + GLASS_CLEAR_M)])
+    # Both sides of the wall line: the glass sits in the wall, the plate just in front of it.
+    return run.buffer(WALL_GAP_M + PLATE_THICK_M + GLASS_CLEAR_M, cap_style="flat")
 
 
 def _plate_meshes(sign: Sign) -> tuple[Mesh, Mesh, Mesh]:
