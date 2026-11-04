@@ -382,6 +382,9 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "tree_" in source
     # Overgrow props (material prop_<id>) are lit by probes, not lightmaps: small ones baked black.
     assert 'StartsWith("m_prop_")' in source
+    # They stay in the bake to cast its shadows; only the horizon backdrop leaves GI.
+    assert "renderer.receiveGI = ReceiveGI.LightProbes;" in source
+    assert "if (mats.Any(m => !CastsBakedShadow(m))) flags &= ~StaticEditorFlags.ContributeGI;" in source
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source
     # A room detail left without a light past interiors.lights_max still gives its probes.

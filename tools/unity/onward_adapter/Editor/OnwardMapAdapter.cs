@@ -582,6 +582,7 @@ namespace OnwardGenerator
                     ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
                 renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                if (!ContributesGi(renderer.sharedMaterial)) renderer.receiveGI = ReceiveGI.LightProbes;
                 byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
             }
 
@@ -685,6 +686,7 @@ namespace OnwardGenerator
                         GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
                         renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m)) ? 0f
                             : visualMaterials[node.mesh].Select(k => ScaleInLightmap(opt, visual.Doc.materials, k)).DefaultIfEmpty(1f).Max();
+                        if (renderer.sharedMaterials.Any(m => !ContributesGi(m))) renderer.receiveGI = ReceiveGI.LightProbes;
                         visualObjects++;
                     }
                 }
@@ -2888,8 +2890,10 @@ namespace OnwardGenerator
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).
         // Overgrow props (material prop_<id>, overgrow/realize.py and dressing.py) are small
         // and often flush against a wall; air-conditioner units came out solid black on the
-        // headset. They are lit by light probes or the ambient probe instead. The horizon
-        // backdrop (ADR-014) is outside the play area and takes no lightmap either.
+        // headset. They take no lightmap texels and are lit by light probes or the ambient probe
+        // (receiveGI = LightProbes), but they stay in the bake so they still cast its shadows:
+        // with every light baked, a renderer left out of GI cast no shadow at all. The horizon
+        // backdrop (ADR-014) is outside the play area and is left out of the bake entirely.
         private static bool ContributesGi(Material material)
         {
             string n = material != null ? material.name.ToLowerInvariant() : "";
@@ -2897,9 +2901,12 @@ namespace OnwardGenerator
                 || n.StartsWith("m_prop_") || n.Contains("horizon_backdrop"));
         }
 
+        private static bool CastsBakedShadow(Material material) =>
+            !(material != null && material.name.ToLowerInvariant().Contains("horizon_backdrop"));
+
         private static StaticEditorFlags LightmapFlags(StaticEditorFlags flags, IEnumerable<Material> mats)
         {
-            if (mats.Any(m => !ContributesGi(m))) flags &= ~StaticEditorFlags.ContributeGI;
+            if (mats.Any(m => !CastsBakedShadow(m))) flags &= ~StaticEditorFlags.ContributeGI;
             return flags;
         }
 
