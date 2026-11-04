@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -15,9 +16,9 @@ from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
 from onward_generator.generation.mesh import Mesh
 from onward_generator.generation.mesh import box as mesh_box
-from onward_generator.overgrow.ambient import cross_yaw
+from onward_generator.overgrow.ambient import cross_yaw, is_solid
 from onward_generator.overgrow.catalog import AssetSpec
-from onward_generator.overgrow.dressing import Dressing, Spot, _place_props, dress
+from onward_generator.overgrow.dressing import Dressing, Spot, _on_solid, _place_props, _repeats, dress
 from onward_generator.overgrow.fit import (
     apply_fit_scale,
     check_scene,
@@ -511,3 +512,201 @@ def test_the_fit_command_names_the_glb_it_checked(tmp_path: Path) -> None:
         "schema": "onward_generator.overgrow_fit", "checked": 1, "rejected": [],
         "visual_sha256": file_sha256(base / "scene_visual.glb"),
     }
+
+
+@pytest.mark.parametrize(
+    ("role", "category", "size", "solid"),
+    [
+        ("trash", "waste", (1.92, 1.45, 1.74), True),  # a dumpster
+        ("debris", "waste", (1.3, 1.3, 1.3), True),  # a concrete block
+        ("bench", "furniture", (1.93, 1.03, 1.31), True),
+        ("debris", "waste", (1.3, 0.4, 0.5), True),  # exactly 0.4 m deep and 0.5 m tall
+        ("debris", "waste", (1.3, 0.39, 0.5), False),
+        ("debris", "waste", (1.3, 0.4, 0.49), False),  # a pallet is too low
+        ("debris", "waste", (0.4, 1.3, 0.5), True),  # the short side may be the length
+        ("lamp", "furniture", (1.87, 0.5, 3.33), False),  # a box would be a wall under the arm
+        ("awning", "facade", (3.2, 0.96, 0.9), False),
+        ("plant", "vegetation", (2.5, 2.4, 1.0), False),
+        ("bench", "furniture", None, False),  # without a size, only the role and category count
+        ("wreck", "vehicles", None, True),
+        ("debris", "vehicles", (0.59, 0.16, 0.59), True),  # a tyre: solid by its category alone
+        ("path", "structures", (2.8, 2.52, 0.07), True),
+        ("hedge", "vegetation", (2.0, 1.0, 1.5), False),  # cover-sized, but vegetation
+    ],
+)
+def test_a_prop_that_looks_like_cover_is_solid(role: str, category: str, size: tuple[float, float, float] | None, solid: bool) -> None:
+    assert is_solid(role, category, size) is solid
+
+
+def test_a_solid_prop_may_not_stand_inside_another() -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    block = _barrel()  # 0.6 x 0.6 x 0.9, a solid barrel
+    result = Dressing()
+    assert _on_solid(block, spot, False, result) is False
+    result.solid_prints.append(box(0.1, -1.0, 2.0, 1.0))  # shares 0.2 x 0.6 = 0.12 m2
+    assert _on_solid(block, spot, False, result) is False
+    result.solid_prints.append(box(-0.3, -0.3, 0.1, 0.3))  # shares 0.4 x 0.6 = 0.24 m2
+    assert _on_solid(block, spot, False, result) is False
+    result.solid_prints.append(box(-0.3, -0.3, 0.3, 0.3))  # the whole 0.36 m2
+    assert _on_solid(block, spot, False, result) is True
+    can = Prop(AssetSpec("can_0", "waste", "can", ("sidewalk",), "ground", "test"), _mesh(0.12, 0.12, 0.15),
+               np.zeros((24, 2), dtype=np.float32), b"")
+    assert _on_solid(can, spot, False, result) is False
+
+
+def test_a_solid_prop_is_measured_turned() -> None:
+    # A 3 x 0.4 m fence turned a quarter lies along y and misses a box east of the spot.
+    fence = Prop(AssetSpec("fence_0", "structures", "fence", ("sidewalk",), "ground", "test"), _mesh(3.0, 0.4, 1.0),
+                 np.zeros((24, 2), dtype=np.float32), b"")
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    result = Dressing(solid_prints=[box(0.5, -0.5, 1.5, 0.5)])
+    assert _on_solid(fence, spot, False, result) is True
+    assert _on_solid(fence, spot, False, result, math.pi / 2) is False
+
+
+def test_a_bench_gets_a_collision_box() -> None:
+    bench = Prop(AssetSpec("bench_0", "furniture", "bench", ("sidewalk",), "ground", "test"), _mesh(1.93, 1.03, 1.31),
+                 np.zeros((24, 2), dtype=np.float32), b"")
+    result = Dressing()
+    _place_props([bench], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == ["bench_0"]
+    assert result.records[0]["solid"] is True
+    assert [node.name for node in result.colliders] == ["overgrow/collider/prop/bench_0/0"]
+    assert len(result.solid_prints) == 1
+
+
+
+def _solid_prop(asset_id: str, role: str, category: str, size: tuple[float, float, float]) -> Prop:
+    return Prop(AssetSpec(asset_id, category, role, ("sidewalk",), "ground", "test"), _mesh(*size), np.zeros((24, 2), dtype=np.float32), b"")
+
+
+@pytest.mark.parametrize(
+    "prop",
+    [
+        _solid_prop("barrier_0", "barrier", "waste", (1.0, 1.0, 0.3)),  # solid by its role only: too low for cover
+        _solid_prop("path_0", "path", "structures", (1.0, 1.0, 0.07)),  # by its category only
+        _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0)),  # by its size only
+    ],
+)
+def test_every_kind_of_solid_prop_keeps_off_a_solid_footprint(prop: Prop) -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    assert _on_solid(prop, spot, False, Dressing(solid_prints=[box(-0.5, -0.5, 0.5, 0.5)])) is True
+
+
+def test_a_shared_area_of_exactly_0_25_m2_is_allowed() -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    barrel = _solid_prop("barrel_0", "barrel", "waste", (0.5, 0.5, 0.9))  # 0.25 m2
+    assert _on_solid(barrel, spot, False, Dressing(solid_prints=[box(-0.25, -0.25, 0.25, 0.25)])) is False
+    assert _on_solid(barrel, spot, False, Dressing(solid_prints=[box(-0.25, -0.25, 0.5, 0.5)])) is False
+    big = _solid_prop("barrel_1", "barrel", "waste", (0.6, 0.6, 0.9))
+    assert _on_solid(big, spot, False, Dressing(solid_prints=[box(-0.3, -0.3, 0.3, 0.3)])) is True
+
+
+def test_a_street_blocking_wreck_is_footprinted_where_it_crosses_the_lane() -> None:
+    car = _solid_prop("car_0", "wreck", "vehicles", (4.2, 1.8, 1.5))
+    spot = Spot("carriageway", 0.0, -1.15, 0.0, "lane:0", "lane-0", 10.0, lane_x=0.0, lane_y=0.0, normal=(0.0, -1.0))
+    # Blocking the street, the car stands 0.9 m off the axis; otherwise beside the lane, about 5.6 m off.
+    on_axis = Dressing(solid_prints=[box(-2.0, -1.4, 2.0, -0.4)])
+    assert _on_solid(car, spot, True, on_axis) is True
+    assert _on_solid(car, spot, False, on_axis) is False
+
+
+def test_a_solid_prop_over_a_solid_footprint_is_rejected_and_reported() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    result = Dressing(solid_prints=[box(0.5, 1.5, 1.5, 2.5)])
+    _place_props([bench], [Spot("sidewalk", 1.0, 2.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == []
+    assert result.rejects == [{"asset_id": "bench_0", "reason": "overlaps_prop", "kind": "furniture", "position_m": [1.0, 2.0, 0.0]}]
+
+
+def test_a_turned_street_barrier_is_footprinted_turned_and_across_the_lane() -> None:
+    barrier = Prop(AssetSpec("barrier_0", "barriers", "barrier", ("carriageway",), "ground", "test"), _mesh(3.0, 0.4, 1.0),
+                   np.zeros((24, 2), dtype=np.float32), b"")
+    spot = Spot("carriageway", 0.0, -1.15, 0.0, "lane:0", "lane-0", 10.0, lane_x=0.0, lane_y=0.0, normal=(0.0, -1.0))
+    # The third barrier on a blocked street turns a quarter and stands 0.9 m off the axis: x -0.2..0.2, y -2.4..0.6.
+    # Unturned it would cross the first box; beside the lane, as on an open street, it would cross the second.
+    result = Dressing(solid_prints=[box(0.5, -1.4, 1.5, -0.4), box(-0.5, -6.0, 0.5, -4.0)])
+    _place_props([barrier], [spot], STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, block_streets=True, placed_roles=Counter({"barrier": 2}), used=[], seen=set())
+    assert result.placed_ids == ["barrier_0"]
+    assert result.records[0]["crosswise"] is True
+
+
+
+def test_a_prop_too_thin_for_cover_gets_no_collider() -> None:
+    board = _solid_prop("board_0", "debris", "waste", (1.0, 0.3, 1.0))  # 0.3 m deep: not cover
+    result = Dressing()
+    _place_props([board], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == ["board_0"]
+    assert result.records[0]["solid"] is False and result.colliders == [] and result.solid_prints == []
+
+
+@pytest.mark.parametrize(
+    ("role", "kind", "size"),
+    [("trash", "waste", (1.0, 1.0, 1.5)), ("barrier", "barriers", (1.0, 1.0, 0.3))],  # solid by size; by role alone
+)
+def test_fit_counts_every_kind_of_solid_prop_in_a_pile(tmp_path: Path, role: str, kind: str, size: tuple[float, float, float]) -> None:
+    nodes = [
+        Node(f"overgrow/prop/{role}_{n}/0", (Primitive(_mesh(*size), f"prop_{role}_{n}"),), {"role": role, "kind": kind},
+             yaw_matrix(0.0, -6.0, 0.0, 0.0))
+        for n in (0, 1)
+    ]
+    _checked, problems = _fit_scene(tmp_path, nodes)
+    assert problems == [f"overgrow/prop/{role}_0/0 overlaps overgrow/prop/{role}_1/0 1.00m2"]
+
+
+def _spots(*keys_and_x: tuple[str, float]) -> list[Spot]:
+    return [Spot("sidewalk", x, 0.0, 0.0, key, "grid", 10.0) for key, x in keys_and_x]
+
+
+def test_a_taken_spot_does_not_end_the_search() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    taken = box(-0.5, -0.5, 0.5, 0.5)
+    spots = _spots(*[(f"grid:{n}", 0.0) for n in range(6)], ("grid:far", 20.0))
+    result = Dressing(solid_prints=[taken])
+    _place_props([bench], spots, STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, used=[], seen=set())
+    assert [row["position_m"][:2] for row in result.records][:1] == [[20.0, 0.0]]
+
+
+def _repeat(prop: Prop, spots: list[Spot], result: Dressing, *, block_streets: bool = False, already: int = 0) -> None:
+    result.placed_ids.append(prop.spec.id)
+    _repeats([prop], spots, STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100), 48152, [],
+             60_000, result, [], Counter(), set(), block_streets, Counter({prop.spec.role: already}), None)
+
+
+def test_a_repeat_skips_a_taken_spot_and_goes_on() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    result = Dressing(solid_prints=[box(-0.5, -0.5, 0.5, 0.5)])
+    _repeat(bench, _spots(*[(f"grid:{n}", 0.0) for n in range(6)], ("grid:far", 20.0)), result)
+    assert [row["position_m"][:2] for row in result.records] == [[20.0, 0.0]]
+
+
+def test_a_repeated_street_barrier_is_footprinted_turned_and_across_the_lane() -> None:
+    barrier = Prop(AssetSpec("barrier_0", "barriers", "barrier", ("carriageway",), "ground", "test"), _mesh(3.0, 0.4, 1.0),
+                   np.zeros((24, 2), dtype=np.float32), b"")
+    spot = Spot("carriageway", 0.0, -1.15, 0.0, "lane:0", "lane-0", 10.0, lane_x=0.0, lane_y=0.0, normal=(0.0, -1.0))
+    result = Dressing(solid_prints=[box(0.5, -1.4, 1.5, -0.4), box(-0.5, -6.0, 0.5, -4.0)])
+    _repeat(barrier, [spot], result, block_streets=True, already=2)
+    assert len(result.records) == 1 and result.records[0]["crosswise"] is True
+
+
+
+@pytest.mark.parametrize(
+    "prop",
+    [
+        _solid_prop("barrier_0", "barrier", "waste", (1.0, 1.0, 0.3)),  # solid by its role only
+        _solid_prop("path_0", "path", "structures", (1.0, 1.0, 0.07)),  # by its category only
+        _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0)),  # by its size only
+    ],
+)
+def test_an_ai_plan_gives_every_kind_of_solid_prop_a_collider(prop: Prop) -> None:
+    from onward_generator.overgrow.realize import _emit as emit_planned
+
+    result = Dressing()
+    emit_planned(prop, yaw_matrix(0.0, -6.0, 0.0, 0.0), result, op="place", anchor_id="poi:0", crosswise=False, op_index=0)
+    assert result.records[0]["solid"] is True
+    assert len(result.colliders) == 1

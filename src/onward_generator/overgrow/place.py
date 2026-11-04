@@ -363,7 +363,7 @@ def overgrow(
     written["objects"] = objects
     written["fidelity"] = {
         **dict(manifest.get("fidelity") or {}),
-            "overgrow": "solid props append a collision box; bottles, plants and loose trash stay visual; OSM tree points stay observed",
+            "overgrow": "solid props, and any other prop the size of cover, append a collision box; bottles, plants, lamps and wall props stay visual; OSM tree points stay observed",
     }
     atomic_write_json(targets[2], written)
     detail_report: dict[str, Any] = {}

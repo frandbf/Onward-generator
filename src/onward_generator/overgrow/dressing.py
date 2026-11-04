@@ -32,7 +32,7 @@ from onward_generator.overgrow.constants import (
     VINE_HEIGHT_M,
     VINE_WIDTH_M,
 )
-from onward_generator.overgrow.fit import apply_fit_scale, measure, object_reason, size_reason
+from onward_generator.overgrow.fit import PROP_OVERLAP_M2, _footprint, apply_fit_scale, measure, object_reason, size_reason
 from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
@@ -73,6 +73,8 @@ class Dressing:
     images: dict[str, bytes] = field(default_factory=dict)
     placed_ids: list[str] = field(default_factory=list)
     colliders: list[Node] = field(default_factory=list)
+    # Footprints of the solid props placed so far: a new solid prop may not stand inside one.
+    solid_prints: list[Polygon] = field(default_factory=list)
 
 
 def keep(seed: int, factor: float, *parts: object) -> bool:
@@ -221,6 +223,9 @@ def _place_props(
             if any((final_x - px) ** 2 + (final_y - py) ** 2 < radius ** 2 for px, py, radius in used):
                 _reject(result, prop.spec.id, "too_close", prop.spec.category, spot.x, spot.y)
                 continue
+            if _on_solid(prop, spot, block_streets, result, turn):
+                _reject(result, prop.spec.id, "overlaps_prop", prop.spec.category, spot.x, spot.y)
+                continue
             placed_x, placed_y = _emit(prop, spot, result, seen, block_streets, turn, floor)
             counts[rule.id] += 1
             role_placed[prop.spec.role] += 1
@@ -255,6 +260,8 @@ def _repeats(props, spots, buildings, lane_tree, lanes, zone, profile, seed, spa
             )
             final_x, final_y = _final_xy(prop, spot, block_streets, turn, floor)
             if reason or any((final_x - px) ** 2 + (final_y - py) ** 2 < radius ** 2 for px, py, radius in used):
+                continue
+            if _on_solid(prop, spot, block_streets, result, turn):
                 continue
             placed_x, placed_y = _emit(prop, spot, result, seen, block_streets, turn, floor)
             counts[rule.id] += 1
@@ -401,9 +408,10 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
         "fit_scale": round(prop.fit_scale, 4),
         "size_m": [round(prop.length_m, 3), round(prop.half_y * 2, 3), round(prop.height_m, 3)],
         "crosswise": turn != 0.0,
-        "solid": is_solid(prop.spec.role, prop.spec.category),
+        "solid": is_solid(prop.spec.role, prop.spec.category, prop.size_m),
     })
-    if is_solid(prop.spec.role, prop.spec.category):
+    if is_solid(prop.spec.role, prop.spec.category, prop.size_m):
+        result.solid_prints.append(_footprint(prop.mesh, matrix))
         result.colliders.append(Node(
             f"overgrow/collider/prop/{prop.spec.id}/{len(result.colliders)}",
             (Primitive(collider_mesh(prop.mesh), "collider"),),
@@ -411,6 +419,17 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
             matrix,
         ))
     return x, y
+
+
+def _on_solid(prop: Prop, spot: Spot, block_streets: bool, result: Dressing, turn: float = 0.0) -> bool:
+    """Whether a solid prop would share more than ``PROP_OVERLAP_M2`` with a solid prop already placed.
+
+    The fixed spacing radii are measured between centres, so a long fence and a block 2.2 m apart could still cross.
+    """
+    if not is_solid(prop.spec.role, prop.spec.category, prop.size_m):
+        return False
+    footprint = _footprint(prop.mesh, _frame(prop, spot, block_streets, turn)[0])
+    return any(float(footprint.intersection(other).area) > PROP_OVERLAP_M2 for other in result.solid_prints)
 
 
 def collider_mesh(mesh: Mesh) -> Mesh:

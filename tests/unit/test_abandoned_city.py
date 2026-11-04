@@ -273,7 +273,12 @@ def test_each_category_can_place_without_touching_collision_or_footprints(tmp_pa
     for category in ("vehicles", "waste", "barriers", "furniture", "structures", "facade", "vegetation"):
         assert category in kinds
     assert {"synth_car", "synth_trash", "synth_barrier", "synth_hole", "synth_gate", "synth_cam"} <= placed
-    objects = json.loads((tmp_path / "out" / "scene_detail.json").read_text())["objects"]
+    written = json.loads((tmp_path / "out" / "scene_detail.json").read_text())
+    assert written["fidelity"]["overgrow"] == (
+        "solid props, and any other prop the size of cover, append a collision box; "
+        "bottles, plants, lamps and wall props stay visual; OSM tree points stay observed"
+    )
+    objects = written["objects"]
     growth = [row for row in objects if row.get("type") == "overgrowth"]
     props = [row["position_m"][:2] for row in growth if row.get("asset_id")]
     # Clear of every tree (1.5 m) and wreck (3 m); a tuft of grass may lie under a prop.

@@ -438,7 +438,7 @@ def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_i
     result.triangles += prop.triangles
     result.placed_ids.append(prop.spec.id)
     x, y, z = float(matrix[0, 3]), float(matrix[1, 3]), float(matrix[2, 3])
-    solid = is_solid(prop.spec.role, prop.spec.category)
+    solid = is_solid(prop.spec.role, prop.spec.category, prop.size_m)
     result.records.append({
         "kind": prop.spec.category,
         "role": prop.spec.role,

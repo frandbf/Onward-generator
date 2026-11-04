@@ -131,6 +131,11 @@ class Prop:
     def height_m(self) -> float:
         return _span(self.mesh, 2)
 
+    @property
+    def size_m(self) -> tuple[float, float, float]:
+        """Length, width and height, as ``is_solid`` measures cover."""
+        return (self.length_m, self.half_y * 2, self.height_m)
+
 
 def _span(mesh: Mesh, axis: int) -> float:
     if not mesh.vertex_count:

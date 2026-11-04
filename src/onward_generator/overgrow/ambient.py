@@ -24,8 +24,13 @@ _BLOCKING = (
 _STREET_ROLES = frozenset({"wreck", "barrel", "barrier", "container", "pole"})
 _SOLID_ROLES = _STREET_ROLES | frozenset({"gate", "fence", "cart", "tank", "table", "bed"})
 _OPEN_ROLES = frozenset({
-    "can", "trash", "debris", "plant", "bush", "tree", "camera", "aircon", "manhole", "flower",
+    "can", "plant", "bush", "tree", "camera", "aircon", "manhole", "flower",
+    # A box around a lamp or traffic light would be an invisible wall under its arm.
+    "lamp",
 })
+COVER_HEIGHT_M = 0.5
+COVER_DEPTH_M = 0.4
+"""A prop at least this tall and this deep on its short side looks like cover, so it stops players and bullets."""
 _CROSS_ROLES = frozenset({"wreck", "gate", "barrier"})
 _SCHEMA = {
     "type": "object",
@@ -61,11 +66,20 @@ def plan_from_brief(brief: str, *, provider=None) -> AmbientPlan:
     return AmbientPlan(text, blocking, "ai_generated")
 
 
-def is_solid(role: str, category: str) -> bool:
-    """Cars, barrels, posts and similar masses stop the player. Bottles and plants do not."""
-    if role in _OPEN_ROLES or category == "vegetation":
+def is_solid(role: str, category: str, size_m: tuple[float, float, float] | None = None) -> bool:
+    """Cars, barrels, posts and similar masses stop the player. Bottles and plants do not.
+
+    Any other prop with its ``size_m`` (length, width, height) is solid when it looks like cover:
+    a dumpster, a concrete block, a bench, a planter. Wall-mounted props are never solid.
+    """
+    if role in _OPEN_ROLES or category in {"vegetation", "facade"}:
         return False
-    return role in _SOLID_ROLES or category in {"vehicles", "structures"}
+    if role in _SOLID_ROLES or category in {"vehicles", "structures"}:
+        return True
+    if size_m is None:
+        return False
+    length_m, width_m, height_m = size_m
+    return height_m >= COVER_HEIGHT_M and min(length_m, width_m) >= COVER_DEPTH_M
 
 
 def blocks_street(role: str, *, street_blocking: bool) -> bool:

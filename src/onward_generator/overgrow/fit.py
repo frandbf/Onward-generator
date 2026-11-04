@@ -182,7 +182,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
             length_m, width_m, height_m = measure(mesh)
             problems.append(f"{node.name} {reason} {length_m:.2f}x{width_m:.2f}x{height_m:.2f}")
         # A wreck's role is solid on its own; a prop may be solid by its category (``kind``).
-        if is_solid(role, str(node.extras.get("kind"))):
+        if is_solid(role, str(node.extras.get("kind")), measure(mesh)):
             solid.append((node.name, footprint))
     problems.extend(_overlaps(solid))
     return checked, problems
