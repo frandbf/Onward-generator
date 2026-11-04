@@ -364,7 +364,7 @@ def _mounted(name: str, gap: float) -> Node:
     # A 0.5 m deep aircon on the south wall (y = 8), its back ``gap`` off the wall.
     matrix = frame_matrix((0.0, 8.0 - gap - 0.25, 2.4), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
     return Node(f"overgrow/prop/{name}/0", (Primitive(_mesh(0.8, 0.5, 0.6), "prop_aircon"),),
-                {"role": "aircon", "kind": "facade", "surface": "facade"}, matrix)
+                {"role": "aircon", "kind": "facade"}, matrix)
 
 
 @pytest.mark.parametrize(("gap", "problem"), [(0.08, False), (0.14, False), (0.16, True), (0.43, True)])
@@ -376,7 +376,7 @@ def test_fit_fails_a_wall_prop_off_its_wall(tmp_path: Path, gap: float, problem:
 
 def test_fit_fails_a_wall_prop_with_no_wall_near(tmp_path: Path) -> None:
     lone = Node("overgrow/prop/aircon/0", (Primitive(_mesh(0.8, 0.5, 0.6), "prop_aircon"),),
-                {"role": "aircon", "kind": "facade", "surface": "facade"}, yaw_matrix(30.0, -20.0, 2.4, 0.0))
+                {"role": "aircon", "kind": "facade"}, yaw_matrix(30.0, -20.0, 2.4, 0.0))
     _checked, problems = _fit_scene(tmp_path, [lone])
     assert [p.split()[1] for p in problems] == ["off_wall"]
 
@@ -430,3 +430,34 @@ def test_a_plant_is_brought_down_to_2_5_m_across(size: tuple[float, float, float
     assert applied == pytest.approx(scale)
     assert size_reason("plant", *measure(mesh)) is None
     assert size_reason("plant", *size) == (None if scale == 1.0 else "wrong_size")
+
+
+def _road() -> Node:
+    # The carriageway cap, 0.15 m down, from x 21 to 40 and y 3.2 to 6: off the origin, so only the true centre lands on it.
+    cap = Mesh(np.array([[21, 3.2, -0.15], [40, 3.2, -0.15], [40, 6, -0.15], [21, 6, -0.15]], dtype=np.float64),
+               np.array([[0, 1, 2], [0, 2, 3]]))
+    return Node("surface/carriageway", (Primitive(cap, "asphalt"),), {"type": "surface"})
+
+
+@pytest.mark.parametrize(
+    ("x", "y", "z", "problem"),
+    [
+        (0.0, -6.0, 0.0, None),  # on the sidewalk
+        (0.0, -6.0, 0.05, None),
+        (0.0, -6.0, -0.05, None),
+        (0.0, -6.0, 0.25, "floating_0.25m"),
+        (0.0, -6.0, -0.25, "sunk_0.25m"),
+        (30.0, 4.5, -0.15, None),  # on the carriageway
+        (30.0, 4.5, 0.0, "floating_0.15m"),
+    ],
+)
+def test_fit_fails_a_prop_that_misses_the_ground(tmp_path: Path, x: float, y: float, z: float, problem: str | None) -> None:
+    barrel = Node("overgrow/prop/barrel_a/0", (Primitive(_mesh(1.0, 1.0, 1.0), "prop_barrel"),),
+                  {"role": "barrel", "kind": "waste"}, yaw_matrix(x, y, z, 0.0))
+    _checked, problems = _fit_scene(tmp_path, [_road(), barrel])
+    assert [p.split()[1] for p in problems] == ([problem] if problem else [])
+
+
+def test_a_wall_prop_is_not_held_to_the_ground(tmp_path: Path) -> None:
+    _checked, problems = _fit_scene(tmp_path, [_mounted("aircon", 0.08)])
+    assert problems == []

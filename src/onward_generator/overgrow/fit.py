@@ -5,7 +5,8 @@ scales that copy. A car-shaped wreck is brought into the car band. A wide
 shape such as a helicopter is brought to the largest size that still leaves
 a side passage. A deep fire escape is pulled back to the wall depth. Moss,
 grass and trees are not measured here. ``check_scene`` also refuses a
-wall-mounted prop off its wall and two solid props standing inside each other.
+wall-mounted prop off its wall, a prop that floats above or sinks into the
+ground, and two solid props standing inside each other.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from onward_generator.generation.mesh import Mesh, merge, transform
 from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
+from onward_generator.overgrow.ground import RoadFloor, road_floor
 
 WRECK_LENGTH_M = (2.8, 6.5)
 WRECK_WIDTH_M = (1.4, 2.4)
@@ -40,6 +42,8 @@ BUILDING_OVERLAP_M2 = 0.25
 PROP_OVERLAP_M2 = 0.25
 # A wall-mounted prop farther than FACADE_GAP_M from every wall within this reach floats in the street.
 WALL_REACH_M = 2.0
+# A prop on the ground starts within this of the sidewalk (z = 0) or the carriageway under its centre.
+GROUND_TOLERANCE_M = 0.05
 
 SKIP_HIGHWAYS = frozenset({
     "footway", "path", "cycleway", "steps", "corridor", "elevator",
@@ -145,6 +149,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
         raise FitError(f"{directory}: needs scene_visual.glb")
     nodes, _materials = nodes_from_glb(visual.read_bytes())
     buildings, lanes = grounds_from_scene(geo_scene)
+    floor = road_floor(nodes)
     problems: list[str] = []
     checked = 0
     solid: list[tuple[str, Polygon]] = []
@@ -162,8 +167,11 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
         reason = object_reason(role=role, mesh=mesh, matrix=matrix, buildings=buildings, lanes=lanes)
         checked += 1
         footprint = _footprint(mesh, matrix)
-        if reason is None and node.extras.get("surface") == "facade":
+        # Every wall-mounted prop is in the facade category, whether the rules or an AI plan placed it.
+        if reason is None and node.extras.get("kind") == "facade":
             reason = _wall_reason(footprint, buildings)
+        elif reason is None:
+            reason = _ground_reason(transform(mesh, matrix), floor)
         if reason:
             length_m, width_m, height_m = measure(mesh)
             problems.append(f"{node.name} {reason} {length_m:.2f}x{width_m:.2f}x{height_m:.2f}")
@@ -180,6 +188,18 @@ def _wall_reason(footprint: Polygon, buildings: STRtree) -> str | None:
     walls = [b for b in near if b.geom_type == "Polygon"]
     if not walls or min(float(b.boundary.distance(footprint)) for b in walls) > FACADE_GAP_M:
         return "off_wall"
+    return None
+
+
+def _ground_reason(posed: Mesh, floor: RoadFloor) -> str | None:
+    """``floating`` or ``sunk`` when a prop's lowest vertex misses the ground under its centre."""
+    low = posed.vertices.min(axis=0)
+    high = posed.vertices.max(axis=0)
+    gap = float(low[2]) - floor.z(float(low[0] + high[0]) / 2, float(low[1] + high[1]) / 2)
+    if gap > GROUND_TOLERANCE_M:
+        return f"floating_{gap:.2f}m"
+    if gap < -GROUND_TOLERANCE_M:
+        return f"sunk_{-gap:.2f}m"
     return None
 
 
