@@ -128,6 +128,31 @@ def test_failed_phase04_checks_are_refused(inputs: tuple[Path, Path], tmp_path: 
     assert not (tmp_path / "pkg").exists()
 
 
+@pytest.mark.parametrize(
+    ("envelope", "refused"),
+    [(None, True), ({"id": "envelope/perimeter_wall", "fit": None}, True),
+     ({"id": "envelope/perimeter_wall", "fit": {"checked": 3, "visual_sha256": "a" * 64}}, False)],
+)
+def test_an_overgrown_scene_needs_the_fit_bounds_recorded(
+    inputs: tuple[Path, Path], tmp_path: Path, envelope: dict | None, refused: bool,
+) -> None:
+    detail = tmp_path / "detail"
+    shutil.copytree(inputs[0], detail)
+    manifest = load(detail / "scene_detail.json")
+    manifest["objects"].append({"id": "overgrow/prop/barrel/0", "type": "overgrowth", "kind": "waste", "position_m": [0, 0, 0]})
+    if envelope is not None:
+        manifest["envelope"] = envelope
+    (detail / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+    if refused:
+        with pytest.raises(ExportError) as refusal:
+            package(inputs, tmp_path / "pkg", detail=detail)
+        assert "detail: the scene has overgrowth but no envelope.fit; run overgrow fit, then bounds" in refusal.value.problems
+        assert not (tmp_path / "pkg").exists()
+    else:
+        package(inputs, tmp_path / "pkg", detail=detail)
+        assert (tmp_path / "pkg").is_dir()
+
+
 def test_missing_attribution_is_refused(inputs: tuple[Path, Path], tmp_path: Path) -> None:
     detail = tmp_path / "detail"
     shutil.copytree(inputs[0], detail)

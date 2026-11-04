@@ -265,6 +265,10 @@ def _check_detail(detail_dir: Path) -> tuple[list[str], dict[str, Any], dict[str
             problems.append(f"detail: {detail_dir / name} not found")
     if not manifest.get("attribution"):
         problems.append("detail: scene_detail.json has no attribution; OSM data cannot be exported without it (ODbL)")
+    # bounds copies what overgrow fit passed into envelope.fit; a scene with overgrowth and no record was never checked.
+    overgrown = any(isinstance(o, dict) and o.get("type") == "overgrowth" for o in manifest.get("objects") or [])
+    if overgrown and not (manifest.get("envelope") or {}).get("fit"):
+        problems.append("detail: the scene has overgrowth but no envelope.fit; run overgrow fit, then bounds")
     return problems, manifest, report
 
 
