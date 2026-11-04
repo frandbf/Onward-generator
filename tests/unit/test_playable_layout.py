@@ -26,9 +26,11 @@ from onward_generator.perf.layout import (
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
     STREET_LIGHTS_MAX,
+    TEAM_SEPARATION_M,
     TIME_OF_DAY_SETTINGS,
     LayoutError,
     _block,
+    _defenders,
     _patrol_lines,
     _routes,
     _sample_route,
@@ -673,3 +675,57 @@ def test_ammo_needs_only_3_m_from_an_ai_start() -> None:
     ammo = ammo_points(union_all(squares), ai, [(100.0, 0.5)], (0.0, 0.5))
     assert len(ammo) == AMMO_COUNT
     assert min(math.dist(a, s) for a in ammo for s in ai) >= 3.0
+
+
+
+def test_the_fixture_keeps_the_defenders_within_30_m() -> None:
+    street = box(0, 0, 200, 10)
+    x, y = _defenders(street, (6.0, 4.0), farthest=False)
+    assert math.dist((x, y), (6.0, 4.0)) <= TEAM_SEPARATION_M
+    assert (x, y) == (36.0, 4.0)  # on the line: 30 m exactly, the north tie-break leaves it there
+
+
+def test_the_playable_defenders_go_to_the_far_end_of_the_area() -> None:
+    street = box(0, 0, 200, 10)
+    x, y = _defenders(street, (6.0, 4.0), farthest=True)
+    # The block (4 x 2 points, 1.2 m apart, so 1.8 m and 0.6 m from its centre) must fit inside the street.
+    assert (x, y) == (198.0, 8.0)
+
+
+def test_the_playable_layout_refuses_teams_closer_than_30_m() -> None:
+    plaza = box(0, 0, 32, 10)
+    # The farthest block that fits is (30, 8), 24.3 m from (6, 4).
+    with pytest.raises(LayoutError, match=r"^the largest free area holds the teams only 24\.3 m apart; 30 m are required$"):
+        _defenders(plaza, (6.0, 4.0), farthest=True)
+    # Exactly 30 m is enough: in a 3 m strip a block fits only on y = 2, and x = 34 is the last column that fits.
+    assert _defenders(box(0, 0, 35.9, 3), (4.0, 2.0), farthest=True) == (34.0, 2.0)
+
+
+
+@pytest.mark.parametrize(
+    ("area", "attackers", "expected"),
+    [
+        # A long arm north and a short one east: north is farther, though east runs farther in x.
+        (box(100, 0, 160, 6).union(box(100, 0, 106, 100)), (104.0, 4.0), (102.0, 98.0)),
+        # A long arm east and a short one north.
+        (box(100, 100, 260, 106).union(box(100, 100, 106, 160)), (104.0, 104.0), (258.0, 102.0)),
+        # Bounds off the 2 m grid: the grid stays on whole multiples of 2 m.
+        (box(101, 0, 301, 10), (107.0, 4.0), (298.0, 8.0)),
+        # Two points tie on distance: the northern one wins.
+        (box(0, 0, 200, 10), (6.0, 5.0), (198.0, 8.0)),
+        # Four tie: north, then east.
+        (box(0, 0, 200, 10), (100.0, 5.0), (198.0, 8.0)),
+    ],
+)
+def test_the_farthest_block_is_measured_in_both_axes(area: BaseGeometry, attackers: tuple[float, float], expected: tuple[float, float]) -> None:
+    assert _defenders(area, attackers, farthest=True) == expected
+
+
+
+def test_the_fixture_needs_two_block_widths_between_the_teams() -> None:
+    # Two block widths are 2 x 4 columns x 1.2 m = 9.6 m. In a 3 m strip a block fits only on y = 2.
+    assert _defenders(box(0, 0, 14.2, 3), (2.4, 2.0), farthest=False) == (12.0, 2.0)  # 9.6 m: enough
+    with pytest.raises(LayoutError, match=r"^no second spawn block fits apart from the first$"):
+        _defenders(box(0, 0, 14.0, 3), (4.0, 2.0), farthest=False)  # 8 m
+    with pytest.raises(LayoutError, match=r"^no second spawn block fits near the first$"):
+        _defenders(box(0, 0, 3.0, 3.0), (1.5, 1.5), farthest=False)

@@ -13,7 +13,7 @@ from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail import detail_scene, load_base, load_detail_config
 from onward_generator.export.package import _check_layout
 from onward_generator.generation import load_generation_config
-from onward_generator.perf.layout import playable_layout
+from onward_generator.perf.layout import TEAM_SEPARATION_M, gameplay_layout, playable_layout
 
 
 def test_perf_layout_reads_the_footprints_of_the_scene(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
@@ -77,3 +77,17 @@ def test_the_layout_carries_the_climbs_and_blows_wind_on_their_roofs(detail_inpu
     assert free.area > 0
     assert tuple(layout["attackers"]["centre_m"]) in attackers and tuple(layout["defenders"]["centre_m"]) in defenders
     assert tuple(layout["attackers_b"]["centre_m"]) in attackers and tuple(layout["defenders_b"]["centre_m"]) in defenders
+
+
+
+def test_the_playable_teams_spawn_farther_apart_than_the_fixture_allows(detail_inputs: tuple[Path, Path, Path]) -> None:
+    scene, heights, base = detail_inputs
+    generated, ref = load_base(base, scene, heights, load_generation_config())
+    manifest = detail_scene(generated, ref, heights, scene, load_detail_config()).manifest()
+
+    def gap(doc: dict) -> float:
+        (ax, ay), (dx, dy) = doc["attackers"]["centre_m"], doc["defenders"]["centre_m"]
+        return ((ax - dx) ** 2 + (ay - dy) ** 2) ** 0.5
+
+    assert gap(gameplay_layout(generated, manifest)) <= TEAM_SEPARATION_M
+    assert gap(playable_layout(generated, manifest, json.loads(Path(heights).read_text(encoding="utf-8")))) > TEAM_SEPARATION_M

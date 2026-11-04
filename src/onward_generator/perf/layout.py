@@ -171,7 +171,13 @@ def extra_spawn_block(
     raise LayoutError("no second spawn block fits for Assault")
 
 
-def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> dict[str, Any]:
+def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], *, farthest: bool = False) -> dict[str, Any]:
+    """Two spawn blocks and the Uplink between them on the largest free area.
+
+    The device fixture keeps the defenders within ``TEAM_SEPARATION_M`` of the attackers.
+    With ``farthest`` (the playable layout) they go to the farthest grid point of that area
+    whose block fits, and it must be at least ``TEAM_SEPARATION_M`` away.
+    """
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
     inside = playable_area(detail_manifest)
@@ -188,20 +194,7 @@ def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) ->
     if not _fits(area, _block(*a)):
         raise LayoutError("the largest free area cannot hold a spawn block")
 
-    # Defenders: the grid point farthest from the attackers (up to TEAM_SEPARATION_M) whose block fits.
-    minx, miny, maxx, maxy = area.bounds
-    candidates = [
-        (x, y)
-        for y in (math.floor(miny / GRID_M) * GRID_M + GRID_M * j for j in range(int((maxy - miny) / GRID_M) + 2))
-        for x in (math.floor(minx / GRID_M) * GRID_M + GRID_M * i for i in range(int((maxx - minx) / GRID_M) + 2))
-        if math.hypot(x - a[0], y - a[1]) <= TEAM_SEPARATION_M
-    ]
-    fitting = [c for c in candidates if _fits(area, _block(*c))]
-    if not fitting:
-        raise LayoutError("no second spawn block fits near the first")
-    bx, by = max(fitting, key=lambda c: (math.hypot(c[0] - a[0], c[1] - a[1]), c[1], c[0]))
-    if math.hypot(bx - a[0], by - a[1]) < 2 * SPAWN_SPACING_M * SPAWN_COLUMNS:
-        raise LayoutError("no second spawn block fits apart from the first")
+    bx, by = _defenders(area, a, farthest=farthest)
     b = (round(bx, 2), round(by, 2))
 
     mid = Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
@@ -228,6 +221,31 @@ def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any]) ->
         "damage_volume": {"z_m": DAMAGE_DEPTH_M, "size_m": [round(sx1 - sx0 + 200, 1), 10.0, round(sy1 - sy0 + 200, 1)],
                           "centre_m": [round((sx0 + sx1) / 2, 2), round((sy0 + sy1) / 2, 2)]},
     }
+
+
+def _defenders(area: BaseGeometry, a: tuple[float, float], *, farthest: bool) -> tuple[float, float]:
+    """The grid point farthest from ``a`` whose block fits: within ``TEAM_SEPARATION_M`` for the fixture, anywhere with ``farthest``."""
+    minx, miny, maxx, maxy = area.bounds
+    x0, y0 = math.floor(minx / GRID_M) * GRID_M, math.floor(miny / GRID_M) * GRID_M
+    columns = int((maxx - minx) / GRID_M) + 2  # pragma: no mutate: more columns only add points past the bounds, where no block fits
+    rows = int((maxy - miny) / GRID_M) + 2  # pragma: no mutate: more rows only add points past the bounds, where no block fits
+    candidates = [
+        (x, y)
+        for y in (y0 + GRID_M * j for j in range(rows))
+        for x in (x0 + GRID_M * i for i in range(columns))
+        if farthest or math.hypot(x - a[0], y - a[1]) <= TEAM_SEPARATION_M
+    ]
+    # Farthest first; ties go north, then east. The first block that fits wins.
+    for x, y in sorted(candidates, key=lambda c: (-math.hypot(c[0] - a[0], c[1] - a[1]), -c[1], -c[0])):
+        if not _fits(area, _block(x, y)):
+            continue
+        gap = math.hypot(x - a[0], y - a[1])
+        if farthest and gap < TEAM_SEPARATION_M:
+            raise LayoutError(f"the largest free area holds the teams only {gap:.1f} m apart; {TEAM_SEPARATION_M:.0f} m are required")
+        if gap < 2 * SPAWN_SPACING_M * SPAWN_COLUMNS:
+            raise LayoutError("no second spawn block fits apart from the first")
+        return (x, y)
+    raise LayoutError("no second spawn block fits near the first")
 
 
 def yaw_toward(x: float, y: float, focus_x: float, focus_y: float) -> float:
@@ -680,7 +698,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     if storm and time_of_day != "night":
         raise LayoutError("storm needs a night map: a daytime flash looks wrong (ADR-028)")
     sdk_time, profile = TIME_OF_DAY_SETTINGS[time_of_day]
-    doc = gameplay_layout(base, detail_manifest)
+    doc = gameplay_layout(base, detail_manifest, farthest=True)
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
     inside = playable_area(detail_manifest)
