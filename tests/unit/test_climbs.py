@@ -258,3 +258,56 @@ def test_a_tie_goes_to_the_lower_id() -> None:
 def test_a_tall_roof_with_few_cadastral_levels_gets_neither_a_ladder_nor_a_lift() -> None:
     tall = {**_building("b", 3), "height": {"height_m": 22.9, "estimated_levels": 3}}
     assert _place([tall], {"b": box(0, 100, 20, 110)}) == {"ladders": [], "lifts": []}
+
+
+def _cored(objects: list[dict], footprints: dict, envelope: dict | None = None) -> dict:
+    """``place_climbs`` on a map with a 100 m core (the square from -100 to 100)."""
+    manifest: dict = {"objects": objects, "core": {"half_side_m": 100.0}}
+    if envelope is not None:
+        manifest["envelope"] = envelope
+    ground = FREE.difference(MultiPolygon([f for f in footprints.values() if isinstance(f, Polygon)]))
+    return place_climbs(manifest, footprints, ground, NOTHING, [ATTACK], [DEFEND])
+
+
+def _count(placed: dict) -> int:
+    return len(placed["ladders"]) + len(placed["lifts"])
+
+
+@pytest.mark.parametrize(
+    ("footprint", "count"),
+    [
+        (box(0, 70, 20, 85), 1),
+        (box(0, 90, 20, 105), 0),  # crosses the core edge: its roof runs past the wall
+        (box(0, 85, 20, 99.7), 0),  # inside the core, but its wall side under the 0.4 m wall
+    ],
+)
+def test_a_climb_stays_on_a_roof_inside_the_wall(footprint: Polygon, count: int) -> None:
+    assert _count(_cored([_building("b", 2)], {"b": footprint})) == count
+
+
+def test_the_wall_thickness_comes_from_the_envelope() -> None:
+    assert _count(_cored([_building("b", 2)], {"b": box(0, 85, 20, 99.7)}, {"thickness_m": 0.2})) == 1
+
+
+@pytest.mark.parametrize(
+    ("north", "envelope", "count"),
+    [
+        (94.0, None, 1),  # 6 m from the edge: no jump over the wall
+        (94.5, None, 0),  # 5.5 m: a 15 m roof over the 12 m wall is too close
+        (94.5, {"height_m": 15.0}, 1),  # a 15 m wall: the roof is not above it
+        (94.5, {"height_m": 14.9}, 0),
+    ],
+)
+def test_a_roof_above_the_wall_keeps_clear_of_the_edge(north: float, envelope: dict | None, count: int) -> None:
+    assert _count(_cored([_building("b", 5)], {"b": box(0, 70, 20, north)}, envelope)) == count
+
+
+def test_a_roof_no_higher_than_the_wall_may_stand_next_to_it() -> None:
+    assert _count(_cored([_building("b", 4)], {"b": box(0, 75, 20, 99.5)})) == 1
+
+
+def test_a_refused_roof_does_not_end_the_search() -> None:
+    objects = [_building("a", 2), _building("b", 2)]
+    footprints = {"a": box(0, 90, 20, 105), "b": box(-60, 0, -40, 15)}
+    placed = _cored(objects, footprints)
+    assert [site["x"] for site in placed["ladders"]] == [-50.0]

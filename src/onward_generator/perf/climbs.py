@@ -17,7 +17,8 @@ from shapely.geometry import Point, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
-from onward_generator.tiers import SCENIC
+from onward_generator.bounds.envelope import DEFAULT_HEIGHT_M, DEFAULT_THICKNESS_M
+from onward_generator.tiers import SCENIC, core_of
 
 LADDERS_MAX = 3
 LIFTS_MAX = 3
@@ -57,6 +58,11 @@ ROOF_APRON_M = 2.0
 CENTRE_DIGITS = 2
 COVER_TOLERANCE_M = 0.01
 """A strip that ends on the wall of a turned building misses the roof by rounding alone."""
+WALL_JUMP_CLEAR_M = 6.0
+"""A roof above the perimeter wall stays this far from the core edge, so no one jumps from it over the wall.
+
+Estimated (a run off a roof a few metres above the wall top), not measured on the headset.
+"""
 
 Wall = tuple[float, float, float, float, float]
 """x, y of the middle of a wall, its unit outward normal, and its length."""
@@ -139,6 +145,18 @@ def lift_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, heig
     return None
 
 
+def _inside_wall(detail_manifest: Mapping[str, Any], footprint: BaseGeometry, height_m: float) -> bool:
+    """Whether a roof stays in the playable core (ADR-017): the whole footprint inside the wall, and a roof above
+    the wall top at least ``WALL_JUMP_CLEAR_M`` from the core edge. A map without a core keeps every roof."""
+    core = core_of(detail_manifest)
+    if core is None:
+        return True
+    envelope = detail_manifest.get("envelope") or {}
+    if not core.buffer(-float(envelope.get("thickness_m") or DEFAULT_THICKNESS_M)).covers(footprint):
+        return False
+    return height_m <= float(envelope.get("height_m") or DEFAULT_HEIGHT_M) or core.exterior.distance(footprint) >= WALL_JUMP_CLEAR_M
+
+
 def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, BaseGeometry]) -> list[tuple[str, dict[str, Any], Polygon]]:
     objects = detail_manifest.get("objects", [])
     climbed = {o["source_ids"][0] for o in objects if o.get("type") == "interior" and o.get("roof_access")}
@@ -148,6 +166,8 @@ def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, Bas
             continue
         source = building["source_ids"][0]
         if source in climbed or source not in footprints or building["height"].get("landmark"):
+            continue
+        if not _inside_wall(detail_manifest, footprints[source], float(building["height"]["height_m"])):
             continue
         if building["roof"]["type"] in FLAT_ROOFS:
             footprint = footprints[source]
