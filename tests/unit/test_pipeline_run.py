@@ -420,7 +420,7 @@ def test_plan_steps_argv_equals_command_argv(tmp_path: Path) -> None:
     assert steps["detail"] == list(detail_command(scene, heights, out("generate")).argv)
     assert steps["dress"] == list(dress_command(out("detail"), scene, heights).argv)
     assert steps["materials"] == list(materials_command(out("dress")).argv)
-    assert steps["signs"] == list(signs_command(out("materials")).argv)
+    assert steps["signs"] == list(signs_command(out("materials"), scene).argv)
     assert steps["overgrow"] == list(overgrow_command(out("signs")).argv)
     assert steps["fit"] == list(fit_command(scene, out("overgrow")).argv)
     playable = root / "data" / "processed" / "scene_playable"
@@ -878,7 +878,8 @@ def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> Non
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
     signs = dict(plan_steps(root))["signs"]
     scene = signs[signs.index("--scene") + 1]
-    assert scene.endswith("data/processed/geo/geo_scene.json")
+    # Murcia runs Catastro, so the plates read the split scene that detail builds from.
+    assert scene.endswith("data/processed/cadastre/geo_scene.json")
     bounds = dict(plan_steps(root))["bounds"]
     assert Path(bounds[bounds.index("--out") + 1]).name == "scene_playable"
 
@@ -1344,6 +1345,7 @@ def test_catastro_off_keeps_the_osm_scene_for_heights(tmp_path: Path) -> None:
     scene = Path(steps["geo"][steps["geo"].index("--out") + 1]) / "geo_scene.json"
     assert steps["heights"] == list(heights_command(scene).argv)
     assert "--overrides" not in steps["heights"]
+    assert steps["signs"][steps["signs"].index("--scene") + 1] == str(scene)
 
 
 def test_catastro_steps_read_the_geo_scene_and_write_the_split_scene(tmp_path: Path) -> None:

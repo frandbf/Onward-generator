@@ -153,7 +153,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     if panoramax_enabled(root):
         panoramax_argv = list(panoramax_command(materials).argv)
         signs_base = _flag(panoramax_argv, "--out")
-    signs_argv = list(signs_command(signs_base).argv)
+    signs_argv = list(signs_command(signs_base, scene).argv)
     signs = _flag(signs_argv, "--out")
     overgrow_argv = list(overgrow_command(signs).argv)
     overgrow = _flag(overgrow_argv, "--out")

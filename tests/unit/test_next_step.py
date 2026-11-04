@@ -204,3 +204,27 @@ def test_materials_command_carries_the_maps_facade_block(tmp_path: Path) -> None
             facade_options(root)
     assert facade_options(tmp_path / "elsewhere") == []
     assert "--facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+
+
+def test_signs_read_the_scene_detail_built_from(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
+    processed = root / "data" / "processed"
+    osm = processed / "geo" / "geo_scene.json"
+    split = processed / "cadastre" / "geo_scene.json"
+    for path in (osm, split):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+    materials = processed / "scene_materials"
+    materials.mkdir()
+
+    def scene_of(command: object) -> str:
+        argv = command.argv  # type: ignore[attr-defined]
+        return argv[argv.index("--scene") + 1]
+
+    # No manifest yet: the OSM scene, as before.
+    assert scene_of(signs_command(materials)) == str(osm)
+    (materials / "scene_detail.json").write_text(json.dumps({"inputs": {"geo_scene": {"path": str(split)}}}), encoding="utf-8")
+    assert scene_of(signs_command(materials)) == str(split)
+    # The runner passes its own scene, and that one wins.
+    assert scene_of(signs_command(materials, osm)) == str(osm)

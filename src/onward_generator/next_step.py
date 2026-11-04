@@ -227,8 +227,9 @@ def panoramax_command(base: Path) -> StageCommand:
     )
 
 
-def signs_command(base: Path) -> StageCommand:
-    scene = _geo_for(base)
+def signs_command(base: Path, scene: Path | None = None) -> StageCommand:
+    """``signs place`` on ``scene``: by default the scene ``detail`` built from, so the plates find the walls it built."""
+    scene = scene or _existing(_inputs(base), "geo_scene", "path") or _geo_for(base)
     out_name = STAGE_DIRS["signs"] + ("_compact" if "compact" in Path(base).name else "")
     return invoke(
         "signs", "place",

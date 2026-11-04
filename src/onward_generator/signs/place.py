@@ -151,7 +151,7 @@ def place_signs(
 
     streets = _streets(geo.get("features") or [])
     # No street plate outside the playable core (ADR-017): plates are for the player, and each cell holding one is a draw.
-    # The walls come from the OSM scene, before any Catastro split, so they are kept by position.
+    # The walls come from the scene ``detail`` built from (the Catastro split where it ran), so they are kept by position.
     core = core_of(manifest)
     walls = [wall for wall in _walls(geo.get("features") or []) if core is None or core.covers(Point(*((wall.a + wall.b) / 2)))]
     signs = _choose(streets, walls, max_signs, STRtree(_footprints(geo.get("features") or [])))
