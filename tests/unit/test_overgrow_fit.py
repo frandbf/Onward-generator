@@ -343,14 +343,17 @@ def test_props_keep_clear_of_wrecks_and_trees_but_may_stand_on_grass() -> None:
     assert all(math.dist(point, (x, y)) >= 3.0 for point in beside for x, y, _r in wrecks)
 
 
-def _fit_scene(tmp_path: Path, nodes: list[Node]) -> tuple[int, list[str]]:
+BLOCK = [[-10, 8], [10, 8], [10, 20], [-10, 20], [-10, 8]]
+
+
+def _fit_scene(tmp_path: Path, nodes: list[Node], ring: list[list[float]] = BLOCK) -> tuple[int, list[str]]:
     scene = tmp_path / "geo_scene.json"
     scene.write_text(json.dumps({
         "features": [
             {"kind": "highway", "tags": {"highway": "residential"},
              "geometry": {"type": "LineString", "coordinates": [[-40, 0], [40, 0]]}},
             {"kind": "building", "tags": {"building": "yes"},
-             "geometry": {"type": "Polygon", "coordinates": [[[-10, 8], [10, 8], [10, 20], [-10, 20], [-10, 8]]]}},
+             "geometry": {"type": "Polygon", "coordinates": [ring]}},
         ],
     }), encoding="utf-8")
     base = tmp_path / "scene_overgrow"
@@ -460,4 +463,37 @@ def test_fit_fails_a_prop_that_misses_the_ground(tmp_path: Path, x: float, y: fl
 
 def test_a_wall_prop_is_not_held_to_the_ground(tmp_path: Path) -> None:
     _checked, problems = _fit_scene(tmp_path, [_mounted("aircon", 0.08)])
+    assert problems == []
+
+
+@pytest.mark.parametrize(("y", "problem"), [(8.0 - 0.075, False), (8.0 + 0.075, True), (14.0, True)])
+def test_fit_fails_a_street_plate_inside_its_building(tmp_path: Path, y: float, problem: bool) -> None:
+    # A 1.4 x 0.03 x 0.36 m plate on the south wall (y = 8): 7.5 cm out, or as far inside.
+    plate = Node("street_sign/street_sign_atlas_0", (Primitive(mesh_box(-0.7, 0.7, y - 0.015, y + 0.015, 2.37, 2.73), "street_sign_atlas_0"),),
+                 {"name": "Calle Mayor", "name_origin": "osm", "wall": "osm-way-1"})
+    checked, problems = _fit_scene(tmp_path, [plate])
+    assert checked == 1
+    assert problems == (["street_sign/street_sign_atlas_0 inside_building"] if problem else [])
+
+
+
+
+def _plate(x: float, y: float) -> Node:
+    """A plate modelled at the origin and moved by its node matrix, as a GLB may store it."""
+    mesh = mesh_box(-0.7, 0.7, -0.015, 0.015, 2.37, 2.73)
+    return Node("street_sign/street_sign_atlas_0", (Primitive(mesh, "street_sign_atlas_0"),), {"name": "Calle Mayor"},
+                yaw_matrix(x, y, 0.0, 0.0))
+
+
+def test_fit_reads_a_plate_where_its_matrix_puts_it(tmp_path: Path) -> None:
+    # The second is 1 m inside the east wall (x = 10), the third 2 m outside it.
+    checked, problems = _fit_scene(tmp_path, [_plate(0.0, 7.925), _plate(9.0, 14.0), _plate(12.0, 14.0)])
+    assert checked == 3
+    assert problems == ["street_sign/street_sign_atlas_0 inside_building"]
+
+
+def test_fit_keeps_a_plate_in_the_notch_of_an_l_shaped_building(tmp_path: Path) -> None:
+    # The notch x 0..10, y 8..14 is inside the building's box but outside its outline.
+    ell = [[-10, 8], [0, 8], [0, 14], [10, 14], [10, 20], [-10, 20], [-10, 8]]
+    _checked, problems = _fit_scene(tmp_path, [_plate(5.0, 10.0)], ell)
     assert problems == []

@@ -44,6 +44,8 @@ PROP_OVERLAP_M2 = 0.25
 WALL_REACH_M = 2.0
 # A prop on the ground starts within this of the sidewalk (z = 0) or the carriageway under its centre.
 GROUND_TOLERANCE_M = 0.05
+# ``signs place`` names each street plate node ``street_sign/<material>``.
+STREET_SIGN_NODE = "street_sign/"
 
 SKIP_HIGHWAYS = frozenset({
     "footway", "path", "cycleway", "steps", "corridor", "elevator",
@@ -142,7 +144,7 @@ def object_reason(
 
 
 def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]]:
-    """Measure every placed prop and wreck. Moss, grass, vines and trees stay out."""
+    """Measure every placed prop, wreck and street plate. Moss, grass, vines and trees stay out."""
     directory = Path(base)
     visual = directory / "scene_visual.glb"
     if not visual.is_file():
@@ -154,6 +156,10 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     checked = 0
     solid: list[tuple[str, Polygon]] = []
     for node in nodes:
+        if node.name.startswith(STREET_SIGN_NODE):
+            checked += 1
+            problems.extend(_plate_reasons(node, buildings))
+            continue
         role = _role(node)
         if role is None:
             continue
@@ -189,6 +195,18 @@ def _wall_reason(footprint: Polygon, buildings: STRtree) -> str | None:
     if not walls or min(float(b.boundary.distance(footprint)) for b in walls) > FACADE_GAP_M:
         return "off_wall"
     return None
+
+
+def _plate_reasons(node, buildings: STRtree) -> list[str]:
+    """``inside_building`` when the centre of a street plate falls inside a footprint."""
+    posed = merge(p.mesh for p in node.primitives)
+    if node.matrix is not None:
+        posed = transform(posed, node.matrix)
+    low, high = posed.vertices.min(axis=0), posed.vertices.max(axis=0)
+    centre = Point(float(low[0] + high[0]) / 2, float(low[1] + high[1]) / 2)
+    if buildings.query(centre, predicate="within").size:
+        return [f"{node.name} inside_building"]
+    return []
 
 
 def _ground_reason(posed: Mesh, floor: RoadFloor) -> str | None:
