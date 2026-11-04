@@ -310,3 +310,38 @@ def test_a_scenic_neighbour_hides_no_core_wall(tmp_path: Path) -> None:
     assert house["tier"] == "core" and _record(detailed, "building/osm-way-314")["tier"] == "scenic"
     areas = house["facade"]["wall_area_m2"]
     assert areas["hidden"] == 0.0 and areas["party"] > 0.0
+
+
+def _with_includes(cfg: Any, ids: list[str]) -> Any:
+    from dataclasses import replace as _replace
+    return _replace(cfg, interiors=_replace(cfg.interiors, include_ids=tuple(ids)))
+
+
+def test_a_building_across_the_core_edge_gets_no_interior(ring_inputs: tuple[Path, Path, Path]) -> None:
+    """House 316 runs from x 45 to 58 m over the 50 m edge: past it there is no ground collider and the wall stands."""
+    scene, heights, base = ring_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    asked = _with_includes(CFG, ["osm-way-316"])
+    cored = detail_scene(generated, ref, heights, scene, asked, core_half_side_m=CORE_M)
+    assert not any(o.type == "interior" and o.record["source_ids"] == ["osm-way-316"] for o in cored.objects)
+    edge = [(i.severity, i.message) for i in cored.issues if i.object_id == "osm-way-316" and i.code.startswith("interior_")]
+    assert edge == [("info", "crosses_core_edge")]  # not reported as an unknown include
+    # Without a core the same building is whole on the map and takes the interior it asked for.
+    generated, ref = load_base(base, scene, heights, GEN)
+    plain = detail_scene(generated, ref, heights, scene, asked)
+    assert any(o.type == "interior" and o.record["source_ids"] == ["osm-way-316"] for o in plain.objects)
+
+
+def test_a_shop_across_the_core_edge_keeps_its_shopfront_and_gets_no_room(tmp_path: Path) -> None:
+    pois = {**RING_POIS, 409: ((51, 9), {"shop": "bakery", "name": "Horno"})}
+    scene, heights, base = _detail_inputs(tmp_path, RING_BUILDINGS, pois)
+    generated, ref = load_base(base, scene, heights, GEN)
+    cored = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=CORE_M)
+    house = _record(cored, "building/osm-way-316")
+    assert house["facade"]["ground_floor"] == "shopfront"
+    assert not any(o.type == "interior" and o.record["source_ids"] == ["osm-way-316"] for o in cored.objects)
+    issues = [(i.code, i.severity, i.message) for i in cored.issues if i.object_id == "osm-way-316" and i.code.startswith("interior_")]
+    assert issues == [("interior_not_generated", "info", "crosses_core_edge")]
+    generated, ref = load_base(base, scene, heights, GEN)
+    plain = detail_scene(generated, ref, heights, scene, CFG)
+    assert any(o.type == "interior" and o.record["source_ids"] == ["osm-way-316"] for o in plain.objects)

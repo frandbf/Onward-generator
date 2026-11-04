@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter, defaultdict
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -519,8 +519,12 @@ def interior_quota(cfg: DetailConfig) -> int:
     return low + int(stable_unit(cfg.seed, "interiors", "quota") * span)
 
 
-def _select_interiors(candidates: list[tuple[str, int, Mapping[str, Any], BaseGeometry]], cfg: DetailConfig, issues: list[Issue]) -> list[str]:
-    """Interior queue. ``candidates`` are ``(id, storeys drawn, heights record, footprint)``: the rule reads the storeys the facade shows."""
+def _select_interiors(candidates: list[tuple[str, int, Mapping[str, Any], BaseGeometry]], cfg: DetailConfig, issues: list[Issue],
+                      reported: Collection[str] = ()) -> list[str]:
+    """Interior queue. ``candidates`` are ``(id, storeys drawn, heights record, footprint)``: the rule reads the storeys the facade shows.
+
+    ``reported`` are buildings left out with an issue of their own (across the core edge): an ``include_ids`` entry naming one is not unknown.
+    """
     ic = cfg.interiors
     if interior_quota(cfg) == 0:
         return []
@@ -529,7 +533,7 @@ def _select_interiors(candidates: list[tuple[str, int, Mapping[str, Any], BaseGe
     for bid in ic.include_ids:
         if bid in known:
             ordered.append(bid)
-        else:
+        elif bid not in reported:
             issues.append(Issue("interior_include_unknown", "warning", bid, "include_ids entry is not a generated building"))
     rule = ic.rule
     ruled = []
@@ -555,6 +559,8 @@ def _largest_polygon(geom: BaseGeometry) -> BaseGeometry | None:
     return None
 
 
+# Why a core building gets no interior: part of its footprint lies past the core edge.
+CROSSES_CORE_EDGE = "crosses_core_edge"
 MIN_PART_WALL_M = 0.5  # a part's roof leaves at least this much wall above its base
 # Issue codes of a building:part that is not drawn.
 PART_SKIPS = frozenset({
@@ -814,9 +820,14 @@ def detail_scene(
     setbacks: Counter[str] = Counter()
 
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
+    # An interior needs the whole building inside the core: past its edge the ground colliders end and the
+    # perimeter wall stands, so a room there has no floor and a stair there cannot be reached.
+    whole_in_core = {bid for bid in ids if core is None or core.covers(footprints[bid])}
     candidates = [(bid, storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).count, height_of[bid], footprints[bid])  # pragma: no mutate: storeys_for reads its third argument only for its truth
-                  for bid in ids if tier_of[bid] == CORE]
-    interior_queue = _select_interiors(candidates, cfg, issues)
+                  for bid in ids if tier_of[bid] == CORE and bid in whole_in_core]
+    edge = {bid for bid in cfg.interiors.include_ids if bid in tier_of and bid not in whole_in_core}
+    issues.extend(Issue("interior_not_generated", "info", bid, CROSSES_CORE_EDGE) for bid in sorted(edge))
+    interior_queue = _select_interiors(candidates, cfg, issues, edge)
     interiors_left = interior_quota(cfg)
 
     objects: list[DetailObject] = []
@@ -895,7 +906,9 @@ def detail_scene(
         ic = cfg.interiors
         # A shop gets a one-storey room behind its shopfront and never the stair interior. Neither uses the other's budget.
         # A shop above max_area_m2 has its room cut to a band behind the door's wall, closed by a back wall.
-        sells = shop and ic.enabled and ic.shops.enabled
+        sells = shop and ic.enabled and ic.shops.enabled and bid in whole_in_core
+        if shop and ic.enabled and ic.shops.enabled and bid not in whole_in_core:
+            issues.append(Issue("interior_not_generated", "info", bid, CROSSES_CORE_EDGE))
         depth = ic.shops.band_depth_m if shop and geom.area > ic.shops.max_area_m2 else None
         if main is None and not shop and bid in interior_queue and interiors_left > 0:
             issues.append(Issue("interior_not_generated", "info", bid, "no_street_frontage"))
