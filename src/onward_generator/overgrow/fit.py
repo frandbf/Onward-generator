@@ -4,7 +4,8 @@ The library GLB keeps the file's own units. Placement copies the mesh and
 scales that copy. A car-shaped wreck is brought into the car band. A wide
 shape such as a helicopter is brought to the largest size that still leaves
 a side passage. A deep fire escape is pulled back to the wall depth. Moss,
-grass and trees are not measured here.
+grass and trees are not measured here. ``check_scene`` also refuses a
+wall-mounted prop off its wall and two solid props standing inside each other.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from shapely.geometry.polygon import orient
 from onward_generator.generation.gltf import nodes_from_glb
 from onward_generator.generation.mesh import Mesh, merge, transform
 from onward_generator.io import atomic_write_json
+from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
 
 WRECK_LENGTH_M = (2.8, 6.5)
@@ -32,6 +34,10 @@ FIRE_ESCAPE_DEPTH_M = 1.6
 FACADE_GAP_M = 0.15
 PASSAGE_M = 1.2
 BUILDING_OVERLAP_M2 = 0.25
+# Two solid props whose footprints share more than this stand inside each other.
+PROP_OVERLAP_M2 = 0.25
+# A wall-mounted prop farther than FACADE_GAP_M from every wall within this reach floats in the street.
+WALL_REACH_M = 2.0
 
 SKIP_HIGHWAYS = frozenset({
     "footway", "path", "cycleway", "steps", "corridor", "elevator",
@@ -134,6 +140,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     buildings, lanes = grounds_from_scene(geo_scene)
     problems: list[str] = []
     checked = 0
+    solid: list[tuple[str, Polygon]] = []
     for node in nodes:
         role = _role(node)
         if role is None:
@@ -147,10 +154,41 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
         matrix = node.matrix if node.matrix is not None else np.eye(4)
         reason = object_reason(role=role, mesh=mesh, matrix=matrix, buildings=buildings, lanes=lanes)
         checked += 1
+        footprint = _footprint(mesh, matrix)
+        if reason is None and node.extras.get("surface") == "facade":
+            reason = _wall_reason(footprint, buildings)
         if reason:
             length_m, width_m, height_m = measure(mesh)
             problems.append(f"{node.name} {reason} {length_m:.2f}x{width_m:.2f}x{height_m:.2f}")
+        # A wreck's role is solid on its own; a prop may be solid by its category (``kind``).
+        if is_solid(role, str(node.extras.get("kind"))):
+            solid.append((node.name, footprint))
+    problems.extend(_overlaps(solid))
     return checked, problems
+
+
+def _wall_reason(footprint: Polygon, buildings: STRtree) -> str | None:
+    """``off_wall`` when a wall-mounted prop is more than ``FACADE_GAP_M`` from every wall."""
+    near = [buildings.geometries[int(i)] for i in buildings.query(footprint.buffer(WALL_REACH_M))]
+    walls = [b for b in near if b.geom_type == "Polygon"]
+    if not walls or min(float(b.boundary.distance(footprint)) for b in walls) > FACADE_GAP_M:
+        return "off_wall"
+    return None
+
+
+def _overlaps(solid: list[tuple[str, Polygon]]) -> list[str]:
+    """One line per pair of solid props standing inside each other."""
+    tree = STRtree([footprint for _name, footprint in solid])
+    found = []
+    for index, (name, footprint) in enumerate(solid):
+        # Box hits that do not meet share no area, so the box query is enough.
+        for other in sorted(int(i) for i in tree.query(footprint)):
+            if other <= index:
+                continue
+            shared = float(footprint.intersection(solid[other][1]).area)
+            if shared > PROP_OVERLAP_M2:
+                found.append(f"{name} overlaps {solid[other][0]} {shared:.2f}m2")
+    return found
 
 
 def write_report(path: str | Path, checked: int) -> None:

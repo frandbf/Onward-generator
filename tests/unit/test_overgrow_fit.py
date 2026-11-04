@@ -341,3 +341,79 @@ def test_props_keep_clear_of_wrecks_and_trees_but_may_stand_on_grass() -> None:
     beside = plant(occupied=wrecks, taken=wrecks)
     assert beside
     assert all(math.dist(point, (x, y)) >= 3.0 for point in beside for x, y, _r in wrecks)
+
+
+def _fit_scene(tmp_path: Path, nodes: list[Node]) -> tuple[int, list[str]]:
+    scene = tmp_path / "geo_scene.json"
+    scene.write_text(json.dumps({
+        "features": [
+            {"kind": "highway", "tags": {"highway": "residential"},
+             "geometry": {"type": "LineString", "coordinates": [[-40, 0], [40, 0]]}},
+            {"kind": "building", "tags": {"building": "yes"},
+             "geometry": {"type": "Polygon", "coordinates": [[[-10, 8], [10, 8], [10, 20], [-10, 20], [-10, 8]]]}},
+        ],
+    }), encoding="utf-8")
+    base = tmp_path / "scene_overgrow"
+    base.mkdir()
+    materials = {p.material: Material((0.5, 0.5, 0.5, 1), 0.9) for node in nodes for p in node.primitives}
+    (base / "scene_visual.glb").write_bytes(build_glb(nodes, materials))
+    return check_scene(base, scene)
+
+
+def _mounted(name: str, gap: float) -> Node:
+    # A 0.5 m deep aircon on the south wall (y = 8), its back ``gap`` off the wall.
+    matrix = frame_matrix((0.0, 8.0 - gap - 0.25, 2.4), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
+    return Node(f"overgrow/prop/{name}/0", (Primitive(_mesh(0.8, 0.5, 0.6), "prop_aircon"),),
+                {"role": "aircon", "kind": "facade", "surface": "facade"}, matrix)
+
+
+@pytest.mark.parametrize(("gap", "problem"), [(0.08, False), (0.14, False), (0.16, True), (0.43, True)])
+def test_fit_fails_a_wall_prop_off_its_wall(tmp_path: Path, gap: float, problem: bool) -> None:
+    checked, problems = _fit_scene(tmp_path, [_mounted("aircon", gap)])
+    assert checked == 1
+    assert [p.split()[1] for p in problems] == (["off_wall"] if problem else [])
+
+
+def test_fit_fails_a_wall_prop_with_no_wall_near(tmp_path: Path) -> None:
+    lone = Node("overgrow/prop/aircon/0", (Primitive(_mesh(0.8, 0.5, 0.6), "prop_aircon"),),
+                {"role": "aircon", "kind": "facade", "surface": "facade"}, yaw_matrix(30.0, -20.0, 2.4, 0.0))
+    _checked, problems = _fit_scene(tmp_path, [lone])
+    assert [p.split()[1] for p in problems] == ["off_wall"]
+
+
+def _ground(name: str, role: str, kind: str, x: float) -> Node:
+    return Node(f"overgrow/prop/{name}/0", (Primitive(_mesh(1.0, 1.0, 1.0), f"prop_{name}"),),
+                {"role": role, "kind": kind, "surface": "sidewalk"}, yaw_matrix(x, -6.0, 0.0, 0.0))
+
+
+@pytest.mark.parametrize(
+    ("second", "x", "problem"),
+    [
+        (("barrel", "waste"), 0.7, True),  # 0.3 m2 shared
+        (("barrel", "waste"), 0.75, False),  # exactly 0.25 m2: allowed
+        (("barrel", "waste"), 0.76, False),  # 0.24 m2
+        (("shed", "structures"), 0.7, True),  # solid by its category, not its role
+        (("plant", "vegetation"), 0.2, False),  # a plant does not stop anyone
+        (("barrel", "waste"), 3.0, False),
+    ],
+)
+def test_fit_fails_two_solid_props_inside_each_other(tmp_path: Path, second: tuple[str, str], x: float, problem: bool) -> None:
+    nodes = [_ground("barrel_a", "barrel", "waste", 0.0), _ground("other", *second, x)]
+    _checked, problems = _fit_scene(tmp_path, nodes)
+    expected = ["overgrow/prop/barrel_a/0 overlaps overgrow/prop/other/0 0.30m2"] if problem else []
+    assert problems == expected
+
+
+def test_fit_counts_a_wreck_as_solid(tmp_path: Path) -> None:
+    wreck = Node("overgrow/wreck/0", (Primitive(_mesh(4.0, 1.6, 1.5), "abandoned_wreck"),), {"kind": "wreck"},
+                 yaw_matrix(0.0, -6.0, 0.0, 0.0))
+    _checked, problems = _fit_scene(tmp_path, [wreck, _ground("barrel_a", "barrel", "waste", 1.0)])
+    assert problems == ["overgrow/wreck/0 overlaps overgrow/prop/barrel_a/0 1.00m2"]
+
+
+
+def test_fit_allows_a_wall_prop_exactly_at_the_gap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 0.125 m is exact in binary, so the boundary is tested without rounding.
+    monkeypatch.setattr("onward_generator.overgrow.fit.FACADE_GAP_M", 0.125)
+    _checked, problems = _fit_scene(tmp_path, [_mounted("aircon", 0.125)])
+    assert problems == []
