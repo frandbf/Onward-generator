@@ -337,11 +337,18 @@ def _read(path: Path, spec: AssetSpec, yaw_deg: float) -> Prop:
 
 
 def _uvs(primitive: Primitive) -> np.ndarray:
-    """The primitive's UVs, or zeros when it has none for every vertex."""
+    """The primitive's UVs in the generator's convention, or zeros when it has none for every vertex.
+
+    A library GLB follows glTF: V runs down from the top of the image. The generator's own UVs, and
+    the adapter that reads them as they are, run V up from the bottom, as Unity does. Read as is, a
+    Kenney aircon sampled the black top half of its palette instead of its grey band.
+    """
     uvs = primitive.uvs
     if uvs is None or len(uvs) != primitive.mesh.vertex_count:
         return np.zeros((primitive.mesh.vertex_count, 2), dtype=np.float32)
-    return uvs
+    flipped = uvs.astype(np.float32)  # a copy: the file's primitive keeps its own UVs
+    flipped[:, 1] = 1.0 - flipped[:, 1]
+    return flipped
 
 
 def _turned(mesh: Mesh, degrees: float) -> Mesh:

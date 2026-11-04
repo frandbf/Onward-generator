@@ -258,7 +258,8 @@ def test_the_library_loads_every_primitive_as_one_part_per_albedo(tmp_path: Path
     assert legs.uvs is not None and legs.uvs.tolist() == [[0, 0]] * 6
     assert prop.uvs.dtype == np.float32
     assert seat.mesh.triangles.tolist() == [[0, 1, 2], [0, 2, 3]]
-    assert seat.uvs is not None and seat.uvs.tolist() == [[0, 0], [1, 0], [1, 1], [0, 1]]
+    # The file's glTF V (down from the top) is turned into the generator's V (up from the bottom).
+    assert seat.uvs is not None and seat.uvs.tolist() == [[0, 1], [1, 1], [1, 0], [0, 0]]
     assert np.allclose(seat.mesh.vertices[:, 2], 0.5)
     assert prop.images() == {"prop_bench": RED, "prop_bench__1": BLUE}
 
