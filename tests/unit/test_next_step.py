@@ -206,7 +206,8 @@ def test_materials_command_carries_the_maps_facade_block(tmp_path: Path) -> None
     assert "--facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv
 
 
-def test_signs_read_the_scene_detail_built_from(tmp_path: Path) -> None:
+@pytest.mark.parametrize("command", [signs_command, overgrow_command])
+def test_signs_and_overgrow_read_the_scene_detail_built_from(tmp_path: Path, command: object) -> None:
     root = tmp_path / "murcia"
     create_map(root, map_id="murcia", name="Murcia", latitude=LAT, longitude=LON, radius_m=400)
     processed = root / "data" / "processed"
@@ -223,8 +224,8 @@ def test_signs_read_the_scene_detail_built_from(tmp_path: Path) -> None:
         return argv[argv.index("--scene") + 1]
 
     # No manifest yet: the OSM scene, as before.
-    assert scene_of(signs_command(materials)) == str(osm)
+    assert scene_of(command(materials)) == str(osm)  # type: ignore[operator]
     (materials / "scene_detail.json").write_text(json.dumps({"inputs": {"geo_scene": {"path": str(split)}}}), encoding="utf-8")
-    assert scene_of(signs_command(materials)) == str(split)
+    assert scene_of(command(materials)) == str(split)  # type: ignore[operator]
     # The runner passes its own scene, and that one wins.
-    assert scene_of(signs_command(materials, osm)) == str(osm)
+    assert scene_of(command(materials, osm)) == str(osm)  # type: ignore[operator]

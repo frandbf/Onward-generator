@@ -248,10 +248,11 @@ def fit_command(scene: Path, base: Path) -> StageCommand:
     )
 
 
-def overgrow_command(base: Path) -> StageCommand:
+def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
+    """``overgrow place`` on ``scene``: by default the scene ``detail`` built from, so it dresses the walls it built."""
     root = map_root(base)
     compact = "compact" in Path(base).name
-    scene = _geo_for(base)
+    scene = scene or _existing(_inputs(base), "geo_scene", "path") or _geo_for(base)
     parts = [
         "overgrow", "place",
         "--base", show(base),

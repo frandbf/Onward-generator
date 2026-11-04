@@ -155,7 +155,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         signs_base = _flag(panoramax_argv, "--out")
     signs_argv = list(signs_command(signs_base, scene).argv)
     signs = _flag(signs_argv, "--out")
-    overgrow_argv = list(overgrow_command(signs).argv)
+    overgrow_argv = list(overgrow_command(signs, scene).argv)
     overgrow = _flag(overgrow_argv, "--out")
     fit_argv = list(fit_command(scene, overgrow).argv)
     # bounds, layout and export are planned before their inputs exist, so the
