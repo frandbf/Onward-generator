@@ -270,7 +270,7 @@ def overgrow(
             ))
             wreck_colliders.append(Node(
                 f"overgrow/collider/wreck/{wreck_count}",
-                (Primitive(collider_mesh(wreck), "collider"),),
+                (Primitive(collider_mesh(wreck, "wreck"), "collider"),),  # pragma: no mutate: any role but tree or lamp gives the whole box
                 {"type": "collision", "origin": "generated", "role": "wreck"},
                 matrix,
             ))

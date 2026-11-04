@@ -528,7 +528,7 @@ def test_the_fit_command_names_the_glb_it_checked(tmp_path: Path) -> None:
         ("debris", "waste", (1.3, 0.39, 0.5), False),
         ("debris", "waste", (1.3, 0.4, 0.49), False),  # a pallet is too low
         ("debris", "waste", (0.4, 1.3, 0.5), True),  # the short side may be the length
-        ("lamp", "furniture", (1.87, 0.5, 3.33), False),  # a box would be a wall under the arm
+        ("lamp", "furniture", (1.87, 0.5, 3.33), True),  # solid at its post only (collider_mesh)
         ("awning", "facade", (3.2, 0.96, 0.9), False),
         ("plant", "vegetation", (2.5, 2.4, 1.0), False),
         ("bench", "furniture", None, False),  # without a size, only the role and category count
@@ -953,3 +953,135 @@ def test_fit_lets_a_sign_touch_a_wall_prop(tmp_path: Path, z: float, problem: bo
     sign = {"id": "building/b", "type": "building", "facade": {"shops": [{"sign": {**_fascia(0.0, 8.0, z), "height_m": 0.5}}]}}
     _checked, problems = _fit_scene(tmp_path, [aircon], urban=[sign])
     assert [p.split()[1] for p in problems] == (["covers_sign"] if problem else [])
+
+
+def _bounds(mesh: Mesh) -> list[float]:
+    return [round(float(v), 3) for v in (*mesh.vertices.min(axis=0), *mesh.vertices.max(axis=0))]
+
+
+def test_a_lamp_collides_at_its_post_and_a_tree_at_its_trunk() -> None:
+    from onward_generator.generation.mesh import merge as merge_meshes
+    from onward_generator.overgrow.fit import collider_mesh
+
+    # A traffic light: a 0.28 m post 3.3 m tall and an arm out to y = 1.9 from 2.8 m up.
+    light = merge_meshes([mesh_box(-0.14, 0.14, -0.14, 0.14, 0.0, 3.3), mesh_box(-0.1, 0.1, 0.0, 1.9, 2.8, 3.0)])
+    assert _bounds(collider_mesh(light, "lamp")) == [-0.14, -0.14, 0.0, 0.14, 0.14, 3.3]
+    # A tree whose trunk stands at (1, 2) under a 6 m canopy that comes down to 0.5 m.
+    tree = merge_meshes([mesh_box(0.9, 1.1, 1.9, 2.1, 0.0, 2.0), mesh_box(-2.0, 4.0, -1.0, 5.0, 0.5, 6.0)])
+    assert _bounds(collider_mesh(tree, "tree")) == [0.8, 1.8, 0.0, 1.2, 2.2, 2.5]
+    # Anything else keeps its whole box.
+    assert _bounds(collider_mesh(light, "barrel")) == [-0.14, -0.14, 0.0, 0.14, 1.9, 3.3]
+
+
+def test_the_trunk_and_post_are_measured_from_the_foot_of_the_mesh() -> None:
+    from onward_generator.generation.mesh import merge as merge_meshes
+    from onward_generator.overgrow.fit import collider_mesh
+
+    # The same light and tree standing on a 1 m plinth.
+    light = merge_meshes([mesh_box(-0.14, 0.14, -0.14, 0.14, 1.0, 4.3), mesh_box(-0.1, 0.1, 0.0, 1.9, 3.8, 4.0)])
+    assert _bounds(collider_mesh(light, "lamp")) == [-0.14, -0.14, 1.0, 0.14, 0.14, 4.3]
+    tree = merge_meshes([mesh_box(0.9, 1.1, 1.9, 2.1, 1.0, 3.0), mesh_box(-2.0, 4.0, -1.0, 5.0, 1.29, 7.0)])
+    assert _bounds(collider_mesh(tree, "tree")) == [0.8, 1.8, 1.0, 1.2, 2.2, 3.5]
+
+
+@pytest.mark.parametrize(("role", "category"), [("tree", "vegetation"), ("lamp", "furniture"), ("fire_escape", "facade")])
+def test_a_tree_a_lamp_and_a_fire_escape_are_solid(role: str, category: str) -> None:
+    assert is_solid(role, category) is True
+    assert is_solid(role, category, (0.1, 0.1, 0.1)) is True
+
+
+def _stack(z0: float, z1: float) -> list[Node]:
+    return [
+        Node(f"overgrow/prop/fire_escape_{n}/0", (Primitive(_mesh(3.0, 1.2, 3.0), f"prop_fe_{n}"),),
+             {"role": "fire_escape", "kind": "facade"}, frame_matrix((0.0, 8.0 - 0.08 - 0.6, z), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0)))
+        for n, z in enumerate((z0, z1))
+    ]
+
+
+@pytest.mark.parametrize(("lower", "upper", "problem"), [(0.0, 3.0, False), (3.0, 0.0, False), (0.0, 2.0, True), (0.0, 6.0, False)])
+def test_fit_counts_a_pile_only_where_the_heights_overlap(tmp_path: Path, lower: float, upper: float, problem: bool) -> None:
+    # Two 3 m fire-escape modules on the same wall: stacked either way round, overlapping by 1 m, or a storey apart.
+    _checked, problems = _fit_scene(tmp_path, _stack(lower, upper))
+    assert [p for p in problems if " overlaps " in p] == (
+        ["overgrow/prop/fire_escape_0/0 overlaps overgrow/prop/fire_escape_1/0 3.60m2"] if problem else []
+    )
+
+
+def test_a_solid_tree_is_measured_by_its_trunk_not_its_canopy() -> None:
+    spot = Spot("sidewalk", 2.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    barrel = _solid_prop("barrel_0", "barrel", "waste", (0.6, 0.6, 0.9))
+    tree = _solid_prop("tree_0", "tree", "vegetation", (6.0, 6.0, 6.0))
+    result = Dressing()
+    _place_props([tree], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:t", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == ["tree_0"]
+    assert [round(v, 3) for v in result.solid_prints[0].bounds] == [-0.2, -0.2, 0.2, 0.2]
+    assert _on_solid(barrel, spot, False, result) is False  # 2 m out, under the 3 m canopy
+    # Even over the trunk it shares only its 0.16 m2, under the 0.25 m2 that makes a pile.
+    assert _on_solid(barrel, Spot("sidewalk", 0.0, 0.0, 0.0, "grid:1", "grid", 10.0), False, result) is False
+    big = _solid_prop("crate_0", "barrel", "waste", (1.0, 1.0, 1.0))
+    assert _on_solid(big, Spot("sidewalk", 0.0, 0.0, 0.0, "grid:2", "grid", 10.0), False, Dressing(solid_prints=[box(-0.6, -0.6, 0.6, 0.6)])) is True
+
+
+
+def _light(name: str, x: float, arm: float) -> Node:
+    from onward_generator.generation.mesh import merge as merge_meshes
+
+    # A 0.28 m post with a 2.5 m arm reaching along x, 2.8 to 3.0 m up.
+    mesh = merge_meshes([mesh_box(-0.14, 0.14, -0.14, 0.14, 0.0, 3.3), mesh_box(min(0.0, arm), max(0.0, arm), -0.5, 0.5, 2.8, 3.0)])
+    return Node(f"overgrow/prop/{name}/0", (Primitive(mesh, f"prop_{name}"),), {"role": "lamp", "kind": "furniture"},
+                yaw_matrix(x, -6.0, 0.0, 0.0))
+
+
+def test_fit_sees_no_pile_where_two_lamp_arms_cross(tmp_path: Path) -> None:
+    # The posts stand 3 m apart; their arms cross overhead over 2 m.
+    _checked, problems = _fit_scene(tmp_path, [_light("lamp_a", 0.0, 2.5), _light("lamp_b", 3.0, -2.5)])
+    assert problems == []
+
+
+def test_a_canopy_over_a_footprint_is_no_pile_for_a_new_tree() -> None:
+    tree = _solid_prop("tree_0", "tree", "vegetation", (6.0, 6.0, 6.0))
+    under_canopy = Dressing(solid_prints=[box(1.0, 1.0, 2.5, 2.5)])
+    assert _on_solid(tree, Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0), False, under_canopy) is False
+
+
+def test_a_lamp_writes_its_post_as_collider_from_the_rules_and_an_ai_plan() -> None:
+    from onward_generator.generation.mesh import merge as merge_meshes
+    from onward_generator.overgrow.realize import _emit as emit_planned
+
+    mesh = merge_meshes([mesh_box(-0.14, 0.14, -0.14, 0.14, 0.0, 3.3), mesh_box(-0.1, 0.1, 0.0, 1.9, 2.8, 3.0)])
+    lamp = Prop(AssetSpec("light_0", "furniture", "lamp", ("sidewalk",), "ground", "test"), mesh, np.zeros((mesh.vertex_count, 2), dtype=np.float32), b"")
+    rules = Dressing()
+    _place_props([lamp], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, rules, used=[], seen=set())
+    planned = Dressing()
+    emit_planned(lamp, yaw_matrix(0.0, -6.0, 0.0, 0.0), planned, op="place", anchor_id="poi:0", crosswise=False, op_index=0)
+    for result in (rules, planned):
+        (collider,) = result.colliders
+        assert _bounds(collider.primitives[0].mesh) == [-0.14, -0.14, 0.0, 0.14, 0.14, 3.3]
+
+
+def test_the_post_and_trunk_are_off_the_origin_and_end_at_their_foot_slice() -> None:
+    from onward_generator.generation.mesh import merge as merge_meshes
+    from onward_generator.overgrow.fit import collider_mesh
+
+    # A post at x 0.5..0.8, y 1.0..1.4, and an arm whose bottom is exactly 1 m up: the arm is not in the post.
+    light = merge_meshes([mesh_box(0.5, 0.8, 1.0, 1.4, 0.0, 3.0), mesh_box(0.5, 3.5, 1.0, 1.4, 1.0, 1.2)])
+    assert _bounds(collider_mesh(light, "lamp")) == [0.5, 1.0, 0.0, 0.8, 1.4, 3.0]
+    # A trunk at x 2..2.2, y -1..-0.8, and a canopy whose bottom is exactly 0.25 m up (exact in binary, under 0.3 m).
+    tree = merge_meshes([mesh_box(2.0, 2.2, -1.0, -0.8, 0.0, 2.0), mesh_box(-4.0, 6.0, -3.0, 5.0, 0.25, 6.0)])
+    canopy_low = _bounds(collider_mesh(tree, "tree"))
+    # The canopy starts inside the 0.3 m foot slice, so it widens the foot: centre (1, 1).
+    assert canopy_low == [0.8, 0.8, 0.0, 1.2, 1.2, 2.5]
+    tree = merge_meshes([mesh_box(2.0, 2.2, -1.0, -0.8, 0.0, 2.0), mesh_box(-4.0, 6.0, -3.0, 5.0, 0.5, 6.0)])
+    assert _bounds(collider_mesh(tree, "tree")) == [1.9, -1.1, 0.0, 2.3, -0.7, 2.5]
+
+
+def test_a_part_exactly_at_the_top_of_the_foot_slice_is_left_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.generation.mesh import merge as merge_meshes
+    from onward_generator.overgrow.fit import collider_mesh
+
+    # 0.25 m is exact in binary: a canopy whose bottom sits on the slice's top is not part of the foot.
+    monkeypatch.setattr("onward_generator.overgrow.fit.TRUNK_FOOT_M", 0.25)
+    tree = merge_meshes([mesh_box(2.0, 2.2, -1.0, -0.8, 0.0, 2.0), mesh_box(-4.0, 6.0, -3.0, 5.0, 0.25, 6.0)])
+    assert _bounds(collider_mesh(tree, "tree")) == [1.9, -1.1, 0.0, 2.3, -0.7, 2.5]

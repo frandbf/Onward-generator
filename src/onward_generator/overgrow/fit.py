@@ -20,7 +20,7 @@ from shapely.geometry import LineString, Polygon, shape
 from shapely.geometry.polygon import orient
 
 from onward_generator.generation.gltf import nodes_from_glb
-from onward_generator.generation.mesh import Mesh, merge, transform
+from onward_generator.generation.mesh import Mesh, box, merge, transform
 from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
@@ -144,6 +144,34 @@ def object_reason(
     return _location_reason(role, polygon, buildings, lanes)
 
 
+# A library tree's collider is the trunk box of detail's street tree, centred on its foot.
+TRUNK_HALF_M = 0.2
+TRUNK_TOP_M = 2.5
+TRUNK_FOOT_M = 0.3
+# A lamp's or traffic light's collider is its post: the plan of its lowest metre, to its full height.
+POST_FOOT_M = 1.0
+
+
+def collider_mesh(mesh: Mesh, role: str) -> Mesh:
+    """The box that stops players and bullets. The visible mesh stays in the other file.
+
+    A whole box suits a car or a dumpster. Round a lamp it would be a wall under the arm, and round a
+    tree a block the size of its canopy, so those keep their post or trunk.
+    """
+    vertices = mesh.vertices
+    low, high = vertices.min(axis=0), vertices.max(axis=0)
+    if role == "tree":
+        foot = vertices[vertices[:, 2] < low[2] + TRUNK_FOOT_M]
+        cx, cy = (foot[:, :2].min(axis=0) + foot[:, :2].max(axis=0)) / 2
+        return box(float(cx) - TRUNK_HALF_M, float(cx) + TRUNK_HALF_M, float(cy) - TRUNK_HALF_M, float(cy) + TRUNK_HALF_M,
+                   float(low[2]), float(low[2]) + TRUNK_TOP_M)
+    if role == "lamp":
+        post = vertices[vertices[:, 2] < low[2] + POST_FOOT_M]
+        plow, phigh = post.min(axis=0), post.max(axis=0)
+        return box(float(plow[0]), float(phigh[0]), float(plow[1]), float(phigh[1]), float(low[2]), float(high[2]))
+    return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
+
+
 def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]]:
     """Measure every placed prop, wreck and street plate. Moss, grass, vines and trees stay out."""
     directory = Path(base)
@@ -158,7 +186,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     signs = shop_signs(manifest)
     problems: list[str] = []
     checked = 0
-    solid: list[tuple[str, Polygon]] = []
+    solid: list[tuple[str, Polygon, float, float]] = []
     for node in nodes:
         if node.name.startswith(STREET_SIGN_NODE):
             checked += 1
@@ -189,7 +217,10 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
             problems.append(f"{node.name} {reason} {length_m:.2f}x{width_m:.2f}x{height_m:.2f}")
         # A wreck's role is solid on its own; a prop may be solid by its category (``kind``).
         if is_solid(role, str(node.extras.get("kind")), measure(mesh)):
-            solid.append((node.name, footprint))
+            # A tree or a lamp stops a player at its trunk or post, not under its canopy or arm.
+            collider = collider_mesh(mesh, role)
+            heights = transform(collider, matrix).vertices[:, 2]
+            solid.append((node.name, _footprint(collider, matrix), float(heights.min()), float(heights.max())))
     problems.extend(_overlaps(solid))
     return checked, problems
 
@@ -241,14 +272,17 @@ def _ground_reason(posed: Mesh, floor: RoadFloor) -> str | None:
     return None
 
 
-def _overlaps(solid: list[tuple[str, Polygon]]) -> list[str]:
-    """One line per pair of solid props standing inside each other."""
-    tree = STRtree([footprint for _name, footprint in solid])
+def _overlaps(solid: list[tuple[str, Polygon, float, float]]) -> list[str]:
+    """One line per pair of solid props standing inside each other: their footprints share area and their heights overlap.
+
+    Fire-escape modules stacked up a wall share a footprint storey after storey without touching.
+    """
+    tree = STRtree([footprint for _name, footprint, _low, _high in solid])
     found = []
-    for index, (name, footprint) in enumerate(solid):
+    for index, (name, footprint, low, high) in enumerate(solid):
         # Box hits that do not meet share no area, so the box query is enough.
         for other in sorted(int(i) for i in tree.query(footprint)):
-            if other <= index:
+            if other <= index or not (solid[other][2] < high and solid[other][3] > low):
                 continue
             shared = float(footprint.intersection(solid[other][1]).area)
             if shared > PROP_OVERLAP_M2:

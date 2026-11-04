@@ -18,7 +18,7 @@ from shapely.geometry import LineString, Polygon
 from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
-from onward_generator.generation.mesh import Mesh, box, quad, transform
+from onward_generator.generation.mesh import Mesh, quad, transform
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.overgrow.ambient import blocks_street, cross_yaw, is_solid
 from onward_generator.overgrow.catalog import FACADE_Z_M, RULES_BY_ID, SIDEWALK_COVER_RULE, PlacementRule, rules_for
@@ -32,7 +32,15 @@ from onward_generator.overgrow.constants import (
     VINE_HEIGHT_M,
     VINE_WIDTH_M,
 )
-from onward_generator.overgrow.fit import PROP_OVERLAP_M2, _footprint, apply_fit_scale, measure, object_reason, size_reason
+from onward_generator.overgrow.fit import (
+    PROP_OVERLAP_M2,
+    _footprint,
+    apply_fit_scale,
+    collider_mesh,
+    measure,
+    object_reason,
+    size_reason,
+)
 from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
@@ -428,10 +436,10 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
         "solid": is_solid(prop.spec.role, prop.spec.category, prop.size_m),
     })
     if is_solid(prop.spec.role, prop.spec.category, prop.size_m):
-        result.solid_prints.append(_footprint(prop.mesh, matrix))
+        result.solid_prints.append(_footprint(collider_mesh(prop.mesh, prop.spec.role), matrix))
         result.colliders.append(Node(
             f"overgrow/collider/prop/{prop.spec.id}/{len(result.colliders)}",
-            (Primitive(collider_mesh(prop.mesh), "collider"),),
+            (Primitive(collider_mesh(prop.mesh, prop.spec.role), "collider"),),
             {"type": "collision", "origin": "generated", "asset_id": prop.spec.id, "role": prop.spec.role},
             matrix,
         ))
@@ -467,18 +475,8 @@ def _on_solid(prop: Prop, spot: Spot, block_streets: bool, result: Dressing, tur
     """
     if not is_solid(prop.spec.role, prop.spec.category, prop.size_m):
         return False
-    footprint = _footprint(prop.mesh, _frame(prop, spot, block_streets, turn)[0])
+    footprint = _footprint(collider_mesh(prop.mesh, prop.spec.role), _frame(prop, spot, block_streets, turn)[0])
     return any(float(footprint.intersection(other).area) > PROP_OVERLAP_M2 for other in result.solid_prints)
-
-
-def collider_mesh(mesh: Mesh) -> Mesh:
-    """A box around the prop. The visible mesh stays in the other file."""
-    vertices = mesh.vertices
-    return box(
-        float(vertices[:, 0].min()), float(vertices[:, 0].max()),
-        float(vertices[:, 1].min()), float(vertices[:, 1].max()),
-        float(vertices[:, 2].min()), float(vertices[:, 2].max()),
-    )
 
 
 def _frame(prop: Prop, spot: Spot, block_streets: bool = False, turn: float = 0.0, floor: RoadFloor | None = None) -> tuple[np.ndarray, float, float, float]:

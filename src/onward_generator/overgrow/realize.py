@@ -457,7 +457,7 @@ def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_i
     if solid:
         result.colliders.append(Node(
             f"overgrow/collider/prop/{prop.spec.id}/{len(result.colliders)}",
-            (Primitive(collider_mesh(prop.mesh), "collider"),),
+            (Primitive(collider_mesh(prop.mesh, prop.spec.role), "collider"),),
             {"type": "collision", "origin": "ai_generated", "asset_id": prop.spec.id, "role": prop.spec.role},
             matrix,
         ))

@@ -23,10 +23,10 @@ _BLOCKING = (
 )
 _STREET_ROLES = frozenset({"wreck", "barrel", "barrier", "container", "pole"})
 _SOLID_ROLES = _STREET_ROLES | frozenset({"gate", "fence", "cart", "tank", "table", "bed"})
+# Solid through their trunk, post or frame only (``fit.collider_mesh``), whatever their category.
+_SHAPED_ROLES = frozenset({"tree", "lamp", "fire_escape"})
 _OPEN_ROLES = frozenset({
-    "can", "plant", "bush", "tree", "camera", "aircon", "manhole", "flower",
-    # A box around a lamp or traffic light would be an invisible wall under its arm.
-    "lamp",
+    "can", "plant", "bush", "camera", "aircon", "manhole", "flower",
 })
 COVER_HEIGHT_M = 0.5
 COVER_DEPTH_M = 0.4
@@ -70,8 +70,11 @@ def is_solid(role: str, category: str, size_m: tuple[float, float, float] | None
     """Cars, barrels, posts and similar masses stop the player. Bottles and plants do not.
 
     Any other prop with its ``size_m`` (length, width, height) is solid when it looks like cover:
-    a dumpster, a concrete block, a bench, a planter. Wall-mounted props are never solid.
+    a dumpster, a concrete block, a bench, a planter. A tree, a lamp and a fire escape are solid
+    through their trunk, post or frame; other wall-mounted props and plants never are.
     """
+    if role in _SHAPED_ROLES:
+        return True
     if role in _OPEN_ROLES or category in {"vegetation", "facade"}:
         return False
     if role in _SOLID_ROLES or category in {"vehicles", "structures"}:
