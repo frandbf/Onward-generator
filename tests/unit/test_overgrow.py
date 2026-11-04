@@ -6,6 +6,7 @@ The fixture is local metres around MURCIA_CENTER. It is not the Murcia extract.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -325,3 +326,23 @@ def test_every_overgrow_tree_has_the_trunk_box_of_a_street_tree(tmp_path: Path) 
     for node, tree in zip(boxes, trees, strict=True):
         assert np.array_equal(node.matrix, tree.matrix)
         assert node.extras == {"type": "collision", "origin": tree.extras["origin"], "role": "tree"}
+
+
+
+def test_detail_urban_elements_become_circles_the_props_keep_out_of() -> None:
+    from onward_generator.overgrow.place import DETAIL_ELEMENT_CLEAR_M, DETAIL_ELEMENT_DEFAULT_M, _detail_elements
+
+    # Records that are not placed urban elements sit between the others: they are skipped, not the end.
+    manifest = {"objects": [
+        _urban("osm-node-moss", 0.0, 0.0, kind_of="overgrowth"),
+        _urban("osm-node-bench", 1.0, 2.0, kind="bench"),  # collider 1.8 x 0.5
+        {"id": "urban/bench/x", "type": "urban_element", "kind": "bench", "position_m": []},
+        _urban("osm-node-tree", -3.0, 4.0),  # collider 0.4 x 0.4
+        "not a record",
+        _urban("osm-node-kiosk", 5.0, 6.0, kind="kiosk"),  # no prototype
+    ]}
+    found = _detail_elements(manifest)
+    assert [(x, y) for x, y, _r in found] == [(1.0, 2.0), (-3.0, 4.0), (5.0, 6.0)]
+    radii = [round(r, 4) for _x, _y, r in found]
+    assert radii == [round(math.hypot(1.8, 0.5) / 2 + 0.3, 4), round(math.hypot(0.4, 0.4) / 2 + 0.3, 4), round(1.0 + 0.3, 4)]
+    assert (DETAIL_ELEMENT_CLEAR_M, DETAIL_ELEMENT_DEFAULT_M) == (0.3, 1.0)

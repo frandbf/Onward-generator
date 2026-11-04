@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely import LineString, STRtree, box
+from shapely import LineString, Point, STRtree, box
 
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.config import Material
@@ -18,7 +18,7 @@ from onward_generator.generation.mesh import Mesh
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.overgrow.ambient import cross_yaw, is_solid
 from onward_generator.overgrow.catalog import AssetSpec
-from onward_generator.overgrow.dressing import Dressing, Spot, _on_solid, _place_props, _repeats, dress
+from onward_generator.overgrow.dressing import Dressing, Spot, _in_keep_out, _on_solid, _place_props, _repeats, dress
 from onward_generator.overgrow.fit import (
     apply_fit_scale,
     check_scene,
@@ -710,3 +710,89 @@ def test_an_ai_plan_gives_every_kind_of_solid_prop_a_collider(prop: Prop) -> Non
     emit_planned(prop, yaw_matrix(0.0, -6.0, 0.0, 0.0), result, op="place", anchor_id="poi:0", crosswise=False, op_index=0)
     assert result.records[0]["solid"] is True
     assert len(result.colliders) == 1
+
+
+def test_a_prop_footprint_keeps_out_of_an_urban_element() -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    dumpster = _solid_prop("dumpster_0", "trash", "waste", (2.4, 2.2, 1.7))  # x -1.2..1.2
+    near = Dressing(keep_out=[Point(1.6, 0.0).buffer(0.5)])  # its edge reaches x 1.1
+    far = Dressing(keep_out=[Point(1.8, 0.0).buffer(0.5)])
+    assert _in_keep_out(dumpster, spot, False, near) is True
+    assert _in_keep_out(dumpster, spot, False, far) is False
+    assert _in_keep_out(dumpster, spot, False, Dressing()) is False
+    aircon = Prop(AssetSpec("aircon_0", "facade", "aircon", ("facade",), "facade", "test"), _mesh(0.8, 0.5, 0.6),
+                  np.zeros((24, 2), dtype=np.float32), b"")
+    assert _in_keep_out(aircon, spot, False, Dressing(keep_out=[Point(0.0, 0.0).buffer(1.0)])) is False
+
+
+def test_a_turned_prop_is_kept_out_where_it_lies() -> None:
+    fence = _solid_prop("fence_0", "fence", "structures", (3.0, 0.4, 1.0))
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    east = Dressing(keep_out=[Point(1.3, 0.0).buffer(0.2)])
+    assert _in_keep_out(fence, spot, False, east) is True
+    assert _in_keep_out(fence, spot, False, east, math.pi / 2) is False
+
+
+def test_dress_keeps_every_prop_off_the_urban_elements() -> None:
+    lane = LineString([(-8.0, 0.0), (8.0, 0.0)])
+    barrels = [_solid_prop(f"barrel_{n}", "barrel", "waste", (0.6, 0.6, 0.9)) for n in range(8)]
+
+    def plant(**kwargs: object) -> list[list[float]]:
+        planted = dress(
+            barrels, [], [], STRtree([box(30.0, 30.0, 40.0, 40.0)]), [lane], STRtree([lane]), square_zone(80.0),
+            profile_for(100), 48152, [], grass_mesh=None, grass_left=0, triangle_budget=60_000, **kwargs,  # type: ignore[arg-type]
+        )
+        return [row["position_m"][:2] for row in planted.records]
+
+    alone = plant()
+    benches = [(x, y, 1.0) for x, y in alone[:2]]
+    kept = plant(keep_out=benches)
+    assert kept
+    assert all(math.dist(point, (x, y)) > 1.0 + 0.3 for point in kept for x, y, _r in benches)
+
+
+def test_a_prop_on_an_urban_element_is_rejected_and_reported() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    result = Dressing(keep_out=[Point(1.0, 2.0).buffer(0.4)])
+    _place_props([bench], [Spot("sidewalk", 1.0, 2.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == []
+    assert result.rejects == [{"asset_id": "bench_0", "reason": "on_urban_element", "kind": "furniture", "position_m": [1.0, 2.0, 0.0]}]
+
+
+def test_a_spot_on_an_urban_element_does_not_end_the_search() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    spots = _spots(*[(f"grid:{n}", 0.0) for n in range(6)], ("grid:far", 20.0))
+    result = Dressing(keep_out=[Point(0.0, 0.0).buffer(0.4)])
+    _place_props([bench], spots, STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, used=[], seen=set())
+    assert [row["position_m"][:2] for row in result.records][:1] == [[20.0, 0.0]]
+
+
+def _street_barrier() -> tuple[Prop, Spot, Dressing]:
+    barrier = Prop(AssetSpec("barrier_0", "barriers", "barrier", ("carriageway",), "ground", "test"), _mesh(3.0, 0.4, 1.0),
+                   np.zeros((24, 2), dtype=np.float32), b"")
+    spot = Spot("carriageway", 0.0, -1.15, 0.0, "lane:0", "lane-0", 10.0, lane_x=0.0, lane_y=0.0, normal=(0.0, -1.0))
+    # Turned and across the lane the barrier covers x -0.2..0.2, y -2.4..0.6: unturned it would reach the first
+    # circle, beside the lane (an open street) the second.
+    return barrier, spot, Dressing(keep_out=[Point(1.0, -0.9).buffer(0.3), Point(0.0, -5.0).buffer(0.5)])
+
+
+def test_a_turned_street_barrier_keeps_out_where_it_crosses_the_lane() -> None:
+    barrier, spot, result = _street_barrier()
+    _place_props([barrier], [spot], STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, block_streets=True, placed_roles=Counter({"barrier": 2}), used=[], seen=set())
+    assert result.placed_ids == ["barrier_0"]
+
+
+def test_a_repeated_street_barrier_keeps_out_where_it_crosses_the_lane() -> None:
+    barrier, spot, result = _street_barrier()
+    _repeat(barrier, [spot], result, block_streets=True, already=2)
+    assert len(result.records) == 1
+
+
+def test_a_repeat_skips_an_urban_element_and_goes_on() -> None:
+    bench = _solid_prop("bench_0", "bench", "furniture", (1.0, 1.0, 1.0))
+    result = Dressing(keep_out=[Point(0.0, 0.0).buffer(0.4)])
+    _repeat(bench, _spots(*[(f"grid:{n}", 0.0) for n in range(6)], ("grid:far", 20.0)), result)
+    assert [row["position_m"][:2] for row in result.records] == [[20.0, 0.0]]
