@@ -329,7 +329,7 @@ An `overgrow` output (a base with `overgrow_report.json`) must carry the `fit.js
 | Size | 12 m high, 0.4 m thick, unless `--height-m` and `--thickness-m` |
 | Purpose | Closes the edge with a 12 m collider. It is not drawn. There is no concrete wall mesh |
 | Core | With a `core` in `scene_detail.json`, the wall stands on the core square, so players stay in the core; the backdrop stays at the site edge (ADR-017). `bounds_report.json` gives `wall.core_half_side_m` |
-| Optional | `--backdrop`: a visual haze ring just outside the wall, no collider (ADR-014, `docs/12-export.md`). Off by default; `run` does not pass it |
+| Backdrop | `--backdrop`: a visual haze ring just outside the wall, no collider (ADR-014, `docs/12-export.md`). Off by default for `bounds` alone; `run` passes it, at the default offset and height, since on the headset the ground ended on an empty horizon |
 
 An export of a `gameplay_layout` refuses a `--detail` directory that does not contain that wall.
 

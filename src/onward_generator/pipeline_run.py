@@ -161,7 +161,9 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     # bounds, layout and export are planned before their inputs exist, so the
     # ``next:`` helpers that look for those inputs are not used here.
     playable = root / "data" / "processed" / "scene_playable"
-    bounds_argv = list(invoke("bounds", "--base", show(overgrow), "--out", show(playable)).argv)
+    # The haze ring past the wall (ADR-014): on the headset the ground ended at the site edge on an empty horizon,
+    # as if the player could fall off the map.
+    bounds_argv = list(invoke("bounds", "--base", show(overgrow), "--out", show(playable), "--backdrop").argv)
     layout_path = root / "data" / "processed" / "layout" / "layout.json"
     layout_argv = list(invoke(
         "perf", "layout",

@@ -27,6 +27,10 @@ Real silhouettes of the buildings outside the area of interest would look better
    The contract: `scene_detail.json` (or `scene3d.json`) gets an object of `type: backdrop` and `envelope.backdrop` (`null` when off); `bounds_report.json` gets `backdrop` (`null` when off).
 3. **Unknown, checked on the headset.** Whether the Onward runtime or the `UrbanDay1` post-processing profile overrides `RenderSettings` fog, ambient light, or the skybox (`UseBuiltInSkybox = true`). The project's shader stripping keeps every fog mode (`docs/11-onward-sdk.md`). Whether `PP_Opaque_Simple_Lit` applies fog is not documented in this repository.
 
+## Amendment: the ring is on in `run` (4 November 2026)
+
+On the headset, Murcia2026 (no playable core, so the wall stands on the site edge) showed the paving end on the built-in skybox's brown lower half: the player read it as the edge of the world, as if they could fall off. `run` now passes `--backdrop` to `bounds`, at the default 2 m offset and 30 m height; `bounds` on its own keeps it off. The cost is the one under *Cost* below: 2 triangles per hull edge and one draw call. Whether the gradient reads as haze on the headset, and whether the runtime keeps the ring lit as the editor does, is still to be checked there. A painted skyline or the real buildings outside the area (the next step below) remain separate decisions.
+
 ## Rejected alternatives
 
 - A custom skybox or a horizon shader. Exported materials stay `PP_Opaque_Simple_Lit` with an albedo, and the skybox stays the built-in one.
