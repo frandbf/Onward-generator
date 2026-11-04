@@ -558,7 +558,7 @@ namespace OnwardGenerator
                     var combined = new Mesh { name = name, indexFormat = verts > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
                     combined.CombineMeshes(g.Value.ToArray(), true, true, false);
                     combined.RecalculateBounds();
-                    Unwrapping.GenerateSecondaryUVSet(combined);
+                    Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
                     AssetDatabase.CreateAsset(combined, $"{root}/Meshes/{name}.asset");
@@ -2858,6 +2858,33 @@ namespace OnwardGenerator
             sizes.Length == 0 ? "none" : string.Join(", ", sizes.GroupBy(s => s).Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key));
 
         // ---- Helpers ---------------------------------------------------------------------------
+        // Unity's default pack margin is a fixed fraction of a mesh's 0-1 lightmap square, so a
+        // roof, a stair or a party wall that gets a small square in the atlas kept under one texel
+        // between its charts and bled light from the next one (128 of 168 renderers on MurciaEjemplo).
+        internal const float LightmapMarginTexels = 4f;
+        internal const float LightmapMarginMax = 0.25f;
+
+        // The margin that leaves LightmapMarginTexels between charts, for a mesh whose lightmap
+        // square is about sqrt(area) x texelsPerM texels on a side. Never below Unity's default.
+        private static UnwrapParam LightmapUnwrap(Mesh mesh, float texelsPerM)
+        {
+            UnwrapParam.SetDefaults(out UnwrapParam param);
+            float side = Mathf.Sqrt(SurfaceArea(mesh)) * texelsPerM;
+            if (side > 0f)
+                param.packMargin = Mathf.Clamp(LightmapMarginTexels / side, param.packMargin, LightmapMarginMax);
+            return param;
+        }
+
+        private static float SurfaceArea(Mesh mesh)
+        {
+            Vector3[] v = mesh.vertices;
+            int[] t = mesh.triangles;
+            double area = 0;
+            for (int i = 0; i + 2 < t.Length; i += 3)
+                area += Vector3.Cross(v[t[i + 1]] - v[t[i]], v[t[i + 2]] - v[t[i]]).magnitude * 0.5;
+            return (float)area;
+        }
+
         // Thin trees, lamps and benches baked black at 2 lightmap texels/m (Quest observation).
         // Overgrow props (material prop_<id>, overgrow/realize.py and dressing.py) are small
         // and often flush against a wall; air-conditioner units came out solid black on the
