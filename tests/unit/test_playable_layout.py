@@ -636,6 +636,22 @@ def test_the_climb_keep_out_covers_points_street_doors_and_routes() -> None:
     assert climb_keep_out([(0.0, 0.0)], [], {}).contains(Point(2.9, 0.0))
 
 
+def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> None:
+    """On the headset a street cabin held a pile of bricks: ``overgrow`` places its props before the layout picks the cabins."""
+    manifest = {"objects": [
+        {"type": "overgrowth", "kind": "waste", "role": "debris", "position_m": [50.0, 0.0, 0.0]},
+        {"type": "overgrowth", "kind": "tree", "position_m": [0.0, 80.0, 0.0]},
+        {"type": "overgrowth", "kind": "vegetation", "role": "tree", "position_m": [0.0, -80.0, 0.0]},
+        *({"type": "overgrowth", "kind": kind, "position_m": [-50.0, y, 0.0]} for kind, y in (("grass", 0.0), ("vine", 20.0), ("moss", 40.0))),
+        {"type": "urban_element", "kind": "waste", "position_m": [-80.0, 0.0]},
+    ]}
+    keep_out = climb_keep_out([(500.0, 500.0)], [], manifest)
+    for inside in ((50.9, 0.0), (1.9, 80.0), (1.9, -80.0)):
+        assert keep_out.contains(Point(inside)), inside
+    for outside in ((51.1, 0.0), (2.1, 80.0), (2.1, -80.0), (-50.0, 0.0), (-50.0, 20.0), (-50.0, 40.0), (-80.0, 0.0)):
+        assert not keep_out.contains(Point(outside)), outside
+
+
 
 def test_no_ammo_crate_lands_on_the_attackers_block() -> None:
     plaza = box(0, 0, 40, 12)

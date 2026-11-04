@@ -650,6 +650,12 @@ CLIMB_KEEP_OUT_M = 3.0
 """A cabin or a ladder's foot stays this far from a spawn, an objective, a box and an interior's door."""
 CLIMB_ROUTE_KEEP_OUT_M = 1.5
 """The navmesh is baked without them, so a bot's route must not cross them."""
+CLIMB_PROP_CLEAR_M = 1.0
+"""From the spot of an overgrow prop: the radius ``free_ground`` gives a detail urban element. An estimate, not a measured footprint."""
+CLIMB_TREE_CLEAR_M = 2.0
+"""From an overgrow tree: a generated crown is about 3.8 m across, and it once stood in a street cabin."""
+CLIMB_FLAT_GROWTH = frozenset({"grass", "vine", "moss"})
+"""Overgrowth a cabin may stand on or beside: flat on the ground or on a facade."""
 
 
 def ammo_points(
@@ -669,15 +675,22 @@ def ammo_points(
 
 
 def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
-    """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and the bots' routes."""
+    """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors, the bots' routes
+    and the overgrow props. The layout runs after ``overgrow``, which knew nothing of the cabins: bricks and a tree stood in one."""
+    objects = detail_manifest.get("objects", [])
     doors = [
         tuple(connection["position_m"])
-        for interior in detail_manifest.get("objects", []) if interior.get("type") == "interior"
+        for interior in objects if interior.get("type") == "interior"
         for connection in interior.get("connections", []) if connection.get("from") == "exterior"
+    ]
+    props = [
+        Point(prop["position_m"][:2]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)
+        for prop in objects if prop.get("type") == "overgrowth" and prop.get("kind") not in CLIMB_FLAT_GROWTH
     ]
     return union_all([
         *[Point(p).buffer(CLIMB_KEEP_OUT_M) for p in (*points, *doors)],
         *[LineString([(p["x"], p["y"]) for p in route["points"]]).buffer(CLIMB_ROUTE_KEEP_OUT_M) for route in routes],
+        *props,
     ])
 
 

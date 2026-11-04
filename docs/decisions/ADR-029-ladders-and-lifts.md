@@ -17,7 +17,7 @@ Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the h
 1. A building gets one access. Its roof must be flat, it must not be a landmark or in the scenic tier, and no stair may reach it. On a map with a playable core (ADR-017) the whole footprint must lie inside the perimeter wall (the core less `envelope.thickness_m`), and a roof higher than the wall (`envelope.height_m`, 12 m by default) must stay 6 m (`WALL_JUMP_CLEAR_M`) from the core edge. A core building only has to touch the core, so before this rule a lift reached a 16.7 m roof that ran 37 m past the 12 m wall on MurciaEjemplo, and a player could walk out of the core over it; that map lost one ladder and two lifts to it. The 6 m is an estimate, not a measured jump.
 2. Storeys are the estimated levels, or what the height implies at 3 m a storey when that is more: a real Madrid map has a 22.9 m roof with few cadastral levels. Ladders: at most 3 storeys, no interior, at most 3 per map. Lifts: 3 to 6 storeys, at most 3 pairs per map. The upper limit and the lift cap are decisions of this ADR: a higher roof overlooks the whole map, and a pair is two choke points.
 3. **Fairness.** No access within 30 m of a spawn. Buildings closest to equidistant between the teams go first, then the lowest. Accesses are at least 30 m apart.
-4. **No blocking.** The foot of a ladder and a cabin with 3 m clear in front stay on free ground, 3 m from spawns, objectives, boxes and interior doors, and 1.5 m from bot routes. So there may be no ladder or lift on a map with no room, and that is accepted.
+4. **No blocking.** The foot of a ladder and a cabin with 3 m clear in front stay on free ground, 3 m from spawns, objectives, boxes and interior doors, 1.5 m from bot routes, and clear of the overgrow props (amendment below). So there may be no ladder or lift on a map with no room, and that is accepted.
 
 **A ladder keeps the prefab's shape.** The adapter raises it until `VaultTargetUpper` is at the top of the parapet (`parapet_m` in the site), puts that target back down on the roof, and adds rungs at the same spacing down to the ground, each level as a pair in the prefab's order (Left, Right). The top rungs stand 0.57 m above the parapet, as the prefab's stand above a bare edge, and the hand reach does not change. Under 5.1 m the lowest rungs are simply below the ground.
 
@@ -32,6 +32,10 @@ Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the h
 On the headset, some ladders ended below the top of the wall and the parapets got in the way of shooting. The top rung was 0.57 m above the roof and the parapet 1 to 1.2 m, so the ladder stopped up to 0.63 m short.
 
 Every template's parapet is now 0.7 m, not only those of a roof with a climb. The climbs are chosen at the layout stage, after `detail` has built the walls and their colliders, and every roof a stair reaches needs the same height. 0.7 m is a modelling assumption, to be checked on the headset: below the shoulder of a kneeling player, who can fire over it, and still cover for a crouched one.
+
+## Amendment: overgrow props (4 November 2026)
+
+On the headset a street cabin stood on a pile of Kenney bricks. `overgrow` places its props before the layout picks the cabins, and the keep-out held only spawns, objectives, boxes, doors and routes. Every `overgrowth` record but the flat growth (`grass`, `vine`, `moss`) now joins the keep-out: a circle of 1 m around the prop's spot (the radius `free_ground` gives a detail urban element), 2 m around a tree, whose generated crown is about 3.8 m across. Both radii are estimates, not measured footprints. The regenerated Murcia2026 area had a generated tree in a cabin with the rule before this one.
 
 ## Rejected alternatives
 
