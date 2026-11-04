@@ -790,7 +790,6 @@ def _lifted(flight: Flight, storey_m: float) -> np.ndarray:
 def build_interior(
     plan: InteriorPlan,
     height: float,
-    z_top: float,
     refined: BaseGeometry,
     cfg: DetailConfig,
     window_cuts: Sequence[WallCut] = (),
@@ -801,14 +800,13 @@ def build_interior(
 ) -> Interior:
     """Build the planned interior: ``interior_visual``, then ``assemble_interior``."""
     visual = interior_visual(plan, height, cfg, window_cuts, wall_material=wall_material, floor_material=floor_material)
-    return assemble_interior(plan, visual, height, z_top, refined, cfg, penetrations)
+    return assemble_interior(plan, visual, height, refined, cfg, penetrations)
 
 
 def assemble_interior(
     plan: InteriorPlan,
     visual: dict[str, list[Mesh]],
     height: float,
-    z_top: float,
     refined: BaseGeometry,
     cfg: DetailConfig,
     penetrations: Sequence[tuple[Segment, Hole]] = (),
@@ -825,7 +823,9 @@ def assemble_interior(
     colliders: list[tuple[str, Mesh]] = []
 
     # Everything outside the rooms stays solid: the outer walls, the partitions, and a part without a room.
-    wall_parts, glass = _pierced_walls(refined.difference(area), doors, penetrations, t, z_top)
+    # Up to the roof deck, no higher: above it the parapet has its own collider (``facades.build_shell``), and a
+    # partition raised to the parapet top stood 0.7 m over the roof, drawn by nothing, in front of a roof lift.
+    wall_parts, glass = _pierced_walls(refined.difference(area), doors, penetrations, t, height)
     colliders.extend(wall_parts)
     if not _climbs_to_roof(plan):
         # A room under the roof is closed by a roof slab; otherwise the storeys above stay solid.

@@ -177,7 +177,7 @@ def test_a_one_storey_shop_room_reaches_the_roof_slab() -> None:
     assert not isinstance(plan, str)
     slab = CFG.interiors.slab_m
     assert room_ceiling(plan, 3.0, slab) == pytest.approx(3.0 - slab)
-    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, CFG, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
+    built = build_interior(plan, 3.0, FOOTPRINT, CFG, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
     assert built.defects == 0
     names = [n for n, _ in built.colliders]
     assert names[-1] == "roof_slab" and "upper_solid" not in names
@@ -197,7 +197,7 @@ def test_rooms_of_a_stair_interior_keep_their_slabs_and_area() -> None:
     s = 3.0007  # a storey whose slab line has more than three decimals
     plan = plan_interior("block", odd, DOOR, SEG, 6 * s, s, 6, CFG)
     assert not isinstance(plan, str) and plan.floors >= 2
-    built = build_interior(plan, 6 * s, 6 * s, odd, CFG)
+    built = build_interior(plan, 6 * s, odd, CFG)
     area = plan.inner.area
     assert round(area, 3) != round(area, 4)
     slab = CFG.interiors.slab_m
@@ -219,9 +219,9 @@ def test_room_ceiling_is_the_storey_line_or_the_roof_slab(height: float, ceiling
 def test_a_shop_room_paints_its_walls_and_floor_and_keeps_a_white_ceiling() -> None:
     plan = plan_interior("shop", FOOTPRINT, DOOR, SEG, 18.0, 3.0, 6, CFG, roof_access=False, max_floors=1)
     assert not isinstance(plan, str)
-    built = build_interior(plan, 18.0, 18.0, FOOTPRINT, CFG, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
+    built = build_interior(plan, 18.0, FOOTPRINT, CFG, wall_material="interior_shop_bar", floor_material="interior_shop_wood")
     used = {name: sum(m.triangle_count for m in meshes) for name, meshes in built.visual.items() if meshes}
-    plain = build_interior(plan, 18.0, 18.0, FOOTPRINT, CFG)
+    plain = build_interior(plan, 18.0, FOOTPRINT, CFG)
     default = {name: sum(m.triangle_count for m in meshes) for name, meshes in plain.visual.items() if meshes}
     assert set(used) == {"interior_shop_bar", "interior_shop_wood", "interior_wall"}
     assert used["interior_shop_wood"] == default["interior_floor"] == 2
@@ -251,7 +251,7 @@ def test_a_neck_narrower_than_two_walls_leaves_the_room_behind_the_door_and_the_
     assert not isinstance(plan, str)
     assert plan.inner.bounds == pytest.approx((t, t, 24.0 - t, 8.0 - t))  # the piece the door opens into
     assert plan.depth_m is None
-    built = build_interior(plan, 3.0, 3.0, NECK, CFG)
+    built = build_interior(plan, 3.0, NECK, CFG)
     assert built.defects == 0 and "room_depth_m" not in built.spec
     assert not any(_inside(m, np.array([12.0, 4.0, 1.0])) for _, m in built.colliders)
     assert any(_inside(m, np.array([12.0, 13.0, 1.0])) for _, m in built.colliders)  # the far piece stays solid
@@ -272,7 +272,7 @@ def test_a_shop_room_can_be_cut_to_a_band_behind_its_door_wall() -> None:
     plan = plan_interior("big", FOOTPRINT, DOOR, SEG, 3.0, 3.0, 1, CFG, roof_access=False, max_floors=1, depth_m=6.0)
     assert not isinstance(plan, str) and plan.depth_m == 6.0
     assert plan.inner.bounds == pytest.approx((t, t, 24.0 - t, 6.0))
-    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, CFG)
+    built = build_interior(plan, 3.0, FOOTPRINT, CFG)
     assert built.defects == 0 and built.spec["room_depth_m"] == 6.0
     assert built.spec["rooms"][0]["area_m2"] == pytest.approx((24.0 - 2 * t) * (6.0 - t), abs=1e-3)
     # The back wall closes the room: the floor behind it is solid.

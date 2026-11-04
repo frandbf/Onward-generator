@@ -253,7 +253,7 @@ Measured on Madrid (40.40657, −3.719187) with Catastro: see [09-perf.md](09-pe
 `scene_collision.glb` is a separate file, one material `collider`:
 
 - buildings: the phase-03 prism (a flat facade; recesses and balconies do not change it), plus balcony boxes;
-- buildings with an interior: walls with a door hole and a hole for each `glass_view` and `shop_glass` opening, a separate `<id>#glass` pane in each `glass_view` hole (a `shop_glass` display window has none: a shot crosses it), a slab and a stair ramp for each flight, a roof-deck slab with the stair well cut out, and the parapet; without roof access, a solid above the furnished floors;
+- buildings with an interior: walls up to the roof deck with a door hole and a hole for each `glass_view` and `shop_glass` opening, a separate `<id>#glass` pane in each `glass_view` hole (a `shop_glass` display window has none: a shot crosses it), a slab and a stair ramp for each flight, a roof-deck slab with the stair well cut out, and the parapet; without roof access, a solid above the furnished floors. Above the roof deck only the parapet stands: the walls once rose to the parapet top, so the partitions between shop rooms stood 0.7 m over the roof, drawn by nothing, and on the headset a player could not step out of a roof lift past one;
 - street elements: instanced boxes;
 - ground: the phase-03 slabs.
 

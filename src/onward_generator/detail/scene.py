@@ -952,7 +952,7 @@ def detail_scene(
             refusal = budget.refuse("triangles", visual_triangles(drawn))
             if refusal is None:
                 shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
-                built = assemble_interior(interior, drawn, height, shell.z_top, refined, cfg, glass_penetrations(layout, segments))
+                built = assemble_interior(interior, drawn, height, refined, cfg, glass_penetrations(layout, segments))
                 refusal = budget.refuse("collision_triangles", built.collision_triangles)
         if refusal is not None:
             issues.append(Issue("interior_not_generated", "info", bid, refusal))

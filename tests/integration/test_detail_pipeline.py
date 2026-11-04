@@ -298,6 +298,29 @@ def test_colliders_are_separate_closed_and_positive(detailed) -> None:
     assert all(p.material != "collider" for n in detailed.visual_nodes() for p in n.primitives)
 
 
+@pytest.mark.parametrize("scene", ["detailed", "residential"])
+def test_nothing_of_an_interior_stands_on_its_roof_inside_the_parapet(scene: str, request: pytest.FixtureRequest,
+                                                                       detail_inputs: tuple[Path, Path, Path]) -> None:
+    """Above the roof deck a collider is only the parapet. The interior's walls once rose to the parapet top:
+    the partitions between shops stood 0.7 m over the roof, drawn by nothing, and a player left a roof lift into them."""
+    detailed = request.getfixturevalue(scene)
+    features = json.loads(detail_inputs[0].read_text(encoding="utf-8"))["features"]
+    fps = {f["id"]: shape(f["geometry"]) for f in features if f["kind"] == "building"}
+    checked = 0
+    for b in (o for o in detailed.objects if o.type == "building" and o.record.get("interior")):
+        roof = b.record["roof"]
+        if roof["type"] != "flat_parapet":
+            continue
+        deck = fps[b.record["source_ids"][0]].buffer(-roof["parapet_thickness_m"] - 0.01, join_style="mitre")
+        h = b.record["height"]["height_m"]
+        for mesh in b.colliders:
+            tri = mesh.vertices[mesh.triangles]
+            high = tri[tri[:, :, 2].max(axis=1) > h + 1e-6]
+            assert not any(deck.contains(Point(*t[:, :2].mean(axis=0))) for t in high), b.id
+        checked += 1
+    assert checked
+
+
 def test_interiors_only_in_selected_buildings_with_walkable_door_and_stair(residential) -> None:
     detailed = residential
     interiors = [o for o in detailed.objects if o.type == "interior"]

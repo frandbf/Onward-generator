@@ -93,7 +93,7 @@ def test_see_through_window_opens_the_wall_and_keeps_a_pane() -> None:
     assert opened == 2 and omitted == 0
     assert high.v0 >= ceiling
     built = build_interior(
-        plan, 18.0, 18.0, footprint, cfg,
+        plan, 18.0, footprint, cfg,
         room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment]),
     )
     assert built.defects == 0
@@ -242,7 +242,7 @@ def test_seed_splits_tall_interiors_between_two_and_three_floors() -> None:
             break
     assert set(plans) == {2, 3}
     tall = plans[3]
-    built = build_interior(tall, 18.0, 18.0, footprint, cfg)
+    built = build_interior(tall, 18.0, footprint, cfg)
     assert built.defects == 0
     assert set(built.visual) <= {"interior_wall", "interior_floor", "stair"}
     assert all(mesh.triangle_count for meshes in built.visual.values() for mesh in meshes)
@@ -343,7 +343,7 @@ def test_built_interior_carries_one_anchor_per_furnished_room() -> None:
     door = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, cfg.interiors.wall_thickness_m, None, 0, 0)
     plan = plan_interior("block-anchor", footprint, door, segment, 18.0, 3.0, 6, cfg)
     assert not isinstance(plan, str)
-    built = build_interior(plan, 18.0, 18.0, footprint, cfg)
+    built = build_interior(plan, 18.0, footprint, cfg)
     assert built.light_anchors == light_anchors(plan, built.spec["rooms"])
     assert [a["room_id"] for a in built.light_anchors["rooms"]] == [r["id"] for r in built.spec["rooms"]]
 
@@ -369,7 +369,7 @@ def test_the_visual_pass_is_what_the_built_interior_draws_and_its_colliders_are_
     assert pierce_room_windows(layout, [segment], plan.inner, footprint, cfg.interiors.wall_thickness_m, 6.0) == (2, 0)
     cuts, panes = room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment])
 
-    built = build_interior(plan, 18.0, 18.0, footprint, cfg, cuts, panes, wall_material="interior_shop_bar")
+    built = build_interior(plan, 18.0, footprint, cfg, cuts, panes, wall_material="interior_shop_bar")
     visual = interior_visual(plan, 18.0, cfg, cuts, wall_material="interior_shop_bar")
     drawn = {name: [m.triangle_count for m in meshes] for name, meshes in visual.items()}
     assert drawn == {name: [m.triangle_count for m in meshes] for name, meshes in built.visual.items()}
@@ -378,14 +378,14 @@ def test_the_visual_pass_is_what_the_built_interior_draws_and_its_colliders_are_
     assert visual_triangles(interior_visual(plan, 18.0, cfg, wall_material="interior_shop_bar")) < built.visual_triangles
     assert visual_triangles({"a": [], "b": []}) == 0
 
-    assembled = assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg, panes)
+    assembled = assemble_interior(plan, visual, 18.0, footprint, cfg, panes)
     assert assembled.visual is visual
     assert [(n, m.triangle_count) for n, m in assembled.colliders] == [(n, m.triangle_count) for n, m in built.colliders]
     assert assembled.spec == built.spec and assembled.roof_well is not None
     assert len(built.glass_colliders) == 2 and all(m.triangle_count == 12 for m in built.glass_colliders)
     walls_and_slabs = sum(m.triangle_count for _, m in built.colliders)
     assert built.collision_triangles == walls_and_slabs + 24
-    assert assemble_interior(plan, visual, 18.0, 18.0, footprint, cfg).collision_triangles < built.collision_triangles
+    assert assemble_interior(plan, visual, 18.0, footprint, cfg).collision_triangles < built.collision_triangles
 
 
 def test_interior_budgets_name_the_limit_they_refuse_on() -> None:
@@ -470,7 +470,7 @@ def test_interior_visual_puts_each_slab_well_and_stair_at_its_storey() -> None:
     for along in (door.s0, door.s0 + door.width):
         x, y, _ = segment.point(along, door.height, cfg.interiors.wall_thickness_m)
         assert (round(float(x), 6), round(float(y), 6), round(door.height, 6)) in corners
-    built = build_interior(plan, height, height, footprint, cfg)
+    built = build_interior(plan, height, footprint, cfg)
     names = [n for n, _ in built.colliders]
     assert "upper_solid" not in names and "roof_slab" not in names and names.count("roof_deck") == 1
 
@@ -552,7 +552,7 @@ def test_an_interior_without_roof_access_closes_its_top_room() -> None:
     ceiling = visual["interior_wall"][0]
     assert set(ceiling.vertices[:, 2].round(9)) == {round(plan.floors * plan.storey_m, 9)} and (_normals(ceiling)[:, 2] < 0).all()
     assert len(visual["interior_wall"]) == 1 + 2 * len(plan.flights)
-    names = [n for n, _ in build_interior(plan, 18.0, 18.0, footprint, cfg).colliders]
+    names = [n for n, _ in build_interior(plan, 18.0, footprint, cfg).colliders]
     assert names.count("upper_solid") == 1 and "roof_deck" not in names
 
 

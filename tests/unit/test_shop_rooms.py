@@ -140,7 +140,7 @@ def test_a_room_whose_door_does_not_fit_is_seen_through_its_windows_only() -> No
     home, other = plan.rooms
     assert home.entrance == (DOOR, SEG) and other.entrance is None and other.shops == (0,)
     assert plan.shop_doors == () and _front(0) in layout.holes
-    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, cfg)
+    built = build_interior(plan, 3.0, FOOTPRINT, cfg)
     assert [r["reachable"] for r in built.spec["rooms"]] == [True, False]
     assert [c["to"] for c in built.spec["connections"]] == ["b/L0"]
 
@@ -148,7 +148,7 @@ def test_a_room_whose_door_does_not_fit_is_seen_through_its_windows_only() -> No
 def test_two_shop_rooms_are_built_with_their_colours_doors_lights_and_a_solid_partition() -> None:
     plan, layout = _rooms((0, 4), [_shop(0, BAKERY), _shop(4, PHARMACY)])  # partition at x = 8
     pierce_room_windows(layout, [SEG], plan.ground, FOOTPRINT, T, 3.0 - CFG.interiors.slab_m, plan.hosts)
-    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, CFG, room_window_cuts(layout, [SEG]), glass_penetrations(layout, [SEG]))
+    built = build_interior(plan, 3.0, FOOTPRINT, CFG, room_window_cuts(layout, [SEG]), glass_penetrations(layout, [SEG]))
     assert built.defects == 0
     rooms = built.spec["rooms"]
     assert [r["id"] for r in rooms] == ["b/L0", "b/L0-1"]
@@ -210,7 +210,7 @@ def test_each_part_with_a_shopfront_is_a_room_and_only_a_part_with_a_shop_gets_a
     opened, omitted = pierce_room_windows(layout, list(segments), plan.ground, PARTS, T, 2.8, plan.hosts)
     assert (opened, omitted) == (2, 0)
     assert [h.back for h in layout.holes if h.kind != "interior_door"] == [SHOP_GLASS, SHOP_GLASS, "glass_dark"]
-    built = build_interior(plan, 3.0, 3.0, PARTS, CFG, room_window_cuts(layout, list(segments)), glass_penetrations(layout, list(segments)))
+    built = build_interior(plan, 3.0, PARTS, CFG, room_window_cuts(layout, list(segments)), glass_penetrations(layout, list(segments)))
     assert built.defects == 0 and [r["reachable"] for r in built.spec["rooms"]] == [True, False]
     concrete = [m for _, m in built.colliders]
     assert not any(_inside(m, np.array([35.0, 5.0, 1.0])) for m in concrete)  # part B is hollow
@@ -251,7 +251,7 @@ def test_a_courtyard_shop_has_walls_round_the_hole_and_a_see_through_courtyard_w
     [room] = plan.rooms
     assert len(room.polygon.interiors) == 1
     assert pierce_room_windows(layout, [SEG, YARD], plan.ground, COURTYARD, T, 2.8, plan.hosts) == (2, 0)
-    built = build_interior(plan, 3.0, 3.0, COURTYARD, CFG, room_window_cuts(layout, [SEG, YARD]), glass_penetrations(layout, [SEG, YARD]))
+    built = build_interior(plan, 3.0, COURTYARD, CFG, room_window_cuts(layout, [SEG, YARD]), glass_penetrations(layout, [SEG, YARD]))
     # The courtyard window keeps its pane; the shopfront is frameless shop glass with no pane.
     assert [h.back for h in layout.holes if h.kind != "interior_door"] == [SHOP_GLASS, GLASS_VIEW]
     assert built.defects == 0 and (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (1, 1)
@@ -358,7 +358,7 @@ def test_a_shop_room_record_and_its_door_keep_their_precision() -> None:
     plan = plan_interior("odd", odd, door, SEG, 3.0007, 3.0007, 1, CFG, roof_access=False, max_floors=1, several_parts=True)
     assert not isinstance(plan, str)
     plan = plan_shop_rooms(plan, odd, Layout(holes=[door]), [SEG], [("p", BAKERY, None)], CFG)
-    built = build_interior(plan, 3.0007, 3.0007, odd, CFG)
+    built = build_interior(plan, 3.0007, odd, CFG)
     area = plan.inner.area
     assert round(area, 3) != round(area, 4)
     assert built.spec["rooms"] == [{
@@ -371,7 +371,7 @@ def test_a_shop_room_record_and_its_door_keep_their_precision() -> None:
 
 def test_a_shop_door_is_open_through_the_wall_and_its_lintel_and_ceiling_are_closed() -> None:
     plan, _ = _rooms((0, 4), [_shop(0, BAKERY), _shop(4, PHARMACY)])
-    built = build_interior(plan, 3.0, 3.0, FOOTPRINT, CFG)
+    built = build_interior(plan, 3.0, FOOTPRINT, CFG)
     concrete = [m for _, m in built.colliders]
     for x in (2.0, 10.0):
         assert not any(_inside(m, np.array([x, T - 0.02, 1.0])) for m in concrete)
