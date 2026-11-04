@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import pytest
 from shapely import LineString, STRtree, box
 
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
@@ -26,6 +27,7 @@ from onward_generator.overgrow.fit import (
     size_reason,
 )
 from onward_generator.overgrow.library import Prop
+from onward_generator.overgrow.place import _Edge
 from onward_generator.overgrow.profiles import profile_for
 from onward_generator.overgrow.zone import square_zone
 from tests.conftest import MURCIA_CENTER
@@ -207,3 +209,32 @@ def test_fit_accepts_the_procedural_car(tmp_path: Path) -> None:
     checked, problems = check_scene(base, scene)
     assert problems == []
     assert checked == 1
+
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "outward", "wall_at"),
+    [
+        ((-10.0, 6.0), (10.0, 6.0), (0.0, -1.0), 6.0),  # south wall, facing the lane
+        ((10.0, 6.0), (10.0, 20.0), (1.0, 0.0), 10.0),  # east wall
+    ],
+)
+def test_a_wall_mounted_prop_hangs_on_its_wall(
+    a: tuple[float, float], b: tuple[float, float], outward: tuple[float, float], wall_at: float,
+) -> None:
+    building = box(-10.0, 6.0, 10.0, 20.0)
+    lane = LineString([(-30.0, 0.0), (30.0, 0.0)])
+    start, end, out = np.array(a), np.array(b), np.array(outward)
+    wall = _Edge("osm-way-1", 0, start, end, out, float(np.linalg.norm(end - start)))
+    planted = dress(
+        [_prop("aircon_box", "aircon", _mesh(0.8, 0.5, 0.6), anchor="facade", surfaces=("facade",))],
+        [wall], [], STRtree([building]), [lane], STRtree([lane]), square_zone(80.0), profile_for(100), 48152, [],
+        grass_mesh=None, grass_left=0, triangle_budget=60_000,
+    )
+    assert planted.placed_ids == ["aircon_box"]
+    back = planted.nodes[0].matrix @ np.array([0.0, -0.25, 0.0, 1.0])
+    axis = 0 if out[0] else 1
+    assert round(float((back[axis] - wall_at) * out[axis]), 3) == 0.08
+    mid = (start + end) / 2
+    assert round(float(back[1 - axis]), 3) == round(float(mid[1 - axis]), 3)
+    assert planted.records[0]["position_m"][2] == 2.4

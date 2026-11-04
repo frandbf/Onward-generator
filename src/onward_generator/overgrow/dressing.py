@@ -38,6 +38,10 @@ from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
 from onward_generator.overgrow.zone import Zone
 
+# A facade spot stands this far out from the wall, so its point is never inside the footprint.
+FACADE_SPOT_M = 0.35
+# Gap between a wall-mounted prop's back and the wall, as ``realize`` leaves it.
+MOUNT_GAP_M = 0.08
 
 @dataclass
 class Spot:
@@ -416,7 +420,8 @@ def collider_mesh(mesh: Mesh) -> Mesh:
 
 def _frame(prop: Prop, spot: Spot, block_streets: bool = False, turn: float = 0.0, floor: RoadFloor | None = None) -> tuple[np.ndarray, float, float, float]:
     if prop.spec.anchor == "facade" and spot.outward and spot.along:
-        push = prop.half_y + 0.08
+        # The spot stands FACADE_SPOT_M off the wall; the prop's back stays MOUNT_GAP_M off it.
+        push = prop.half_y + MOUNT_GAP_M - FACADE_SPOT_M
         x = spot.x + spot.outward[0] * push
         y = spot.y + spot.outward[1] * push
         z = float(FACADE_Z_M.get(prop.spec.role, 1.2))
@@ -575,7 +580,7 @@ def _spots(edges, lanes, buildings, lane_tree, parks, heights, zone: Zone, resul
         outward = edge.outward
         mid = edge.mid
         height = float(heights.get(edge.feature_id, 12.0))
-        facade = (float(mid[0] + outward[0] * 0.35), float(mid[1] + outward[1] * 0.35))
+        facade = (float(mid[0] + outward[0] * FACADE_SPOT_M), float(mid[1] + outward[1] * FACADE_SPOT_M))
         _add_area_spot(spots, result, zone, buildings, "facade", facade, edge, height, outward, along)
         front = (float(mid[0] + outward[0] * 1.6), float(mid[1] + outward[1] * 1.6))
         if _lane_distance(Point(front), lane_tree, lanes) < 18.0:

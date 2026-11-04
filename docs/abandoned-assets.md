@@ -249,6 +249,8 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 
 ## Facade
 
+A wall-mounted prop's back stays 0.08 m off its wall, whether the ambient dressing (`overgrow/dressing.py`) or a planned action (`overgrow/realize.py`) places it. The dressing's facade spot stands 0.35 m out so its point never falls inside the footprint; the prop is pulled back from that spot to the wall. Before this, the dressing added the two offsets and every aircon, camera and awning on MurciaEjemplo hung 0.38–0.44 m off the wall.
+
 ### modular fire escape
 
 ![modular fire escape](abandoned-assets/modular_fire_escape.png)
