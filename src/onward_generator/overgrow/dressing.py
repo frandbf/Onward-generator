@@ -36,6 +36,7 @@ from onward_generator.overgrow.fit import PROP_OVERLAP_M2, _footprint, apply_fit
 from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
+from onward_generator.overgrow.urban import FLAT_PROP_M
 from onward_generator.overgrow.zone import Zone
 
 # A facade spot stands this far out from the wall, so its point is never inside the footprint.
@@ -429,8 +430,11 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
 
 
 def _in_keep_out(prop: Prop, spot: Spot, block_streets: bool, result: Dressing, turn: float = 0.0) -> bool:
-    """Whether the prop's footprint where it lands enters an area no prop may take. A wall prop hangs above them."""
-    if not result.keep_out or prop.spec.anchor == "facade":
+    """Whether the prop's footprint where it lands enters an area no prop may take.
+
+    A wall prop hangs above those areas, and a flat one (a cover, a path) lies flush under them.
+    """
+    if not result.keep_out or prop.spec.anchor == "facade" or prop.height_m < FLAT_PROP_M:
         return False
     footprint = _footprint(prop.mesh, _frame(prop, spot, block_streets, turn)[0])
     return any(footprint.intersects(area) for area in result.keep_out)

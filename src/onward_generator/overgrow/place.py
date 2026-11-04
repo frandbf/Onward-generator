@@ -22,7 +22,7 @@ from shapely.geometry.polygon import orient
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.detail.facades import stable_unit
-from onward_generator.detail.modules import urban_prototypes, yaw_matrix
+from onward_generator.detail.modules import yaw_matrix
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
@@ -42,7 +42,7 @@ from onward_generator.overgrow.constants import (
     SEED,
 )
 from onward_generator.overgrow.dressing import block_reason, collider_mesh, dress, keep, load_spawns
-from onward_generator.overgrow.fit import object_reason
+from onward_generator.overgrow.fit import _footprint, object_reason
 from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.growth import (
     canopy_png,
@@ -58,6 +58,7 @@ from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
+from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
 from onward_generator.tiers import core_of
 
@@ -71,10 +72,6 @@ SKIP_HIGHWAYS = frozenset({
 OCCUPIED_M = {"wreck": 3.0, "tree": 1.5, "grass": 0.8}
 # The trunk box of detail's street tree: overgrow's procedural trees share its 0.15 m, 2.6 m trunk.
 TRUNK_COLLIDER = box(-0.2, 0.2, -0.2, 0.2, 0.0, 2.5)
-# A prop's footprint keeps this far beyond the collider of a bench, lamp, bicycle stand or other ``detail`` urban element.
-DETAIL_ELEMENT_CLEAR_M = 0.3
-# Half the plan diagonal of an urban element whose kind has no prototype.
-DETAIL_ELEMENT_DEFAULT_M = 1.0
 # A generated tree keeps this far from a tree ``detail`` already planted, so the canopies do not cross.
 DETAIL_TREE_CLEAR_M = 3.0
 OUTPUT_FILES = (
@@ -131,6 +128,7 @@ def overgrow(
     before = geometry_fingerprint([o for o in (manifest.get("objects") or []) if isinstance(o, dict) and o.get("type") in GEOGRAPHIC])
 
     detail_tree_ids, detail_trees = _detail_trees(manifest)
+    urban_areas = [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
     years = profile_for(profile)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
     area = within_core(area, core_of(manifest))
@@ -254,6 +252,8 @@ def overgrow(
                 lane_tree=lane_tree, lanes=lanes, spawns=spawns,
                 allow_lane=plan.street_blocking,
             ) or object_reason(role="wreck", mesh=wreck, matrix=matrix, buildings=buildings, lanes=lanes)
+            if reason is None and any(_footprint(wreck, matrix).intersects(area) for area in urban_areas):
+                reason = "on_urban_element"
             if reason:
                 _note(rejects, reject_counts, "wreck", reason, spot)
                 continue
@@ -288,7 +288,7 @@ def overgrow(
         floor=floor,
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
-        keep_out=_detail_elements(manifest),
+        keep_out=detail_elements(manifest),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)
@@ -475,28 +475,6 @@ def _detail_trees(manifest: Mapping[str, Any]) -> tuple[set[str], list[tuple[flo
         if len(position) >= 2:
             points.append((float(position[0]), float(position[1])))
     return ids, points
-
-
-def _detail_elements(manifest: Mapping[str, Any]) -> list[tuple[float, float, float]]:
-    """(x, y, radius) of every urban element ``detail`` placed, for the props to keep clear of.
-
-    The radius is half the plan diagonal of its prototype's collider plus ``DETAIL_ELEMENT_CLEAR_M``, and
-    a prop's whole footprint stays out of it: a barrier stood on a bicycle stand and a dumpster on a street tree.
-    """
-    halves = {
-        kind: math.hypot(*(proto.collider.vertices.max(axis=0) - proto.collider.vertices.min(axis=0))[:2]) / 2
-        for kind, proto in urban_prototypes().items() if proto.collider is not None
-    }
-    found = []
-    for item in manifest.get("objects") or []:
-        if not isinstance(item, dict) or item.get("type") != "urban_element":
-            continue
-        position = item.get("position_m") or []
-        if len(position) < 2:
-            continue
-        half = halves.get(str(item.get("kind")), DETAIL_ELEMENT_DEFAULT_M)
-        found.append((float(position[0]), float(position[1]), half + DETAIL_ELEMENT_CLEAR_M))
-    return found
 
 
 def _near_detail_tree(point: np.ndarray, trees: list[tuple[float, float]]) -> str | None:

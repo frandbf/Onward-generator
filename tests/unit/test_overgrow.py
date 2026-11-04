@@ -330,7 +330,7 @@ def test_every_overgrow_tree_has_the_trunk_box_of_a_street_tree(tmp_path: Path) 
 
 
 def test_detail_urban_elements_become_circles_the_props_keep_out_of() -> None:
-    from onward_generator.overgrow.place import DETAIL_ELEMENT_CLEAR_M, DETAIL_ELEMENT_DEFAULT_M, _detail_elements
+    from onward_generator.overgrow.urban import DETAIL_ELEMENT_CLEAR_M, DETAIL_ELEMENT_DEFAULT_M, detail_elements
 
     # Records that are not placed urban elements sit between the others: they are skipped, not the end.
     manifest = {"objects": [
@@ -341,7 +341,7 @@ def test_detail_urban_elements_become_circles_the_props_keep_out_of() -> None:
         "not a record",
         _urban("osm-node-kiosk", 5.0, 6.0, kind="kiosk"),  # no prototype
     ]}
-    found = _detail_elements(manifest)
+    found = detail_elements(manifest)
     assert [(x, y) for x, y, _r in found] == [(1.0, 2.0), (-3.0, 4.0), (5.0, 6.0)]
     radii = [round(r, 4) for _x, _y, r in found]
     assert radii == [round(math.hypot(1.8, 0.5) / 2 + 0.3, 4), round(math.hypot(0.4, 0.4) / 2 + 0.3, 4), round(1.0 + 0.3, 4)]

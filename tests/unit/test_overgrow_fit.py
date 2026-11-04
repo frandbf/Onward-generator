@@ -347,7 +347,8 @@ def test_props_keep_clear_of_wrecks_and_trees_but_may_stand_on_grass() -> None:
 BLOCK = [[-10, 8], [10, 8], [10, 20], [-10, 20], [-10, 8]]
 
 
-def _fit_scene(tmp_path: Path, nodes: list[Node], ring: list[list[float]] = BLOCK) -> tuple[int, list[str]]:
+def _fit_scene(tmp_path: Path, nodes: list[Node], ring: list[list[float]] = BLOCK, urban: list[dict] | None = None) -> tuple[int, list[str]]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     scene = tmp_path / "geo_scene.json"
     scene.write_text(json.dumps({
         "features": [
@@ -361,6 +362,8 @@ def _fit_scene(tmp_path: Path, nodes: list[Node], ring: list[list[float]] = BLOC
     base.mkdir()
     materials = {p.material: Material((0.5, 0.5, 0.5, 1), 0.9) for node in nodes for p in node.primitives}
     (base / "scene_visual.glb").write_bytes(build_glb(nodes, materials))
+    if urban is not None:
+        (base / "scene_detail.json").write_text(json.dumps({"objects": urban}), encoding="utf-8")
     return check_scene(base, scene)
 
 
@@ -796,3 +799,48 @@ def test_a_repeat_skips_an_urban_element_and_goes_on() -> None:
     result = Dressing(keep_out=[Point(0.0, 0.0).buffer(0.4)])
     _repeat(bench, _spots(*[(f"grid:{n}", 0.0) for n in range(6)], ("grid:far", 20.0)), result)
     assert [row["position_m"][:2] for row in result.records] == [[20.0, 0.0]]
+
+
+
+def _bench(x: float, y: float) -> dict:
+    return {"id": "urban/bench/osm-node-1", "type": "urban_element", "kind": "bench", "position_m": [x, y]}
+
+
+@pytest.mark.parametrize(
+    ("node", "problem"),
+    [
+        (_ground("barrel_a", "barrel", "waste", 0.0), True),  # on the bench at (1.5, -6)
+        (Node("overgrow/prop/cover/0", (Primitive(_mesh(1.0, 1.0, 0.07), "prop_cover"),), {"role": "manhole", "kind": "barriers"},
+              yaw_matrix(1.5, -6.0, 0.0, 0.0)), False),  # flat: lies under it
+        (_ground("barrel_b", "barrel", "waste", 5.0), False),
+    ],
+)
+def test_fit_fails_a_ground_prop_on_an_urban_element(tmp_path: Path, node: Node, problem: bool) -> None:
+    _checked, problems = _fit_scene(tmp_path, [node], urban=[_bench(1.5, -6.0)])
+    assert [p.split()[1] for p in problems] == (["on_urban_element"] if problem else [])
+
+
+def test_fit_holds_no_wall_prop_or_scene_without_a_manifest_to_the_urban_elements(tmp_path: Path) -> None:
+    _checked, problems = _fit_scene(tmp_path / "wall", [_mounted("aircon", 0.08)], urban=[_bench(0.0, 7.5)])
+    assert problems == []
+    _checked, problems = _fit_scene(tmp_path / "bare", [_ground("barrel_a", "barrel", "waste", 0.0)])
+    assert problems == []
+
+
+def test_a_flat_prop_may_lie_under_an_urban_element() -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    cover = _solid_prop("cover_0", "manhole", "barriers", (0.7, 0.7, 0.09))
+    raised = _solid_prop("cover_1", "manhole", "barriers", (0.7, 0.7, 0.1))
+    result = Dressing(keep_out=[Point(0.0, 0.0).buffer(1.0)])
+    assert _in_keep_out(cover, spot, False, result) is False
+    assert _in_keep_out(raised, spot, False, result) is True
+
+
+
+def test_a_prop_exactly_at_the_flat_height_counts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 0.125 m is exact in float32, as the GLB stores it, so the boundary is tested without rounding.
+    monkeypatch.setattr("onward_generator.overgrow.fit.FLAT_PROP_M", 0.125)
+    kerb = Node("overgrow/prop/kerb/0", (Primitive(_mesh(1.0, 1.0, 0.125), "prop_kerb"),), {"role": "barrier", "kind": "barriers"},
+                yaw_matrix(1.5, -6.0, 0.0, 0.0))
+    _checked, problems = _fit_scene(tmp_path, [kerb], urban=[_bench(1.5, -6.0)])
+    assert [p.split()[1] for p in problems] == ["on_urban_element"]

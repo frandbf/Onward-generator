@@ -25,6 +25,7 @@ from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
 from onward_generator.overgrow.ground import RoadFloor, road_floor
+from onward_generator.overgrow.urban import FLAT_PROP_M, detail_elements
 
 WRECK_LENGTH_M = (2.8, 6.5)
 WRECK_WIDTH_M = (1.4, 2.4)
@@ -152,6 +153,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     nodes, _materials = nodes_from_glb(visual.read_bytes())
     buildings, lanes = grounds_from_scene(geo_scene)
     floor = road_floor(nodes)
+    urban = _urban_areas(directory / "scene_detail.json")
     problems: list[str] = []
     checked = 0
     solid: list[tuple[str, Polygon]] = []
@@ -178,6 +180,8 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
             reason = _wall_reason(footprint, buildings)
         elif reason is None:
             reason = _ground_reason(transform(mesh, matrix), floor)
+            if reason is None and measure(mesh)[2] >= FLAT_PROP_M and any(footprint.intersects(area) for area in urban):
+                reason = "on_urban_element"
         if reason:
             length_m, width_m, height_m = measure(mesh)
             problems.append(f"{node.name} {reason} {length_m:.2f}x{width_m:.2f}x{height_m:.2f}")
@@ -195,6 +199,14 @@ def _wall_reason(footprint: Polygon, buildings: STRtree) -> str | None:
     if not walls or min(float(b.boundary.distance(footprint)) for b in walls) > FACADE_GAP_M:
         return "off_wall"
     return None
+
+
+def _urban_areas(manifest_path: Path) -> list[Polygon]:
+    """The circles round ``detail``'s urban elements that no ground prop may enter; none without a manifest."""
+    if not manifest_path.is_file():
+        return []
+    manifest = json.loads(manifest_path.read_bytes())
+    return [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
 
 
 def _plate_reasons(node, buildings: STRtree) -> list[str]:

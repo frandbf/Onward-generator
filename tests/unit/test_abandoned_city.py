@@ -818,3 +818,23 @@ def test_no_prop_stands_on_a_bench_detail_placed(tmp_path: Path) -> None:
     second = json.loads((tmp_path / "second" / "scene_detail.json").read_text())["objects"]
     assert report["reject_counts"]["on_urban_element"] >= 1
     assert all(math.dist(row["position_m"][:2], (x, y)) > 1.0 for row in second if row.get("asset_id") and row.get("kind") != "facade")
+
+
+
+def test_no_wreck_stands_on_a_bench_detail_placed(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    overgrow(tmp_path / "base", scene, tmp_path / "first", zone=square_zone(80), seed=48152)
+    first = json.loads((tmp_path / "first" / "scene_detail.json").read_text())["objects"]
+    x, y, _z = next(row["position_m"] for row in first if row.get("kind") == "wreck")
+    base = tmp_path / "with_bench"
+    _base(base)
+    manifest = json.loads((base / "scene_detail.json").read_text())
+    manifest["objects"].append({"id": "urban/bench/osm-node-bench", "type": "urban_element", "kind": "bench",
+                                "source_ids": ["osm-node-bench"], "position_m": [x, y]})
+    (base / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+    report = overgrow(base, scene, tmp_path / "second", zone=square_zone(80), seed=48152)
+    second = json.loads((tmp_path / "second" / "scene_detail.json").read_text())["objects"]
+    assert report["reject_counts"]["on_urban_element"] >= 1
+    assert all(math.dist(row["position_m"][:2], (x, y)) > 2.0 for row in second if row.get("kind") == "wreck")
