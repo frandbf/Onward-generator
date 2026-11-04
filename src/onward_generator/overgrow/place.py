@@ -58,7 +58,7 @@ from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import Site, compose, load_replay
-from onward_generator.overgrow.urban import detail_elements
+from onward_generator.overgrow.urban import detail_elements, shop_signs
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
 from onward_generator.tiers import core_of
 
@@ -289,6 +289,7 @@ def overgrow(
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
         keep_out=detail_elements(manifest),
+        signs=shop_signs(manifest),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)

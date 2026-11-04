@@ -78,6 +78,8 @@ class Dressing:
     solid_prints: list[Polygon] = field(default_factory=list)
     # Areas no prop footprint may enter, such as a ``detail`` bench or bicycle stand.
     keep_out: list[Polygon] = field(default_factory=list)
+    # Shop signs (plan footprint, bottom z, top z) no wall-mounted prop may cover.
+    signs: list[tuple[Polygon, float, float]] = field(default_factory=list)
 
 
 def keep(seed: int, factor: float, *parts: object) -> bool:
@@ -136,14 +138,16 @@ def dress(
     occupied: list[tuple[float, float, float]] | None = None,
     taken: list[tuple[float, float, float]] | None = None,
     keep_out: list[tuple[float, float, float]] | None = None,
+    signs: list[tuple[Polygon, float, float]] | None = None,
 ) -> Dressing:
     """``occupied`` lists (x, y, radius) already taken by wrecks, trees and grass; the sidewalk covers keep clear of all of it.
 
     ``taken`` is the part every prop keeps clear of, the wrecks and trees: a barrier placed
     while only the covers counted the wrecks stood inside one. Grass may lie under a prop.
     ``keep_out`` are circles (x, y, radius) no prop footprint may enter: the urban elements of ``detail``.
+    ``signs`` are the shop signs no wall-mounted prop may cover.
     """
-    result = Dressing(keep_out=[Point(x, y).buffer(radius) for x, y, radius in keep_out or []])
+    result = Dressing(keep_out=[Point(x, y).buffer(radius) for x, y, radius in keep_out or []], signs=list(signs or []))
     ground = floor if floor is not None else RoadFloor.empty()
     parks = _parks(features)
     heights = _heights(features)
@@ -234,6 +238,9 @@ def _place_props(
             if _in_keep_out(prop, spot, block_streets, result, turn):
                 _reject(result, prop.spec.id, "on_urban_element", prop.spec.category, spot.x, spot.y)
                 continue
+            if _covers_sign(prop, spot, result):
+                _reject(result, prop.spec.id, "covers_sign", prop.spec.category, spot.x, spot.y)
+                continue
             placed_x, placed_y = _emit(prop, spot, result, seen, block_streets, turn, floor)
             counts[rule.id] += 1
             role_placed[prop.spec.role] += 1
@@ -270,6 +277,8 @@ def _repeats(props, spots, buildings, lane_tree, lanes, zone, profile, seed, spa
             if reason or any((final_x - px) ** 2 + (final_y - py) ** 2 < radius ** 2 for px, py, radius in used):
                 continue
             if _on_solid(prop, spot, block_streets, result, turn) or _in_keep_out(prop, spot, block_streets, result, turn):
+                continue
+            if _covers_sign(prop, spot, result):
                 continue
             placed_x, placed_y = _emit(prop, spot, result, seen, block_streets, turn, floor)
             counts[rule.id] += 1
@@ -427,6 +436,17 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
             matrix,
         ))
     return x, y
+
+
+def _covers_sign(prop: Prop, spot: Spot, result: Dressing) -> bool:
+    """Whether a wall-mounted prop would hang over a shop sign: their footprints cross and their heights overlap."""
+    if not result.signs or prop.spec.anchor != "facade":
+        return False
+    matrix = _frame(prop, spot)[0]
+    footprint = _footprint(prop.mesh, matrix)
+    bottom = float(matrix[2, 3])
+    top = bottom + prop.height_m
+    return any(footprint.intersects(area) and low < top and high > bottom for area, low, high in result.signs)
 
 
 def _in_keep_out(prop: Prop, spot: Spot, block_streets: bool, result: Dressing, turn: float = 0.0) -> bool:

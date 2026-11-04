@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -18,7 +19,7 @@ from onward_generator.generation.mesh import Mesh
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.overgrow.ambient import cross_yaw, is_solid
 from onward_generator.overgrow.catalog import AssetSpec
-from onward_generator.overgrow.dressing import Dressing, Spot, _in_keep_out, _on_solid, _place_props, _repeats, dress
+from onward_generator.overgrow.dressing import Dressing, Spot, _covers_sign, _in_keep_out, _on_solid, _place_props, _repeats, dress
 from onward_generator.overgrow.fit import (
     apply_fit_scale,
     check_scene,
@@ -844,3 +845,111 @@ def test_a_prop_exactly_at_the_flat_height_counts(tmp_path: Path, monkeypatch: p
                 yaw_matrix(1.5, -6.0, 0.0, 0.0))
     _checked, problems = _fit_scene(tmp_path, [kerb], urban=[_bench(1.5, -6.0)])
     assert [p.split()[1] for p in problems] == ["on_urban_element"]
+
+
+def _fascia(x: float, y: float, z: float, *, kind: str = "fascia", normal: tuple[float, float] = (0.0, -1.0)) -> dict:
+    return {"kind": kind, "centre_m": [x, y, z], "normal": list(normal), "width_m": 2.0, "height_m": 0.4, "depth_m": 0.1}
+
+
+def _shopfront(*signs: dict) -> dict:
+    return {"objects": [
+        "not a record",
+        {"id": "urban/bench/x", "type": "urban_element"},
+        {"id": "building/b", "type": "building", "facade": {"shops": [{"name": "no sign"}, "bad", *({"sign": s} for s in signs)]}},
+    ]}
+
+
+def test_shop_signs_are_a_footprint_and_a_height_band() -> None:
+    from onward_generator.overgrow.urban import SIGN_CLEAR_M, shop_signs
+
+    fascia, blade = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9), _fascia(5.0, 8.0, 3.0, kind="blade")))
+    # A fascia runs along the wall (x), as deep as itself plus the clearance on each side.
+    assert [round(v, 3) for v in fascia[0].bounds] == [round(v, 3) for v in (-1.0, 8.0 - 0.05 - SIGN_CLEAR_M, 1.0, 8.0 + 0.05 + SIGN_CLEAR_M)]
+    assert (round(fascia[1], 3), round(fascia[2], 3)) == (2.7, 3.1)
+    # A blade stands out of the wall, along its normal (y).
+    assert [round(v, 3) for v in blade[0].bounds] == [5.0 - 0.1, 7.0, 5.0 + 0.1, 9.0]
+    # Each is the full rectangle: 2 m long, 0.1 m deep plus the clearance either side.
+    assert round(fascia[0].area, 6) == round(blade[0].area, 6) == round(2.0 * (0.1 + 2 * SIGN_CLEAR_M), 6)
+    ((wide, _low, _high),) = shop_signs(_shopfront({**_fascia(0.0, 8.0, 2.9), "width_m": 3.0}))
+    assert [round(v, 3) for v in wide.bounds][::2] == [-1.5, 1.5]
+
+
+def _awning() -> Prop:
+    return Prop(AssetSpec("awning_0", "facade", "awning", ("facade",), "facade", "test"), _mesh(1.9, 0.96, 0.9),
+                np.zeros((24, 2), dtype=np.float32), b"")
+
+
+def _wall_spot(x: float = 0.0) -> Spot:
+    # A facade spot 0.35 m out from a south wall at y = 8; the awning hangs from 2.5 to 3.4 m.
+    return Spot("facade", x, 8.0 - 0.35, 0.0, f"facade:b:{x}", "b", 10.0, outward=(0.0, -1.0), along=(1.0, 0.0),
+                edge_length=20.0, wall_height=12.0)
+
+
+@pytest.mark.parametrize(
+    ("z", "covered"),
+    [(2.9, True), (3.2, True), (3.59, True), (3.61, False), (2.29, False)],  # the fascia spans z - 0.2 .. z + 0.2
+)
+def test_a_wall_prop_may_not_cover_a_shop_sign(z: float, covered: bool) -> None:
+    from onward_generator.overgrow.urban import shop_signs
+
+    result = Dressing(signs=shop_signs(_shopfront(_fascia(0.0, 8.0, z))))
+    assert _covers_sign(_awning(), _wall_spot(), result) is covered
+
+
+def test_only_a_wall_prop_over_a_sign_counts() -> None:
+    from onward_generator.overgrow.urban import shop_signs
+
+    signs = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9)))
+    assert _covers_sign(_awning(), _wall_spot(5.0), Dressing(signs=signs)) is False  # further along the wall
+    assert _covers_sign(_awning(), _wall_spot(), Dressing()) is False
+    # A 3.5 m pole right under the fascia is a ground prop: only wall props are held to the signs.
+    pole = _solid_prop("pole_0", "pole", "structures", (0.2, 0.2, 3.5))
+    assert _covers_sign(pole, Spot("sidewalk", 0.0, 8.0, 0.0, "grid:0", "grid", 10.0), Dressing(signs=signs)) is False
+
+
+def test_a_wall_prop_over_a_sign_is_rejected_reported_and_the_search_goes_on() -> None:
+    from onward_generator.overgrow.urban import shop_signs
+
+    awning = _awning()
+    signs = shop_signs(_shopfront(_fascia(0.0, 8.0, 2.9)))
+    spots = [_wall_spot() for _ in range(6)] + [_wall_spot(10.0)]
+    spots = [replace(spot, key=f"facade:b:{n}") for n, spot in enumerate(spots)]
+    result = Dressing(signs=signs)
+    _place_props([awning], spots, STRtree([box(-10.0, 8.0, 20.0, 20.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, used=[], seen=set())
+    assert [row["position_m"][0] for row in result.records][:1] == [10.0]
+    assert {"asset_id": "awning_0", "reason": "covers_sign", "kind": "facade", "position_m": [0.0, 7.65, 0.0]} in result.rejects
+    repeated = Dressing(signs=signs)
+    _repeat(awning, spots, repeated)
+    assert [row["position_m"][0] for row in repeated.records] == [10.0]
+
+
+def test_fit_fails_a_wall_prop_over_a_shop_sign(tmp_path: Path) -> None:
+    sign = {"id": "building/b", "type": "building", "facade": {"shops": [{"sign": _fascia(0.0, 8.0, 2.6)}]}}
+    _checked, problems = _fit_scene(tmp_path / "over", [_mounted("aircon", 0.08)], urban=[sign])
+    assert [p.split()[1] for p in problems] == ["covers_sign"]
+    high = {"id": "building/b", "type": "building", "facade": {"shops": [{"sign": _fascia(0.0, 8.0, 3.21)}]}}
+    _checked, problems = _fit_scene(tmp_path / "above", [_mounted("aircon", 0.08)], urban=[high])
+    assert problems == []
+
+
+
+@pytest.mark.parametrize(("z", "covered"), [(3.75, False), (2.25, False), (3.74, True), (2.26, True)])
+def test_a_sign_that_only_touches_a_wall_prop_is_not_covered(z: float, covered: bool) -> None:
+    from onward_generator.overgrow.urban import shop_signs
+
+    # Exact in binary: the 1 m awning hangs from 2.5 to 3.5 m, the 0.5 m fascia from z - 0.25 to z + 0.25.
+    awning = Prop(AssetSpec("awning_0", "facade", "awning", ("facade",), "facade", "test"), _mesh(1.9, 0.96, 1.0),
+                  np.zeros((24, 2), dtype=np.float32), b"")
+    sign = {**_fascia(0.0, 8.0, z), "height_m": 0.5}
+    assert _covers_sign(awning, _wall_spot(), Dressing(signs=shop_signs(_shopfront(sign)))) is covered
+
+
+@pytest.mark.parametrize(("z", "problem"), [(3.75, False), (2.25, False), (3.74, True), (2.26, True)])
+def test_fit_lets_a_sign_touch_a_wall_prop(tmp_path: Path, z: float, problem: bool) -> None:
+    # Exact in float32: a 1 m aircon from 2.5 to 3.5 m, 0.08 m off the south wall.
+    matrix = frame_matrix((0.0, 8.0 - 0.08 - 0.25, 2.5), (-1.0, 0.0, 0.0), (0.0, -1.0, 0.0))
+    aircon = Node("overgrow/prop/aircon/0", (Primitive(_mesh(0.8, 0.5, 1.0), "prop_aircon"),), {"role": "aircon", "kind": "facade"}, matrix)
+    sign = {"id": "building/b", "type": "building", "facade": {"shops": [{"sign": {**_fascia(0.0, 8.0, z), "height_m": 0.5}}]}}
+    _checked, problems = _fit_scene(tmp_path, [aircon], urban=[sign])
+    assert [p.split()[1] for p in problems] == (["covers_sign"] if problem else [])

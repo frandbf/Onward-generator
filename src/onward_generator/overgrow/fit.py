@@ -25,7 +25,7 @@ from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
 from onward_generator.overgrow.ground import RoadFloor, road_floor
-from onward_generator.overgrow.urban import FLAT_PROP_M, detail_elements
+from onward_generator.overgrow.urban import FLAT_PROP_M, detail_elements, shop_signs
 
 WRECK_LENGTH_M = (2.8, 6.5)
 WRECK_WIDTH_M = (1.4, 2.4)
@@ -153,7 +153,9 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
     nodes, _materials = nodes_from_glb(visual.read_bytes())
     buildings, lanes = grounds_from_scene(geo_scene)
     floor = road_floor(nodes)
-    urban = _urban_areas(directory / "scene_detail.json")
+    manifest = _manifest(directory / "scene_detail.json")
+    urban = [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
+    signs = shop_signs(manifest)
     problems: list[str] = []
     checked = 0
     solid: list[tuple[str, Polygon]] = []
@@ -177,7 +179,7 @@ def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]
         footprint = _footprint(mesh, matrix)
         # Every wall-mounted prop is in the facade category, whether the rules or an AI plan placed it.
         if reason is None and node.extras.get("kind") == "facade":
-            reason = _wall_reason(footprint, buildings)
+            reason = _wall_reason(footprint, buildings) or _sign_reason(footprint, transform(mesh, matrix), signs)
         elif reason is None:
             reason = _ground_reason(transform(mesh, matrix), floor)
             if reason is None and measure(mesh)[2] >= FLAT_PROP_M and any(footprint.intersects(area) for area in urban):
@@ -201,12 +203,18 @@ def _wall_reason(footprint: Polygon, buildings: STRtree) -> str | None:
     return None
 
 
-def _urban_areas(manifest_path: Path) -> list[Polygon]:
-    """The circles round ``detail``'s urban elements that no ground prop may enter; none without a manifest."""
-    if not manifest_path.is_file():
-        return []
-    manifest = json.loads(manifest_path.read_bytes())
-    return [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
+def _manifest(path: Path) -> dict:
+    """The base's ``scene_detail.json``, or an empty one: its urban elements and shop signs are then not checked."""
+    return json.loads(path.read_bytes()) if path.is_file() else {}
+
+
+def _sign_reason(footprint: Polygon, posed: Mesh, signs: list[tuple[Polygon, float, float]]) -> str | None:
+    """``covers_sign`` when a wall-mounted prop hangs over a shop sign."""
+    bottom = float(posed.vertices[:, 2].min())
+    top = float(posed.vertices[:, 2].max())
+    if any(footprint.intersects(area) and low < top and high > bottom for area, low, high in signs):
+        return "covers_sign"
+    return None
 
 
 def _plate_reasons(node, buildings: STRtree) -> list[str]:

@@ -838,3 +838,24 @@ def test_no_wreck_stands_on_a_bench_detail_placed(tmp_path: Path) -> None:
     second = json.loads((tmp_path / "second" / "scene_detail.json").read_text())["objects"]
     assert report["reject_counts"]["on_urban_element"] >= 1
     assert all(math.dist(row["position_m"][:2], (x, y)) > 2.0 for row in second if row.get("kind") == "wreck")
+
+
+def test_no_camera_hangs_over_a_shop_sign(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _library(tmp_path / "library")
+    _base(tmp_path / "base")
+    overgrow(tmp_path / "base", scene, tmp_path / "first", zone=square_zone(80), library=tmp_path / "library", seed=48152)
+    first = json.loads((tmp_path / "first" / "scene_detail.json").read_text())["objects"]
+    x, y, z = next(row["position_m"] for row in first if row.get("asset_id") == "synth_cam")
+    # detail hangs a fascia right where the first run hung the camera.
+    base = tmp_path / "with_sign"
+    _base(base)
+    manifest = json.loads((base / "scene_detail.json").read_text())
+    sign = {"kind": "fascia", "centre_m": [x, y, z + 0.2], "normal": [0.0, -1.0], "width_m": 2.0, "height_m": 0.4, "depth_m": 0.1}
+    manifest["objects"][0]["facade"] = {"shops": [{"name": "Tienda", "sign": sign}]}
+    (base / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+    report = overgrow(base, scene, tmp_path / "second", zone=square_zone(80), library=tmp_path / "library", seed=48152)
+    second = json.loads((tmp_path / "second" / "scene_detail.json").read_text())["objects"]
+    assert report["reject_counts"]["covers_sign"] >= 1
+    assert all(math.dist(row["position_m"][:2], (x, y)) > 1.0 for row in second if row.get("asset_id") == "synth_cam")
