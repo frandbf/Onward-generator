@@ -886,6 +886,7 @@ def test_signs_keeps_the_map_scene_path_before_geo_exists(tmp_path: Path) -> Non
     assert Path(bounds[bounds.index("--out") + 1]).name == "scene_playable"
     # The haze ring past the wall, at the default offset and height: an empty horizon looked like the edge of the world.
     assert bounds[-1] == "--backdrop" and "--backdrop-offset-m" not in bounds
+    assert Path(bounds[bounds.index("--base") + 1]).name == "scene_overgrow"
 
 
 def test_bounds_stays_on_scene_playable_when_later_copies_exist(tmp_path: Path) -> None:
