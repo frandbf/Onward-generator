@@ -404,9 +404,11 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "TextureImporterFormat.ASTC_6x6" in source and "AlbedoMinMaxTextureSize = 4096" in source
 
 
-def test_default_fog_colour_is_the_backdrop_haze() -> None:
-    from onward_generator.bounds.envelope import HAZE_HEX
+def test_default_fog_colour_is_darker_than_the_backdrop_haze() -> None:
+    """Fog is mixed in after lighting; the ring is lit first, and drawn with the fog colour it read as a slate wall."""
+    from onward_generator.bounds.envelope import HAZE_HEX, _rgb
 
     build = load(EXPORT_CONFIG_DEFAULT)["build"]
     assert build["fog_enabled"] is True and build["fog_end_m"] > build["fog_start_m"]
-    assert build["fog_color"] == HAZE_HEX
+    assert build["fog_color"] == "#C8CDD2"
+    assert all(ring > fog for ring, fog in zip(_rgb(HAZE_HEX), _rgb(build["fog_color"]), strict=True))
