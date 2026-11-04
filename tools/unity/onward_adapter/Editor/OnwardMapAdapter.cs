@@ -582,7 +582,15 @@ namespace OnwardGenerator
                     ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
                 renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
-                if (!ContributesGi(renderer.sharedMaterial)) renderer.receiveGI = ReceiveGI.LightProbes;
+                if (!ContributesGi(renderer.sharedMaterial))
+                {
+                    renderer.receiveGI = ReceiveGI.LightProbes;
+                    // Unity samples the probes once per renderer, at its bounds centre. For the trees and props
+                    // of a 100 m cell that point fell inside a building on 3 of 4 cells of MurciaEjemplo2 and the
+                    // whole cell went dark; sampling at one of its pieces instead put another cell in shadow.
+                    // A combined renderer therefore takes the scene's ambient light, the same everywhere.
+                    renderer.lightProbeUsage = LightProbeUsage.Off;
+                }
                 byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
             }
 
