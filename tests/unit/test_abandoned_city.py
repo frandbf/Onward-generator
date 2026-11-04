@@ -275,7 +275,7 @@ def test_each_category_can_place_without_touching_collision_or_footprints(tmp_pa
     assert {"synth_car", "synth_trash", "synth_barrier", "synth_hole", "synth_gate", "synth_cam"} <= placed
     written = json.loads((tmp_path / "out" / "scene_detail.json").read_text())
     assert written["fidelity"]["overgrow"] == (
-        "solid props, and any other prop the size of cover, append a collision box; "
+        "solid props, and any other prop the size of cover, append a collision box, and every procedural tree a trunk box; "
         "bottles, plants, lamps and wall props stay visual; OSM tree points stay observed"
     )
     objects = written["objects"]

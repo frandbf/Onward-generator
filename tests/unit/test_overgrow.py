@@ -157,7 +157,8 @@ def test_an_abandoned_brief_puts_a_wreck_in_the_carriageway(tmp_path: Path) -> N
     report = overgrow(base, scene, tmp_path / "out", brief="Ciudad abandonada, autos bloqueando las calles")
     assert report["street_blocking"] is True
     assert report["ambient_origin"] == "rules"
-    assert report["colliders"] == report["wrecks"]
+    # No library props here: the colliders are the wrecks and the tree trunks.
+    assert report["colliders"] == report["wrecks"] + report["trees"]
     assert report["wrecks"] >= 1
     manifest = json.loads((tmp_path / "out" / "scene_detail.json").read_text())
     wrecks = [row for row in manifest["objects"] if row.get("kind") == "wreck"]
@@ -303,3 +304,24 @@ def test_only_a_detail_tree_within_three_metres_moves_a_generated_one(tmp_path: 
     report = overgrow(base, scene, tmp_path / "planted" / "out")
     assert report["trees_observed"] == 2
     assert report["trees"] == 2 + len(generated)
+
+
+
+def test_every_overgrow_tree_has_the_trunk_box_of_a_street_tree(tmp_path: Path) -> None:
+    from onward_generator.detail.modules import urban_prototypes
+    from onward_generator.overgrow.place import TRUNK_COLLIDER
+
+    trunk = urban_prototypes()["tree"].collider
+    assert trunk is not None and np.array_equal(TRUNK_COLLIDER.vertices, trunk.vertices)
+    base, scene = _tree_scene(tmp_path / "town", [])
+    report = overgrow(base, scene, tmp_path / "out")
+    visual, _ = nodes_from_glb((tmp_path / "out" / "scene_visual.glb").read_bytes())
+    collision, _ = nodes_from_glb((tmp_path / "out" / "scene_collision.glb").read_bytes())
+    # Generated trees on one building share a node name, so they are kept as a list.
+    trees = [node for node in visual if node.name.startswith("overgrow/tree/")]
+    boxes = [node for node in collision if node.name.startswith("overgrow/collider/tree/")]
+    assert report["trees"] == len(trees) == len(boxes) >= 2
+    assert {node.extras["origin"] for node in boxes} == {"observed", "generated"}
+    for node, tree in zip(boxes, trees, strict=True):
+        assert np.array_equal(node.matrix, tree.matrix)
+        assert node.extras == {"type": "collision", "origin": tree.extras["origin"], "role": "tree"}

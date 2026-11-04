@@ -26,7 +26,7 @@ from onward_generator.detail.modules import yaw_matrix
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
-from onward_generator.generation.mesh import Mesh, merge, transform
+from onward_generator.generation.mesh import Mesh, box, merge, transform
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.maps.workspace import MapError, load_map
@@ -69,6 +69,8 @@ SKIP_HIGHWAYS = frozenset({
 })
 # Radius each procedural object keeps clear of a sidewalk manhole cover.
 OCCUPIED_M = {"wreck": 3.0, "tree": 1.5, "grass": 0.8}
+# The trunk box of detail's street tree: overgrow's procedural trees share its 0.15 m, 2.6 m trunk.
+TRUNK_COLLIDER = box(-0.2, 0.2, -0.2, 0.2, 0.0, 2.5)
 # A generated tree keeps this far from a tree ``detail`` already planted, so the canopies do not cross.
 DETAIL_TREE_CLEAR_M = 3.0
 OUTPUT_FILES = (
@@ -338,10 +340,20 @@ def overgrow(
         unit_uv_materials={"glass_dark", "glass_boarded", "glass_view", "door_wood"},
     )
     atomic_write_bytes(targets[0], visual)
-    colliders = [*wreck_colliders, *planted.colliders]
+    trees = [node for node in extra_nodes if node.name.startswith("overgrow/tree/")]
+    tree_colliders = [
+        Node(
+            f"overgrow/collider/tree/{index}",
+            (Primitive(TRUNK_COLLIDER, "collider"),),
+            {"type": "collision", "origin": node.extras["origin"], "role": "tree"},
+            node.matrix,
+        )
+        for index, node in enumerate(trees)
+    ]
+    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders]
     collision = base / "scene_collision.glb"
     atomic_write_bytes(targets[1], _collision_bytes(collision.read_bytes() if collision.is_file() else b"", colliders))
-    if len(colliders) != wreck_count + sum(1 for row in planted.records if row.get("solid")):
+    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")):
         raise OvergrowError("a solid prop was placed without a collision box")
     objects = [dict(o) for o in (manifest.get("objects") or []) if isinstance(o, dict)]
     objects.extend(
@@ -363,7 +375,7 @@ def overgrow(
     written["objects"] = objects
     written["fidelity"] = {
         **dict(manifest.get("fidelity") or {}),
-            "overgrow": "solid props, and any other prop the size of cover, append a collision box; bottles, plants, lamps and wall props stay visual; OSM tree points stay observed",
+            "overgrow": "solid props, and any other prop the size of cover, append a collision box, and every procedural tree a trunk box; bottles, plants, lamps and wall props stay visual; OSM tree points stay observed",
     }
     atomic_write_json(targets[2], written)
     detail_report: dict[str, Any] = {}
