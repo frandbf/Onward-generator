@@ -497,3 +497,17 @@ def test_fit_keeps_a_plate_in_the_notch_of_an_l_shaped_building(tmp_path: Path) 
     ell = [[-10, 8], [0, 8], [0, 14], [10, 14], [10, 20], [-10, 20], [-10, 8]]
     _checked, problems = _fit_scene(tmp_path, [_plate(5.0, 10.0)], ell)
     assert problems == []
+
+
+def test_the_fit_command_names_the_glb_it_checked(tmp_path: Path) -> None:
+    from onward_generator.cli import main
+    from onward_generator.dress.geometry import file_sha256
+
+    _fit_scene(tmp_path, [_plate(0.0, 7.925)])
+    base = tmp_path / "scene_overgrow"
+    out = base / "fit.json"
+    assert main(["overgrow", "fit", "--base", str(base), "--scene", str(tmp_path / "geo_scene.json"), "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8")) == {
+        "schema": "onward_generator.overgrow_fit", "checked": 1, "rejected": [],
+        "visual_sha256": file_sha256(base / "scene_visual.glb"),
+    }

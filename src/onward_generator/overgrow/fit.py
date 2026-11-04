@@ -236,11 +236,13 @@ def _overlaps(solid: list[tuple[str, Polygon]]) -> list[str]:
     return found
 
 
-def write_report(path: str | Path, checked: int) -> None:
+def write_report(path: str | Path, checked: int, visual_sha256: str) -> None:
+    """``fit.json`` for a scene that passed. ``visual_sha256`` names the GLB checked, so ``bounds`` can tell it is the same."""
     atomic_write_json(path, {
         "schema": "onward_generator.overgrow_fit",
         "checked": checked,
         "rejected": [],
+        "visual_sha256": visual_sha256,
     })
 
 

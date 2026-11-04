@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from onward_generator.config.loader import ConfigLoadError
+from onward_generator.io import sha256_file
 from onward_generator.next_step import bounds_command, emit, fit_command
 from onward_generator.overgrow.constants import SEED
 from onward_generator.overgrow.fetch import FetchError, fetch_library
@@ -145,7 +146,8 @@ def _fit(args: argparse.Namespace) -> int:
             print(f"fit: {line}", file=sys.stderr)
         print(f"fit: rejected={len(problems)}", file=sys.stderr)
         return 1
-    write_report(out, checked)
+    # check_scene has read this GLB, so it is there to hash.
+    write_report(out, checked, sha256_file(Path(args.base) / "scene_visual.glb"))
     print(f"fit: checked={checked}")
     emit(bounds_command(Path(args.base)))
     return 0

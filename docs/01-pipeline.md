@@ -320,6 +320,8 @@ The sidewalk and the foot of the facade receive grass tufts. There is no moss st
 
 `onward-generator bounds`. Applied to the **latest dressed copy** (`overgrow`, or signs, materials, dress, or detail when there was no dressing). It is not applied to the `generate` that `detail --base` uses.
 
+An `overgrow` output (a base with `overgrow_report.json`) must carry the `fit.json` that `overgrow fit` wrote for that same `scene_visual.glb`: a passing one (`rejected: []`) whose `visual_sha256` matches the file. Otherwise `bounds` stops and names what is missing. It copies `{checked, visual_sha256}` to `envelope.fit` in `scene_detail.json` and to `fit` in `bounds_report.json`; a base without overgrowth gets `null`. Before, only `run` stopped after a failed `fit`; a `bounds` run by hand took an unchecked scene.
+
 | | |
 | --- | --- |
 | Input | `--base` of a `generate` or `detail` directory |

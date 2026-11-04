@@ -40,6 +40,8 @@ WALL_ID = "envelope/perimeter_wall"
 WALL_MATERIAL = "envelope_wall"
 DEFAULT_HEIGHT_M = 12.0
 DEFAULT_THICKNESS_M = 0.4
+OVERGROW_REPORT = "overgrow_report.json"
+FIT_FILE = "fit.json"
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 
 
@@ -54,6 +56,24 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(doc, dict):
         raise BoundsError(f"{path}: expected a JSON object")
     return doc
+
+
+def _fit_record(base: Path, visual_path: Path) -> dict[str, Any] | None:
+    """What ``overgrow fit`` passed, for an overgrow output; ``None`` for a scene without overgrowth.
+
+    A base that ``overgrow place`` wrote must carry the ``fit.json`` of that same ``scene_visual.glb``.
+    """
+    if not (base / OVERGROW_REPORT).is_file():
+        return None
+    path = base / FIT_FILE
+    if not path.is_file():
+        raise BoundsError(f"{base}: overgrow output without {FIT_FILE}; run overgrow fit first")
+    fit = _load_json(path)
+    if not is_schema(fit.get("schema"), "onward_generator.overgrow_fit") or fit.get("rejected") != []:
+        raise BoundsError(f"{path}: not a passing overgrow fit")
+    if fit.get("visual_sha256") != file_sha256(visual_path):
+        raise BoundsError(f"{path}: checked another scene_visual.glb; run overgrow fit again")
+    return {"checked": int(fit["checked"]), "visual_sha256": str(fit["visual_sha256"])}
 
 
 def _detect(base: Path) -> tuple[str, dict[str, Any]]:
@@ -236,6 +256,7 @@ def apply_bounds(
         raise BoundsError(f"{base}: missing scene_visual.glb or scene_collision.glb")
     if any(o.get("id") == WALL_ID for o in (manifest.get("objects") or [])):
         raise BoundsError(f"{base}: already has {WALL_ID}")
+    fit = _fit_record(base, visual_path)
     full_site = site_polygon(manifest)
     core = core_of(manifest)
     core_m = (manifest.get("core") or {}).get("half_side_m")
@@ -270,6 +291,7 @@ def apply_bounds(
         "id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m,
         "source_sha256": file_sha256(protected[2]),
         "backdrop": ring_record,
+        "fit": fit,
     }
 
     before = geometry_fingerprint([o for o in (manifest.get("objects") or []) if o.get("type") in GEOGRAPHIC])
@@ -285,6 +307,7 @@ def apply_bounds(
         "wall": {"id": WALL_ID, "height_m": height_m, "thickness_m": thickness_m, "triangles": tris, "core_half_side_m": core_m,
                  "site_area_m2": round(float(site.area), 3)},
         "backdrop": ring_record,
+        "fit": fit,
         "geometry": compare,
         "note": "DamageVolume in the layout remains a fall-kill. The perimeter is a collision barrier and is not drawn.",
     }

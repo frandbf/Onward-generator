@@ -107,3 +107,61 @@ def test_bounds_backdrop_is_visual_only_and_recorded(
 
     assert apply_bounds(detail, tmp_path / "library")["backdrop"] is None
     assert (tmp_path / "library" / "scene_visual.glb").read_bytes() == (detail / "scene_visual.glb").read_bytes()
+
+
+def _overgrown(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> Path:
+    """A detail scene that says it came out of overgrow place."""
+    scene, heights, base = detail_inputs
+    detail = tmp_path / "scene_overgrow"
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights),
+                 "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
+    (detail / "overgrow_report.json").write_text("{}", encoding="utf-8")
+    return detail
+
+
+def _fit(directory: Path, **change: object) -> None:
+    from onward_generator.dress.geometry import file_sha256
+
+    fit = {"schema": "onward_generator.overgrow_fit", "checked": 3, "rejected": [],
+           "visual_sha256": file_sha256(directory / "scene_visual.glb"), **change}
+    (directory / "fit.json").write_text(json.dumps(fit), encoding="utf-8")
+
+
+def test_bounds_records_the_fit_of_an_overgrown_scene(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    detail = _overgrown(detail_inputs, tmp_path)
+    _fit(detail)
+    out = tmp_path / "scene_playable"
+    assert main(["bounds", "--base", str(detail), "--out", str(out)]) == 0
+    fit = json.loads((out / "scene_detail.json").read_text())["envelope"]["fit"]
+    assert fit == json.loads((out / "bounds_report.json").read_text())["fit"]
+    assert fit["checked"] == 3 and len(fit["visual_sha256"]) == 64
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (None, "overgrow output without fit.json; run overgrow fit first"),
+        ({"rejected": ["overgrow/prop/x/0 off_wall"]}, "not a passing overgrow fit"),
+        ({"schema": "onward_generator.something_else"}, "not a passing overgrow fit"),
+        ({"visual_sha256": "0" * 64}, "checked another scene_visual.glb; run overgrow fit again"),
+    ],
+)
+def test_bounds_refuses_an_overgrown_scene_without_its_fit(
+    detail_inputs: tuple[Path, Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str], change: dict | None, message: str,
+) -> None:
+    detail = _overgrown(detail_inputs, tmp_path)
+    if change is not None:
+        _fit(detail, **change)
+    assert main(["bounds", "--base", str(detail), "--out", str(tmp_path / "scene_playable")]) != 0
+    assert message in capsys.readouterr().err
+    assert not (tmp_path / "scene_playable" / "scene_detail.json").exists()
+
+
+def test_a_scene_without_overgrowth_needs_no_fit(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    scene, heights, base = detail_inputs
+    detail = tmp_path / "detail"
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights),
+                 "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
+    out = tmp_path / "playable"
+    assert main(["bounds", "--base", str(detail), "--out", str(out)]) == 0
+    assert json.loads((out / "scene_detail.json").read_text())["envelope"]["fit"] is None

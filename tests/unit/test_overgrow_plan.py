@@ -337,7 +337,7 @@ def test_replay_places_the_plan_and_fit_accepts_it(tmp_path: Path) -> None:
     checked, problems = check_scene(out, scene_path)
     assert problems == []
     assert checked >= 4
-    write_report(out / "fit.json", checked)
+    write_report(out / "fit.json", checked, "0" * 64)
     nodes, _ = nodes_from_glb((out / "scene_visual.glb").read_bytes())
     assert any(node.name.startswith("overgrow/prop/large_iron_gate/") for node in nodes)
     stored = json.loads((out / "ambient_plan.json").read_text(encoding="utf-8"))
