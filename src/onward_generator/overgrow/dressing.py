@@ -213,7 +213,10 @@ def _place_props(
             if reason:
                 _reject(result, prop.spec.id, reason, prop.spec.category, spot.x, spot.y)
                 continue
-            if any((spot.x - px) ** 2 + (spot.y - py) ** 2 < radius ** 2 for px, py, radius in used):
+            # ``used`` holds where props landed, so test where this one lands, not its spot.
+            # The turn and the floor change only the yaw and the height, not x and y.
+            final_x, final_y = _final_xy(prop, spot, block_streets)
+            if any((final_x - px) ** 2 + (final_y - py) ** 2 < radius ** 2 for px, py, radius in used):
                 _reject(result, prop.spec.id, "too_close", prop.spec.category, spot.x, spot.y)
                 continue
             placed_x, placed_y = _emit(prop, spot, result, seen, block_streets, turn, floor)

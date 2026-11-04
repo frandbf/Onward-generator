@@ -17,7 +17,7 @@ from onward_generator.generation.mesh import Mesh
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.overgrow.ambient import cross_yaw
 from onward_generator.overgrow.catalog import AssetSpec
-from onward_generator.overgrow.dressing import dress
+from onward_generator.overgrow.dressing import Dressing, Spot, _place_props, dress
 from onward_generator.overgrow.fit import (
     apply_fit_scale,
     check_scene,
@@ -251,3 +251,68 @@ def test_an_awning_clears_the_door_under_it() -> None:
     )
     assert planted.placed_ids == ["awning_small"]
     assert planted.records[0]["position_m"][2] == 2.5
+
+
+def test_props_from_one_lane_station_do_not_land_on_one_point() -> None:
+    # One station (12 m along a 16 m lane): curb, sidewalk and carriageway spots on each side
+    # all move to the same point beside the lane.
+    lane = LineString([(-8.0, 0.0), (8.0, 0.0)])
+    barrels = [
+        Prop(
+            AssetSpec(f"barrel_{index}", "waste", "barrel", ("curb", "sidewalk", "carriageway"), "ground", "test"),
+            _mesh(0.6, 0.6, 0.9), np.zeros((24, 2), dtype=np.float32), b"",
+        )
+        for index in range(8)
+    ]
+    planted = dress(
+        barrels, [], [], STRtree([box(30.0, 30.0, 40.0, 40.0)]), [lane], STRtree([lane]), square_zone(80.0),
+        profile_for(100), 48152, [], grass_mesh=None, grass_left=0, triangle_budget=60_000,
+    )
+    points = [row["position_m"][:2] for row in planted.records]
+    assert len(points) >= 2
+    closest = min(math.dist(a, b) for index, a in enumerate(points) for b in points[index + 1:])
+    assert closest >= 2.2
+
+
+
+def _barrel() -> Prop:
+    spec = AssetSpec("barrel_0", "waste", "barrel", ("sidewalk",), "ground", "test")
+    mesh = _mesh(0.6, 0.6, 0.9)
+    return Prop(spec, mesh, np.zeros((mesh.vertex_count, 2), dtype=np.float32), b"")
+
+
+@pytest.mark.parametrize(
+    ("taken", "placed"),
+    [
+        ((0.0, 2.3, 2.2), True),  # 2.3 m away, behind: clear of 2.2 m
+        ((0.0, -2.0, 2.0), True),  # exactly on the radius: clear
+        ((0.0, -2.5, 3.0), False),
+        ((0.0, -0.4, 0.5), False),
+    ],
+)
+def test_a_prop_keeps_the_radius_of_one_already_placed(taken: tuple[float, float, float], placed: bool) -> None:
+    spot = Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)
+    result = Dressing()
+    _place_props(
+        [_barrel()], [spot], STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+        48152, [], 60_000, result, used=[taken], seen=set(),
+    )
+    assert (result.placed_ids == ["barrel_0"]) is placed
+
+
+def test_a_street_blocking_wreck_is_spaced_where_it_crosses_the_lane() -> None:
+    spec = AssetSpec("covered_car", "vehicles", "wreck", ("carriageway",), "ground", "test")
+    car = Prop(spec, _mesh(4.2, 1.8, 1.5), np.zeros((24, 2), dtype=np.float32), b"")
+    spot = Spot("carriageway", 0.0, -1.15, 0.0, "lane:0", "lane-0", 10.0, lane_x=0.0, lane_y=0.0, normal=(0.0, -1.0))
+
+    def plant(taken: tuple[float, float, float]) -> list[str]:
+        result = Dressing()
+        _place_props(
+            [car], [spot], STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+            48152, [], 60_000, result, block_streets=True, used=[taken], seen=set(),
+        )
+        return result.placed_ids
+
+    # Blocking the street, the car lands 0.9 m off the axis, not beside the lane.
+    assert plant((0.0, -0.9, 2.2)) == []
+    assert plant((0.0, -5.6, 2.2)) == ["covered_car"]
