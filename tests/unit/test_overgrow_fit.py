@@ -316,3 +316,28 @@ def test_a_street_blocking_wreck_is_spaced_where_it_crosses_the_lane() -> None:
     # Blocking the street, the car lands 0.9 m off the axis, not beside the lane.
     assert plant((0.0, -0.9, 2.2)) == []
     assert plant((0.0, -5.6, 2.2)) == ["covered_car"]
+
+
+def test_props_keep_clear_of_wrecks_and_trees_but_may_stand_on_grass() -> None:
+    lane = LineString([(-8.0, 0.0), (8.0, 0.0)])
+    barrels = [
+        Prop(
+            AssetSpec(f"barrel_{index}", "waste", "barrel", ("curb", "sidewalk", "carriageway"), "ground", "test"),
+            _mesh(0.6, 0.6, 0.9), np.zeros((24, 2), dtype=np.float32), b"",
+        )
+        for index in range(8)
+    ]
+
+    def plant(**kwargs: object) -> list[list[float]]:
+        planted = dress(
+            barrels, [], [], STRtree([box(30.0, 30.0, 40.0, 40.0)]), [lane], STRtree([lane]), square_zone(80.0),
+            profile_for(100), 48152, [], grass_mesh=None, grass_left=0, triangle_budget=60_000, **kwargs,  # type: ignore[arg-type]
+        )
+        return [row["position_m"][:2] for row in planted.records]
+
+    alone = plant()
+    wrecks = [(x, y, 3.0) for x, y in alone[:2]]
+    assert plant(occupied=[(x, y, 0.8) for x, y in alone]) == alone
+    beside = plant(occupied=wrecks, taken=wrecks)
+    assert beside
+    assert all(math.dist(point, (x, y)) >= 3.0 for point in beside for x, y, _r in wrecks)

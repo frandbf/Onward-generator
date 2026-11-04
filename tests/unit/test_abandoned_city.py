@@ -6,6 +6,7 @@ Downloads are not required. Props are tiny synthetic GLBs.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -250,7 +251,11 @@ def test_block_reason_rejects_buildings_lanes_and_spawns() -> None:
 
 def test_each_category_can_place_without_touching_collision_or_footprints(tmp_path: Path) -> None:
     scene = tmp_path / "geo_scene.json"
-    _scene(scene, _city_features())
+    # The block's long walls each get a generated tree 2.4 m out, where their block edge is, and a gate
+    # keeps clear of a tree. The kiosk's walls are too short for a tree, so the gate has an edge of its own.
+    kiosk = _feature("building", {"type": "Polygon", "coordinates": [[[40, 12], [48, 12], [48, 18], [40, 18], [40, 12]]]},
+                     {"building": "yes", "height": "3"}, "osm-way-kiosk")
+    _scene(scene, [*_city_features(), kiosk])
     _base(tmp_path / "base")
     library = tmp_path / "library"
     _library(library)
@@ -269,6 +274,12 @@ def test_each_category_can_place_without_touching_collision_or_footprints(tmp_pa
         assert category in kinds
     assert {"synth_car", "synth_trash", "synth_barrier", "synth_hole", "synth_gate", "synth_cam"} <= placed
     objects = json.loads((tmp_path / "out" / "scene_detail.json").read_text())["objects"]
+    growth = [row for row in objects if row.get("type") == "overgrowth"]
+    props = [row["position_m"][:2] for row in growth if row.get("asset_id")]
+    # Clear of every tree (1.5 m) and wreck (3 m); a tuft of grass may lie under a prop.
+    for kind, radius in (("tree", 1.5), ("wreck", 3.0)):
+        assert all(math.dist(p, row["position_m"][:2]) >= radius for p in props for row in growth if row["kind"] == kind)
+    assert any(math.dist(p, row["position_m"][:2]) < 0.8 for p in props for row in growth if row["kind"] == "grass")
     building = next(row for row in objects if row["id"] == "building/osm-way-block")
     assert building["source_ids"] == ["osm-way-block"]
     for row in objects:

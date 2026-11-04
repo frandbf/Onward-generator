@@ -281,6 +281,7 @@ def overgrow(
         placed_roles={"wreck": wreck_count},
         floor=floor,
         occupied=_occupied(records),
+        taken=_occupied([row for row in records if row["kind"] != "grass"]),
     )
     if use_plan and composed is not None:
         planted.nodes.extend(composed.dressing.nodes)

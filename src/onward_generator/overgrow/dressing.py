@@ -129,17 +129,19 @@ def dress(
     placed_roles: dict[str, int] | None = None,
     floor: RoadFloor | None = None,
     occupied: list[tuple[float, float, float]] | None = None,
+    taken: list[tuple[float, float, float]] | None = None,
 ) -> Dressing:
-    """``occupied`` lists (x, y, radius) already taken by wrecks, trees and grass.
+    """``occupied`` lists (x, y, radius) already taken by wrecks, trees and grass; the sidewalk covers keep clear of all of it.
 
-    Only the sidewalk covers read it, so the other props keep their places.
+    ``taken`` is the part every prop keeps clear of, the wrecks and trees: a barrier placed
+    while only the covers counted the wrecks stood inside one. Grass may lie under a prop.
     """
     result = Dressing()
     ground = floor if floor is not None else RoadFloor.empty()
     parks = _parks(features)
     heights = _heights(features)
     spots = _spots(edges, lanes, buildings, lane_tree, parks, heights, zone, result)
-    used: list[tuple[float, float, float]] = []
+    used: list[tuple[float, float, float]] = list(taken or [])
     seen: set[str] = set()
     _place_props(
         props, spots, buildings, lane_tree, lanes, zone, profile, seed, spawns, triangle_budget, result,
