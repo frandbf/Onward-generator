@@ -8,6 +8,7 @@ from an OSM point. Solid props also append a box to the collision mesh.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -68,6 +69,8 @@ SKIP_HIGHWAYS = frozenset({
 })
 # Radius each procedural object keeps clear of a sidewalk manhole cover.
 OCCUPIED_M = {"wreck": 3.0, "tree": 1.5, "grass": 0.8}
+# A generated tree keeps this far from a tree ``detail`` already planted, so the canopies do not cross.
+DETAIL_TREE_CLEAR_M = 3.0
 OUTPUT_FILES = (
     "scene_visual.glb",
     "scene_collision.glb",
@@ -121,6 +124,7 @@ def overgrow(
     floor = road_floor(nodes)
     before = geometry_fingerprint([o for o in (manifest.get("objects") or []) if isinstance(o, dict) and o.get("type") in GEOGRAPHIC])
 
+    detail_tree_ids, detail_trees = _detail_trees(manifest)
     years = profile_for(profile)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
     area = within_core(area, core_of(manifest))
@@ -182,6 +186,10 @@ def overgrow(
         point = _tree_point(feature)
         if point is None:
             continue
+        if feature.get("id") in detail_tree_ids:
+            # ``detail`` already planted this OSM tree; a second copy would cross its canopy.
+            _note(rejects, reject_counts, "tree", "in_detail", point)
+            continue
         reason = block_reason(
             float(point[0]), float(point[1]), zone=area, buildings=buildings,
             lane_tree=lane_tree, lanes=lanes, spawns=spawns,
@@ -202,7 +210,7 @@ def overgrow(
         reason = block_reason(
             float(spot[0]), float(spot[1]), zone=area, buildings=buildings,
             lane_tree=lane_tree, lanes=lanes, spawns=spawns,
-        )
+        ) or _near_detail_tree(spot, detail_trees)
         if reason:
             _note(rejects, reject_counts, "tree", reason, spot)
             continue
@@ -435,6 +443,26 @@ def _layout_near(scene: Path) -> Path | None:
         return None
     candidate = root / "data" / "processed" / "layout" / "layout.json"
     return candidate if candidate.is_file() else None
+
+
+def _detail_trees(manifest: Mapping[str, Any]) -> tuple[set[str], list[tuple[float, float]]]:
+    """Source ids and points of the trees ``detail`` planted as urban elements."""
+    ids: set[str] = set()
+    points: list[tuple[float, float]] = []
+    for item in manifest.get("objects") or []:
+        if not isinstance(item, dict) or item.get("type") != "urban_element" or item.get("kind") != "tree":
+            continue
+        ids.update(str(source) for source in item.get("source_ids") or [])
+        position = item.get("position_m") or []
+        if len(position) >= 2:
+            points.append((float(position[0]), float(position[1])))
+    return ids, points
+
+
+def _near_detail_tree(point: np.ndarray, trees: list[tuple[float, float]]) -> str | None:
+    if any(math.dist((float(point[0]), float(point[1])), tree) < DETAIL_TREE_CLEAR_M for tree in trees):
+        return "near_detail_tree"
+    return None
 
 
 def _occupied(records: list[dict[str, Any]]) -> list[tuple[float, float, float]]:

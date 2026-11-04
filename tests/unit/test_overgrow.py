@@ -218,3 +218,88 @@ def test_the_model_may_only_choose_the_street_rule() -> None:
     assert fallback.origin == "rules" and fallback.street_blocking is True
     assert is_solid("wreck", "vehicles") and is_solid("barrel", "waste") and is_solid("pole", "structures")
     assert not is_solid("trash", "waste") and not is_solid("plant", "vegetation") and not is_solid("can", "waste")
+
+
+
+def _tree_scene(root: Path, urban: list[dict]) -> tuple[Path, Path]:
+    root.mkdir()
+    scene = root / "geo_scene.json"
+    scene.write_text(json.dumps({
+        "schema": "onward_generator.geo_scene",
+        "origin": {"longitude": MURCIA_CENTER[0], "latitude": MURCIA_CENTER[1]},
+        "features": [
+            _feature("highway", {"type": "LineString", "coordinates": [[-30, 0], [60, 0]]},
+                     {"highway": "residential", "name": "Calle Mayor"}, "osm-way-mayor"),
+            _feature("building", {"type": "Polygon", "coordinates": [[[0, 12], [24, 12], [24, 30], [0, 30], [0, 12]]]},
+                     {"building": "yes", "height": "12"}, "osm-way-block"),
+            _feature("poi", {"type": "Point", "coordinates": [10, 36]}, {"natural": "tree"}, "osm-node-tree"),
+            _feature("poi", {"type": "Point", "coordinates": [18, 38]}, {"natural": "tree"}, "osm-node-tree-2"),
+        ],
+    }), encoding="utf-8")
+    base = root / "base"
+    base.mkdir()
+    ground = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [0.0, 4.0, 0.0]], dtype=np.float64), np.array([[0, 1, 2]]))
+    (base / "scene_visual.glb").write_bytes(build_glb(
+        [Node("ground", (Primitive(ground, "ground"),), {"type": "surface"})],
+        {"ground": Material((0.4, 0.4, 0.4, 1), 1)},
+    ))
+    (base / "scene_collision.glb").write_bytes(b"collision-bytes")
+    (base / "scene_detail.json").write_text(json.dumps({
+        "schema": "onward_generator.scene_detail",
+        "objects": [{"id": "building/osm-way-block", "type": "building", "source_ids": ["osm-way-block"]}, *urban],
+        "files": {"visual": "scene_visual.glb", "collision": "scene_collision.glb"},
+    }), encoding="utf-8")
+    return base, scene
+
+
+def _urban(source_id: str, x: float, y: float, *, kind: str = "tree", kind_of: str = "urban_element") -> dict:
+    return {
+        "id": f"urban/{kind}/{source_id}", "type": kind_of, "kind": kind, "source_ids": [source_id],
+        "attribute_origin": "observed", "position_m": [x, y],
+    }
+
+
+def _trees(out: Path) -> list[dict]:
+    manifest = json.loads((out / "scene_detail.json").read_text())
+    return [o for o in manifest["objects"] if o["type"] == "overgrowth" and o["kind"] == "tree"]
+
+
+def _bare_trees(tmp_path: Path) -> list[list[float]]:
+    base, scene = _tree_scene(tmp_path / "bare", [])
+    alone = overgrow(base, scene, tmp_path / "bare" / "out")
+    assert alone["trees_observed"] == 2
+    generated = [o["position_m"] for o in _trees(tmp_path / "bare" / "out") if o["origin"] == "generated"]
+    assert generated
+    return generated
+
+
+def test_a_tree_detail_already_planted_is_not_planted_again(tmp_path: Path) -> None:
+    generated = _bare_trees(tmp_path)
+    # detail holds the first OSM tree and a tree 2.9 m from each generated one; the second OSM tree is not in detail.
+    urban = [
+        _urban("osm-node-tree", 10.0, 36.0),
+        *(_urban(f"osm-node-near-{index}", x + 2.9, y) for index, (x, y, _z) in enumerate(generated)),
+    ]
+    base, scene = _tree_scene(tmp_path / "planted", urban)
+    report = overgrow(base, scene, tmp_path / "planted" / "out")
+    assert report["trees_observed"] == 1
+    assert report["trees"] == 1
+    assert report["reject_counts"]["in_detail"] == 1
+    assert report["reject_counts"]["near_detail_tree"] == len(generated)
+    assert [(row["kind"], row["position_m"][:2]) for row in report["rejects"] if row["reason"] == "in_detail"] == [("tree", [10.0, 36.0])]
+    assert [o["source_ids"] for o in _trees(tmp_path / "planted" / "out")] == [["osm-node-tree-2"]]
+
+
+def test_only_a_detail_tree_within_three_metres_moves_a_generated_one(tmp_path: Path) -> None:
+    generated = _bare_trees(tmp_path)
+    x, y, _z = generated[0]
+    urban = [
+        *(_urban(f"osm-node-far-{index}", gx + 3.0, gy) for index, (gx, gy, _gz) in enumerate(generated)),
+        # On the spot, but a bench, and a tree that is not a detail urban element.
+        _urban("osm-node-bench", x, y, kind="bench"),
+        _urban("osm-node-other", x, y, kind_of="overgrowth"),
+    ]
+    base, scene = _tree_scene(tmp_path / "planted", urban)
+    report = overgrow(base, scene, tmp_path / "planted" / "out")
+    assert report["trees_observed"] == 2
+    assert report["trees"] == 2 + len(generated)
