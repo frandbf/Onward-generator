@@ -400,6 +400,8 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "tree_" in source
     # Overgrow props (material prop_<id>) are lit by probes, not lightmaps: small ones baked black.
     assert 'StartsWith("m_prop_")' in source
+    # Grass tufts and vines too: lightmapped, the small cards baked black (Barcelona Sarria).
+    assert 'n.Contains("abandoned_grass") || n.Contains("abandoned_vine")' in source
     # They stay in the bake to cast its shadows; only the horizon backdrop leaves GI.
     assert "renderer.receiveGI = ReceiveGI.LightProbes;" in source
     # A combined probe-lit renderer would sample one probe for a whole 100 m cell: it takes the ambient light.
