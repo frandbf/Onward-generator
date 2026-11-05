@@ -27,6 +27,11 @@ from onward_generator.overgrow.zone import ZoneError, radius_zone, square_zone, 
 from tests.conftest import MURCIA_CENTER
 
 
+def _grass_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The tuft placement as it ran before the cap went to 0 (opaque cards read as green squares on the headset)."""
+    monkeypatch.setattr("onward_generator.overgrow.place.MAX_TUFTS", 480)
+
+
 def _feature(kind: str, geometry: dict, tags: dict, feature_id: str) -> dict:
     return {
         "id": feature_id,
@@ -162,7 +167,8 @@ def test_profile_lowers_density_and_caps() -> None:
     assert scaled_cap(12, profile_for(10).props) < scaled_cap(12, profile_for(100).props)
 
 
-def test_profile_changes_how_many_grass_tufts_are_kept(tmp_path: Path) -> None:
+def test_profile_changes_how_many_grass_tufts_are_kept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _grass_on(monkeypatch)
     scene = tmp_path / "geo_scene.json"
     _scene(scene, [
         _feature("highway", {"type": "LineString", "coordinates": [[-20, 0], [70, 0]]},
@@ -175,6 +181,21 @@ def test_profile_changes_how_many_grass_tufts_are_kept(tmp_path: Path) -> None:
     high = overgrow(tmp_path / "base", scene, tmp_path / "high", profile=100, seed=48152, zone=zone)
     assert high["grass"] > low["grass"]
     assert high["profile_years"] == 100 and low["profile_years"] == 10
+
+
+def test_no_grass_tuft_is_written_but_the_report_keeps_the_key(tmp_path: Path) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, [
+        _feature("highway", {"type": "LineString", "coordinates": [[-20, 0], [70, 0]]},
+                 {"highway": "residential"}, "osm-way-mayor"),
+        _zigzag(),
+    ])
+    _base(tmp_path / "base")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", profile=100, seed=48152, zone=square_zone(80))
+    assert report["grass"] == 0
+    nodes, materials = nodes_from_glb((tmp_path / "out" / "scene_visual.glb").read_bytes())
+    assert not any(node.name == "overgrow/grass" for node in nodes)
+    assert "abandoned_grass" not in materials
 
 
 def test_no_moss_skirt_is_written_but_the_report_keeps_the_key(tmp_path: Path) -> None:
@@ -249,7 +270,8 @@ def test_block_reason_rejects_buildings_lanes_and_spawns() -> None:
     assert block_reason(40, 0, **common) == "outside_zone"
 
 
-def test_each_category_can_place_without_touching_collision_or_footprints(tmp_path: Path) -> None:
+def test_each_category_can_place_without_touching_collision_or_footprints(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _grass_on(monkeypatch)
     scene = tmp_path / "geo_scene.json"
     # The block's long walls each get a generated tree 2.4 m out, where their block edge is, and a gate
     # keeps clear of a tree. The kiosk's walls are too short for a tree, so the gate has an edge of its own.

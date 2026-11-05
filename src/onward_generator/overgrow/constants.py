@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 LANE_M = 4.2
-MAX_TUFTS = 480
+# No grass tufts: the export is opaque only, so a tuft is a solid green 0.55 m square, single-sided, that read
+# as litter on the headset and baked black (Barcelona Sarria, 5 November 2026). Was 480.
+MAX_TUFTS = 0
 MAX_TREES = 96
 MAX_WRECKS = 28
 MAX_ADDED_TRIS = 80_000

@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import pytest
 from shapely.geometry import Polygon
 
 from onward_generator.ai.providers import StaticProvider
@@ -21,6 +22,11 @@ from onward_generator.materials.apply import building_boarded, building_uv_phase
 from onward_generator.overgrow.ambient import is_solid, plan_from_brief
 from onward_generator.overgrow.place import overgrow
 from tests.conftest import MURCIA_CENTER
+
+
+def _grass_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The tuft placement as it ran before the cap went to 0 (opaque cards read as green squares on the headset)."""
+    monkeypatch.setattr("onward_generator.overgrow.place.MAX_TUFTS", 480)
 
 
 def _feature(kind: str, geometry: dict, tags: dict, feature_id: str) -> dict:
@@ -79,7 +85,8 @@ def test_each_map_gets_its_own_texture_plan(tmp_path: Path) -> None:
         assert plan["entries"]
 
 
-def test_growth_stays_off_the_lane_and_keeps_an_osm_tree(tmp_path: Path) -> None:
+def test_growth_stays_off_the_lane_and_keeps_an_osm_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _grass_on(monkeypatch)
     scene = tmp_path / "geo_scene.json"
     scene.write_text(json.dumps({
         "schema": "onward_generator.geo_scene",
@@ -167,7 +174,8 @@ def test_an_abandoned_brief_puts_a_wreck_in_the_carriageway(tmp_path: Path) -> N
     assert min(abs(row["position_m"][1]) for row in wrecks) < 4.2
 
 
-def test_a_wreck_in_the_street_sits_on_the_asphalt(tmp_path: Path) -> None:
+def test_a_wreck_in_the_street_sits_on_the_asphalt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _grass_on(monkeypatch)
     scene = tmp_path / "geo_scene.json"
     scene.write_text(json.dumps({
         "schema": "onward_generator.geo_scene",
