@@ -158,17 +158,31 @@ def test_building_parts_take_their_height_from_levels_and_their_roof_from_tags(s
     assert parts["osm-way-910"].record["visual"] == {"triangles": 7}  # a closed triangle way
     # Its walls start at the top of its 12 m building, or at its own min_height above that: below it the part is inside.
     # A roof that starts lower (osm-way-908, eave 10.5 m) starts there.
-    top = _obj(s3db, "building/osm-way-806").record["height"]["height_m"]
+    building = _obj(s3db, "building/osm-way-806")
+    top = building.record["height"]["height_m"]
     assert top == pytest.approx(12.0)
+    # Along the building's outline they start at its parapet top instead, where its own wall ends: the open foot of the
+    # part's wall there lies on the top edge of the building's wall (on Barcelona Sarria the two z-fought along the parapet).
+    rim = top + building.record["roof"]["parapet_m"]
+    assert rim > top
+    shell = merge([p.mesh for p in building.visual])
+    tris = shell.vertices[shell.triangles]
+    rim_edges = [(t[i], t[(i + 1) % 3]) for t in tris for i in range(3)
+                 if abs(t[i][2] - rim) < 1e-6 and abs(t[(i + 1) % 3][2] - rim) < 1e-6]
+    raised_on_outline = 0
     for part in parts.values():
         visual = merge([p.mesh for p in part.visual])
         z = visual.vertices[:, 2]
         base = min(max(part.record["height"]["min_height_m"], top), part.record["height"]["eave_m"])
         assert z.max() == pytest.approx(part.record["height"]["height_m"]) and z.min() == pytest.approx(base)
-        assert open_edge_defects(visual, z_base=base) == 0
+        # Where an inner wall meets the outline, its side from its foot up to the parapet top lies on the building's wall.
+        corners = [((x, y, base), (x, y, rim)) for x, y, z in visual.vertices if abs(z - rim) < 1e-6]
+        assert open_edge_defects(visual, z_base=base, allowed=[*rim_edges, *corners]) == 0
+        raised_on_outline += open_edge_defects(visual, z_base=base) > 0
         assert part.record["visual"]["triangles"] == visual.triangle_count
         [collider] = part.colliders
         assert closed_manifold_defects(collider) == 0 and collider.vertices[:, 2].max() == pytest.approx(part.record["height"]["eave_m"])
+    assert raised_on_outline > 0
     assert s3db.stats["building_parts"] == {
         "kept": 6, "height_origin": {"estimated": 1, "observed": 5}, "roofs": {"flat": 3, "gabled": 1, "pyramidal": 1, "skillion": 1},
         "skipped": {"building_part_height_order": 1, "building_part_hidden": 1, "building_part_no_height": 1, "building_part_outside_footprint": 1},

@@ -12,11 +12,12 @@ import json
 from collections import Counter, defaultdict
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import Point, Polygon, STRtree, union_all
+from shapely import LineString, Point, Polygon, STRtree, union_all
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
@@ -79,7 +80,18 @@ from onward_generator.detail.typology import TypologyConfig, building_typologies
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
-from onward_generator.generation.mesh import Mesh, cap, closed_manifold_defects, merge, prism, signed_volume, walls
+from onward_generator.generation.mesh import (
+    Mesh,
+    cap,
+    closed_manifold_defects,
+    collapse_short_edges,
+    merge,
+    polygons_of,
+    prism,
+    quad,
+    signed_volume,
+    walls,
+)
 from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.io import sha256_file as _sha256
@@ -611,6 +623,51 @@ def _part_roof(
     return eave, roof, dict(built.record), None
 
 
+# A part edge that lies within this of its building's outline along its whole length stands on that outline.
+PART_OUTLINE_M = 0.01
+
+
+def _part_walls(part: BaseGeometry, outline: BaseGeometry, base: float, rim: float, eave: float) -> Mesh:
+    """A part's walls from ``base`` to ``eave``; on the edges it shares with its building's outline, from ``rim`` up.
+
+    ``rim`` is the top of the building's own wall, its parapet included: below it that wall stands in the same
+    plane, and on Barcelona Sarria the two z-fought along the 0.7 m of parapet.
+    """
+    if base >= eave:
+        return Mesh.empty()
+    near = outline.buffer(PART_OUTLINE_M)
+    raised_from = max(base, rim)
+    # Beside a raised edge an inner face gets a corner at ``rim`` too, so the two walls share their vertical edge.
+    corner = rim if base < rim < eave else None
+    collapsed, _ = collapse_short_edges(part)
+    faces = []
+    for polygon in polygons_of(collapsed):
+        for ring in (polygon.exterior, *polygon.interiors):
+            edges = list(pairwise(ring.coords))
+            shared = [near.covers(LineString(edge)) for edge in edges]
+            for i, (a, b) in enumerate(edges):
+                if not shared[i]:
+                    faces.append(_edge_face(a, b, base, eave, corner, shared[i - 1], shared[(i + 1) % len(edges)]))
+                elif raised_from < eave:
+                    faces.append(quad((*a, raised_from), (*b, raised_from), (*b, eave), (*a, eave)))
+    return merge(faces)
+
+
+def _edge_face(
+    a: tuple[float, float], b: tuple[float, float], z0: float, z1: float, rim: float | None, at_a: bool, at_b: bool,
+) -> Mesh:
+    """The wall face a→b from ``z0`` to ``z1``, outward like :func:`quad`, with a vertex at ``rim`` on the ``at_a``/``at_b`` sides."""
+    a0, b0, b1, a1 = (*a, z0), (*b, z0), (*b, z1), (*a, z1)
+    if rim is None or not (at_a or at_b):
+        return quad(a0, b0, b1, a1)
+    ar, br = (*a, rim), (*b, rim)
+    if at_a and at_b:
+        return merge([quad(a0, b0, br, ar), quad(ar, br, b1, a1)])
+    vertices, triangles = ([a0, b0, b1, a1, ar], [(0, 1, 4), (4, 1, 2), (4, 2, 3)]) if at_a else \
+        ([a0, b0, b1, a1, br], [(0, 1, 4), (0, 4, 2), (0, 2, 3)])
+    return Mesh(np.array(vertices), np.array(triangles))
+
+
 def _building_parts(
     features: list[Mapping[str, Any]],
     footprints: Mapping[str, BaseGeometry],
@@ -618,12 +675,14 @@ def _building_parts(
     *,
     storey_of: Callable[[str], tuple[float, str]],
     top_of: Mapping[str, float],
+    parapet_of: Mapping[str, float],
 ) -> tuple[list[DetailObject], list[Issue]]:
     """Extrude OSM ``building:part`` polygons, clipped to the building footprint they overlap most.
 
     The part's height is its ``height`` tag, else its levels times the storey height of that building's
     category (``storey_of``: storey metres and category). A part no higher than that building
-    (``top_of``) is inside it and is not drawn; a higher one draws its walls from that top up. ``roof:*``
+    (``top_of``) is inside it and is not drawn; a higher one draws its walls from that top up, and from the top
+    of the building's parapet (``parapet_of``, metres) where it stands on the building's outline. ``roof:*``
     tags shape its roof under its height.
     """
     from shapely.geometry.polygon import orient
@@ -683,7 +742,8 @@ def _building_parts(
         # Below the building's top the part is inside it, and its walls on the shared outline stood over the
         # facade: on Barcelona Sarria they hid 11 shopfronts and z-fought with the walls they covered.
         base = max(min_h, top_of[parent])
-        visual = [*([Primitive(walls(clipped, base, eave), wall)] if base < eave else []), *roof]
+        part_walls = _part_walls(clipped, footprints[parent].boundary, base, top_of[parent] + parapet_of.get(parent, 0.0), eave)
+        visual = [*([Primitive(part_walls, wall)] if part_walls.triangle_count else []), *roof]
         objects.append(DetailObject(
             part_id, "building_part", visual, [collider],
             {
@@ -1123,6 +1183,8 @@ def detail_scene(
         features, footprints, cfg,
         storey_of=lambda b: (float(storeys_m[height_of[b]["category"]]), str(height_of[b]["category"])),
         top_of={o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs},
+        parapet_of={x.record["source_ids"][0]: float(x.record["roof"]["parapet_m"]) for x in objects
+                    if x.type == "building" and "parapet_m" in x.record["roof"]},
     )
     issues.extend(part_issues)
     if core is not None:
