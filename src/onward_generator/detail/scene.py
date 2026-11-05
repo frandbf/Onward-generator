@@ -631,12 +631,20 @@ DOOR_CLEAR_M = 1.5
 DOOR_SIDE_CLEAR_M = 0.3
 
 
+def _ground_doors(holes: Sequence[Hole]) -> list[Hole]:
+    """The ground-floor doors: a shop room's own door is an ``interior_door``."""
+    return [h for h in holes if h.storey == 0 and h.kind in DOOR_KINDS]
+
+
+def _door_centres(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[list[float]]:
+    """``facade.doors_m``: the middle of each ground-floor door on the wall line, ``[x, y]`` in metres."""
+    return [[round(float(c), 3) for c in segments[h.segment].point(h.s0 + h.width / 2)[:2]] for h in _ground_doors(holes)]
+
+
 def _door_fronts(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[Polygon]:
-    """The ground in front of each ground-floor door, outside the wall: a shop room's own door is an ``interior_door``."""
+    """The ground in front of each ground-floor door, outside the wall."""
     fronts = []
-    for h in holes:
-        if h.storey != 0 or h.kind not in DOOR_KINDS:
-            continue
+    for h in _ground_doors(holes):
         seg = segments[h.segment]
         a, b = seg.point(h.s0 - DOOR_SIDE_CLEAR_M)[:2], seg.point(h.s0 + h.width + DOOR_SIDE_CLEAR_M)[:2]
         out = seg.n_out[:2] * DOOR_CLEAR_M
@@ -816,6 +824,7 @@ def _scenic_building(o: Any, geom: BaseGeometry, landmark: bool, use: FacadeUse,
             "materials": {"wall": wall, "wall_origin": "generated", "roof": SCENIC_ROOF, "roof_origin": "generated"},
             "use": use.to_record(),
             "door": "none",
+            "doors_m": [],
         },
         "roof": roof,
         "interior": False,
@@ -1158,6 +1167,7 @@ def detail_scene(
                               "roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": _source(tagged_roof(tags, cfg.materials), roof_origin)},
                 "use": use.to_record(),
                 "door": door_rule,
+                "doors_m": _door_centres(layout.holes, segments),
             },
             "roof": shell.roof,
             "interior": interior_record is not None,

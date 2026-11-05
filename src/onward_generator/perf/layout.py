@@ -692,13 +692,16 @@ def ammo_points(
 
 
 def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
-    """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors, the bots' routes
-    and the overgrow props. The layout runs after ``overgrow``, which knew nothing of the cabins: bricks and a tree stood in one."""
+    """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and every other
+    ground-floor door of a facade, the bots' routes and the overgrow props. The layout runs after ``overgrow``, which knew
+    nothing of the cabins: bricks and a tree stood in one. On Barcelona Sarria two ladders stood over a facade door."""
     objects = detail_manifest.get("objects", [])
     doors = [
-        tuple(connection["position_m"])
-        for interior in objects if interior.get("type") == "interior"
-        for connection in interior.get("connections", []) if connection.get("from") == "exterior"
+        *(tuple(connection["position_m"])
+          for interior in objects if interior.get("type") == "interior"
+          for connection in interior.get("connections", []) if connection.get("from") == "exterior"),
+        # A manifest from before ``facade.doors_m`` has only the interiors' doors.
+        *(tuple(door) for building in objects if building.get("type") == "building" for door in (building.get("facade") or {}).get("doors_m", [])),
     ]
     props = [
         Point(prop["position_m"]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)

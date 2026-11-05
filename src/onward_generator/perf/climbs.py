@@ -64,6 +64,8 @@ ROOF_MIN_M2 = 30.0
 Barcelona Sarria: ladders led to roofs of 4.3 to 17.7 m2 under walls 4 to 12 m taller, dead ends for a player.
 Estimated, not measured on the headset.
 """
+SLIDE_STEP_M = 0.5
+"""How far a ladder or a cabin moves along its wall at each try, away from what it must keep clear of."""
 WALL_JUMP_CLEAR_M = 6.0
 """A roof above the perimeter wall stays this far from the core edge, so no one jumps from it over the wall.
 
@@ -108,6 +110,17 @@ def _along(wall: Wall, distance_m: float) -> tuple[float, float]:
     return wall[0] + wall[2] * distance_m, wall[1] + wall[3] * distance_m
 
 
+def _slid(wall: Wall, width_m: float) -> list[Wall]:
+    """The wall with its middle moved along it in ``SLIDE_STEP_M`` steps, nearest the middle first, the strip still on the wall.
+
+    A ladder or a cabin at the middle may stand over a door; Barcelona Sarria has 827 ground-floor doors in its core.
+    """
+    x, y, nx, ny, length = wall
+    steps = max(0, int((length - width_m) / 2 / SLIDE_STEP_M))
+    shifts = dict.fromkeys(s for k in range(steps + 1) for s in (k * SLIDE_STEP_M, -k * SLIDE_STEP_M))
+    return [(x - ny * s, y + nx * s, nx, ny, length) for s in shifts]
+
+
 def _yaw(nx: float, ny: float) -> float:
     """Unity yaw of a forward along ``(nx, ny)``: 0 looks along local +y."""
     return round(math.degrees(math.atan2(nx, ny)), 1)
@@ -128,7 +141,7 @@ def ladder_on(
     narrow roof left 1.45 m for the 1.6 m ladder.
     """
     roof = deck(footprint, parapet_thickness_m).buffer(COVER_TOLERANCE_M)
-    for wall in _walls(footprint):
+    for wall in (slid for side in _walls(footprint) for slid in _slid(side, LADDER_WIDTH_M)):
         foot = _strip(wall, LADDER_WIDTH_M, CABIN_WALL_GAP_M, CABIN_WALL_GAP_M + LADDER_FOOT_M)
         landing = _strip(wall, LADDER_WIDTH_M, -(parapet_thickness_m + LANDING_DEPTH_M), -parapet_thickness_m)
         if free.covers(foot) and not keep_out.intersects(foot) and roof.covers(landing):
@@ -152,7 +165,7 @@ def lift_on(
     """
     roof = deck(footprint, parapet_thickness_m).buffer(COVER_TOLERANCE_M)
     street_far = CABIN_WALL_GAP_M + CABIN_DEPTH_M
-    for wall in _walls(footprint):
+    for wall in (slid for side in _walls(footprint) for slid in _slid(side, CABIN_WIDTH_M)):
         street = _strip(wall, CABIN_WIDTH_M, CABIN_WALL_GAP_M, street_far + CABIN_APRON_M)
         top = _strip(wall, CABIN_WIDTH_M, -(ROOF_EDGE_M + CABIN_DEPTH_M + ROOF_APRON_M), -ROOF_EDGE_M)
         if free.covers(street) and not keep_out.intersects(street) and roof.covers(top):

@@ -524,3 +524,17 @@ def test_the_street_furniture_hears_of_every_door_front(detail_inputs: tuple[Pat
     [doors] = passed
     every = [p for _, out in fronts for p in out]
     assert every and doors.equals(union_all(every))
+
+
+def test_each_building_records_the_middle_of_every_ground_floor_door(detail_inputs: tuple[Path, Path, Path]) -> None:
+    """``facade.doors_m`` lists one point per door the facade counts, on the building's own outline."""
+    from onward_generator.detail.facades import DOOR_KINDS
+
+    shops = _detail(detail_inputs)
+    buildings = [o for o in shops.objects if o.type == "building"]
+    assert sum(len(b.record["facade"]["doors_m"]) for b in buildings) > len(buildings) / 2
+    for b in buildings:
+        facade = b.record["facade"]
+        assert len(facade["doors_m"]) == sum(n for kind, n in facade["openings"].items() if kind in DOOR_KINDS), b.id
+        outline = _footprint(detail_inputs, b.record["source_ids"][0]).boundary
+        assert all(outline.distance(Point(p)) < 1e-3 for p in facade["doors_m"]), b.id

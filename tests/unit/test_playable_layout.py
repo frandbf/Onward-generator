@@ -637,6 +637,21 @@ def test_the_climb_keep_out_covers_points_street_doors_and_routes() -> None:
     assert climb_keep_out([(0.0, 0.0)], [], {}).contains(Point(2.9, 0.0))
 
 
+def test_the_climb_keep_out_covers_every_ground_floor_door_of_a_facade() -> None:
+    """Barcelona Sarria: two ladders stood over a facade door of a building with no interior."""
+    manifest = {"objects": [
+        {"type": "building", "facade": {"doors_m": [[400.0, 0.0], [400.0, 20.0]]}},
+        {"type": "building", "facade": {"door": "none"}},  # a manifest from before doors_m
+        {"type": "building"},
+        {"type": "interior", "facade": {"doors_m": [[600.0, 0.0]]}},
+    ]}
+    keep_out = climb_keep_out([(0.0, 0.0)], [], manifest)
+    for inside in ((402.9, 0.0), (400.0, 22.9)):
+        assert keep_out.contains(Point(inside)), inside
+    for outside in ((403.1, 0.0), (600.0, 0.0)):
+        assert not keep_out.contains(Point(outside)), outside
+
+
 def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> None:
     """On the headset a street cabin held a pile of bricks: ``overgrow`` places its props before the layout picks the cabins."""
     manifest = {"objects": [

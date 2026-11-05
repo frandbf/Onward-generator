@@ -11,7 +11,9 @@ from onward_generator.perf.climbs import (
     LADDERS_MAX,
     LIFTS_MAX,
     ROOF_MIN_M2,
+    SLIDE_STEP_M,
     SPAWN_CLEAR_M,
+    _slid,
     _strip,
     _walls,
     _yaw,
@@ -64,7 +66,9 @@ def test_a_ladder_moves_to_the_next_wall_when_the_ground_is_taken() -> None:
     free = box(-30, 0, 50, 40).difference(footprint)  # nothing south of the building
     site = ladder_on(footprint, free, NOTHING, 9.0)
     assert site is not None and (site["x"], site["y"], abs(site["yaw"])) == (10.0, 10.15, 180.0)
-    assert ladder_on(footprint, free, Point(10, 11).buffer(1.0), 9.0)["x"] in (-0.15, 20.15)
+    # Something kept clear at the middle of the wall: the ladder slides along it, 0.5 m at a time, east first.
+    slid = ladder_on(footprint, free, Point(10, 11).buffer(1.0), 9.0)
+    assert (slid["x"], slid["y"]) == (8.0, 10.15)  # the north wall runs west, so +0.5 m along it is -0.5 m in x
     assert ladder_on(footprint, box(100, 100, 110, 110), NOTHING, 9.0) is None
 
 
@@ -115,7 +119,8 @@ def test_a_lift_needs_room_on_the_roof_and_stays_out_of_what_is_kept_clear() -> 
     small = box(0, 0, 5, 5)
     assert lift_on(small, FREE.difference(small), NOTHING, 15.0) is None
     footprint = box(0, 0, 20, 10)
-    assert lift_on(footprint, FREE.difference(footprint), Point(10, -5).buffer(0.5), 15.0)["y"] != -1.65
+    moved = lift_on(footprint, FREE.difference(footprint), Point(10, -5).buffer(0.5), 15.0)
+    assert moved["y"] == -1.65 and abs(moved["x"] - 10.0) == 2.5  # slid along the same wall past the kept-clear point
 
 
 def test_the_rules_choose_ladders_up_to_3_storeys_and_lifts_from_3_to_6() -> None:
@@ -359,3 +364,15 @@ def test_the_deck_is_the_inner_edge_detail_gives_the_parapet_sharp_corners_and_a
     wedge = Polygon([(0, 0), (20, 0), (20, 25.5), (10, 3), (0, 25.5)])  # a notch of 24 degrees each side: its mitre is 2.5 times the offset
     assert deck(wedge, 0.5).equals(wedge.buffer(-0.5, join_style="mitre", mitre_limit=2.0))
     assert not deck(wedge, 0.5).equals(wedge.buffer(-0.5, join_style="mitre", mitre_limit=3.0))
+
+
+def test_a_wall_slides_from_its_middle_outward_and_keeps_the_strip_on_it() -> None:
+    wall = (10.0, 0.0, 0.0, -1.0, 4.0)  # the south wall of a box, 8 to 12 m in x, running east
+    assert [w[0] for w in _slid(wall, 1.6)] == [10.0, 10.5, 9.5, 11.0, 9.0]  # 1.2 m each side of the middle: two steps
+    assert all(w[1:] == wall[1:] for w in _slid(wall, 1.6))
+    assert [w[0] for w in _slid(wall, 3.2)] == [10.0]  # 0.4 m each side: no full step
+    assert [w[0] for w in _slid(wall, 5.0)] == [10.0]  # wider than the wall: the middle only, as before
+    assert [w[0] for w in _slid((10.0, 0.0, 0.0, -1.0, 2.6), 1.6)] == [10.0, 10.5, 9.5]  # exactly one step
+    east = (20.0, 5.0, 1.0, 0.0, 10.0)  # the east wall of a box, running north: along it is +y
+    assert [w[:2] for w in _slid(east, 9.2)] == [(20.0, 5.0)] and [w[:2] for w in _slid(east, 9.0)] == [(20.0, 5.0), (20.0, 5.5), (20.0, 4.5)]
+    assert SLIDE_STEP_M == 0.5

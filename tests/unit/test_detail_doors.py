@@ -168,7 +168,7 @@ def test_a_shop_without_room_for_its_door_gets_a_low_glazed_one() -> None:
 
 
 def test_the_ground_in_front_of_each_ground_floor_door_is_kept_for_the_door() -> None:
-    from onward_generator.detail.scene import DOOR_CLEAR_M, DOOR_SIDE_CLEAR_M, _door_fronts
+    from onward_generator.detail.scene import DOOR_CLEAR_M, DOOR_SIDE_CLEAR_M, _door_centres, _door_fronts
 
     walls = [_wall(20.0), Segment(0, 0, 1, (20.0, 0.0), (20.0, 10.0), True)]
     door = Hole("door", 0, 2.0, 0.0, 1.2, 2.4, 0.15, "door_wood", 1, 0)
@@ -180,3 +180,6 @@ def test_the_ground_in_front_of_each_ground_floor_door_is_kept_for_the_door() ->
     assert front.equals(box(2.0 - DOOR_SIDE_CLEAR_M, -DOOR_CLEAR_M, 3.2 + DOOR_SIDE_CLEAR_M, 0.0))  # outside is −y
     assert side.equals(box(20.0, 4.0 - DOOR_SIDE_CLEAR_M, 20.0 + DOOR_CLEAR_M, 7.0 + DOOR_SIDE_CLEAR_M))
     assert (DOOR_CLEAR_M, DOOR_SIDE_CLEAR_M) == (1.5, 0.3)
+    # ``facade.doors_m``: the same doors, by the middle of each on the wall line, to the millimetre.
+    assert _door_centres(holes, walls) == [[2.6, 0.0], [20.0, 5.5]]
+    assert _door_centres([Hole("door", 0, 1.0 / 3, 0.0, 1.0, 2.4, 0.15, "door_wood", 1, 0)], walls) == [[0.833, 0.0]]
