@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import hashlib
 from collections import defaultdict
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
+from itertools import combinations, pairwise
 from typing import Any
 
 import numpy as np
@@ -64,6 +65,11 @@ OPAQUE = 255
 REFERENCE_PX = 100  # the font size the text is measured at
 MIN_FONT_PX = 6
 MIN_MARGIN_PX = 2
+MAX_LINES = 3
+"""A name may wrap onto up to this many lines, between words, when that draws it larger: on Barcelona Sarria long names
+on the 0.7 x 0.5 m blade boards were one line a few centimetres tall."""
+LINE_GAP = 0.15
+"""Between two lines, as a share of the line height."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,12 +163,34 @@ def label_rgba(label: Label) -> np.ndarray:
     margin = max(MIN_MARGIN_PX, label.height_px // 8)
     reference = plaque_font(REFERENCE_PX)
     ascent, descent = reference.getmetrics()
-    # Glyph sizes scale with the font size: the largest size whose line fits the height and whose text fits the width.
-    scale = min((label.height_px - 2 * margin) / (ascent + descent), (label.width_px - 2 * margin) / draw.textlength(label.text, font=reference))
+    line = ascent + descent
+
+    def width(text: str) -> float:
+        return float(draw.textlength(text, font=reference))
+
+    # Glyph sizes scale with the font size: for each way to wrap the name, the largest size whose lines fit the height
+    # and whose longest line fits the width; the largest of those wins, the fewest lines on a tie (argmax keeps the first).
+    options = _wrappings(label.text, width)
+    scales = [min((label.height_px - 2 * margin) / (line * (len(rows) + LINE_GAP * (len(rows) - 1))),
+                  (label.width_px - 2 * margin) / max(width(row) for row in rows)) for rows in options]
+    best = int(np.argmax(scales))
+    scale, lines = scales[best], options[best]
     font = plaque_font(max(MIN_FONT_PX, int(REFERENCE_PX * scale)))
     centre = (PAD_PX + label.width_px / 2, PAD_PX + label.height_px / 2)
-    draw.text(centre, label.text, fill=(*ink, OPAQUE), font=font, anchor="mm")
+    gap = LINE_GAP * sum(font.getmetrics())
+    draw.multiline_text(centre, "\n".join(lines), fill=(*ink, OPAQUE), font=font, anchor="mm", align="center", spacing=gap)
     return np.asarray(image)
+
+
+def _wrappings(text: str, width: Callable[[str], float]) -> list[tuple[str, ...]]:
+    """The text on one line, and on 2 to ``MAX_LINES`` lines broken between words where the longest line is shortest."""
+    words = text.split()
+    options: list[tuple[str, ...]] = [(text,)]
+    for count in range(2, min(MAX_LINES, len(words)) + 1):
+        splits = [(0, *cut, len(words)) for cut in combinations(range(1, len(words)), count - 1)]
+        rows = [tuple(" ".join(words[a:b]) for a, b in pairwise(cut)) for cut in splits]
+        options.append(min(rows, key=lambda r: max(width(row) for row in r)))
+    return options
 
 
 def page_height(used: int) -> int:

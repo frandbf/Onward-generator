@@ -82,7 +82,8 @@ def test_label_size_and_colours() -> None:
         (Label("board", "Farmacia Ñoño Pérez de la Fuente", 660, 72), "3ada25ba0ad265b49608082d36bd4504f08650476b1af337b30a4a1636f5533d"),
         (Label("board", "Bar", 140, 100), "713218449c387f15e6ced3fbe4af874813ad21b7959e9fd11fc52b4529a05a4a"),
         (Label("vinyl", "Panadería", 480, 52), "1a82a72f00c8713469b99b89808b2936be5627fa6617009009ea9fabba38e127"),
-        (Label("board", "Comercio de prueba", 40, 16), "03843a9703c0cae35fceb323ad6cf1872f3e2b34f615a32ac6c12d0dfcfcbd4c"),
+        # Square enough to wrap: two lines draw it larger than one (5 November 2026).
+        (Label("board", "Comercio de prueba", 40, 16), "f65bb512e0db4005866c816abe2d5a306278fda023f7c692b972f1695e4d0d76"),
         (Label("board", "Comercio de prueba", 40, 8), "6637fc37178d76be33dc7c81f7c4a6e78e4fe862f1c08e086e8300ec0f748dc2"),
     ],
 )
@@ -103,6 +104,48 @@ def test_label_text_fits_inside_its_margin(text: str) -> None:
     assert rows.min() >= PAD_PX + margin - 1 and rows.max() <= PAD_PX + 64 - margin
     assert cols.min() >= PAD_PX + margin - 1 and cols.max() <= PAD_PX + 400 - margin
     assert rows.max() - rows.min() >= 12  # the text is not shrunk to nothing
+
+
+def _ink_rows(label: Label) -> list[tuple[int, int]]:
+    """The bands of pixel rows that hold letters, top to bottom."""
+    background, _ = label.colours()
+    pixels = label_rgba(label)
+    inked = np.any(np.any(pixels[..., :3] != np.array(background, dtype=np.uint8), axis=2), axis=1)
+    bands, start = [], None
+    for y, on in enumerate([*inked, False]):
+        if on and start is None:
+            start = y
+        elif not on and start is not None:
+            bands.append((start, y))
+            start = None
+    return bands
+
+
+def test_a_long_name_on_a_blade_wraps_onto_lines_between_words_and_draws_larger(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Barcelona Sarria: long names on the 0.7 x 0.5 m blades were one line a few centimetres tall."""
+    blade = Label("board", "Panadería y Bollería Artesana Hermanos García", 140, 100)
+    bands = _ink_rows(blade)
+    with monkeypatch.context() as m:
+        m.setattr("onward_generator.signs.shop.MAX_LINES", 1)
+        [(top, bottom)] = _ink_rows(blade)  # one line, as before
+    assert len(bands) == 3 and min(b - a for a, b in bands) > 1.4 * (bottom - top)  # 9 to 11 px against 6 px
+    one_line = Label("board", "Panadería y Bollería Artesana Hermanos García", 660, 72)  # on a 3.3 x 0.36 m fascia
+    assert len(_ink_rows(one_line)) == 1
+    assert len(_ink_rows(Label("board", "Bar", 140, 100))) == 1  # one word never wraps
+    assert len(_ink_rows(Label("board", "Farmacia Central", 140, 100))) == 2
+
+
+def test_wrapping_breaks_where_the_longest_line_is_shortest() -> None:
+    from onward_generator.signs.shop import MAX_LINES, _wrappings
+
+    def width(text: str) -> float:
+        return float(len(text))
+
+    assert _wrappings("aaaa bb cc dddd", width) == [("aaaa bb cc dddd",), ("aaaa bb", "cc dddd"), ("aaaa", "bb cc", "dddd")]
+    assert _wrappings("solo", width) == [("solo",)]
+    assert _wrappings("aaa b c", width)[2] == ("aaa", "b", "c")  # never an empty line, even where one would tie
+    assert _wrappings("a b", width) == [("a b",), ("a", "b")]
+    assert len(_wrappings("a b c d e f", width)) == MAX_LINES == 3
 
 
 # --- Packing -------------------------------------------------------------------------------
