@@ -402,8 +402,21 @@ def _choose(
         chosen.append(sign)
         taken.append((_plate_box(sign), sign.outward))
         seen_names.add(street.name)
-    chosen.sort(key=lambda s: (float(s.position[0] ** 2 + s.position[1] ** 2), s.name))
-    return chosen[:max_signs]
+    return _cap(chosen, max_signs)
+
+
+def _cap(chosen: Sequence[Sign], max_signs: int) -> list[Sign]:
+    """At most ``max_signs`` plates, nearest the centre first, but each street's nearest plate before any second one.
+
+    Cutting by distance alone left 8 named streets of Barcelona Sarria without a plate. With more streets than
+    ``max_signs``, the streets nearest the centre keep theirs.
+    """
+    ranked = sorted(chosen, key=lambda s: (float(s.position[0] ** 2 + s.position[1] ** 2), s.name))
+    first: dict[str, Sign] = {}
+    for sign in ranked:
+        first.setdefault(sign.name, sign)
+    kept = {id(sign) for sign in [*first.values(), *(s for s in ranked if first[s.name] is not s)][:max_signs]}
+    return [sign for sign in ranked if id(sign) in kept]
 
 
 def _junctions(streets: Sequence[_Street]) -> list[tuple[np.ndarray, tuple[str, ...]]]:

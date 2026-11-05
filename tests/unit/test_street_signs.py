@@ -751,3 +751,25 @@ def test_a_plate_facing_a_wall_0_73_m_away_goes_to_another_wall() -> None:
     checked = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features)))}
     assert (bare["Calle Mayor"].feature_id, float(bare["Calle Mayor"].outward[1])) == ("osm-way-corner", -1.0)
     assert "Calle Mayor" not in checked or float(checked["Calle Mayor"].outward[1]) != -1.0
+
+
+def test_the_cap_keeps_one_plate_per_street_before_a_second_one_nearest_the_centre_first() -> None:
+    """Barcelona Sarria: cutting at 64 by distance alone left 8 named streets without a plate."""
+    from onward_generator.signs.place import Sign, _cap
+
+    def plate(name: str, x: float) -> Sign:
+        return Sign(name, "m", np.array([x, 0.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
+
+    near = [plate("Calle Mayor", x) for x in (1.0, 2.0, 3.0)]
+    far, farther = plate("Calle Lejana", 50.0), plate("Calle Remota", -60.0)
+    signs = [farther, *near, far]
+    # Three plates: one per street, not the three nearest, which are all Calle Mayor.
+    assert [(s.name, s.position[0]) for s in _cap(signs, 3)] == [("Calle Mayor", 1.0), ("Calle Lejana", 50.0), ("Calle Remota", -60.0)]
+    assert [s.position[0] for s in _cap(signs, 4)] == [1.0, 2.0, 50.0, -60.0]  # the second plate of the nearest street next
+    assert [s.name for s in _cap(signs, 2)] == ["Calle Mayor", "Calle Lejana"]  # more streets than plates: the nearest
+    assert [s.position[0] for s in _cap(signs, 10)] == [1.0, 2.0, 3.0, 50.0, -60.0]
+    assert _cap([], 3) == []
+    tie = [plate("Calle B", 5.0), plate("Calle A", -5.0)]
+    assert [s.name for s in _cap(tie, 1)] == ["Calle A"]  # the same distance: by name
+    south = Sign("Calle Sur", "m", np.array([0.0, -3.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
+    assert [s.name for s in _cap([south, plate("Calle Este", 2.5)], 1)] == ["Calle Este"]  # 2.5 m from the centre, not 3 m
