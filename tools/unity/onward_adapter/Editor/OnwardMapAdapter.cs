@@ -2952,7 +2952,15 @@ namespace OnwardGenerator
             // Grass tufts and vines are 0.55 m cards and 0.25 m strips: lightmapped they baked black (Barcelona Sarria).
             return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal")
                 || n.StartsWith("m_prop_") || n.Contains("abandoned_grass") || n.Contains("abandoned_vine")
-                || n.Contains("horizon_backdrop"));
+                || IsSeeThroughOrRim(n) || n.Contains("horizon_backdrop"));
+        }
+
+        // The see-through glass is drawn unlit, so its texels lit nothing; the 3 cm rims of the shop and
+        // street signs held 17 of 18 overlapping-UV charts. Neither needs the lightmap (Barcelona Sarria).
+        private static bool IsSeeThroughOrRim(string lowerName)
+        {
+            return lowerName == "m_" + ViewGlassMaterial || lowerName == "m_" + ShopGlassMaterial
+                || lowerName.EndsWith("_sign_edge");
         }
 
         private static bool CastsBakedShadow(Material material) =>

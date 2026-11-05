@@ -402,6 +402,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert 'StartsWith("m_prop_")' in source
     # Grass tufts and vines too: lightmapped, the small cards baked black (Barcelona Sarria).
     assert 'n.Contains("abandoned_grass") || n.Contains("abandoned_vine")' in source
+    # The unlit see-through glass and the sign rims take no lightmap texels either.
+    assert '|| IsSeeThroughOrRim(n) ||' in source
+    assert 'lowerName == "m_" + ViewGlassMaterial || lowerName == "m_" + ShopGlassMaterial' in source
+    assert 'lowerName.EndsWith("_sign_edge")' in source
     # They stay in the bake to cast its shadows; only the horizon backdrop leaves GI.
     assert "renderer.receiveGI = ReceiveGI.LightProbes;" in source
     # A combined probe-lit renderer would sample one probe for a whole 100 m cell: it takes the ambient light.
