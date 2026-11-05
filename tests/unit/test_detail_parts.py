@@ -46,3 +46,12 @@ def test_a_part_as_high_as_its_building_is_hidden_and_a_hair_higher_is_too() -> 
 def test_the_eave_is_rounded_to_the_millimetre() -> None:
     kept, _ = _run(_part("roofed", 1, 1, 7, 5, height="20", **{"roof:shape": "gabled", "roof:height": "3.33333"}))
     assert kept["roofed"]["height"]["eave_m"] == 16.667
+
+
+def test_a_part_whose_eaves_are_its_building_top_draws_no_wall() -> None:
+    objects, _ = _building_parts([_part("cap", 1, 1, 5, 5, height="16", **{"roof:shape": "pyramidal", "roof:height": "4"}),
+                                  _part("walled", 6, 6, 10, 10, height="17", **{"roof:shape": "pyramidal", "roof:height": "4"})],
+                                 {"b": box(0, 0, 20, 20)}, CFG, storey_of=lambda b: (3.0, "unknown"), top_of={"b": TOP})
+    visual = {o.record["source_ids"][1]: o.visual for o in objects}
+    assert [p.material for p in visual["cap"]] == ["roof_tile"]  # eaves at 12 m: only the roof
+    assert len(visual["walled"]) == 2 and min(float(p.mesh.vertices[:, 2].min()) for p in visual["walled"]) == TOP

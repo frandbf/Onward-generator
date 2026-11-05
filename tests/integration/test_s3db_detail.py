@@ -145,7 +145,8 @@ def test_building_parts_take_their_height_from_levels_and_their_roof_from_tags(s
     assert [(p.material, p.mesh.triangle_count) for p in parts["osm-way-903"].visual] == [
         ("plaster_white__tint_red", 8), ("roof_tile__tint_grey", 4), ("plaster_white__tint_red", 2)]
     assert [(p.material, p.mesh.triangle_count) for p in parts["osm-way-905"].visual] == [("plaster_ochre", 8), ("roof_tile", 2)]
-    assert [p.material for p in parts["osm-way-908"].visual] == ["plaster_ochre", "roof_tile", "plaster_ochre"]
+    # Its roof starts at 10.5 m, inside its 12 m building: it keeps no wall, only the roof and its gables.
+    assert [p.material for p in parts["osm-way-908"].visual] == ["roof_tile", "plaster_ochre"]
     flat = parts["osm-way-905"].record
     assert flat["roof"] == {"type": "flat", "material": "roof_tile", "roof_shape": None, "origin": "generated"}
     assert flat["height"]["eave_m"] == 15.0 and flat["materials"] == {"wall": "plaster_ochre", **GENERATED}
@@ -155,11 +156,16 @@ def test_building_parts_take_their_height_from_levels_and_their_roof_from_tags(s
     assert parts["osm-way-909"].record["roof"] == {"type": "flat", "fallback": "no_room_under_height", "material": "roof_tile",
                                                     "roof_shape": "pyramidal", "origin": "observed"}
     assert parts["osm-way-910"].record["visual"] == {"triangles": 7}  # a closed triangle way
+    # Its walls start at the top of its 12 m building, or at its own min_height above that: below it the part is inside.
+    # A roof that starts lower (osm-way-908, eave 10.5 m) starts there.
+    top = _obj(s3db, "building/osm-way-806").record["height"]["height_m"]
+    assert top == pytest.approx(12.0)
     for part in parts.values():
         visual = merge([p.mesh for p in part.visual])
         z = visual.vertices[:, 2]
-        assert z.max() == pytest.approx(part.record["height"]["height_m"]) and z.min() == pytest.approx(part.record["height"]["min_height_m"])
-        assert open_edge_defects(visual, z_base=part.record["height"]["min_height_m"]) == 0
+        base = min(max(part.record["height"]["min_height_m"], top), part.record["height"]["eave_m"])
+        assert z.max() == pytest.approx(part.record["height"]["height_m"]) and z.min() == pytest.approx(base)
+        assert open_edge_defects(visual, z_base=base) == 0
         assert part.record["visual"]["triangles"] == visual.triangle_count
         [collider] = part.colliders
         assert closed_manifold_defects(collider) == 0 and collider.vertices[:, 2].max() == pytest.approx(part.record["height"]["eave_m"])

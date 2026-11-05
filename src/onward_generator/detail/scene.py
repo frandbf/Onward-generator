@@ -623,7 +623,8 @@ def _building_parts(
 
     The part's height is its ``height`` tag, else its levels times the storey height of that building's
     category (``storey_of``: storey metres and category). A part no higher than that building
-    (``top_of``) is inside it and is not drawn. ``roof:*`` tags shape its roof under its height.
+    (``top_of``) is inside it and is not drawn; a higher one draws its walls from that top up. ``roof:*``
+    tags shape its roof under its height.
     """
     from shapely.geometry.polygon import orient
 
@@ -679,7 +680,10 @@ def _building_parts(
             issues.append(Issue("building_part_mesh_not_closed", "warning", fid, f"{defects} collider defects; skipped"))
             continue
         part_id = f"building_part/{parent}/{f['id']}"
-        visual = [Primitive(walls(clipped, min_h, eave), wall), *roof]
+        # Below the building's top the part is inside it, and its walls on the shared outline stood over the
+        # facade: on Barcelona Sarria they hid 11 shopfronts and z-fought with the walls they covered.
+        base = max(min_h, top_of[parent])
+        visual = [*([Primitive(walls(clipped, base, eave), wall)] if base < eave else []), *roof]
         objects.append(DetailObject(
             part_id, "building_part", visual, [collider],
             {
