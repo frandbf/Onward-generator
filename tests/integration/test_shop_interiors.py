@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely import Point
+from shapely import Point, union_all
 from shapely.geometry import shape
 
 from onward_generator.detail import config_from_document, detail_scene, load_base
@@ -498,3 +498,29 @@ def test_the_shops_get_the_balcony_slabs_of_their_building(row_inputs: tuple[Pat
     for (balconies, spec), slabs in planned:
         expected = [(seg, s0, s0 + spec.width_m, v0 - spec.slab_m) for seg, s0, v0 in balconies] if spec is not None else []  # type: ignore[attr-defined]
         assert slabs == expected
+
+
+def test_the_street_furniture_hears_of_every_door_front(detail_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    """``place_elements`` gets the union of the ground in front of every building's doors, a shop room's own door included."""
+    import onward_generator.detail.scene as scene_module
+
+    fronts: list[tuple[list, list]] = []
+    passed: list[object] = []
+    real_fronts, real_place = scene_module._door_fronts, scene_module.place_elements
+
+    def door_fronts(holes, segments):  # type: ignore[no-untyped-def]
+        out = real_fronts(holes, segments)
+        fronts.append((list(holes), out))
+        return out
+
+    def place(*args, **kw):  # type: ignore[no-untyped-def]
+        passed.append(kw["doors"])
+        return real_place(*args, **kw)
+
+    monkeypatch.setattr(scene_module, "_door_fronts", door_fronts)
+    monkeypatch.setattr(scene_module, "place_elements", place)
+    _detail(detail_inputs)
+    assert any(h.kind == "interior_door" for holes, _ in fronts for h in holes), "no shop room had its own door"
+    [doors] = passed
+    every = [p for _, out in fronts for p in out]
+    assert every and doors.equals(union_all(every))

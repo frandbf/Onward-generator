@@ -50,7 +50,7 @@ def test_the_fallback_door_sits_in_the_centre_bay(length: float, s0: float, widt
     rule = ensure_door(layout, [_wall(length)], STOREY, "door", DOOR, TEMPLATE, box(0, 0, length, 10), CFG)
     assert rule == "fallback"
     door = _door(layout)
-    assert (door.segment, door.v0, door.back, door.depth) == (0, 0.0, "door_wood", CFG.recess_depth_m)
+    assert (door.segment, door.v0, door.back, door.depth, door.storey) == (0, 0.0, "door_wood", CFG.recess_depth_m, 0)
     assert door.s0 == pytest.approx(s0) and door.width == pytest.approx(width) and door.height == pytest.approx(2.4)
     assert layout.holes[-1] is door
     assert any(h.kind == "balcony_door" for h in layout.holes)
@@ -165,3 +165,18 @@ def test_a_shop_without_room_for_its_door_gets_a_low_glazed_one() -> None:
     door = next(h for h in layout.holes if h.kind == "shop_door")
     assert (door.back, door.width) == ("glass_dark", CFG.shop_door.width_m)
     assert door.height == pytest.approx(8 / 3 - CFG.head_clearance_m)
+
+
+def test_the_ground_in_front_of_each_ground_floor_door_is_kept_for_the_door() -> None:
+    from onward_generator.detail.scene import DOOR_CLEAR_M, DOOR_SIDE_CLEAR_M, _door_fronts
+
+    walls = [_wall(20.0), Segment(0, 0, 1, (20.0, 0.0), (20.0, 10.0), True)]
+    door = Hole("door", 0, 2.0, 0.0, 1.2, 2.4, 0.15, "door_wood", 1, 0)
+    shop_room = Hole("interior_door", 1, 4.0, 0.0, 3.0, 2.6, 0.15, "door_wood", 2, 0)  # a shop room's own door
+    # The window, the shopfront and the upper door come first: each is skipped, and the doors after them still count.
+    holes = [_window(0, 6.0), Hole("shopfront", 0, 10.0, 0.0, 3.0, 2.6, 0.15, "glass_dark", 3, 0),
+             Hole("door", 0, 15.0, 3.0, 1.0, 2.2, 0.15, "door_wood", 4, 1), door, shop_room]
+    front, side = _door_fronts(holes, walls)
+    assert front.equals(box(2.0 - DOOR_SIDE_CLEAR_M, -DOOR_CLEAR_M, 3.2 + DOOR_SIDE_CLEAR_M, 0.0))  # outside is −y
+    assert side.equals(box(20.0, 4.0 - DOOR_SIDE_CLEAR_M, 20.0 + DOOR_CLEAR_M, 7.0 + DOOR_SIDE_CLEAR_M))
+    assert (DOOR_CLEAR_M, DOOR_SIDE_CLEAR_M) == (1.5, 0.3)

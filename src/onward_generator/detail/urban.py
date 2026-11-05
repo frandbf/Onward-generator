@@ -63,8 +63,14 @@ def place_elements(
     buildings: BaseGeometry,
     prototypes: Mapping[str, Prototype],
     cfg: DetailConfig,
+    *,
+    doors: BaseGeometry | None = None,
 ) -> tuple[list[Element], list[Rejected]]:
-    """Place observed POIs, then generated lamps, on ``free`` walkable ground without overlaps."""
+    """Place observed POIs, then generated lamps, on ``free`` walkable ground without overlaps.
+
+    A generated element also keeps off ``doors``, the ground in front of the buildings' doors. An observed one
+    stays where OSM puts it: the doors are generated.
+    """
     placed: list[Element] = []
     rejected: list[Rejected] = []
     taken: list[BaseGeometry] = []
@@ -74,6 +80,8 @@ def place_elements(
         fp = _footprint(prototypes[element.kind], element.matrix, clearance)
         if not free.contains(fp):
             return "not_on_free_walkable_ground"
+        if element.origin == "generated" and doors is not None and doors.intersects(fp):
+            return "in_front_of_a_door"
         if taken and STRtree(taken).query(fp, predicate="intersects").size:
             return "overlaps_another_element"
         taken.append(fp)

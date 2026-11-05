@@ -24,7 +24,9 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator import __version__
 from onward_generator.detail.config import DetailConfig, Template
 from onward_generator.detail.facades import (
+    DOOR_KINDS,
     HIDDEN_GAP_M,
+    Hole,
     Layout,
     Segment,
     Shell,
@@ -623,6 +625,25 @@ def _part_roof(
     return eave, roof, dict(built.record), None
 
 
+# A generated lamp, bench or bin keeps off this much ground in front of a ground-floor door, and this far past each jamb.
+# Barcelona Sarria: a bench stood 0.47 m in front of a shop door, across its whole width.
+DOOR_CLEAR_M = 1.5
+DOOR_SIDE_CLEAR_M = 0.3
+
+
+def _door_fronts(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[Polygon]:
+    """The ground in front of each ground-floor door, outside the wall: a shop room's own door is an ``interior_door``."""
+    fronts = []
+    for h in holes:
+        if h.storey != 0 or h.kind not in DOOR_KINDS:
+            continue
+        seg = segments[h.segment]
+        a, b = seg.point(h.s0 - DOOR_SIDE_CLEAR_M)[:2], seg.point(h.s0 + h.width + DOOR_SIDE_CLEAR_M)[:2]
+        out = seg.n_out[:2] * DOOR_CLEAR_M
+        fronts.append(Polygon([a, b, b + out, a + out]))
+    return fronts
+
+
 # A part edge that lies within this of its building's outline along its whole length stands on that outline.
 PART_OUTLINE_M = 0.01
 
@@ -905,6 +926,7 @@ def detail_scene(
     shop_interiors: list[str] = []
     budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
     lit: list[tuple[bool, dict[str, Any]]] = []
+    door_fronts: list[Polygon] = []
     exposed_m = party_m = 0.0
 
     # Buildings in the interior queue go first, in queue order, so the quota and the triangle budget go
@@ -1108,6 +1130,7 @@ def detail_scene(
         balcony_slabs = [(seg, bs0, bs0 + spec.width_m, v0 - spec.slab_m) for seg, bs0, v0 in layout.balconies] if spec is not None else []  # pragma: no mutate: a template without a balcony lays out none; the guard only tells mypy spec is set
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
                            interior.shop_doors if interior is not None else (), balcony_slabs) if shop else []
+        door_fronts.extend(_door_fronts(layout.holes, segments))
         for entry in shops:
             if entry["poi_id"] in place_of:
                 entry["poi_source"] = place_source(place_of[entry["poi_id"]])
@@ -1209,7 +1232,7 @@ def detail_scene(
     walkable = [s.geometry for c, s in base.partition.surfaces.items() if c not in (SurfaceClass.CARRIAGEWAY, SurfaceClass.WATER)]
     free = union_all(walkable) if walkable else Point(0, 0).buffer(0)
     buildings_union = union_all(list(footprints.values()))
-    elements, rejected = place_elements(features, base.ways, free, buildings_union, prototypes, cfg)
+    elements, rejected = place_elements(features, base.ways, free, buildings_union, prototypes, cfg, doors=union_all(door_fronts))
     if extra_urban is not None:
         extra, extra_rejected = extra_urban(free, buildings_union, prototypes, cfg, elements)
         elements.extend(extra)

@@ -799,7 +799,8 @@ def ensure_door(
         if width >= MIN_DOOR_WIDTH_M and footprint.buffer(1e-6).contains(seg.plan_rect(s0, s0 + width, -cfg.recess_depth_m, 0.0)):
             hole = Hole(
                 door_kind, seg.index, s0, 0.0, width, height, cfg.recess_depth_m, DOOR_BACK[door_kind],
-                -1, 0,  # pragma: no mutate: nothing reads the column or the storey of a fallback door
+                -1,  # pragma: no mutate: nothing reads the column of a fallback door
+                0,  # the ground floor: the detail scene keeps generated street furniture off the ground in front of it
             )
             clear = rect_uv(hole.s0 - cfg.min_pier_m, hole.v0, hole.s0 + hole.width + cfg.min_pier_m, hole.v0 + hole.height)
             layout.holes = [h for h in layout.holes if h.segment != seg.index or not clear.intersects(h.uv_rect())]

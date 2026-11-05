@@ -232,7 +232,7 @@ Windows, shopfronts, and balcony doors below the accessible ceiling keep a hole 
 
 - **Observed:** OSM POIs `tree`, `bollard`, `bicycle_parking`, `bus_stop`, `fire_hydrant`, `traffic_signals`, `street_lamp`, `bench`, `waste_basket`. Marked `attribute_origin: observed`.
 - **Generated:** lamps every 25 m beside `vehicular` ways, 0.5 m from the kerb, at least 1 m from buildings and 8 m from each other. Marked `attribute_origin: generated`.
-- An element is placed only when its footprint fits on free walkable ground and does not touch another element. A missed observed element warns `urban_element_not_placed`. A missed generated lamp records the same code as info.
+- An element is placed only when its footprint fits on free walkable ground and does not touch another element. A missed observed element warns `urban_element_not_placed`. A missed generated lamp records the same code as info. A generated lamp, bench or bin also keeps off the ground in front of every ground-floor door (`door`, `shop_door`, `landmark_door`, and `interior_door`, the door of a shop room): 1.5 m out from the wall and 0.3 m past each jamb (`DOOR_CLEAR_M`, `DOOR_SIDE_CLEAR_M` in `detail/scene.py`). A refused one gives the reason `in_front_of_a_door`. An observed element stays where OSM puts it, because the doors are generated. On Barcelona Sarria a generated bench stood 0.47 m in front of a shop door, across its whole width.
 - Each type is one shared prototype mesh, instanced with a glTF `matrix`, plus a collision box.
 
 ### Playable core and scenic ring

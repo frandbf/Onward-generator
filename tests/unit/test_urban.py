@@ -197,3 +197,18 @@ def test_prototype_without_collider_is_a_programming_error() -> None:
     protos = {"bench": Prototype("urban:bench", PROTOS["bench"].parts, None)}
     with pytest.raises(AssertionError):
         place_elements([_poi("node/1", 0.0, 0.0, amenity="bench")], [], FREE, FAR_BUILDING, protos, _cfg())
+
+
+def test_generated_furniture_and_lamps_keep_off_the_ground_in_front_of_a_door_and_observed_ones_do_not() -> None:
+    """Barcelona Sarria: a generated bench stood 0.47 m in front of a shop door, across its whole width."""
+    items = (FurnitureItem("bench", 28.0, 0.4, 80),)
+    walk = LinearWay("way/3", "pedestrian", LineString([(0.0, 20.0), (60.0, 20.0)]), 4.0, "observed")
+    road = LinearWay("way/1", "vehicular", LineString([(0.0, -40.0), (30.0, -40.0)]), 6.0, "observed")
+    doors = box(13.0, 21.5, 15.0, 23.0) | box(13.0, 17.0, 15.0, 18.5) | box(11.0, -37.5, 14.0, -36.0)  # bench 0 either side, lamp 0
+    observed = [_poi("node/8", 14.0, 22.4, amenity="bench")]
+    cfg = _cfg(lamps=True, furniture=items)
+    placed, rejected = place_elements(observed, [walk, road], FREE, FAR_BUILDING, PROTOS, cfg, doors=doors)
+    assert [e.id for e in placed] == ["urban/bench/node/8", "urban/bench/way/3#bench1"]
+    assert [(r.id, r.reason) for r in rejected] == [("way/1#lamp0", "in_front_of_a_door"), ("way/3#bench0", "in_front_of_a_door")]
+    alone, none = place_elements([], [walk, road], FREE, FAR_BUILDING, PROTOS, cfg)
+    assert none == [] and len(alone) == 3
