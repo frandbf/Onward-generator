@@ -140,25 +140,38 @@ The macOS values are the ones used before the option existed. The Linux values a
 `run` prints a header with the map name, folder, centre, radius, margin and lightmap density. Map setup (`map create` and `osm download`) has no numbered row. Each Python stage then prints one line: its number, name, duration and key numbers. Those numbers come from the report JSON the stage wrote under its `--out` (`geo_report.json`, `heights_report.json`, `generation_report.json`, `detail_report.json`, `materials_report.json`, `panoramax_report.json`, `signs_report.json`, `overgrow_report.json`, `fit.json`, `bounds_report.json`, `layout.json`, `onward_export.json`), not from its printed text. A breakdown (openings, urban elements, overgrow growth, skipped materials) goes on indented lines, as `key count` sorted by count and wrapped at about 100 columns. Thousands are grouped with a space. A non-zero `critical` or `warning` severity, a geo error or warning, or an export warning goes on its own line that starts with `!`, red for errors and yellow for warnings. The standing `export_adapter_unverified` warning is not repeated. Colour is used only on a terminal and never when `NO_COLOR` is set. The last line gives the Python time, the map setup time and the warning count, then `→ Unity:` names the Unity steps still missing. `--verbose` adds each stage's full output under its line. File paths, the package listing, the layout JSON, and the full Unity log stay out of that summary.
 
 ```
-LogSample  maps/logsample
-37.98407, -1.12863  r 90 m  margin 5 m  lightmap 10 t/m
+Paris Contrescarpe  maps/paris_contrescarpe
+48.84044803797855, 2.3498059975093395  r 50 m  margin 30 m  lightmap 40 t/m
 
- [ 1/12] geo        0.1 s  EPSG:25830  kept 173  dropped 615
- [ 2/12] heights    0.1 s  31 buildings  inferred 12.9%  fallback 87.1%  review 1
- [ 3/12] generate   1.7 s  2 258 tris  1 656 collision  9 mat
- [ 4/12] detail     3.6 s  28 458 tris  25 mat  128 nodes
-         openings   narrow_window 571, balcony 201, balcony_door 201, window 109, shopfront 36,
-                    door 4, interior_door 2, landmark_door 1
-         urban      tree 62 obs, bench 13, bicycle_parking 5 obs, waste_basket 3, street_lamp 2,
-                    fire_hydrant 1 obs
-         ! warning 10 (urban_element_not_placed 10)
- [ 5/12] dress      4.6 s  trees 16-side x3  atlas on
- [ 6/12] materials 15.5 s  applied 13  skipped 2
-         skipped    color_id_not_used: plaster_white_wall, stone_light_wall
- ...
- [12/12] export     1.9 s  logsample_f2c32e9333
+sources  fr.lidar_hd, overture  (not here: es.catastro, es.pnoa_ndsm)
+ [ 1/16] geo        0.1 s  EPSG:32631  kept 453  dropped 87
+ [ 2/16] lidar_hd   6.0 s  566 KiB  1 tile  etalab-2.0
+ [ 3/16] lidar_hd_heights  0.1 s  measured 60/65  2.67–23.43 m
+ [ 4/16] overture  13.9 s
+ [ 5/16] overture-match  0.0 s  places 68 of 160  heights 0 of 65
+ [ 6/16] heights    0.0 s  65 buildings  measured 92.31%  inferred 7.69%
+ [ 7/16] generate   0.2 s  4 538 tris  3 492 collision  9 mat
+ [ 8/16] detail     1.5 s  46 375 tris  39 mat  171 nodes
+         openings   window 959, balcony 436, balcony_door 436, narrow_window 298, shopfront 216,
+                    interior_door 45, door 12, shop_door 5, landmark_door 1
+         urban      bench 16, street_lamp 13 obs, waste_basket 11, tree 6 obs, fire_hydrant 4 obs,
+                    street_lamp 4, bollard 1 obs
+         typology   closed_block 38, row_house 11, other 7, detached_house 4, open_block 3, civic 1,
+                    landmark 1
+         era        unknown 65
+         ! warning 67 (urban_element_not_placed 66, budget_exceeded 1)
+ [ 9/16] dress      1.3 s  trees 16-side x3  atlas on
+ [10/16] materials  1.1 s  applied 14  skipped 1  facades legacy generic
+         skipped    color_id_not_used: stone_light_wall
+ [11/16] signs      0.7 s  16 plates  174 shop signs
+ [12/16] overgrow   1.3 s  11 729 tris  props 35  wrecks 0  trees 0 (0 obs)
+         growth     vines 16
+ [13/16] fit        0.1 s  checked 51
+ [14/16] bounds     0.3 s  wall 12 m  32 tris
+ [15/16] layout     0.3 s  routes 32  hunt 32  attackers 8  defenders 8
+ [16/16] export     0.7 s  paris_contrescarpe_0bb0ba4a50  per view 76 median, 177 p90, 183 max
 
-✓ Python 45.0 s  (map setup 37.4 s)  10 warnings
+✓ Python 27.6 s  (map setup 38.6 s)  67 warnings
 → Unity: tool, scene, launcher
 ```
 
