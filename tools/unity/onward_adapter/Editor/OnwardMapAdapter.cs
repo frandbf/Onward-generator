@@ -766,6 +766,7 @@ namespace OnwardGenerator
                 var probes = new List<Vector3>();
                 AddInteriorLights(visual, opt, probes);
                 AddStreetLights(pkg.Layout);
+                AddClimbProbes(pkg.Layout, probes);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
                 EditorSceneManager.SaveScene(scene, scenePath);
 
@@ -2597,6 +2598,20 @@ namespace OnwardGenerator
             go.AddComponent<LightProbeGroup>().probePositions = points.ToArray();
             Debug.Log($"{LogPrefix} Light probes: {points.Count} ({roomProbes.Count} in rooms, {columns} outdoor columns, {shut} shut in).");
             return points.Count;
+        }
+
+        // A pair of probes over each roof a ladder or a lift reaches: the street columns stop at 6 m and the
+        // roof cabins took the dark of the room probes under them (0.13 upward on Barcelona Sarria).
+        private static readonly float[] ClimbRoofProbeHeightsM = { 1f, 3f };
+
+        private static void AddClimbProbes(Layout layout, List<Vector3> probes)
+        {
+            foreach (Climb[] kind in new[] { layout.ladders, layout.lifts })
+            {
+                if (kind == null) continue;
+                foreach (Climb c in kind)
+                    foreach (float h in ClimbRoofProbeHeightsM) probes.Add(Local(c.roof_x, c.roof_y, c.height_m + h));
+            }
         }
 
         // Whether the sky reaches the ground at ``ground`` and nothing stands within OutdoorProbeClearM

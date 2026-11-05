@@ -415,6 +415,9 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "if (!OpenColumn(hit.position))" in source
     assert "private const float OutdoorProbeClearM = 1f;" in source and "private const float OutdoorProbeClearFromM = 1.2f;" in source
     assert source.count("QueryTriggerInteraction.Ignore") >= 2
+    # Each climbed roof gets probes 1 and 3 m over it, before the group is built.
+    assert "private static readonly float[] ClimbRoofProbeHeightsM = { 1f, 3f };" in source
+    assert source.index("AddClimbProbes(pkg.Layout, probes);") < source.index('AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));')
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
     # Lightmap scale per material from adapter_options.json, and the baked texel count in the log and report.
