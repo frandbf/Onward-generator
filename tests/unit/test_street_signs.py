@@ -668,3 +668,47 @@ def test_a_plate_that_finds_its_wall_taken_tries_the_next_wall() -> None:
     signs = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64)}
     assert signs["Calle Mayor"].feature_id == "osm-way-sliver"
     assert signs["Calle Vieja"].feature_id == "osm-way-far"
+
+
+@pytest.mark.parametrize(("gap", "kept"), [(0.29, False), (0.31, True)])
+def test_a_plate_keeps_0_3_m_from_any_other_plate(gap: float, kept: bool) -> None:
+    """Barcelona Sarria: two names hung end to end 1.7 cm apart on one wall, read as one board."""
+    from dataclasses import replace
+
+    from onward_generator.signs.place import PLATE_GAP_M, PLATE_WIDTH_M, _plate_box
+
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    features = _corner(ring)
+    streets, walls = _streets(features), _walls(features)
+    tree = STRtree([LineString([wall.a, wall.b]) for wall in walls])
+    first = _sign_for("Calle Mayor", np.array([0.0, 0.0]), streets, walls, tree, set())
+    assert first is not None
+    beside = replace(first, name="Calle Otra", position=first.position + np.array([*first.along * (PLATE_WIDTH_M + gap), 0.0]))
+    again = _sign_for("Calle Mayor", np.array([0.0, 0.0]), streets, walls, tree, set(), taken=[(_plate_box(beside), beside.outward)])
+    assert (again is not None and np.allclose(again.position, first.position)) is kept
+    assert PLATE_GAP_M == 0.3
+
+
+def test_plates_on_the_two_walls_of_a_corner_may_come_close_but_never_meet() -> None:
+    from shapely import box as plan
+
+    from onward_generator.signs.place import SAME_FACING_COS, Sign, _crowds
+
+    sign = Sign("Calle Mayor", "m", np.array([0.0, 0.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
+    east = plan(0.8, -0.015, 2.2, 0.015)  # end to end with the plate (x ±0.7), 0.1 m beyond its east end
+    assert _crowds(sign, [(east, np.array([0.0, -1.0]))])  # facing the same way: within 0.3 m
+    assert not _crowds(sign, [(east, np.array([1.0, 0.0]))])  # on the other wall of a corner: 0.1 m is enough
+    assert _crowds(sign, [(east, np.array([0.1305, -0.9914]))])  # 7.5 degrees apart: the same facing
+    assert not _crowds(sign, [(east, np.array([0.1478, -0.989]))])  # 8.5 degrees apart: not
+    assert _crowds(sign, [(plan(0.6, -0.5, 0.8, 0.5), np.array([1.0, 0.0]))])  # meeting: never
+    assert not _crowds(sign, [(plan(1.0, -0.015, 2.4, 0.015), np.array([0.0, -1.0]))])  # 0.3 m apart
+    # On the boundaries, exactly in floating point: 0.3 m apart, and facings whose cosine is 0.99, do not crowd.
+    from onward_generator.signs.place import PLATE_GAP_M, _plate_box
+
+    shifted = Sign("Calle Mayor", "m", np.array([-0.98, 0.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
+    end = -0.98 + 0.7
+    edge = plan(end + PLATE_GAP_M, -0.015, end + 1.7, 0.015)
+    assert _plate_box(shifted).distance(edge) == PLATE_GAP_M and not _crowds(shifted, [(edge, np.array([0.0, -1.0]))])
+    tilted = np.array([(1 - SAME_FACING_COS**2) ** 0.5, -SAME_FACING_COS])
+    assert float(sign.outward @ tilted) == SAME_FACING_COS and not _crowds(sign, [(east, tilted)])
+    assert SAME_FACING_COS == 0.99
