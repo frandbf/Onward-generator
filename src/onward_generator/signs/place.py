@@ -374,21 +374,24 @@ def _choose(
     chosen: list[Sign] = []
     used_edges: set[tuple[str, int]] = set()
     seen_names: set[str] = set()
+    taken: list[BaseGeometry] = []
     for point, names in junctions:
         for name in names:
-            sign = _sign_for(name, point, streets, walls, tree, used_edges, buildings, glass)
+            sign = _sign_for(name, point, streets, walls, tree, used_edges, buildings, glass, taken)
             if sign is None or _too_close(sign, chosen):
                 continue
             chosen.append(sign)
+            taken.append(_plate_box(sign))
             seen_names.add(name)
     for street in streets:
         if street.name in seen_names:
             continue
         mid = street.line.interpolate(0.5, normalized=True)
-        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges, buildings, glass)
+        sign = _sign_for(street.name, np.array([mid.x, mid.y]), streets, walls, tree, used_edges, buildings, glass, taken)
         if sign is None or _too_close(sign, chosen):
             continue
         chosen.append(sign)
+        taken.append(_plate_box(sign))
         seen_names.add(street.name)
     chosen.sort(key=lambda s: (float(s.position[0] ** 2 + s.position[1] ** 2), s.name))
     return chosen[:max_signs]
@@ -446,8 +449,9 @@ def _sign_for(
     used_edges: set[tuple[str, int]],
     buildings: STRtree | None = None,
     glass: _Glass | None = None,
+    taken: Sequence[BaseGeometry] = (),
 ) -> Sign | None:
-    """The nearest wall within ``MAX_JUNCTION_M`` that faces ``point`` along the street.
+    """The nearest wall within ``MAX_JUNCTION_M`` that faces ``point`` along the street, where no plate in ``taken`` hangs.
 
     ``tree`` holds one segment per wall, in the order of ``walls``. Only walls
     whose box meets the square of half-side ``MAX_JUNCTION_M`` around ``point``
@@ -492,10 +496,22 @@ def _sign_for(
         spot = _clear_of_glass(wall, along, closest, glass)
         if spot is None:
             continue
-        used_edges.add((wall.feature_id, index))
         centre = np.array([*(spot + wall.outward * (WALL_GAP_M + PLATE_THICK_M * 0.5)), MOUNT_Z_M])
-        return Sign(name, material_id(name), centre, along, wall.outward, wall.feature_id)
+        sign = Sign(name, material_id(name), centre, along, wall.outward, wall.feature_id)
+        # Two footprints can share a wall line to a few millimetres: each has its edge, and both got a plate.
+        if any(_plate_box(sign).intersects(other) for other in taken):
+            continue
+        used_edges.add((wall.feature_id, index))
+        return sign
     return None
+
+
+def _plate_box(sign: Sign) -> BaseGeometry:
+    """The plan of a plate: its width along the wall, its thickness out from it."""
+    half = sign.along * PLATE_WIDTH_M / 2
+    depth = sign.outward * PLATE_THICK_M / 2
+    centre = sign.position[:2]
+    return Polygon([centre - half - depth, centre + half - depth, centre + half + depth, centre - half + depth])
 
 
 def _clear_of_glass(wall: _Wall, along: np.ndarray, closest: np.ndarray, glass: _Glass | None) -> np.ndarray | None:

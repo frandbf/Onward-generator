@@ -608,3 +608,63 @@ def test_a_plate_slides_off_glass_set_back_in_its_wall(depth: float, moved: bool
     # The wall line is y = 6, its street side -y: depth > 0 is into the wall, < 0 in front of the plate.
     spot = _slide(2.0, _pane(1.0, 3.0, 6.0 + depth, 2.0, 3.0))
     assert (spot != [2.0, 6.0]) is moved
+
+
+def test_two_footprints_on_one_wall_line_do_not_get_a_plate_each_in_one_spot() -> None:
+    """On Barcelona Sarria a Catastro sliver 3 mm in front of its neighbour's wall gave two names one volume."""
+    from onward_generator.signs.place import _plate_box
+
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    sliver = [[6.0, 5.997], [26.0, 5.997], [26.0, 6.0], [6.0, 6.0], [6.0, 5.997]]
+    features = _corner(
+        ring,
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, -1], [30, -1]]},
+                 {"highway": "residential", "name": "Calle Vieja"}, "osm-way-vieja"),
+        _feature("building", {"type": "Polygon", "coordinates": [sliver]}, {"building": "yes", "height": "12"}, "osm-way-sliver"),
+    )
+    signs = _choose(_streets(features), _walls(features), 64)
+    assert {"Calle Mayor", "Calle Nueva"} <= {sign.name for sign in signs}
+    boxes = [_plate_box(sign) for sign in signs]
+    assert not any(a.intersects(b) for i, a in enumerate(boxes) for b in boxes[i + 1:])
+
+
+def test_a_plate_box_is_its_width_along_the_wall_and_its_thickness_out() -> None:
+    from onward_generator.signs.place import PLATE_THICK_M, PLATE_WIDTH_M, Sign, _plate_box
+
+    sign = Sign("Calle Mayor", "m", np.array([2.0, 5.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "w")
+    plate = _plate_box(sign)
+    assert plate.is_valid and plate.area == pytest.approx(PLATE_WIDTH_M * PLATE_THICK_M)
+    assert plate.bounds == pytest.approx((2.0 - PLATE_WIDTH_M / 2, 5.0 - PLATE_THICK_M / 2, 2.0 + PLATE_WIDTH_M / 2, 5.0 + PLATE_THICK_M / 2))
+
+
+def test_streets_without_a_junction_do_not_share_a_plate_spot_either() -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    sliver = [[6.0, 5.997], [26.0, 5.997], [26.0, 6.0], [6.0, 6.0], [6.0, 5.997]]
+    features = [
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, -1], [30, -1]]}, {"highway": "residential", "name": "Calle Vieja"}, "osm-way-a"),
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, -2], [30, -2]]}, {"highway": "residential", "name": "Calle Baja"}, "osm-way-b"),
+        _feature("building", {"type": "Polygon", "coordinates": [ring]}, {"building": "yes", "height": "12"}, "osm-way-corner"),
+        _feature("building", {"type": "Polygon", "coordinates": [sliver]}, {"building": "yes", "height": "12"}, "osm-way-sliver"),
+    ]
+    from onward_generator.signs.place import _plate_box
+
+    signs = _choose(_streets(features), _walls(features), 64)
+    assert signs
+    boxes = [_plate_box(sign) for sign in signs]
+    assert not any(a.intersects(b) for i, a in enumerate(boxes) for b in boxes[i + 1:])
+
+
+def test_a_plate_that_finds_its_wall_taken_tries_the_next_wall() -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    sliver = [[6.0, 5.997], [26.0, 5.997], [26.0, 6.0], [6.0, 6.0], [6.0, 5.997]]
+    far = [[6.0, -20.0], [26.0, -20.0], [26.0, -10.0], [6.0, -10.0], [6.0, -20.0]]  # across the street, farther
+    features = _corner(
+        ring,
+        _feature("highway", {"type": "LineString", "coordinates": [[-30, -1], [30, -1]]},
+                 {"highway": "residential", "name": "Calle Vieja"}, "osm-way-vieja"),
+        _feature("building", {"type": "Polygon", "coordinates": [sliver]}, {"building": "yes", "height": "12"}, "osm-way-sliver"),
+        _feature("building", {"type": "Polygon", "coordinates": [far]}, {"building": "yes", "height": "12"}, "osm-way-far"),
+    )
+    signs = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64)}
+    assert signs["Calle Mayor"].feature_id == "osm-way-sliver"
+    assert signs["Calle Vieja"].feature_id == "osm-way-far"
