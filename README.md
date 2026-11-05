@@ -142,7 +142,12 @@ The documentation is in English.
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers the development setup, the tests and the quality gates; [AGENTS.md](AGENTS.md) holds the working rules for every change. In short: `task ci` runs what CI runs, and a change is ready when `task ci` and `task mutate` pass.
+[![Let's build amazing maps together: share feedback, test the project, contribute assets, improve the code](docs/images/contribute.jpg)](CONTRIBUTING.md)
+
+- **Share your feedback.** Ideas, suggestions and bugs go to the [issues](https://github.com/frandbf/Onward-generator/issues). A map that looks wrong is most useful with its name, centre and radius.
+- **Test the project.** Build a map of a street you know with [Try it](#try-it) and tell us how it plays on the headset.
+- **Contribute assets.** 3D models, props and textures join a catalogue under `assets/`, each with its licence recorded ([docs/legal/data-sources.md](docs/legal/data-sources.md), [docs/abandoned-assets.md](docs/abandoned-assets.md)).
+- **Improve the code.** [CONTRIBUTING.md](CONTRIBUTING.md) covers the development setup, the tests and the quality gates; [AGENTS.md](AGENTS.md) holds the working rules for every change. In short: `task ci` runs what CI runs, and a change is ready when `task ci` and `task mutate` pass.
 
 ## Data and licences
 
