@@ -53,6 +53,10 @@ MIN_EDGE_M = 1.6
 MIN_WALL_M = 3.4
 # A plate's wall must have open ground this far in front of it, not another building.
 FRONT_CLEAR_M = 0.5
+# Where the plate finally hangs, open ground this far in front of its whole width, less ``PLATE_END_TOLERANCE_M`` at each
+# end: on Barcelona Sarria a plate in a concave corner faced a wall 0.73 m away. An end may touch a wall that meets its own.
+PLATE_FRONT_CLEAR_M = 1.0
+PLATE_END_TOLERANCE_M = 0.1
 # Glass a plate may not hang over: the windows of rooms with an interior and the shopfronts.
 GLASS_MATERIALS = frozenset({"glass_view", "shop_glass"})
 # Kept between a plate and the glass, on every side.
@@ -504,11 +508,21 @@ def _sign_for(
         centre = np.array([*(spot + wall.outward * (WALL_GAP_M + PLATE_THICK_M * 0.5)), MOUNT_Z_M])
         sign = Sign(name, material_id(name), centre, along, wall.outward, wall.feature_id)
         # Two footprints can share a wall line to a few millimetres: each has its edge, and both got a plate.
-        if _crowds(sign, taken):
+        if _crowds(sign, taken) or (buildings is not None and _faces_a_building(sign, buildings)):
             continue
         used_edges.add((wall.feature_id, index))
         return sign
     return None
+
+
+def _faces_a_building(sign: Sign, buildings: STRtree) -> bool:
+    """Whether a footprint stands within ``PLATE_FRONT_CLEAR_M`` in front of the plate's face, its two ends excepted."""
+    centre = sign.position[:2]
+    half = sign.along * (PLATE_WIDTH_M / 2 - PLATE_END_TOLERANCE_M)
+    face = PLATE_THICK_M / 2
+    near, far = sign.outward * face, sign.outward * (face + PLATE_FRONT_CLEAR_M)
+    front = Polygon([centre - half + near, centre + half + near, centre + half + far, centre - half + far])
+    return bool(buildings.query(front, predicate="intersects").size)
 
 
 def _crowds(sign: Sign, taken: Sequence[tuple[BaseGeometry, np.ndarray]]) -> bool:

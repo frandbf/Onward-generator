@@ -712,3 +712,42 @@ def test_plates_on_the_two_walls_of_a_corner_may_come_close_but_never_meet() -> 
     tilted = np.array([(1 - SAME_FACING_COS**2) ** 0.5, -SAME_FACING_COS])
     assert float(sign.outward @ tilted) == SAME_FACING_COS and not _crowds(sign, [(east, tilted)])
     assert SAME_FACING_COS == 0.99
+
+
+def test_a_plate_needs_1_m_of_open_ground_in_front_of_its_face_and_its_ends_may_touch_a_wall() -> None:
+    """Barcelona Sarria: a plate in a concave corner faced a wall 0.73 m away."""
+    from shapely import box as plan
+
+    from onward_generator.signs.place import PLATE_END_TOLERANCE_M, PLATE_FRONT_CLEAR_M, Sign, _faces_a_building
+
+    # The plate faces −y from the wall y = 0, 1.4 m wide along x, its centre 0.075 m out.
+    sign = Sign("Calle Mayor", "m", np.array([0.0, -0.075, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
+
+    def faces(*buildings: object) -> bool:
+        return _faces_a_building(sign, STRtree(list(buildings)))
+
+    assert faces(plan(-5.0, -0.075 - 0.73 - 3.0, 5.0, -0.075 - 0.73))  # a wall 0.73 m in front
+    assert not faces(plan(-5.0, -0.075 - 1.1 - 3.0, 5.0, -0.075 - 1.1))  # 1.1 m: room enough
+    assert not faces(plan(0.61, -3.0, 3.0, 0.0))  # a wall meeting the plate's own across its last 9 cm
+    assert faces(plan(0.55, -3.0, 3.0, 0.0))  # across its last 0.15 m
+    assert not faces(plan(-5.0, -3.0, 5.0, -0.075 - 0.015 - PLATE_FRONT_CLEAR_M - 0.01))
+    assert faces(plan(-5.0, -3.0, 5.0, -0.075 - 0.015 - PLATE_FRONT_CLEAR_M + 0.01))
+    assert not faces(plan(-5.0, -0.075 - 0.015 + 0.0025, 5.0, 1.0))  # 2.5 mm behind the plate's face: its own wall
+    # A post in any corner of the ground in front of the face counts.
+    near, far = -0.075 - 0.015, -0.075 - 0.015 - PLATE_FRONT_CLEAR_M
+    for x in (-0.59, 0.59):
+        for y in (near - 0.01, far + 0.01):
+            assert faces(plan(x - 0.005, y - 0.005, x + 0.005, y + 0.005)), (x, y)
+    assert (PLATE_FRONT_CLEAR_M, PLATE_END_TOLERANCE_M) == (1.0, 0.1)
+
+
+def test_a_plate_facing_a_wall_0_73_m_away_goes_to_another_wall() -> None:
+    ring = [[6.0, 6.0], [26.0, 6.0], [26.0, 26.0], [6.0, 26.0], [6.0, 6.0]]
+    # 0.73 m in front of the corner's south wall, past the 0.5 m the first check looks: a low annex the plate would face.
+    annex = _feature("building", {"type": "Polygon", "coordinates": [[[6, 5.18], [26, 5.18], [26, 3], [6, 3], [6, 5.18]]]},
+                     {"building": "yes", "height": "3"}, "osm-way-annex")
+    features = _corner(ring, annex)
+    bare = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64)}
+    checked = {sign.name: sign for sign in _choose(_streets(features), _walls(features), 64, STRtree(_footprints(features)))}
+    assert (bare["Calle Mayor"].feature_id, float(bare["Calle Mayor"].outward[1])) == ("osm-way-corner", -1.0)
+    assert "Calle Mayor" not in checked or float(checked["Calle Mayor"].outward[1]) != -1.0
