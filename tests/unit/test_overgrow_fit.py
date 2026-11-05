@@ -864,16 +864,22 @@ def _shopfront(*signs: dict) -> dict:
 def test_shop_signs_are_a_footprint_and_a_height_band() -> None:
     from onward_generator.detail.shops import SIGN_CLEAR_M, sign_footprints
 
-    fascia, blade = sign_footprints(_shopfront(_fascia(0.0, 8.0, 2.9), _fascia(5.0, 8.0, 3.0, kind="blade")))
+    # As ``detail`` writes them on a wall that runs along +x and faces −y: a fascia's normal is the wall's, a blade's is −u.
+    fascia, blade = sign_footprints(_shopfront(_fascia(0.0, 8.0, 2.9), _fascia(5.0, 8.0, 3.0, kind="blade", normal=(-1.0, 0.0))))
     # A fascia runs along the wall (x), as deep as itself plus the clearance on each side.
     assert [round(v, 3) for v in fascia[0].bounds] == [round(v, 3) for v in (-1.0, 8.0 - 0.05 - SIGN_CLEAR_M, 1.0, 8.0 + 0.05 + SIGN_CLEAR_M)]
     assert (round(fascia[1], 3), round(fascia[2], 3)) == (2.7, 3.1)
-    # A blade stands out of the wall, along its normal (y).
+    # A blade stands out of the wall (y), across its own normal.
     assert [round(v, 3) for v in blade[0].bounds] == [5.0 - 0.1, 7.0, 5.0 + 0.1, 9.0]
     # Each is the full rectangle: 2 m long, 0.1 m deep plus the clearance either side.
     assert round(fascia[0].area, 6) == round(blade[0].area, 6) == round(2.0 * (0.1 + 2 * SIGN_CLEAR_M), 6)
     ((wide, _low, _high),) = sign_footprints(_shopfront({**_fascia(0.0, 8.0, 2.9), "width_m": 3.0}))
     assert [round(v, 3) for v in wide.bounds][::2] == [-1.5, 1.5]
+    # On an oblique wall (along u = (0.8, 0.6), facing (0.6, −0.8)) the fascia runs along u and the blade along the normal.
+    oblique, sideways = sign_footprints(_shopfront(_fascia(0.0, 0.0, 2.9, normal=(0.6, -0.8)),
+                                                   _fascia(20.0, 0.0, 3.0, kind="blade", normal=(-0.8, -0.6))))
+    assert oblique[0].contains(Point(0.8 * 0.9, 0.6 * 0.9)) and not oblique[0].contains(Point(-0.8 * 0.9, 0.6 * 0.9))
+    assert sideways[0].contains(Point(20.0 + 0.6 * 0.9, -0.8 * 0.9)) and not sideways[0].contains(Point(20.0 + 0.8 * 0.9, 0.6 * 0.9))
 
 
 def _awning() -> Prop:

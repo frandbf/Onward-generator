@@ -178,6 +178,12 @@ def test_blade_sign_hangs_on_a_bracket_beside_the_window() -> None:
     assert sign["normal"] == pytest.approx([-1.0, 0.0])
     assert (sign["width_m"], sign["height_m"], sign["depth_m"]) == pytest.approx((0.7, 0.5, 0.04))
     assert sign["double_sided"] is True and sign["bracket_m"] == pytest.approx(0.85)
+    # Its footprint stands out of the wall, from the bracket's gap to the board's far edge plus the clearance.
+    from onward_generator.detail.shops import SIGN_CLEAR_M, sign_footprints
+
+    [(plan, _, _)] = sign_footprints({"objects": [{"type": "building", "facade": {"shops": [record]}}]})
+    x0, y0, x1, y1 = plan.bounds
+    assert (y0, y1) == pytest.approx((-0.85, -0.15)) and x1 - x0 == pytest.approx(0.04 + 2 * SIGN_CLEAR_M)
 
 
 def test_sign_kind_is_seeded_per_building_and_shop_and_both_kinds_appear() -> None:

@@ -190,8 +190,9 @@ def sign_footprints(manifest: Mapping[str, Any]) -> list[tuple[Polygon, float, f
             centre = np.asarray(sign["centre_m"])
             normal = np.asarray(sign["normal"])
             width, depth = float(sign["width_m"]) / 2, float(sign["depth_m"]) / 2 + SIGN_CLEAR_M
-            # A fascia runs along the wall; a blade sign stands out of it, along the normal.
-            length_axis = np.array([-normal[1], normal[0]]) if sign["kind"] == "fascia" else normal  # pragma: no mutate: either way along the wall gives the same symmetric footprint
+            # A board runs across its own normal: a fascia's is the wall's, so it runs along the wall; a blade's runs along
+            # the wall (``-seg.u``), so it stands out of it. Until 5 November 2026 a blade's footprint ran along the wall.
+            length_axis = np.array([-normal[1], normal[0]])
             run = LineString([centre[:2] - length_axis * width, centre[:2] + length_axis * width])
             half = float(sign["height_m"]) / 2
             found.append((run.buffer(depth, cap_style="flat"), float(centre[2]) - half, float(centre[2]) + half))
