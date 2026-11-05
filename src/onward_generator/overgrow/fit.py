@@ -15,13 +15,13 @@ import json
 from pathlib import Path
 
 import numpy as np
-from shapely import Point, STRtree
+from shapely import MultiPoint, Point, STRtree, unary_union
 from shapely.geometry import LineString, Polygon, shape
 from shapely.geometry.polygon import orient
 
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.generation.gltf import nodes_from_glb
-from onward_generator.generation.mesh import Mesh, box, merge, transform
+from onward_generator.generation.mesh import Mesh, box, merge, prism, transform
 from onward_generator.io import atomic_write_json
 from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.constants import LANE_M
@@ -151,13 +151,16 @@ TRUNK_TOP_M = 2.5
 TRUNK_FOOT_M = 0.3
 # A lamp's or traffic light's collider is its post: the plan of its lowest metre, to its full height.
 POST_FOOT_M = 1.0
+# A fence collides along its panels: the plan its triangles cover, widened by this, to its full height.
+FENCE_PANEL_M = 0.05
 
 
 def collider_mesh(mesh: Mesh, role: str) -> Mesh:
     """The box that stops players and bullets. The visible mesh stays in the other file.
 
     A whole box suits a car or a dumpster. Round a lamp it would be a wall under the arm, and round a
-    tree a block the size of its canopy, so those keep their post or trunk.
+    tree a block the size of its canopy, so those keep their post or trunk. A box round a U-shaped fence
+    filled the yard it encloses with an invisible solid, so a fence keeps the plan of its panels.
     """
     vertices = mesh.vertices
     low, high = vertices.min(axis=0), vertices.max(axis=0)
@@ -170,6 +173,12 @@ def collider_mesh(mesh: Mesh, role: str) -> Mesh:
         post = vertices[vertices[:, 2] < low[2] + POST_FOOT_M]
         plow, phigh = post.min(axis=0), post.max(axis=0)
         return box(float(plow[0]), float(phigh[0]), float(plow[1]), float(phigh[1]), float(low[2]), float(high[2]))
+    if role == "fence":
+        plan = unary_union([
+            MultiPoint(corners).convex_hull.buffer(FENCE_PANEL_M, cap_style="square")
+            for corners in vertices[mesh.triangles]
+        ]).simplify(FENCE_PANEL_M / 2)
+        return prism(plan, float(low[2]), float(high[2]), bottom=True)
     return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
 
 

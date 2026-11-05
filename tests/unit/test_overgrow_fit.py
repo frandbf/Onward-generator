@@ -10,12 +10,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely import LineString, Point, STRtree, box
+from shapely import LineString, Point, Polygon, STRtree, box, unary_union
 
+from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail.modules import frame_matrix, yaw_matrix
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, build_glb
-from onward_generator.generation.mesh import Mesh
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
+from onward_generator.generation.mesh import Mesh, closed_manifold_defects, merge
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.overgrow.ambient import cross_yaw, is_solid
 from onward_generator.overgrow.catalog import AssetSpec
@@ -23,6 +24,7 @@ from onward_generator.overgrow.dressing import Dressing, Spot, _covers_sign, _in
 from onward_generator.overgrow.fit import (
     apply_fit_scale,
     check_scene,
+    collider_mesh,
     fit_scale,
     measure,
     object_reason,
@@ -1085,3 +1087,34 @@ def test_a_part_exactly_at_the_top_of_the_foot_slice_is_left_out(monkeypatch: py
     monkeypatch.setattr("onward_generator.overgrow.fit.TRUNK_FOOT_M", 0.25)
     tree = merge_meshes([mesh_box(2.0, 2.2, -1.0, -0.8, 0.0, 2.0), mesh_box(-4.0, 6.0, -3.0, 5.0, 0.25, 6.0)])
     assert _bounds(collider_mesh(tree, "tree")) == [1.9, -1.1, 0.0, 2.3, -0.7, 2.5]
+
+
+def test_a_u_shaped_fence_collides_along_its_panels_and_leaves_its_yard_open() -> None:
+    # A 6 m back and two 3 m sides, 0.1 m thick and 1.9 m tall, open at the front.
+    fence = merge([mesh_box(-3.0, 3.0, -1.5, -1.4, 0.0, 1.9), mesh_box(-3.0, -2.9, -1.5, 1.5, 0.0, 1.9),
+                   mesh_box(2.9, 3.0, -1.5, 1.5, 0.0, 1.9)])
+    collider = collider_mesh(fence, "fence")
+    plan = unary_union([Polygon(t[:, :2]) for t in collider.vertices[collider.triangles] if Polygon(t[:, :2]).area > 1e-9])
+    assert not plan.intersects(box(-2.7, -1.2, 2.7, 1.5))  # the yard and its open front
+    for x, y in ((0.0, -1.45), (-2.95, 0.0), (2.95, 0.0), (-2.95, 1.5), (3.0, -1.5)):
+        assert plan.contains(Point(x, y))
+    low, high = collider.vertices.min(axis=0), collider.vertices.max(axis=0)
+    assert (low[2], high[2]) == (0.0, 1.9)
+    assert np.all(low[:2] >= (-3.0 - 0.08, -1.5 - 0.08)) and np.all(high[:2] <= (3.0 + 0.08, 1.5 + 0.08))
+    assert closed_manifold_defects(collider) == 0
+
+
+def test_a_box_shaped_prop_still_collides_with_its_whole_box() -> None:
+    collider = collider_mesh(_mesh(2.0, 1.0, 1.5), "gate")
+    assert collider.vertices.min(axis=0).tolist() == [-1.0, -0.5, 0.0]
+    assert collider.vertices.max(axis=0).tolist() == [1.0, 0.5, 1.5]
+
+
+def test_the_kenney_u_fence_collides_with_its_panels_widened_by_5_cm() -> None:
+    nodes, _ = nodes_from_glb((REPO_ROOT / "assets" / "kenney" / "suburban" / "fence-1x2.glb").read_bytes())
+    fence = merge(p.mesh for n in nodes for p in n.primitives)
+    collider = collider_mesh(fence, "fence")
+    plan = unary_union([Polygon(t[:, :2]) for t in collider.vertices[collider.triangles] if Polygon(t[:, :2]).area > 1e-9])
+    # Square ends 5 cm past each panel, a 2.5 cm simplification: 3.77 m2 of a 6.1 x 3.1 m box, in 156 triangles.
+    assert plan.area == pytest.approx(3.770, abs=0.005)
+    assert collider.triangle_count <= 160
