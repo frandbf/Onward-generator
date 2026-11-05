@@ -2463,6 +2463,12 @@ namespace OnwardGenerator
         private const float OutdoorProbeSpacingM = 12f;
         private const int OutdoorProbeColumnsMax = 1500;
         private static readonly float[] OutdoorProbeHeightsM = { 1f, 6f };
+        // An outdoor column needs open sky down to its ground and this much room round it from
+        // OutdoorProbeClearFromM up: a column on a shop floor, under a balcony or in a gap between two
+        // footprints baked black, and the street probes next to it took its dark (Barcelona Sarria).
+        private const float OutdoorProbeClearM = 1f;
+        private const float OutdoorProbeClearFromM = 1.2f;
+        private const float OutdoorProbeSkyM = 300f;
 
         // ADR-026. A layout without a time of day (the measurement fixture) is a day map.
         private static LevelDescriptor.ETimeOfDay TimeOfDayOf(Layout layout) =>
@@ -2556,7 +2562,8 @@ namespace OnwardGenerator
         private static int AddLightProbes(List<Vector3> roomProbes, bool hasNavMesh)
         {
             var points = new List<Vector3>(roomProbes);
-            int columns = 0;
+            int columns = 0, shut = 0;
+            Physics.SyncTransforms();
             NavMeshTriangulation tri = hasNavMesh ? NavMesh.CalculateTriangulation() : new NavMeshTriangulation();
             if (tri.vertices != null && tri.vertices.Length > 0)
             {
@@ -2571,6 +2578,11 @@ namespace OnwardGenerator
                     {
                         NavMeshHit hit;
                         if (!NavMesh.SamplePosition(new Vector3(x, bounds.center.y, z), out hit, step / 2f, mask)) continue;
+                        if (!OpenColumn(hit.position))
+                        {
+                            shut++;
+                            continue;
+                        }
                         foreach (float h in OutdoorProbeHeightsM) points.Add(hit.position + Vector3.up * h);
                         columns++;
                     }
@@ -2583,8 +2595,22 @@ namespace OnwardGenerator
             }
             var go = new GameObject("LightProbes");
             go.AddComponent<LightProbeGroup>().probePositions = points.ToArray();
-            Debug.Log($"{LogPrefix} Light probes: {points.Count} ({roomProbes.Count} in rooms, {columns} outdoor columns).");
+            Debug.Log($"{LogPrefix} Light probes: {points.Count} ({roomProbes.Count} in rooms, {columns} outdoor columns, {shut} shut in).");
             return points.Count;
+        }
+
+        // Whether the sky reaches the ground at ``ground`` and nothing stands within OutdoorProbeClearM
+        // of the column above OutdoorProbeClearFromM: not indoors, under a slab, or in a narrow gap.
+        private static bool OpenColumn(Vector3 ground)
+        {
+            Vector3 sky = new Vector3(ground.x, ground.y + OutdoorProbeSkyM, ground.z);
+            // Triggers (the damage volume, the spawn and objective zones) cover the ground and are not walls.
+            if (Physics.Raycast(sky, Vector3.down, out RaycastHit first, OutdoorProbeSkyM, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                && first.point.y > ground.y + 0.2f) return false;
+            float top = OutdoorProbeHeightsM.Max();
+            return !Physics.CheckCapsule(ground + Vector3.up * (OutdoorProbeClearFromM + OutdoorProbeClearM),
+                ground + Vector3.up * Mathf.Max(top, OutdoorProbeClearFromM + OutdoorProbeClearM), OutdoorProbeClearM,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
         }
 
         // Lightmap bake profiles (docs/12-export.md, "Bake profiles"). Same names as BAKE_PROFILES

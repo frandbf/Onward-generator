@@ -410,6 +410,11 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     # A room detail left without a light past interiors.lights_max still gives its probes.
     assert source.index("probes.Add(Local(room.probes_m[i]") < source.index("if (room.light_m == null || room.light_m.Length != 3) continue;")
     assert "LightmapBakeType.Baked" in source and "LightProbeGroup" in source
+    # An outdoor column needs open sky to its ground and 1 m of room: one on a shop floor or in a gap between
+    # footprints baked black and darkened the street probes beside it (Barcelona Sarria). Triggers do not count.
+    assert "if (!OpenColumn(hit.position))" in source
+    assert "private const float OutdoorProbeClearM = 1f;" in source and "private const float OutdoorProbeClearFromM = 1.2f;" in source
+    assert source.count("QueryTriggerInteraction.Ignore") >= 2
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
     # Lightmap scale per material from adapter_options.json, and the baked texel count in the log and report.
