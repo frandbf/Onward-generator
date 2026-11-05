@@ -46,6 +46,7 @@ from onward_generator.perf.layout import (
     patrol_seeds,
     patrol_spawns,
     playable_area,
+    reachable_ground,
     roof_wind,
     scatter_points,
     spread_routes,
@@ -745,3 +746,24 @@ def test_the_fixture_needs_two_block_widths_between_the_teams() -> None:
         _defenders(box(0, 0, 14.0, 3), (4.0, 2.0), farthest=False)  # 8 m
     with pytest.raises(LayoutError, match=r"^no second spawn block fits near the first$"):
         _defenders(box(0, 0, 3.0, 3.0), (1.5, 1.5), farthest=False)
+
+
+@pytest.mark.parametrize(("gap_m", "reached"), [(0.6, False), (0.8, True)])
+def test_a_courtyard_is_reached_through_a_gap_a_player_fits(gap_m: float, reached: bool) -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 6.0, "config_default")
+    # A block closed round a 20 m courtyard, open on its south side by ``gap_m``.
+    ring = box(10, 10, 40, 40).difference(box(15, 15, 35, 35)).difference(box(25 - gap_m / 2, 9, 25 + gap_m / 2, 16))
+    partition = build_partition(box(-50, -50, 50, 50), [ring], [street], [], config)
+    ground = reachable_ground(_base(street, partition=partition), None, (0.0, -20.0))  # type: ignore[arg-type]
+    assert ground.covers(Point(0, 20)) and ground.covers(Point(0, 0))  # across the carriageway
+    assert ground.covers(Point(25, 25)) is reached
+    assert not ground.intersects(box(10.5, 10.5, 14.5, 39.5))  # the buildings
+
+
+def test_reachable_ground_stays_inside_the_core() -> None:
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-210, 0), (210, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
+    ground = reachable_ground(_base(street, partition=partition), box(-60, -60, 60, 60), (0.0, -20.0))  # type: ignore[arg-type]
+    assert ground.covers(Point(59.9, 0)) and not ground.covers(Point(61, 0))

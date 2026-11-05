@@ -519,6 +519,21 @@ def fit_spawn_separation(
     raise LayoutError(f"route starts hold {held} spawns at {MIN_SPAWN_SEPARATION_M:g} m; {count} are required")
 
 
+def reachable_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any], uplink: tuple[float, float]) -> BaseGeometry:
+    """The ground a player walks to from the Uplink: every surface but water, the carriageway too, less the buildings,
+    inside the playable core when the map has one.
+
+    A gap narrower than a player (twice ``NAV_AGENT_RADIUS_M``) is closed. A ladder or a lift in a courtyard
+    the buildings close is reached by nobody: on Barcelona Sarria four of six were.
+    """
+    walkable = [s.geometry for c, s in base.partition.surfaces.items() if c != SurfaceClass.WATER]
+    ground = union_all(walkable).difference(base.partition.buildings)
+    inside = playable_area(detail_manifest)
+    if inside is not None:
+        ground = ground.intersection(inside)
+    return component_holding(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)), uplink).buffer(NAV_AGENT_RADIUS_M)
+
+
 def nav_islands(base: GeneratedScene, inside: BaseGeometry | None = None) -> list[BaseGeometry]:
     """The walkable ground the adapter bakes, shrunk by the agent radius, one piece per island.
 
@@ -763,7 +778,8 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
 
     gameplay_points = [uplink, *ai, *ammo, *escort, evac, *drives, *occupied_pts]
     keep_out = climb_keep_out(gameplay_points, routes, detail_manifest)
-    climbs = place_climbs(detail_manifest, footprints or {}, free, keep_out, (attack, attack_b), (defend, defend_b))
+    reachable = free.intersection(reachable_ground(base, detail_manifest, uplink))
+    climbs = place_climbs(detail_manifest, footprints or {}, reachable, keep_out, (attack, attack_b), (defend, defend_b))
 
     doc.update({
         "schema": GAMEPLAY_SCHEMA,
