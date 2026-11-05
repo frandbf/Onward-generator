@@ -2424,13 +2424,16 @@ namespace OnwardGenerator
             go.name = name;
             go.transform.position = Local(x, y, floorM + ElevatorPivotM);
             go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            // Four posts and a roof around the cabin, outside its 3.01 x 3.13 x 3.03 m. The prefab's only mesh is a helper,
-            // so this marks the lift even if the game draws no cabin, and does not get in the way if it does.
-            var boxes = new List<CombineInstance>();
-            foreach (float px in new[] { -1.6f, 1.6f })
-                foreach (float pz in new[] { -1.65f, 1.65f })
-                    boxes.Add(Box(new Vector3(px, 1.6f, pz), new Vector3(0.1f, 3.2f, 0.1f)));
-            boxes.Add(Box(new Vector3(0f, 3.25f, 0f), new Vector3(3.4f, 0.1f, 3.5f)));
+            // A shell around the cabin, outside its 3.01 x 3.13 x 3.03 m: back and side walls, a roof, and the door side
+            // (local +Z) open between the side walls. The game draws its own cabin, but from a distance it drops the cabin's
+            // outer walls: on the headset a far lift showed its inside panels until the player came close. These walls hide it.
+            var boxes = new List<CombineInstance>
+            {
+                Box(new Vector3(0f, 1.6f, -1.65f), new Vector3(3.3f, 3.2f, 0.1f)),
+                Box(new Vector3(-1.6f, 1.6f, 0f), new Vector3(0.1f, 3.2f, 3.4f)),
+                Box(new Vector3(1.6f, 1.6f, 0f), new Vector3(0.1f, 3.2f, 3.4f)),
+                Box(new Vector3(0f, 3.25f, 0f), new Vector3(3.4f, 0.1f, 3.5f)),
+            };
             AddClimbLook(name + "_Look", Local(x, y, floorM), go.transform.rotation, boxes, material, root);
             return go.GetComponent<Elevator>();
         }

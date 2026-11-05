@@ -362,6 +362,16 @@ def test_unity_adapter_knows_the_shop_glass_and_decal_material_names() -> None:
     assert 'SdkGlassNames = { "GlassVfx", "Glass" }' in source
 
 
+def test_unity_adapter_walls_the_lift_cabin_on_three_sides() -> None:
+    """From a distance the game draws its cabin without the outer walls: the adapter's shell hides that, door side open."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    shell = source[source.index("private static Elevator PlaceCabin"):source.index("AddClimbLook(name + \"_Look\"")]
+    assert "Box(new Vector3(0f, 1.6f, -1.65f), new Vector3(3.3f, 3.2f, 0.1f))" in shell  # back
+    assert shell.count("new Vector3(0.1f, 3.2f, 3.4f)") == 2  # sides
+    assert "Box(new Vector3(0f, 3.25f, 0f), new Vector3(3.4f, 0.1f, 3.5f))" in shell  # roof
+    assert "1.65f)" not in shell.replace("-1.65f)", "")  # nothing on the door side
+
+
 def test_unity_adapter_puts_the_sprite_glass_in_the_transparent_queue() -> None:
     """The sprite graph reports queue 2000 in batchmode. A pane left there was drawn among the opaque meshes, the room
     behind it over it, and on the headset a window read as a hole. The decals go one step later still."""

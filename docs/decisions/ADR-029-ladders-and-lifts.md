@@ -37,6 +37,10 @@ Every template's parapet is now 0.7 m, not only those of a roof with a climb. Th
 
 On the headset a street cabin stood on a pile of Kenney bricks. `overgrow` places its props before the layout picks the cabins, and the keep-out held only spawns, objectives, boxes, doors and routes. Every `overgrowth` record but the flat growth (`grass`, `vine`, `moss`) now joins the keep-out: a circle of 1 m around the prop's spot (the radius `free_ground` gives a detail urban element), 2 m around a tree, whose generated crown is about 3.8 m across. Both radii are estimates, not measured footprints. The regenerated Murcia2026 area had a generated tree in a cabin with the rule before this one.
 
+## Amendment: a shell around the cabin (4 November 2026)
+
+On the headset the game does spawn a cabin, with its panels, rails and buttons. From a distance it draws the cabin without its outer walls, so a far lift showed its inside panels, and the walls appeared only when the player came close. That is the game's model, which a map cannot change. The adapter's posts become a shell outside the cabin's 3.01 × 3.13 × 3.03 m: a back wall, two side walls and the roof, 0.1 m thick, with the door side (local +Z) open between the side walls. From outside the player sees the shell at any distance, and from inside the game's panels. It is still one mesh and one draw call, with no collider, lit by probes. The street cabin's back wall reaches 5 cm into the facade it stands against.
+
 ## Rejected alternatives
 
 - **Stretching the prefab or its rungs.** 9 m would put rungs about 0.55 m apart and change the hand reach and the vault's height.
@@ -46,7 +50,7 @@ On the headset a street cabin stood on a pile of Kenney bricks. `overgrow` place
 
 ## To check on the headset
 
-- Whether the game spawns a cabin, a door and a button. If not, the four posts and the roof are all a player sees, and how a lift is called is unknown.
+- Whether the game spawns a cabin, a door and a button. It does (amendment above): the cabin, its panels and its buttons.
 - Climbing a ladder with added rungs, and the vault from the top rungs over the parapet down to the roof, now that the target is lower than the prefab has it.
 - Whether a parapet of 0.7 m lets a player shoot from the roof and still gives cover when crouched.
 - A lift between different heights. `Validate` only requires `PairedElevator`, so the SDK does not refuse it, but the travel is in the game and `ExampleScene` only shows the same height. If it fails, the lifts come out and the ladders stay.
