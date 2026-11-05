@@ -10,11 +10,13 @@ from onward_generator.perf.climbs import (
     ACCESS_SPACING_M,
     LADDERS_MAX,
     LIFTS_MAX,
+    ROOF_MIN_M2,
     SPAWN_CLEAR_M,
     _strip,
     _walls,
     _yaw,
     climbed_roofs,
+    deck,
     ladder_on,
     lift_on,
     place_climbs,
@@ -69,6 +71,32 @@ def test_a_ladder_moves_to_the_next_wall_when_the_ground_is_taken() -> None:
 def test_a_ladder_needs_a_roof_behind_it() -> None:
     sliver = box(0, 0, 20, 1.0)
     assert ladder_on(sliver, FREE.difference(sliver), NOTHING, 9.0) is None
+
+
+def test_a_ladder_lands_on_the_roof_inside_its_parapet() -> None:
+    """Barcelona Sarria: the side parapets of a narrow roof left 1.45 m for the 1.6 m ladder."""
+    narrow = box(0, 0, 20, 1.7)  # 1.7 m of roof: 1.2 m inside a 0.25 m parapet, less than the 1.5 m landing
+    assert ladder_on(narrow, FREE.difference(narrow), NOTHING, 9.0) is not None
+    assert ladder_on(narrow, FREE.difference(narrow), NOTHING, 9.0, 0.7, 0.25) is None
+    footprint = box(0, 0, 20, 10)
+    site = ladder_on(footprint, FREE.difference(footprint), NOTHING, 9.0, 0.7, 0.25)
+    assert site is not None and (site["y"], site["roof_y"]) == (-0.15, 1.0)  # the roof point is the middle of the landing
+
+
+def test_a_lift_cabin_and_its_apron_stand_on_the_roof_inside_its_parapet() -> None:
+    """Barcelona Sarria: the apron of a roof cabin ran 0.26 m into the far parapet."""
+    shallow = box(0, 0, 5.9, 5.9)  # 0.6 + 3.2 + 2.0 = 5.8 m of roof needed from any wall, 5.65 m inside a 0.25 m parapet
+    assert lift_on(shallow, FREE.difference(shallow), NOTHING, 15.0) is not None
+    assert lift_on(shallow, FREE.difference(shallow), NOTHING, 15.0, 0.25) is None
+
+
+@pytest.mark.parametrize(("thickness", "kept"), [(0.0, True), (0.25, False)])
+def test_a_roof_needs_30_square_metres_inside_its_parapet(thickness: float, kept: bool) -> None:
+    """Barcelona Sarria: ladders led to roofs of 4.3 to 17.7 m2 under taller walls, dead ends for a player."""
+    roof = {**_building("b", 2), "roof": {"type": "flat_parapet", "parapet_m": 0.7, "parapet_thickness_m": thickness}}
+    placed = _place([roof], {"b": box(0, 0, 6, 5)})  # 30 m2 bare, 24.75 m2 inside a 0.25 m parapet
+    assert bool(placed["ladders"]) is kept
+    assert ROOF_MIN_M2 == 30.0
 
 
 def test_a_lift_has_a_cabin_in_the_street_and_one_on_the_roof_with_opposite_doors() -> None:
@@ -311,3 +339,23 @@ def test_a_refused_roof_does_not_end_the_search() -> None:
     footprints = {"a": box(0, 90, 20, 105), "b": box(-60, 0, -40, 15)}
     placed = _cored(objects, footprints)
     assert [site["x"] for site in placed["ladders"]] == [-50.0]
+
+
+def test_the_building_record_gives_each_access_its_parapet_thickness() -> None:
+    def walled(source: str, storey_count: int, thickness: float) -> dict:
+        return {**_building(source, storey_count), "roof": {"type": "flat_parapet", "parapet_m": 0.7, "parapet_thickness_m": thickness}}
+
+    ladder = _place([walled("b", 2, 0.25)], {"b": box(0, 0, 20, 10)})["ladders"]
+    assert [site["roof_y"] for site in ladder] == [1.0]
+    street = box(-30, -10, 50, 0)  # only the south wall has its street, and 5.9 m of roof behind it
+    assert _place([walled("c", 4, 0.0)], {"c": box(0, 0, 20, 5.9)}, free=street)["lifts"]
+    assert _place([walled("c", 4, 0.25)], {"c": box(0, 0, 20, 5.9)}, free=street)["lifts"] == []
+
+
+def test_the_deck_is_the_inner_edge_detail_gives_the_parapet_sharp_corners_and_all() -> None:
+    """``build_shell`` cuts the parapet with a mitred inward offset, limit 2: a reflex corner stays sharp, a needle is bevelled."""
+    ell = box(0, 0, 10, 10).difference(box(5, 5, 10, 10))
+    assert deck(ell, 1.0).area == pytest.approx(8 * 8 - 5 * 5)  # sharp at the reflex corner, not rounded
+    wedge = Polygon([(0, 0), (20, 0), (20, 25.5), (10, 3), (0, 25.5)])  # a notch of 24 degrees each side: its mitre is 2.5 times the offset
+    assert deck(wedge, 0.5).equals(wedge.buffer(-0.5, join_style="mitre", mitre_limit=2.0))
+    assert not deck(wedge, 0.5).equals(wedge.buffer(-0.5, join_style="mitre", mitre_limit=3.0))

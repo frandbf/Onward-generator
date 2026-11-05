@@ -58,6 +58,12 @@ ROOF_APRON_M = 2.0
 CENTRE_DIGITS = 2
 COVER_TOLERANCE_M = 0.01
 """A strip that ends on the wall of a turned building misses the roof by rounding alone."""
+ROOF_MIN_M2 = 30.0
+"""The least roof inside the parapet an access leads to: room for a squad to stand and move, about 5 x 6 m.
+
+Barcelona Sarria: ladders led to roofs of 4.3 to 17.7 m2 under walls 4 to 12 m taller, dead ends for a player.
+Estimated, not measured on the headset.
+"""
 WALL_JUMP_CLEAR_M = 6.0
 """A roof above the perimeter wall stays this far from the core edge, so no one jumps from it over the wall.
 
@@ -107,18 +113,27 @@ def _yaw(nx: float, ny: float) -> float:
     return round(math.degrees(math.atan2(nx, ny)), 1)
 
 
-def ladder_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float, parapet_m: float = 0.0) -> dict[str, float] | None:
+def deck(footprint: Polygon, parapet_thickness_m: float) -> BaseGeometry:
+    """The roof a player stands on: the footprint inside its parapet."""
+    return footprint.buffer(-parapet_thickness_m, join_style="mitre", mitre_limit=2.0)
+
+
+def ladder_on(
+    footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float, parapet_m: float = 0.0, parapet_thickness_m: float = 0.0,
+) -> dict[str, float] | None:
     """A ladder on the longest wall with clear ground at its foot and roof behind it. The ladder faces the wall.
 
-    ``parapet_m`` is what the ladder has to rise above the roof, so its top rungs stand clear of the parapet.
+    ``parapet_m`` is what the ladder has to rise above the roof, so its top rungs stand clear of the parapet. The
+    landing lies on the roof inside the parapet (``parapet_thickness_m``): on Barcelona Sarria the side parapets of a
+    narrow roof left 1.45 m for the 1.6 m ladder.
     """
-    roof = footprint.buffer(COVER_TOLERANCE_M)
+    roof = deck(footprint, parapet_thickness_m).buffer(COVER_TOLERANCE_M)
     for wall in _walls(footprint):
         foot = _strip(wall, LADDER_WIDTH_M, CABIN_WALL_GAP_M, CABIN_WALL_GAP_M + LADDER_FOOT_M)
-        landing = _strip(wall, LADDER_WIDTH_M, -LANDING_DEPTH_M, 0.0)
+        landing = _strip(wall, LADDER_WIDTH_M, -(parapet_thickness_m + LANDING_DEPTH_M), -parapet_thickness_m)
         if free.covers(foot) and not keep_out.intersects(foot) and roof.covers(landing):
             x, y = _along(wall, LADDER_WALL_GAP_M)
-            roof_x, roof_y = _along(wall, -LANDING_DEPTH_M / 2)
+            roof_x, roof_y = _along(wall, -(parapet_thickness_m + LANDING_DEPTH_M / 2))
             return {
                 "x": round(x, CENTRE_DIGITS), "y": round(y, CENTRE_DIGITS), "yaw": _yaw(-wall[2], -wall[3]),
                 "height_m": round(height_m, CENTRE_DIGITS), "parapet_m": parapet_m,
@@ -127,9 +142,15 @@ def ladder_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, he
     return None
 
 
-def lift_on(footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float) -> dict[str, float] | None:
-    """A cabin against the longest wall that has room for it in the street and on the roof above. Both doors face away from the wall line."""
-    roof = footprint.buffer(COVER_TOLERANCE_M)
+def lift_on(
+    footprint: Polygon, free: BaseGeometry, keep_out: BaseGeometry, height_m: float, parapet_thickness_m: float = 0.0,
+) -> dict[str, float] | None:
+    """A cabin against the longest wall that has room for it in the street and on the roof above. Both doors face away from the wall line.
+
+    The roof cabin and its apron lie on the roof inside the parapet (``parapet_thickness_m``): on Barcelona Sarria an
+    apron ran 0.26 m into the far parapet of an oblique roof.
+    """
+    roof = deck(footprint, parapet_thickness_m).buffer(COVER_TOLERANCE_M)
     street_far = CABIN_WALL_GAP_M + CABIN_DEPTH_M
     for wall in _walls(footprint):
         street = _strip(wall, CABIN_WIDTH_M, CABIN_WALL_GAP_M, street_far + CABIN_APRON_M)
@@ -172,8 +193,13 @@ def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, Bas
         if building["roof"]["type"] in FLAT_ROOFS:
             footprint = footprints[source]
             largest = max(getattr(footprint, "geoms", [footprint]), key=lambda part: part.area)
-            found.append((source, building, largest))
+            if deck(largest, _parapet_thickness(building)).area >= ROOF_MIN_M2:
+                found.append((source, building, largest))
     return found
+
+
+def _parapet_thickness(building: Mapping[str, Any]) -> float:
+    return float(building["roof"].get("parapet_thickness_m", 0.0))
 
 
 def _fairness(footprint: Polygon, attackers: Sequence[tuple[float, float]], defenders: Sequence[tuple[float, float]]) -> float:
@@ -207,13 +233,14 @@ def place_climbs(
 
     for source, building, footprint in ranked:
         if len(ladders) < LADDERS_MAX and storeys(building) <= LADDER_MAX_STOREYS and not building.get("interior"):
-            site = ladder_on(footprint, free, keep_out, float(building["height"]["height_m"]), float(building["roof"].get("parapet_m", 0.0)))
+            site = ladder_on(footprint, free, keep_out, float(building["height"]["height_m"]), float(building["roof"].get("parapet_m", 0.0)),
+                             _parapet_thickness(building))
             if site is not None and spaced(site):
                 ladders.append(site)
                 used.add(source)
     for source, building, footprint in ranked:
         if source not in used and len(lifts) < LIFTS_MAX and LIFT_MIN_STOREYS <= storeys(building) <= LIFT_MAX_STOREYS:
-            site = lift_on(footprint, free, keep_out, float(building["height"]["height_m"]))
+            site = lift_on(footprint, free, keep_out, float(building["height"]["height_m"]), _parapet_thickness(building))
             if site is not None and spaced(site):
                 lifts.append(site)
     return {"ladders": ladders, "lifts": lifts}
