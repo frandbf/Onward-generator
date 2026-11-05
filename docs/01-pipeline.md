@@ -253,7 +253,7 @@ Copies the `detail` GLB and replaces street instances (trees, benches, bins) and
 | --- | --- |
 | Input | `--base` (a `dress` or a `detail`) and this map's `config/texture_plan.json`. `map create` writes it by choosing textures from the imported library. `map create --textures` rewrites only that file |
 | Output | A new directory: a GLB with one image per material (repeated at `tile_m`), a contact `atlas.png`, and reports |
-| Shader | `PP_Opaque_Simple_Lit`: `_BaseColor × _BaseMap`. No normals, no 8k, no PBR. Interior panes use `PP_Sprite_Lit` and `_MainTex` ([07-detail.md](07-detail.md)) |
+| Shader | `PP_Opaque_Simple_Lit`: `_BaseColor × _BaseMap`. No normals, no 8k, no PBR. Interior panes use `PP_Sprite_Lit` and `_MainTex` ([07-detail.md](07-detail.md)); the horizon ring uses `PP_Opaque_Unlit` (ADR-014) |
 | UVs | Wall plane, V upward. A 30 m facade with a 2 m tile repeats 15 times. Windows and doors occupy 0–1 so the frame falls in the opening |
 | Network | Only `--download`, and only for an older Poly Haven plan (Diffuse 1k, CC0, cache in `assets/textures/`). A library plan reads files already in the imported library |
 

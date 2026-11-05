@@ -426,6 +426,11 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert source.index("AddClimbProbes(pkg.Layout, probes);") < source.index('AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));')
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
+    # The ring alone is drawn with the SDK's unlit graph: lit, it took only the ambient light (Barcelona Sarria).
+    assert 'UnlitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Unlit.shadergraph";' in source
+    assert 'BackdropMaterial = "horizon_backdrop";' in source
+    assert "string shaderPath = safe == BackdropMaterial ? UnlitShaderPath : LitShaderPath;" in source
+    assert source.count("UnlitShaderPath") == 2
     # Lightmap scale per material from adapter_options.json, and the baked texel count in the log and report.
     assert "public LightmapScale[] lightmap_scales" in source
     assert "public string material; public float scale" in source
@@ -436,11 +441,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "TextureImporterFormat.ASTC_6x6" in source and "AlbedoMinMaxTextureSize = 4096" in source
 
 
-def test_default_fog_colour_is_darker_than_the_backdrop_haze() -> None:
-    """Fog is mixed in after lighting; the ring is lit first, and drawn with the fog colour it read as a slate wall."""
-    from onward_generator.bounds.envelope import HAZE_HEX, _rgb
+def test_default_fog_colour_is_the_backdrop_haze() -> None:
+    """The ring is drawn unlit, so its bottom row on screen is the fog colour and it fades into the fog at any distance."""
+    from onward_generator.bounds.envelope import HAZE_HEX
 
     build = load(EXPORT_CONFIG_DEFAULT)["build"]
     assert build["fog_enabled"] is True and build["fog_end_m"] > build["fog_start_m"]
-    assert build["fog_color"] == "#C8CDD2"
-    assert all(ring > fog for ring, fog in zip(_rgb(HAZE_HEX), _rgb(build["fog_color"]), strict=True))
+    assert build["fog_color"] == HAZE_HEX == "#C8CDD2"

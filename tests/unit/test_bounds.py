@@ -146,8 +146,8 @@ def test_backdrop_gradient_runs_from_sky_at_the_top_to_haze_at_the_bottom() -> N
     expected = np.rint(sky + (haze - sky) * (np.arange(64) / 63)[:, None]).astype(np.uint8)
     assert (image == expected[:, None, :]).all()
     assert backdrop_png() == backdrop_png()
-    # Near white: the scene's light darkens the ring, and the first colours read as a slate wall on the headset.
-    assert (_rgb(HAZE_HEX), _rgb(SKY_HEX)) == ((0xEE, 0xF1, 0xF4), (0xF7, 0xFA, 0xFE))
+    # The adapter draws the ring unlit, so these colours reach the screen as they are, then the fog.
+    assert (_rgb(HAZE_HEX), _rgb(SKY_HEX)) == ((0xC8, 0xCD, 0xD2), (0xD6, 0xE0, 0xEC))
 
 
 def test_backdrop_keeps_every_image_uv_and_extra_of_the_scene() -> None:

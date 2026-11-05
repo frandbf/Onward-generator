@@ -55,6 +55,10 @@ namespace OnwardGenerator
         private const string SdkRoot = "Assets/OnwardCustomContent";
         private const string PrefabRoot = SdkRoot + "/Prefabs";
         private const string LitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Simple_Lit.shadergraph";
+        // The horizon ring (ADR-014) is drawn unlit: lit, it took only the ambient light and read as a slate wall
+        // darker than the fog. Same _BaseMap and _BaseColor as the lit graph; URP's unlit pass still mixes in the fog.
+        private const string UnlitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Unlit.shadergraph";
+        private const string BackdropMaterial = "horizon_backdrop";
         // PP_Sprite_Lit is already transparent, Render Face Both, no alpha clip.
         // It has no _BaseColor. Alpha is vertex alpha times _MainTex alpha.
         private const string SpriteShaderPath = SdkRoot + "/Internal/Shaders/PP_Sprite_Lit.shadergraph";
@@ -3023,8 +3027,9 @@ namespace OnwardGenerator
                 AssetDatabase.CreateAsset(view, path);
                 return view;
             }
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(LitShaderPath)
-                ?? throw new InvalidOperationException($"Missing SDK shader at {LitShaderPath}.");
+            string shaderPath = safe == BackdropMaterial ? UnlitShaderPath : LitShaderPath;
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(shaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {shaderPath}.");
             var material = new Material(shader) { name = $"M_{safe}" };
             float[] c = g.pbrMetallicRoughness?.baseColorFactor;
             // glTF base colours are linear; Unity material colours are authored in sRGB.

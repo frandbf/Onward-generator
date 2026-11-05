@@ -140,10 +140,10 @@ DEFAULT_BACKDROP_HEIGHT_M = 30.0
 BACKDROP_BASE_Z_M = -1.0
 # The simplified hull lies up to this far inside the true hull; the offset adds it back.
 BACKDROP_SIMPLIFY_M = 1.0
-# sRGB, near white. The ring is lit by the scene's probes and ambient light, so it shows far darker than its albedo:
-# from #C8CDD2 and #D6E0EC (the default fog colour and a pale sky) it read as a slate wall on the headset.
-HAZE_HEX = "#EEF1F4"
-SKY_HEX = "#F7FAFE"
+# sRGB. The bottom is the default export fog colour (config/export/onward.default.json). The adapter draws the ring
+# unlit, so these are the colours on screen before the fog: lit, it took only the ambient light and read as a slate wall.
+HAZE_HEX = "#C8CDD2"
+SKY_HEX = "#D6E0EC"
 GRADIENT_ROWS = 64
 BACKDROP_PNG_LEVEL = 6  # zlib default, which Pillow used before the level was named
 
