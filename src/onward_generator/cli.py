@@ -235,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--time-of-day", choices=("day", "night"), default=None, help="day or night: light, Onward profile and street lamps (default: what map.json has, else day; ADR-026)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--storm", action=argparse.BooleanOptionalAction, default=None, help="night maps only: lightning and thunder (default: what map.json has, else none; ADR-028)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
-    run.add_argument("--core-radius-m", type=float, default=150.0, help="half-side of the playable core square, metres (default 150; 0 or at least the radius plays the whole map; ADR-017)")
+    run.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(

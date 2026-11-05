@@ -143,7 +143,7 @@ def test_detail_command_carries_the_maps_playable_core(tmp_path: Path) -> None:
 
 def test_detail_command_without_a_core_has_no_core_flag(tmp_path: Path) -> None:
     root = tmp_path / "small"
-    create_map(root, map_id="small", name="Small", latitude=40.40657, longitude=-3.719187, radius_m=120)
+    create_map(root, map_id="small", name="Small", latitude=40.40657, longitude=-3.719187, radius_m=120, core_radius_m=0)
     scene = root / "data" / "processed" / "geo" / "geo_scene.json"
     assert core_radius(scene) is None
     assert "--core-radius-m" not in detail_command(scene, scene, root).argv

@@ -93,7 +93,7 @@ def map_create_argv(
     time_of_day: str | None = None,
     storm: bool = False,
     lightmap_texels_per_m: float = 10.0,
-    core_radius_m: float = 150.0,
+    core_radius_m: float | None = None,
     overwrite: bool = False,
 ) -> list[str]:
     argv = [
@@ -104,7 +104,7 @@ def map_create_argv(
         "--radius-m", str(radius_m),
         "--margin-m", str(margin_m),
         "--lightmap-texels-per-m", str(lightmap_texels_per_m),
-        "--core-radius-m", str(core_radius_m),
+        *(("--core-radius-m", str(core_radius_m)) if core_radius_m is not None else ()),
     ]
     if seed is not None:
         argv.extend(["--seed", str(seed)])
@@ -766,7 +766,7 @@ def run_map(
     storm: bool | None = None,
     sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
-    core_radius_m: float = 150.0,
+    core_radius_m: float | None = None,
     overwrite: bool = False,
     start: str | None = None,
     execute: Execute | None = None,

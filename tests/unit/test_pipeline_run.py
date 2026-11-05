@@ -1571,11 +1571,12 @@ def test_run_stores_the_playable_core_through_map_create(tmp_path: Path, monkeyp
     create = seen[0]
     assert create[:2] == ["map", "create"]
     assert create[create.index("--core-radius-m") + 1] == "120"
-    assert map_create_argv(name="M", latitude=1.0, longitude=2.0, radius_m=300, margin_m=30)[-2:] == ["--core-radius-m", "150.0"]
+    # Without a core the flag is left out, and map create picks the default from the radius.
+    assert "--core-radius-m" not in map_create_argv(name="M", latitude=1.0, longitude=2.0, radius_m=300, margin_m=30)
     seen.clear()
     run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
             radius_m=300, margin_m=30, out="maps/murcia", execute=execute, interactive=False, palette=Palette())
-    assert seen[0][seen[0].index("--core-radius-m") + 1] == "150.0"
+    assert "--core-radius-m" not in seen[0]
 
 
 def test_run_and_detail_help_describe_the_core() -> None:
@@ -1584,7 +1585,7 @@ def test_run_and_detail_help_describe_the_core() -> None:
     subparsers = next(action for action in build_parser()._actions if isinstance(action, argparse._SubParsersAction))
     helps = {action.dest: action.help for action in subparsers.choices["run"]._actions}
     assert helps["core_radius_m"] == (
-        "half-side of the playable core square, metres (default 150; 0 or at least the radius plays the whole map; ADR-017)")
+        "half-side of the playable core square, metres " + "(default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     detail = {action.dest: action for action in detail_parser()._actions}["core_radius_m"]
     assert detail.help == "half-side of the playable core square, metres (ADR-017); buildings outside it are scenic shells"
     assert detail.default is None and detail.type is float
@@ -1600,7 +1601,7 @@ def test_run_command_passes_the_core(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("onward_generator.pipeline_run.run_map", fake_run_map)
     args = ["run", "--name", "Madrid", "--lat", "40.40657", "--lon", "-3.719187"]
     assert main(args) == 0
-    assert received["core_radius_m"] == 150.0
+    assert received["core_radius_m"] is None
     assert main([*args, "--core-radius-m", "0"]) == 0
     assert received["core_radius_m"] == 0.0
 

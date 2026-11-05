@@ -151,8 +151,8 @@ def test_cli_create_and_show(tmp_path: Path, capsys: pytest.CaptureFixture[str],
     capsys.readouterr()
     with pytest.raises(SystemExit):
         main(["map", "create", "--help"])
-    assert ("--core-radius-m CORE_RADIUS_M half-side of the playable core square, metres (default 150; 0 or at least "
-            "the radius plays the whole map; ADR-017)") in " ".join(capsys.readouterr().out.split())
+    assert ("--core-radius-m CORE_RADIUS_M half-side of the playable core square, metres (default: 50 m inside the "
+            "radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)") in " ".join(capsys.readouterr().out.split())
 
 
 def _polygon(ring: tuple[tuple[float, float], ...]):
@@ -246,13 +246,27 @@ def test_a_larger_map_gets_a_playable_core_and_fog_from_its_wall(tmp_path: Path)
     (300, 299.5, 299.5),
     (300, 300, None),     # a core at the radius is the whole map
     (300, 400, None),
-    (150, 150, None),     # the default core on a 150 m map
+    (150, 150, None),     # the core a 150 m map had by default before 5 November 2026
     (300, 0, None),
 ])
 def test_core_radius_is_stored_only_inside_the_map(tmp_path: Path, radius: float, core: float, stored: float | None) -> None:
     document = create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
                           radius_m=radius, core_radius_m=core)
     assert document["core_radius_m"] == stored
+
+
+@pytest.mark.parametrize(("radius", "stored"), [
+    (150, 100.0),  # Barcelona Sarria: 381 k triangles and 376 draws a view with the whole map played
+    (200, 150.0),
+    (300, 150.0),  # at most 150 m
+    (100, 50.0),
+    (99.9, None),  # a 49.9 m core is under the 50 m minimum: the whole map is played
+    (50, None),
+])
+def test_without_a_core_a_map_keeps_a_50_m_scenic_ring(tmp_path: Path, radius: float, stored: float | None) -> None:
+    document = create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                          radius_m=radius)
+    assert document["core_radius_m"] == (pytest.approx(stored) if stored is not None else None)
 
 
 @pytest.mark.parametrize(("core", "message"), [(49.9, "^core_radius_m must be 0 or at least 50$"), (-10, "0 or at least 50"),

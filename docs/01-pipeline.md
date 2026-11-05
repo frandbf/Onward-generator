@@ -127,7 +127,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 
 | | |
 | --- | --- |
-| Input | `--name` (1–80). The id and `maps/<id>` are that name in lower case, without accents, spaces as `_`. `--lat`, `--lon`, `--radius-m` (50–1500, default 400), `--margin-m` (default 30), `--lightmap-texels-per-m` (greater than 0 and at most 40, default 10), `--core-radius-m` (default 150; 0 or at least the radius plays the whole map, otherwise at least 50) |
+| Input | `--name` (1–80). The id and `maps/<id>` are that name in lower case, without accents, spaces as `_`. `--lat`, `--lon`, `--radius-m` (50–1500, default 400), `--margin-m` (default 30), `--lightmap-texels-per-m` (greater than 0 and at most 40, default 10), `--core-radius-m` (default `min(150, radius − 50)`, none under a 100 m radius; 0 or at least the radius plays the whole map, otherwise at least 50) |
 | Output | `map.json`, `config/project.json`, `config/export.json`, `config/texture_plan.json`, `reference/aoi.geojson`, `data/raw/<id>.osm` |
 | Area | A square in local metres around the centre, converted to WGS84. Degrees are not treated as metres |
 | CRS | EPSG:25830 when the centre is in peninsular Spain. Otherwise the WGS84 UTM zone of that point (north `EPSG:326xx`, south `EPSG:327xx`). Stored in `map.json`. `map show` prints the `--crs` that `geo` must use |

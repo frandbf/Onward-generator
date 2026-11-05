@@ -35,8 +35,11 @@ _MARGIN_MAX_M = 500.0
 TIMES_OF_DAY = ("day", "night")
 TIME_OF_DAY_DEFAULT = "day"
 _TEXELS_DEFAULT = 10.0
-# The playable core (ADR-017): a square of this half-side around the centre keeps full detail.
+# The playable core (ADR-017): a square of this half-side around the centre keeps full detail. Without
+# ``core_radius_m`` a map keeps a scenic ring at least CORE_RING_DEFAULT_M wide and a core of at most this:
+# on Barcelona Sarria (r 150) the whole map was played, at 381 k triangles and up to 376 draws a view.
 CORE_RADIUS_DEFAULT_M = 150.0
+CORE_RING_DEFAULT_M = 50.0
 _TEXELS_MAX = 40.0
 # Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
 _FOG_BAND_M = 600.0
@@ -69,7 +72,7 @@ def create_map(
     time_of_day: str = TIME_OF_DAY_DEFAULT,
     storm: bool = False,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
-    core_radius_m: float = CORE_RADIUS_DEFAULT_M,
+    core_radius_m: float | None = None,
     overwrite: bool = False,
     texture_provider: Provider | None = None,
 ) -> dict[str, Any]:
@@ -332,8 +335,20 @@ def _margin(margin_m: float) -> float:
     return float(margin_m)
 
 
-def _core(core_radius_m: float, radius_m: float) -> float | None:
-    """The playable core half-side, or None: 0, or a core at or past the radius, plays the whole map."""
+def default_core(radius_m: float) -> float:
+    """The core half-side a map gets when none is given: ``CORE_RING_DEFAULT_M`` inside the radius, at most
+    ``CORE_RADIUS_DEFAULT_M``. Under ``MIN_CORE_HALF_SIDE_M`` it is 0, and the whole map is played."""
+    core = min(CORE_RADIUS_DEFAULT_M, radius_m - CORE_RING_DEFAULT_M)
+    return core if core >= MIN_CORE_HALF_SIDE_M else 0.0
+
+
+def _core(core_radius_m: float | None, radius_m: float) -> float | None:
+    """The playable core half-side, or None: 0, or a core at or past the radius, plays the whole map.
+
+    ``None`` takes ``default_core``.
+    """
+    if core_radius_m is None:
+        core_radius_m = default_core(radius_m)
     if isinstance(core_radius_m, bool) or not isinstance(core_radius_m, (int, float)):
         raise MapError("core_radius_m must be a number")
     if core_radius_m == 0 or core_radius_m >= radius_m:
