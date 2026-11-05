@@ -57,6 +57,9 @@ FRONT_CLEAR_M = 0.5
 GLASS_MATERIALS = frozenset({"glass_view", "shop_glass"})
 # Kept between a plate and the glass, on every side.
 GLASS_CLEAR_M = 0.05
+# Glass a plate covers sits up to this far behind its wall line: a shopfront's pane stands at the back of the
+# 0.3 m interior wall (``detail`` ``interiors.wall_thickness_m``), and a plate over it hid 0.30 m-deep glass.
+GLASS_BEHIND_M = 0.4
 # Over glass, a plate slides along its wall in these steps, at most this far, before the next wall is tried.
 PLATE_SLIDE_STEP_M = 0.5
 PLATE_SLIDE_MAX_M = 4.0
@@ -511,17 +514,21 @@ def _clear_of_glass(wall: _Wall, along: np.ndarray, closest: np.ndarray, glass: 
         if offset and not PLATE_WIDTH_M / 2 <= position <= length - PLATE_WIDTH_M / 2:
             continue
         spot = wall.a + along * position
-        if not glass.meets(_plate_plan(spot, along), MOUNT_Z_M - PLATE_HEIGHT_M / 2 - GLASS_CLEAR_M,
+        if not glass.meets(_plate_plan(spot, along, wall.outward), MOUNT_Z_M - PLATE_HEIGHT_M / 2 - GLASS_CLEAR_M,
                            MOUNT_Z_M + PLATE_HEIGHT_M / 2 + GLASS_CLEAR_M):
             return spot
     return None
 
 
-def _plate_plan(spot: np.ndarray, along: np.ndarray) -> BaseGeometry:
-    """The plate's plan on the wall at ``spot``, ``GLASS_CLEAR_M`` larger on every side."""
-    run = LineString([spot - along * (PLATE_WIDTH_M / 2 + GLASS_CLEAR_M), spot + along * (PLATE_WIDTH_M / 2 + GLASS_CLEAR_M)])
-    # Both sides of the wall line: the glass sits in the wall, the plate just in front of it.
-    return run.buffer(WALL_GAP_M + PLATE_THICK_M + GLASS_CLEAR_M, cap_style="flat")
+def _plate_plan(spot: np.ndarray, along: np.ndarray, outward: np.ndarray) -> BaseGeometry:
+    """The plate's plan on the wall at ``spot``, ``GLASS_CLEAR_M`` larger on every side, and the wall behind it.
+
+    In front of the wall line it reaches past the plate; behind it, ``GLASS_BEHIND_M`` deep, where the glass sits.
+    """
+    half = along * (PLATE_WIDTH_M / 2 + GLASS_CLEAR_M)
+    front = outward * (WALL_GAP_M + PLATE_THICK_M + GLASS_CLEAR_M)
+    back = -outward * GLASS_BEHIND_M
+    return Polygon([spot - half + back, spot + half + back, spot + half + front, spot - half + front])
 
 
 def _plate_meshes(sign: Sign) -> tuple[Mesh, Mesh, Mesh]:

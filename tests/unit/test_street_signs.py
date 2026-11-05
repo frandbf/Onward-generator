@@ -550,7 +550,9 @@ def _slide(start_x: float, *panes: Node, length: float = 4.0) -> list[float] | N
         (2.0, (_pane(2.72, 4.0, 6.0, 2.0, 3.0),), 4.0, [1.5, 6.0]),  # 2 cm past its forward end still counts
         (2.0, (_pane(1.0, 1.28, 6.0, 2.0, 3.0),), 4.0, [2.5, 6.0]),  # and 2 cm past its back end
         (2.0, (_pane(1.0, 3.0, 6.1, 2.0, 3.0),), 6.0, [4.0, 6.0]),  # a window set 0.1 m into the wall
-        (2.0, (_pane(1.0, 3.0, 6.16, 2.0, 3.0),), 6.0, [2.0, 6.0]),  # glass past the plate's 0.14 m reach
+        (2.0, (_pane(1.0, 3.0, 6.3, 2.0, 3.0),), 6.0, [4.0, 6.0]),  # a shopfront at the back of a 0.3 m wall
+        (2.0, (_pane(1.0, 3.0, 6.41, 2.0, 3.0),), 6.0, [2.0, 6.0]),  # glass past the 0.4 m reach behind the wall
+        (2.0, (_pane(1.0, 3.0, 5.84, 2.0, 3.0),), 6.0, [2.0, 6.0]),  # and past the 0.14 m in front of it
 
     ],
 )
@@ -598,3 +600,11 @@ def test_a_wall_holds_one_plate() -> None:
     assert first is not None and first.material == material_id("Calle Mayor")
     assert len(used) == 1
     assert _sign_for("Calle Mayor", np.array([0.0, 0.0]), streets, walls, tree, used) is None
+
+
+@pytest.mark.parametrize(("depth", "moved"), [(0.30, True), (0.39, True), (0.41, False), (-0.13, True), (-0.15, False)])
+def test_a_plate_slides_off_glass_set_back_in_its_wall(depth: float, moved: bool) -> None:
+    """On Barcelona Sarria two plates hung over shopfront glass 0.30 m behind the wall line, past a 0.14 m check."""
+    # The wall line is y = 6, its street side -y: depth > 0 is into the wall, < 0 in front of the plate.
+    spot = _slide(2.0, _pane(1.0, 3.0, 6.0 + depth, 2.0, 3.0))
+    assert (spot != [2.0, 6.0]) is moved
