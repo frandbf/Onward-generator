@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -467,3 +468,33 @@ def test_a_kiosk_a_necked_shop_and_a_large_shop_all_get_rooms(tight_inputs: tupl
     # The stair interior keeps its 20 m² floor: the flats the size of the kiosk get no room.
     flats = _detail(tight_inputs, _cfg(interiors__include_ids=["osm-way-873"]))
     assert ("osm-way-873", "inner_space_too_small") in [(i.object_id, i.message) for i in flats.issues if i.code == "interior_not_generated"]
+
+
+def test_the_shops_get_the_balcony_slabs_of_their_building(row_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    """``plan_shops`` hears of each slab ``build_shell`` attaches to the same building, as (segment, s0, s1, bottom z)."""
+    import onward_generator.detail.scene as scene_module
+    from onward_generator.detail import load_detail_config
+
+    built: list[tuple[list, object]] = []
+    planned: list[tuple[tuple[list, object], list]] = []
+    real_shell, real_shops = scene_module.build_shell, scene_module.plan_shops
+
+    def shell(refined, segments, layout, height, template, *rest, **kw):  # type: ignore[no-untyped-def]
+        built.append((list(layout.balconies), template.balcony))
+        return real_shell(refined, segments, layout, height, template, *rest, **kw)
+
+    def shops(*args, **kw):  # type: ignore[no-untyped-def]
+        planned.append((built[-1], list(args[6])))
+        return real_shops(*args, **kw)
+
+    monkeypatch.setattr(scene_module, "build_shell", shell)
+    monkeypatch.setattr(scene_module, "plan_shops", shops)
+    scene, heights, base = row_inputs
+    generated, ref = load_base(base, scene, heights, load_generation_config())
+    cfg = load_detail_config()
+    balconied = {k: replace(t, balcony=replace(t.balcony, share=1.0)) if t.balcony is not None else t for k, t in cfg.templates.items()}
+    detail_scene(generated, ref, heights, scene, replace(cfg, templates=balconied))
+    assert any(slabs for _, slabs in planned), "no shop building had a balcony"
+    for (balconies, spec), slabs in planned:
+        expected = [(seg, s0, s0 + spec.width_m, v0 - spec.slab_m) for seg, s0, v0 in balconies] if spec is not None else []  # type: ignore[attr-defined]
+        assert slabs == expected

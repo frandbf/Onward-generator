@@ -1040,8 +1040,10 @@ def detail_scene(
         for reason, n in sorted(layout.skipped.items()):
             counts[f"skipped:{reason}"] += n
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
+        spec = shell_template.balcony
+        balcony_slabs = [(seg, bs0, bs0 + spec.width_m, v0 - spec.slab_m) for seg, bs0, v0 in layout.balconies] if spec is not None else []  # pragma: no mutate: a template without a balcony lays out none; the guard only tells mypy spec is set
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
-                           interior.shop_doors if interior is not None else ()) if shop else []
+                           interior.shop_doors if interior is not None else (), balcony_slabs) if shop else []
         for entry in shops:
             if entry["poi_id"] in place_of:
                 entry["poi_source"] = place_source(place_of[entry["poi_id"]])

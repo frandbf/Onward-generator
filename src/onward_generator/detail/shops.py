@@ -32,6 +32,8 @@ CATASTRO_USE_TAG = "catastro:current_use"
 """The tag a shop of a Catastro-use building carries in place of an OSM POI's tags (ADR-022). Not an OSM tag."""
 VINYL_INSET_M = 0.01  # in front of the glass, inside the recess
 VINYL_BACKS = frozenset({"glass_dark", "glass_view", "shop_glass"})
+# A balcony slab on a wall: (segment, s0, s1, bottom z).
+Slab = tuple[int, float, float, float]
 # A shop sign's footprint reaches this far beyond its own depth, front and back.
 SIGN_CLEAR_M = 0.05
 # One shop: its POI id (``None`` for the building itself), its tags, and its point in local metres.
@@ -78,10 +80,16 @@ def _board(seg: Segment, s: float, z: float, out: float, normal: np.ndarray, wid
     }
 
 
-def _sign(kind: str, seg: Segment, hole: Hole, cfg: DetailConfig) -> dict[str, Any]:
+def _sign(kind: str, seg: Segment, hole: Hole, cfg: DetailConfig, slabs: Sequence[Slab] = ()) -> dict[str, Any]:
     sc = cfg.shops
     if kind == "fascia":
         z0 = hole.v0 + hole.height + FASCIA_GAP_M
+        # Under a balcony the board comes down until its top keeps the gap below the slab: on Barcelona Sarria
+        # 18 of 40 fascias had their top 0.11 m inside the first-floor slab, letters clipped.
+        s0, s1 = hole.s0 - sc.fascia_overhang_m, hole.s0 + hole.width + sc.fascia_overhang_m
+        above = [bottom for segment, a, b, bottom in slabs if segment == hole.segment and a < s1 and b > s0 and bottom > z0]
+        if above:
+            z0 = min(z0, min(above) - FASCIA_GAP_M - sc.fascia_height_m)
         board = _board(seg, hole.s0 + hole.width / 2, z0 + sc.fascia_height_m / 2, sc.fascia_depth_m / 2, seg.n_out,
                        hole.width + 2 * sc.fascia_overhang_m, sc.fascia_height_m, sc.fascia_depth_m)
         return {"kind": kind, **board, "double_sided": False, "bracket_m": 0.0}
@@ -129,11 +137,13 @@ def plan_shops(
     segments: Sequence[Segment],
     cfg: DetailConfig,
     entrances: Sequence[Hole] = (),
+    slabs: Sequence[Slab] = (),
 ) -> list[dict[str, Any]]:
     """One record per shop ``(poi_id, tags, point)``: its name, its sign, and the vinyls on the windows it owns.
 
     A shop takes its bay (``shop_bays``) and its sign goes on it. A shop left without one gets no sign
-    and no vinyl. A door in ``entrances`` gets no vinyl. ``shops`` is never empty.
+    and no vinyl. A door in ``entrances`` gets no vinyl. ``shops`` is never empty. ``slabs`` are the
+    building's balcony slabs, ``(segment, s0, s1, bottom z)``: a fascia stays under them.
     """
     centre = _fronts(holes, segments, entrances)
     records: list[dict[str, Any]] = []
@@ -147,7 +157,7 @@ def plan_shops(
         if bay is None:
             continue
         kind = "fascia" if stable_unit(cfg.seed, building_id, key, "shop_sign") < cfg.shops.fascia_share else "blade"
-        record["sign"] = {**_sign(kind, segments[bay.segment], bay, cfg), "attribute_origin": "generated"}
+        record["sign"] = {**_sign(kind, segments[bay.segment], bay, cfg, slabs), "attribute_origin": "generated"}
         bays.append((bay, record))
     for hole in centre:
         if hole.back not in VINYL_BACKS or stable_unit(cfg.seed, building_id, hole.segment, hole.column, "vinyl") >= cfg.shops.vinyl_share:

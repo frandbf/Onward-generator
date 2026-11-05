@@ -396,3 +396,25 @@ def test_a_shop_fits_a_building_with_a_street_front_and_room_for_the_door_cleara
     ring = [box(-10, -10, 20, 0), box(-10, 10, 20, 20), box(-10, 0, 0, 10), box(10.5, 0, 20, 10)]
     assert not _fits(box(0, 0, 10, 10), *ring)
     assert _fits(box(0, 0, 10, 10), *ring[:3])  # the east wall is on the street
+
+
+@pytest.mark.parametrize(
+    ("slab", "centre_z"),
+    [
+        ((0, 1.5, 3.1, 2.85), 2.85 - FASCIA_GAP_M - 0.18),  # Barcelona Sarria: the top was 0.11 m inside this slab
+        ((0, 4.1, 5.7, 2.85), 2.85 - FASCIA_GAP_M - 0.18),  # over the board's 0.15 m overhang only
+        ((0, 4.16, 5.76, 2.85), None),  # past it
+        ((1, 1.5, 3.1, 2.85), None),  # on another wall
+        ((0, 1.5, 3.1, 0.25 + 2.3 + FASCIA_GAP_M + 0.36 + FASCIA_GAP_M), None),  # the gap is already kept
+        ((0, 1.5, 3.1, 0.25 + 2.3 + FASCIA_GAP_M + 0.36 + FASCIA_GAP_M - 0.01), 2.6 + 0.18 - 0.01),
+        ((0, 1.5, 3.1, 2.55), None),  # a slab under the board's bottom is not over it
+        ((0, -0.75, 1.0 - 0.15, 2.85), None),  # ending where the board starts
+        ((0, -0.5, 0.9, 2.85), 2.85 - FASCIA_GAP_M - 0.18),  # over its left overhang only
+        ((0, 1.0 + 3.0 + 0.15, 5.75, 2.85), None),  # starting where it ends
+        ((0, 1.5, 3.1, 0.25 + 2.3 + FASCIA_GAP_M), None),  # at the board's bottom exactly
+    ],
+)
+def test_a_fascia_comes_down_under_a_balcony_slab(slab: tuple[int, float, float, float], centre_z: float | None) -> None:
+    [record] = plan_shops("b1", [("n1", {"shop": "bakery"}, (2.0, -1.0))], [_front(1.0, 0)], [SEG], _cfg(1.0), slabs=[slab])
+    high = 0.25 + 2.3 + FASCIA_GAP_M + 0.18
+    assert record["sign"]["centre_m"][2] == pytest.approx(high if centre_z is None else centre_z)
