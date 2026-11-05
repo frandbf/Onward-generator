@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 from shapely.geometry import LineString, Polygon
+from shapely.geometry.base import BaseGeometry
 
 from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCategory
 from onward_generator.detail.facades import Hole, Segment, stable_unit
@@ -99,6 +100,19 @@ def _sign(kind: str, seg: Segment, hole: Hole, cfg: DetailConfig, slabs: Sequenc
     return {"kind": kind, **board, "double_sided": True, "bracket_m": sc.blade_wall_gap_m + sc.blade_width_m}
 
 
+# A blade's two faces look along its wall: each needs this much open ground in front of it, or the sign is a fascia.
+# Barcelona Sarria: blades in re-entrant corners had one face 0.7 to 0.8 m from a neighbour's wall.
+BLADE_SIDE_CLEAR_M = 1.0
+
+
+def _faces_a_wall(sign: Mapping[str, Any], footprints: BaseGeometry) -> bool:
+    """Whether a footprint stands within ``BLADE_SIDE_CLEAR_M`` of either face of a blade, across the board's width."""
+    centre, face = np.asarray(sign["centre_m"][:2]), np.asarray(sign["normal"])
+    out = np.array([-face[1], face[0]]) * float(sign["width_m"]) / 2  # the wall's outward normal: the board's width
+    board = LineString([centre - out, centre + out])
+    return bool(footprints.intersects(board.buffer(BLADE_SIDE_CLEAR_M, cap_style="flat")))
+
+
 def _vinyl(seg: Segment, hole: Hole, cfg: DetailConfig) -> dict[str, Any]:
     sc = cfg.shops
     half = sc.vinyl_height_m / 2
@@ -138,12 +152,14 @@ def plan_shops(
     cfg: DetailConfig,
     entrances: Sequence[Hole] = (),
     slabs: Sequence[Slab] = (),
+    footprints: BaseGeometry | None = None,
 ) -> list[dict[str, Any]]:
     """One record per shop ``(poi_id, tags, point)``: its name, its sign, and the vinyls on the windows it owns.
 
     A shop takes its bay (``shop_bays``) and its sign goes on it. A shop left without one gets no sign
     and no vinyl. A door in ``entrances`` gets no vinyl. ``shops`` is never empty. ``slabs`` are the
-    building's balcony slabs, ``(segment, s0, s1, bottom z)``: a fascia stays under them.
+    building's balcony slabs, ``(segment, s0, s1, bottom z)``: a fascia stays under them. ``footprints`` are the
+    map's buildings, this one included: a blade with one within ``BLADE_SIDE_CLEAR_M`` of a face becomes a fascia.
     """
     centre = _fronts(holes, segments, entrances)
     records: list[dict[str, Any]] = []
@@ -157,7 +173,10 @@ def plan_shops(
         if bay is None:
             continue
         kind = "fascia" if stable_unit(cfg.seed, building_id, key, "shop_sign") < cfg.shops.fascia_share else "blade"
-        record["sign"] = {**_sign(kind, segments[bay.segment], bay, cfg, slabs), "attribute_origin": "generated"}
+        sign = _sign(kind, segments[bay.segment], bay, cfg, slabs)
+        if kind == "blade" and footprints is not None and _faces_a_wall(sign, footprints):
+            sign = _sign("fascia", segments[bay.segment], bay, cfg, slabs)
+        record["sign"] = {**sign, "attribute_origin": "generated"}
         bays.append((bay, record))
     for hole in centre:
         if hole.back not in VINYL_BACKS or stable_unit(cfg.seed, building_id, hole.segment, hole.column, "vinyl") >= cfg.shops.vinyl_share:

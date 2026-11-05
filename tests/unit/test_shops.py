@@ -424,3 +424,50 @@ def test_a_fascia_comes_down_under_a_balcony_slab(slab: tuple[int, float, float,
     [record] = plan_shops("b1", [("n1", {"shop": "bakery"}, (2.0, -1.0))], [_front(1.0, 0)], [SEG], _cfg(1.0), slabs=[slab])
     high = 0.25 + 2.3 + FASCIA_GAP_M + 0.18
     assert record["sign"]["centre_m"][2] == pytest.approx(high if centre_z is None else centre_z)
+
+
+@pytest.mark.parametrize(("gap", "kind"), [(0.9, "fascia"), (1.1, "blade")])
+def test_a_blade_with_a_wall_within_1_m_of_a_face_becomes_a_fascia(gap: float, kind: str) -> None:
+    """Barcelona Sarria: blades in re-entrant corners had one face 0.7 to 0.8 m from a neighbour's wall."""
+    from onward_generator.detail.shops import BLADE_SIDE_CLEAR_M
+
+    x = 1.0 - CFG.min_pier_m / 4  # the blade's plane, beside the window at s0 = 1 m
+    own = box(0.0, 0.0, 12.0, 10.0)
+    for neighbour in (box(-30.0, -5.0, x - gap, 0.0), box(x + gap, -5.0, 30.0, 0.0)):  # west, then east of the blade
+        [record] = plan_shops("b1", [(None, {"shop": "books"}, None)], [_front(1.0, 0)], [SEG], _cfg(0.0), footprints=own | neighbour)
+        assert record["sign"]["kind"] == kind
+    [alone] = plan_shops("b1", [(None, {"shop": "books"}, None)], [_front(1.0, 0)], [SEG], _cfg(0.0), footprints=own)
+    assert alone["sign"]["kind"] == "blade"  # its own building behind the wall is not in front of a face
+    [far_out] = plan_shops("b1", [(None, {"shop": "books"}, None)], [_front(1.0, 0)], [SEG], _cfg(0.0),
+                           footprints=own | box(x - 0.5, -3.0, x + 0.5, -0.86))  # past the board's far edge, 0.85 m out
+    assert far_out["sign"]["kind"] == "blade"
+    [near_in] = plan_shops("b1", [(None, {"shop": "books"}, None)], [_front(1.0, 0)], [SEG], _cfg(0.0),
+                           footprints=own | box(x - 0.5, -0.84, x + 0.5, -0.8))
+    assert near_in["sign"]["kind"] == "fascia"
+    assert BLADE_SIDE_CLEAR_M == 1.0
+
+
+def test_a_blade_on_an_oblique_wall_looks_along_it() -> None:
+    from onward_generator.detail.shops import _faces_a_wall
+
+    # A wall along u = (0.8, 0.6), outward n = (0.6, -0.8): the blade's face is -u, its 0.7 m board runs along n.
+    sign = {"centre_m": [0.0, 0.0, 2.65], "normal": [-0.8, -0.6], "width_m": 0.7}
+
+    def post(along_u: float, along_n: float) -> Polygon:
+        x, y = 0.8 * along_u + 0.6 * along_n, 0.6 * along_u - 0.8 * along_n
+        return box(x - 0.01, y - 0.01, x + 0.01, y + 0.01)
+
+    for a, b in ((-0.9, 0.0), (0.9, 0.0), (0.0, 0.3), (0.5, -0.3)):
+        assert _faces_a_wall(sign, post(a, b)), (a, b)
+    for a, b in ((0.0, 0.4), (-1.1, 0.0), (0.9, -0.4)):
+        assert not _faces_a_wall(sign, post(a, b)), (a, b)
+
+
+def test_a_blade_turned_fascia_still_comes_down_under_a_balcony() -> None:
+    x = 1.0 - CFG.min_pier_m / 4
+    wall = box(-30.0, -5.0, x - 0.5, 0.0) | box(0.0, 0.0, 12.0, 10.0)
+    slab = (0, 0.0, 6.0, 3.0)  # a balcony slab over the window, its bottom at 3 m
+    [record] = plan_shops("b1", [(None, {"shop": "books"}, None)], [_front(1.0, 0)], [SEG], _cfg(0.0), slabs=[slab], footprints=wall)
+    sign = record["sign"]
+    assert sign["kind"] == "fascia"
+    assert sign["centre_m"][2] + sign["height_m"] / 2 == pytest.approx(3.0 - FASCIA_GAP_M)

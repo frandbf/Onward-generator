@@ -936,6 +936,7 @@ def detail_scene(
     budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
     lit: list[tuple[bool, dict[str, Any]]] = []
     door_fronts: list[Polygon] = []
+    every_footprint = union_all(list(footprints.values()))  # what a blade sign must not face (``plan_shops``)
     exposed_m = party_m = 0.0
 
     # Buildings in the interior queue go first, in queue order, so the quota and the triangle budget go
@@ -1138,7 +1139,7 @@ def detail_scene(
         spec = shell_template.balcony
         balcony_slabs = [(seg, bs0, bs0 + spec.width_m, v0 - spec.slab_m) for seg, bs0, v0 in layout.balconies] if spec is not None else []  # pragma: no mutate: a template without a balcony lays out none; the guard only tells mypy spec is set
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
-                           interior.shop_doors if interior is not None else (), balcony_slabs) if shop else []
+                           interior.shop_doors if interior is not None else (), balcony_slabs, every_footprint) if shop else []
         door_fronts.extend(_door_fronts(layout.holes, segments))
         for entry in shops:
             if entry["poi_id"] in place_of:
@@ -1241,7 +1242,7 @@ def detail_scene(
     prototypes = dict(prototypes or urban_prototypes())
     walkable = [s.geometry for c, s in base.partition.surfaces.items() if c not in (SurfaceClass.CARRIAGEWAY, SurfaceClass.WATER)]
     free = union_all(walkable) if walkable else Point(0, 0).buffer(0)
-    buildings_union = union_all(list(footprints.values()))
+    buildings_union = every_footprint
     elements, rejected = place_elements(features, base.ways, free, buildings_union, prototypes, cfg, doors=union_all(door_fronts))
     if extra_urban is not None:
         extra, extra_rejected = extra_urban(free, buildings_union, prototypes, cfg, elements)

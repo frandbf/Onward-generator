@@ -538,3 +538,23 @@ def test_each_building_records_the_middle_of_every_ground_floor_door(detail_inpu
         assert len(facade["doors_m"]) == sum(n for kind, n in facade["openings"].items() if kind in DOOR_KINDS), b.id
         outline = _footprint(detail_inputs, b.record["source_ids"][0]).boundary
         assert all(outline.distance(Point(p)) < 1e-3 for p in facade["doors_m"]), b.id
+
+
+def test_the_shops_hear_of_every_footprint_of_the_map(detail_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    """``plan_shops`` gets the union of the map's footprints, its own building's included, to keep blades off walls."""
+    import onward_generator.detail.scene as scene_module
+
+    heard: list[object] = []
+    real = scene_module.plan_shops
+
+    def shops(building_id, *args, **kw):  # type: ignore[no-untyped-def]
+        heard.append(args[6])
+        return real(building_id, *args, **kw)
+
+    monkeypatch.setattr(scene_module, "plan_shops", shops)
+    detailed = _detail(detail_inputs)
+    assert heard
+    scene = json.loads(detail_inputs[0].read_text(encoding="utf-8"))
+    ids = {o.record["source_ids"][0] for o in detailed.objects if o.type == "building"}
+    every = union_all([shape(f["geometry"]) for f in scene["features"] if f["id"] in ids])
+    assert all(around.equals(every) for around in heard)  # type: ignore[attr-defined]
