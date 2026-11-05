@@ -52,6 +52,8 @@ AI_COUNT = 32
 AMMO_COUNT = 4
 # No ammo crate this close to a spawn point: a player would spawn inside or against it.
 AMMO_SPAWN_CLEAR_M = 3.0
+# No Escort, Evac or Retrieval point this close to an ammo crate: both went to the pole of the ground, one on the other.
+AMMO_OBJECTIVE_CLEAR_M = 3.0
 AI_SPACING_M = 8.0
 # One spawn per route. Starts closer than this share a spot, and Hunt then
 # drops several bots on what reads as a single position. A short sidewalk
@@ -758,6 +760,7 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
             "points_m": [_xy(p["x"], p["y"], focus) for p in block["points_m"]],
         }
     open_ground = area.difference(union_all([Point(p).buffer(2.0) for p in occupied_pts]))
+    open_ground = open_ground.difference(union_all([Point(p).buffer(AMMO_OBJECTIVE_CLEAR_M) for p in ammo]))
     if open_ground.is_empty:
         raise LayoutError("no ground left for Escort, Evac and Retrieval")
     escort = scatter_points(open_ground, 2, 8.0, uplink)

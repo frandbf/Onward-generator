@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail import detail_scene, load_base, load_detail_config
 from onward_generator.export.package import _check_layout
 from onward_generator.generation import load_generation_config
-from onward_generator.perf.layout import TEAM_SEPARATION_M, gameplay_layout, playable_layout
+from onward_generator.perf.layout import AMMO_OBJECTIVE_CLEAR_M, TEAM_SEPARATION_M, gameplay_layout, playable_layout
 
 
 def test_perf_layout_reads_the_footprints_of_the_scene(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
@@ -91,3 +92,15 @@ def test_the_playable_teams_spawn_farther_apart_than_the_fixture_allows(detail_i
 
     assert gap(gameplay_layout(generated, manifest)) <= TEAM_SEPARATION_M
     assert gap(playable_layout(generated, manifest, json.loads(Path(heights).read_text(encoding="utf-8")))) > TEAM_SEPARATION_M
+
+
+def test_no_objective_lands_on_an_ammo_crate(detail_inputs: tuple[Path, Path, Path]) -> None:
+    """On Barcelona Sarria both Escort points sat exactly on a crate, and a hard drive 0.75 m from one."""
+    scene, heights, base = detail_inputs
+    generated, ref = load_base(base, scene, heights, load_generation_config())
+    manifest = detail_scene(generated, ref, heights, scene, load_detail_config()).manifest()
+    layout = playable_layout(generated, manifest, json.loads(Path(heights).read_text(encoding="utf-8")))
+    objectives = [layout["escort_a_m"], layout["escort_b_m"], layout["evac_m"], *layout["harddrives_m"]]
+    points = [(o["x"], o["y"]) if isinstance(o, dict) else (o[0], o[1]) for o in objectives]
+    crates = [(a["x"], a["y"]) for a in layout["ammo_m"]]
+    assert min(math.dist(o, c) for o in points for c in crates) >= AMMO_OBJECTIVE_CLEAR_M
