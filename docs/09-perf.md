@@ -97,9 +97,27 @@ ADR-017. Madrid, 40.40657, −3.719187, with Catastro, on fork/main of 30 Octobe
 - With a 150 m core the map is about 209 000 triangles before the SDK prefabs and the players, against the guide's 250 000 for all of it (ADR-005). A 120 m core leaves about 82 000. Which margin a match needs is a headset question.
 - The scenic shells bake at scale 0.25: 3.4 M texels of the 34.7 M at r300.
 
+## Hunt with bots on a small map
+
+Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.
+
+| Measure | Value |
+| --- | --- |
+| Map load | 2.9 s |
+| Frame rate | median 73, p05 72, minimum 44 |
+| App GPU time | median 4.85 ms, p95 6.57 ms, max 8.58 ms |
+| GPU / CPU utilisation (median) | 48 % / 34 % |
+| App PSS | 2 422–2 628 MB, flat after the load |
+| Free memory | at least 1 907 MB |
+| Graphics memory (`meminfo`) | 670–710 MB in the menu, 880–960 MB in the map |
+
+- Six samples fall below 72: five in the first 20 s in the map (71, 66, 58, 44, 66), while the bots spawn, and one 69 at 125 s. Every other sample is 72 or 73.
+- No error from the map in `logcat`.
+- One small map, one session. It says the 40 texels-per-metre lightmap of a 50 m map fits in memory with room left; it is not a budget for a larger map or a match with other players.
+
 ## Known limits of the measurement
 
-- Free Roam, one player, no bots. The official guide counts players and objectives inside its budget.
+- Free Roam, one player, no bots, except the Hunt session above, which had bots but still one player. The official guide counts players and objectives inside its budget.
 - One walking route, repeated by hand. Between two passes of the same build, GPU time p50/p95 varied by 9% and PSS by 183 MB.
 - Draw calls were measured in two views, not at the worst view of the whole map.
 - `ovrgpuprofiler -r` has no timestamp. It is aligned to the first `logcat` line (±2 s), so it is a relative signal. In one session the fragment counter returned −1.
