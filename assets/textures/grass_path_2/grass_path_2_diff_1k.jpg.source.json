@@ -14,7 +14,7 @@
   "map": "Diffuse",
   "resolution": "1k",
   "format": "jpg",
-  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/grass_path_2/grass_path_2_diff_1k.jpg",
+  "path": "assets/textures/grass_path_2/grass_path_2_diff_1k.jpg",
   "retrieved_at": "2026-10-19T20:21:37+00:00",
   "user_agent": "onward-generator/0.1.0 (local research tool)"
 }

@@ -22,6 +22,7 @@ INFO_URL = "https://api.polyhaven.com/info/{id}"
 FILES_URL = "https://api.polyhaven.com/files/{id}"
 LICENSE_URL = "https://polyhaven.com/license"
 PAGE_URL = "https://polyhaven.com/a/{id}"
+CC0_URL = "https://creativecommons.org/publicdomain/zero/1.0/"
 USER_AGENT = f"onward-generator/{__version__} (local research tool)"
 ALLOWED = frozenset({"api.polyhaven.com", "dl.polyhaven.org", "polyhaven.com", "www.polyhaven.com"})
 MAX_BYTES = 260 * 1024 * 1024
@@ -198,23 +199,7 @@ def _one(spec, raw_root: Path, library: Path, get: Getter) -> tuple[dict, dict |
         "height_m": round(normalized.height_m, 3),
         "normalized_file": f"{spec.id}.glb",
     })
-    prefab = {
-        "id": spec.id,
-        "file": f"{spec.id}.glb",
-        "category": spec.category,
-        "role": spec.role,
-        "surfaces": list(spec.surfaces),
-        "anchor": spec.anchor,
-        "lane": spec.lane,
-        "clearance_m": spec.clearance_m,
-        "use": spec.use,
-        "triangles": normalized.triangles_after,
-        "length_m": round(normalized.length_m, 3),
-        "depth_m": round(normalized.depth_m, 3),
-        "height_m": round(normalized.height_m, 3),
-        "collider": "none",
-    }
-    return base, prefab
+    return base, _prefab(spec, normalized, base["authors"])
 
 
 def _local_ready(folder: Path, asset_id: str) -> bool:
@@ -266,7 +251,7 @@ def _from_local(spec, folder: Path, library: Path) -> tuple[dict, dict | None]:
     write_normalized_glb(library / f"{spec.id}.glb", spec.id, normalized)
     base.update(_normalized_fields(normalized, info))
     base["normalized_file"] = f"{spec.id}.glb"
-    return base, _prefab(spec, normalized)
+    return base, _prefab(spec, normalized, base["authors"])
 
 
 def _normalized_fields(normalized, info: dict) -> dict:
@@ -289,7 +274,7 @@ def _normalized_fields(normalized, info: dict) -> dict:
     }
 
 
-def _prefab(spec, normalized) -> dict:
+def _prefab(spec, normalized, authors: list[str]) -> dict:
     return {
         "id": spec.id,
         "file": f"{spec.id}.glb",
@@ -305,6 +290,11 @@ def _prefab(spec, normalized) -> dict:
         "depth_m": round(normalized.depth_m, 3),
         "height_m": round(normalized.height_m, 3),
         "collider": "none",
+        "license": "CC0-1.0",
+        "license_url": CC0_URL,
+        "author": ", ".join(authors),
+        "source_url": PAGE_URL.format(id=spec.id),
+        "source": "polyhaven",
     }
 
 

@@ -14,7 +14,7 @@
   "map": "Diffuse",
   "resolution": "1k",
   "format": "jpg",
-  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/plastered_wall_05/plastered_wall_05_diff_1k.jpg",
+  "path": "assets/textures/plastered_wall_05/plastered_wall_05_diff_1k.jpg",
   "retrieved_at": "2026-10-19T20:21:28+00:00",
   "user_agent": "onward-generator/0.1.0 (local research tool)"
 }

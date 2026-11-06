@@ -1,0 +1,28 @@
+name: Problem on the headset
+description: The map builds, but something is wrong when you play it on a Meta Quest.
+labels: ["headset"]
+body:
+  - type: input
+    id: map
+    attributes:
+      label: Map
+      description: Place and coordinates, or the map id.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode
+      options: [Free Roam, Hunt, Uplink, Other]
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Frame rate, missing geometry, bots stuck, spawns, collisions... Where on the map, and a screenshot or video if you can.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Headset and versions
+      description: Quest model, Onward version, Unity and SDK version used for the build.
