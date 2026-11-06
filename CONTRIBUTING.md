@@ -2,6 +2,8 @@
 
 Thank you for helping. This page covers the development setup, the tests and the quality gates. The working rules for every change, by a person or an agent, are in [AGENTS.md](AGENTS.md): read them first. How the pipeline fits together is [docs/01-pipeline.md](docs/01-pipeline.md).
 
+By sending a contribution you agree that it is licensed like the project: code under the GNU AGPL v3 or later, documentation under CC BY-SA 4.0 ([NOTICE](NOTICE)). A new asset under `assets/` keeps its author's licence, which must be one the catalogue accepts and must be recorded in its manifest.
+
 ## Environment
 
 - macOS (tested on macOS 26.6.2, Apple M4 Pro) or Linux. The host is detected, or chosen with `--platform macos|linux` or `ONWARD_PLATFORM` ([docs/01-pipeline.md](docs/01-pipeline.md#host-platform)). The Linux Unity paths are the Unity Hub defaults and have not been checked with Unity on Linux.

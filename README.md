@@ -157,3 +157,12 @@ The documentation is in English.
 - Generated maps (`maps/`) are local work and are not committed. Neither are credentials, the Onward SDK or large source extracts.
 
 Details: [docs/legal/data-sources.md](docs/legal/data-sources.md). This project is not affiliated with Downpour Interactive.
+
+## License
+
+onward-generator is free software under the [GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later). Use it, study it, change it and share it. If you share a modified version, or let people use one over a network, share its source under the same licence and keep the credit "onward-generator, Francisco de Brito Fontes" with a link to this repository. That is how improvements come back and the project grows.
+
+[NOTICE](NOTICE) has the details:
+- **Unity and the SDK:** an exception lets the Unity scripts run with Unity and the Onward SDK.
+- **Other licences:** the documentation is CC BY-SA 4.0, and `assets/` keeps the licence of each author.
+- **Maps:** the licence does not cover the maps you generate; their data licences, OpenStreetMap's above all, still apply.

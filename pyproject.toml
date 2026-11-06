@@ -7,6 +7,10 @@ name = "onward-generator"
 version = "0.1.0"
 description = "Local, AI-assisted 3D map generator from legal geographic data, initially targeting Onward custom maps."
 readme = "README.md"
+license = {text = "AGPL-3.0-or-later"}
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+]
 requires-python = ">=3.12"
 dependencies = [
     "shapely==2.2.0",

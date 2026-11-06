@@ -1,0 +1,68 @@
+onward-generator
+https://github.com/frandbf/Onward-generator
+Copyright (C) 2026 Francisco de Brito Fontes
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. The full text is in LICENSE.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+Additional term under GNU AGPL version 3 section 7(b): if you convey this
+program or a modified version of it, or make a modified version available to
+users over a network, keep this NOTICE and the copyright line above, and give
+the credit "onward-generator, Francisco de Brito Fontes" with a link to the
+repository where the program shows its legal notices. Section 5(a) already
+requires a modified version to say that you changed it and when.
+
+
+Additional permission under GNU AGPL version 3 section 7
+--------------------------------------------------------
+
+The Unity scripts in tools/unity/ run inside the Unity Editor next to the Onward
+Custom Content SDK, neither of which is free software. As a special exception,
+the copyright holder gives you permission to combine those scripts, and works
+based on them, with the Unity Editor and engine and with the Onward Custom
+Content SDK, and to convey the resulting combination, without those components
+being covered by the GNU AGPL. The scripts themselves, and your changes to
+them, stay under the GNU AGPL. If you modify the scripts, you may extend this
+exception to your version, but you are not obliged to do so; if you do not,
+delete this paragraph from your version.
+
+
+What is not covered by the GNU AGPL
+-----------------------------------
+
+- assets/: every model, texture, font and image keeps the licence of its
+  author, recorded in the catalogue's manifest.json, its review file, or the
+  licence file beside it (CC0-1.0, CC-BY-4.0, the DejaVu font licence). The
+  author, source URL and licence of each CC-BY model are in
+  assets/normalized/manifest.json and assets/normalized_review.json.
+- tests/fixtures/: synthetic test data created for this project, CC0-1.0.
+- docs/: the documentation and its images are licensed under Creative Commons
+  Attribution-ShareAlike 4.0 International (CC BY-SA 4.0),
+  https://creativecommons.org/licenses/by-sa/4.0/. Credit "onward-generator,
+  Francisco de Brito Fontes" with a link to the repository.
+- Excerpts of the Onward Custom Content SDK v1.15 that the patch scripts search
+  for and replace (the OLD_ASSIGN and OLD_BUILD strings, and the parts of
+  NEW_ASSIGN and NEW_BUILD taken from the SDK, in
+  tools/unity/onward_adapter/patch_content_builder.py, and the matched line in
+  tools/unity/phase0_room/run_phase0.sh) belong to Downpour Interactive. They
+  are included only so the scripts can find the place to patch in a copy of
+  the SDK that you obtained yourself. The SDK is not distributed here.
+
+
+Data and names
+--------------
+
+Maps made with this program are built from OpenStreetMap data (ODbL-1.0) and
+other sources listed in docs/legal/data-sources.md. Their attribution and
+licence obligations apply to every map, whatever licence this program has. The
+licence of this program does not cover the maps it generates.
+
+Onward is a trademark of Downpour Interactive. This project is not affiliated
+with or endorsed by Downpour Interactive. Unity is a trademark of Unity
+Technologies.
