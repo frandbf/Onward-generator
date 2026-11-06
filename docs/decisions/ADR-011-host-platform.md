@@ -13,7 +13,7 @@ Every host-specific path assumed macOS: the Unity editor and adb under `/Applica
 3. **Unknown values are errors.** A misspelt platform or an unsupported system exits with `2`. It is never ignored and never falls back to macOS. `doctor` reports it as a failed `host:platform` check.
 4. **Single-path overrides keep working.** `UNITY`, `ADB`, `LOG_ROOT`, and `ASSET_STORE_CACHE` override one path after the host is chosen. `LOG_DIR` still overrides one script's log folder. `run` passes `ONWARD_PLATFORM`, `UNITY`, `ADB`, and `LOG_ROOT` to `run_export.sh`, so Python and the script use the same paths.
 5. **macOS behaviour does not change.** Its defaults are the previous constants, and its hashes still use `md5 -q` and `shasum -a 256`. Linux uses `md5sum` and `sha256sum` when `shasum` is missing. Both print the same format.
-6. **No browser data.** The profile holds no browser or keyring path. A download that needs an account uses that service's API token.
+6. **No browser data.** The profile holds no browser or keyring path. A download that needs an account uses that service's API token ([ADR-030](ADR-030-sketchfab-download-api.md)).
 7. **No host configuration file.** `generator.schema.json` describes map projects, not machines, and the variable already gives a persistent choice.
 
 ## Rejected alternatives

@@ -65,6 +65,7 @@ def test_linux_paths_under_home() -> None:
         assert str(value).startswith("/home/tester/")
         assert "/Applications" not in str(value) and "Library/" not in str(value)
     assert host.log_root == Path("/home/tester/.local/state/onward-generator")
+    assert host.asset_store_cache == Path("/home/tester/.local/share/unity3d/Asset Store-5.x")
     assert resolve_host("linux", env=HOME | {"XDG_STATE_HOME": "/state"}).log_root == Path("/state/onward-generator")
 
 
@@ -75,3 +76,7 @@ def test_script_env_keys() -> None:
     assert env[PLATFORM_ENV] == "linux"
     assert env["UNITY"] == str(host.unity_editor)
     assert set(host.to_dict()) == {"name", "source", "unity_editor", "adb", "log_root", "asset_store_cache"}
+
+
+def test_asset_store_cache_override() -> None:
+    assert resolve_host("linux", env=HOME | {"ASSET_STORE_CACHE": "/cache"}).asset_store_cache == Path("/cache")

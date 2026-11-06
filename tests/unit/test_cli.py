@@ -129,3 +129,10 @@ def test_overgrow_subcommand_defers_its_help_to_the_overgrow_parser() -> None:
     assert sub.choices["overgrow"].add_help is False
     helps = {choice.dest: choice.help for choice in sub._choices_actions}
     assert helps["overgrow"] == "add abandoned-city grass, trees and wrecks (see: overgrow --help)"
+
+
+def test_platform_help_names_only_the_unity_paths(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--help"]) == 0
+    out = " ".join(capsys.readouterr().out.split())
+    assert "host for the Unity paths (default: $ONWARD_PLATFORM, else detected); goes before the command" in out
+    assert "Chrome" not in out
