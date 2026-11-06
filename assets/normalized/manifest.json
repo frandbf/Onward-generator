@@ -47,7 +47,12 @@
       "length_m": 4.347,
       "depth_m": 1.754,
       "height_m": 1.348,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "MP",
+      "source_url": "https://polyhaven.com/a/covered_car",
+      "source": "polyhaven"
     },
     {
       "id": "rusted_wheel_rim_02",
@@ -81,7 +86,12 @@
       "length_m": 0.33,
       "depth_m": 0.117,
       "height_m": 0.33,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "John Hutcheson",
+      "source_url": "https://polyhaven.com/a/rusted_wheel_rim_02",
+      "source": "polyhaven"
     },
     {
       "id": "old_tyre",
@@ -115,7 +125,12 @@
       "length_m": 0.6,
       "depth_m": 0.165,
       "height_m": 0.6,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "MP",
+      "source_url": "https://polyhaven.com/a/old_tyre",
+      "source": "polyhaven"
     },
     {
       "id": "large_iron_gate",
@@ -143,7 +158,12 @@
       "length_m": 2.932,
       "depth_m": 0.059,
       "height_m": 2.91,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Josh Dean",
+      "source_url": "https://polyhaven.com/a/large_iron_gate",
+      "source": "polyhaven"
     },
     {
       "id": "modular_fire_escape",
@@ -169,7 +189,12 @@
       "length_m": 6.655,
       "depth_m": 1.399,
       "height_m": 9.746,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Juniix",
+      "source_url": "https://polyhaven.com/a/modular_fire_escape",
+      "source": "polyhaven"
     },
     {
       "id": "metal_trash_can",
@@ -202,7 +227,12 @@
       "length_m": 1.758,
       "depth_m": 0.543,
       "height_m": 0.906,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "GurJas Studios",
+      "source_url": "https://polyhaven.com/a/metal_trash_can",
+      "source": "polyhaven"
     },
     {
       "id": "Barrel_01",
@@ -235,7 +265,12 @@
       "length_m": 0.563,
       "depth_m": 0.563,
       "height_m": 0.88,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Jorge Camacho",
+      "source_url": "https://polyhaven.com/a/Barrel_01",
+      "source": "polyhaven"
     },
     {
       "id": "barrel_stove",
@@ -268,7 +303,12 @@
       "length_m": 0.582,
       "depth_m": 0.583,
       "height_m": 0.851,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "MP",
+      "source_url": "https://polyhaven.com/a/barrel_stove",
+      "source": "polyhaven"
     },
     {
       "id": "Barrel_02",
@@ -301,7 +341,12 @@
       "length_m": 0.488,
       "depth_m": 0.485,
       "height_m": 0.88,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Jorge Camacho",
+      "source_url": "https://polyhaven.com/a/Barrel_02",
+      "source": "polyhaven"
     },
     {
       "id": "can_rusted",
@@ -334,7 +379,12 @@
       "length_m": 0.123,
       "depth_m": 0.124,
       "height_m": 0.149,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Rahul Chaudhary",
+      "source_url": "https://polyhaven.com/a/can_rusted",
+      "source": "polyhaven"
     },
     {
       "id": "small_lpg_tank",
@@ -367,7 +417,12 @@
       "length_m": 0.405,
       "depth_m": 0.404,
       "height_m": 0.632,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Ulan Cabanilla",
+      "source_url": "https://polyhaven.com/a/small_lpg_tank",
+      "source": "polyhaven"
     },
     {
       "id": "propane_tank",
@@ -400,7 +455,12 @@
       "length_m": 0.334,
       "depth_m": 0.334,
       "height_m": 0.552,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Slinc",
+      "source_url": "https://polyhaven.com/a/propane_tank",
+      "source": "polyhaven"
     },
     {
       "id": "industrial_storage_cart",
@@ -434,7 +494,12 @@
       "length_m": 1.584,
       "depth_m": 1.089,
       "height_m": 1.368,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Jule Bielitz",
+      "source_url": "https://polyhaven.com/a/industrial_storage_cart",
+      "source": "polyhaven"
     },
     {
       "id": "old_bed_frame",
@@ -467,7 +532,12 @@
       "length_m": 1.993,
       "depth_m": 0.896,
       "height_m": 1.182,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Luca B",
+      "source_url": "https://polyhaven.com/a/old_bed_frame",
+      "source": "polyhaven"
     },
     {
       "id": "wooden_picnic_table",
@@ -500,7 +570,12 @@
       "length_m": 3.018,
       "depth_m": 2.229,
       "height_m": 0.743,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Ulan Cabanilla",
+      "source_url": "https://polyhaven.com/a/wooden_picnic_table",
+      "source": "polyhaven"
     },
     {
       "id": "exterior_aircon_unit",
@@ -526,7 +601,12 @@
       "length_m": 1.782,
       "depth_m": 0.358,
       "height_m": 0.919,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Monsta3D",
+      "source_url": "https://polyhaven.com/a/exterior_aircon_unit",
+      "source": "polyhaven"
     },
     {
       "id": "security_camera_02",
@@ -552,7 +632,12 @@
       "length_m": 0.394,
       "depth_m": 0.136,
       "height_m": 0.206,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Garrison Gager, Yann Kervran",
+      "source_url": "https://polyhaven.com/a/security_camera_02",
+      "source": "polyhaven"
     },
     {
       "id": "security_camera_01",
@@ -578,7 +663,12 @@
       "length_m": 0.553,
       "depth_m": 0.166,
       "height_m": 0.285,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Alexander Otterbeck, Yann Kervran",
+      "source_url": "https://polyhaven.com/a/security_camera_01",
+      "source": "polyhaven"
     },
     {
       "id": "concrete_road_barrier",
@@ -607,7 +697,12 @@
       "length_m": 1.542,
       "depth_m": 0.621,
       "height_m": 0.807,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Amal Kumar",
+      "source_url": "https://polyhaven.com/a/concrete_road_barrier",
+      "source": "polyhaven"
     },
     {
       "id": "concrete_road_barrier_02",
@@ -636,7 +731,12 @@
       "length_m": 1.56,
       "depth_m": 0.431,
       "height_m": 1.099,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Amal Kumar",
+      "source_url": "https://polyhaven.com/a/concrete_road_barrier_02",
+      "source": "polyhaven"
     },
     {
       "id": "water_manhole_cover",
@@ -664,7 +764,12 @@
       "length_m": 0.691,
       "depth_m": 0.691,
       "height_m": 0.068,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Raunox",
+      "source_url": "https://polyhaven.com/a/water_manhole_cover",
+      "source": "polyhaven"
     },
     {
       "id": "fern_02",
@@ -693,7 +798,12 @@
       "length_m": 1.954,
       "depth_m": 1.712,
       "height_m": 0.406,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Rob Tuytel, Rico Cilliers",
+      "source_url": "https://polyhaven.com/a/fern_02",
+      "source": "polyhaven"
     },
     {
       "id": "flower_empodium",
@@ -722,7 +832,12 @@
       "length_m": 1.322,
       "depth_m": 0.283,
       "height_m": 0.268,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Jenelle van Heerden, Rico Cilliers",
+      "source_url": "https://polyhaven.com/a/flower_empodium",
+      "source": "polyhaven"
     },
     {
       "id": "weed_plant_02",
@@ -750,7 +865,12 @@
       "length_m": 2.118,
       "depth_m": 0.286,
       "height_m": 0.071,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Rob Tuytel, Rico Cilliers",
+      "source_url": "https://polyhaven.com/a/weed_plant_02",
+      "source": "polyhaven"
     },
     {
       "id": "shrub_03",
@@ -778,7 +898,12 @@
       "length_m": 1.367,
       "depth_m": 0.143,
       "height_m": 0.403,
-      "collider": "none"
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "Rico Cilliers",
+      "source_url": "https://polyhaven.com/a/shrub_03",
+      "source": "polyhaven"
     },
     {
       "id": "mustang_boss_429",

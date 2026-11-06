@@ -321,15 +321,15 @@ def test_header_names_the_map_and_its_area(capsys: pytest.CaptureFixture[str]) -
 
 def test_a_stage_summary_drops_paths_and_groups_skips() -> None:
     text = "\n".join([
-        "source:   /Volumes/Personal/Repositorios/Onward/maps/lascondes/data/raw/lascondes.osm (sha256 80498da080b6…, ODbL-1.0)",
+        "source:   /home/tester/onward/maps/lascondes/data/raw/lascondes.osm (sha256 80498da080b6…, ODbL-1.0)",
         "frame:    EPSG:32719, origin -70.5638000, -33.4039900",
         "kept:     35  dropped: 32  rejected: 0",
-        "written:  /Volumes/Personal/Repositorios/Onward/maps/lascondes/data/processed/geo/geo_scene.json",
+        "written:  /home/tester/onward/maps/lascondes/data/processed/geo/geo_scene.json",
         "materials apply: applied=10 skipped=6 brick_nodes=0 cobble=False",
         "  skip plaster_ochre_wall: color_id_not_used",
         "  skip tree_bark: color_id_not_used",
         "  WARNING project: the adapter has not passed the Quest acceptance test yet",
-        "package lascondes_b31e46f683 written to /Volumes/Personal/Repositorios/Onward/maps/lascondes/data/processed/export/pkg_01",
+        "package lascondes_b31e46f683 written to /home/tester/onward/maps/lascondes/data/processed/export/pkg_01",
         "  adapter onward_unity 0.1.0 (device_verified: False)",
     ])
     summary = _stage_summary(text)
@@ -348,7 +348,7 @@ def test_unity_summary_keeps_the_result_and_drops_the_file_listing() -> None:
     text = "\n".join([
         "already applied",
         "[export] copied OnwardMapAdapter.cs and listing thumbnail into the project",
-        "[export] step 'scene' -> /Users/frandbf/Library/Logs/onward-export/lascondes-scene.log",
+        "[export] step 'scene' -> /home/tester/.local/state/onward-generator/lascondes-scene.log",
         "[OnwardAdapter] Package lascondes: 5 files verified (manifest sha256 abc)",
         "[OnwardAdapter] Navigation spacing 5.8 m, attempt 1: 445 nodes, depth 43, one-way 1147, dropped 0.",
         "[OnwardAdapter] Route_30 dropped: fewer than 2 points on a walkable path.",

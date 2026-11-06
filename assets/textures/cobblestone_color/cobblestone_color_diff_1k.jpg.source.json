@@ -14,7 +14,7 @@
   "map": "Diffuse",
   "resolution": "1k",
   "format": "jpg",
-  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/cobblestone_color/cobblestone_color_diff_1k.jpg",
+  "path": "assets/textures/cobblestone_color/cobblestone_color_diff_1k.jpg",
   "retrieved_at": "2026-10-19T12:22:58+00:00",
   "user_agent": "murcia-generator/0.1.0 (local research tool)"
 }

@@ -130,17 +130,26 @@ def test_cc0_model_is_normalized_and_listed(tmp_path: Path, one_asset: None) -> 
     manifest = json.loads((tmp_path / "library" / "manifest.json").read_text(encoding="utf-8"))
     assert [asset["id"] for asset in manifest["assets"]] == ["test_crate"]
     assert manifest["assets"][0]["collider"] == "none"
+    assert {key: manifest["assets"][0][key] for key in ("license", "license_url", "author", "source_url", "source")} == {
+        "license": "CC0-1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "author": "Someone",
+        "source_url": "https://polyhaven.com/a/test_crate",
+        "source": "polyhaven",
+    }
     assert json.loads((tmp_path / "inventory.json").read_text(encoding="utf-8")) == document
 
 
 def test_second_run_reuses_the_download(tmp_path: Path, one_asset: None) -> None:
-    info = {"name": "Crate", "polycount": 12}
+    info = {"name": "Crate", "polycount": 12, "authors": {"Rob Tuytel": "All", "Rico Cilliers": "Model"}}
     _run(tmp_path, FakeGet(_responses(info)))
     get = FakeGet({LICENSE_URL: (200, b"CC0")})
     document = _run(tmp_path, get)
     assert get.calls == [LICENSE_URL]
     assert document["assets"][0]["import_status"] == "normalized"
     assert "Reused the download" in document["assets"][0]["license_evidence"]
+    [prefab] = json.loads((tmp_path / "library" / "manifest.json").read_text(encoding="utf-8"))["assets"]
+    assert (prefab["license"], prefab["author"], prefab["source"]) == ("CC0-1.0", "Rob Tuytel, Rico Cilliers", "polyhaven")
 
 
 def test_non_cc0_model_is_refused_before_the_mesh(tmp_path: Path, one_asset: None) -> None:

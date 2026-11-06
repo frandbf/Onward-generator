@@ -2,6 +2,8 @@
 
 Tileable textures go to assets/textures. Kenney GLBs go to assets/kenney.
 Albedo only. Normals, roughness and displacement stay in Downloads.
+The source folders default to ~/Downloads/texturas and ~/Downloads/objetos;
+set ONWARD_TEXTURES_DIR or ONWARD_OBJECTS_DIR to read them from elsewhere.
 Kenney buildings are listed and marked so they cannot replace OSM footprints.
 Nothing in the catalogue is bound to a texture plan.
 """
@@ -10,12 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-TEXTURES = Path("/Users/frandbf/Downloads/texturas")
-OBJECTS = Path("/Users/frandbf/Downloads/objetos")
+TEXTURES = Path(os.environ.get("ONWARD_TEXTURES_DIR") or Path.home() / "Downloads" / "texturas")
+OBJECTS = Path(os.environ.get("ONWARD_OBJECTS_DIR") or Path.home() / "Downloads" / "objetos")
 ASSETS = REPO / "assets"
 KENNEY = REPO / "assets" / "kenney"
 CATALOG = REPO / "config" / "dress" / "imported_library.json"

@@ -14,7 +14,7 @@
   "map": "Diffuse",
   "resolution": "1k",
   "format": "jpg",
-  "path": "/Volumes/Personal/Repositorios/Onward/data/raw/textures/white_plaster_02/white_plaster_02_diff_1k.jpg",
+  "path": "assets/textures/white_plaster_02/white_plaster_02_diff_1k.jpg",
   "retrieved_at": "2026-10-19T19:36:19+00:00",
   "user_agent": "onward-generator/0.1.0 (local research tool)"
 }

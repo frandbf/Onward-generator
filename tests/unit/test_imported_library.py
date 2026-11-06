@@ -11,6 +11,8 @@ import pytest
 from onward_generator.overgrow.manifest import LOAD_FIELDS
 
 REPO = Path(__file__).resolve().parents[2]
+# Per-row provenance of a downloaded model. Kenney records its licence in each pack's License.txt instead.
+PROVENANCE = ("license", "license_url", "author", "source_url", "source")
 CATALOG = REPO / "config" / "dress" / "imported_library.json"
 
 
@@ -78,13 +80,13 @@ def test_kenney_manifest_matches_the_normalized_shape_and_the_files() -> None:
     assert document["schema_version"] == normalized["schema_version"]
     assert document["unit"] == "m"
     assert document["collider"] == "none"
-    sample = normalized["assets"][0]
+    sample = [key for key in normalized["assets"][0] if key not in PROVENANCE]
     files = sorted(path.relative_to(REPO / "assets" / "kenney").as_posix() for path in (REPO / "assets" / "kenney").rglob("*.glb"))
     listed = [row["file"] for row in document["assets"]]
     assert sorted(listed) == files
     assert len(listed) == len(set(row["id"] for row in document["assets"]))
     for row in document["assets"]:
-        assert [key for key in row if key not in LOAD_FIELDS] == list(sample)
+        assert [key for key in row if key not in LOAD_FIELDS] == sample
         assert row["use"]
         assert row["collider"] == "none"
         assert (REPO / "assets" / "kenney" / row["file"]).is_file()

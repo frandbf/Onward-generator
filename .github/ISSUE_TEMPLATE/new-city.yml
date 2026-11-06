@@ -1,0 +1,41 @@
+name: A place that fails or looks wrong
+description: The generator fails on a location, or the map it makes looks wrong.
+labels: ["new city"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you. With the coordinates and the command anyone can rebuild the same map, since the same input and seed give the same result.
+  - type: input
+    id: place
+    attributes:
+      label: Place
+      description: Name, latitude and longitude, and radius.
+      placeholder: Rue Mouffetard, 48.84045, 2.34981, radius 100 m
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, what you got, and at which stage (fetch, geo, dress, overgrow, export, headset). Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The end of the output, or the stage log. Remove anything private.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker or local venv, commit (`git rev-parse --short HEAD`), and Unity / SDK version if the export is involved.

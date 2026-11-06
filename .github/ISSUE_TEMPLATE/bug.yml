@@ -1,0 +1,29 @@
+name: Bug
+description: A command fails, crashes or does something it should not, outside a specific place.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected and what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: Commands and inputs, in order.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The error output. Remove tokens and private paths.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker or local venv, commit (`git rev-parse --short HEAD`).
