@@ -322,7 +322,7 @@ The sidewalk and the foot of the facade received grass tufts until 5 November 20
 
 `overgrow fetch` downloads only the models named in the catalogue (CC0, glTF 1k), keeps the original, and writes the albedo GLB. It does not walk `/models/nature`, `/plants`, or `/trees`.
 
-`overgrow library list` shows every catalogue under `assets` and the Sketchfab licence review. `overgrow fetch-sketchfab` downloads only the models that review marks usable and adds them to `assets/normalized`. `overgrow library select --installed --out maps/<id>/config/prop_selection.json` writes every installed id from every `assets/*/manifest.json`. If that file exists, the `next:` from `signs` passes it to `overgrow place`. An id that is not installed is refused. Without a selection, `overgrow place` uses the whole catalogue.
+`overgrow library list` shows every catalogue under `assets` and the Sketchfab licence review. `overgrow fetch-sketchfab` downloads only the models that review marks usable, through the Sketchfab Download API, and adds them to `assets/normalized`. It needs the personal API token from sketchfab.com (Settings > Password & API) in `SKETCHFAB_API_TOKEN`; without it the command stops before any request. The token goes only to `api.sketchfab.com`, never to the signed archive URL, and is not stored. Decision: [ADR-030](decisions/ADR-030-sketchfab-download-api.md). `overgrow library select --installed --out maps/<id>/config/prop_selection.json` writes every installed id from every `assets/*/manifest.json`. If that file exists, the `next:` from `signs` passes it to `overgrow place`. An id that is not installed is refused. Without a selection, `overgrow place` uses the whole catalogue.
 
 | | |
 | --- | --- |
