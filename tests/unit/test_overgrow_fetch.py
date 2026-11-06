@@ -141,7 +141,7 @@ def test_cc0_model_is_normalized_and_listed(tmp_path: Path, one_asset: None) -> 
 
 
 def test_second_run_reuses_the_download(tmp_path: Path, one_asset: None) -> None:
-    info = {"name": "Crate", "polycount": 12}
+    info = {"name": "Crate", "polycount": 12, "authors": {"Rob Tuytel": "All", "Rico Cilliers": "Model"}}
     _run(tmp_path, FakeGet(_responses(info)))
     get = FakeGet({LICENSE_URL: (200, b"CC0")})
     document = _run(tmp_path, get)
@@ -149,7 +149,7 @@ def test_second_run_reuses_the_download(tmp_path: Path, one_asset: None) -> None
     assert document["assets"][0]["import_status"] == "normalized"
     assert "Reused the download" in document["assets"][0]["license_evidence"]
     [prefab] = json.loads((tmp_path / "library" / "manifest.json").read_text(encoding="utf-8"))["assets"]
-    assert (prefab["license"], prefab["author"], prefab["source"]) == ("CC0-1.0", "", "polyhaven")
+    assert (prefab["license"], prefab["author"], prefab["source"]) == ("CC0-1.0", "Rob Tuytel, Rico Cilliers", "polyhaven")
 
 
 def test_non_cc0_model_is_refused_before_the_mesh(tmp_path: Path, one_asset: None) -> None:
