@@ -2,7 +2,7 @@
 
 Thank you for helping. This page covers the development setup, the tests and the quality gates. The working rules for every change, by a person or an agent, are in [AGENTS.md](AGENTS.md): read them first. How the pipeline fits together is [docs/01-pipeline.md](docs/01-pipeline.md).
 
-By sending a contribution you agree that it is licensed like the project: code under the GNU AGPL v3 or later, documentation under CC BY-SA 4.0 ([NOTICE](NOTICE)). A new asset under `assets/` keeps its author's licence, which must be one the catalogue accepts and must be recorded in its manifest.
+By sending a contribution you agree that it is licensed like the project: code under the MIT License, documentation under CC BY 4.0 ([NOTICE](NOTICE)). Small and rough pull requests are welcome: a failing test, a map that looks wrong or a one-line fix is a good start, and the review will help you with the rest. A new asset under `assets/` keeps its author's licence, which must be one the catalogue accepts and must be recorded in its manifest.
 
 ## Environment
 

@@ -1,40 +1,29 @@
 onward-generator
 https://github.com/frandbf/Onward-generator
-Copyright (C) 2026 Francisco de Brito Fontes
+Copyright (c) 2026 Francisco de Brito Fontes
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version. The full text is in LICENSE.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
-
-Additional term under GNU AGPL version 3 section 7(b): if you convey this
-program or a modified version of it, or make a modified version available to
-users over a network, keep this NOTICE and the copyright line above, and give
-the credit "onward-generator, Francisco de Brito Fontes" with a link to the
-repository where the program shows its legal notices. Section 5(a) already
-requires a modified version to say that you changed it and when.
+The code is released under the MIT License (see LICENSE). Its only condition is
+that the copyright line and the licence text stay with every copy.
 
 
-Additional permission under GNU AGPL version 3 section 7
---------------------------------------------------------
+Grow it with us
+---------------
 
-The Unity scripts in tools/unity/ run inside the Unity Editor next to the Onward
-Custom Content SDK, neither of which is free software. As a special exception,
-the copyright holder gives you permission to combine those scripts, and works
-based on them, with the Unity Editor and engine and with the Onward Custom
-Content SDK, and to convey the resulting combination, without those components
-being covered by the GNU AGPL. The scripts themselves, and your changes to
-them, stay under the GNU AGPL. If you modify the scripts, you may extend this
-exception to your version, but you are not obliged to do so; if you do not,
-delete this paragraph from your version.
+These are requests, not licence conditions. They are how the project gets
+better for everyone:
+
+- Send your improvements back. A fix, a new data source, a better facade or a
+  faster bake helps every map. Open a pull request, even a small or rough one:
+  https://github.com/frandbf/Onward-generator/pulls
+- Tell us what you build. Share your map, a video or a bug in the issues:
+  https://github.com/frandbf/Onward-generator/issues
+- Credit the project. In a map description, a video or a fork, a line such as
+  "Made with onward-generator (github.com/frandbf/Onward-generator)" lets other
+  people find it and join in.
 
 
-What is not covered by the GNU AGPL
------------------------------------
+What is not covered by the MIT License
+--------------------------------------
 
 - assets/: every model, texture, font and image keeps the licence of its
   author, recorded in the catalogue's manifest.json, its review file, or the
@@ -43,8 +32,8 @@ What is not covered by the GNU AGPL
   assets/normalized/manifest.json and assets/normalized_review.json.
 - tests/fixtures/: synthetic test data created for this project, CC0-1.0.
 - docs/: the documentation and its images are licensed under Creative Commons
-  Attribution-ShareAlike 4.0 International (CC BY-SA 4.0),
-  https://creativecommons.org/licenses/by-sa/4.0/. Credit "onward-generator,
+  Attribution 4.0 International (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/. Credit "onward-generator,
   Francisco de Brito Fontes" with a link to the repository.
 - Excerpts of the Onward Custom Content SDK v1.15 that the patch scripts search
   for and replace (the OLD_ASSIGN and OLD_BUILD strings, and the parts of

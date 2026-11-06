@@ -160,9 +160,14 @@ Details: [docs/legal/data-sources.md](docs/legal/data-sources.md). This project 
 
 ## License
 
-onward-generator is free software under the [GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later). Use it, study it, change it and share it. If you share a modified version, or let people use one over a network, share its source under the same licence and keep the credit "onward-generator, Francisco de Brito Fontes" with a link to this repository. That is how improvements come back and the project grows.
+onward-generator is free and open source under the [MIT License](LICENSE): use it, change it, ship it, even commercially. Keep the copyright line and the licence with your copy, and that is all the licence asks.
+
+**Grow it with us.** These are requests, not conditions, and they are how the project gets better for everyone:
+
+- **Send your improvements back.** A fix, a data source for your country, a better facade, a faster bake: open a [pull request](https://github.com/frandbf/Onward-generator/pulls), even a small or rough one.
+- **Show what you build.** Share your map, a video or a bug in the [issues](https://github.com/frandbf/Onward-generator/issues).
+- **Credit the project.** A line such as *Made with [onward-generator](https://github.com/frandbf/Onward-generator)* in a map description, a video or a fork helps other people find it and join in.
 
 [NOTICE](NOTICE) has the details:
-- **Unity and the SDK:** an exception lets the Unity scripts run with Unity and the Onward SDK.
-- **Other licences:** the documentation is CC BY-SA 4.0, and `assets/` keeps the licence of each author.
+- **Other licences:** the documentation is CC BY 4.0, and `assets/` keeps the licence of each author.
 - **Maps:** the licence does not cover the maps you generate; their data licences, OpenStreetMap's above all, still apply.
