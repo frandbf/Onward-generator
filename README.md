@@ -4,7 +4,10 @@
 
 Give it a name, a latitude and a longitude. It downloads the real streets and buildings around that point from OpenStreetMap, builds them in 3D with facades, shops, signs and props, and hands the result to Unity and the Onward SDK, which build a map you can upload to your headset and play: Free Roam, Hunt with bots and Uplink.
 
-![From a real-world location to a playable Onward map: location, 3D reconstruction, dressing, gameplay, lighting, ready for Meta Quest](docs/images/pipeline.jpg)
+
+https://github.com/user-attachments/assets/259e6c67-4b65-49d3-bd56-b2356fc652f1
+
+
 
 ## See it in action
 
@@ -148,6 +151,9 @@ The documentation is in English.
 - **Test the project.** Build a map of a street you know with [Try it](#try-it) and tell us how it plays on the headset.
 - **Contribute assets.** 3D models, props and textures join a catalogue under `assets/`, each with its licence recorded ([docs/legal/data-sources.md](docs/legal/data-sources.md), [docs/abandoned-assets.md](docs/abandoned-assets.md)).
 - **Improve the code.** [CONTRIBUTING.md](CONTRIBUTING.md) covers the development setup, the tests and the quality gates; [AGENTS.md](AGENTS.md) holds the working rules for every change. In short: `task ci` runs what CI runs, and a change is ready when `task ci` and `task mutate` pass.
+
+![From a real-world location to a playable Onward map: location, 3D reconstruction, dressing, gameplay, lighting, ready for Meta Quest](docs/images/pipeline.jpg)
+
 
 ## Data and licences
 
