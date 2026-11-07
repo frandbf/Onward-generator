@@ -8,7 +8,9 @@ rotation, so triangle winding is preserved.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import struct
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -234,6 +236,53 @@ def uv_islands(triangles: np.ndarray, count: int) -> np.ndarray:
         np.minimum.at(label, np.maximum(a[differ], b[differ]), np.minimum(a[differ], b[differ]))
 
 
+@dataclass(frozen=True, slots=True)
+class CellPhase:
+    """A UV phase per combine cell for map-wide ground surfaces (plan C1, ADR-009 "Repetition per cell").
+
+    ``cell_m`` is the adapter's combine cell (ADR-005); ``materials`` are the surfaces that take it.
+    """
+
+    cell_m: float
+    materials: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.cell_m) or self.cell_m <= 0:
+            raise ValueError(f"cell phase needs a finite cell size above 0 m, got {self.cell_m!r}")
+
+
+def cell_uv_phase(material: str, cell: tuple[int, int]) -> tuple[float, float]:
+    """A deterministic (u, v) phase in [0, 1] for ``material`` in combine cell ``cell``."""
+    digest = hashlib.sha256(f"cell:{material}:{cell[0]}:{cell[1]}".encode()).digest()
+    return (digest[0] / 255.0, digest[1] / 255.0)
+
+
+def island_cell_phases(vertices: np.ndarray, triangles: np.ndarray, material: str, cell_m: float) -> np.ndarray:
+    """A per-vertex UV phase, constant on each island of ``uv_islands``.
+
+    The island's cell is the adapter's rule (``tiers.combine_cell``): the centre of its plan
+    bounds, on x and -y, floored by ``cell_m``. The shift is rigid per island, so no seam opens
+    inside one.
+    """
+    points = np.asarray(vertices, dtype=np.float64)
+    if len(points) == 0:
+        return np.zeros((0, 2), dtype=np.float64)
+    _, island = np.unique(uv_islands(triangles, len(points)), return_inverse=True)
+    count = int(island.max()) + 1
+    low = np.full((count, 2), np.inf)
+    high = np.full((count, 2), -np.inf)
+    np.minimum.at(low, island, points[:, :2])
+    np.maximum.at(high, island, points[:, :2])
+    phases = np.array([
+        cell_uv_phase(material, (
+            math.floor((float(low[index, 0]) + float(high[index, 0])) / 2 / cell_m),
+            math.floor(-(float(low[index, 1]) + float(high[index, 1])) / 2 / cell_m),
+        ))
+        for index in range(count)
+    ], dtype=np.float64)
+    return phases[island]
+
+
 def recentre_uvs(uvs: np.ndarray, triangles: np.ndarray, runs: np.ndarray | None = None) -> np.ndarray:
     """Subtract ``floor(min)`` per UV island so repeat UVs stay small.
 
@@ -294,8 +343,12 @@ def build_glb(
     roof_uv_materials: Collection[str] | None = None,
     preserve_uvs: bool = False,
     explicit_uv_materials: Collection[str] | None = None,
+    cell_phase: CellPhase | None = None,
 ) -> bytes:
     """``explicit_uv_materials`` keep the UVs stored on their primitives even when they have a repeat image.
+
+    ``cell_phase`` shifts each island of its ground materials by a phase per combine cell, on
+    unplaced nodes without a building ``uv_phase``. None (the default) leaves the bytes as before.
 
     Materials whose repeat images have the same bytes share one glTF image and texture,
     unless that would leave one image: the adapter clamps the image of a one-image GLB
@@ -353,6 +406,8 @@ def build_glb(
                         # Storey-aligned V keeps its ground line; only U takes the building phase.
                         storeys = (runs >= 0) if frame and frame.get("storey_h") else np.zeros(len(uvs), dtype=bool)
                         uvs[~storeys, 1] += float(phase[1])
+                    elif cell_phase is not None and node.matrix is None and prim.material in cell_phase.materials:
+                        uvs += island_cell_phases(prim.mesh.vertices, prim.mesh.triangles, prim.material, cell_phase.cell_m)
                     uvs = recentre_uvs(uvs, prim.mesh.triangles, runs)
                 attributes["TEXCOORD_0"] = builder.add(uvs.astype(np.float32), target=_ARRAY_BUFFER, component=_FLOAT, kind="VEC2")
             elif prim.uvs is not None and len(prim.uvs) == len(prim.mesh.vertices):

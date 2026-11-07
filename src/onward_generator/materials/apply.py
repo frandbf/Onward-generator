@@ -32,7 +32,7 @@ from onward_generator.dress.catalog import MaterialCatalog, load_catalog
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.dress.surfaces import _load_features, _tags_of
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
+from onward_generator.generation.gltf import CellPhase, Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.materials.openings import boarded_png, shop_glass_png, window_png
 from onward_generator.materials.plan import TexturePlan, load_texture_plan
@@ -77,6 +77,9 @@ WALL_COLOR_IDS = frozenset({
 WHITE = (1.0, 1.0, 1.0, 1.0)
 MAX_PHOTO_PX = 1024
 UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "shop_glass", "door_wood"})
+# The map-wide ground surfaces that take a UV phase per combine cell with the "repetition" switch
+# (plan C1, ADR-009 "Repetition per cell"). The open ground and the green keep one phase.
+GROUND_CELL_PHASE_MATERIALS = frozenset({"carriageway", "sidewalk", "pedestrian", "cobblestone_paving"})
 # The see-through panes keep their RGBA images. The contact atlas is opaque.
 ATLAS_SKIP = frozenset({"glass_view", "shop_glass"})
 # Shop interiors (docs/07-detail.md, *Shop interiors*): one library photograph per shared material,
@@ -368,6 +371,15 @@ def _catalog_snapshot(
     return doc
 
 
+def _assert_calm_plan(path: Path) -> None:
+    """Refuse a library plan that binds a roof or paving tile over its limit, before anything is written."""
+    from onward_generator.materials.library_plan import assert_library_entries
+
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if document.get("provider") == "library":
+        assert_library_entries(document, extended=True)
+
+
 def apply_materials(
     base_dir: str | Path,
     out_dir: str | Path,
@@ -384,8 +396,14 @@ def apply_materials(
     facades: str = "trim",
     facade_style: str = AUTO,
     style_table: str | Path | None = None,
+    repetition: bool = False,
+    cell_m: float = 100.0,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
+
+    ``repetition`` (the map.json switch, off by default) refuses a library plan that binds a roof
+    or paving tile over its coarse-contrast limit, shifts the ground surfaces' UVs by a phase per
+    ``cell_m`` combine cell, and adds a ``repetition`` block to the report. Off, nothing changes.
 
     ``facades`` is ``trim`` (the regional trim-sheet atlas, ADR-020) or ``legacy`` (one
     material per facade part). ``facade_style`` names a style of ``style_table``, or
@@ -400,8 +418,11 @@ def apply_materials(
     if out == base:
         raise MaterialsError("output must be a new directory; will not overwrite the base scene")
 
+    cell_phase = CellPhase(float(cell_m), GROUND_CELL_PHASE_MATERIALS) if repetition else None
     catalog = load_catalog(catalog_path)
     plan = load_texture_plan(plan_path, catalog=catalog)
+    if repetition:
+        _assert_calm_plan(plan.path)
     try:
         manifest, _ = read_json_document(base / "scene_detail.json", max_bytes=MAX_SCENE_BYTES)
     except ConfigLoadError as exc:
@@ -509,6 +530,19 @@ def apply_materials(
     shop_tile_m: dict[str, float] = {}
     shop_shared = share_shop_interior_photos(used, photo_tiles, materials, shop_tile_m)
 
+    repetition_block: dict[str, Any] | None = None
+    if cell_phase is not None:
+        from onward_generator.materials.library_plan import repetition_rows
+
+        slots = repetition_rows(applied, {record.asset_id: Path(record.path) for record in records.values()})
+        repetition_block = {
+            "enabled": True,
+            "cell_m": cell_phase.cell_m,
+            "cell_phase_materials": sorted(cell_phase.materials),
+            "slots": slots,
+            "over_limit": sorted({row["asset_id"] for row in slots if row["over_limit"]}),
+        }
+
     after_hashes = _base_hashes(base)
     if after_hashes != before_hashes:
         raise MaterialsError("base scene changed while applying materials; nothing was written")
@@ -535,6 +569,8 @@ def apply_materials(
         },
         "atlas": {"size": built.size, "grid": built.tiles, "tiles": len(built.slots), "note": built.note},
     }
+    if cell_phase is not None:
+        extras["materials"]["repetition"] = {"cell_m": cell_phase.cell_m}
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
     for row in interior_shared:
         tile_m[str(row["color_id"])] = float(row["tile_m"])
@@ -582,7 +618,7 @@ def apply_materials(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
         roof_uv_materials={color_id for color_id in used_ids if material_base(color_id) in roof_ids},
-        explicit_uv_materials=trim.materials,
+        explicit_uv_materials=trim.materials, cell_phase=cell_phase,
     )
     atomic_write_bytes(targets[0], visual)
     if collision.is_file():
@@ -643,6 +679,8 @@ def apply_materials(
         "input_hashes": before_hashes,
         "min_mean_luma": MIN_MEAN_LUMA,
     }
+    if repetition_block is not None:
+        materials_report["repetition"] = repetition_block
     atomic_write_json(targets[5], materials_report)
     if not compare["identical"]:
         raise MaterialsError("materials apply mutated geographic object records; this is a bug")

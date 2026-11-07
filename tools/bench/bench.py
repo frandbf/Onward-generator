@@ -1,6 +1,6 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
-    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report]
+    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -49,7 +49,15 @@ from shapely import box
 from onward_generator.export.package import MANIFEST_FILE, THUMBNAIL_FILE
 from onward_generator.export.thumbnail import THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH
 from onward_generator.gameplay.headline import REPORT_FILE as GAMEPLAY_FILE
-from onward_generator.maps.workspace import MapError, create_map, load_map, store_gameplay_report, store_sources
+from onward_generator.maps.workspace import (
+    MapError,
+    create_map,
+    load_map,
+    refresh_texture_plan,
+    store_gameplay_report,
+    store_repetition,
+    store_sources,
+)
 from onward_generator.next_step import geo_command
 from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import PipelineError, plan_steps, run_steps, source_plan
@@ -301,10 +309,13 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 # ---------------------------------------------------------------------------------------------------- running
 
 
-def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False) -> MapRun:
+def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
+              repetition: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
+    ``repetition`` switches the plan C1 option on in the run copy only and chooses its textures
+    again from the extended pools, so a saved plan with an over-limit roof or paving tile is replaced.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -312,6 +323,9 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     copy_inputs(prepared.inputs, root)
     if gameplay_report:
         store_gameplay_report(root, True)
+    if repetition:
+        store_repetition(root, True)
+        refresh_texture_plan(root)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -522,12 +536,50 @@ def gameplay_metrics(root: Path) -> dict[str, Any] | None:
     return {**metrics, "status": status}
 
 
+def materials_report_path(root: Path) -> Path:
+    return root / "data" / "processed" / "scene_materials" / "materials_report.json"
+
+
+def repetition_metrics(root: Path) -> dict[str, Any] | None:
+    """The plan C1 summary of the map's ``materials_report.json``, or None when it has no ``repetition`` block.
+
+    ``slots_measured`` counts measured slots, ``max_ratio`` is the largest contrast over its limit
+    (4 places), ``over_limit_count`` the slots over their limit. A malformed block is an error.
+    """
+    path = materials_report_path(root)
+    if not path.is_file():
+        return None
+    report = _read_object(path)
+    if "repetition" not in report:
+        return None
+    where = f"{path}: repetition"
+    block = _object(report, "repetition", str(path))
+    slots = block.get("slots")
+    if not isinstance(slots, list) or not all(isinstance(row, dict) for row in slots):
+        raise BenchError(f"{where}.slots must be a list of objects")
+    measured = [row for row in slots if row.get("status") == "measured"]
+    ratios: list[float] = []
+    for row in measured:
+        contrast, limit = row.get("coarse_contrast"), row.get("limit")
+        if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in (contrast, limit)) or not limit:
+            raise BenchError(f"{where}: slot {row.get('slot')!r} needs a number coarse_contrast and limit")
+        ratios.append(float(contrast) / float(limit))
+    return {
+        "slots_measured": len(measured),
+        "max_ratio": round(max(ratios), 4) if ratios else None,
+        "over_limit_count": sum(1 for row in measured if row.get("over_limit") is True),
+    }
+
+
 def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None = None) -> dict[str, Any]:
-    """The comparable figures of one map; ``gameplay`` only when ``root`` holds a gameplay report."""
+    """The comparable figures of one map; ``gameplay`` and ``repetition`` only when ``root`` holds their reports."""
     entry = {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
     gameplay = gameplay_metrics(root) if root is not None else None
     if gameplay is not None:
         entry["gameplay"] = gameplay
+    repetition = repetition_metrics(root) if root is not None else None
+    if repetition is not None:
+        entry["repetition"] = repetition
     return entry
 
 
@@ -634,10 +686,17 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("longest open sight m", "maps", ("gameplay", "longest_open_sight_m")),
     ("cover per 100 m (min stretch)", "maps", ("gameplay", "cover_per_100m_min_stretch")),
     ("contact diff %", "maps", ("gameplay", "contact_diff_pct")),
+    ("repetition slots measured", "maps", ("repetition", "slots_measured")),
+    ("repetition max contrast/limit", "maps", ("repetition", "max_ratio")),
+    ("repetition tiles over limit", "maps", ("repetition", "over_limit_count")),
     ("python s", "timings", ("python_s",)),
     ("setup s", "timings", ("setup_s",)),
     ("unity bake s", "timings", ("unity", "seconds", "scene.bake")),
 )
+
+
+# Rows of an opt-in block are left out of the table when neither report has the block.
+_OPTIONAL_BLOCKS = frozenset({"repetition"})
 
 
 def _value(report: Mapping[str, Any] | None, map_id: str, where: str, keys: tuple[str, ...]) -> Any:
@@ -685,6 +744,8 @@ def compare(old: Mapping[str, Any], new: Mapping[str, Any], *, old_name: str, ne
         for label, where, path in _ROWS:
             before = _value(old if map_id in old_maps else None, map_id, where, path)
             after = _value(new if map_id in new_maps else None, map_id, where, path)
+            if path[0] in _OPTIONAL_BLOCKS and before is None and after is None:
+                continue
             lines.append(f"| {map_id} | {label} | {_cell(before)} | {_cell(after)} | {_delta(before, after)} |")
     return "\n".join(lines) + "\n"
 
@@ -750,7 +811,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
     map_timings: dict[str, dict[str, Any]] = {}
     for item in prepared:
         print(f"bench: {item.ref.id}", flush=True)
-        ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report)
+        ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -771,6 +832,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         gameplay = gameplay_metrics(run_dir / map_id)
         if gameplay is not None:
             entry["gameplay"] = gameplay
+        repetition = repetition_metrics(run_dir / map_id)
+        if repetition is not None:
+            entry["repetition"] = repetition
         timing = report.setdefault("timings", {}).setdefault("maps", {}).setdefault(map_id, {})
         timing["unity"] = unity_timings(package)
     write_report(report, run_dir / REPORT_FILE)
@@ -805,6 +869,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-id", default=None, help="run folder name (default: the UTC time, YYYYMMDDTHHMMSSZ)")
     run.add_argument("--gameplay-report", action="store_true",
                      help="also write gameplay_report.json in each run copy (ADR-032) and add its headline to the report")
+    run.add_argument("--repetition", action="store_true",
+                     help="switch the plan C1 repetition option on in each run copy and add its summary to the report")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

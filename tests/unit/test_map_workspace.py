@@ -538,3 +538,54 @@ def test_gameplay_report_refuses_a_value_that_is_not_a_bool(tmp_path: Path, valu
 def test_store_gameplay_report_needs_a_map(tmp_path: Path) -> None:
     with pytest.raises(MapError, match="not found"):
         store_gameplay_report(tmp_path / "nowhere", True)
+
+
+def test_repetition_is_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import repetition_enabled, store_repetition
+
+    assert repetition_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "repetition" not in load_map(root)
+    assert repetition_enabled(root) is False
+    store_repetition(root, True)
+    assert load_map(root)["repetition"] is True and repetition_enabled(root) is True
+    store_repetition(root, False)
+    assert load_map(root)["repetition"] is False and repetition_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_repetition_refuses_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import repetition_enabled, store_repetition
+
+    root = _atlas_map(tmp_path, repetition=value)
+    with pytest.raises(MapError) as caught:
+        repetition_enabled(root)
+    assert str(caught.value) == f'map.json "repetition" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_repetition(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"repetition" must be true or false, got {value!r}'
+
+
+def test_store_repetition_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_repetition
+
+    with pytest.raises(MapError, match="not found"):
+        store_repetition(tmp_path / "nowhere", True)
+
+
+def test_refresh_with_repetition_picks_calm_roofs_and_paving(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import refresh_texture_plan, store_repetition
+    from onward_generator.materials.library_plan import deterministic_choices, library_rows
+
+    root = _atlas_map(tmp_path)
+    seed = int(load_map(root).get("seed") or 0)
+    rows = library_rows()
+
+    def picks() -> dict[str, str]:
+        plan = json.loads(refresh_texture_plan(root).read_text(encoding="utf-8"))
+        return {row["id"]: row["library_id"] for row in plan["entries"]}
+
+    assert picks() == deterministic_choices(rows, seed)
+    store_repetition(root, True)
+    assert picks() == deterministic_choices(rows, seed, extended=True)
+    assert deterministic_choices(rows, seed, extended=True) != deterministic_choices(rows, seed)

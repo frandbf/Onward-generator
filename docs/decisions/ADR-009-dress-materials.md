@@ -32,3 +32,14 @@ Flat-colour volumes needed textures, better trees, and sidewalk furniture, plus 
 ## Amendment — colour tints (31 October 2026)
 
 [ADR-023](ADR-023-simple-3d-buildings.md) adds tinted copies of catalogue materials (`<base>__tint_<key>`) for OSM `building:colour` and `roof:colour`. `materials apply` and `dress style` give a tint its base's texture, in greyscale under the tint colour, and its base's repeat. No photograph is added.
+
+## Amendment — Repetition per cell (7 November 2026, proposed)
+
+Plan C1 (`docs/plans/2026-11-07-workshop-quality.md`, section 2.1 *Repetición de texturas*). Status: proposed until the headset review.
+
+- **Switch.** `map.json` `"repetition"` (bool, default `false`, any other value refused). With it off the pools, the picks, the plan check and every output are byte for byte as before, because changing a pool changes the deterministic choice for every map.
+- **Calm roofs and paving.** With the switch on, the calm-texture rule of `docs/08-dress.md` (*Calm textures*) also measures roofs (`ROOF_CONTRAST_LIMIT = 0.019`) and paving (`PAVING_CONTRAST_LIMIT = 0.016`), calibrated on the library and a visual review: `acg_roofingtiles012c`, `acg_pavingstones050` and `acg_pavingstones141` leave their pools. The plan choice uses the extended pools, and `materials apply --repetition` refuses a library plan that binds an over-limit image. Doors are not applicable (mapped 0-1 per opening); bark is unmeasured.
+- **Report.** `materials_report.json` gets a `repetition` block with the coarse contrast, limit and verdict of every applied slot, only with the switch on.
+- **Per-cell phase.** The map-wide ground surfaces (`carriageway`, `sidewalk`, `pedestrian`, `cobblestone_paving`) take a hashed UV phase per connected island, keyed on the adapter's combine cell (ADR-005, 100 m default). It is UV only: no vertex, triangle, material, image or draw. The per-building phase on walls (ADR-012) is unchanged.
+- **Rejected.** Splitting ground islands at cell boundaries (adds vertices and seams); new tile variants as extra images (adds images and draws, against ADR-005); enforcing the roof and paving limits by default (would refuse existing plans and move every map's picks).
+- **To confirm on the headset.** No visible grid at the 2 m and 10 m repeats on a long street and a plaza; no visible jump at the 100 m cell boundaries; no repeated blotch on the roofs seen from the elevated spawns; draws and frame rate in views A and B unchanged. Then this amendment moves to accepted, or the limits are corrected.

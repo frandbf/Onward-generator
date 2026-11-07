@@ -258,3 +258,28 @@ def test_detail_command_on_a_budget_map_carries_the_largest_core_and_the_target(
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(MapError, match='core mode must be "budget"'):
         detail_command(scene, heights, base)
+
+
+def test_materials_command_carries_the_repetition_switch(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_repetition
+    from onward_generator.next_step import materials_command
+
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=37.98407, longitude=-1.12863, radius_m=150)
+    dress = root / "data" / "processed" / "scene_dress"
+    off = list(materials_command(dress).argv)
+    assert "--repetition" not in off and "--cell-m" not in off
+    assert off[off.index("--download") + 1] == "--out"
+    store_repetition(root, False)
+    assert list(materials_command(dress).argv) == off
+    store_repetition(root, True)
+    on = list(materials_command(dress).argv)
+    assert on[on.index("--download") + 1 : -2] == ["--repetition", "--cell-m", "100.0"]
+    assert on[:-2] == off[:-2] + ["--repetition", "--cell-m", "100.0"] and on[-2:] == off[-2:]
+    card_path = root / "config" / "export.json"
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    card["build"]["combine_cell_m"] = 50
+    card_path.write_text(json.dumps(card), encoding="utf-8")
+    on = list(materials_command(dress).argv)
+    assert on[on.index("--repetition") : on.index("--repetition") + 3] == ["--repetition", "--cell-m", "50.0"]
+    assert "--repetition" not in materials_command(tmp_path / "loose" / "scene_dress").argv

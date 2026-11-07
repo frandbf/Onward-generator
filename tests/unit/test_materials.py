@@ -704,3 +704,39 @@ def test_scenic_walls_share_a_plaster_photograph(tmp_path: Path) -> None:
     assert {mode for _rgb, mode in tiles.values()} == {"greyscale_modulation"}
     only_ochre: dict[str, tuple[Any, str]] = {}
     assert share_facade_photos({"ochre_facades": ochre}, {"scenic_wall_warm"}, only_ochre)[0]["slot"] == "ochre_facades"
+
+
+def test_cli_passes_the_repetition_switch_and_the_cell(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import __main__ as cli
+
+    seen: list[dict[str, Any]] = []
+
+    def fake(base: str, out: str, **kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs)
+        return {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False,
+                **({"repetition": {"cell_m": kwargs["cell_m"], "slots": [], "over_limit": []}} if kwargs["repetition"] else {})}
+
+    monkeypatch.setattr(cli, "apply_materials", fake)
+    monkeypatch.setattr(cli, "emit", lambda _command: None)
+    args = ["apply", "--base", str(tmp_path / "b"), "--out", str(tmp_path / "o"), "--plan", str(tmp_path / "p.json")]
+    assert cli.main(args) == 0
+    assert cli.main([*args, "--repetition"]) == 0
+    assert cli.main([*args, "--repetition", "--cell-m", "50"]) == 0
+    assert [(row["repetition"], row["cell_m"]) for row in seen] == [(False, 100.0), (True, 100.0), (True, 50.0)]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "ten"])
+def test_cli_refuses_a_cell_that_is_not_a_positive_number(value: str, capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.materials.__main__ import main as materials_main
+
+    assert materials_main(["apply", "--base", "b", "--out", "o", "--repetition", "--cell-m", value]) == 2
+    err = capsys.readouterr().err
+    assert "--cell-m" in err
+    assert ("is not a number of metres" if value == "ten" else "the combine cell must be a finite number of metres above 0") in err
+
+
+def test_cell_metres_accepts_a_small_positive_cell() -> None:
+    from onward_generator.materials.__main__ import cell_metres
+
+    assert cell_metres("0.5") == 0.5
+    assert cell_metres("100") == 100.0

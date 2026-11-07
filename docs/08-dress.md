@@ -90,7 +90,7 @@ The GLB has the same bytes with a cold cache, a warm one, or none. The cache can
 
 ### Calm textures
 
-A tile repeats every few metres on a large floor or facade, so a streak, a blotch or a centred feature becomes a visible grid. A headset test saw the rusted manhole cover baked into `acg_concrete047b` every 2 m along a sidewalk, and plaster stains repeating up a wall. The planner (`materials/library_plan.py`) measures each asphalt, concrete, plaster, brick and rock image before it joins a pool: the image is reduced to 128 px greyscale, blurred with a Gaussian of 4 px (1/32 of the tile), and the standard deviation of the luminance (0–1) is its coarse contrast. Fine grain is blurred away; patches, streaks and covers stay. An image joins the pool only when the coarse contrast is at most its family limit: `COARSE_CONTRAST_LIMIT = 0.012` for asphalt and concrete, `WALL_CONTRAST_LIMIT = 0.025` for plaster, brick and rock, whose mortar and grain read higher without forming a grid. Roofs, paving and doors are not measured.
+A tile repeats every few metres on a large floor or facade, so a streak, a blotch or a centred feature becomes a visible grid. A headset test saw the rusted manhole cover baked into `acg_concrete047b` every 2 m along a sidewalk, and plaster stains repeating up a wall. The planner (`materials/library_plan.py`) measures each asphalt, concrete, plaster, brick and rock image before it joins a pool: the image is reduced to 128 px greyscale, blurred with a Gaussian of 4 px (1/32 of the tile), and the standard deviation of the luminance (0–1) is its coarse contrast. Fine grain is blurred away; patches, streaks and covers stay. An image joins the pool only when the coarse contrast is at most its family limit: `COARSE_CONTRAST_LIMIT = 0.012` for asphalt and concrete, `WALL_CONTRAST_LIMIT = 0.025` for plaster, brick and rock, whose mortar and grain read higher without forming a grid. By default roofs, paving and doors are not measured; the `"repetition"` switch below measures roofs and paving.
 
 | Texture | Coarse contrast | Pool |
 | --- | --- | --- |
@@ -119,6 +119,43 @@ The two Poly Haven plasters were already in `assets/textures/`; they joined the 
 
 The rule applies when a plan is chosen: the deterministic pick and the Ollama reply both use the filtered pools, and a reply that names a dropped image is rejected. It also applies when a plan is loaded: a saved `texture_plan.json` that binds a dropped image is refused by `materials apply`, and the message says to run `map create --name <map> --textures`, which rewrites only that map's texture plan; the next `materials apply` uses it. Before 2026-10-30 such a plan still applied, which is how a map created before the rule kept the repeated cover. The one asphalt slot (`carriageway`) keeps one colour per map.
 
+#### Roofs and paving: the `"repetition"` switch (plan C1)
+
+`map.json` key `"repetition"` (a bool, default `false`; any other value is refused with `MapError`) extends the rule to roofs and paving ([ADR-009](decisions/ADR-009-dress-materials.md), amendment *Repetition per cell*, proposed). With it off, the pools, the deterministic picks, the plan check and every output are as before. With it on:
+
+- `PAVING_CONTRAST_LIMIT = 0.016` and `ROOF_CONTRAST_LIMIT = 0.019` join the table (`EXTENDED_CONTRAST_LIMITS`; `CONTRAST_LIMITS` is unchanged). Paving carries joints and stone grain at a coarser scale than asphalt, and roof tiles carry rows and weathering, so both limits sit between the ground and the wall limits. Every library value is at least 1e-4 away from its limit.
+- `map create --name <map> --textures` (`refresh_texture_plan`) and the Ollama check choose roofs and `streets_plazas` from the extended pools. The pool sizes change, so the extended pick for a seed can differ even when the default pick was calm.
+- `materials apply --repetition` refuses a library plan that binds an over-limit roof or paving image, before it writes anything, with the same `repeats visibly ... map create --name <map> --textures` message.
+- Doors are **not applicable**: `door_wood` is a unit-UV material, each opening is mapped 0-1, so the image never tiles and its coarse contrast says nothing about repetition. Bark has no limit and is reported as **unmeasured**.
+
+| Texture | Coarse contrast | Pool with `"repetition"` |
+| --- | --- | --- |
+| `acg_pavingstones151` | 0.0073 | kept: small even setts |
+| `acg_pavingstones007` | 0.0126 | kept: even diamond pavers |
+| `acg_pavingstones008` | 0.0152 | kept: herringbone, light joints only |
+| `acg_pavingstones050` | 0.0165 | dropped: fan of red and grey setts whose arcs read as a grid |
+| `acg_pavingstones141` | 0.0188 | dropped: large mottled pebbles |
+| `acg_roofingtiles014a` | 0.0109 | kept: even tiles |
+| `acg_roofingtiles014b` | 0.0156 | kept: light weathering |
+| `acg_roofingtiles011b` | 0.0168 | kept: one darker band, faint from the roofs' viewing distance |
+| `acg_roofingtiles011c` | 0.0183 | kept, closest to the limit: lichen spots and a darker band |
+| `acg_roofingtiles012c` | 0.0211 | dropped: dark stains and moss patches that repeat |
+| `kenney_fantasy_door_wood` (and `_frame`, `_handle`, `_window`) | 0.0393 to 0.1305 | not applicable: mapped 0-1 per opening |
+
+With the switch on, `materials_report.json` gets a `repetition` block (written only then, so a report without the switch is byte for byte as before; `schema_version` stays `0.1.0` because the block is optional and additive):
+
+```json
+"repetition": {
+  "enabled": true, "cell_m": 100.0,
+  "cell_phase_materials": ["carriageway", "cobblestone_paving", "pedestrian", "sidewalk"],
+  "slots": [{"slot": "roofs", "color_id": "roof_tile", "asset_id": "acg_roofingtiles011b", "family": "roof",
+             "coarse_contrast": 0.0168, "limit": 0.019, "over_limit": false, "status": "measured"}],
+  "over_limit": []
+}
+```
+
+`slots` has one row per applied plan binding. `status` is `measured`, `unmeasured` (no family limit, e.g. bark) or `not_applicable` (doors). `coarse_contrast` is rounded to 4 places; `over_limit` is decided on the unrounded value, as `is_calm` does. `over_limit` lists the asset ids over their limit; a library plan cannot reach it with the switch on, but a Poly Haven plan is reported, not refused. The visual GLB records `extras.materials.repetition = {"cell_m": ...}`.
+
 Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m, an identical grid smaller than a lane), `sidewalk_concrete` stays 2 m. A `tile_m` change reaches an existing map the next time `dress style` or `materials apply` runs.
 
 ## Texture coordinates
@@ -131,6 +168,7 @@ Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m,
 - **Roofs:** catalogue entries whose `compatible_surfaces` include `roof` use the face plane up to `|n.z| < 0.98`. U runs along the eave and V up the slope, so a 22° hip or gable measures true metres along the slope instead of a top-down projection that is about 8% short. Only roofs get this rule. `cap()` shares vertices across a whole ground or slab surface, which must keep one planar projection.
 - **Windows and doors** (`glass_dark`, `glass_boarded`, `glass_view`, `door_wood` in `materials apply`): each opening fits 0–1.
 - **Per-building phase:** `materials apply` adds the hashed `uv_phase` of each building before the next step. On a street facade whose V follows storeys, only U takes the phase, so the storey lines stay whole.
+- **Per-cell phase** (`"repetition"` switch only, plan C1): the ground surfaces `carriageway`, `sidewalk`, `pedestrian` and `cobblestone_paving` are one node per surface for the whole map, so they have no building phase. With the switch on, `materials apply` shifts each connected UV island of those materials by `cell_uv_phase(material, cell)`: bytes 0 and 1 of `sha256("cell:<material>:<i>:<j>")` divided by 255. The cell is the island's plan-bounds centre on x and -y floored by the combine cell (`build.combine_cell_m` of the export card, 100 m by default), the same rule as the adapter's `tiers.combine_cell`. The shift is rigid per island, before recentring, so no seam opens inside an island; neighbouring islands in different cells that touch without sharing vertices can show a phase jump at their border. An island that spans several cells takes its centre cell, and an island that is the whole network takes one phase: on the bench maps the carriageway is 1 island in Murcia, 13 in Madrid, 4 in Paris and 2 in Krakow; sidewalks are 71, 137, 23 and 5. Splitting islands at the cell boundaries would add vertices and is left out. `ground` and `green`, nodes with a `matrix`, unit-UV openings, roofs and buildings with their own `uv_phase` (ADR-012) are untouched. No vertex, triangle, material, image or draw is added; downstream stages keep the UVs (`preserve_uvs`).
 - **Recentring:** for every connected island of triangles (vertices shared through triangles), `floor(min)` is subtracted from U and V. The fraction of every UV is unchanged, so the texture looks identical with Repeat wrapping, but the values stay within the island's extent plus one repeat instead of reaching hundreds or thousands far from the origin. That keeps the fraction exact if the shader works in half precision. Openings already fit 0–1 and are not shifted. The faces of one street-facade run count as one island, so recentring does not open a seam at its corners.
 
 - **Party walls** (`party_<wall>`, `docs/07-detail.md`): the wall's own image, `tile_m` and colour. Both steps draw the tiles per wall and point the party material at the same texture, so the GLB holds one image for the two; `build_glb` shares a texture between any materials whose images are byte for byte the same. `materials apply` binds the plan to the wall, so a party wall whose wall appears nowhere else still gets the photograph, and an OSM brick building's party walls become `party_brick_red`.
