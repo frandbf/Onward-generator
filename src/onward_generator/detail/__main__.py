@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from onward_generator.contracts import is_schema
+from onward_generator.detail.budget import detail_scene_budget
 from onward_generator.detail.config import DetailConfigError, load_detail_config
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
 from onward_generator.detail.typology import TypologyConfigError, load_typology_config
@@ -21,7 +22,7 @@ from onward_generator.generation.preview import render_rgb, side_by_side
 from onward_generator.generation.scene import GenerationError
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.next_step import dress_command, emit
-from onward_generator.tiers import SCENIC_WALLS
+from onward_generator.tiers import SCENIC_WALLS, check_target, core_square
 
 VISUAL_FILE = "scene_visual.glb"
 COLLISION_FILE = "scene_collision.glb"
@@ -44,6 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-preview", action="store_true", help="skip the before/after comparison images")
     parser.add_argument("--core-radius-m", type=float,
                         help="half-side of the playable core square, metres (ADR-017); buildings outside it are scenic shells")
+    parser.add_argument("--core-target-triangles", type=int,
+                        help="budget mode (ADR-017 amendment): solve the core half-side for this many core visual triangles, "
+                             "1000 to 2000000; --core-radius-m is then the largest half-side")
     parser.add_argument("--places",
                         help="overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)")
     parser.add_argument("--overwrite", action="store_true")
@@ -69,6 +73,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:
         return 0 if exc.code in (0, None) else 2
     try:
+        if args.core_target_triangles is not None:
+            if args.core_radius_m is None:
+                raise DetailError("--core-target-triangles needs --core-radius-m")
+            check_target(args.core_target_triangles)
+            core_square(args.core_radius_m)
         cfg = load_detail_config(args.config)
         typology = load_typology_config(args.typology_config)
         gen_cfg = load_generation_config(args.generation_config)
@@ -82,8 +91,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
-        detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
-                                typology=typology)
+        if args.core_target_triangles is None:
+            detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
+                                    typology=typology)
+        else:
+            detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
+                                           max_half_side_m=args.core_radius_m, places=places, typology=typology)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
@@ -120,6 +133,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"openings={c['openings']} interiors={c['interiors']} urban={c['urban_elements']}")
     print(f"visual_triangles={c['visual_triangles']} (phase 03: {c['visual_triangles_phase03']}) collision_triangles={c['collision_triangles']} "
           f"materials={c['materials']} nodes={c['visual_nodes']} shared_meshes={c['shared_meshes']}")
+    if detailed.core is not None and "target_triangles" in detailed.core:
+        core = detailed.core
+        print(f"core half_side_m={core['half_side_m']:g} target={core['target_triangles']} predicted={core['predicted_triangles']} "
+              f"achieved={core['achieved_triangles']} within_tolerance={core['within_tolerance']}")
     print(f"severity={report['severity']}")
     for path in targets:
         print(f"wrote {path}")

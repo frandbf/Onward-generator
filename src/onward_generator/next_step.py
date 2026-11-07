@@ -153,9 +153,29 @@ def core_radius(start: Path) -> float | None:
     return float(value) if value else None
 
 
-def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None) -> StageCommand:
-    """``detail``, with the map's playable core when ``map.json`` has one, and Overture places when given."""
+def core_budget(start: Path) -> tuple[float, int] | None:
+    """``(max_half_side_m, target_triangles)`` of the budget core of the map that contains ``start``, or None.
+
+    A ``map.json`` ``core`` block of another mode is refused (``MapError``)."""
+    root = map_root(start)
+    if root is None:
+        return None
+    from onward_generator.maps.workspace import core_budget as read_budget
+
+    return read_budget(json.loads((root / "map.json").read_bytes()))
+
+
+def _core_flags(scene: Path) -> tuple[str, ...]:
+    """The core flags of ``detail``: the budget pair on a budget map, the fixed half-side otherwise."""
+    budget = core_budget(scene)
+    if budget is not None:
+        return ("--core-radius-m", f"{budget[0]:g}", "--core-target-triangles", str(budget[1]))
     core = core_radius(scene)
+    return ("--core-radius-m", f"{core:g}") if core is not None else ()
+
+
+def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None) -> StageCommand:
+    """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), and Overture places when given."""
     return invoke(
         "detail",
         "--scene", show(scene),
@@ -163,7 +183,7 @@ def detail_command(scene: Path, heights: Path, base: Path, places: Path | None =
         "--base", show(base),
         *(("--places", show(places)) if places is not None else ()),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
-        *(("--core-radius-m", f"{core:g}") if core is not None else ()),
+        *_core_flags(scene),
     )
 
 

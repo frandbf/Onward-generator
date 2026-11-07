@@ -13,10 +13,12 @@ import hashlib
 import math
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from typing import Any
+from dataclasses import dataclass
+from itertools import pairwise
+from typing import Any, Literal
 
 from shapely import STRtree, box
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.generation.config import Material
@@ -38,6 +40,11 @@ SCENIC_WALLS: Mapping[str, Material] = {
 }
 # Every scenic roof: one roof material of the detail configuration, so it bakes at the roof scale.
 SCENIC_ROOF = "roof_flat_grey"
+# Budget mode (ADR-017 amendment, 7 November 2026): the core half-side solved from a triangle target.
+CORE_BUDGET_MODE = "budget"
+CORE_BUDGET_TOLERANCE = 0.05
+MIN_TARGET_TRIANGLES = 1000
+MAX_TARGET_TRIANGLES = 2_000_000
 
 
 class CoreError(ValueError):
@@ -64,6 +71,182 @@ def building_tier(footprint: BaseGeometry, core: BaseGeometry | None) -> str:
     if core is None or (footprint.intersects(core) and not footprint.touches(core)):
         return CORE
     return SCENIC
+
+
+def check_target(value: object) -> int:
+    """``value`` as a triangle target: an integer from MIN_TARGET_TRIANGLES to MAX_TARGET_TRIANGLES."""
+    if isinstance(value, bool) or not isinstance(value, int) or not MIN_TARGET_TRIANGLES <= value <= MAX_TARGET_TRIANGLES:
+        raise CoreError(f"target_triangles must be an integer from {MIN_TARGET_TRIANGLES} to {MAX_TARGET_TRIANGLES}, got {value!r}")
+    return value
+
+
+def within_tolerance(achieved: int, target: int) -> bool:
+    """True when ``achieved`` is at most CORE_BUDGET_TOLERANCE of ``target`` away from it."""
+    return abs(achieved - target) <= CORE_BUDGET_TOLERANCE * target
+
+
+def _segment_reach(x0: float, y0: float, x1: float, y1: float) -> float:
+    """The smallest ``max(|x|, |y|)`` on a segment. Along it the function is convex and piecewise linear, so
+    its minimum is at an end or where it bends: where x = 0, y = 0, x = y or x = -y."""
+    dx, dy = x1 - x0, y1 - y0
+    ts = [0.0, 1.0]
+    for a, b in ((dx, x0), (dy, y0), (dx - dy, x0 - y0), (dx + dy, x0 + y0)):  # the bend where a t + b = 0
+        if a != 0:
+            t = -b / a
+            if 0.0 < t < 1.0:  # pragma: no mutate: t of 0 or 1 is an end, already in ts
+                ts.append(t)
+    return min(max(abs(x0 + t * dx), abs(y0 + t * dy)) for t in ts)
+
+
+def core_reach(footprint: BaseGeometry) -> float:
+    """The L-infinity distance in local metres from the map centre to ``footprint``, 0 when it holds the centre.
+
+    A polygon footprint is ``core`` (``building_tier``) exactly when its reach is under the core half-side.
+    """
+    if isinstance(footprint, MultiPolygon):
+        return min(core_reach(part) for part in footprint.geoms)
+    if not isinstance(footprint, Polygon) or footprint.is_empty:
+        raise CoreError(f"core_reach needs a polygon footprint, got {footprint.geom_type}")
+    if footprint.covers(Point(0.0, 0.0)):
+        return 0.0
+    rings = [footprint.exterior, *footprint.interiors]
+    return min(_segment_reach(*a, *b) for ring in rings for a, b in pairwise(ring.coords))
+
+
+def core_extent(footprint: BaseGeometry) -> float:
+    """The largest ``max(|x|, |y|)`` of ``footprint`` in local metres: the smallest core half-side that covers it.
+
+    An interior needs the whole footprint inside the core (``detail``), so it starts at this half-side.
+    """
+    if isinstance(footprint, MultiPolygon):
+        return max(core_extent(part) for part in footprint.geoms)
+    if not isinstance(footprint, Polygon) or footprint.is_empty:
+        raise CoreError(f"core_extent needs a polygon footprint, got {footprint.geom_type}")
+    return max(max(abs(x), abs(y)) for x, y in footprint.exterior.coords)
+
+
+def building_costs(objects: Iterable[tuple[Mapping[str, Any], int]]) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    """Visual triangles per building of the ``core`` objects of a detail run, and of their interiors per kind.
+
+    ``objects`` are (record, visual triangles) pairs. A building's cost is every core object whose
+    ``source_ids[0]`` is that building: the building, its ``building_part`` and ``landmark_part`` pieces.
+    Interiors are kept apart by their ``kind`` (``residential`` or ``shop``): each kind has its own
+    triangle budget, and an interior needs its whole footprint inside the core. Records without the
+    core tier (scenic, ground, urban elements) are left out.
+    """
+    costs: Counter[str] = Counter()
+    interiors: dict[str, Counter[str]] = {}
+    for record, triangles in objects:
+        if record.get("tier") != CORE:
+            continue
+        bid = str(record["source_ids"][0])
+        if record.get("type") == "interior":
+            interiors.setdefault(str(record.get("kind", "residential")), Counter())[bid] += triangles
+        else:
+            costs[bid] += triangles
+    return dict(sorted(costs.items())), {kind: dict(sorted(c.items())) for kind, c in sorted(interiors.items())}
+
+
+@dataclass(frozen=True, slots=True)
+class InteriorPool:
+    """Interiors that share one triangle budget: per building, the half-side that covers its footprint and its triangles."""
+
+    limit: int
+    costs: Mapping[str, tuple[float, int]]
+
+
+@dataclass(frozen=True, slots=True)
+class CoreBudget:
+    """The core a triangle target picks: its half-side, the triangles the cost model predicts and the buildings it holds.
+
+    ``clamped`` is ``floor`` when the smallest core (MIN_CORE_HALF_SIDE_M) is already over the target, ``ceiling``
+    when the largest one (``max_half_side_m``) is still under it, and None otherwise.
+    """
+
+    half_side_m: float
+    predicted_triangles: int
+    buildings: tuple[str, ...]
+    clamped: Literal["floor", "ceiling"] | None
+
+
+def _count(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise CoreError(f"{name} must be a non-negative integer, got {value!r}")
+    return value
+
+
+def _metres(name: str, value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        raise CoreError(f"{name} must be a finite non-negative number, got {value!r}")
+    return float(value)
+
+
+def _sweep(halves: Sequence[float], reach: Mapping[str, float], cost: Mapping[str, int], pools: Sequence[InteriorPool]) -> list[int]:
+    """Predicted triangles at each of the ascending ``halves``: every building whose reach is under the
+    half-side, and every interior whose extent is at most it, each pool up to its limit."""
+    buildings = sorted((r, cost.get(bid, 0)) for bid, r in reach.items())
+    rooms = [sorted(extent for extent, _ in p.costs.values()) for p in pools]
+    room_costs = [[t for _, t in sorted(p.costs.values())] for p in pools]
+    at, total = 0, 0
+    at_rooms, room_totals = [0] * len(pools), [0] * len(pools)
+    predicted = []
+    for h in halves:
+        while at < len(buildings) and buildings[at][0] < h:
+            total += buildings[at][1]
+            at += 1
+        for k, extents in enumerate(rooms):
+            while at_rooms[k] < len(extents) and extents[at_rooms[k]] <= h:
+                room_totals[k] += room_costs[k][at_rooms[k]]
+                at_rooms[k] += 1
+        predicted.append(total + sum(min(p.limit, room_totals[k]) for k, p in enumerate(pools)))
+    return predicted
+
+
+def solve_core(reach: Mapping[str, float], cost: Mapping[str, int], target: int, *, max_half_side_m: float,
+               interiors: Sequence[InteriorPool] = ()) -> CoreBudget:
+    """The square core whose predicted triangles come nearest ``target``, buildings taken whole.
+
+    ``reach`` is each building's ``core_reach`` and ``cost`` its triangles (a building without one costs 0).
+    A building is in the core of half-side h when its reach is under h; its interior, from one of the
+    ``interiors`` pools, when its ``core_extent`` is at most h, and each pool adds at most its limit.
+    Under MIN_CORE_HALF_SIDE_M a building is always core; at or past ``max_half_side_m`` it never is.
+    The half-sides tried are MIN_CORE_HALF_SIDE_M, ``max_half_side_m`` and the midpoint between two
+    neighbouring reaches or extents, so no footprint lies on the edge. A tie goes to the smaller core,
+    except under a target the largest core cannot reach: that core is kept, so ``detail`` reuses its run.
+    """
+    if isinstance(target, bool) or not isinstance(target, int) or target < 1:
+        raise CoreError(f"target_triangles must be a positive integer, got {target!r}")
+    if isinstance(max_half_side_m, bool) or not MIN_CORE_HALF_SIDE_M <= max_half_side_m <= MAX_CORE_HALF_SIDE_M:
+        raise CoreError(f"max_half_side_m must be between {MIN_CORE_HALF_SIDE_M:g} and {MAX_CORE_HALF_SIDE_M:g} m, got {max_half_side_m!r}")
+    cap = float(max_half_side_m)
+    for bid, r in reach.items():
+        _metres(f"reach of {bid}", r)
+    for bid, c in cost.items():
+        _count(f"cost of {bid}", c)
+        if bid not in reach:
+            raise CoreError(f"cost of {bid} has no reach")
+    for pool in interiors:
+        _count("interior limit", pool.limit)
+        for bid, (extent, t) in pool.costs.items():
+            _count(f"interior of {bid}", t)
+            if bid not in reach:
+                raise CoreError(f"interior of {bid} has no reach")
+            if _metres(f"extent of {bid}", extent) <= reach[bid]:
+                raise CoreError(f"extent of {bid} must exceed its reach")
+    inside = {bid: float(r) for bid, r in reach.items() if r < cap}  # pragma: no mutate: a reach at the cap is under no half-side tried
+    pools = [InteriorPool(p.limit, {b: v for b, v in p.costs.items() if b in inside}) for p in interiors]
+    values = {MIN_CORE_HALF_SIDE_M, cap, *inside.values(), *(e for p in pools for e, _ in p.costs.values())}
+    edges = sorted(v for v in values if MIN_CORE_HALF_SIDE_M <= v <= cap)  # pragma: no mutate: 50 and the cap are in the set already
+    halves = [MIN_CORE_HALF_SIDE_M, *((a + b) / 2 for a, b in pairwise(edges)), cap]
+    predicted = _sweep(halves, inside, cost, pools)
+    best = min(range(len(halves)), key=lambda k: (abs(predicted[k] - target), k))
+    clamped: Literal["floor", "ceiling"] | None = None
+    if predicted[-1] < target:  # even the largest core is under the target: it is the one kept
+        clamped, best = "ceiling", len(halves) - 1
+    elif predicted[0] > target:
+        clamped = "floor"
+    h = halves[best]
+    return CoreBudget(h, predicted[best], tuple(sorted(bid for bid, r in inside.items() if r < h)), clamped)
 
 
 def scenic_wall(seed: int, building_id: str) -> str:
