@@ -200,8 +200,14 @@ def combine_cell_m(directory: str | Path) -> float:
         return DEFAULT_COMBINE_CELL_M
     import json
 
-    card = json.loads(card_path.read_bytes())
-    value = ((card.get("build") or {}) if isinstance(card, dict) else {}).get("combine_cell_m", 0.0)
+    try:
+        card = json.loads(card_path.read_bytes())
+    except ValueError as exc:  # JSONDecodeError and UnicodeDecodeError
+        raise MapError(f"{card_path}: not valid JSON ({exc})") from exc
+    build = (card.get("build") or {}) if isinstance(card, dict) else {}
+    if not isinstance(build, dict):
+        raise MapError(f"{card_path}: build must be an object, got {build!r}")
+    value = build.get("combine_cell_m", 0.0)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         raise MapError(f"{card_path}: build.combine_cell_m must be a number of metres, got {value!r}")
     return float(value) if value > 0 else DEFAULT_COMBINE_CELL_M

@@ -305,6 +305,35 @@ def test_panoramax_atlas_false_writes_what_no_key_writes(
         assert (plain / name).read_bytes() == (switched / name).read_bytes()
 
 
+@pytest.mark.parametrize("card", [b'{"build": {"combine_cell_m": "100"}}', b'{"build": {"combine_cell_m": 1'])
+def test_panoramax_off_switch_ignores_a_bad_export_card(
+    detail_inputs: tuple[Path, Path, Path],
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+    card: bytes,
+) -> None:
+    block = _block(detail_inputs, tmp_path, monkeypatch)
+    plain = block.root / "data" / "processed" / "scene_panoramax"
+    assert run_apply(block.materials, plain, client=block.client()) == 0
+    card_path = block.root / "config" / "export.json"
+    card_path.write_bytes(card)
+    capsys.readouterr()
+    # Switch off: the cell size is never read, so the stage writes what it wrote with a good card.
+    bad = block.root / "data" / "processed" / "scene_panoramax_bad_card"
+    assert run_apply(block.materials, bad, client=block.client()) == 0
+    for name in ("scene_visual.glb", "panoramax_report.json", "scene_collision.glb"):
+        assert (plain / name).read_bytes() == (bad / name).read_bytes()
+    # Switch on: the card is read and the refusal is a panoramax message, not a traceback.
+    block.set_map(panoramax_atlas=True)
+    capsys.readouterr()
+    refused = block.root / "data" / "processed" / "scene_panoramax_refused"
+    assert run_apply(block.materials, refused, client=block.client()) == 1
+    err = capsys.readouterr().err
+    assert err.startswith(f"panoramax: {card_path}: ")
+    assert not refused.exists()
+
+
 def test_panoramax_atlas_on_trim_facades(
     detail_inputs: tuple[Path, Path, Path],
     tmp_path: Path,

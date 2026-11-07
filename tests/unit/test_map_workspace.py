@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -473,6 +474,24 @@ def test_combine_cell_m_refuses_a_value_that_is_not_metres(tmp_path: Path, value
     card["build"]["combine_cell_m"] = value
     card_path.write_text(json.dumps(card), encoding="utf-8")
     with pytest.raises(MapError, match="combine_cell_m must be a number of metres"):
+        combine_cell_m(root)
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (b'{"build": {"combine_cell_m": 10', "not valid JSON"),
+        (b"\xff\xfe not utf-8", "not valid JSON"),
+        (b'{"build": [100]}', "build must be an object, got \\[100\\]"),
+    ],
+)
+def test_combine_cell_m_refuses_a_card_that_is_not_json_or_has_no_build_object(
+    tmp_path: Path, content: bytes, message: str
+) -> None:
+    root = _atlas_map(tmp_path)
+    card_path = root / "config" / "export.json"
+    card_path.write_bytes(content)
+    with pytest.raises(MapError, match=f"^{re.escape(str(card_path))}: {message}"):
         combine_cell_m(root)
 
 
