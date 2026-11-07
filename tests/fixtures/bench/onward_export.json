@@ -1,0 +1,22 @@
+{
+  "schema": "onward_generator.export_package",
+  "schema_version": "0.1.0",
+  "package_id": "bench_murcia_0123456789",
+  "created_at": "2026-10-18T12:00:00+00:00",
+  "generator_version": "0.1.0",
+  "map": {"id": "bench_murcia", "title": "Bench Murcia", "description": "Synthetic bench fixture around MURCIA_CENTER 37.98407, -1.12863"},
+  "inputs": {
+    "project": {"path": "/work/output/bench/runs/20261107T000000Z/bench_murcia/config/project.json", "sha256": "00"},
+    "export_config": {"path": "/work/output/bench/runs/20261107T000000Z/bench_murcia/config/export.json", "sha256": "11"}
+  },
+  "lightmap_estimate": {"texels_per_m": 10.0, "max_size": 2048, "renderers": 41, "renderers_capped": 0, "texels": 9000000, "texels_by_class": {"wall": 9000000}, "pages_at_least": 3},
+  "tiers": {
+    "cell_m": 25.0,
+    "draws": 50,
+    "core": {"visual_triangles": 1200, "draws": 40},
+    "scenic": {"visual_triangles": 300, "draws": 12},
+    "shared": {"visual_triangles": 0, "draws": 0}
+  },
+  "view_draws": {"cell_m": 25.0, "fov_deg": 110.0, "far_m": 1000.0, "step_m": 25.0, "yaws": 16, "views": 64, "median": 33, "p90": 41, "max": 47, "worst": {"x_m": -25.0, "y_m": 0.0, "yaw_deg": 90.0}},
+  "warnings": []
+}

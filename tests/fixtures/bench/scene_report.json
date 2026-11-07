@@ -1,0 +1,5 @@
+{
+  "package_id": "bench_murcia_0123456789",
+  "lightmap_bake": {"profile": "draft", "lightmapper_requested": "ProgressiveGPU", "lightmapper": "ProgressiveGPU", "fallback": false, "sizes": ["2048x2048"]},
+  "seconds": {"scene": 12.0, "bake": 61.5, "import": 4.04, "total": 73.5, "note": "not a number"}
+}

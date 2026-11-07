@@ -1,0 +1,7 @@
+{
+  "schema": "onward_generator.export_package",
+  "schema_version": "0.1.0",
+  "package_id": "bench_murcia_0123456789",
+  "created_at": "2026-10-18T12:00:00+00:00",
+  "generator_version": "0.1.0",
+  "map": {"id": "bench_murcia", "title": "Bench Murcia", "description": "Synthetic bench fixture aroun
