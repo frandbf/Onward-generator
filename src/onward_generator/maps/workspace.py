@@ -185,6 +185,32 @@ def panoramax_atlas_enabled(directory: str | Path) -> bool:
     return value
 
 
+def gameplay_report_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"gameplay_report": true`` (ADR-032, off by default).
+
+    ``run`` then asks ``perf layout`` for ``gameplay_report.json``. A map without
+    ``map.json`` or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("gameplay_report", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "gameplay_report" must be true or false, got {value!r}')
+    return value
+
+
+def store_gameplay_report(directory: str | Path, enabled: bool) -> None:
+    """Record the gameplay report switch on an existing map (ADR-032)."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"gameplay_report" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["gameplay_report"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 

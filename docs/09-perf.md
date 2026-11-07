@@ -25,6 +25,7 @@ Those numbers are one scene, one route, one player, no bots. A match with player
 | --- | --- |
 | `onward-generator perf measure DIRS [--combine-cell-m …] --out` | Counts nodes, meshes, primitives, triangles, vertices, materials, textures, and lights in `scene_visual.glb` and `scene_collision.glb`, and estimates texture memory (`texture_memory`: every embedded image with mips as RGBA32 and as ASTC 6×6). With `--combine-cell-m`, predicts draw calls if primitives were merged by (cell, material). Offline |
 | `onward-generator perf layout --scene --heights --base --detail --out` | Without `--playable`: the measurement fixture (`perf_layout` 0.1.0). Spawns, Uplink, map quad, and tent. With `--playable`: `gameplay_layout` 0.3.0, the layout of a new map. See [01-pipeline.md](01-pipeline.md) |
+| `onward-generator perf layout … --playable --gameplay-report` | Also writes `gameplay_report.json` beside `--out`: routes between the spawns, overlap, longest open sightline, cover per 25 m stretch and the teams' times to the Uplink, estimated on the 2D navmesh. A report only, off by default ([ADR-032](decisions/ADR-032-gameplay-metrics.md), [Gameplay metrics](#gameplay-metrics)) |
 | `onward-generator perf device --csv [--logcat] --label --time-column "Time Stamp" --skip-first-s --until-s [--note] --out` | Per-column statistics (n, mean, min, p05, p50, p95, max) of an OVR Metrics CSV inside a time window, plus load times from `logcat` |
 | `onward-generator perf drawcalls LABEL=PATH… --out` | Counts draw calls of each command buffer in `ovrgpuprofiler -t -x=…` traces |
 | `tools/unity/perf_harness/Editor/MurciaPerfBuilder.cs` | Editor tool copied into the phase-0 project. Loads the generator's GLB subset, builds a scene with the SDK prefabs, bakes lighting, and calls the Onward Launcher. Writes `unity_stats.json` |
@@ -158,6 +159,28 @@ Pending (not done; the switch stays off until they pass):
 - [ ] Headset: graphics memory with the per-cell CC BY-SA images beside the 4096 px trim atlas.
 
 Then the ADR-020 amendment goes from proposed to accepted or is corrected. Turning the switch on by default is a separate decision (plan 4.2).
+
+## Gameplay metrics
+
+Plan B4, [ADR-032](decisions/ADR-032-gameplay-metrics.md), a report only and off by default (`perf layout --playable --gameplay-report`, `map.json` `"gameplay_report": true`, `bench.py run --gameplay-report`). With the option off, `task bench -- --offline` (run `20261107T221930Z`) is the same as run `20261107T215608Z` apart from timings (`bench.py check`). With it on, runs `20261107T222047Z` and `20261107T222156Z` are the same as each other apart from timings, every `gameplay_report.json` is byte-identical between them, and every `layout.json` and every package file but `onward_export.json` is byte-identical to the option-off run (the manifest differs only in the run folder paths and the input hashes that already differ between two option-off runs). No package holds the report.
+
+Estimated on the 2D navmesh grid (2 m) and the collision GLB's boxes, Docker on an Apple M4 Pro; not a device or playtest measurement:
+
+| Map | Distinct routes (attackers / _b) | Max overlap | Longest open sightline | Stretches with no cover | Cover per 100 m, median / max | Uplink at 4 m/s, attackers / defenders | Contact difference | Layout stage off → on |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 2 / 2 | 16.9 % | 133.86 m, (90.49, 12.49) → (−25.44, −54.44) | 17 of 38 | 4.0 / 32.0 | 24.73 s / 23.43 s | 5.23 % | 0.7 → 1.1 s |
+| bench_madrid r300, Catastro | 3 / 4 | 43.35 % | 291.21 m, (−131.29, −46.0) → (150.0, 29.37) | 53 of 74 | 0.0 / 24.0 | 22.55 s / 31.98 s | 29.48 % | 2.2 → 3.5 s |
+| bench_paris r50, 40 t/m, no core | 4 / 4 | 32.02 % | 195.2 m, (78.0, −51.63) → (−71.54, 73.84) | 19 of 44 | 4.0 / 9.09 | 12.69 s / 12.78 s | 0.67 % | 0.2 → 0.5 s |
+| bench_krakow r150 | 6 / 6 | 45.46 % | 208.99 m, (89.41, −82.59) → (−100.0, 5.73) | 66 of 118 | 0.0 / 20.0 | 26.02 s / 20.69 s | 20.48 % | 0.6 → 1.5 s |
+
+Against the plan §1 proposals: three or more distinct routes pass on Madrid, Paris and Krakow and fail on Murcia (2: the two pairs' third attempts stay within 8 m of a kept route for more than half its length). The longest open sightline fails everywhere: these are long streets and plazas with no prop within 1.5 m of the sample, seen from a route sample to a building or the wall, and the 60 m proposal is for a sightline a player can be shot along. The contact difference passes on Murcia and Paris and fails on Madrid and Krakow, where one team's nearer block is 21 to 38 m farther from the Uplink. The cover density N is reported, not judged: about half of the 25 m stretches have no cover collider within 1.5 m, and the median stretch has 0 to 4 per 100 m. The report adds 0.3 to 1.3 s to the layout stage.
+
+Pending (not done; the option stays a report until they pass):
+
+- [ ] Playtest (plan 4.2): two or three real matches on a bench map, Hunt and Uplink, comparing the reported routes, open sightlines and first-contact balance with what players feel. It calibrates the §1 thresholds, the 8 m corridor and N.
+- [ ] Headset, on a `bench_murcia` package: stand at the four spawn blocks and at both ends of the longest reported sightline, (90.49, 12.49) and (−25.44, −54.44) in local metres (Unity x, z), and confirm that the open stretches are open ground in the game and that the 2D grid matches the baked navmesh there.
+
+Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check, or acting on it (C6, C7), comes after that.
 
 ## Hunt with bots on a small map
 

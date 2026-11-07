@@ -1,6 +1,6 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
-    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT]
+    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -48,7 +48,8 @@ from shapely import box
 
 from onward_generator.export.package import MANIFEST_FILE, THUMBNAIL_FILE
 from onward_generator.export.thumbnail import THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH
-from onward_generator.maps.workspace import MapError, create_map, load_map, store_sources
+from onward_generator.gameplay.headline import REPORT_FILE as GAMEPLAY_FILE
+from onward_generator.maps.workspace import MapError, create_map, load_map, store_gameplay_report, store_sources
 from onward_generator.next_step import geo_command
 from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import PipelineError, plan_steps, run_steps, source_plan
@@ -300,11 +301,17 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 # ---------------------------------------------------------------------------------------------------- running
 
 
-def bench_map(prepared: Prepared, run_dir: Path, execute: Execute) -> MapRun:
-    """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached."""
+def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False) -> MapRun:
+    """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
+
+    ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
+    The frozen inputs and their digest do not change.
+    """
     ref = prepared.ref
     root = run_dir / ref.id
     copy_inputs(prepared.inputs, root)
+    if gameplay_report:
+        store_gameplay_report(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -482,8 +489,46 @@ def host_info(host_os: str | None, host_gpu: str | None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------------------------------- report
 
 
-def map_entry(ref: ReferenceMap, package: Path, inputs: Path) -> dict[str, Any]:
-    return {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
+GAMEPLAY_KEYS = ("distinct_routes", "max_overlap_pct", "longest_open_sight_m", "cover_per_100m_min_stretch", "contact_diff_pct")
+
+
+def gameplay_path(root: Path) -> Path:
+    return root / "data" / "processed" / "layout" / GAMEPLAY_FILE
+
+
+def gameplay_metrics(root: Path) -> dict[str, Any] | None:
+    """The headline of the map's ``gameplay_report.json`` and its status, or None when the run wrote no report.
+
+    A missing headline key or a value that is not a number or null is an error, never a zero. A null value
+    (a report whose spawns have no path) stays null and reads ``-`` in the comparison.
+    """
+    path = gameplay_path(root)
+    if not path.is_file():
+        return None
+    report = _read_object(path)
+    where = str(path)
+    headline = _object(report, "headline", where)
+    metrics: dict[str, Any] = {}
+    for key in GAMEPLAY_KEYS:
+        if key not in headline:
+            raise BenchError(f"{where}: headline has no {key}")
+        value = headline[key]
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int | float)):
+            raise BenchError(f"{where}: headline.{key} must be a number or null, got {value!r}")
+        metrics[key] = value
+    status = report.get("status")
+    if not isinstance(status, str):
+        raise BenchError(f"{where}: status must be a string, got {status!r}")
+    return {**metrics, "status": status}
+
+
+def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None = None) -> dict[str, Any]:
+    """The comparable figures of one map; ``gameplay`` only when ``root`` holds a gameplay report."""
+    entry = {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
+    gameplay = gameplay_metrics(root) if root is not None else None
+    if gameplay is not None:
+        entry["gameplay"] = gameplay
+    return entry
 
 
 def build_report(
@@ -584,6 +629,11 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("view draws p90", "maps", ("view_draws", "p90")),
     ("view draws max", "maps", ("view_draws", "max")),
     ("lightmap pages", "maps", ("lightmap", "pages_at_least")),
+    ("distinct routes", "maps", ("gameplay", "distinct_routes")),
+    ("max route overlap %", "maps", ("gameplay", "max_overlap_pct")),
+    ("longest open sight m", "maps", ("gameplay", "longest_open_sight_m")),
+    ("cover per 100 m (min stretch)", "maps", ("gameplay", "cover_per_100m_min_stretch")),
+    ("contact diff %", "maps", ("gameplay", "contact_diff_pct")),
     ("python s", "timings", ("python_s",)),
     ("setup s", "timings", ("setup_s",)),
     ("unity bake s", "timings", ("unity", "seconds", "scene.bake")),
@@ -700,8 +750,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
     map_timings: dict[str, dict[str, Any]] = {}
     for item in prepared:
         print(f"bench: {item.ref.id}", flush=True)
-        ran = bench_map(item, run_dir, execute)
-        entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs)
+        ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report)
+        entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
     report = build_report(entries, map_timings, host_info(args.host_os, args.host_gpu))
@@ -718,6 +768,9 @@ def cmd_report(args: argparse.Namespace) -> int:
     for map_id, entry in report["maps"].items():
         package = _package_of(run_dir, map_id)
         entry |= map_metrics(package)
+        gameplay = gameplay_metrics(run_dir / map_id)
+        if gameplay is not None:
+            entry["gameplay"] = gameplay
         timing = report.setdefault("timings", {}).setdefault("maps", {}).setdefault(map_id, {})
         timing["unity"] = unity_timings(package)
     write_report(report, run_dir / REPORT_FILE)
@@ -750,6 +803,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--against", type=Path, help="compare with this report or run folder instead of the previous run")
     run.add_argument("--root", type=Path, default=BENCH_ROOT, help="bench folder (default output/bench)")
     run.add_argument("--run-id", default=None, help="run folder name (default: the UTC time, YYYYMMDDTHHMMSSZ)")
+    run.add_argument("--gameplay-report", action="store_true",
+                     help="also write gameplay_report.json in each run copy (ADR-032) and add its headline to the report")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

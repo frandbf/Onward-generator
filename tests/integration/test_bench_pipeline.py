@@ -41,6 +41,11 @@ def _load() -> ModuleType:
 
 
 bench = _load()
+GAMEPLAY = {
+    "status": "ok",
+    "headline": {"distinct_routes": 3, "max_overlap_pct": 41.5, "longest_open_sight_m": 133.86,
+                 "cover_per_100m_min_stretch": 0.0, "contact_diff_pct": 5.23},
+}
 
 
 class Stub:
@@ -83,6 +88,8 @@ class Stub:
         elif out.suffix:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text("{}")
+            if head == ("perf", "layout") and "--gameplay-report" in argv:
+                (out.parent / "gameplay_report.json").write_text(json.dumps(GAMEPLAY), encoding="utf-8")
         else:
             out.mkdir(parents=True, exist_ok=True)
             (out / "stub.json").write_text("{}")
@@ -274,3 +281,37 @@ def test_real_export_metrics(detail_inputs: tuple[Path, Path, Path], tmp_path: P
     assert counted["visual_triangles"]["total"] == metrics["visual_triangles"]["total"] > 0
     assert counted["visual_triangles"]["core"] == counted["visual_triangles"]["total"]
     assert counted["visual_triangles"]["scenic"] == counted["visual_triangles"]["shared"] == 0
+
+
+def test_gameplay_report_run_adds_the_headline_and_an_off_run_does_not(workdir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    layout = next(argv for argv in off.calls if argv[:2] == ["perf", "layout"])
+    assert "--gameplay-report" not in layout
+    first = json.loads((root / "runs" / "r1" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert "gameplay" not in first["maps"]["bench_murcia"]
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--gameplay-report") == 0
+    layout = next(argv for argv in on.calls if argv[:2] == ["perf", "layout"])
+    assert "--gameplay-report" in layout
+    second = json.loads((root / "runs" / "r2" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert second["maps"]["bench_murcia"]["gameplay"] == {**GAMEPLAY["headline"], "status": "ok"}
+    # The switch lives in the run copy only: the frozen inputs and their digest do not change.
+    assert bench.inputs_sha256(inputs) == digest
+    assert second["maps"]["bench_murcia"]["inputs_sha256"] == first["maps"]["bench_murcia"]["inputs_sha256"]
+    assert "gameplay_report" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert json.loads((root / "runs" / "r2" / "bench_murcia" / "map.json").read_text(encoding="utf-8"))["gameplay_report"] is True
+    assert bench.strip_timings(first)["maps"]["bench_murcia"] == {
+        key: value for key, value in bench.strip_timings(second)["maps"]["bench_murcia"].items() if key != "gameplay"
+    }
+    diff = (root / "runs" / "r2" / bench.DIFF_FILE).read_text(encoding="utf-8")
+    assert "| bench_murcia | distinct routes | - | 3 | - |" in diff
+    assert "| bench_murcia | longest open sight m | - | 133.9 | - |" in diff
+
+    third = Stub()
+    assert _run(root, "r3", third, "--offline") == 0
+    assert bench.main(["check", str(root / "runs" / "r1"), str(root / "runs" / "r3")]) == 0

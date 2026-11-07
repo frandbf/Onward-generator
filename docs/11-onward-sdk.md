@@ -68,6 +68,8 @@ On a map with a playable core (ADR-017) the ground colliders (`collider/walkable
 
 Agent: radius 0.35 m, height 1.8 m, slope 30°, step 0.3 m. A bake from the visual meshes is not used. It would put nodes on the roofs.
 
+The gameplay report (`perf layout --gameplay-report`, [ADR-032](decisions/ADR-032-gameplay-metrics.md)) models this navmesh with a 2 m grid over the same 2D islands (`nav_islands`): crossings baked, footprints cut, furniture not an obstacle, ladders and lifts off it. Its routes, sightlines and times are estimates; this baked navmesh is the real one.
+
 Navigation-map doors (to split a large plaza) are not generated on their own. `AddDoor` requires a real opening of at most 3 m. In an open plaza it builds a degenerate node. Doors are added when an interior has a real opening.
 
 Headset confirmation of a full 32-bot match is still the acceptance checklist. `device_verified` stays false.

@@ -18,9 +18,11 @@ from onward_generator.maps.workspace import (
     combine_cell_m,
     core_budget,
     create_map,
+    gameplay_report_enabled,
     load_map,
     panoramax_atlas_enabled,
     source_enabled,
+    store_gameplay_report,
     store_sources,
 )
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
@@ -511,3 +513,28 @@ def test_combine_cell_m_defaults_to_config_export_json(tmp_path: Path) -> None:
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     (root / "config" / "export.json").write_text(json.dumps({"build": {"combine_cell_m": 40}}), encoding="utf-8")
     assert combine_cell_m(root) == 40.0
+
+
+def test_gameplay_report_is_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    assert gameplay_report_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "gameplay_report" not in load_map(root)
+    assert gameplay_report_enabled(root) is False
+    store_gameplay_report(root, True)
+    assert load_map(root)["gameplay_report"] is True and gameplay_report_enabled(root) is True
+    store_gameplay_report(root, False)
+    assert load_map(root)["gameplay_report"] is False and gameplay_report_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", ["true", 1, 0, None, []])
+def test_gameplay_report_refuses_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    root = _atlas_map(tmp_path, gameplay_report=value)
+    with pytest.raises(MapError, match='"gameplay_report" must be true or false'):
+        gameplay_report_enabled(root)
+    with pytest.raises(MapError, match='"gameplay_report" must be true or false'):
+        store_gameplay_report(root, value)  # type: ignore[arg-type]
+
+
+def test_store_gameplay_report_needs_a_map(tmp_path: Path) -> None:
+    with pytest.raises(MapError, match="not found"):
+        store_gameplay_report(tmp_path / "nowhere", True)
