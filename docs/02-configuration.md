@@ -12,7 +12,7 @@ Exit codes: `0` valid, `1` invalid, `2` usage error.
 
 Validation has three steps:
 
-1. **Strict read** (`config/loader.py`). The file must be `.json`, UTF-8, at most 1 MB, with an object at the root, no duplicate keys, and no `NaN` or `Infinity`.
+1. **Strict read** (`config/loader.py`). The file must be `.json`, UTF-8, at most 1 MB (a scene manifest or a `heights_overrides` file, which the pipeline writes, at most 64 MB), with an object at the root, no duplicate keys, and no `NaN` or `Infinity`.
 2. **Schema.** Unknown fields are refused (`additionalProperties: false`). Types, ranges, and enums are strict. Every error is reported, each with its JSON pointer (`/area/margin_m`).
 3. **Semantic rules** (`config/validation.py`), only after the schema passes:
 
