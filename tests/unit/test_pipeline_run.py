@@ -608,7 +608,7 @@ def test_a_core_target_on_a_map_without_one_is_refused(tmp_path, capsys: pytest.
     before = (root / "map.json").read_bytes()
     assert _run_existing(root, 150_000) == 1
     out = capsys.readouterr().out
-    assert "FAILED plan" in out and "already records no core target" in out and "drop --core-target-triangles" in out
+    assert "FAILED plan" in out and "already records no core target. The budget core is set at map create: drop --core-target-triangles, or use another name.\n" in out
     assert (root / "map.json").read_bytes() == before
 
 

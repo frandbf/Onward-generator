@@ -1124,11 +1124,11 @@ def _same_request(root: Path, map_id: str, latitude: float, longitude: float, ra
 
 
 def _same_core_target(root: Path, target: int) -> None:
-    """Refuse ``--core-target-triangles`` on a map that records another one: the budget core is set at map create."""
-    try:
-        recorded = core_budget(load_map(root))
-    except MapError as exc:
-        raise PipelineError(str(exc)) from exc
+    """Refuse ``--core-target-triangles`` on a map that records another one: the budget core is set at map create.
+
+    Called after ``_same_request``, which has already read and checked ``map.json``.
+    """
+    recorded = core_budget(load_map(root))
     if recorded is None or recorded[1] != target:
         has = f"core target {recorded[1]}" if recorded else "no core target"
         raise PipelineError(
