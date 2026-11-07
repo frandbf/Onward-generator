@@ -21,6 +21,7 @@ from pathlib import Path
 
 from onward_generator.maps.workspace import (
     MapError,
+    core_budget,
     load_map,
     map_directory,
     map_storm,
@@ -878,6 +879,8 @@ def run_map(
         header(root)
         try:
             _same_request(root, map_id, latitude, longitude, radius_m, margin_m)
+            if core_target_triangles is not None:
+                _same_core_target(root, core_target_triangles)
             if brief is not None or ambient_ai:
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
             if panoramax:
@@ -1117,6 +1120,20 @@ def _same_request(root: Path, map_id: str, latitude: float, longitude: float, ra
         raise PipelineError(
             f"{root} already records {', '.join(mismatches)}. "
             "Use the same centre, radius and margin, or another name."
+        )
+
+
+def _same_core_target(root: Path, target: int) -> None:
+    """Refuse ``--core-target-triangles`` on a map that records another one: the budget core is set at map create."""
+    try:
+        recorded = core_budget(load_map(root))
+    except MapError as exc:
+        raise PipelineError(str(exc)) from exc
+    if recorded is None or recorded[1] != target:
+        has = f"core target {recorded[1]}" if recorded else "no core target"
+        raise PipelineError(
+            f"{root} already records {has}. The budget core is set at map create: "
+            "drop --core-target-triangles, or use another name."
         )
 
 

@@ -595,6 +595,33 @@ def _ready_map(tmp_path):
     return root
 
 
+def _run_existing(root: Path, target: int) -> int:
+    return run_map(
+        map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+        radius_m=400, margin_m=30, out=str(root), core_target_triangles=target,
+        push=lambda _path: 0, build=lambda _path, _steps: 0,
+    )
+
+
+def test_a_core_target_on_a_map_without_one_is_refused(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _ready_map(tmp_path)
+    before = (root / "map.json").read_bytes()
+    assert _run_existing(root, 150_000) == 1
+    out = capsys.readouterr().out
+    assert "FAILED plan" in out and "already records no core target" in out and "drop --core-target-triangles" in out
+    assert (root / "map.json").read_bytes() == before
+
+
+def test_another_core_target_is_refused_and_the_same_one_runs(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+               radius_m=400, core_target_triangles=150_000)
+    _finish_python_stages(root)
+    assert _run_existing(root, 120_000) == 1
+    assert "already records core target 150000" in capsys.readouterr().out
+    assert "FAILED plan" not in (_run_existing(root, 150_000), capsys.readouterr().out)[1]
+
+
 def test_a_yes_uploads_the_built_package(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _ready_map(tmp_path)
     package = root / "data" / "processed" / "export" / "pkg_01"
