@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -29,6 +29,22 @@ FACADE_USES = ("historic", "institutional", "office", "retail", "industrial", "r
 # a fascia needs FASCIA_CLEAR_M more than its own height above the head.
 FASCIA_GAP_M = 0.05
 FASCIA_CLEAR_M = 0.07
+# Shop furnishing (ADR-031). The catalogues it may read: placement interior, licence recorded CC0 1.0 in
+# docs/legal/data-sources.md. Street overgrow still refuses every interior row (overgrow/library.py).
+FURNISH_CATALOGUES = ("kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop")
+FURNISH_DECOR_CATALOGUE = "kenney_food"
+FURNISH_SLOTS = ("counter", "wall", "decor")
+# Rows that are not furniture: floor, wall, fence and column tiles, a character, a mannequin, and things a player
+# would read as loose clutter on the floor. Refused in any furnishing set.
+FURNISH_EXCLUDED_IDS = frozenset({
+    "kenney_shop_floor", "kenney_shop_floor_wood", "kenney_shop_wall", "kenney_shop_wall_corner",
+    "kenney_shop_wall_door_rotate", "kenney_shop_wall_window", "kenney_shop_fence", "kenney_shop_fence_door_rotate",
+    "kenney_shop_column", "kenney_shop_character_employee", "kenney_shop_mannequin", "kenney_shop_shopping_basket",
+    "kenney_shop_shopping_cart", "kenney_shop_hand_truck",
+})
+# The deepest piece a slot takes, across the wall it stands against, after its turn. A deeper piece is refused at load.
+MAX_WALL_DEPTH_M = 0.8
+MAX_COUNTER_DEPTH_M = 1.0
 
 
 class DetailConfigError(ValueError):
@@ -156,6 +172,48 @@ class ShopCategory:
 
 
 @dataclass(frozen=True, slots=True)
+class FurnishEntry:
+    """One catalogue row a furnishing set may place, and the quarter turn applied to it before it is set against a wall."""
+
+    id: str
+    turn_deg: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class FurnishSet:
+    """The rows of one shop category: one counter, wall pieces, and small decor on the counter top."""
+
+    counter: tuple[FurnishEntry, ...]
+    wall: tuple[FurnishEntry, ...]
+    decor: tuple[FurnishEntry, ...]
+
+    def slot(self, name: str) -> tuple[FurnishEntry, ...]:
+        return {"counter": self.counter, "wall": self.wall, "decor": self.decor}[name]
+
+
+@dataclass(frozen=True, slots=True)
+class ShopFurnish:
+    """Catalogue furniture in the shop rooms (ADR-031). Off by default; an absent block is off."""
+
+    enabled: bool = False
+    max_triangles: int = 12000
+    max_collision_triangles: int = 1200
+    max_pieces_per_room: int = 8
+    max_assets: int = 16
+    walk_width_m: float = 1.2
+    wall_gap_m: float = 0.03
+    piece_gap_m: float = 0.1
+    pane_clear_m: float = 0.15
+    head_clear_m: float = 0.1
+    catalogues: tuple[str, ...] = FURNISH_CATALOGUES
+    sets: Mapping[str, FurnishSet] = MappingProxyType({})
+
+    def set_for(self, category: str) -> FurnishSet:
+        """The set of ``category``, else the ``generic`` one."""
+        return self.sets.get(category) or self.sets["generic"]
+
+
+@dataclass(frozen=True, slots=True)
 class ShopInteriors:
     """One-storey interiors behind shopfronts, with their own triangle budget and a small fixed palette."""
 
@@ -168,6 +226,7 @@ class ShopInteriors:
     min_room_area_m2: float
     categories: tuple[ShopCategory, ...]
     generic: ShopCategory
+    furnish: ShopFurnish = ShopFurnish()
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,7 +379,79 @@ def _shop_interiors(d: Mapping[str, Any]) -> ShopInteriors:
     )
     generic = ShopCategory("generic", MappingProxyType({}), d["generic"]["wall"], d["generic"]["floor"])
     return ShopInteriors(bool(d["enabled"]), int(d["max_triangles"]), int(d["max_collision_triangles"]), float(d["max_area_m2"]),
-                         float(d["band_depth_m"]), float(d["min_room_area_m2"]), categories, generic)
+                         float(d["band_depth_m"]), float(d["min_room_area_m2"]), categories, generic, _shop_furnish(d.get("furnish")))
+
+
+def _furnish_entry(item: str | Mapping[str, Any]) -> FurnishEntry:
+    if isinstance(item, str):
+        return FurnishEntry(item)
+    return FurnishEntry(str(item["id"]), int(item.get("turn_deg", 0)))
+
+
+def _shop_furnish(d: Mapping[str, Any] | None) -> ShopFurnish:
+    """The ``interiors.shops.furnish`` block. Absent, furnishing is off."""
+    if d is None:
+        return ShopFurnish()
+    sets = {
+        name: FurnishSet(*(tuple(_furnish_entry(item) for item in block[slot]) for slot in FURNISH_SLOTS))
+        for name, block in sorted(d["sets"].items())
+    }
+    return ShopFurnish(
+        enabled=bool(d["enabled"]),
+        max_triangles=int(d["max_triangles"]),
+        max_collision_triangles=int(d["max_collision_triangles"]),
+        max_pieces_per_room=int(d["max_pieces_per_room"]),
+        max_assets=int(d["max_assets"]),
+        walk_width_m=float(d["walk_width_m"]),
+        wall_gap_m=float(d["wall_gap_m"]),
+        piece_gap_m=float(d["piece_gap_m"]),
+        pane_clear_m=float(d["pane_clear_m"]),
+        head_clear_m=float(d["head_clear_m"]),
+        catalogues=tuple(sorted(d["catalogues"])),
+        sets=MappingProxyType(sets),
+    )
+
+
+def furnish_problems(furnish: ShopFurnish, categories: Sequence[str], assets: Path) -> list[str]:
+    """Why an enabled furnishing block cannot load: a set key that is no category, or a row that is not a piece of furniture.
+
+    Each row must be in ``catalogues`` (the allow-listed CC0 interior catalogues under ``assets``), have
+    ``placement: interior``, not be a tile, a character or loose clutter (``FURNISH_EXCLUDED_IDS``), and not be
+    deeper than its slot allows after its turn. Decor comes from ``kenney_food`` only. Reads the manifests, never a GLB.
+    """
+    where = "/interiors/shops/furnish"
+    problems = [f"{where}/sets: {name!r} is not a shop category or 'generic'" for name in furnish.sets
+                if name not in categories and name != "generic"]  # the schema requires the generic set
+    rows: dict[str, tuple[str, Mapping[str, Any]]] = {}
+    for catalogue in furnish.catalogues:
+        try:
+            manifest = json.loads((assets / catalogue / "manifest.json").read_text(encoding="utf-8"))  # pragma: no mutate: the image's locale is UTF-8, so its default decodes the same bytes; the argument pins it on other hosts
+        except (OSError, json.JSONDecodeError):
+            problems.append(f"{where}/catalogues: {catalogue!r} has no readable manifest under {assets}")
+            continue
+        for row in manifest.get("assets") or []:
+            if isinstance(row, Mapping) and row.get("id"):
+                rows[str(row["id"])] = (catalogue, row)
+    for name, chosen in furnish.sets.items():
+        for slot in FURNISH_SLOTS:
+            for entry in chosen.slot(slot):
+                problems.extend(f"{where}/sets/{name}/{slot}: {entry.id!r} {why}" for why in _entry_problems(entry, slot, rows.get(entry.id)))
+    return problems
+
+
+def _entry_problems(entry: FurnishEntry, slot: str, found: tuple[str, Mapping[str, Any]] | None) -> list[str]:
+    if found is None:
+        return ["is not a row of an allowed catalogue"]
+    catalogue, row = found
+    if entry.id in FURNISH_EXCLUDED_IDS:
+        return ["is a tile, a character or loose clutter, not furniture"]
+    if row.get("placement") != "interior":
+        return [f"has placement {row.get('placement')!r}, not 'interior'"]
+    if slot == "decor":
+        return [] if catalogue == FURNISH_DECOR_CATALOGUE else [f"is decor outside {FURNISH_DECOR_CATALOGUE}"]
+    depth = float(row["length_m"] if entry.turn_deg % 180 else row["depth_m"])
+    limit = MAX_COUNTER_DEPTH_M if slot == "counter" else MAX_WALL_DEPTH_M
+    return [] if depth <= limit else [f"is {depth:g} m deep, more than {limit:g} m for a {slot} piece"]
 
 
 def _template(name: str, d: Mapping[str, Any]) -> Template:
@@ -478,6 +609,9 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
         sha256=sha256,
     )
     problems = _semantic(cfg)
+    furnish = cfg.interiors.shops.furnish
+    if furnish.enabled:  # a default load never reads assets/
+        problems += furnish_problems(furnish, [c.name for c in cfg.interiors.shops.categories], REPO_ROOT / "assets")
     if problems:
         raise DetailConfigError(path or "<document>", problems)
     return cfg

@@ -1,0 +1,473 @@
+"""Shop furnishing planner (ADR-031): sets by category, wall snap, door and path clearance, budget, colliders.
+
+Local metres. Plan geometry is synthetic; the shop-room fixture is the 24 x 18 m shop of
+``tests/unit/test_shop_rooms.py`` (origin MURCIA_CENTER). Catalogue sizes come from the manifests, so
+these tests read no GLB.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import replace
+
+import pytest
+from shapely import LineString, Point, Polygon, box, unary_union
+from shapely.affinity import rotate
+
+from onward_generator.detail.config import (
+    REPO_ROOT,
+    FurnishEntry,
+    FurnishSet,
+    ShopFurnish,
+    config_from_document,
+)
+from onward_generator.detail.furnish import (
+    COLLIDER_TRIANGLES,
+    FurnishAsset,
+    FurnishBudget,
+    FurnishRoom,
+    Piece,
+    RoomFurnishing,
+    _Planner,
+    footprint_size,
+    free_intervals,
+    furnish_rooms,
+    piece_solid,
+    plan_room,
+    room_edges,
+)
+from onward_generator.detail.interiors import _door_zone, light_anchors, plan_shop_rooms
+from onward_generator.detail.shops import CATASTRO_USE_TAG, shop_category
+from onward_generator.generation.mesh import polygons_of
+from tests.unit.test_shop_rooms import BAKERY, DOC, PHARMACY, SEG, _front, _plan, _shop
+
+ON = json.loads(json.dumps(DOC))
+ON["interiors"]["shops"]["furnish"]["enabled"] = True
+CFG = config_from_document(ON)
+FURNISH = CFG.interiors.shops.furnish
+GAP = FURNISH.wall_gap_m
+
+
+def _manifest_assets() -> dict[str, FurnishAsset]:
+    found = {}
+    for catalogue in FURNISH.catalogues:
+        doc = json.loads((REPO_ROOT / "assets" / catalogue / "manifest.json").read_text(encoding="utf-8"))
+        for row in doc["assets"]:
+            found[row["id"]] = FurnishAsset(row["id"], catalogue, "CC0-1.0", row["role"], row["category"],
+                                            (row["length_m"], row["depth_m"], row["height_m"]), row["triangles"], "0" * 64)
+    return found
+
+
+ASSETS = _manifest_assets()
+
+
+def _asset(asset_id: str, size: tuple[float, float, float], triangles: int = 100, role: str = "shelf") -> FurnishAsset:
+    return FurnishAsset(asset_id, "polyhaven_shop", "CC0-1.0", role, "furniture", size, triangles, "f" * 64)
+
+
+def _furnish(counter=(), wall=(), decor=(), **changes) -> ShopFurnish:
+    sets = {"generic": FurnishSet(tuple(FurnishEntry(i) for i in counter), tuple(FurnishEntry(i) for i in wall),
+                                  tuple(FurnishEntry(i) for i in decor))}
+    return replace(FURNISH, sets=sets, **changes)
+
+
+def _room(polygon: Polygon, door_zone: Polygon | None, **kw) -> FurnishRoom:
+    return FurnishRoom("b/L0", polygon, door_zone, kw.pop("ceiling_m", 3.0), **kw)
+
+
+ROOM = box(0.0, 0.0, 6.0, 4.0)
+DOOR_ZONE = box(3.5, 0.0, 5.3, 1.5)  # a 1.2 m door at x 3.8..5.0 on the street wall y = 0
+WINDOW = Polygon([(0.5, 0.0), (2.0, 0.0), (2.0, 0.001), (0.5, 0.001)])
+
+
+def _plan_default(room: FurnishRoom, seed: int = 48152, building: str = "b", catalogue=None, furnish=FURNISH) -> RoomFurnishing:
+    result = plan_room(room, furnish, catalogue or ASSETS, seed, building)
+    assert isinstance(result, RoomFurnishing), result
+    return result
+
+
+def _floor(result: RoomFurnishing) -> list[Piece]:
+    return [p for p in result.pieces if p.slot != "decor"]
+
+
+@pytest.mark.parametrize("slot", ["counter", "wall", "decor"])
+@pytest.mark.parametrize(("tags", "category"), [
+    ({"shop": "bakery"}, "bakery"), ({"amenity": "pharmacy"}, "pharmacy"), ({"amenity": "cafe"}, "bar"),
+    ({"shop": "clothes"}, "generic"), ({CATASTRO_USE_TAG: "C"}, "generic"),
+])
+def test_each_category_picks_only_from_its_own_set(tags: dict[str, str], category: str, slot: str) -> None:
+    chosen = shop_category([tags], CFG).name
+    assert chosen == category
+    room = _room(box(0.0, 0.0, 10.0, 8.0), box(3.0, 0.0, 4.8, 1.5), category=chosen,
+                 display=(Polygon([(6.0, 0.0), (9.0, 0.0), (9.0, 1e-3), (6.0, 1e-3)]).exterior,))
+    result = _plan_default(room)
+    allowed = {entry.id for entry in FURNISH.set_for(category).slot(slot)}
+    used = {p.asset.asset_id for p in result.pieces if p.slot == slot}
+    assert used <= allowed
+    assert result.category == category
+    if slot != "decor" or allowed:
+        assert used, f"no {slot} piece in a 10 x 8 m {category} room"
+
+
+def _wall_of(piece: Piece, polygon: Polygon) -> tuple[float, float]:
+    """Distance from the piece's footprint to the nearest wall, and |cos| between its facing and that wall."""
+    facing = (math.sin(math.radians(piece.yaw_deg)), -math.cos(math.radians(piece.yaw_deg)))  # the model's -Y, turned
+    depth = footprint_size(piece.asset, piece.turn_deg)[1]
+    back = Point(piece.centre[0] - facing[0] * depth / 2, piece.centre[1] - facing[1] * depth / 2)
+    ring = list(polygon.exterior.coords)
+    wall = min((LineString([ring[k], ring[k + 1]]) for k in range(len(ring) - 1)), key=back.distance)
+    (ax, ay), (bx, by) = wall.coords
+    ux, uy = (bx - ax) / wall.length, (by - ay) / wall.length
+    return back.distance(wall), abs(facing[0] * ux + facing[1] * uy)
+
+
+@pytest.mark.parametrize("turn", [0.0, 37.0])
+def test_wall_pieces_stand_back_to_the_wall_a_wall_gap_off_it(turn: float) -> None:
+    polygon = rotate(ROOM, turn, origin=(0, 0))
+    zone = rotate(DOOR_ZONE, turn, origin=(0, 0))
+    result = _plan_default(_room(polygon, zone))
+    assert len(result.pieces) == FURNISH.max_pieces_per_room
+    for piece in _floor(result):
+        distance, cosine = _wall_of(piece, polygon)
+        assert distance == pytest.approx(GAP, abs=1e-6)
+        assert cosine == pytest.approx(0.0, abs=1e-6)  # it faces straight into the room
+        assert polygon.buffer(-GAP + 1e-9).contains(piece.footprint)
+    gaps = [a.footprint.distance(b.footprint) for i, a in enumerate(_floor(result)) for b in _floor(result)[i + 1:]]
+    assert min(gaps) >= FURNISH.piece_gap_m - 1e-6
+    assert any(g == pytest.approx(FURNISH.piece_gap_m, abs=1e-6) for g in gaps)
+
+
+def test_the_same_layout_in_a_room_turned_by_37_degrees() -> None:
+    flat = _plan_default(_room(ROOM, DOOR_ZONE))
+    turned = _plan_default(_room(rotate(ROOM, 37.0, origin=(0, 0)), rotate(DOOR_ZONE, 37.0, origin=(0, 0))))
+    assert [p.asset.asset_id for p in flat.pieces] == [p.asset.asset_id for p in turned.pieces]
+    c, s = math.cos(math.radians(37.0)), math.sin(math.radians(37.0))
+    for a, b in zip(flat.pieces, turned.pieces, strict=True):
+        assert b.centre == pytest.approx((a.centre[0] * c - a.centre[1] * s, a.centre[0] * s + a.centre[1] * c), abs=1e-6)
+        assert (b.yaw_deg - a.yaw_deg) % 360.0 == pytest.approx(37.0, abs=1e-6)
+
+
+NARROW = box(0.0, 0.0, 8.0, 2.6)
+WEST_DOOR = box(0.0, 0.4, 1.5, 2.2)  # a 1.2 m door in the west wall
+
+
+def _walk_ok(polygon: Polygon, result: RoomFurnishing, zone: Polygon, width: float) -> bool:
+    walk = polygon.difference(result.floor_footprints).buffer(-width / 2)
+    parts = [p for p in polygons_of(walk) if p.area > 1e-6]
+    return len(parts) == 1 and parts[0].intersects(zone)
+
+
+def test_a_far_wall_shelf_that_would_leave_1_1_m_is_refused() -> None:
+    deep = _asset("deep", (1.5, 0.72, 2.0))  # two facing it leave 2.6 - 2 x 0.75 = 1.1 m
+    result = _plan_default(_room(NARROW, WEST_DOOR), catalogue={"deep": deep}, furnish=_furnish(wall=["deep"], max_pieces_per_room=12))
+    assert "blocks_path" in result.refusals
+    assert _walk_ok(NARROW, result, WEST_DOOR, FURNISH.walk_width_m)
+    ys = [p.footprint.bounds for p in result.pieces]
+    low = [b for b in ys if b[1] < 1.0]
+    high = [b for b in ys if b[1] > 1.0]
+    assert low and high
+    assert not any(a[0] < b[2] and b[0] < a[2] for a in low for b in high)  # no two face each other across 1.1 m
+
+
+@pytest.mark.parametrize(("corridor", "furnished"), [(1.21, True), (1.19, False)])
+def test_the_corridor_beside_a_piece_must_stay_1_2_m(corridor: float, furnished: bool) -> None:
+    width = 2.0
+    depth = width - GAP - corridor
+    piece = _asset("p", (2.0, depth, 1.8))
+    room = _room(box(0.0, 0.0, 6.0, width), box(0.0, 0.1, 1.5, 1.9))
+    result = plan_room(room, _furnish(wall=["p"], max_pieces_per_room=1), {"p": piece}, 48152, "b")
+    if furnished:
+        assert isinstance(result, RoomFurnishing) and len(result.pieces) == 1
+    else:
+        assert result == "blocks_path"
+
+
+def test_no_piece_enters_the_door_zone_beside_a_free_wall() -> None:
+    result = _plan_default(_room(ROOM, DOOR_ZONE), furnish=replace(FURNISH, max_pieces_per_room=24))
+    assert len(result.pieces) > 4
+    assert all(p.footprint.intersection(DOOR_ZONE).area <= 1e-9 for p in result.pieces)
+    assert _walk_ok(ROOM, result, DOOR_ZONE, FURNISH.walk_width_m)
+
+
+def _two_shops():
+    layout_holes = [_front(c) for c in (0, 1, 3, 4, 5)]
+    from onward_generator.detail.facades import Layout
+
+    layout = Layout()
+    layout.holes = layout_holes
+    plan = _plan()
+    shops = [_shop(0, BAKERY), _shop(4, PHARMACY)]
+    rooms = plan_shop_rooms(plan, box(0.0, 0.0, 24.0, 18.0), layout, [SEG], shops, CFG)
+    records = [{"id": f"b/L0{'-' + str(i) if i else ''}", "ceiling_z_m": 3.0} for i in range(len(rooms.rooms))]
+    return rooms, records
+
+
+def test_every_walkable_door_of_a_two_shop_plan_keeps_its_zone_and_the_partition_clear() -> None:
+    plan, records = _two_shops()
+    rooms = furnish_rooms(plan, records, [], CFG.interiors)
+    assert len(rooms) == 2 and all(room.door_zone is not None for room in rooms)
+    inner = box(0.0, 0.0, 24.0, 18.0).buffer(-CFG.interiors.wall_thickness_m, join_style="mitre")
+    partition = inner.difference(unary_union([room.polygon for room in rooms]))
+    assert partition.area > 0
+    for room in rooms:
+        result = _plan_default(room)
+        assert result.category in {"bakery", "pharmacy"}
+        for piece in result.pieces:
+            assert room.polygon.contains(piece.footprint)
+            for other in rooms:
+                assert piece.footprint.intersection(other.door_zone).area <= 1e-9
+            assert piece.footprint.intersection(partition).area <= 1e-9
+
+
+def test_the_counter_stands_on_the_display_wall_or_beside_it() -> None:
+    room = _room(ROOM, DOOR_ZONE, display=(WINDOW.exterior,), panes=(box(0.5, -0.3, 2.0, FURNISH.pane_clear_m),))
+    result = _plan_default(room)
+    counter = next(p for p in result.pieces if p.slot == "counter")
+    walls = {"street": counter.footprint.distance(box(0, -1, 6, 0)), "west": counter.footprint.distance(box(-1, 0, 0, 4)),
+             "east": counter.footprint.distance(box(6, 0, 7, 4))}
+    assert min(walls.values()) == pytest.approx(GAP, abs=1e-6)
+    assert counter.footprint.intersection(DOOR_ZONE).area <= 1e-9
+    assert counter.footprint.intersection(room.panes[0]).area <= 1e-9
+
+
+def test_a_room_with_no_counter_spot_records_it_once_and_keeps_its_wall_pieces() -> None:
+    catalogue = {"long": _asset("long", (9.0, 0.8, 1.0), role="counter"), "shelf": _asset("shelf", (1.0, 0.3, 1.8))}
+    result = _plan_default(_room(ROOM, DOOR_ZONE), catalogue=catalogue, furnish=_furnish(counter=["long"], wall=["shelf"]))
+    assert result.refusals.count("no_counter_spot") == 1
+    assert {p.slot for p in result.pieces} == {"wall"}
+
+
+def test_pieces_never_overlap_and_keep_off_a_courtyard() -> None:
+    courtyard = box(4.0, 4.0, 6.0, 6.0)
+    polygon = box(0.0, 0.0, 10.0, 10.0).difference(courtyard)
+    result = _plan_default(_room(polygon, box(3.0, 0.0, 4.8, 1.5)), furnish=replace(FURNISH, max_pieces_per_room=24))
+    floor = _floor(result)
+    assert any(p.footprint.distance(courtyard) <= GAP + 1e-6 for p in floor)  # the courtyard walls take pieces too
+    for i, a in enumerate(floor):
+        assert a.footprint.intersection(courtyard.buffer(GAP - 1e-6)).area <= 1e-9
+        for b in floor[i + 1:]:
+            assert a.footprint.intersection(b.footprint).area <= 1e-9
+
+
+@pytest.mark.parametrize(("depth", "reason"), [(0.149, "pane_band"), (0.151, None)])
+def test_the_pane_band_boundary(depth: float, reason: str | None) -> None:
+    band = box(1.0, -0.3, 3.0, FURNISH.pane_clear_m)
+    planner = _Planner(_room(ROOM, DOOR_ZONE, panes=(band,)), FURNISH, ASSETS, 48152, "b")
+    assert planner.conflict(box(1.2, depth, 2.0, depth + 0.5)) == reason
+
+
+def test_no_piece_reaches_the_head_clearance() -> None:
+    result = _plan_default(_room(ROOM, DOOR_ZONE, ceiling_m=2.0))
+    assert result.pieces
+    assert all(p.z_m + p.asset.size_m[2] <= 2.0 - FURNISH.head_clear_m + 1e-9 for p in result.pieces)
+
+
+def test_the_piece_count_is_capped_and_a_room_with_no_door_is_unreachable() -> None:
+    big = _room(box(0.0, 0.0, 20.0, 20.0), box(3.0, 0.0, 4.8, 1.5))
+    assert len(_plan_default(big, furnish=replace(FURNISH, max_pieces_per_room=3)).pieces) == 3
+    assert plan_room(_room(ROOM, None), FURNISH, ASSETS, 48152, "b") == "unreachable"
+
+
+def _furnished(triangles: int, solid: int = 0, asset_id: str = "x") -> RoomFurnishing:
+    asset = _asset(asset_id, (1.0, 0.5, 1.0), triangles)
+    pieces = tuple(Piece(asset, "wall", box(0, 0, 1, 0.5), (0.5, 0.25), 0.0, 0.0, 0, k < solid) for k in range(max(solid, 1)))
+    return RoomFurnishing("b/L0", "generic", pieces)
+
+
+def test_the_budget_takes_a_room_that_fits_exactly_and_refuses_one_triangle_more() -> None:
+    budget = FurnishBudget(1000, 1200, 16)
+    budget.used["triangles"] = 600
+    assert budget.refuse(_furnished(400)) is None
+    assert budget.refuse(_furnished(401)) == "triangle_budget: needs 401 triangles, 400 left of shops.furnish.max_triangles 1000"
+    collision = FurnishBudget(100000, 24, 16)
+    assert collision.refuse(_furnished(1, solid=2)) is None
+    assert collision.refuse(_furnished(1, solid=3)) == (
+        "collision_budget: needs 36 collision triangles, 24 left of shops.furnish.max_collision_triangles 24")
+    assert FurnishBudget(0, 1200, 16).refuse(_furnished(1)) is not None
+
+
+def test_the_asset_cap_refuses_a_seventeenth_distinct_asset() -> None:
+    budget = FurnishBudget(100000, 1200, 16)
+    budget.assets = {f"a{k}" for k in range(16)}
+    assert budget.refuse(_furnished(1, asset_id="a3")) is None
+    assert budget.refuse(_furnished(1, asset_id="new")) == "asset_cap: needs 17 distinct assets, 16 allowed by shops.furnish.max_assets"
+    budget.spend(_furnished(5, solid=1, asset_id="a3"))
+    assert budget.used == {"triangles": 5, "collision_triangles": COLLIDER_TRIANGLES}
+
+
+@pytest.mark.parametrize(("size", "solid"), [
+    ((1.0, 0.4, 0.5), True), ((1.0, 0.39, 0.5), False), ((1.0, 0.4, 0.49), False), ((0.4, 2.0, 0.5), True),
+])
+def test_a_piece_gets_a_collider_only_when_it_is_cover_sized(size: tuple[float, float, float], solid: bool) -> None:
+    asset = _asset("p", size, role="room_furniture")
+    assert piece_solid(asset, "wall") is solid
+    assert piece_solid(asset, "decor") is False
+    assert _furnished(1, solid=2).collision_triangles == 2 * COLLIDER_TRIANGLES
+
+
+def test_food_decor_is_never_solid_and_sits_on_the_counter() -> None:
+    room = _room(ROOM, DOOR_ZONE, category="bakery", display=(WINDOW.exterior,))
+    result = _plan_default(room)
+    decor = [p for p in result.pieces if p.slot == "decor"]
+    counter = next(p for p in result.pieces if p.slot == "counter")
+    assert decor and all(not p.solid and p.asset.catalogue == "kenney_food" for p in decor)
+    assert all(counter.footprint.contains(p.footprint) and p.z_m == pytest.approx(counter.asset.size_m[2]) for p in decor)
+
+
+def _record(result: RoomFurnishing) -> str:
+    return json.dumps(result.record("b", 0), sort_keys=True)
+
+
+def test_the_plan_is_deterministic_and_does_not_depend_on_set_or_catalogue_order() -> None:
+    room = _room(ROOM, DOOR_ZONE, category="bar", display=(WINDOW.exterior,))
+    first = _record(_plan_default(room))
+    assert first == _record(_plan_default(room))
+    reversed_sets = {name: FurnishSet(*(tuple(reversed(s.slot(slot))) for slot in ("counter", "wall", "decor")))
+                     for name, s in FURNISH.sets.items()}
+    shuffled = dict(reversed(list(ASSETS.items())))
+    assert _record(_plan_default(room, catalogue=shuffled, furnish=replace(FURNISH, sets=reversed_sets))) == first
+    assert _record(_plan_default(room, seed=7)) != first
+    assert _plan_default(room, building="c").record("b", 0) != json.loads(first)
+
+
+def test_every_piece_records_its_provenance() -> None:
+    record = _plan_default(_room(ROOM, DOOR_ZONE, category="bakery", display=(WINDOW.exterior,))).record("osm-way-1", 3)
+    assert record["attribute_origin"] == "generated" and record["method"] == "shop_furnishing"
+    assert [p["id"] for p in record["pieces"]][:2] == ["furnish/osm-way-1/3", "furnish/osm-way-1/4"]
+    for piece in record["pieces"]:
+        assert piece["slot"] in {"counter", "wall", "decor"}
+        assert piece["attribute_origin"] == "generated" and piece["semantics_origin"] == "estimated"
+        assert piece["licence"] == "CC0-1.0" and piece["catalogue"] in FURNISH.catalogues
+        assert piece["asset_id"] in ASSETS and len(piece["glb_sha256"]) == 64
+        assert set(piece) >= {"position_m", "yaw_deg", "turn_deg", "size_m", "footprint_m", "triangles", "solid"}
+
+
+def test_light_probes_keep_out_of_the_furniture_and_stay_put_without_it() -> None:
+    plan, records = _two_shops()
+    rooms = [dict(r, floor_z_m=0.0) for r in records]
+    before = light_anchors(plan, rooms)
+    assert light_anchors(plan, rooms, furniture=None) == before
+    assert light_anchors(plan, rooms, furniture=Polygon()) == before
+    furniture = unary_union([box(1.0, 0.3, 11.0, 3.0), box(13.0, 0.3, 23.0, 3.0)])
+    after = light_anchors(plan, rooms, furniture=furniture)
+    assert after != before
+    for room in after["rooms"]:
+        probes = room["probes_m"]
+        for k in range(0, len(probes), 3):
+            assert not furniture.contains(Point(probes[k], probes[k + 1]))
+
+
+def test_door_zone_used_is_the_interiors_one() -> None:
+    plan, records = _two_shops()
+    rooms = furnish_rooms(plan, records, [], CFG.interiors)
+    door, seg = plan.rooms[0].entrance
+    assert rooms[0].door_zone.equals(_door_zone(seg, door, CFG.interiors))
+
+
+@pytest.mark.parametrize(("role", "category", "solid"), [
+    ("table", "furniture", True), ("room_furniture", "structures", True), ("shelf", "vegetation", False), ("plant", "furniture", False),
+])
+def test_the_cover_rule_reads_the_role_and_the_category(role: str, category: str, solid: bool) -> None:
+    small, big = (0.2, 0.2, 0.2), (1.0, 1.0, 1.0)
+    asset = FurnishAsset("p", "kenney_furniture", "CC0-1.0", role, category, small if solid else big, 10, "0" * 64)
+    assert piece_solid(asset, "wall") is solid
+
+
+@pytest.mark.parametrize(("turn", "size"), [(0, (1.0, 0.3)), (90, (0.3, 1.0)), (180, (1.0, 0.3)), (270, (0.3, 1.0))])
+def test_a_quarter_turn_swaps_length_and_depth(turn: int, size: tuple[float, float]) -> None:
+    assert footprint_size(_asset("p", (1.0, 0.3, 2.0)), turn) == size
+
+
+def test_room_edges_skip_a_repeated_vertex_keep_short_edges_and_number_the_rings() -> None:
+    outer = [(0.0, 0.0), (0.0, 0.0), (6.0, 0.0), (6.0, 0.5), (6.0, 4.0), (0.0, 4.0)]
+    polygon = Polygon(outer, [[(2.0, 1.0), (2.0, 2.0), (3.0, 2.0), (3.0, 1.0)]])
+    edges = room_edges(polygon)
+    assert [(e.ring, round(e.length, 6)) for e in edges] == [(0, 6.0), (0, 0.5), (0, 3.5), (0, 6.0), (0, 4.0),
+                                                            (1, 1.0), (1, 1.0), (1, 1.0), (1, 1.0)]
+    for edge in edges:
+        assert edge.u[0] * edge.n[1] - edge.u[1] * edge.n[0] == pytest.approx(1.0)  # the room is on the left of every ring
+        assert polygon.contains(Point(*(edge.a + edge.u * edge.length / 2 + edge.n * 0.01)))
+
+
+def test_free_intervals_leave_no_empty_stretch_at_either_end() -> None:
+    edge = room_edges(Polygon([(0.0, 0.0), (6.0, 0.0), (6.0, 4.0), (0.0, 4.0)]))[0]  # (0, 0) to (6, 0)
+    assert free_intervals(edge, 0.5, box(-1.0, -1.0, 7.0, 5.0), 0.03) == [(0.0, 6.0)]
+    assert free_intervals(edge, 0.5, box(1.0, -1.0, 7.0, 5.0), 0.03) == [(1.0, 6.0)]
+    assert free_intervals(edge, 0.5, box(-1.0, -1.0, 5.0, 5.0), 0.03) == [(0.0, 5.0)]
+    assert free_intervals(edge, 0.5, box(-1.0, -1.0, 7.0, 5.0).difference(box(2.0, 0.0, 3.0, 1.0)), 0.03) == [(0.0, 2.0), (3.0, 6.0)]
+
+
+def test_plan_room_says_why_a_room_gets_nothing() -> None:
+    narrow = _room(box(0.0, 0.0, 6.0, 1.0), box(0.0, 0.0, 1.5, 1.0))
+    assert plan_room(narrow, FURNISH, ASSETS, 48152, "b") == "blocks_path"
+    shopfront = _room(ROOM, DOOR_ZONE, display=(WINDOW.exterior,))
+    assert _plan_default(shopfront).pieces[0].slot == "counter"
+    assert plan_room(shopfront, replace(FURNISH, max_pieces_per_room=0), ASSETS, 48152, "b") == "no_free_wall"
+    huge = {"x": _asset("x", (20.0, 0.5, 1.0))}
+    assert plan_room(_room(ROOM, DOOR_ZONE), _furnish(counter=["x"], wall=["x"]), huge, 48152, "b") == "no_free_wall"
+    other = replace(_room(ROOM, DOOR_ZONE, category="butcher"), room_id="b/L0-2")
+    result = _plan_default(other)
+    assert result.room_id == "b/L0-2" and result.category == "generic"
+
+
+def test_furnish_rooms_reads_doors_bands_and_display_spans_of_each_room() -> None:
+    from onward_generator.detail.facades import Hole
+    from onward_generator.detail.interiors import GLASS_VIEW, SHOP_GLASS, InteriorPlan, Room
+
+    t = CFG.interiors.wall_thickness_m
+    door = Hole("interior_door", 0, 9.4, 0.0, 1.2, 2.4, t, None, 2, 0)
+    left, right = box(t, t, 12.0, 18.0 - t), box(12.2, t, 24.0 - t, 18.0 - t)
+    category = CFG.interiors.shops.categories[0]
+    rooms = (Room(left, (door, SEG), category, (0,)), Room(right, None, None, ()))
+    plan = InteriorPlan("b", left, 1, 3.0, door, SEG, (), rooms)
+    front = Hole("shopfront", 0, 0.5, 0.25, 3.0, 2.3, t, SHOP_GLASS, 0, 0)
+    window = Hole("window", 0, 14.0, 0.9, 1.2, 1.4, t, GLASS_VIEW, 3, 0)
+    far = Hole("shopfront", 0, 15.5, 0.25, 3.0, 2.3, t, SHOP_GLASS, 4, 0)
+    records = [{"id": "b/L0", "ceiling_z_m": 3.0}, {"id": "b/L0-1", "ceiling_z_m": 2.8}]
+    a, b = furnish_rooms(plan, records, [(SEG, front), (SEG, window), (SEG, far)], CFG.interiors)
+    pane = FURNISH.pane_clear_m
+    assert (a.room_id, a.ceiling_m, a.category, b.room_id, b.ceiling_m, b.category) == ("b/L0", 3.0, category.name, "b/L0-1", 2.8, "generic")
+    assert [p.bounds for p in a.panes] == [pytest.approx((0.5, 0.0, 3.5, t + pane))]
+    assert [p.bounds for p in b.panes] == [pytest.approx((14.0, 0.0, 15.2, t + pane)), pytest.approx((15.5, 0.0, 18.5, t + pane))]
+    assert [list(s.coords) for s in a.display] == [[(0.5, t), (3.5, t)]]
+    assert [list(s.coords) for s in b.display] == [[(15.5, t), (18.5, t)]]
+    assert list(a.door_span.coords) == [(9.4, t), (10.6, t)] and a.door_zone.equals(_door_zone(SEG, door, CFG.interiors))
+    assert b.door_zone is None and b.door_span is None
+    with pytest.raises(ValueError):
+        furnish_rooms(plan, records[:1], [], CFG.interiors)
+
+
+def test_load_catalogue_gives_exactly_the_rows_of_the_sets_with_their_provenance(tmp_path) -> None:
+    import hashlib
+
+    from onward_generator.detail import furnish as module
+    from onward_generator.detail.furnish import FurnishError, load_catalogue
+    from onward_generator.overgrow.library import read_interior_catalogue
+
+    module._CATALOGUES.clear()
+    furnish = _furnish(counter=["kenney_furniture_kitchenCabinet"], wall=["Shelf_01", "wooden_display_shelves_01"])
+    assets = load_catalogue(furnish, REPO_ROOT / "assets")
+    assert sorted(assets) == ["Shelf_01", "kenney_furniture_kitchenCabinet", "wooden_display_shelves_01"]
+    props, _ = read_interior_catalogue(REPO_ROOT / "assets", FURNISH.catalogues, sorted(assets))
+    for asset_id, asset in assets.items():
+        found = props[asset_id]
+        size = tuple(round(v, 6) for v in found.prop.size_m)
+        assert asset == FurnishAsset(asset_id, found.catalogue, "CC0-1.0", found.prop.spec.role, found.prop.spec.category, size,
+                                     found.prop.triangles, found.glb_sha256, found.parts)
+    shelf = (REPO_ROOT / "assets" / "polyhaven_shop" / "Shelf_01.glb").read_bytes()
+    assert assets["Shelf_01"].glb_sha256 == hashlib.sha256(shelf).hexdigest()
+    assert assets["Shelf_01"].catalogue == "polyhaven_shop" and assets["kenney_furniture_kitchenCabinet"].role == "room_furniture"
+    assert sorted(load_catalogue(_furnish(wall=["Shelf_01"]), REPO_ROOT / "assets")) == ["Shelf_01"]
+    with pytest.raises(FurnishError) as caught:
+        load_catalogue(furnish, tmp_path)
+    assert str(caught.value) == (f"shops.furnish: rows the catalogues under {tmp_path} do not give: Shelf_01 (not installed), "
+                                 "kenney_furniture_kitchenCabinet (not installed), wooden_display_shelves_01 (not installed)")
+    with pytest.raises(FurnishError, match=r"kenney_furniture_kitchenFridge \(alpha_mode_blend\)$"):
+        load_catalogue(_furnish(wall=["kenney_furniture_kitchenFridge"]), REPO_ROOT / "assets")
+
+
+def test_the_map_pass_takes_the_seed_of_the_configuration() -> None:
+    from onward_generator.detail.scene import _furnishing
+
+    assert _furnishing(replace(CFG, seed=7)).seed == 7

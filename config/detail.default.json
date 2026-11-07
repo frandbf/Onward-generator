@@ -138,7 +138,42 @@
         { "name": "pharmacy", "tags": { "amenity": ["pharmacy"], "shop": ["chemist"], "healthcare": ["pharmacy"] }, "wall": "interior_shop_pharmacy", "floor": "interior_shop_tile" },
         { "name": "bar", "tags": { "amenity": ["bar", "pub", "cafe", "restaurant", "fast_food", "ice_cream"] }, "wall": "interior_shop_bar", "floor": "interior_shop_wood" }
       ],
-      "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" }
+      "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" },
+      "furnish": {
+        "enabled": false,
+        "max_triangles": 12000,
+        "max_collision_triangles": 1200,
+        "max_pieces_per_room": 8,
+        "max_assets": 16,
+        "walk_width_m": 1.2,
+        "wall_gap_m": 0.03,
+        "piece_gap_m": 0.1,
+        "pane_clear_m": 0.15,
+        "head_clear_m": 0.1,
+        "catalogues": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"],
+        "sets": {
+          "bakery": {
+            "counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_kitchenCabinetDrawer"],
+            "wall": ["Shelf_01", "kenney_furniture_bookcaseOpenLow", "kenney_furniture_bookcaseOpen"],
+            "decor": ["kenney_food_loaf", "kenney_food_croissant", "kenney_food_loaf_round", "kenney_food_cake"]
+          },
+          "pharmacy": {
+            "counter": ["kenney_furniture_kitchenCabinetDrawer", "kenney_furniture_desk"],
+            "wall": ["kenney_furniture_bookcaseClosedDoors", "kenney_furniture_bookcaseClosed", "Shelf_01"],
+            "decor": []
+          },
+          "bar": {
+            "counter": ["kenney_furniture_kitchenBar", "kenney_furniture_kitchenCabinet"],
+            "wall": ["kenney_furniture_bookcaseOpenLow", "kenney_furniture_sideTable", "kenney_furniture_cabinetTelevision"],
+            "decor": ["kenney_food_cup_coffee", "kenney_food_glass_wine", "kenney_food_wine_red", "kenney_food_soda_bottle"]
+          },
+          "generic": {
+            "counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_desk"],
+            "wall": ["kenney_furniture_bookcaseOpen", "Shelf_01", "kenney_furniture_bookcaseClosedWide", "kenney_shop_display_small"],
+            "decor": []
+          }
+        }
+      }
     }
   },
   "urban": {

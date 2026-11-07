@@ -26,7 +26,7 @@ SEMANTIC_FIELDS = ("description", "placement", "grouping", "condition", "tags")
 LOAD_FIELDS = ("yaw_deg", "refused")
 KIT_ONLY = "kit_only"
 INTERIOR = "interior"
-"""A prop for inside a room. Nothing places these yet, and overgrow must not put one on a street."""
+"""A prop for inside a room. Placed only by detail shop furnishing (ADR-031); overgrow must not put one on a street."""
 
 
 @cache

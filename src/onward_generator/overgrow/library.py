@@ -28,9 +28,11 @@ target. The copy keeps ``source_triangles``; the GLB is not rewritten.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import math
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -216,6 +218,86 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
             rejects.append(LibraryReject(spec.id, reason))
             continue
         props.append(level_of_detail(prop))
+    return props, rejects
+
+
+INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0"}
+"""Licences an interior catalogue's manifest ``source`` may name, and the SPDX id furnishing records (ADR-031)."""
+
+
+@dataclass(frozen=True, slots=True)
+class InteriorProp:
+    """An interior row shop furnishing may place: the mesh as loaded (level of detail applied), and its provenance."""
+
+    prop: Prop
+    catalogue: str
+    licence: str
+    glb_sha256: str
+
+    @property
+    def parts(self) -> int:
+        """Materials the prop adds: ``prop_<id>`` and one ``prop_<id>__<n>`` per further albedo."""
+        return len(self.prop._parts())
+
+
+def interior_licence(source: object) -> str | None:
+    """The SPDX id of the first allowed licence a manifest ``source`` names, or ``None``."""
+    text = str(source)
+    return next((spdx for name, spdx in INTERIOR_LICENCES.items() if name in text), None)
+
+
+def read_interior_catalogue(
+    path: str | Path, allowed: Collection[str], ids: Collection[str] | None = None,
+) -> tuple[dict[str, InteriorProp], list[LibraryReject]]:
+    """Read the ``placement: interior`` rows of the catalogues under ``path`` whose folder is in ``allowed``.
+
+    Only shop furnishing reads these (ADR-031); ``read_library`` keeps refusing every interior row for the
+    street. A catalogue whose manifest ``source`` names no allowed licence (``INTERIOR_LICENCES``) is refused
+    whole. A row that is not ``interior``, or whose GLB has a material that is not opaque, is refused with its
+    reason. ``ids`` limits the rows read (each GLB is read and reduced as ``read_library`` does). The same id
+    in two catalogues is an error.
+    """
+    props: dict[str, InteriorProp] = {}
+    rejects: list[LibraryReject] = []
+    for directory in library_directories(path):
+        if directory.name not in allowed:
+            continue
+        manifest = directory / "manifest.json"
+        try:
+            document = json.loads(manifest.read_text(encoding="utf-8"))  # pragma: no mutate: the image's locale is UTF-8, so its default decodes the same bytes; the argument pins it on other hosts
+        except (OSError, json.JSONDecodeError):
+            continue
+        check_manifest(document, str(manifest))
+        licence = interior_licence(document.get("source"))
+        for row in document.get("assets") or []:
+            if not isinstance(row, dict) or not row.get("id") or not row.get("file") or (ids is not None and row["id"] not in ids):
+                continue
+            asset_id = str(row["id"])
+            refusal = "licence" if licence is None else None if row.get("placement") == INTERIOR else "not_interior"
+            refusal = refusal or row.get("refused")
+            if refusal:
+                rejects.append(LibraryReject(asset_id, str(refusal)))
+                continue
+            spec = _spec(row)
+            file = directory / str(row["file"])
+            if spec is None or not file.is_file():
+                rejects.append(LibraryReject(asset_id, "unreadable"))
+                continue
+            try:
+                data = file.read_bytes()
+                prop = _read(file, spec, float(row.get("yaw_deg") or 0.0))
+                doc, _blob = read_glb(data)
+            except (OSError, ValueError, KeyError):
+                rejects.append(LibraryReject(asset_id, "unreadable"))
+                continue
+            reason = reject_reason(spec, doc, prop.mesh)
+            if reason is not None:
+                rejects.append(LibraryReject(asset_id, reason))
+                continue
+            if asset_id in props:
+                raise LibraryError(f"{asset_id}: declared in {props[asset_id].catalogue} and {directory.name}")
+            assert licence is not None  # a catalogue without one refused every row above
+            props[asset_id] = InteriorProp(level_of_detail(prop), directory.name, licence, hashlib.sha256(data).hexdigest())
     return props, rejects
 
 
