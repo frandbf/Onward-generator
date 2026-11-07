@@ -52,7 +52,11 @@ def match_facades(
     interior_ids: Sequence[str],
     config: DetailConfig | None = None,
 ) -> dict[str, object]:
-    """Return assignments and skips. This function does not write a GLB."""
+    """Return assignments, skips and the exposed faces considered. This function does not write a GLB.
+
+    ``faces`` lists every exposed ring-0 face of a building that may take a photo
+    (not an interior, not a landmark), with its length: the coverage denominator.
+    """
     cfg = config if config is not None else load_detail_config()
     interiors = set(interior_ids)
     located = [_Located(picture, _local_xy(frame, picture.longitude, picture.latitude)) for picture in pictures]
@@ -65,6 +69,7 @@ def match_facades(
     assignments: list[dict[str, object]] = []
     skipped_faces: list[dict[str, object]] = []
     skipped_buildings: list[dict[str, str]] = []
+    faces: list[dict[str, object]] = []
     for building in buildings:
         if building.kind == "landmark_part":
             skipped_buildings.append({"building_id": building.id, "reason": "landmark"})
@@ -78,6 +83,7 @@ def match_facades(
         for segment in segments:
             if not segment.exposed or segment.ring != 0:
                 continue
+            faces.append({"building_id": building.id, "segment_index": segment.index, "length_m": round(segment.length, 3)})
             spans = _frontal_spans(building.polygon, segment, located)
             if not spans:
                 skipped_faces.append({
@@ -115,6 +121,7 @@ def match_facades(
         "assignments": assignments,
         "skipped_faces": skipped_faces,
         "skipped_buildings": skipped_buildings,
+        "faces": faces,
     }
 
 

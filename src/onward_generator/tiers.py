@@ -270,11 +270,25 @@ def _combined_nodes(visual: bytes, cell_m: float) -> Iterator[tuple[str, tuple[f
     nodes, _ = nodes_from_glb(visual)
     for node in nodes:
         primitives = node.world_primitives()
-        lo = [min(float(p.mesh.vertices[:, k].min()) for p in primitives) for k in (0, 1)]
-        hi = [max(float(p.mesh.vertices[:, k].max()) for p in primitives) for k in (0, 1)]
-        # The adapter's cell is on the glTF ground plane (x east, z = -north), as perf measure.
-        cell = (math.floor((lo[0] + hi[0]) / 2 / cell_m), math.floor(-(lo[1] + hi[1]) / 2 / cell_m))
-        yield str(node.extras.get("object_id") or node.name), (lo[0], lo[1], hi[0], hi[1]), cell, primitives
+        lo, hi = _plan_bounds(primitives)
+        yield str(node.extras.get("object_id") or node.name), (lo[0], lo[1], hi[0], hi[1]), _cell(lo, hi, cell_m), primitives
+
+
+def _plan_bounds(primitives: Sequence[Primitive]) -> tuple[list[float], list[float]]:
+    lo = [min(float(p.mesh.vertices[:, k].min()) for p in primitives) for k in (0, 1)]
+    hi = [max(float(p.mesh.vertices[:, k].max()) for p in primitives) for k in (0, 1)]
+    return lo, hi
+
+
+def _cell(lo: Sequence[float], hi: Sequence[float], cell_m: float) -> tuple[int, int]:
+    # The adapter's cell is on the glTF ground plane (x east, z = -north), as perf measure.
+    return (math.floor((lo[0] + hi[0]) / 2 / cell_m), math.floor(-(lo[1] + hi[1]) / 2 / cell_m))
+
+
+def combine_cell(primitives: Sequence[Primitive], cell_m: float) -> tuple[int, int]:
+    """The adapter's combine cell of a node from its world primitives: the plan-bounds centre, x and -y, floored by ``cell_m``."""
+    lo, hi = _plan_bounds(primitives)
+    return _cell(lo, hi, cell_m)
 
 
 def tier_summary(visual: bytes, objects: Iterable[Mapping[str, Any]], core: BaseGeometry, *, cell_m: float) -> dict[str, Any]:

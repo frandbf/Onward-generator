@@ -207,6 +207,43 @@ def test_a_sphere_in_front_of_a_facade_is_assigned_and_the_others_are_not(tmp_pa
     assert not (tmp_path / "scene_panoramax").exists()
 
 
+def test_match_lists_the_exposed_faces_it_considered(tmp_path: Path) -> None:
+    from shapely import Polygon, union_all
+
+    from onward_generator.detail.config import load_detail_config
+    from onward_generator.detail.facades import refine_exposure
+    from onward_generator.geo.projection import LocalFrame
+    from onward_generator.maps.workspace import load_map
+    from onward_generator.panoramax.match import BuildingFootprint, match_facades
+
+    root = _map(tmp_path)
+    document = load_map(root)
+    center = document["center"]
+    frame = LocalFrame.create(float(center["longitude"]), float(center["latitude"]), str(document["crs"]))
+    block = BuildingFootprint("block", "building", Polygon([(0, 10), (20.12345, 10), (20.12345, 30), (0, 30)]))
+    east = BuildingFootprint("east", "building", Polygon([(20.12345, 10), (40, 10), (40, 30), (20.12345, 30)]))
+    interior = BuildingFootprint("room", "building", Polygon([(50, 10), (70, 10), (70, 30), (50, 30)]))
+    landmark = BuildingFootprint("tower", "landmark_part", Polygon([(80, 10), (90, 10), (90, 20), (80, 20)]))
+    buildings = [block, east, interior, landmark]
+    report = match_facades(buildings, [], frame=frame, interior_ids=["room"])
+    expected = []
+    for building in (block, east):
+        others = union_all([item.polygon for item in buildings if item.id != building.id and item.kind == "building"])
+        _refined, segments = refine_exposure(building.polygon, others, load_detail_config())
+        expected.extend(
+            {"building_id": building.id, "segment_index": segment.index, "length_m": round(segment.length, 3)}
+            for segment in segments
+            if segment.exposed and segment.ring == 0
+        )
+    assert report["faces"] == expected
+    assert {row["building_id"] for row in report["faces"]} == {"block", "east"}
+    # The party wall at x = 20.12345 is not a face: three exposed sides on each building, to the millimetre.
+    assert sum(row["length_m"] for row in report["faces"] if row["building_id"] == "block") == pytest.approx(60.246, abs=1e-9)
+    assert 20.123 in [row["length_m"] for row in report["faces"]]
+    assert report["assignments"] == []
+    assert len(report["skipped_faces"]) == len(report["faces"])
+
+
 def test_the_facing_wall_receives_the_painted_colour_and_the_opposite_wall_does_not() -> None:
     from PIL import Image
 

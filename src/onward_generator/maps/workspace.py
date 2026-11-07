@@ -169,6 +169,44 @@ def panoramax_enabled(directory: str | Path) -> bool:
     return bool(document.get("panoramax", False))
 
 
+def panoramax_atlas_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"panoramax_atlas": true`` (ADR-020 amendment, off by default).
+
+    It acts only together with ``"panoramax": true``. A map without ``map.json``
+    or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("panoramax_atlas", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "panoramax_atlas" must be true or false, got {value!r}')
+    return value
+
+
+DEFAULT_COMBINE_CELL_M = 100.0
+
+
+def combine_cell_m(directory: str | Path) -> float:
+    """The export card's ``build.combine_cell_m``; 100 m when the card is missing or the value is 0 (ADR-005)."""
+    root = Path(directory).expanduser().resolve()
+    try:
+        document = load_map(root)
+    except MapError:
+        return DEFAULT_COMBINE_CELL_M
+    card_path = root / str((document.get("paths") or {}).get("export") or "config/export.json")
+    if not card_path.is_file():
+        return DEFAULT_COMBINE_CELL_M
+    import json
+
+    card = json.loads(card_path.read_bytes())
+    value = ((card.get("build") or {}) if isinstance(card, dict) else {}).get("combine_cell_m", 0.0)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise MapError(f"{card_path}: build.combine_cell_m must be a number of metres, got {value!r}")
+    return float(value) if value > 0 else DEFAULT_COMBINE_CELL_M
+
+
 def store_panoramax(directory: str | Path, enabled: bool) -> None:
     """Record the Panoramax switch on an existing map. Does not rewrite scenes."""
     root = Path(directory).expanduser().resolve()

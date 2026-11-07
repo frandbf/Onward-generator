@@ -135,6 +135,30 @@ Pending on the headset (not done; the option stays off until they pass):
 
 Then ADR-031 goes from proposed to accepted or is corrected. Turning furnishing on by default is a separate decision (plan 4.2).
 
+## Panoramax with the trim atlas
+
+Plan B2, ADR-020 amendment of 7 November 2026, off by default (`map.json` `"panoramax_atlas": true`, with `"panoramax": true`). With the switch off, `task bench -- --offline` (run `20261107T201937Z`, no Panoramax) is the same as run `20261107T195936Z` apart from timings (`bench.py check`), and the Panoramax stage of the synthetic Murcia block writes the same five files, by SHA-256, as before the change.
+
+Measured on copies of the bench inputs in `output/b2_measure/` (never `maps/`), with network, one run with the switch off (per-face decals) and one with it on, Docker on an Apple M4 Pro. The searches succeeded; no download failed, so no retry was needed:
+
+| Copy | 360 pictures kept | Exposed frontage | With a photo | Decal draws added | Package draws | View draws median / p90 / max | Panoramax stage, off / on |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 0 (2 flat skipped) | 6 179.8 m | 0 m, 0.0 % | 0 | 213 → 213 | 85 / 181 / 213 | 16.7 s / 15.6 s |
+| bench_madrid r300 | 0 (7 flat skipped) | 22 328.7 m | 0 m, 0.0 % | 0 | 504 → 504 | 175 / 374 / 448 | 5 min 58 s / 5 min 18 s |
+| bench_paris r50, `facades.style` mediterranean | 65 | 52.2 m (2 OSM buildings) | 0 m, 0.0 % | 0 | — (no core) | 33 / 74 / 87 | 2 min 11 s (downloads) / 9.7 s |
+
+None of the three squares has a 360 picture in front of an exposed facade, so the per-cell figures on a real city (decals per cell, image side, scale, tints) are still open: a blocker for that part of the measure, not for the code. On the synthetic block (`tests/integration/test_panoramax_pipeline.py`) one photographed building gives one cell, one decal, one added draw, a 512 px cell image at scale 1, and a tint from `stone_warm` tone 1 to tone 0 for a pale photo. Generator figures, not device measurements.
+
+Pending (not done; the switch stays off until they pass):
+
+- [ ] Build a map with Panoramax photos in front of trim facades (a square with 360 coverage) and the switch on; record coverage, decals per cell, cell image sides and scales, and `draws_added` against the package `tiers`.
+- [ ] Headset, OVR Metrics in fixed views A and B on that map: the draws the decals add against the 150 target, and a median of at least 72 fps.
+- [ ] Headset: decals 4 cm in front of the trim facades: no z-fighting or shimmer against the string courses and zocalo; no visible seams between crops packed in one cell texture under ASTC 6×6.
+- [ ] Headset: the tinted wall strip reads as the photographed building's colour and does not clash with the photo above 2.2 m.
+- [ ] Headset: graphics memory with the per-cell CC BY-SA images beside the 4096 px trim atlas.
+
+Then the ADR-020 amendment goes from proposed to accepted or is corrected. Turning the switch on by default is a separate decision (plan 4.2).
+
 ## Hunt with bots on a small map
 
 Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.

@@ -284,6 +284,25 @@ A picture is offered to an exposed facade of a `building` that was not given an 
 
 Each kept stretch becomes one decal, 4 cm in front of the existing wall, from 2.2 m above the ground up to the height a 35° ray from the camera still meets. A camera too close to paint that much wall keeps the generated facade. The generated windows, the roof, and the rest of the wall stay. The photograph keeps the real width and height of that stretch, up to 80 px per metre and 512 px on the long side. Several stretches of one face share one image. The new material is white, so the shader does not tint the photograph. `scene_collision.glb` is copied byte for byte. Interiors, landmarks, and buildings without a photo keep their vertices. The report and the GLB extras store the picture id, the author, `CC-BY-SA-4.0`, and origin `observed`. The licence record is [legal/data-sources.md](legal/data-sources.md).
 
+Panoramax runs on trim facades (ADR-020) as on the per-material ones: the decals are their own primitives, and the merged `facade_trim_<style>` primitive is not changed.
+
+**Decal atlas and tint (opt-in).** `map.json` `"panoramax_atlas": true` changes three things, and only together with `"panoramax": true`. Absent or `false` it is off and the output above is unchanged byte for byte; another value stops the step with `panoramax: map.json "panoramax_atlas" must be true or false` before anything is searched or written. The ADR-020 amendment of 7 November 2026 has the rules; its status is proposed until the headset session.
+
+- The crops of one combine cell (`build.combine_cell_m` of the export card, 100 m when the card is missing or says 0, by the node's plan-bounds centre with its decals, as the adapter combines) share one image and one white material, `pano-cell-<cx>_<cy>`, instead of one per face. The image is the smallest power-of-two square from 256 px that holds the crops at full size, up to 2048 px; past that they shrink by 0.75 at a time, and a cell that still does not fit stops the step without writing `scene_panoramax`. Those images hold only CC BY-SA pixels, never the trim atlas.
+- A photographed building's trim wall moves to the strip of its wall family nearest the median colour of its crops, without a new material or draw. The step reads `facades` from `materials_report.json` in `--base`; a scene baked from another style table stops it with `rerun materials`.
+- `panoramax_report.json` gets more keys, `schema_version` staying `0.1.0`:
+
+| Key | Content |
+| --- | --- |
+| `atlas` | `cell_m` and `side_px` (the largest cell image, 2048) |
+| `coverage` | `exposed_m` (exposed ring-0 faces of the buildings that may take a photo), `photo_m` (under an applied photo, spans merged per face), `percent` (one decimal; `null` without frontage), and `buildings`: one row per building with the same three fields, sorted by id |
+| `decal_cells` | one row per cell: `cell` `[cx, cy]`, `material`, `decals`, `buildings`, `side_px`, `scale` (1 when nothing shrank) |
+| `draws_added` | decal draws the adapter's (cell, material) combine adds: one per cell |
+| `tints` | `building_id`, `rgb` (the median sRGB), `from` and `to` (`wall`, `tone`), `picture_ids`, `authors`, origin `observed`, source `panoramax`. The same record, without the id, is the node's `panoramax_tint` extra |
+| `tint_skipped` | `building_id` and `reason`: `no_trim_atlas`, `layout_mismatch`, `osm_colour`, `no_wall_strip` or `unchanged` |
+
+The step prints `coverage=<pct>% draws_added=<n>` after the assignments, and `run` adds `coverage <pct> %  +<n> draws` to its `panoramax` line. The other stages read `scene_panoramax` as before: `dress` copies the stored UVs of the decals, and a later stage can move a node's centre across a cell line, so the export package's `tiers` remain the draw figure of record.
+
 | | |
 | --- | --- |
 | Input | `--base` (`scene_materials`) |
