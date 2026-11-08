@@ -415,3 +415,19 @@ def test_open_sight_points_refuse_another_layout_and_skip_a_missing_spawn() -> N
     assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=off, defenders_b=off)) == []
     # One pair still routed: its samples count.
     assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=off)) != []
+
+
+def test_open_sight_points_are_longest_first_along_a_walled_corridor() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    frame = box(-400, -400, 400, 400).difference(box(-20, -1, 80, 1))
+    found = open_sight_points(CORRIDOR, frame, [], _layout())
+    lengths = [p.length_m for p in found]
+    assert lengths == sorted(lengths, reverse=True) and lengths[0] == 80.0 and lengths[-1] > 60.0
+    assert found[0].point == (0.0, 0.0) and found[1].point == (60.0, 0.0)
+
+
+def test_open_sight_points_skip_a_pair_without_its_defenders() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=None, defenders_b=None)) == []

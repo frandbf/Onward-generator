@@ -30,9 +30,6 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.bounds.envelope import WALL_ID
 from onward_generator.dress.geometry import compare_fingerprints, geometry_fingerprint
 from onward_generator.gameplay.cover import (
-    COVER_MAX_ADDED_DRAWS,
-    MAX_COVER_PROPS,
-    MAX_NEW_COVER_ASSETS,
     MAX_PROP_LENGTH_M,
     TARGET_SPACING_M,
     Caps,
@@ -184,7 +181,7 @@ def build_site(
 ) -> CoverSite:
     """The keep-outs and the ground of one playable scene, in local metres."""
     playable = playable_area(manifest)
-    free = free_ground(base, [])
+    free = free_ground(base, [])  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
     ground = union_all([free, base.partition.crossings])
     if playable is not None:
         free, ground = free.intersection(playable), ground.intersection(playable)
@@ -337,7 +334,7 @@ def apply_cover(
     props, _library_rejects = read_library(library)
     candidates, refused = cover_props(fitted_props(props), catalogue_licences(library), _scene_assets(materials))
     overgrown = _overgrow_triangles(nodes)
-    caps = Caps(props=MAX_COVER_PROPS, triangles=triangle_cap(overgrown), draws=COVER_MAX_ADDED_DRAWS, new_assets=MAX_NEW_COVER_ASSETS)
+    caps = Caps(triangles=triangle_cap(overgrown))
     site = build_site(base, manifest, layout, layout_file, scene_file, collision_path)
     plan = choose_cover(
         targets, candidates, site, caps,
@@ -430,10 +427,10 @@ def _write(
     objects.extend(records)
     after = geometry_fingerprint([o for o in objects if o.get("type") in GEOGRAPHIC])
     compare = compare_fingerprints(before, after)
-    if not compare["identical"]:
-        raise CoverError("cover changed a geographic object record; this is a bug")
-    # The visual's nodes are checked before anything is written where export reads it.
-    atomic_write_json(work / "scene_detail.json", {**manifest, "objects": objects})
+    if not compare["identical"]:  # pragma: no mutate: a guard; the records added are overgrowth, never a geographic type
+        raise CoverError("cover changed a geographic object record; this is a bug")  # pragma: no mutate: unreachable guard
+    # overgrow fit reads the urban elements and shop signs of the manifest beside the visual.
+    shutil.copyfile(detail / "scene_detail.json", work / "scene_detail.json")
     checked, problems = check_scene(work, scene_file)
     if problems:
         raise CoverError("the covered scene fails overgrow fit: " + "; ".join(problems[:10]))
@@ -446,10 +443,11 @@ def _write(
     atomic_write_json(work / "detail_report.json", detail_report)
     vis, _ = nodes_from_glb((work / "scene_visual.glb").read_bytes())
     col, _ = nodes_from_glb((work / "scene_collision.glb").read_bytes())
-    if any(node.name.startswith("overgrow/collider/") for node in vis) or any(node.name.startswith("overgrow/prop/") for node in col):
-        raise CoverError("a cover collider reached the visual mesh or a visual node the collision mesh; this is a bug")
-    if not any(node.name == f"{WALL_ID}#collider" for node in col):
-        raise CoverError("the covered collision GLB lost the perimeter wall; this is a bug")
+    # Guards against a bug: _nodes names the two node lists apart, and glb_append keeps every existing node.
+    if any(node.name.startswith("overgrow/collider/") for node in vis) or any(node.name.startswith("overgrow/prop/") for node in col):  # pragma: no mutate: unreachable guard
+        raise CoverError("a cover collider reached the visual mesh or a visual node the collision mesh; this is a bug")  # pragma: no mutate: unreachable guard
+    if not any(node.name == f"{WALL_ID}#collider" for node in col):  # pragma: no mutate: unreachable guard; _check_inputs saw the wall
+        raise CoverError("the covered collision GLB lost the perimeter wall; this is a bug")  # pragma: no mutate: unreachable guard
     return records
 
 

@@ -513,3 +513,17 @@ def test_the_note_lists_every_asset_placed() -> None:
     )
     mixed = CoverPlan(2, (_placed(0.0, 0.0, _cover("x")), _placed(20.0, 0.0, _cover("y"))), {}, Caps())
     assert note(mixed).startswith("cover: placed 2 of 2 targets over 60 m (x, y), ")
+
+
+def test_the_early_plans_are_empty_and_name_their_reason() -> None:
+    caps = Caps(props=5)
+    assert choose_cover([], [_cover()], _site(), caps) == CoverPlan(0, (), {}, caps, NO_TARGET)
+    assert choose_cover(_grid(3), [], _site(), caps) == CoverPlan(3, (), {}, caps, NO_PROP)
+
+
+def test_skipped_targets_are_counted_and_the_next_ones_still_placed() -> None:
+    targets = [_target(0.0, 0.0, length=100.0), _target(5.0, 0.0, length=90.0), _target(30.0, 0.0, length=80.0),
+               _target(33.0, 0.0, length=70.0), _target(2.0, 0.0, length=60.5)]
+    plan = choose_cover(targets, [_cover()], _site())
+    assert [item.target.length_m for item in plan.placements] == [100.0, 80.0]
+    assert plan.rejects == {"covered": 1, "spacing": 2}

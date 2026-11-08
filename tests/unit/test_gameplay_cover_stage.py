@@ -373,3 +373,15 @@ def test_overgrow_triangles_and_scene_assets_read_the_visual() -> None:
     assert _overgrow_triangles(nodes) == 2 * cube.triangle_count
     grey = Material((1, 1, 1, 1), 0.9)
     assert _scene_assets({"prop_a": grey, "prop_b__1": grey, "prop_c__d": grey, "wall": grey, "x_prop_e": grey}) == frozenset({"a", "b", "c"})
+
+
+@pytest.mark.parametrize("flag", ["--scene", "--heights", "--base", "--detail", "--layout", "--out"])
+def test_perf_cover_needs_each_path(flag: str, tmp_path: Path) -> None:
+    from onward_generator.perf.__main__ import build_parser
+
+    argv = {name: str(tmp_path / name.strip("-")) for name in ("--scene", "--heights", "--base", "--detail", "--layout", "--out")}
+    full = ["cover", *[part for name, value in argv.items() for part in (name, value)]]
+    args = build_parser().parse_args(full)
+    assert (args.library, args.generation_config, args.overwrite) == ("assets", None, False)
+    with pytest.raises(SystemExit):
+        build_parser().parse_args([part for part in full if part not in (flag, argv[flag])])

@@ -267,7 +267,7 @@ def keep_out(site: CoverSite, prop: CoverProp, matrix: np.ndarray, placed: Seque
     if not site.islands.covers(Point(x, y)):
         return "off_navmesh"
     # No lane test here: the footprint must lie on walkable ground off the carriageway (below), not 4.2 m from the street's axis.
-    reason = block_reason(x, y, zone=site.zone, buildings=site.buildings, lane_tree=None, lanes=[], spawns=site.spawns, allow_lane=True)
+    reason = block_reason(x, y, zone=site.zone, buildings=site.buildings, lane_tree=None, lanes=[], spawns=site.spawns, allow_lane=True)  # pragma: no mutate: without a lane tree block_reason measures no lane, allowed or not
     if reason is not None:
         return reason
     if not site.free.covers(print_):

@@ -28,6 +28,7 @@ from onward_generator.generation.mesh import box
 from onward_generator.overgrow.dressing import load_spawns
 from onward_generator.overgrow.fit import check_scene
 from onward_generator.overgrow.growth import grass_png
+from onward_generator.overgrow.library import read_library
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -69,7 +70,7 @@ def stage(detail_inputs: tuple[Path, Path, Path], tmp_path_factory: pytest.TempP
     assert main(["bounds", "--base", str(detail), "--out", str(playable)]) == 0
     layout = root / "layout" / "layout.json"
     common = ["--scene", str(scene), "--heights", str(heights), "--base", str(base), "--detail", str(playable)]
-    assert main(["perf", "layout", *common, "--playable", "--out", str(layout)]) == 0
+    assert main(["perf", "layout", *common, "--playable", "--gameplay-report", "--out", str(layout)]) == 0
     measurement = root / "measurement" / "layout.json"
     assert main(["perf", "layout", *common, "--out", str(measurement)]) == 0
     library = _library(root / "library", [
@@ -131,6 +132,9 @@ def test_cover_stands_catalogue_props_with_provenance_and_leaves_its_inputs(
     assert keep_outs["ammo"] == len(layout_doc["ammo_m"]) and keep_outs["hunt_routes"] == len(layout_doc["routes"])
     assert set(keep_outs) == {"spawn_points", "ammo", "climbs", "doors", "hunt_routes", "urban_elements", "solids"}
     assert report["candidates"] == ["synth_barrier", "synth_barrel"]
+    # The headline before is the layout's own gameplay report: the same islands, inside the core.
+    layout_report = json.loads((stage["layout"].parent / REPORT_FILE).read_text(encoding="utf-8"))
+    assert report["before"]["headline"] == layout_report["headline"]
     placed = report["placed"]
     assert 1 <= len(placed) <= 24 and report["nothing_placed"] is None
     assert all(row["triangles"] == 12 and row["primitives"] == 1 for row in placed)
@@ -154,6 +158,18 @@ def test_cover_stands_catalogue_props_with_provenance_and_leaves_its_inputs(
     assert not any(n.name.startswith("overgrow/prop/") for n in collision)
     assert any(n.name == "envelope/perimeter_wall#collider" for n in collision)
     assert {p.material for n in collision if "/cover/" in n.name for p in n.primitives} == {"collider"}
+    collision_doc, _ = read_glb((out / "scene_collision.glb").read_bytes())
+    grey = [m["pbrMetallicRoughness"]["baseColorFactor"] for m in collision_doc["materials"] if m["name"] == "collider"]
+    assert grey == [pytest.approx([0.45, 0.45, 0.45, 1.0])]
+    # The prop keeps the UVs it has in the catalogue: none are generated for its albedo.
+    library = {prop.spec.id: prop for prop in read_library(stage["library"])[0]}
+    for node in visual:
+        if "/cover/" in node.name:
+            expected = library[node.extras["asset_id"]].primitives()
+            assert [np.asarray(p.uvs).tolist() for p in node.primitives] == [np.asarray(p.uvs).tolist() for p in expected], node.name
+    detail_report = json.loads((out / "detail_report.json").read_text(encoding="utf-8"))
+    assert detail_report["cover"]["op"] == "sightline_cover" and detail_report["cover"]["count"] == len(placed)
+    assert detail_report["cover"]["geometry"]["identical"] is True and detail_report["cover"]["added_triangles"] == 12 * len(placed)
     old_doc, _ = read_glb((stage["playable"] / "scene_visual.glb").read_bytes())
     new_doc, _ = read_glb((out / "scene_visual.glb").read_bytes())
     assert new_doc.get("extras") == old_doc.get("extras")
@@ -252,10 +268,20 @@ def test_refusals_exit_1_and_leave_no_directory(stage: dict[str, Path], tmp_path
 def test_a_scene_fit_refuses_is_not_written(stage: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from onward_generator.gameplay import cover_stage
 
-    monkeypatch.setattr(cover_stage, "check_scene", lambda _work, _scene: (1, ["overgrow/prop/x/cover/0 floating_0.10m"]))
+    problems = [f"overgrow/prop/x/cover/{n} floating_0.10m" for n in range(11)]
+    seen: list[dict[str, object]] = []
+
+    def check(work: Path, _scene: Path) -> tuple[int, list[str]]:
+        # The check reads the playable manifest's urban elements and signs beside the new visual.
+        seen.append(json.loads((work / "scene_detail.json").read_text(encoding="utf-8")))
+        return 11, problems
+
+    monkeypatch.setattr(cover_stage, "check_scene", check)
     base, _ = load_base(stage["base"], stage["scene"], stage["heights"], load_generation_config(None))
-    with pytest.raises(CoverError, match="the covered scene fails overgrow fit: overgrow/prop/x/cover/0 floating_0.10m"):
+    with pytest.raises(CoverError) as caught:
         apply_cover(base, stage["scene"], stage["playable"], stage["layout"], tmp_path / "out", library=stage["library"])
+    assert str(caught.value) == "the covered scene fails overgrow fit: " + "; ".join(problems[:10])
+    assert seen == [json.loads((stage["playable"] / "scene_detail.json").read_text(encoding="utf-8"))]
     assert list(tmp_path.iterdir()) == []
 
 
