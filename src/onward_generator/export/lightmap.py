@@ -192,7 +192,7 @@ def page_budget_density(areas: LightmapAreas, *, requested: float, pages_max: in
         )
     # Invariant: ``low`` fits, and no grid step above ``high`` is a candidate (it is over ``requested``).
     while low < high:
-        middle = (low + high + 1) // 2
+        middle = (low + high + 1) // 2  # pragma: no mutate: any middle in (low, high] gives the same result; +2 still lands there
         if fits(middle * LIGHTMAP_DENSITY_STEP):
             low = middle
         else:

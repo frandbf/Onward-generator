@@ -291,6 +291,10 @@ def test_lightmap_areas_by_cell_and_material() -> None:
                ("prop_x", _floor(0, 5, 0, 5)))
     assert dict(lightmap_areas(glb, cell_m=100.0)) == {((0, 0), "ground"): 102.0, ((0, 0), "roof_tile"): 20.0}
     assert dict(lightmap_areas(glb, cell_m=0.0)) == {((0,), "ground"): 100.0, ((1,), "ground"): 2.0, ((2,), "roof_tile"): 20.0}
+    # The scenic walls stay in by default, as in ``estimate``.
+    scenic = _glb(("scenic_wall_light", _floor(0, 3, 0, 1)))
+    assert dict(lightmap_areas(scenic, cell_m=100.0)) == {((0, 0), "scenic_wall_light"): 3.0}
+    assert dict(lightmap_areas(scenic, cell_m=100.0, scenic_out_of_lightmap=True)) == {}
 
 
 def test_page_budget_constants() -> None:
@@ -409,3 +413,13 @@ def test_page_budget_density_requested_below_floor() -> None:
     # Just above the floor and over budget: nothing on the grid between 4.0 and 4.1 fits.
     with pytest.raises(LightmapBudgetError, match="at 4 texels/m"):
         page_budget_density(areas, requested=4.1, pages_max=1, max_size=512)
+
+
+def test_page_budget_refusal_counts_pages_with_the_class_scales() -> None:
+    # Three 1 600 m² roofs, 64 px pages (4 096 texels). At the floor with the roof scale (1 texel/m): 4 800 texels,
+    # 2 pages; without the scale each would be capped at a page, 3 pages. The message counts with the scale.
+    areas = _areas(_quads("roof_tile", count=3, side=40.0))
+    scales = material_scales(["roof_tile"], DEFAULT_CLASS_SCALES)
+    assert pages_at_least(areas, 4.0, max_size=64) == 3
+    with pytest.raises(LightmapBudgetError, match="needs at least 2 pages at 4 texels/m"):
+        page_budget_density(areas, requested=10.0, pages_max=1, max_size=64, scales=scales)
