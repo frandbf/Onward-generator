@@ -181,7 +181,7 @@ Pending (not done; the option stays a report until they pass):
 - [ ] Playtest (plan 4.2): two or three real matches on a bench map, Hunt and Uplink, comparing the reported routes, open sightlines and first-contact balance with what players feel. It calibrates the §1 thresholds, the 8 m corridor and N.
 - [ ] Headset, on a `bench_murcia` package: stand at the four spawn blocks and at both ends of the longest reported sightline, (90.49, 12.49) and (−25.44, −54.44) in local metres (Unity x, z), and confirm that the open stretches are open ground in the game and that the 2D grid matches the baked navmesh there.
 
-Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check comes after that. C6 acts on the metrics behind an option that is off by default ([Balanced spawns](#balanced-spawns)); turning it on by default waits for the playtest.
+Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check comes after that. C6 acts on the metrics behind an option that is off by default ([Balanced spawns](#balanced-spawns)), and so does C7 ([Cover on long sightlines](#cover-on-long-sightlines)); turning either on by default waits for the playtest.
 
 ## Balanced spawns
 
@@ -206,6 +206,34 @@ Pending (not done):
 - [ ] Headset, a `bench_murcia` package with the option on: the four spawn blocks and the Uplink load; Assault, Uplink and Hunt validate in the SDK (Unity 2021.3.23f1 build without validator errors); bots patrol from their starts; no spawn stands in or against a prop; the spawns are on the baked navmesh.
 - [ ] Headset: ≥ 72 fps and ≤ 150 draws at views A and B with the option off and on; no long open sightline joins the two teams' spawns.
 - [ ] Unity (A3): the Uplink, the navigation origin, is within 0.25 m of the baked mesh, and the `Navmesh islands` log line still shows the origin island holding most of the area.
+
+## Cover on long sightlines
+
+Plan C7, the ADR-032 C7 amendment (proposed), off by default (`map.json` `"sightline_cover": true`, `perf cover`, `bench.py run --sightline-cover`; rules in [01-pipeline.md](01-pipeline.md#sightline-cover-off-by-default)). A stage after the layout copies `scene_playable` to `scene_covered` and stands up to 24 solid catalogue props at the route samples the gameplay report finds open past 60 m, each leaving 1.2 m of passage and clear of the spawns, objectives, AI starts, ammo, climbs, doors, Hunt routes and the carriageway. Docker on an Apple M4 Pro, frozen bench inputs, `--offline --gameplay-report`, runs in a scratch bench root because the repository volume was nearly full:
+
+- **Off.** Run `c7_off` against the workshop/c6 run `20261108T201929Z`: `bench.py check` finds no difference outside timings; `layout.json`, `gameplay_report.json`, `scene_visual.glb`, `scene_collision.glb` and every package file but `onward_export.json` are byte-identical, and no `scene_covered` is written.
+- **On.** Runs `c7_on` and `c7_on2` are the same apart from timings; every GLB and `gameplay_report.json` in `scene_covered` and every package file but `onward_export.json` are byte-identical, and the JSON files differ only in the run folder paths and the hashes of files that hold them. `layout.json` is the option-off file.
+
+| Map | Props (targets over 60 m) | Longest open sightline off → on | Uncovered stretches off → on | Stretches over 60 m off → on | Cover per 100 m, min stretch | Distinct routes, max overlap, contact diff | Triangles off → on | Draws off → on | View draws max | Lightmap pages | Cover stage |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 17 (97) | 133.86 → 129.42 m | 17 → 4 of 38 | 32 → 29 | 0.0 → 0.0 | 2, 16.9 %, 5.23 % (unchanged) | 150 339 → 151 273 | 213 → 218 | 213 → 218 | 4 → 4 | 2.4 s |
+| bench_madrid r300, Catastro | 24 (273) | 291.21 → 254.3 m | 53 → 35 of 74 | 72 → 71 | 0.0 → 0.0 | 3, 43.35 %, 29.48 % (unchanged) | 398 025 → 398 551 | 504 → 509 | 448 → 453 | 11 → 11 | 6.3 s |
+| bench_paris r50, no core | 22 (183) | 195.2 → 192.34 m | 19 → 5 of 44 | 44 → 44 | 0.0 → 0.0 | 4, 32.02 %, 0.67 % (unchanged) | 47 585 → 47 849 | 91 → 93 | 91 → 93 | 3 → 3 | 1.7 s |
+| bench_krakow r150 | 24 (508) | 208.99 → 205.01 m | 66 → 31 of 118 | 118 → 118 | 0.0 → 0.0 | 6, 45.46 %, 20.48 % (unchanged) | 72 884 → 73 172 | 272 → 275 | 268 → 271 | 2 → 2 | 3.9 s |
+
+With `--balanced-spawns` as well (run `c7_on_bal`), the longest open sightline is 124.08 m on Murcia, 241.55 m on Madrid, 191.62 m on Paris and 205.01 m on Krakow, with the C6 contact differences (2.29, 0.57, 0.13 and 0.49 %) unchanged by the cover.
+
+The longest open sightline falls on all four maps and the uncovered stretches by a third to three quarters; the stretches over 60 m stay the same on Paris and Krakow, where every stretch still has a sample open past 60 m. The minimum cover per 100 m stays 0.0 because some stretches remain uncovered, mostly beside the 5 m spawn keep-outs: Murcia's longest ray starts 3.4 m from a defenders' spawn point. Routes, overlap and contact difference cannot move, because the 2D navmesh ignores furniture. Every prop placed was already in the scene (`kenney_urban_detail_block`, `Barrel_02`, `kenney_urban_detail_barrier_strong_type_a`), so no material is added: 264 to 934 triangles, 2 to 5 draws and no lightmap page. Part of the gain is by definition: a sample with cover within 1.5 m stops counting as open even under a prop lower than 1.2 m (`cover_report.json` `rays_cut` counts the rays each prop really shortens). The cover stage takes 1.7 to 6.3 s. Estimates on the 2D navmesh, not device or playtest measurements.
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Playtest (plan 4.2), with the option off and on, on a bench map in Hunt and Uplink: the new cover reads as cover, does not feel like an arbitrary obstacle and does not block a route players use. It calibrates the 60 m sightline and the cover N.
+- [ ] Headset: a `bench_murcia` package with the option on, built in Unity 2021.3.23f1 with no SDK validator errors. Stand at both ends of the previously longest reported sightlines and confirm a placed prop now breaks them.
+- [ ] Headset: walk past every cover prop; at least 1.2 m of passage stays free, no prop floats, sinks or clips a facade, door, ladder or lift, and none sits on a spawn, the Uplink, an ammo box or an AI start.
+- [ ] Headset or Unity: the baked navmesh is not split by the new colliders (the `Navmesh islands` log line still shows the origin island holding most of the area), and Hunt bots still patrol from their starts.
+- [ ] Headset: ≥ 72 fps and ≤ 150 draws at views A and B with the option off and on (OVR Metrics, the protocol above).
+
+Then the ADR-032 C7 amendment moves to accepted or is corrected. The option is not turned on by default before then.
 
 ## Repetition per cell
 
