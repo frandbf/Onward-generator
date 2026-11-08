@@ -99,6 +99,9 @@ def test_the_rise_is_the_spread_within_the_builder_limits() -> None:
     assert spread_spec(_spread(10.0, 10.05), "roof_tile").rise_m == MIN_RISE_M
     assert spread_spec(_spread(10.0, 10.0), "roof_tile").rise_m == MIN_RISE_M
     assert spread_spec(_spread(10.0, 12.25), "roof_flat_grey").rise_m == 2.25
+    for missing in (_spread(p25=None), _spread(p75=None)):
+        with pytest.raises(ValueError, match="a gable needs both percentiles"):
+            spread_spec(missing, "roof_tile")
 
 
 def test_half_span_and_fill_read_the_minimum_rotated_rectangle() -> None:
@@ -174,6 +177,18 @@ def test_no_path_reads_nothing_and_a_valid_report_reads_its_spreads(tmp_path: Pa
     assert loaded is not None and loaded.buildings["osm-way-1"] == RoofSpread("measured", 10.0, 12.0, 0, 0)
     legacy, scene_path = _files(tmp_path, [], schema="murcia_generator.source_heights_report")
     assert load_roof_spread(legacy, scene_path) is not None
+    level, scene_path = _files(tmp_path, [_entry(p25_m=11.5)])
+    loaded = load_roof_spread(level, scene_path)
+    assert loaded is not None and loaded.buildings["osm-way-1"].p25_m == loaded.buildings["osm-way-1"].p75_m == 11.5
+    # A scene without features has no building; a report naming none still loads.
+    bare = tmp_path / "bare.json"
+    bare.write_text(json.dumps({"frame": {}}), encoding="utf-8")
+    empty, _ = _files(tmp_path, [])
+    document = json.loads(Path(empty).read_text(encoding="utf-8"))
+    document["scene"]["sha256"] = hashlib.sha256(bare.read_bytes()).hexdigest()
+    Path(empty).write_text(json.dumps(document), encoding="utf-8")
+    loaded = load_roof_spread(empty, str(bare))
+    assert loaded is not None and loaded.buildings == {}
 
 
 @pytest.mark.parametrize(("entry", "message"), [
@@ -265,3 +280,48 @@ def test_the_parser_names_the_flag() -> None:
 
     action = next(a for a in build_parser()._actions if a.dest == "lidar_roofs")
     assert action.option_strings == ["--lidar-roofs"] and action.default is None and action.metavar == "REPORT"
+    assert action.help == ("<id>_report.json of a LiDAR source plugin for this scene: flat or pitched roofs from the nDSM spread "
+                           "(plan C3)")
+
+
+# --- scene helpers --------------------------------------------------------------------------------------------
+
+
+def test_the_terrace_under_a_taller_part_of_its_parcel_is_not_classified() -> None:
+    from shapely import STRtree
+
+    from onward_generator.detail.config import load_detail_config
+    from onward_generator.detail.scene import _lidar_classes
+
+    cfg = load_detail_config()
+    footprints = {"low": box(0, 0, 20, 10), "high": box(20, 0, 40, 10), "alone": box(100, 0, 120, 10)}
+    ids = sorted(footprints)
+    tree = STRtree([footprints[i] for i in ids])
+    key_of = {"low": "parcel:1", "high": "parcel:1", "alone": "alone"}
+    heights = {"low": 9.0, "high": 15.0, "alone": 9.0}
+    report = SpreadReport("r", "s", "es.pnoa_ndsm", "p", "CC-BY-4.0", "a", dict.fromkeys(ids, _spread(10.0, 11.5)))
+    classes = _lidar_classes(ids, footprints, tree, key_of, {i: {} for i in ids}, heights, dict.fromkeys(ids, "core"), report, cfg)
+    assert classes == {"low": "terrace", "high": "pitched", "alone": "pitched"}
+    scenic = _lidar_classes(ids, footprints, tree, key_of, {i: {} for i in ids}, heights, {"low": "core", "high": "core", "alone": "scenic"},
+                            report, cfg)
+    assert scenic["alone"] == "scenic"
+    tagged = _lidar_classes(ids, footprints, tree, key_of, {"low": {}, "high": {"roof:levels": "1"}, "alone": {}}, heights,
+                            dict.fromkeys(ids, "core"), report, cfg)
+    assert tagged["high"] == "tagged"
+
+
+def test_the_attribution_line_is_merged_once_and_sorted() -> None:
+    from types import SimpleNamespace
+
+    from onward_generator.detail.scene import _lidar_record
+
+    report = SpreadReport("r", "s", "es.pnoa_ndsm", "p", "CC-BY-4.0", "ign.es", {})
+    other = {"text": "Data from meta; Overture Maps Foundation", "license": "CDLA-Permissive-2.0", "license_url": "u"}
+    same = {"text": "ign.es", "license": "CC-BY-4.0", "license_url": "kept"}
+    detailed = SimpleNamespace(stats={}, extra_attribution=[same, other])
+    _lidar_record(detailed, [], {"b": "pitched"}, report)  # type: ignore[arg-type]
+    assert detailed.extra_attribution == [other, same]
+    detailed = SimpleNamespace(stats={}, extra_attribution=[other])
+    _lidar_record(detailed, [], {"b": "flat"}, report)  # type: ignore[arg-type]
+    assert detailed.extra_attribution == [other, {"text": "ign.es", "license": "CC-BY-4.0"}]
+    assert detailed.stats["lidar_roofs"]["flat"] == 1 and detailed.stats["lidar_roofs"]["core_buildings"] == 1

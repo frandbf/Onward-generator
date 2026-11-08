@@ -502,7 +502,7 @@ def _lidar_record(detailed: DetailedScene, objects: Sequence[DetailObject], clas
     }
     if counts[FLAT] or counts[PITCHED]:
         lines = {(a["text"], a["license"]): a for a in detailed.extra_attribution}
-        lines[(report.attribution, report.license)] = {"text": report.attribution, "license": report.license}
+        lines.setdefault((report.attribution, report.license), {"text": report.attribution, "license": report.license})
         detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
 
 
@@ -1091,13 +1091,9 @@ def detail_scene(
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     tags_of = {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids}
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
-    lidar_classes: dict[str, str] = {}
-    lidar_plans: dict[str, tuple[str, RoofSpread]] = {}
-    lidar_evidence: dict[str, dict[str, object]] = {}
-    if roof_spread is not None:
-        lidar_classes = _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg)
-        lidar_plans = {bid: (c, roof_spread.buildings[bid]) for bid, c in lidar_classes.items() if c in (FLAT, PITCHED)}
-        lidar_evidence = {bid: roof_spread.evidence(spread, c) for bid, (c, spread) in lidar_plans.items()}
+    lidar_classes = {} if roof_spread is None else _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg)
+    lidar_plans = {} if roof_spread is None else {bid: (c, roof_spread.buildings[bid]) for bid, c in lidar_classes.items() if c in (FLAT, PITCHED)}
+    lidar_evidence = {} if roof_spread is None else {bid: roof_spread.evidence(spread, c) for bid, (c, spread) in lidar_plans.items()}
     roof_plans = _roof_plans(ids, footprints, tree, key_of, tags_of, templates, heights_m, cfg, storey_heights, lent_roofs, lidar_plans)
     setbacks: Counter[str] = Counter()
 

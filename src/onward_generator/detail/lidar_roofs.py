@@ -132,7 +132,8 @@ def spread_spec(spread: RoofSpread, material: str) -> PitchedRoof:
     A rise of the spread, about half the real rise, puts the drawn ridge near the measured one, so the building does
     not grow by a whole default roof. With no direction the ridge runs along the long side.
     """
-    assert spread.p25_m is not None and spread.p75_m is not None  # classify returns pitched only with both
+    if spread.p25_m is None or spread.p75_m is None:
+        raise ValueError("a gable needs both percentiles; classify gives pitched only with both")
     rise = min(max(spread.p75_m - spread.p25_m, MIN_RISE_M), DEFAULT_MAX_RISE_M)
     return PitchedRoof(shape="gabled", tag="gabled", material=material, rise_m=rise, rise_rule=RULE, angle_deg=None,
                        direction_deg=None, across=False)

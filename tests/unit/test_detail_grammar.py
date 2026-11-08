@@ -315,6 +315,12 @@ def test_a_pitched_class_takes_a_tagged_or_lent_colour_as_a_tile_tint() -> None:
     assert (material, origin) == ("roof_flat_grey", "observed")
 
 
+def test_a_pitched_class_drops_a_template_hip() -> None:
+    hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 30.0, 4.0, "roof_flat_light"))
+    template, material, *_ = choose_roof({}, hipped, CFG.seed, "b", 100.0, lidar=("pitched", SPREAD))
+    assert template.hip is None and template.pitched is not None and material == "roof_tile"
+
+
 def test_a_flat_class_keeps_the_template_and_draws_no_estimated_hip() -> None:
     bid = _coin_hip_id()
     assert choose_roof({}, RESIDENTIAL, CFG.seed, bid, 100.0, lidar=None)[0].hip is not None

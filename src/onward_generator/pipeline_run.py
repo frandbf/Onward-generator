@@ -273,15 +273,19 @@ def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None,
 def _roof_spread_input(root: Path) -> list[Path]:
     """The LiDAR report ``detail`` reads with ``"lidar_roofs": true`` (plan C3), so a new report makes detail stale."""
     try:
-        roof_spread = third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json")[3]
+        roof_spread = third_party_plan(root, root / GEO_SCENE)[3]
     except (MapError, PipelineError):
         return []
     return [roof_spread] if roof_spread is not None else []
 
 
+# The scene the source plugins of a map start from (``plan_steps`` reads it from the geo stage's ``--out``).
+GEO_SCENE = Path("data") / "processed" / "geo" / "geo_scene.json"
+
+
 def _source_stages(root: Path) -> list[SourceStage]:
     try:
-        return source_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json")[0]
+        return source_plan(root, root / GEO_SCENE)[0]
     except (MapError, PipelineError):
         return []
 
@@ -511,7 +515,8 @@ def output_ready(name: str, root: Path) -> bool:
     marker = _canon(root, name)
     if marker is None:
         return False
-    return _fresh(marker, _input_markers(root, name))
+    # With "lidar_roofs" detail also reads the LiDAR report (plan C3), so a newer report makes it stale.
+    return _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) if name == "detail" else []))
 
 
 # The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.
@@ -549,8 +554,7 @@ def _input_markers(root: Path, name: str) -> list[Path]:
     if previous is None:
         return []
     marker = _canon(root, previous)
-    extra = _roof_spread_input(root) if name == "detail" else []
-    return ([marker] if marker is not None else []) + extra
+    return [marker] if marker is not None else []
 
 
 def _fresh(marker: Path, inputs: Sequence[Path]) -> bool:

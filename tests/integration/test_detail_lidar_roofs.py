@@ -2,7 +2,7 @@
 
 A is a 20 x 10 m rectangle whose nDSM spread is 1.5 m over 20 cells (pitched), B a 12 x 12 m square with a 0.2 m
 spread (flat), C a rectangle with 4 valid cells (unclassified), D a tagged gabled house with a wide spread (the tag
-wins). The report is synthetic and made for the fixture scene.
+wins), E a rectangle the report does not name and that lies outside a 50 m core. The report is synthetic and made for the fixture scene.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ BUILDINGS: dict[int, tuple[list[tuple[float, float]], dict[str, str]]] = {
     902: ([(-10, 8), (2, 8), (2, 20), (-10, 20)], PLAIN),
     903: ([(10, 8), (22, 8), (22, 14), (10, 14)], PLAIN),
     904: ([(30, 8), (42, 8), (42, 16), (30, 16)], {**PLAIN, "roof:shape": "gabled"}),
+    905: ([(60, 8), (72, 8), (72, 18), (60, 18)], PLAIN),  # outside a 50 m core; not in the report
 }
 SPREADS = {
     "osm-way-901": {"valid": 20, "cells": 24, "p25_m": 5.0, "p75_m": 6.5},
@@ -99,8 +100,8 @@ def test_the_spread_draws_flat_and_pitched_roofs_with_their_evidence(block: tupl
     d = _building(on, "osm-way-904").record
     assert d["roof"]["origin"] == "observed" and "lidar" not in d["roof"] and d == _building(off, "osm-way-904").record
     assert on.stats["lidar_roofs"] == {
-        "source": "es.pnoa_ndsm", "buildings": 4, "core_buildings": 4, "flat": 1, "pitched": 1,
-        "unclassified": {"tagged": 1, "scenic": 0, "terrace": 0, "no_data": 0, "too_few_cells": 1, "not_rectangular": 0, "mixed": 0,
+        "source": "es.pnoa_ndsm", "buildings": 5, "core_buildings": 5, "flat": 1, "pitched": 1,
+        "unclassified": {"tagged": 1, "scenic": 0, "terrace": 0, "no_data": 1, "too_few_cells": 1, "not_rectangular": 0, "mixed": 0,
                          "ambiguous": 0, "fallback": 0},
     }
     assert on.inputs["roof_spread"] == {"path": str(block[3]), "sha256": hashlib.sha256(block[3].read_bytes()).hexdigest(),
@@ -142,19 +143,36 @@ def test_a_pitched_class_that_cannot_be_drawn_falls_back_flat_and_is_counted(blo
     assert issue.message == "the estimated gable (nDSM spread) drawn flat: rise_too_small"
 
 
-def test_without_a_classified_roof_no_attribution_is_added(block: tuple[Path, Path, Path, Path], tmp_path: Path) -> None:
+@pytest.mark.parametrize("kept", [None, "osm-way-901", "osm-way-902"])
+def test_the_attribution_line_comes_with_a_classified_roof(block: tuple[Path, Path, Path, Path], tmp_path: Path, kept: str | None) -> None:
     scene, heights, base, _ = block
     few = tmp_path / "few.json"
     doc = _report(scene)
     for entry in doc["buildings"]:
-        entry["valid"] = 2
+        if entry["id"] != kept:
+            entry["valid"] = 2
     few.write_text(json.dumps(doc), encoding="utf-8")
     generated, ref = load_base(base, scene, heights, GEN)
     detailed = detail_scene(generated, ref, heights, scene, CFG, roof_spread=load_roof_spread(str(few), str(scene)))
     off = _detail(block, False)
-    assert detailed.attribution == off.attribution
-    assert detailed.stats["lidar_roofs"]["unclassified"]["too_few_cells"] == 3
-    assert detailed.manifest()["objects"] == off.manifest()["objects"]
+    counts = detailed.stats["lidar_roofs"]
+    assert (counts["flat"], counts["pitched"]) == {None: (0, 0), "osm-way-901": (0, 1), "osm-way-902": (1, 0)}[kept]
+    assert counts["unclassified"]["too_few_cells"] == (3 if kept is None else 2)
+    line = {"text": ATTRIBUTION, "license": "CC-BY-4.0"}
+    assert detailed.attribution == off.attribution + ([] if kept is None else [line])
+    if kept is None:
+        assert detailed.manifest()["objects"] == off.manifest()["objects"]
+
+
+def test_a_scenic_shell_is_counted_apart_and_keeps_its_cap(block: tuple[Path, Path, Path, Path]) -> None:
+    scene, heights, base, report = block
+    generated, ref = load_base(base, scene, heights, GEN)
+    on = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0, roof_spread=load_roof_spread(str(report), str(scene)))
+    off = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0)
+    counts = on.stats["lidar_roofs"]
+    assert (counts["buildings"], counts["core_buildings"], counts["unclassified"]["scenic"], counts["unclassified"]["no_data"]) == (5, 4, 1, 0)
+    assert _building(on, "osm-way-905").record == _building(off, "osm-way-905").record
+    assert _building(on, "osm-way-901").record["roof"]["type"] == "gabled"
 
 
 def _cli(block: tuple[Path, Path, Path, Path], out: Path, *extra: str) -> int:

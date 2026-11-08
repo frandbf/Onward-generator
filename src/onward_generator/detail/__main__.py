@@ -7,7 +7,7 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 import numpy as np
 
@@ -121,7 +121,7 @@ SPREAD_REPORT_SCHEMA = "onward_generator.source_heights_report"
 SPREAD_META = ("source", "provider", "license", "attribution")
 
 
-def _is_count(value: object) -> bool:
+def _is_count(value: object) -> TypeGuard[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
@@ -139,9 +139,8 @@ def _spread(entry: object, buildings: set[str]) -> tuple[str, RoofSpread] | str:
     p25, p75, valid, cells = (entry.get(k) for k in ("p25_m", "p75_m", "valid", "cells"))
     if not (_is_metres(p25) and _is_metres(p75)) or "p25_m" not in entry or "p75_m" not in entry:
         return f"building {bid}: p25_m and p75_m must be numbers or null"
-    if not (_is_count(valid) and _is_count(cells)):
+    if not _is_count(valid) or not _is_count(cells):
         return f"building {bid}: valid and cells must be counts"
-    assert isinstance(valid, int) and isinstance(cells, int)  # _is_count checked both
     if valid > cells:
         return f"building {bid}: {valid} valid cells of {cells}"
     if p25 is not None and p75 is not None and p25 > p75:

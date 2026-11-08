@@ -550,7 +550,31 @@ def test_the_lidar_roofs_switch_hands_the_report_to_detail_and_marks_detail_stal
     report.write_text("{}", encoding="utf-8")
     os.utime(report, (1_000_000, 1_000_000))
     assert output_ready("detail", root)
-    os.utime(report, (1_000_003, 1_000_003))  # a new report makes detail stale
-    assert not output_ready("detail", root)
+    heights = processed / "heights" / "heights.json"
+    heights.parent.mkdir(parents=True, exist_ok=True)
+    heights.write_text("{}", encoding="utf-8")
+    os.utime(heights, (1_000_000, 1_000_000))
+    os.utime(report, (1_000_003, 1_000_003))  # a new report makes detail stale, and only detail
+    assert not output_ready("detail", root) and output_ready("generate", root)
     store_lidar_roofs(root, False)
     assert output_ready("detail", root)
+
+
+def test_a_broken_lidar_roofs_switch_leaves_detail_freshness_to_the_base(tmp_path: Path) -> None:
+    import os
+
+    from onward_generator.pipeline_run import output_ready
+
+    root = (tmp_path / "murcia").resolve()
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps(document | {"lidar_roofs": "yes"}), encoding="utf-8")
+    processed = root / "data" / "processed"
+    for name, when in (("scene3d/scene_visual.glb", 1), ("scene_detail/scene_visual.glb", 2)):
+        path = processed / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+        os.utime(path, (1_000_000 + when, 1_000_000 + when))
+    assert output_ready("detail", root)
+    os.utime(processed / "scene3d" / "scene_visual.glb", (1_000_003, 1_000_003))
+    assert not output_ready("detail", root)
