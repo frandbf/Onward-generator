@@ -375,7 +375,7 @@ def _assert_calm_plan(path: Path) -> None:
     """Refuse a library plan that binds a roof or paving tile over its limit, before anything is written."""
     from onward_generator.materials.library_plan import assert_library_entries
 
-    document = json.loads(path.read_text(encoding="utf-8"))
+    document = json.loads(path.read_bytes())
     if document.get("provider") == "library":
         assert_library_entries(document, extended=True)
 

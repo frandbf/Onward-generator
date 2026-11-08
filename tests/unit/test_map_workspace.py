@@ -589,3 +589,12 @@ def test_refresh_with_repetition_picks_calm_roofs_and_paving(tmp_path: Path) -> 
     store_repetition(root, True)
     assert picks() == deterministic_choices(rows, seed, extended=True)
     assert deterministic_choices(rows, seed, extended=True) != deterministic_choices(rows, seed)
+
+
+def test_map_create_chooses_from_the_default_pools(tmp_path: Path) -> None:
+    from onward_generator.materials.library_plan import deterministic_choices, library_rows
+
+    root = _atlas_map(tmp_path)
+    plan = json.loads((root / "config" / "texture_plan.json").read_text(encoding="utf-8"))
+    seed = int(load_map(root).get("seed") or 0)
+    assert {row["id"]: row["library_id"] for row in plan["entries"]} == deterministic_choices(library_rows(), seed)

@@ -487,3 +487,73 @@ def test_the_over_limit_verdict_is_on_the_unrounded_value(tmp_path: Path, monkey
     monkeypatch.setattr(library_plan, "coarse_contrast", lambda _path: 0.016)
     (row,) = library_plan.repetition_rows([_applied("streets_plazas", "x")], {"x": path})
     assert row["over_limit"] is False
+
+
+class _Recording:
+    """A provider that replays ``replies`` in turn and keeps every instruction it was given."""
+
+    def __init__(self, *replies: str) -> None:
+        self.replies = list(replies)
+        self.instructions: list[dict] = []
+
+    def complete(self, system: str, instruction: str, schema: dict) -> object:
+        from onward_generator.ai.providers import ProviderResult
+
+        self.instructions.append(json.loads(instruction))
+        return ProviderResult(self.replies.pop(0), {"provider": "test", "source": "test", "model": None})
+
+
+def _busy_roof_only() -> list[dict[str, str]]:
+    row = _fixture_row("fx_roof_busy", "RoofingTiles012C")
+    row["path"] = "assets/textures/ambientcg/acg_roofingtiles012c.jpg"
+    return [row]
+
+
+def test_unfilled_slots_measure_roofs_only_when_extended() -> None:
+    rows = _busy_roof_only()
+    assert "roofs" not in unfilled_slots(rows)
+    assert "roofs" in unfilled_slots(rows, extended=True)
+
+
+def test_the_model_is_shown_the_extended_pools_and_the_brief() -> None:
+    rows = library_rows()
+    choices = deterministic_choices(rows, 2, extended=True)
+    good = json.dumps({"choices": [{"slot": key, "library_id": value} for key, value in choices.items()]})
+    provider = _Recording('{"choices": []}', good)
+    plan = select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                               brief="abandoned old town", seed=2, provider=provider, library=rows, extended=True)
+    assert plan["selector"] == "ollama"
+    first, second = provider.instructions
+    assert "acg_roofingtiles012c" not in first["ids_by_family"]["roof"]
+    assert set(first["ids_by_family"]["roof"]) == CALM_ROOF
+    assert set(first["ids_by_family"]["paving"]) == CALM_PAVING
+    assert first["map"]["brief"] == "abandoned old town"
+    assert first["complaint"] == ""
+    assert second["complaint"].startswith("texture reply missed")
+    assert plan["atmosphere"] == "abandoned"
+    assert plan["description"].startswith("Textures for Murcia, chosen from the imported library (ollama).")
+
+
+def test_an_accepted_extended_reply_names_the_extended_gaps() -> None:
+    rows = _busy_roof_only()
+    common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
+              "brief": "abandoned", "seed": 2, "library": rows}
+    extended = select_texture_plan(**common, provider=_Recording('{"choices": []}'), extended=True)
+    assert extended["selector"] == "ollama" and extended["atmosphere"] == "abandoned"
+    assert extended["description"].startswith("Textures for Murcia, chosen from the imported library (ollama).")
+    assert "roofs (roof)" in extended["description"]
+
+
+@pytest.mark.parametrize("extended", [False, True])
+def test_a_fallback_plan_keeps_the_name_the_brief_and_the_extended_gaps(extended: bool) -> None:
+    rows = _busy_roof_only()
+    common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
+              "brief": "abandoned", "seed": 2, "library": rows}
+    plan = select_texture_plan(**common, provider=_Recording("not json", "not json"), extended=extended)
+    assert plan["selector"] == "library" and plan["atmosphere"] == "abandoned"
+    assert plan["description"].startswith("Textures for Murcia, chosen from the imported library (library).")
+    assert ("roofs (roof)" in plan["description"]) is extended
+    direct = select_texture_plan(**common, extended=extended)
+    assert direct["atmosphere"] == "abandoned"
+    assert direct["description"].startswith("Textures for Murcia, chosen from the imported library (library).")
+    assert ("roofs (roof)" in direct["description"]) is extended

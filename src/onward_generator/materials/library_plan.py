@@ -211,7 +211,7 @@ def is_calm(row: Mapping[str, Any], limit: float | None = None, *, extended: boo
     return coarse_contrast(path) <= (family_limit if limit is None else limit)
 
 
-def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool = False) -> dict[str, list[dict[str, Any]]]:
+def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool) -> dict[str, list[dict[str, Any]]]:
     pools: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         family = texture_family(row)
@@ -255,7 +255,7 @@ def deterministic_choices(rows: Sequence[Mapping[str, Any]], seed: int, *, exten
 
 
 def _document(name: str, choices: Mapping[str, str], rows: Sequence[Mapping[str, Any]], *, selector: str, brief: str | None,
-              extended: bool = False) -> dict[str, Any]:
+              extended: bool) -> dict[str, Any]:
     by_id = {str(row["id"]): row for row in rows}
     entries = [_entry(slot, by_id[library_id]) for slot, library_id in choices.items()]
     entries.sort(key=lambda row: row["id"])
@@ -310,8 +310,8 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]], *, extended: bo
     return chosen
 
 
-def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], seed: int, complaint: str | None,
-         extended: bool = False) -> dict[str, str]:
+def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], complaint: str | None,
+         extended: bool) -> dict[str, str]:
     pools = _pools(rows, extended=extended)
     listed = {
         family: [row["id"] for row in pool]
@@ -355,7 +355,7 @@ def select_texture_plan(
         try:
             choices = _ask(
                 provider, name=name, map_id=map_id, latitude=latitude, longitude=longitude,
-                brief=brief, rows=rows, seed=seed, complaint=complaint, extended=extended,
+                brief=brief, rows=rows, complaint=complaint, extended=extended,
             )
             return _document(name, choices, rows, selector="ollama", brief=brief, extended=extended)
         except ProviderError as exc:

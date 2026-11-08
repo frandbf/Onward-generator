@@ -115,7 +115,7 @@ def create_map(
     atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, core or radius_m + margin_m))
     _write_texture_plan(
         root, map_id=map_id, name=title, latitude=latitude, longitude=longitude,
-        brief=brief, seed=seed, provider=texture_provider,
+        brief=brief, seed=seed, provider=texture_provider, extended=False,
     )
 
     project_result = validate_config_file(root / project_rel)
@@ -402,7 +402,7 @@ def _write_texture_plan(
     brief: str | None,
     seed: int,
     provider: Provider | None,
-    extended: bool = False,
+    extended: bool,
 ) -> Path:
     document = select_texture_plan(
         name=name,

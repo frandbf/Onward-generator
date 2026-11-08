@@ -740,3 +740,34 @@ def test_cell_metres_accepts_a_small_positive_cell() -> None:
 
     assert cell_metres("0.5") == 0.5
     assert cell_metres("100") == 100.0
+
+
+@pytest.mark.parametrize(("over", "expected"), [([], "none"), (["acg_a", "acg_b"], "acg_a, acg_b")])
+def test_cli_prints_the_repetition_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+                                        over: list[str], expected: str) -> None:
+    from onward_generator.materials import __main__ as cli
+
+    def fake(base: str, out: str, **kwargs: Any) -> dict[str, Any]:
+        return {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False,
+                "repetition": {"cell_m": kwargs["cell_m"], "slots": [{}, {}, {}], "over_limit": over}}
+
+    monkeypatch.setattr(cli, "apply_materials", fake)
+    monkeypatch.setattr(cli, "emit", lambda _command: None)
+    assert cli.main(["apply", "--base", "b", "--out", str(tmp_path / "o"), "--repetition", "--cell-m", "50"]) == 0
+    assert f"repetition: cell 50 m, slots=3 over limit: {expected}\n" in capsys.readouterr().out
+
+
+def test_apply_reports_every_tile_over_its_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Poly Haven plan is reported, not refused; the over_limit list names each asset once."""
+    from onward_generator.materials import library_plan
+
+    cache = tmp_path / "cache"
+    _cache_plan(cache)
+    base = _write_base(tmp_path)
+    monkeypatch.setattr(library_plan, "coarse_contrast", lambda _path: 1.0)
+    report = apply_materials(base, tmp_path / "out", cache_dir=cache, download=False,
+                             plan_path=_polyhaven_plan(tmp_path / "plan.json"), repetition=True)
+    block = report["repetition"]
+    measured = [row for row in block["slots"] if row["status"] == "measured"]
+    assert measured and all(row["over_limit"] for row in measured)
+    assert block["over_limit"] == sorted({row["asset_id"] for row in measured})

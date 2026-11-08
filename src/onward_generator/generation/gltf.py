@@ -264,9 +264,9 @@ def island_cell_phases(vertices: np.ndarray, triangles: np.ndarray, material: st
     bounds, on x and -y, floored by ``cell_m``. The shift is rigid per island, so no seam opens
     inside one.
     """
-    points = np.asarray(vertices, dtype=np.float64)
+    points = np.asarray(vertices)
     if len(points) == 0:
-        return np.zeros((0, 2), dtype=np.float64)
+        return np.zeros((0, 2))
     _, island = np.unique(uv_islands(triangles, len(points)), return_inverse=True)
     count = int(island.max()) + 1
     low = np.full((count, 2), np.inf)
@@ -279,7 +279,7 @@ def island_cell_phases(vertices: np.ndarray, triangles: np.ndarray, material: st
             math.floor(-(float(low[index, 1]) + float(high[index, 1])) / 2 / cell_m),
         ))
         for index in range(count)
-    ], dtype=np.float64)
+    ])
     return phases[island]
 
 
