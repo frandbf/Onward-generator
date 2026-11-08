@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     lay = sub.add_parser("layout", help="spawn/objective fixture for the device measurement map")
     lay.add_argument("--scene", required=True)
     lay.add_argument("--heights", required=True)
-    lay.add_argument("--base", required=True, help="validated phase 03 directory")  # pragma: no mutate: help text
+    lay.add_argument("--base", required=True, help="validated phase 03 directory")
     lay.add_argument("--detail", required=True, help="phase 04 directory (urban element positions)")
     lay.add_argument("--generation-config", default=None)
     lay.add_argument("--out", required=True, help="output JSON")
@@ -75,7 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     cov = sub.add_parser("cover", help="copy the playable scene and stand solid catalogue props on its long open sightlines (plan C7)")  # pragma: no mutate: help text
     cov.add_argument("--scene", required=True)
     cov.add_argument("--heights", required=True)
-    cov.add_argument("--base", required=True, help="validated phase 03 directory")
+    cov.add_argument("--base", required=True, help="validated phase 03 directory")  # pragma: no mutate: help text
     cov.add_argument("--detail", required=True, help="the bounds output (scene_playable)")  # pragma: no mutate: help text
     cov.add_argument("--layout", required=True, help="the playable layout.json (perf layout --playable)")  # pragma: no mutate: help text
     cov.add_argument("--library", default="assets", help="catalogue folder (default assets)")  # pragma: no mutate: help text
