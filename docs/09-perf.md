@@ -316,3 +316,31 @@ Pending (not done; the option stays off until they pass):
 - [ ] Headset (Quest 3), option on and off: the ring's brightness and colour sit with the fog, no seam at the core wall, median at least 72 fps, views A and B at or under 150 draws, graphics memory at or under 1 GB.
 
 Then the ADR-017 amendment goes from proposed to accepted, or the option is dropped.
+
+
+## Lightmap page budget
+
+Plan C5 (U2 of the scale-and-speed plan) is covered by the ADR-005 amendment of 8 November 2026 (proposed) and is off by default. It is turned on by the export card's `build.lightmap_pages_max: N` or `bench.py run --lightmap-pages-max N`, which sets it in each run copy's card. `export package` then lowers `lightmap_texels_per_m`, in 0.25 steps and never below 4 texels/m, until `lightmap_estimate.pages_at_least` is at most N. The rules are in [12-export.md](12-export.md#lighting). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline`, on 8 November 2026.
+
+- **Off.** `bench.py check` finds no difference outside timings between run `c5_off` and the baseline `c5_baseline` (HEAD of plan C4), and every map's `adapter_options.json` and `package_id` are byte-identical.
+- **On, N = 8.** Run `c5_on8` against `c5_off`. Only Madrid r300 is over the budget at 10 texels/m, as U2 expected (only at 40 texels/m or from r300).
+- **On, N = 8, with plan C4.** Run `c5_on8_scenic` (Madrid only, `--scenic-out-of-lightmap` too): the scenic walls leave the estimate first, Madrid is at 8 pages at 10 texels/m, and the density is kept.
+
+| Map | Texels/m: card → applied | Lightmap texels (estimate) | Pages at least | Triangles, draws, view draws |
+| --- | --- | --- | --- | --- |
+| bench_murcia r150 | 10, kept | 13 796 669, 0 | 4, 0 | 150 339; 213; 85 / 181 / 213: 0 |
+| bench_madrid r300 | 10 → 8.75 | 42 183 417 → 32 296 678 | 11 → 8 | 398 025; 504; 175 / 374 / 448: 0 |
+| bench_madrid r300, with C4 | 10, kept | 42 183 417 → 30 723 971 | 11 → 8 | 398 025; 504: 0 |
+| bench_paris r50 | 40, kept | 11 516 466, 0 | 3, 0 | 47 585; 91; 34 / 77 / 91: 0 |
+| bench_krakow r150 | 10, kept | 6 995 380, 0 | 2, 0 | 72 884; 272; 95 / 219 / 268: 0 |
+
+At 9 texels/m Madrid would need 34.2 M texels, over the 33.6 M of 8 pages of 2048 px, so 8.75 is the largest density on the grid that fits. A map whose budget does not bind keeps its density but gets a new `package_id`, since the card changed. The figures are the export estimate, a lower bound on pages, not a bake: Unity packed 5 pages for 17.8 M texels on Barcelona r150 and 24 pages for Paris at 40 texels/m, where the estimate said 3, so the measured count can still exceed N (`unity.status` is `missing` on every bench map).
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Unity 2021.3.23f1: build bench_madrid with `build.lightmap_pages_max` 8 and without it, `task unity -- --bake draft` and `--bake final`; compare `lightmaps`, `lightmap_texels`, `seconds.gi_bake` and `seconds.bake` with `python tools/unity/report_timings.py <pkgA> <pkgB>`. The `lightmaps` count of `build/scene_report.json` is at most 8, or record how far the lower-bound estimate is off (A3).
+- [ ] Scene log: the `Lightmaps: N, T texels, at X texels/m` line shows 8.75, and no new object with overlapping UVs beyond the known sign rims.
+- [ ] Editor views A, B and a close facade: shadows softer, with no blotches, seams or black charts at the lowered density.
+- [ ] Headset (Quest 3), budget on and off on bench_madrid or another r300 map: shadow and contact-shadow quality on facades and streets acceptable, median at least 72 fps, views A and B at or under 150 draws, graphics memory at or under 1 GB, load time noted.
+
+Then the ADR-005 amendment goes from proposed to accepted, or the option is dropped.

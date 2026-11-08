@@ -537,6 +537,7 @@ The first run downloads OSM and the source plugins' data, then copies what it do
 - with `run --gameplay-report`, `gameplay`: the headline of each map's `gameplay_report.json`;
 - with `run --repetition` (plan C1), `repetition`: `slots_measured`, `max_ratio` (largest coarse contrast over its limit) and `over_limit_count` from the `repetition` block of `scene_materials/materials_report.json`. The flag sets `"repetition": true` in the run copy's `map.json` and rewrites the run copy's texture plan from the extended pools; the frozen inputs do not change. A report without the flag has no `repetition` key, and `bench_diff.md` shows the rows only when a report has them.
 - with `run --overture-tints` (plan C2), nothing new in the report: the flag sets `"overture_tints": true` in the run copy's `map.json`, so `overture match --tints` and `detail --overture-tints` run; the frozen inputs do not change. Its effect shows in the triangles and draws.
+- with `run --scenic-out-of-lightmap` (plan C4) or `run --lightmap-pages-max N` (plan C5, N a whole number of at least 1), nothing new in the report: the flags set `build.scenic_out_of_lightmap: true` or `build.lightmap_pages_max: N` in each run copy's export card; the frozen inputs do not change. Their effect shows in `lightmap.pages_at_least` and `texels`; the density a budget applied is in each package's `onward_export.json` `lightmap_estimate`.
 
 `created_at`, `package_id` and every path are left out. Everything that cannot be reproduced sits under `timings`:
 
