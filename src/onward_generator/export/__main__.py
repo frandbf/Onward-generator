@@ -52,8 +52,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     for f in m["files"]:
         print(f"  {f['path']}: {f['bytes']} bytes, sha256 {f['sha256'][:12]}")
     lm = m["lightmap_estimate"]
+    budget = ""
+    if "lightmap_pages_max" in lm:
+        budget = (f", lowered from {lm['texels_per_m_requested']:g} t/m by build.lightmap_pages_max {lm['lightmap_pages_max']}"
+                  if lm["texels_per_m"] != lm["texels_per_m_requested"]
+                  else f", within build.lightmap_pages_max {lm['lightmap_pages_max']}")
     print(f"  lightmap estimate: {lm['texels']:,} texels at {lm['texels_per_m']:g} texels/m, "
-          f"at least {lm['pages_at_least']} pages of {lm['max_size']} px")
+          f"at least {lm['pages_at_least']} pages of {lm['max_size']} px{budget}")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0
 

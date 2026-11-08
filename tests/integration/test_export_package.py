@@ -18,7 +18,16 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
-from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales, surface_class
+from onward_generator.export.lightmap import (
+    DEFAULT_CLASS_SCALES,
+    LIGHTMAP_DENSITY_STEP,
+    estimate,
+    lightmap_areas,
+    material_scales,
+    page_budget_density,
+    pages_at_least,
+    surface_class,
+)
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
     MANIFEST_FILE,
@@ -198,6 +207,14 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(scenic_out_of_lightmap=1), "/build/scenic_out_of_lightmap"),
     (lambda c: c["build"].update(scenic_out_of_lightmap=None), "/build/scenic_out_of_lightmap"),
     (lambda c: c["build"].update(scenic_out_of_lightmaps=True), "scenic_out_of_lightmaps"),
+    (lambda c: c["build"].update(lightmap_pages_max=0), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max=-1), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max=2.5), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max="8"), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max=True), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max=None), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_pages_max=65), "/build/lightmap_pages_max"),
+    (lambda c: c["build"].update(lightmap_page_max=8), "lightmap_page_max"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -222,6 +239,99 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
     assert result.manifest["lightmap_estimate"] == estimate(
         visual, texels_per_m=float(build["lightmap_texels_per_m"]), max_size=int(build["lightmap_max_size"]),
         cell_m=float(build["combine_cell_m"]), scales=scales)
+
+
+ESTIMATE_KEYS = {"texels_per_m", "max_size", "renderers", "renderers_capped", "texels", "texels_by_class", "pages_at_least"}
+
+
+def _budget_card(tmp_path: Path, name: str, **build: Any) -> Path:
+    """The default card at 512 px pages, where the fixture needs 4 pages at 10 texels/m and 2 at the 4 t/m floor."""
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"].update({"lightmap_max_size": 512, **build})
+    path = tmp_path / f"{name}.json"
+    path.write_text(json.dumps(cfg), encoding="utf-8")
+    return path
+
+
+def _fixture_areas(inputs: tuple[Path, Path]) -> tuple[Any, list[dict[str, Any]]]:
+    visual = (inputs[0] / "scene_visual.glb").read_bytes()
+    names = [str(m.get("name")) for m in read_glb(visual)[0].get("materials") or []]
+    return lightmap_areas(visual, cell_m=100.0), material_scales(names, DEFAULT_CLASS_SCALES)
+
+
+def test_lightmap_pages_max_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    """Plan C5: a card without the key runs no budget code; options and estimate keep their keys and values."""
+    assert "lightmap_pages_max" not in load(EXPORT_CONFIG_DEFAULT)["build"]
+    off = package(inputs, tmp_path / "off", export_config=_budget_card(tmp_path, "off"))
+    options = load(off.directory / "adapter_options.json")
+    assert "lightmap_pages_max" not in options and options["lightmap_texels_per_m"] == 10.0
+    lm = off.manifest["lightmap_estimate"]
+    assert set(lm) == ESTIMATE_KEYS and lm["pages_at_least"] == 4
+    again = package(inputs, tmp_path / "again", export_config=_budget_card(tmp_path, "again"))
+    assert again.manifest["package_id"] == off.manifest["package_id"]
+    assert (again.directory / "adapter_options.json").read_bytes() == (off.directory / "adapter_options.json").read_bytes()
+
+
+def test_lightmap_pages_max_lowers_the_adapter_density(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    areas, scales = _fixture_areas(inputs)
+    expected = page_budget_density(areas, requested=10.0, pages_max=3, max_size=512, scales=scales)
+    assert 4.0 <= expected < 10.0 and pages_at_least(areas, expected + LIGHTMAP_DENSITY_STEP, max_size=512, scales=scales) > 3
+    off = package(inputs, tmp_path / "off", export_config=_budget_card(tmp_path, "off"))
+    on = package(inputs, tmp_path / "on", export_config=_budget_card(tmp_path, "on", lightmap_pages_max=3))
+    options = load(on.directory / "adapter_options.json")
+    assert options["lightmap_texels_per_m"] == expected and options["lightmap_pages_max"] == 3
+    off_options = load(off.directory / "adapter_options.json")
+    assert {k: v for k, v in options.items() if k not in ("variant", "lightmap_texels_per_m", "lightmap_pages_max")} == {
+        k: v for k, v in off_options.items() if k not in ("variant", "lightmap_texels_per_m")}
+    lm = on.manifest["lightmap_estimate"]
+    assert set(lm) == ESTIMATE_KEYS | {"texels_per_m_requested", "lightmap_pages_max"}
+    assert (lm["texels_per_m"], lm["texels_per_m_requested"], lm["lightmap_pages_max"]) == (expected, 10.0, 3)
+    assert lm["pages_at_least"] <= 3 < off.manifest["lightmap_estimate"]["pages_at_least"]
+    assert {k: v for k, v in lm.items() if k not in ("texels_per_m_requested", "lightmap_pages_max")} == estimate(
+        (inputs[0] / "scene_visual.glb").read_bytes(), texels_per_m=expected, max_size=512, cell_m=100.0, scales=scales)
+    assert on.manifest["tiers"] == off.manifest["tiers"] and on.manifest["view_draws"] == off.manifest["view_draws"]
+    assert on.manifest["package_id"] != off.manifest["package_id"]
+
+
+@pytest.mark.parametrize("pages_max", [4, 5, 64])
+def test_lightmap_pages_max_within_budget_keeps_the_density(inputs: tuple[Path, Path], tmp_path: Path, pages_max: int) -> None:
+    off = package(inputs, tmp_path / "off", export_config=_budget_card(tmp_path, "off"))
+    on = package(inputs, tmp_path / "on", export_config=_budget_card(tmp_path, "on", lightmap_pages_max=pages_max))
+    options, off_options = load(on.directory / "adapter_options.json"), load(off.directory / "adapter_options.json")
+    assert options["lightmap_texels_per_m"] == 10.0
+    assert {k: v for k, v in options.items() if k not in ("variant", "lightmap_pages_max")} == {
+        k: v for k, v in off_options.items() if k != "variant"}
+    lm = on.manifest["lightmap_estimate"]
+    assert lm == {**off.manifest["lightmap_estimate"], "texels_per_m_requested": 10.0, "lightmap_pages_max": pages_max}
+    # The card changed, so the package does too, although the density did not.
+    assert on.manifest["package_id"] != off.manifest["package_id"]
+
+
+def test_lightmap_pages_max_unreachable_is_refused(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    with pytest.raises(ExportError) as caught:
+        package(inputs, tmp_path / "pkg", export_config=_budget_card(tmp_path, "one", lightmap_pages_max=1))
+    assert caught.value.problems == [
+        "export config: /build/lightmap_pages_max: build.lightmap_pages_max 1 cannot be met: the lightmap needs at "
+        "least 2 pages at 4 texels/m, and the density never goes below the 4 texels/m floor (ADR-005)"
+    ]
+    assert not (tmp_path / "pkg").exists()
+
+
+def test_cli_package_prints_the_budget(inputs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    detail, layout = inputs
+    args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
+    assert main([*args, "--out", str(tmp_path / "on"), "--config", str(_budget_card(tmp_path, "on", lightmap_pages_max=3))]) == 0
+    lm = load(tmp_path / "on" / MANIFEST_FILE)["lightmap_estimate"]
+    assert (f"  lightmap estimate: {lm['texels']:,} texels at {lm['texels_per_m']:g} texels/m, at least "
+            f"{lm['pages_at_least']} pages of 512 px, lowered from 10 t/m by build.lightmap_pages_max 3\n") in capsys.readouterr().out
+    assert main([*args, "--out", str(tmp_path / "in"), "--config", str(_budget_card(tmp_path, "in", lightmap_pages_max=4))]) == 0
+    lm = load(tmp_path / "in" / MANIFEST_FILE)["lightmap_estimate"]
+    assert (f"  lightmap estimate: {lm['texels']:,} texels at 10 texels/m, at least 4 pages of 512 px, "
+            "within build.lightmap_pages_max 4\n") in capsys.readouterr().out
+    assert main([*args, "--out", str(tmp_path / "off"), "--config", str(_budget_card(tmp_path, "off"))]) == 0
+    assert "pages of 512 px\n" in capsys.readouterr().out
+    assert main([*args, "--out", str(tmp_path / "no"), "--config", str(_budget_card(tmp_path, "no", lightmap_pages_max=1))]) == 1
+    assert "/build/lightmap_pages_max" in capsys.readouterr().err
 
 
 def test_albedo_compression_reaches_the_adapter_options(inputs: tuple[Path, Path], tmp_path: Path) -> None:

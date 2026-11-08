@@ -421,3 +421,24 @@ def test_scenic_out_of_lightmap_run_switches_the_run_copy_only(workdir: Path) ->
     assert {k: v for k, v in on_card.items() if k != "build"} == {k: v for k, v in off_card.items() if k != "build"}
     assert bench.inputs_sha256(inputs) == digest
     assert "scenic_out_of_lightmap" not in json.loads((inputs / card_rel).read_text(encoding="utf-8"))["build"]
+
+
+def test_lightmap_pages_max_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    assert _run(root, "r1", Stub()) == 0
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    card_rel = json.loads((inputs / "map.json").read_text(encoding="utf-8"))["paths"]["export"]
+    off_card = json.loads((root / "runs" / "r1" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert "lightmap_pages_max" not in off_card["build"]
+
+    assert _run(root, "r2", Stub(), "--offline", "--lightmap-pages-max", "8") == 0
+    on_card = json.loads((root / "runs" / "r2" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert on_card["build"] == {**off_card["build"], "lightmap_pages_max": 8}
+    assert {k: v for k, v in on_card.items() if k != "build"} == {k: v for k, v in off_card.items() if k != "build"}
+    assert bench.inputs_sha256(inputs) == digest
+    assert "lightmap_pages_max" not in json.loads((inputs / card_rel).read_text(encoding="utf-8"))["build"]
+
+    assert _run(root, "r3", Stub(), "--offline", "--lightmap-pages-max", "6", "--scenic-out-of-lightmap") == 0
+    both = json.loads((root / "runs" / "r3" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert both["build"] == {**off_card["build"], "scenic_out_of_lightmap": True, "lightmap_pages_max": 6}
