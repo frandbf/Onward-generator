@@ -189,6 +189,7 @@ Plan C6, the ADR-032 C6 amendment (proposed), off by default (`perf layout --pla
 
 - **Off.** Run `c6_off` against `head_off` (workshop/c5): `bench.py check` finds no difference outside timings; `layout.json`, `gameplay_report.json` and every package file but `onward_export.json` are byte-identical.
 - **On.** Runs `c6_on` and `c6_on2` are the same apart from timings, with byte-identical `layout.json` and `gameplay_report.json`. Triangles, draws and lightmap pages are those of `c6_off`.
+- **After the mutation fixes.** Runs `c6_off_b` and `c6_on_b` repeat `c6_off` and `c6_on`: `bench.py check` finds no difference outside timings, and every `layout.json` and `gameplay_report.json` is byte-identical.
 
 | Map | Candidate | Contact difference off → on | Distinct routes off → on | Max overlap off → on | Layout stage off → on |
 | --- | --- | --- | --- | --- | --- |
