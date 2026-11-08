@@ -367,3 +367,33 @@ def test_a_landmark_is_lent_no_wall_colour() -> None:
     walls = _facade_walls(ids, PARTS, tree, features, height_of, [], CFG, lent=lent)
     assert walls["r"] == _facade_walls(ids, PARTS, tree, features, height_of, [], CFG)["r"]
     assert walls["q"][1:] == ("plaster_white__tint_ochre", "observed")
+
+
+def test_tint_source_names_overture_only_when_no_osm_colour_shares_the_building() -> None:
+    from onward_generator.detail.scene import tint_source
+
+    def record(wall: str | None, roof: str | None) -> dict[str, Any]:
+        return {"facade": {"materials": {"wall_source": wall, "roof_source": roof}}}
+
+    assert tint_source(record("overture:facade_color", None)) == "overture"
+    assert tint_source(record("building:material", "overture:roof_color")) == "overture"
+    assert tint_source(record("overture:facade_color", "roof:colour")) is None
+    assert tint_source(record("building:colour", "overture:roof_color")) is None
+    assert tint_source(record("building:colour", "roof:colour")) is None
+    assert tint_source(record(None, None)) is None and tint_source({"materials": []}) is None
+
+
+def test_why_a_lent_colour_decided_nothing() -> None:
+    from onward_generator.detail.scene import _tint_not_used
+
+    def record(source: str | None, origin: str, landmark: bool = False, tier: str | None = None) -> dict[str, Any]:
+        materials = {"wall_source": source, "wall_origin": origin, "roof_source": source, "roof_origin": origin}
+        return {"facade": {"materials": materials, "needs_custom_model": landmark}, **({"tier": tier} if tier else {})}
+
+    assert _tint_not_used(record("overture:facade_color", "observed"), "wall", "overture:facade_color") is None
+    assert _tint_not_used(record(None, "generated", tier="scenic"), "wall", "overture:facade_color") == "scenic"
+    assert _tint_not_used(record(None, "generated", landmark=True), "wall", "overture:facade_color") == "landmark"
+    assert _tint_not_used(record(None, "generated", landmark=True), "roof", "overture:roof_color") == "no_tint_material"
+    assert _tint_not_used(record("roof:colour", "observed"), "roof", "overture:roof_color") == "osm_tag"
+    assert _tint_not_used(record(None, "estimated"), "roof", "overture:roof_color") == "estimated_roof"
+    assert _tint_not_used(record(None, "generated"), "wall", "overture:facade_color") == "no_tint_material"

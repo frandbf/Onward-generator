@@ -137,8 +137,8 @@ def _first(tags: dict[str, str], key: str) -> str:
     return raw.split(";")[0].strip().lower()
 
 
-def _tinted(colours: Mapping[str, Material] | None, base: str, raw: str, palette: tuple[Tint, ...]) -> str | None:
-    """``base`` under the palette entry nearest ``raw``, when ``raw`` is a colour and ``colours`` defines that tint."""
+def _tinted(colours: Mapping[str, Material] | None, base: str, raw: str | None, palette: tuple[Tint, ...]) -> str | None:
+    """``base`` under the palette entry nearest ``raw``, when ``raw`` is a colour and ``colours`` defines that tint (``None`` is none)."""
     tint = quantize_colour(raw, palette)
     if tint is None or not colours:
         return None
@@ -187,7 +187,7 @@ def tagged_roof(tags: Mapping[str, str], colours: Mapping[str, Material] | None 
         return tinted, "roof:colour"
     if material:
         return material, "roof:material"
-    borrowed = _tinted(colours, base, lent, ROOF_PALETTE) if lent is not None else None
+    borrowed = _tinted(colours, base, lent, ROOF_PALETTE)
     return (borrowed, OVERTURE_ROOF) if borrowed else None
 
 

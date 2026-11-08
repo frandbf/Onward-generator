@@ -609,3 +609,20 @@ def test_the_tints_document_lists_licences_and_attribution(tmp_path: Path) -> No
     assert doc["tints"] == [t.to_dict() for t in tints]
     assert tints_document([], _record(tmp_path / "b.parquet"), {}, frame())["counts"] == {
         "rows": 0, "matched": 0, "facade": 0, "roof": 0, "skipped": {}}
+
+
+def test_an_unlisted_dataset_follows_the_default_origin(tmp_path: Path) -> None:
+    observed = dataclasses.replace(CFG, default_origin="observed")
+    tints, skipped = _tints(tmp_path, [building("o1", box(0, 0, 10, 10), facade="#ffffff", sources=[source("Someone", "CC0-1.0")])], observed)
+    assert [(t.facade.dataset, t.facade.origin) for t in tints if t.facade] == [("Someone", "observed")] and skipped == {"unmatched": 0}
+
+
+def test_without_osm_footprints_or_with_a_point_no_colour_is_paired(tmp_path: Path) -> None:
+    rows = [building("o1", box(0, 0, 10, 10), facade="#ffffff"), building("o2", box(0, 0, 10, 10), roof="#ffffff")]
+    assert match_tints(_buildings(tmp_path, rows), scene({}), CFG, BUILDING_ALLOWED) == ([], {"no_footprint": 2, "unmatched": 0})
+    tints, skipped = _tints(tmp_path, [
+        building("pair", MultiPolygon([box(12, 0, 22, 10), box(12, 20, 13, 21)]), facade="#ffffff"),
+        building("dot", Point(5, 5), facade="#ffffff"),
+        building("dot2", Point(5, 5), facade="#ffffff"),
+    ])
+    assert [(t.building_id, t.gers_id) for t in tints] == [("osm-way-2", "pair")] and skipped == {"no_footprint": 2, "unmatched": 0}

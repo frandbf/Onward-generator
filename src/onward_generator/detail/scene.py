@@ -417,7 +417,7 @@ def _facade_walls(
         if h.get("landmark"):
             use = FacadeUse("landmark", "observed", bid, None, "landmark")
             palette = cfg.templates[cfg.landmark_template].wall_materials
-            colour = None
+            colour = None  # pragma: no mutate: an empty colour parses as no colour, so the landmark keeps its wall either way
         else:
             use = resolve_use(bid, tags, [r for m in members[key] for r in related.get(m, [])])
             palette = cfg.facade_palettes[use.use]
@@ -599,7 +599,7 @@ def _third_party_tints(detailed: DetailedScene, objects: Sequence[DetailObject],
         if o.type != "building":
             continue
         key = key_of[o.record["source_ids"][0]]
-        for (part, lent_source), by_key in zip((("wall", OVERTURE_FACADE), ("roof", OVERTURE_ROOF)), lent, strict=True):
+        for part, lent_source, by_key in (("wall", OVERTURE_FACADE, lent[0]), ("roof", OVERTURE_ROOF, lent[1])):
             lend = by_key.get(key)
             if lend is None:
                 continue
@@ -1023,7 +1023,7 @@ def detail_scene(
     feature_of.update({p["id"]: place_feature(p) for p in places})
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
     lent_walls, lent_roofs = _lent_by_key(ids, key_of, tints or ())
-    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg, lent=lent_walls)
+    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)  # only the use is read from this pass
     heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
     templates = _templates(ids, height_of, cfg)
     ranking = load_source_config().evidence
@@ -1283,7 +1283,8 @@ def detail_scene(
         for entry in shops:
             if entry["poi_id"] in place_of:
                 entry["poi_source"] = place_source(place_of[entry["poi_id"]])
-        lent_wall = None if landmark else lent_walls.get(key_of[bid])
+        # A landmark was lent no wall colour (``_facade_walls``), so its OSM tag or generated wall leaves no Overture source here.
+        lent_wall = lent_walls.get(key_of[bid])
         lent_roof = lent_roofs.get(key_of[bid])
         wall_source = _source(tagged_wall(tags, cfg.materials, lent=_lent_colour(lent_wall)), wall_origin)
         roof_source = _source(tagged_roof(tags, cfg.materials, lent=_lent_colour(lent_roof)), roof_origin)

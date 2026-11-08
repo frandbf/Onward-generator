@@ -87,3 +87,29 @@ def test_the_cli_exits_one_before_writing_anything(tmp_path: Path, capsys: pytes
     assert main(args) == 1
     assert capsys.readouterr().err == f"detail: {missing} not found; rerun overture match --tints --overwrite\n"
     assert not out.exists()
+
+
+def test_a_scene_without_features_has_no_building_to_tint(tmp_path: Path) -> None:
+    path, _ = _files(tmp_path, [])
+    bare = tmp_path / "bare.json"
+    bare.write_text(json.dumps({"frame": frame().to_dict()}), encoding="utf-8")
+    assert load_tints(path, str(bare)) == []
+
+
+def test_the_budget_core_reads_the_tints_too(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    import onward_generator.detail.__main__ as cli
+
+    path, scene_path = _files(tmp_path, [_entry()])
+    seen: dict[str, Any] = {}
+
+    def budget(*args: Any, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        raise DetailError("stop")
+
+    monkeypatch.setattr(cli, "load_base", lambda *args: (None, {}))
+    monkeypatch.setattr(cli, "detail_scene_budget", budget)
+    args = ["--scene", scene_path, "--heights", str(tmp_path / "h.json"), "--base", str(tmp_path / "b"), "--no-preview",
+            "--core-radius-m", "100", "--core-target-triangles", "20000", "--overture-tints", path, "--out", str(tmp_path / "d")]
+    assert main(args) == 1
+    assert capsys.readouterr().err == "detail: stop\n"
+    assert seen["tints"] == [_entry()]

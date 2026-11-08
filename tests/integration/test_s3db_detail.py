@@ -241,7 +241,8 @@ def s3db_inputs(tmp_path_factory: pytest.TempPathFactory):
 
 def test_a_lent_colour_tints_a_plain_building_and_names_its_evidence(s3db_inputs) -> None:
     generated, ref, heights, scene = s3db_inputs
-    tints = [_tint(b) for b in ("osm-way-801", "osm-way-802", "osm-way-803", "osm-way-806", "osm-way-811")]
+    # 808 lends only a roof colour: the wall is not lent, and the roof still is.
+    tints = [_tint(b) for b in ("osm-way-801", "osm-way-802", "osm-way-803", "osm-way-806", "osm-way-811")] + [_tint("osm-way-808", facade=None)]
     tinted = detail_scene(generated, ref, heights, scene, CFG, tints=tints)
     assert not tinted.critical
     plain = _obj(tinted, "building/osm-way-806").record["facade"]["materials"]
@@ -254,6 +255,8 @@ def test_a_lent_colour_tints_a_plain_building_and_names_its_evidence(s3db_inputs
     # A pitched roof:shape takes the tile tint.
     hipped = _obj(tinted, "building/osm-way-802").record
     assert hipped["roof"]["material"] == "roof_tile__tint_red" and hipped["facade"]["materials"]["roof_source"] == "overture:roof_color"
+    roof_only = _obj(tinted, "building/osm-way-808").record["facade"]["materials"]
+    assert roof_only["wall_source"] is None and roof_only["roof"] == "roof_flat_grey__tint_red"
     # OSM colours win and carry no evidence; an OSM material keeps the wall while the roof still takes the lent colour.
     osm = _obj(tinted, "building/osm-way-801").record["facade"]["materials"]
     assert osm == {"wall": "plaster_white__tint_white", "wall_origin": "observed", "wall_source": "building:colour",
@@ -271,14 +274,14 @@ def test_a_lent_colour_tints_a_plain_building_and_names_its_evidence(s3db_inputs
     parts = [o for o in tinted.objects if o.type == "building_part"]
     assert parts and not any("overture" in str(o.record["materials"]) for o in parts)
     assert tinted.stats["third_party_tints"] == {
-        "matched": 5, "walls": 3, "roofs": 3, "by_dataset": {"Esri Community Maps": 6},
+        "matched": 6, "walls": 3, "roofs": 4, "by_dataset": {"Esri Community Maps": 7},
         "not_used": {"osm_tag": 3, "landmark": 0, "scenic": 0, "estimated_roof": 1, "no_tint_material": 0},
     }
     assert tinted.extra_attribution == [ESRI_LINE]
     assert tinted.attribution[-1] == ESRI_LINE
     # The visual node says when every tint on it is Overture's: not on 801, whose tints are OSM's.
     sources = {n.name: n.extras.get("tint_source") for n in tinted.visual_nodes() if n.name.startswith("building/")}
-    assert {k for k, v in sources.items() if v == "overture"} == {f"building/osm-way-{b}" for b in (802, 803, 806, 811)}
+    assert {k for k, v in sources.items() if v == "overture"} == {f"building/osm-way-{b}" for b in (802, 803, 806, 808, 811)}
     tints_used = {p.material for n in tinted.visual_nodes() for p in n.primitives if "__tint_" in p.material}
     assert tints_used == {"plaster_white__tint_white", "roof_tile__tint_grey", "plaster_white__tint_red", "plaster_white__tint_ochre",
                           "roof_tile__tint_red", "roof_flat_grey__tint_red"}
