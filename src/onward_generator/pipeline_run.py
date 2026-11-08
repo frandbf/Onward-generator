@@ -29,6 +29,7 @@ from onward_generator.maps.workspace import (
     map_storm,
     map_time_of_day,
     panoramax_enabled,
+    sightline_cover_enabled,
     store_brief,
     store_panoramax,
     store_sources,
@@ -183,8 +184,23 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         *(["--balanced-spawns"] if balanced_spawns_enabled(root) else []),
         "--out", show(layout_path),
     ).argv)
+    # Sightline cover (plan C7) copies the playable scene after the layout, so export reads that copy.
+    cover_steps: list[tuple[str, list[str]]] = []
+    exported = playable
+    if sightline_cover_enabled(root):
+        exported = root / "data" / "processed" / STAGE_DIRS["cover"]
+        cover_steps.append(("cover", list(invoke(
+            "perf", "cover",
+            "--scene", show(scene),
+            "--heights", show(heights),
+            "--base", show(scene3d),
+            "--detail", show(playable),
+            "--layout", show(layout_path),
+            "--library", show(Path("assets")),
+            "--out", show(exported),
+        ).argv)))
     export_argv = list(export_invocation(
-        root, playable, layout_path, root / "data" / "processed" / "export" / "pkg_01",
+        root, exported, layout_path, root / "data" / "processed" / "export" / "pkg_01",
     ).argv)
     picture_steps: list[tuple[str, list[str]]] = []
     if panoramax_argv is not None:
@@ -203,6 +219,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         ("fit", fit_argv),
         ("bounds", bounds_argv),
         ("layout", layout_argv),
+        *cover_steps,
         ("export", export_argv),
     ]
 
@@ -522,7 +539,7 @@ def output_ready(name: str, root: Path) -> bool:
 
 
 # The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.
-_MARKER_FILES = {"geo": "geo_scene.json", "heights": "heights.json", "fit": "fit.json", "layout": "layout.json"}
+_MARKER_FILES = {"geo": "geo_scene.json", "heights": "heights.json", "fit": "fit.json", "layout": "layout.json", "cover": "cover_report.json"}
 
 
 def _canon(root: Path, name: str) -> Path | None:
@@ -549,6 +566,7 @@ def _input_markers(root: Path, name: str) -> list[Path]:
         "fit": "overgrow",
         "bounds": "fit",
         "layout": "bounds",
+        "cover": "layout",
     }
     previous = previous_of.get(name)
     if previous == "osm":
@@ -577,10 +595,17 @@ def _export_is_fresh(root: Path) -> bool:
     playable = _canon(root, "bounds")
     if layout is None or playable is None or not _fresh(layout, [playable]):
         return False
+    stamps = [layout, playable]
+    if sightline_cover_enabled(root):
+        # With sightline cover on, export reads scene_covered: it must be newer than the layout it was placed for.
+        covered = _canon(root, "cover")
+        if covered is None or not _fresh(covered, [layout]):
+            return False
+        stamps.append(covered)
     export_root = root / "data" / "processed" / "export"
     if not export_root.is_dir():
         return False
-    need = max(layout.stat().st_mtime, playable.stat().st_mtime)
+    need = max(path.stat().st_mtime for path in stamps)
     return any(
         manifest.is_file() and manifest.stat().st_mtime >= need
         for manifest in export_root.glob("pkg_*/onward_export.json")

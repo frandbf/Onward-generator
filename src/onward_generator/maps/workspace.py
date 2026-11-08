@@ -237,6 +237,32 @@ def store_balanced_spawns(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def sightline_cover_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"sightline_cover": true`` (plan C7, ADR-032 C7 amendment, off by default).
+
+    ``run`` then plans ``perf cover`` after the layout and exports its ``scene_covered``. A map without
+    ``map.json`` or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("sightline_cover", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "sightline_cover" must be true or false, got {value!r}')
+    return value
+
+
+def store_sightline_cover(directory: str | Path, enabled: bool) -> None:
+    """Record the sightline cover switch on an existing map (plan C7)."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"sightline_cover" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["sightline_cover"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 def repetition_enabled(directory: str | Path) -> bool:
     """True only when ``map.json`` has ``"repetition": true`` (plan C1, ADR-009 amendment, off by default).
 

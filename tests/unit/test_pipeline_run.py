@@ -1697,6 +1697,7 @@ def test_each_stage_marker_is_its_file_in_the_stage_directory(tmp_path: Path) ->
         "fit": processed / "scene_overgrow" / "fit.json",
         "bounds": processed / "scene_playable" / "scene_visual.glb",
         "layout": processed / "layout" / "layout.json",
+        "cover": processed / "scene_covered" / "cover_report.json",
     }
 
 
@@ -1748,3 +1749,82 @@ def test_a_balanced_spawns_value_that_is_not_a_bool_stops_the_plan(tmp_path: Pat
     with pytest.raises(MapError, match='"balanced_spawns" must be true or false'):
         plan_steps(root)
     assert sorted(p.relative_to(root).as_posix() for p in root.rglob("*")) == before
+
+
+def test_the_sightline_cover_key_adds_the_cover_stage_and_exports_its_copy(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_sightline_cover
+
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    before = plan_steps(root)
+    assert "cover" not in dict(before)
+    export = dict(before)["export"]
+    assert Path(export[export.index("--detail") + 1]).name == "scene_playable"
+    store_sightline_cover(root, False)
+    assert plan_steps(root) == before
+    store_sightline_cover(root, True)
+    after = plan_steps(root)
+    names = [name for name, _ in after]
+    assert names == [*[name for name, _ in before][:-1], "cover", "export"]
+    assert names.index("cover") == names.index("layout") + 1
+    for (name, old), (_, new) in zip(before[:-1], after[:-2], strict=True):
+        assert (name, new) == (name, old)
+    cover = dict(after)["cover"]
+    layout = dict(before)["layout"]
+    flag = lambda argv, key: argv[argv.index(key) + 1]  # noqa: E731 - a one-line lookup in one test
+    assert cover[:2] == ["perf", "cover"]
+    for key in ("--scene", "--heights", "--base", "--detail"):
+        assert flag(cover, key) == flag(layout, key)
+    assert flag(cover, "--layout") == flag(layout, "--out")
+    assert flag(cover, "--library") == "assets"
+    assert Path(flag(cover, "--out")) == (root / "data" / "processed" / "scene_covered").resolve()
+    exported = dict(after)["export"]
+    assert Path(flag(exported, "--detail")).name == "scene_covered"
+    assert [arg for arg in exported if "scene_covered" not in arg] == [arg for arg in export if "scene_playable" not in arg]
+
+
+def test_a_sightline_cover_value_that_is_not_a_bool_stops_the_plan(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps({**document, "sightline_cover": "true"}), encoding="utf-8")
+    before = sorted(p.relative_to(root).as_posix() for p in root.rglob("*"))
+    with pytest.raises(MapError, match='"sightline_cover" must be true or false'):
+        plan_steps(root)
+    assert sorted(p.relative_to(root).as_posix() for p in root.rglob("*")) == before
+
+
+def test_with_sightline_cover_the_export_is_stale_until_the_covered_copy_is_newer_than_the_layout(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_sightline_cover
+
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    processed = root / "data" / "processed"
+    files = {
+        "playable": processed / "scene_playable" / "scene_visual.glb",
+        "layout": processed / "layout" / "layout.json",
+        "covered": processed / "scene_covered" / "cover_report.json",
+        "package": processed / "export" / "pkg_01" / "onward_export.json",
+    }
+    for path in files.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+
+    def stamp(**seconds: int) -> None:
+        for key, value in seconds.items():
+            os.utime(files[key], (1_000_000 + value, 1_000_000 + value))
+
+    stamp(playable=0, layout=10, covered=5, package=20)
+    # Off, the covered copy is not an input: an old one does not make the export stale.
+    assert output_ready("export", root)
+    store_sightline_cover(root, True)
+    assert not output_ready("export", root)
+    assert not output_ready("cover", root)
+    stamp(covered=10)
+    assert output_ready("cover", root) and output_ready("export", root)
+    stamp(covered=30)
+    assert not output_ready("export", root)
+    stamp(package=30)
+    assert output_ready("export", root)
+    files["covered"].unlink()
+    assert not output_ready("export", root)

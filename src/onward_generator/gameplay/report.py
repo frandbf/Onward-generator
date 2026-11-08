@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import struct
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +75,8 @@ NOTE = (
     "playtest, and never block a stage or an export (ADR-032)."
 )
 __all__ = [
-    "REPORT_FILE", "build_report", "gameplay_report", "headline_text", "parameters", "proposed_checks", "read_colliders", "report_text",
+    "REPORT_FILE", "OpenPoint", "build_report", "gameplay_report", "headline_text", "open_sight_points", "parameters", "proposed_checks",
+    "read_colliders", "report_text",
 ]
 _BLOCKING_STATUSES = ("spawn_missing", "spawn_off_navmesh", "uplink_off_navmesh", "no_path")
 
@@ -349,6 +351,53 @@ def build_report(
     }
     doc["proposed_checks"] = proposed_checks(doc["headline"])
     return doc
+
+
+@dataclass(frozen=True, slots=True)
+class OpenPoint:
+    """A route sample whose longest open ray is longer than ``MAX_SIGHTLINE_M``: ``point`` and ``ray_to_m`` as the report rounds them."""
+
+    point: tuple[float, float]
+    ray_to_m: tuple[float, float]
+    length_m: float
+
+
+def open_sight_points(
+    islands: Sequence[BaseGeometry],
+    buildings: BaseGeometry,
+    colliders: Sequence[Collider],
+    layout: Mapping[str, Any],
+) -> list[OpenPoint]:
+    """The route samples the report counts as open past ``MAX_SIGHTLINE_M`` (plan C7), longest first, then by x and y.
+
+    The same routes, samples, cover reach and rays as ``build_report``. A layout whose spawns have no
+    route gives no sample, so an empty list; a layout that is not ``gameplay_layout`` 0.3.0 is a GameplayError.
+    """
+    if layout.get("schema") != LAYOUT_SCHEMA or layout.get("schema_version") != LAYOUT_VERSION:
+        raise GameplayError(
+            f"cover reads a {LAYOUT_SCHEMA} {LAYOUT_VERSION} layout, not {layout.get('schema')!r} {layout.get('schema_version')!r}"
+        )
+    graph = nav_graph(islands)
+    cover = CoverIndex.of(colliders)
+    sight = _Sight(SightCaster(sight_segments(buildings, colliders)), cover)
+    for a, b in PAIRS:
+        start, goal = _centre(layout, a), _centre(layout, b)
+        first = snap(graph, start) if start is not None else None
+        last = snap(graph, goal) if goal is not None else None
+        if first is None or last is None:
+            continue
+        for route in distinct_routes(graph, first, last):
+            corners = route_points(graph, route)
+            line = LineString([corners[0], *corners])
+            for distance in route_samples(route.length_mm / 1000.0):
+                point = line.interpolate(distance)
+                sight.at((float(point.x), float(point.y)))
+    found = [
+        OpenPoint((value["from_m"][0], value["from_m"][1]), (value["to_m"][0], value["to_m"][1]), value["length_m"])
+        for value in sight.cache.values()
+        if value is not None and value["length_m"] > MAX_SIGHTLINE_M
+    ]
+    return sorted(found, key=lambda p: (-p.length_m, p.point, p.ray_to_m))
 
 
 def gameplay_report(base: Any, manifest: Mapping[str, Any], layout: Mapping[str, Any], collision_path: str | Path) -> dict[str, Any]:
