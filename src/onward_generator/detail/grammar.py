@@ -237,7 +237,7 @@ def choose_roof(
 
     ``lidar`` is ``(class, spread)`` of a footprint ``lidar_roofs.classify`` called ``flat`` or ``pitched``
     (plan C3, opt-in). Without a shape tag, ``pitched`` draws ``spread_spec``'s gable on any area, in the tagged
-    material (a tile tint) or ``roof_tile``; ``flat`` keeps the template roof and draws no estimated hip. ``origin``
+    material (a tile tint) or ``roof_tile``; ``flat`` keeps the template roof without a hip (estimated or the template's). ``origin``
     stays the material's. ``None`` (the default) is the choice without it.
     """
     shape = _first(tags, "roof:shape")
@@ -257,6 +257,9 @@ def choose_roof(
             material = tiled[0] if tiled else "roof_tile"
             pitched = spread_spec(lidar[1], material)
             return replace(template, parapet_m=0.0, hip=None, pitched=pitched), material, "observed" if tiled else "estimated", None
+        if template.hip is not None:
+            # A measured flat roof draws no hip, not even the template's (the minor template has one).
+            template = replace(template, hip=None)
     elif (
         not shape
         and template.hip is None

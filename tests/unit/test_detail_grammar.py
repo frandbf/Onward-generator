@@ -321,6 +321,14 @@ def test_a_pitched_class_drops_a_template_hip() -> None:
     assert template.hip is None and template.pitched is not None and material == "roof_tile"
 
 
+def test_a_flat_class_drops_a_template_hip() -> None:
+    hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 22.0, 2.5, "roof_tile"))
+    template, material, origin, shape = choose_roof({}, hipped, CFG.seed, "b", 100.0, lidar=("flat", SPREAD))
+    assert template == replace(hipped, hip=None) and template.pitched is None
+    assert material in RESIDENTIAL.flat_roof_materials and origin == "generated" and shape is None
+    assert choose_roof({}, hipped, CFG.seed, "b", 100.0)[0].hip is not None
+
+
 def test_a_flat_class_keeps_the_template_and_draws_no_estimated_hip() -> None:
     bid = _coin_hip_id()
     assert choose_roof({}, RESIDENTIAL, CFG.seed, bid, 100.0, lidar=None)[0].hip is not None

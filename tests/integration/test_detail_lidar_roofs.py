@@ -205,3 +205,23 @@ def test_a_report_of_another_scene_stops_detail_before_any_output(block: tuple[P
     assert _cli(block, out, "--lidar-roofs", str(other)) == 1
     assert capsys.readouterr().err == f"detail: {other} was measured on another scene than {block[0]}\n"
     assert not out.exists()
+
+
+def test_a_flat_class_drops_the_hip_of_a_minor_template(tmp_path_factory: pytest.TempPathFactory) -> None:
+    # A 10 x 10 m garage takes generic_minor, whose template hip covers 200 m²; a 0.3 m spread over 12 cells is flat.
+    root = tmp_path_factory.mktemp("lidar_minor")
+    scene, heights, base = _detail_inputs(root, {911: ([(-40, 8), (-30, 8), (-30, 18), (-40, 18)], {"building": "garage"})}, {})
+    doc = _report(scene)
+    doc["buildings"] = [{**doc["buildings"][0], "id": "osm-way-911", "valid": 12, "cells": 14, "p25_m": 3.0, "p75_m": 3.3,
+                         "height_m": 3.15}]
+    report = root / "minor_report.json"
+    report.write_text(json.dumps(doc), encoding="utf-8")
+    generated, ref = load_base(base, scene, heights, GEN)
+    off = detail_scene(generated, ref, heights, scene, CFG)
+    on = detail_scene(generated, ref, heights, scene, CFG, roof_spread=load_roof_spread(str(report), str(scene)))
+    garage_off, garage_on = _building(off, "osm-way-911").record, _building(on, "osm-way-911").record
+    assert garage_off["generation"]["template"] == "generic_minor" and garage_off["roof"]["type"] == "hip"
+    assert garage_on["roof"]["type"] == "flat" and garage_on["roof"]["lidar"]["class"] == "flat"
+    assert garage_on["facade"]["materials"]["roof"] in CFG.templates["generic_minor"].flat_roof_materials
+    assert not [p for p in _building(on, "osm-way-911").visual if p.material == "roof_tile"]
+    assert on.stats["lidar_roofs"]["flat"] == 1 and on.stats["lidar_roofs"]["pitched"] == 0
