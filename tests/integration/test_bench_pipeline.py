@@ -362,3 +362,25 @@ def test_repetition_run_switches_the_run_copy_and_adds_the_summary(workdir: Path
     }
     diff = (root / "runs" / "r2" / bench.DIFF_FILE).read_text(encoding="utf-8")
     assert "| bench_murcia | repetition tiles over limit | - | 0 | - |" in diff
+
+
+def test_overture_tints_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    match = next(argv for argv in off.calls if argv[:2] == ["overture", "match"])
+    detail = next(argv for argv in off.calls if argv[0] == "detail")
+    assert "--tints" not in match and "--overture-tints" not in detail
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--overture-tints") == 0
+    match = next(argv for argv in on.calls if argv[:2] == ["overture", "match"])
+    detail = next(argv for argv in on.calls if argv[0] == "detail")
+    copy = root / "runs" / "r2" / "bench_murcia"
+    assert match[-1] == "--tints"
+    assert Path(detail[detail.index("--overture-tints") + 1]).resolve() == (copy / "data" / "processed" / "overture" / "overture_tints.json").resolve()
+    assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["overture_tints"] is True
+    assert bench.inputs_sha256(inputs) == digest
+    assert "overture_tints" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))

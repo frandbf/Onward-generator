@@ -322,3 +322,48 @@ def test_templates_follow_the_category_and_a_landmark_takes_its_own() -> None:
         "c": CFG.template_for("None", False),
     }
     assert CFG.template_for("commercial", False) != CFG.templates[CFG.landmark_template]
+
+
+def _lend(colour: str) -> dict[str, Any]:
+    return {"colour": colour, "dataset": "Esri Community Maps", "license": "CC-BY-4.0", "origin": "observed", "attribution": {}}
+
+
+def test_a_colour_lent_to_one_part_is_the_parcels() -> None:
+    from onward_generator.detail.scene import _lent_by_key
+
+    ids = sorted(PARTS)
+    key_of = {bid: appearance_key(bid, _feature(bid)) for bid in ids}
+    tints = [
+        {"building_id": "p2", "gers_id": "g2", "iou": 0.8, "facade": _lend("#c88c3c"), "roof": _lend("#b43c28")},
+        {"building_id": "q", "gers_id": "gq", "iou": 0.7, "roof": _lend("#323237")},
+        {"building_id": "elsewhere", "gers_id": "gx", "iou": 0.9, "facade": _lend("#ffffff")},
+    ]
+    walls, roofs = _lent_by_key(ids, key_of, tints)
+    assert walls == {"parcel:P": {"gers_id": "g2", "iou": 0.8, **_lend("#c88c3c")}}
+    assert roofs == {"parcel:P": {"gers_id": "g2", "iou": 0.8, **_lend("#b43c28")}, "q": {"gers_id": "gq", "iou": 0.7, **_lend("#323237")}}
+    # The first part in id order lends first; a second part's colour does not replace it.
+    first = [{"building_id": "p1", "gers_id": "g1", "iou": 0.6, "facade": _lend("#5078c8")}, *tints]
+    walls, roofs = _lent_by_key(ids, key_of, first)
+    assert walls["parcel:P"]["gers_id"] == "g1" and roofs["parcel:P"]["gers_id"] == "g2"
+    # Both parts draw that tint, wall and roof, though only p2 was matched.
+    tree = STRtree([PARTS[i] for i in ids])
+    height_of = {bid: {"category": "unknown", "landmark": False} for bid in ids}
+    drawn = _facade_walls(ids, PARTS, tree, {bid: _feature(bid) for bid in ids}, height_of, [], CFG, lent=_lent_by_key(ids, key_of, tints)[0])
+    assert drawn["p1"][1:] == drawn["p2"][1:] == ("plaster_white__tint_ochre", "observed")
+    assert drawn["q"][2] == "generated" and drawn["r"][2] == "generated"
+    flat = replace(TEMPLATE, parapet_m=0.0)  # no estimated hip on these 100 m² squares
+    plans = _roof_plans(ids, PARTS, tree, key_of, {i: {} for i in ids}, dict.fromkeys(ids, flat), dict.fromkeys(ids, 9.0),
+                        CFG, dict.fromkeys(ids, 3.0), _lent_by_key(ids, key_of, tints)[1])
+    assert plans["p1"][1] == plans["p2"][1] == "roof_flat_grey__tint_red"
+    assert plans["q"][1] == "roof_flat_grey__tint_dark" and "__tint_" not in plans["r"][1]
+
+
+def test_a_landmark_is_lent_no_wall_colour() -> None:
+    ids = sorted(PARTS)
+    tree = STRtree([PARTS[i] for i in ids])
+    height_of = {bid: {"category": "unknown", "landmark": bid == "r"} for bid in ids}
+    features = {bid: _feature(bid) for bid in ids}
+    lent = {"r": {"gers_id": "g", "iou": 1.0, **_lend("#c88c3c")}, "q": {"gers_id": "g", "iou": 1.0, **_lend("#c88c3c")}}
+    walls = _facade_walls(ids, PARTS, tree, features, height_of, [], CFG, lent=lent)
+    assert walls["r"] == _facade_walls(ids, PARTS, tree, features, height_of, [], CFG)["r"]
+    assert walls["q"][1:] == ("plaster_white__tint_ochre", "observed")

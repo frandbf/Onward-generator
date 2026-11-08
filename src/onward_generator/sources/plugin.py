@@ -66,6 +66,8 @@ class SourceSteps:
     """Third-party overrides that ``heights --secondary-overrides`` ranks below an OSM ``height`` (Overture, ADR-021)."""
     places: Path | None = None
     """Third-party POIs that ``detail --places`` ranks as shop evidence by ``config/sources.json`` ``evidence`` (Overture, ADR-021)."""
+    tints: Path | None = None
+    """Third-party colours that ``detail --overture-tints`` reads below the OSM wall and roof tags (Overture, plan C2; opt-in)."""
 
 
 class SourcePlugin(Protocol):

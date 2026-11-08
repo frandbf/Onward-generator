@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import random
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.materials.trim_style import TrimLayout, load_style_table, trim_layout
 from onward_generator.panoramax.apply import (
     _CELL_SIDE,
+    TINT_SKIP_REASONS,
     Patch,
     TintAtlas,
     _pack_cell,
@@ -526,6 +528,13 @@ def test_tint_node_skips(layout: TrimLayout, families: dict[str, str]) -> None:
         assert tint_node(node, patches, reason) == (node, {"reason": reason})
     tinted = _photographed(layout, "plaster_cream", 0, (Primitive(_box(0, 0, 1, 1), "plaster_white__tint_ab12"),))
     assert tint_node(tinted, patches, atlas) == (tinted, {"reason": "osm_colour"})
+    # Plan C2: a building whose tints all came from Overture colours says so.
+    lent = replace(tinted, extras={**tinted.extras, "tint_source": "overture"})
+    assert tint_node(lent, patches, atlas) == (lent, {"reason": "overture_colour"})
+    other = replace(tinted, extras={**tinted.extras, "tint_source": "osm"})
+    assert tint_node(other, patches, atlas) == (other, {"reason": "osm_colour"})
+    assert {"osm_colour", "overture_colour"} <= set(TINT_SKIP_REASONS)
+    assert TINT_SKIP_REASONS == ("no_trim_atlas", "layout_mismatch", "osm_colour", "overture_colour", "no_wall_strip", "unchanged")
     bare = Node("building/1", (Primitive(_box(0, 0, 1, 1), "roof_tile"),))
     assert tint_node(bare, patches, atlas) == (bare, {"reason": "no_wall_strip"})
     assert tint_node(node, patches, atlas) == (node, {"reason": "unchanged"})

@@ -18,16 +18,19 @@ from onward_generator.overture.match import (
     load_config,
     match_buildings,
     match_report,
+    match_tints,
     overrides_document,
     places_document,
     read_places,
     scene_frame,
+    tints_document,
 )
 from onward_generator.sources.registry import load_source_config
 
 OVERRIDES_FILE = "heights_overrides.overture.json"
 PLACES_FILE = "overture_places.json"
 REPORT_FILE = "overture_match_report.json"
+TINTS_FILE = "overture_tints.json"
 
 
 def _fetch(args: argparse.Namespace) -> int:
@@ -54,6 +57,7 @@ def _match(args: argparse.Namespace) -> int:
     allowed = load_source_config().licence_allowlist
     places, place_skips = read_places(places_path, frame, cfg, allowed)
     matches, building_skips = match_buildings(buildings_path, scene, cfg, allowed)
+    tints = match_tints(buildings_path, scene, cfg, allowed) if args.tints else None
     if sha256_file(scene_path) != before:
         raise OvertureError("scene file changed while being read")
     places_doc = places_document(places, places_record, place_skips, frame)
@@ -63,17 +67,20 @@ def _match(args: argparse.Namespace) -> int:
         scene_ref=scene_ref, cfg=cfg, places=places_doc, matches=matches, building_skips=building_skips,
         buildings_record=buildings_record, osm_buildings=osm_buildings,
     )
-    out_overrides, out_places, out_report = prepare_outputs(
-        args.out, (OVERRIDES_FILE, PLACES_FILE, REPORT_FILE), overwrite=args.overwrite,
-        protected=(scene_path, places_path, buildings_path),
-    )
+    names = (OVERRIDES_FILE, PLACES_FILE, REPORT_FILE) + ((TINTS_FILE,) if tints is not None else ())
+    targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=(scene_path, places_path, buildings_path))
+    out_overrides, out_places, out_report = targets[:3]
     atomic_write_json(out_overrides, overrides_document(matches, buildings_record, cfg))
     atomic_write_json(out_places, places_doc)
     atomic_write_json(out_report, report)
     counts = report["buildings"]["counts"]
     print(f"places={len(places)} of {places_record.rows} buildings matched={counts['matched']} of {osm_buildings} "
           f"height={counts['with_height']} levels={counts['with_levels']}")
-    for path in (out_overrides, out_places, out_report):
+    if tints is not None:
+        tints_doc = tints_document(tints[0], buildings_record, tints[1], frame)
+        atomic_write_json(targets[3], tints_doc)
+        print(f"tints facade={tints_doc['counts']['facade']} roof={tints_doc['counts']['roof']}")
+    for path in targets:
         print(f"wrote {path}")
     return 0
 
@@ -92,6 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     match.add_argument("--map", required=True, help="map directory holding data/raw/overture_*.parquet")
     match.add_argument("--out", required=True, help="output directory")
     match.add_argument("--config", help="Overture configuration (default: config/overture.default.json)")
+    match.add_argument("--tints", action="store_true",
+                       help="also lend observed Overture facade and roof colours to matched OSM footprints: overture_tints.json (plan C2)")
     match.add_argument("--overwrite", action="store_true")
     match.set_defaults(handler=_match)
     return parser

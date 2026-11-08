@@ -6,7 +6,9 @@ not join the ADR-018 merge: a merged ``height_m`` is an authoritative override
 that outranks an OSM ``height``. They go to ``heights --secondary-overrides``,
 below an OSM ``height`` and the merged overrides, above OSM ``building:levels``.
 Its places go to ``detail --places``, ranked as shop evidence by ``config/sources.json``
-``evidence`` (ADR-022).
+``evidence`` (ADR-022). With ``map.json`` ``"overture_tints": true`` (plan C2, off by default)
+the match also writes ``overture_tints.json`` for ``detail --overture-tints``; that file is then
+the stage's marker, so switching the option on runs the match again.
 """
 
 from __future__ import annotations
@@ -43,16 +45,21 @@ class OverturePlugin:
         return -180.0 <= longitude <= 180.0 and -90.0 <= latitude <= 90.0
 
     def steps(self, root: Path, scene: Path) -> SourceSteps:
+        from onward_generator.maps.workspace import overture_tints_enabled  # the workspace imports the registry, which imports this plugin
+
         raw = root / "data" / "raw"
-        match = overture_match_command(scene, root).argv
+        tints = overture_tints_enabled(root)
+        match = overture_match_command(scene, root, tints=tints).argv
         out = Path(match[match.index("--out") + 1])
         buildings = raw / "overture_buildings.parquet"
+        tints_file = out / "overture_tints.json" if tints else None
         return SourceSteps(
             stages=(
                 SourceStage("overture", overture_fetch_command(root).argv, buildings, (), download=True),
-                SourceStage("overture-match", match, out / "overture_places.json", (scene, buildings)),
+                SourceStage("overture-match", match, tints_file or out / "overture_places.json", (scene, buildings)),
             ),
             overrides=None,
             secondary_overrides=out / "heights_overrides.overture.json",
             places=out / "overture_places.json",
+            tints=tints_file,
         )

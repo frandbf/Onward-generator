@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import main
-from onward_generator.maps.workspace import create_map, store_sources
+from onward_generator.maps.workspace import create_map, store_overture_tints, store_sources
 from onward_generator.next_step import detail_command, heights_command, overture_fetch_command, overture_match_command
 from onward_generator.pipeline_run import PipelineError, output_ready, plan_steps, prepare_from, third_party_plan
 from onward_generator.run_log import StageReport, summarize
@@ -68,6 +68,52 @@ def test_the_plugin_stages_fetch_then_match_the_latest_scene(tmp_path: Path) -> 
     assert match.argv == ("overture", "match", "--scene", str(scene), "--map", str(root), "--out", str(out))
     assert steps.overrides is None and steps.scene is None
     assert steps.secondary_overrides == out / "heights_overrides.overture.json" and steps.places == out / "overture_places.json"
+    assert steps.tints is None
+
+
+def test_the_tints_switch_asks_the_match_for_colours_and_marks_the_stage_with_them(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    scene = root / "data" / "processed" / "cadastre" / "geo_scene.json"
+    out = root / "data" / "processed" / "overture"
+    store_overture_tints(root, True)
+    steps = OverturePlugin().steps(root, scene)
+    match = steps.stages[1]
+    assert match.argv == ("overture", "match", "--scene", str(scene), "--map", str(root), "--out", str(out), "--tints")
+    assert match.argv == overture_match_command(scene, root, tints=True).argv
+    assert match.marker == out / "overture_tints.json" and steps.tints == out / "overture_tints.json"
+    assert steps.places == out / "overture_places.json"
+
+
+def test_with_the_tints_switch_detail_reads_the_colours(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    store_overture_tints(root, True)
+    by_name = dict(plan_steps(root))
+    processed = root / "data" / "processed"
+    scene = processed / "cadastre" / "geo_scene.json"
+    places = processed / "overture" / "overture_places.json"
+    tints = processed / "overture" / "overture_tints.json"
+    assert by_name["overture-match"][-1] == "--tints"
+    assert by_name["detail"][by_name["detail"].index("--overture-tints") + 1] == str(tints)
+    assert by_name["detail"][:-1] == list(detail_command(scene, processed / "heights" / "heights.json", processed / "scene3d", places, tints).argv)
+    assert third_party_plan(root, processed / "geo" / "geo_scene.json")[2] == tints
+
+
+def test_switching_tints_on_makes_the_match_and_what_follows_stale(tmp_path: Path) -> None:
+    root = _murcia(tmp_path)
+    processed = root / "data" / "processed"
+    raw = root / "data" / "raw"
+    now = (root / "map.json").stat().st_mtime
+    _touch(processed / "geo" / "geo_scene.json", now)
+    _touch(raw / "catastro.gml", now + 1)
+    _touch(processed / "cadastre" / "geo_scene.json", now + 2)
+    _touch(raw / "overture_buildings.parquet", now + 3)
+    _touch(processed / "overture" / "overture_places.json", now + 4)
+    _touch(processed / "heights" / "heights.json", now + 5)
+    assert output_ready("overture-match", root) and output_ready("heights", root)
+    store_overture_tints(root, True)
+    assert not output_ready("overture-match", root)  # no overture_tints.json yet
+    _touch(processed / "overture" / "overture_tints.json", now + 6)
+    assert output_ready("overture-match", root) and not output_ready("heights", root)
 
 
 def test_fetch_and_match_run_after_the_split_and_feed_heights_and_detail(tmp_path: Path) -> None:
@@ -83,7 +129,10 @@ def test_fetch_and_match_run_after_the_split_and_feed_heights_and_detail(tmp_pat
     assert by_name["heights"] == list(heights_command(scene, processed / "cadastre" / "heights_overrides.catastro.json", secondary).argv)
     assert by_name["detail"][by_name["detail"].index("--places") + 1] == str(places)
     assert by_name["detail"][:-1] == list(detail_command(scene, processed / "heights" / "heights.json", processed / "scene3d", places).argv)
-    assert third_party_plan(root, processed / "geo" / "geo_scene.json") == (secondary, places)
+    assert third_party_plan(root, processed / "geo" / "geo_scene.json") == (secondary, places, None)
+    # Plan C2 is off by default: neither the match nor detail asks for colours.
+    assert "--tints" not in by_name["overture-match"] and "--overture-tints" not in by_name["detail"]
+    assert by_name["overture-match"] == list(overture_match_command(scene, root).argv)
 
 
 def test_without_catastro_the_match_reads_the_geo_scene(tmp_path: Path) -> None:
@@ -101,7 +150,11 @@ def test_no_source_overture_leaves_heights_and_detail_as_before(tmp_path: Path) 
     by_name = dict(plan_steps(root))
     assert "overture" not in by_name and "overture-match" not in by_name
     assert "--secondary-overrides" not in by_name["heights"] and "--places" not in by_name["detail"]
-    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None)
+    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None)
+    store_overture_tints(root, True)  # the colour switch alone adds no stage and no flag
+    by_name = dict(plan_steps(root))
+    assert "overture-match" not in by_name and "--overture-tints" not in by_name["detail"]
+    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None)
 
 
 def test_a_priority_that_ranks_overture_above_catastro_stops_the_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

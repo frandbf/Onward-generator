@@ -50,6 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "1000 to 2000000; --core-radius-m is then the largest half-side")
     parser.add_argument("--places",
                         help="overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)")
+    parser.add_argument("--overture-tints",
+                        help="overture_tints.json from overture match --tints: Overture colours below the OSM wall and roof tags (plan C2)")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -65,6 +67,51 @@ def load_places(path: str | None, scene_path: str) -> list[dict[str, Any]]:
     if any(doc["frame"].get(k) != frame.get(k) for k in ("crs", "origin_projected")):
         raise DetailError(f"{path} was made for another local grid than {scene_path}")
     return list(doc["places"])
+
+
+TINT_KEYS = ("colour", "dataset", "license", "origin", "attribution")
+
+
+def _tint_entry(entry: object, buildings: set[str]) -> str | None:
+    """Why one ``tints`` entry is malformed, or ``None`` when it names a building of the scene and holds observed colours."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("gers_id"), str) or not isinstance(entry.get("iou"), int | float):
+        return "an entry needs building_id, gers_id and iou"
+    if entry.get("building_id") not in buildings:
+        return f"building {entry.get('building_id')!r} is not in the scene"
+    lends = [entry[kind] for kind in ("facade", "roof") if kind in entry]
+    if not lends:
+        return f"building {entry['building_id']} lends no colour"
+    for lend in lends:
+        if not isinstance(lend, dict) or any(not isinstance(lend.get(k), str | dict) for k in TINT_KEYS):
+            return f"building {entry['building_id']}: a colour needs {', '.join(TINT_KEYS)}"
+        if lend["origin"] != "observed":
+            return f"building {entry['building_id']}: origin {lend['origin']!r} is not observed"
+    return None
+
+
+def load_tints(path: str | None, scene_path: str) -> list[dict[str, Any]] | None:
+    """The entries of ``overture_tints.json`` (plan C2), after checking it was made for this scene, or ``None`` without a path.
+
+    A missing file, another schema, another local grid, a building the scene does not have or a malformed entry is refused.
+    """
+    if path is None:
+        return None
+    source = Path(path).expanduser()
+    if not source.is_file():
+        raise DetailError(f"{path} not found; rerun overture match --tints --overwrite")
+    doc = json.loads(source.read_bytes())
+    if not is_schema(doc.get("schema"), "onward_generator.overture_tints"):
+        raise DetailError(f"{path} is not onward_generator.overture_tints")
+    scene = json.loads(Path(scene_path).expanduser().read_bytes())
+    frame = scene.get("frame") or {}
+    if any(doc["frame"].get(k) != frame.get(k) for k in ("crs", "origin_projected")):
+        raise DetailError(f"{path} was made for another local grid than {scene_path}")
+    buildings = {str(f["id"]) for f in scene.get("features", []) if f.get("kind") == "building"}
+    for entry in doc["tints"]:
+        problem = _tint_entry(entry, buildings)
+        if problem is not None:
+            raise DetailError(f"{path}: {problem}")
+    return list(doc["tints"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -87,16 +134,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         names = (VISUAL_FILE, COLLISION_FILE, MANIFEST_FILE, REPORT_FILE) + (() if args.no_preview else COMPARE_FILES)
         base_dir = Path(args.base)
         places = load_places(args.places, args.scene)
+        tints = load_tints(args.overture_tints, args.scene)
         protected = (Path(args.scene), Path(args.heights), base_dir / "scene3d.json", base_dir / "generation_report.json",
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
         if args.core_target_triangles is None:
             detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
-                                    typology=typology)
+                                    typology=typology, tints=tints)
         else:
             detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
-                                           max_half_side_m=args.core_radius_m, places=places, typology=typology)
+                                           max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1

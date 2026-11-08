@@ -50,6 +50,8 @@ from onward_generator.detail.facades import (
 from onward_generator.detail.furnish import FurnishError, ShopFurnishing, load_catalogue
 from onward_generator.detail.grammar import (
     FLAT_SHAPES,
+    OVERTURE_FACADE,
+    OVERTURE_ROOF,
     FacadeUse,
     appearance_key,
     choose_roof,
@@ -159,6 +161,9 @@ class DetailedScene:
                 extras["uv_frame"] = o.uv_frame
             if o.light_anchors is not None:
                 extras["light_anchors"] = o.light_anchors
+            source = tint_source(o.record)
+            if source is not None:
+                extras["tint_source"] = source
             if o.instance_of is not None:
                 proto = self.prototypes[o.instance_of]
                 nodes.append(Node(o.id, tuple(Primitive(m, mat) for mat, m in proto.parts), extras, o.matrix, proto.key))
@@ -382,6 +387,7 @@ def _facade_walls(
     ids: list[str], footprints: dict[str, BaseGeometry], tree: STRtree, feature_of: Mapping[str, Mapping[str, Any]],
     height_of: Mapping[str, Mapping[str, Any]], features: list[Mapping[str, Any]], cfg: DetailConfig,
     style_palettes: Mapping[str, Sequence[str]] | None = None,
+    lent: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, tuple[FacadeUse, str, str]]:
     """``(use, wall, wall origin)`` per building, in id order so a wall can avoid its neighbours' walls.
 
@@ -391,6 +397,7 @@ def _facade_walls(
     The sub-buildings of one parcel (``appearance_key``, ADR-016) are one building: the first in id
     order resolves the use from the evidence of them all and draws the wall for its key, and the
     others take the same. Neighbours are the footprints of other keys within ``probe_m``.
+    ``lent`` holds the Overture facade colour of each key (``_lent_by_key``, plan C2); a landmark is never lent one.
     """
     related = _use_evidence(features, footprints, cfg)
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
@@ -406,9 +413,11 @@ def _facade_walls(
             continue
         h = height_of[bid]
         tags = dict(feature_of[bid].get("tags") or {})
+        colour = _lent_colour((lent or {}).get(key))
         if h.get("landmark"):
             use = FacadeUse("landmark", "observed", bid, None, "landmark")
             palette = cfg.templates[cfg.landmark_template].wall_materials
+            colour = None
         else:
             use = resolve_use(bid, tags, [r for m in members[key] for r in related.get(m, [])])
             palette = cfg.facade_palettes[use.use]
@@ -416,7 +425,7 @@ def _facade_walls(
                 palette = tuple(style_palettes[bid])
         near = {ids[k] for m in members[key] for k in tree.query(footprints[m], predicate="dwithin", distance=cfg.probe_m)}
         avoid = {out[n][1] for n in near if n in out}  # no other part of this parcel is drawn yet
-        wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid, cfg.materials)
+        wall, origin = choose_wall(tags, palette, cfg.seed, key, avoid, cfg.materials, lent=colour)
         out[bid] = (use, wall, origin)
     return out
 
@@ -433,10 +442,12 @@ def _roof_plans(
     ids: list[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, key_of: Mapping[str, str],
     tags_of: Mapping[str, dict[str, str]], templates: Mapping[str, Template], heights_m: Mapping[str, float], cfg: DetailConfig,
     storeys_m: Mapping[str, float],
+    lent: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, RoofPlan]:
     """``choose_roof`` per building, drawn for its ``appearance_key`` so the parts of one parcel share a roof.
 
-    ``storeys_m`` is each building's storey height, the height of one ``roof:levels``.
+    ``storeys_m`` is each building's storey height, the height of one ``roof:levels``. ``lent`` holds the
+    Overture roof colour of each key (``_lent_by_key``, plan C2).
 
     A part with a taller part of its own parcel within ``probe_m`` gets no estimated hip: its roof is
     the terrace under the setback, flat behind its parapet.
@@ -448,8 +459,51 @@ def _roof_plans(
         terrace = any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
         convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
         plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace,
-                                 storey_m=storeys_m[bid], colours=cfg.materials)
+                                 storey_m=storeys_m[bid], colours=cfg.materials, lent=_lent_colour((lent or {}).get(key_of[bid])))
     return plans
+
+
+def _lent_colour(lend: Mapping[str, Any] | None) -> str | None:
+    """The colour of one lent Overture value, or ``None`` when the key has none."""
+    return None if lend is None else str(lend["colour"])
+
+
+def _lent_by_key(ids: Sequence[str], key_of: Mapping[str, str], tints: Sequence[Mapping[str, Any]]) -> tuple[
+        dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """The Overture facade and roof colour of each ``appearance_key`` (plan C2), each with the evidence it came with.
+
+    The parts of one parcel share their wall and roof, so a colour lent to one part is the parcel's: the first part
+    in id order with a facade colour lends it, and apart from that, the first with a roof colour.
+    """
+    by_id = {str(t["building_id"]): t for t in tints}
+    walls: dict[str, dict[str, Any]] = {}
+    roofs: dict[str, dict[str, Any]] = {}
+    for bid in ids:
+        entry = by_id.get(bid)
+        if entry is None:
+            continue
+        for kind, found in (("facade", walls), ("roof", roofs)):
+            if kind in entry and key_of[bid] not in found:
+                found[key_of[bid]] = {"gers_id": entry["gers_id"], "iou": entry["iou"], **entry[kind]}
+    return walls, roofs
+
+
+def _tint_evidence(lend: Mapping[str, Any]) -> dict[str, Any]:
+    """``facade.materials.wall_evidence`` / ``roof_evidence``: the Overture record a lent colour came from."""
+    return {"provider": "overture", "gers_id": lend["gers_id"], "dataset": lend["dataset"], "license": lend["license"],
+            "origin": "observed", "colour": lend["colour"], "iou": lend["iou"]}
+
+
+def tint_source(record: Mapping[str, Any]) -> str | None:
+    """``overture`` when a building's tints all come from Overture colours (plan C2), else ``None``.
+
+    The visual node carries it, so ``panoramax apply`` can say why it leaves the wall alone (``overture_colour``).
+    """
+    materials = (record.get("facade") or {}).get("materials") or {}
+    sources = {materials.get("wall_source"), materials.get("roof_source")}
+    if sources & {OVERTURE_FACADE, OVERTURE_ROOF} and not sources & {"building:colour", "roof:colour"}:
+        return "overture"
+    return None
 
 
 def _ground_evidence(ground: str, template: Template, category: str, poi_ids: list[str],
@@ -504,6 +558,64 @@ def _third_party_record(detailed: DetailedScene, objects: Sequence[DetailObject]
         "by_dataset": dict(sorted(Counter(p["dataset"] for p in used).items())),
     }
     lines = {(p["attribution"]["text"], p["attribution"]["license"]): p["attribution"] for p in used}
+    detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
+
+
+# Why a colour lent to a building's key did not decide its wall or roof (``counts.third_party_tints.not_used``).
+TINT_NOT_USED = ("osm_tag", "landmark", "scenic", "estimated_roof", "no_tint_material")
+
+
+def _tint_not_used(record: Mapping[str, Any], part: str, lent_source: str) -> str | None:
+    """Why a building's ``part`` (``wall`` or ``roof``) did not take the colour lent to it, or ``None`` when it did."""
+    if record.get("tier") == SCENIC:
+        return "scenic"
+    materials = record["facade"]["materials"]
+    source = materials[f"{part}_source"]
+    if source == lent_source:
+        return None
+    if part == "wall" and record["facade"]["needs_custom_model"]:
+        return "landmark"
+    if source is not None:
+        return "osm_tag"
+    if materials[f"{part}_origin"] == "estimated":
+        return "estimated_roof"
+    return "no_tint_material"
+
+
+def _third_party_tints(detailed: DetailedScene, objects: Sequence[DetailObject], tints: Sequence[Mapping[str, Any]], ids: Sequence[str],
+                       key_of: Mapping[str, str], lent: tuple[Mapping[str, Mapping[str, Any]], Mapping[str, Mapping[str, Any]]]) -> None:
+    """``counts.third_party_tints`` (plan C2) and one attribution line per Overture dataset whose colour a building took.
+
+    ``matched`` is the tints entries of this scene's buildings; ``walls`` and ``roofs`` the buildings (each Catastro part
+    counts) whose material a lent colour decided; ``by_dataset`` those materials by dataset; ``not_used`` the lent colours
+    that decided nothing, by reason (``TINT_NOT_USED``). The attribution merges these lines with the places' lines, sorted.
+    """
+    known = set(ids)
+    not_used: Counter[str] = Counter(dict.fromkeys(TINT_NOT_USED, 0))
+    used: Counter[str] = Counter()
+    by_dataset: Counter[str] = Counter()
+    lines = {(a["text"], a["license"]): a for a in detailed.extra_attribution}
+    for o in objects:
+        if o.type != "building":
+            continue
+        key = key_of[o.record["source_ids"][0]]
+        for (part, lent_source), by_key in zip((("wall", OVERTURE_FACADE), ("roof", OVERTURE_ROOF)), lent, strict=True):
+            lend = by_key.get(key)
+            if lend is None:
+                continue
+            reason = _tint_not_used(o.record, part, lent_source)
+            if reason is not None:
+                not_used[reason] += 1
+                continue
+            used[part] += 1
+            by_dataset[str(lend["dataset"])] += 1
+            lines[(lend["attribution"]["text"], lend["attribution"]["license"])] = lend["attribution"]
+    detailed.stats["third_party_tints"] = {
+        "matched": sum(str(t["building_id"]) in known for t in tints),
+        "walls": used["wall"], "roofs": used["roof"],
+        "by_dataset": dict(sorted(by_dataset.items())),
+        "not_used": dict(not_used),
+    }
     detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
 
 
@@ -882,13 +994,16 @@ def detail_scene(
     core_half_side_m: float | None = None,
     places: Sequence[Mapping[str, Any]] = (),
     typology: TypologyConfig | None = None,
+    tints: Sequence[Mapping[str, Any]] | None = None,
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
 
     ``places`` are third-party POIs from ``overture_places.json`` (ADR-021): shop evidence ``overture``,
     ranked by ``config/sources.json`` ``evidence`` (ADR-022). ``typology`` (default ``config/typology.default.json``)
-    names each building's typology and era (ADR-024); it changes nothing that is drawn."""
+    names each building's typology and era (ADR-024); it changes nothing that is drawn. ``tints`` are the entries of
+    ``overture_tints.json`` (plan C2): Overture colours a wall or roof takes when no OSM tag names it. ``None``
+    (the default) reads none and adds no count."""
     tcfg = typology or load_typology_config()
     core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
@@ -906,8 +1021,9 @@ def detail_scene(
     place_evidence = _shop_evidence([place_feature(p) for p in places], footprints, cfg)
     place_of = {p["id"]: p for p in places}
     feature_of.update({p["id"]: place_feature(p) for p in places})
-    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg)
     key_of = {bid: appearance_key(bid, feature_of[bid]) for bid in ids}
+    lent_walls, lent_roofs = _lent_by_key(ids, key_of, tints or ())
+    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg, lent=lent_walls)
     heights_m = {o.record["source_ids"][0]: float(o.record["height"]["height_m"]) for o in building_objs}
     templates = _templates(ids, height_of, cfg)
     ranking = load_source_config().evidence
@@ -915,7 +1031,8 @@ def detail_scene(
                                      {bid: facade_walls[bid][0] for bid in ids}, ranking, cfg, tcfg, issues)
     facade_styles = {bid: facade_style(t["typology"], t["inputs"]["period"], tcfg) for bid, t in typologies.items()}
     # The use comes from the walls above; drawing them again with the palettes of the styles keeps the neighbour rule.
-    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg, {bid: style.palette for bid, style in facade_styles.items()})
+    facade_walls = _facade_walls(ids, footprints, tree, feature_of, height_of, features, cfg, {bid: style.palette for bid, style in facade_styles.items()},
+                                 lent_walls)
     sources = _shop_sources(ids, feature_of, evidence, templates, cfg, ranking,
                             lambda bid: _shop_fits(bid, ids, footprints, tree, cfg), place_evidence)
     catastro = {bid: feature_of[bid]["catastro_use"] for bid, source in sources.items() if source == CATASTRO_ID}
@@ -927,7 +1044,7 @@ def detail_scene(
     # One roof:levels is a storey of the building, a landmark's too: its single facade band is not a storey.
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
-                             templates, heights_m, cfg, storey_heights)
+                             templates, heights_m, cfg, storey_heights, lent_roofs)
     setbacks: Counter[str] = Counter()
 
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
@@ -1166,6 +1283,16 @@ def detail_scene(
         for entry in shops:
             if entry["poi_id"] in place_of:
                 entry["poi_source"] = place_source(place_of[entry["poi_id"]])
+        lent_wall = None if landmark else lent_walls.get(key_of[bid])
+        lent_roof = lent_roofs.get(key_of[bid])
+        wall_source = _source(tagged_wall(tags, cfg.materials, lent=_lent_colour(lent_wall)), wall_origin)
+        roof_source = _source(tagged_roof(tags, cfg.materials, lent=_lent_colour(lent_roof)), roof_origin)
+        wall_record: dict[str, Any] = {"wall": wall_material, "wall_origin": wall_origin, "wall_source": wall_source}
+        if wall_source == OVERTURE_FACADE and lent_wall is not None:
+            wall_record["wall_evidence"] = _tint_evidence(lent_wall)
+        roof_record: dict[str, Any] = {"roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": roof_source}
+        if roof_source == OVERTURE_ROOF and lent_roof is not None:
+            roof_record["roof_evidence"] = _tint_evidence(lent_roof)
         record = {
             **{k: v for k, v in o.record.items() if k not in ("visual", "materials", "collider", "checks", "generation")},
             "generation": {"method": "phase03_volume + generic facade template", "phase03": o.record.get("generation"),
@@ -1186,8 +1313,7 @@ def detail_scene(
                 "relief": dict(shell.relief),
                 "shops": shops,
                 "skipped": dict(sorted(layout.skipped.items())),
-                "materials": {"wall": wall_material, "wall_origin": wall_origin, "wall_source": _source(tagged_wall(tags, cfg.materials), wall_origin),
-                              "roof": shell.roof["material"], "roof_origin": roof_origin, "roof_source": _source(tagged_roof(tags, cfg.materials), roof_origin)},
+                "materials": wall_record | roof_record,
                 "use": use.to_record(),
                 "door": door_rule,
                 "doors_m": _door_centres(layout.holes, segments),
@@ -1326,6 +1452,8 @@ def detail_scene(
     detailed.stats["wall_area_m2"] = wall_areas.to_record()
     detailed.stats["setback_walls"] = {k: setbacks[k] for k in ("walls", "opened", "openings")}
     _third_party_record(detailed, objects, places, third_party)
+    if tints is not None:
+        _third_party_tints(detailed, objects, tints, ids, key_of, (lent_walls, lent_roofs))
     detailed.stats["roof_shapes"] = dict(sorted(roof_shapes.items()))
     detailed.stats["building_parts"] = {
         "kept": len(part_objects),

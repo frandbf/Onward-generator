@@ -1,6 +1,6 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
-    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition]
+    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -55,6 +55,7 @@ from onward_generator.maps.workspace import (
     load_map,
     refresh_texture_plan,
     store_gameplay_report,
+    store_overture_tints,
     store_repetition,
     store_sources,
 )
@@ -310,12 +311,13 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 
 
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
-              repetition: bool = False) -> MapRun:
+              repetition: bool = False, overture_tints: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
     ``repetition`` switches the plan C1 option on in the run copy only and chooses its textures
     again from the extended pools, so a saved plan with an over-limit roof or paving tile is replaced.
+    ``overture_tints`` switches the plan C2 Overture colours on in the run copy only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -326,6 +328,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     if repetition:
         store_repetition(root, True)
         refresh_texture_plan(root)
+    if overture_tints:
+        store_overture_tints(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -811,7 +815,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
     map_timings: dict[str, dict[str, Any]] = {}
     for item in prepared:
         print(f"bench: {item.ref.id}", flush=True)
-        ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition)
+        ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
+                        overture_tints=args.overture_tints)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -871,6 +876,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="also write gameplay_report.json in each run copy (ADR-032) and add its headline to the report")
     run.add_argument("--repetition", action="store_true",
                      help="switch the plan C1 repetition option on in each run copy and add its summary to the report")
+    run.add_argument("--overture-tints", action="store_true",
+                     help="switch the plan C2 Overture colour tints on in each run copy (map.json overture_tints)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

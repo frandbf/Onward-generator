@@ -612,3 +612,36 @@ def test_map_create_hands_the_brief_and_the_provider_to_the_texture_plan(tmp_pat
     plan = json.loads((root / "config" / "texture_plan.json").read_text(encoding="utf-8"))
     assert plan["atmosphere"] == "abandoned"
     assert plan["selector"] == "ollama"
+
+
+def test_overture_tints_are_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import overture_tints_enabled, store_overture_tints
+
+    assert overture_tints_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "overture_tints" not in load_map(root)
+    assert overture_tints_enabled(root) is False
+    store_overture_tints(root, True)
+    assert load_map(root)["overture_tints"] is True and overture_tints_enabled(root) is True
+    store_overture_tints(root, False)
+    assert load_map(root)["overture_tints"] is False and overture_tints_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_overture_tints_refuse_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import overture_tints_enabled, store_overture_tints
+
+    root = _atlas_map(tmp_path, overture_tints=value)
+    with pytest.raises(MapError) as caught:
+        overture_tints_enabled(root)
+    assert str(caught.value) == f'map.json "overture_tints" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_overture_tints(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"overture_tints" must be true or false, got {value!r}'
+
+
+def test_store_overture_tints_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_overture_tints
+
+    with pytest.raises(MapError, match="not found"):
+        store_overture_tints(tmp_path / "nowhere", True)
