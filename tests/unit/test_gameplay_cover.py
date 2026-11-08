@@ -448,3 +448,68 @@ def test_a_plan_is_a_frozen_record() -> None:
     plan = CoverPlan(0, (), {}, Caps())
     with pytest.raises(dataclasses.FrozenInstanceError):
         plan.targets = 1  # type: ignore[misc]
+
+
+# ------------------------------------------------------------------------------------------------ edges the mutation run found
+
+
+def test_only_a_prop_deeper_than_long_turns_and_the_turn_is_a_rotation() -> None:
+    tall = _cover_of(_prop("tall", size=(1.0, 0.5, 2.0)))
+    assert (tall.length_m, tall.depth_m) == pytest.approx((1.0, 0.5)) and tall.local[0, 0] == 1.0
+    square = _cover_of(_prop("square", size=(1.0, 1.0, 1.0)))
+    assert np.array_equal(square.local[:3, :3], np.eye(3))
+    deep = _cover_of(_prop("deep", size=(0.5, 2.0, 1.0)))
+    assert np.linalg.det(deep.local[:3, :3]) == pytest.approx(1.0)
+    # A quarter turn counter-clockwise: +y goes to -x.
+    assert (deep.local[:3, :3] @ np.array([0.0, 1.0, 0.0])) == pytest.approx([-1.0, 0.0, 0.0])
+
+
+def test_pose_rotates_about_z_rests_on_z_and_keeps_a_rigid_matrix() -> None:
+    item = _cover(size=(2.0, 0.5, 1.0))
+    matrix = pose(item, Spot(3.0, 4.0, math.pi / 2))
+    assert matrix[3].tolist() == [0.0, 0.0, 0.0, 1.0]
+    assert (matrix @ np.array([1.0, 0.0, 0.0, 1.0]))[:3] == pytest.approx([3.0, 5.0, 0.0])
+    assert np.linalg.det(matrix[:3, :3]) == pytest.approx(1.0)
+    assert (matrix @ np.array([0.0, 0.0, 1.0, 1.0]))[2] == pytest.approx(1.0)
+    assert pose(item, Spot(0.0, 0.0, 0.0))[2, 3] == 0.0
+
+
+def test_spots_follow_the_ray_from_the_sample_and_round_to_the_centimetre() -> None:
+    north = spots(_target(10.0, 20.0, to=(10.0, 100.0)))
+    assert [(s.x, s.y) for s in north][:3] == [(10.0, 21.0), (9.0, 21.0), (11.0, 21.0)]
+    diagonal = spots(_target(0.0, 0.0, to=(10.0, 10.0)))
+    assert {s.yaw for s in diagonal} == {0.0}
+    odd = spots(_target(0.123, 0.456))
+    assert (odd[0].x, odd[0].y) == (1.12, 0.46)
+    assert (odd[1].x, odd[1].y) == (1.12, 1.46)
+
+
+@pytest.mark.parametrize(("key", "radius"), [("ammo", 3.0), ("climbs", 3.0), ("doors", 3.0)])
+def test_a_spot_exactly_at_a_keep_out_radius_is_clear(key: str, radius: float) -> None:
+    item = _cover(size=(0.5, 0.5, 1.0))
+    assert keep_out(_site(**{key: [(0.0, 0.0)]}), item, _at(item, radius, 0.0)) is None
+
+
+def test_keep_out_counts_the_props_already_placed_in_the_passage() -> None:
+    item = _cover(size=(1.0, 1.0, 1.0))
+    site = _site(box(0, 0, 20, 3))
+    matrix = _at(item, 10.0, 0.5)
+    assert keep_out(site, item, matrix) is None
+    assert keep_out(site, item, matrix, [box(9, 2.19, 11, 3)]) == "blocks_passage"
+
+
+def test_a_capped_prop_gives_way_to_the_next_one() -> None:
+    heavy = _cover("a_heavy", parts=3)
+    light = _cover("b_light")
+    plan = choose_cover([_target()], [heavy, light], _site(), Caps(draws=1))
+    assert [item.prop.asset_id for item in plan.placements] == ["b_light"]
+    assert plan.rejects == {"cap_draws": 1}
+
+
+def test_the_note_lists_every_asset_placed() -> None:
+    plan = choose_cover(_grid(2), [_cover("b_new", size=(1.0, 0.5, 1.2)), _cover("a_old")], _site())
+    assert note(plan) == (
+        "cover: placed 2 of 2 targets over 60 m (b_new), +24 triangles, +2 primitives (estimated from the 2D navmesh)"
+    )
+    mixed = CoverPlan(2, (_placed(0.0, 0.0, _cover("x")), _placed(20.0, 0.0, _cover("y"))), {}, Caps())
+    assert note(mixed).startswith("cover: placed 2 of 2 targets over 60 m (x, y), ")

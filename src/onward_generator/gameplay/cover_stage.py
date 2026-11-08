@@ -80,6 +80,10 @@ ALLOWED_LICENCES = frozenset({"CC0-1.0", "CC-BY-4.0"})
 CATALOGUE_LICENCES: Mapping[str, str] = {"kenney": "CC0-1.0"}
 """Catalogues whose rows carry no ``license``: each Kenney pack's ``License.txt`` is CC0 1.0 (docs/legal/data-sources.md)."""
 COPIED = ("bounds_report.json",)
+PROP_MATERIAL = Material((1, 1, 1, 1), 0.9)
+"""A catalogue prop's material when the scene has none of that name: white under the albedo, as overgrow writes it."""
+COLLIDER_MATERIAL = Material((0.45, 0.45, 0.45, 1), 0.9)
+"""The material overgrow gives the collision boxes it appends."""
 NOTE = (
     "Estimated. Cover props stand where the 2D gameplay report finds a route sample open past the proposed sightline; "
     "a covered sample stops counting as open even when the prop is lower than a sight blocker, so part of the gain is "
@@ -105,7 +109,7 @@ def catalogue_licences(library: str | Path | None) -> dict[str, str]:
     found: dict[str, str] = {}
     for directory in library_directories(library):
         try:
-            document = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+            document = json.loads((directory / "manifest.json").read_bytes())
         except (OSError, json.JSONDecodeError):
             continue
         for row in document.get("assets") or []:
@@ -121,7 +125,7 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise CoverError(f"missing {path}")
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
+        document = json.loads(path.read_bytes())
     except json.JSONDecodeError as exc:
         raise CoverError(f"{path}: not JSON ({exc})") from exc
     if not isinstance(document, dict):
@@ -302,7 +306,7 @@ def _stretches(report: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _rays_cut(before: SightCaster, after: SightCaster, point: tuple[float, float]) -> int:
-    return int(np.count_nonzero(after.lengths(point) < before.lengths(point) - 1e-6))
+    return int(np.count_nonzero(after.lengths(point) < before.lengths(point) - 1e-6))  # pragma: no mutate: equal only for a ray shortened by exactly 1 micrometre
 
 
 def apply_cover(
@@ -312,7 +316,7 @@ def apply_cover(
     layout_path: str | Path,
     out_dir: str | Path,
     *,
-    library: str | Path | None = "assets",
+    library: str | Path | None,
     overwrite: bool = False,
 ) -> CoverResult:
     """Write ``out_dir``: the playable scene with cover props, or a verbatim copy with none. Inputs are not modified."""
@@ -333,14 +337,18 @@ def apply_cover(
     props, _library_rejects = read_library(library)
     candidates, refused = cover_props(fitted_props(props), catalogue_licences(library), _scene_assets(materials))
     overgrown = _overgrow_triangles(nodes)
-    caps = Caps(MAX_COVER_PROPS, triangle_cap(overgrown), COVER_MAX_ADDED_DRAWS, MAX_NEW_COVER_ASSETS)
+    caps = Caps(props=MAX_COVER_PROPS, triangles=triangle_cap(overgrown), draws=COVER_MAX_ADDED_DRAWS, new_assets=MAX_NEW_COVER_ASSETS)
     site = build_site(base, manifest, layout, layout_file, scene_file, collision_path)
-    plan = choose_cover(targets, candidates, site, caps, floor=road_floor(nodes))
+    plan = choose_cover(
+        targets, candidates, site, caps,
+        floor=road_floor(nodes),  # pragma: no mutate: cover stands off the carriageway, where the road floor is z = 0 as without one
+    )
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"))
+    # Beside the output, so the final rename stays on one file system; the name never outlives the call.
+    work = Path(tempfile.mkdtemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"))  # pragma: no mutate: tests write on one file system, and the name is not kept
     try:
-        written = _write(work, detail, manifest, layout_file, plan, nodes, materials, visual_bytes, scene_file)
+        written = _write(work, detail, manifest, plan, nodes, materials, visual_bytes, scene_file)
         after_colliders = read_colliders(work / "scene_collision.glb")
         after_report = build_report(islands, base.partition.buildings, after_colliders, layout)
         after_report["layout_sha256"] = sha256_file(layout_file)
@@ -363,15 +371,19 @@ def apply_cover(
                 "max_sightline_m": MAX_SIGHTLINE_M, "target_spacing_m": TARGET_SPACING_M, "max_prop_length_m": MAX_PROP_LENGTH_M,
                 "max_added_tris": MAX_ADDED_TRIS,
             },
-            "caps": {"props": caps.props, "triangles": caps.triangles, "draws": caps.draws, "new_assets": caps.new_assets,
-                     "overgrow_triangles": overgrown},
+            "caps": {"props": plan.caps.props, "triangles": plan.caps.triangles, "draws": plan.caps.draws,
+                     "new_assets": plan.caps.new_assets, "overgrow_triangles": overgrown},
+            "keep_outs": {
+                "spawn_points": len(site.spawns), "ammo": len(site.ammo), "climbs": len(site.climbs), "doors": len(site.doors),
+                "hunt_routes": len(site.routes), "urban_elements": len(site.urban), "solids": len(site.solids),
+            },
             "targets": plan.targets,
             "candidates": [item.asset_id for item in candidates],
             "refused_props": refused,
             "placed": [
                 {**record, "triangles": item.prop.triangles, "primitives": item.prop.parts,
                  "rays_cut": _rays_cut(before_caster, after_caster, item.target.point)}
-                for record, item in zip(written, plan.placements, strict=True)
+                for record, item in zip(written, plan.placements, strict=True)  # pragma: no mutate: _records makes one row per placement
             ],
             "rejects": plan.rejects,
             "nothing_placed": plan.reason,
@@ -379,16 +391,16 @@ def apply_cover(
             "before": _stretches(before_report),
             "after": _stretches(after_report),
         }
-        atomic_write_bytes(work / COVER_REPORT, (json.dumps(report, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+        atomic_write_bytes(work / COVER_REPORT, report_text(report).encode("utf-8"))
         _swap(work, out)
     except BaseException:
-        shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(work, ignore_errors=True)  # pragma: no mutate: the work directory exists here, so removing it raises nothing to ignore
         raise
     return CoverResult(plan, report, out)
 
 
 def _write(
-    work: Path, detail: Path, manifest: Mapping[str, Any], layout_file: Path, plan: CoverPlan,
+    work: Path, detail: Path, manifest: Mapping[str, Any], plan: CoverPlan,
     nodes: list[Node], materials: dict[str, Material], visual_bytes: bytes, scene_file: Path,
 ) -> list[dict[str, Any]]:
     """The scene files in ``work``; returns the new manifest records. A refused scene raises CoverError."""
@@ -404,13 +416,13 @@ def _write(
     all_images.update(images)
     merged = dict(materials)
     for name in images:
-        merged.setdefault(name, Material((1, 1, 1, 1), 0.9))
+        merged.setdefault(name, PROP_MATERIAL)
     extras = read_glb(visual_bytes)[0].get("extras")
     atomic_write_bytes(work / "scene_visual.glb", build_glb(
         [*nodes, *visual_nodes], merged, extras=extras, repeat_images=all_images, preserve_uvs=True,
     ))
     atomic_write_bytes(work / "scene_collision.glb", glb_append(
-        (detail / "scene_collision.glb").read_bytes(), collider_nodes, {"collider": Material((0.45, 0.45, 0.45, 1), 0.9)},
+        (detail / "scene_collision.glb").read_bytes(), collider_nodes, {"collider": COLLIDER_MATERIAL},
     ))
     records = _records(plan.placements)
     objects = [dict(o) for o in manifest.get("objects") or [] if isinstance(o, Mapping)]

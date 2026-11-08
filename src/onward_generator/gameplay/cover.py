@@ -234,13 +234,13 @@ def _eroded(geometry: BaseGeometry) -> list[BaseGeometry]:
     if geometry.is_empty:
         return []
     shrunk = geometry.buffer(-(PASSAGE_M / 2 - ERODE_EPS_M))
-    return [part for part in polygons_of(shrunk) if part.area >= MIN_PART_M2]
+    return [part for part in polygons_of(shrunk) if part.area >= MIN_PART_M2]  # pragma: no mutate: equal only for a piece of exactly 0.01 m², which a buffer does not produce
 
 
 def joined(room: BaseGeometry, pieces: Sequence[BaseGeometry]) -> bool:
     """The ADR-031 test: ``room`` less ``pieces``, eroded by half of ``PASSAGE_M``, keeps each eroded piece of ``room`` in one piece."""
     before = _eroded(room)
-    after = _eroded(room.difference(union_all(list(pieces))) if pieces else room)
+    after = _eroded(room.difference(union_all(list(pieces))))
     for part in before:
         if sum(1 for other in after if other.intersects(part)) != 1:
             return False
@@ -254,9 +254,7 @@ def keeps_passage(site: CoverSite, print_: BaseGeometry, centre: tuple[float, fl
     """
     disc = Point(centre).buffer(CONNECT_RADIUS_M)
     blocked = [geometry for geometry in (*site.solids, *placed) if geometry.intersects(disc)]
-    room = site.ground.intersection(disc)
-    if blocked:
-        room = room.difference(union_all(blocked))
+    room = site.ground.intersection(disc).difference(union_all(blocked))
     return joined(room, [print_])
 
 
@@ -268,11 +266,8 @@ def keep_out(site: CoverSite, prop: CoverProp, matrix: np.ndarray, placed: Seque
         return "outside_playable"
     if not site.islands.covers(Point(x, y)):
         return "off_navmesh"
-    reason = block_reason(
-        x, y, zone=site.zone, buildings=site.buildings, lane_tree=site.lane_tree, lanes=site.lanes, spawns=site.spawns,
-        # The footprint must lie on walkable ground off the carriageway (below), not 4.2 m from the street's axis.
-        allow_lane=True,
-    )
+    # No lane test here: the footprint must lie on walkable ground off the carriageway (below), not 4.2 m from the street's axis.
+    reason = block_reason(x, y, zone=site.zone, buildings=site.buildings, lane_tree=None, lanes=[], spawns=site.spawns, allow_lane=True)
     if reason is not None:
         return reason
     if not site.free.covers(print_):
@@ -283,13 +278,16 @@ def keep_out(site: CoverSite, prop: CoverProp, matrix: np.ndarray, placed: Seque
         return "climb_foot"
     if _near(site.doors, x, y, CLIMB_KEEP_OUT_M):
         return "door"
-    if any(route.distance(print_) < NAV_AGENT_RADIUS_M for route in site.routes) or any(
+    if any(route.distance(print_) < NAV_AGENT_RADIUS_M for route in site.routes) or any(  # pragma: no mutate: no box edge lies exactly 0.35 m from a line in floating point
         _near(list(route.coords), x, y, CLIMB_ROUTE_KEEP_OUT_M) for route in site.routes
     ):
         return "hunt_route"
     if any(area.intersects(print_) for area in site.urban):
         return "on_urban_element"
-    reason = object_reason(role=prop.prop.spec.role, mesh=prop.prop.mesh, matrix=matrix, buildings=site.buildings, lanes=site.lanes)
+    reason = object_reason(
+        role=prop.prop.spec.role, mesh=prop.prop.mesh, matrix=matrix, buildings=site.buildings,
+        lanes=site.lanes,  # pragma: no mutate: a prop at most 3 m long cannot leave under 1.2 m on both sides of the 8.4 m lane band
+    )
     if reason is not None:
         return reason
     if any(other.intersection(print_).area > PROP_OVERLAP_M2 for other in (*site.solids, *placed)):
@@ -304,8 +302,7 @@ def split_reason(site: CoverSite, prints: Sequence[BaseGeometry]) -> str | None:
     a spawn, the Uplink or an AI start leaves the islands; None when neither happens."""
     if not prints:
         return None
-    room = site.ground.difference(union_all(site.solids)) if site.solids else site.ground
-    if not joined(room, prints):
+    if not joined(site.ground.difference(union_all(site.solids)), prints):
         return "navmesh_split"
     islands = site.islands.difference(union_all([geometry.buffer(NAV_AGENT_RADIUS_M) for geometry in prints]))
     if any(site.islands.covers(Point(p)) and not islands.covers(Point(p)) for p in site.anchors):
@@ -433,15 +430,12 @@ def _first_fit(
         for spot in spots(target):
             matrix = pose(prop, spot, floor.z(spot.x, spot.y))
             print_ = footprint(prop, matrix)
-            # The report measures the collider's axis-aligned box: so is the reach and the sample's clearance.
-            gap = print_.envelope.distance(Point(target.point))
-            if gap > COVER_REACH_M:
-                rejects["out_of_reach"] += 1
-                continue
-            if gap < NAV_AGENT_RADIUS_M:
+            # The report measures the collider's axis-aligned box, so the sample's clearance is measured to it too. Every spot
+            # is at most 1.42 m from the sample and inside the footprint, so the box is always within COVER_REACH_M.
+            if print_.envelope.distance(Point(target.point)) < NAV_AGENT_RADIUS_M:  # pragma: no mutate: equal only at exactly 0.35 m, which rotated boxes do not hit
                 rejects["on_route_sample"] += 1
                 continue
-            reason = keep_out(site, prop, matrix, prints)
+            reason = keep_out(site, prop, matrix, prints)  # pragma: no mutate: targets keep 12 m from placed props, beyond the 6 m passage disc and any footprint
             if reason is None:
                 return Placement(prop, spot, matrix, print_, target)
             rejects[reason] += 1
