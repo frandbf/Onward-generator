@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import build_parser, main
-from onward_generator.maps.workspace import create_map, store_gameplay_report, store_sources
+from onward_generator.maps.workspace import MapError, create_map, store_balanced_spawns, store_gameplay_report, store_sources
 from onward_generator.next_step import (
     STAGE_DIRS,
     cadastre_split_command,
@@ -1716,3 +1716,35 @@ def test_the_gameplay_report_key_adds_only_the_flag_to_the_layout(tmp_path: Path
     layout = dict(after)["layout"]
     assert layout[layout.index("--gameplay-report") + 1] == "--out"
     assert [arg for arg in layout if arg != "--gameplay-report"] == dict(before)["layout"]
+
+
+def test_the_balanced_spawns_key_adds_only_the_flag_to_the_layout(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    before = plan_steps(root)
+    assert "--balanced-spawns" not in dict(before)["layout"]
+    store_balanced_spawns(root, False)
+    assert plan_steps(root) == before
+    store_balanced_spawns(root, True)
+    after = plan_steps(root)
+    assert [name for name, _ in after] == [name for name, _ in before]
+    for (name, old), (_, new) in zip(before, after, strict=True):
+        if name != "layout":
+            assert new == old
+    layout = dict(after)["layout"]
+    assert layout[layout.index("--balanced-spawns") + 1] == "--out"
+    assert [arg for arg in layout if arg != "--balanced-spawns"] == dict(before)["layout"]
+    store_gameplay_report(root, True)
+    both = dict(plan_steps(root))["layout"]
+    assert both[both.index("--gameplay-report") + 1] == "--balanced-spawns"
+
+
+def test_a_balanced_spawns_value_that_is_not_a_bool_stops_the_plan(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps({**document, "balanced_spawns": "true"}), encoding="utf-8")
+    before = sorted(p.relative_to(root).as_posix() for p in root.rglob("*"))
+    with pytest.raises(MapError, match='"balanced_spawns" must be true or false'):
+        plan_steps(root)
+    assert sorted(p.relative_to(root).as_posix() for p in root.rglob("*")) == before

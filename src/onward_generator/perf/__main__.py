@@ -17,7 +17,14 @@ from onward_generator.generation.config import GenerationConfigError, load_gener
 from onward_generator.generation.scene import GenerationError
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs, sha256_file
 from onward_generator.perf.device import drawcall_trace, load_times, summarize_csv
-from onward_generator.perf.layout import TIME_OF_DAY_SETTINGS, LayoutError, gameplay_layout, load_detail_manifest, playable_layout
+from onward_generator.perf.layout import (
+    TIME_OF_DAY_SETTINGS,
+    LayoutError,
+    balanced_playable_layout,
+    gameplay_layout,
+    load_detail_manifest,
+    playable_layout,
+)
 from onward_generator.perf.measure import combine_groups, measure_scene_dir
 
 MEASURE_SCHEMA = "onward_generator.perf_measure"
@@ -59,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--gameplay-report", action="store_true",
         help=f"playable layout only: also write {REPORT_FILE} beside --out (routes, sightlines, cover, balance; ADR-032)",  # pragma: no mutate: help text
     )
+    lay.add_argument(
+        "--balanced-spawns", action="store_true",
+        help="playable layout only: place the defenders and the Uplink by the gameplay metrics (plan C6, ADR-032; off by default)",  # pragma: no mutate: help text
+    )
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
@@ -83,7 +94,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if want_report and not args.playable:
         print("perf: --gameplay-report needs --playable", file=sys.stderr)
         return 1
+    if args.command == "layout" and args.balanced_spawns and not args.playable:
+        print("perf: --balanced-spawns needs --playable", file=sys.stderr)
+        return 1
     report: dict[str, Any] | None = None
+    placement_line: str | None = None
     try:
         names = (Path(args.out).name, *((REPORT_FILE,) if want_report else ()))
         target, *report_target = prepare_outputs(Path(args.out).parent, names, overwrite=args.overwrite)
@@ -112,7 +127,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 heights = json.loads(Path(args.heights).expanduser().read_text(encoding="utf-8"))
                 scene = json.loads(Path(args.scene).expanduser().read_bytes())
                 footprints = {f["id"]: shape(f["geometry"]) for f in scene["features"]}
-                doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm, footprints=footprints)
+                if args.balanced_spawns:
+                    doc, placement_line = balanced_playable_layout(
+                        base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm, footprints=footprints)
+                else:
+                    doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm, footprints=footprints)
                 if want_report:
                     # Computed before either file is written: a refusal leaves both untouched.
                     report = gameplay_report(base, manifest, doc, Path(args.detail).expanduser() / "scene_collision.glb")
@@ -156,6 +175,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("layout: " + (" ".join(parts) if parts else str(doc.get("schema", "written"))))
     else:
         print(json.dumps({k: v for k, v in doc.items() if k not in ("metrics",)}, ensure_ascii=False)[:600])
+    if placement_line is not None:
+        print(placement_line)
     print(f"wrote {target}")
     if report is not None:
         print(f"gameplay: {headline_text(report)}  status {report['status']}  (estimated, report only)")

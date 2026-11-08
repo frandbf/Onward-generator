@@ -17,7 +17,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from shapely import LineString, MultiLineString, Point, STRtree, contains_xy, dwithin, offset_curve, prepare, union_all
@@ -29,6 +29,11 @@ from onward_generator.generation.scene import GeneratedScene
 from onward_generator.generation.surfaces import LinearWay, SurfaceClass
 from onward_generator.perf.climbs import climbed_roofs, place_climbs
 from onward_generator.tiers import core_of
+
+if TYPE_CHECKING:
+    # gameplay.metrics imports overgrow, which leads back here through maps and export: imported where used.
+    from onward_generator.gameplay.metrics import NavGraph
+    from onward_generator.gameplay.placement import Choice, Placement
 
 LAYOUT_SCHEMA = "onward_generator.perf_layout"
 LAYOUT_VERSION = "0.1.0"
@@ -173,19 +178,19 @@ def extra_spawn_block(
     raise LayoutError("no second spawn block fits for Assault")
 
 
-def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], *, farthest: bool = False) -> dict[str, Any]:
-    """Two spawn blocks and the Uplink between them on the largest free area.
-
-    The device fixture keeps the defenders within ``TEAM_SEPARATION_M`` of the attackers.
-    With ``farthest`` (the playable layout) they go to the farthest grid point of that area
-    whose block fits, and it must be at least ``TEAM_SEPARATION_M`` away.
-    """
+def _free_inside(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> BaseGeometry:
+    """Free ground less the urban elements, inside the playable core when the map has one."""
     urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
     free = free_ground(base, urban)
     inside = playable_area(detail_manifest)
     if inside is not None:
         free = free.intersection(inside)
-    region = free.buffer(-CLEARANCE_M)
+    return free
+
+
+def _spawn_site(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tuple[BaseGeometry, tuple[float, float]]:
+    """The largest free area with ``CLEARANCE_M`` clearance and the attackers' centre at its pole of inaccessibility."""
+    region = _free_inside(base, detail_manifest).buffer(-CLEARANCE_M)
     parts = [p for p in polygons_of(region) if p.area > 0]
     if not parts:
         raise LayoutError(f"no free walkable area with {CLEARANCE_M} m clearance")
@@ -195,13 +200,36 @@ def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], *,
     a = (round(centre.x, 2), round(centre.y, 2))
     if not _fits(area, _block(*a)):
         raise LayoutError("the largest free area cannot hold a spawn block")
+    return area, a
 
-    bx, by = _defenders(area, a, farthest=farthest)
-    b = (round(bx, 2), round(by, 2))
 
+def _midpoint_on(area: BaseGeometry, a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+    """The midpoint of the two teams, moved onto ``area`` when it falls outside, rounded to the centimetre."""
     mid = Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
     if not area.contains(mid):
         mid = nearest_points(area, mid)[0]
+    return (round(mid.x, 2), round(mid.y, 2))
+
+
+def gameplay_layout(
+    base: GeneratedScene, detail_manifest: Mapping[str, Any], *, farthest: bool = False, placement: Placement | None = None,
+) -> dict[str, Any]:
+    """Two spawn blocks and the Uplink between them on the largest free area.
+
+    The device fixture keeps the defenders within ``TEAM_SEPARATION_M`` of the attackers.
+    With ``farthest`` (the playable layout) they go to the farthest grid point of that area
+    whose block fits, and it must be at least ``TEAM_SEPARATION_M`` away. A ``placement``
+    from ``choose_placement`` (plan C6) gives the defenders and the Uplink instead; the same
+    rules are checked again.
+    """
+    area, a = _spawn_site(base, detail_manifest)
+    if placement is None:
+        bx, by = _defenders(area, a, farthest=farthest)
+        b = (round(bx, 2), round(by, 2))
+        uplink = _midpoint_on(area, a, b)
+    else:
+        _check_placement(area, a, placement)
+        b, uplink = placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
     quad = (a[0], a[1] - SPAWN_SPACING_M * 2)
@@ -215,7 +243,7 @@ def gameplay_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], *,
         # Points are {x, y} objects: Unity's JsonUtility cannot read nested arrays.
         "attackers": {"centre_m": list(a), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*a)]},
         "defenders": {"centre_m": list(b), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*b)]},
-        "uplink_m": [round(mid.x, 2), round(mid.y, 2)],
+        "uplink_m": [uplink[0], uplink[1]],
         "map_quad_m": [round(quad[0], 2), round(quad[1], 2)],
         "level_size_m": round(max(sx1 - sx0, sy1 - sy0), 1),
         "site_bounds_m": [round(v, 2) for v in (sx0, sy0, sx1, sy1)],
@@ -248,6 +276,123 @@ def _defenders(area: BaseGeometry, a: tuple[float, float], *, farthest: bool) ->
             raise LayoutError("no second spawn block fits apart from the first")
         return (x, y)
     raise LayoutError("no second spawn block fits near the first")
+
+
+def _defender_candidates(area: BaseGeometry, a: tuple[float, float], limit: int) -> list[tuple[float, float]]:
+    """Up to ``limit`` defenders' centres in the order ``_defenders`` tries them (farthest first, then north, then east).
+
+    Each block fits, lies at least ``TEAM_SEPARATION_M`` from ``a`` and at least ``BLOCK_GAP_M`` from the
+    centres already kept. The first one is ``_defenders(area, a, farthest=True)`` when that succeeds.
+    """
+    minx, miny, maxx, maxy = area.bounds
+    x0, y0 = math.floor(minx / GRID_M) * GRID_M, math.floor(miny / GRID_M) * GRID_M
+    columns = int((maxx - minx) / GRID_M) + 2  # pragma: no mutate: more columns only add points past the bounds, where no block fits
+    rows = int((maxy - miny) / GRID_M) + 2  # pragma: no mutate: more rows only add points past the bounds, where no block fits
+    points = [(x0 + GRID_M * i, y0 + GRID_M * j) for j in range(rows) for i in range(columns)]
+    kept: list[tuple[float, float]] = []
+    for x, y in sorted(points, key=lambda c: (-math.hypot(c[0] - a[0], c[1] - a[1]), -c[1], -c[0])):
+        if len(kept) >= limit or math.hypot(x - a[0], y - a[1]) < TEAM_SEPARATION_M:
+            break
+        if all(math.hypot(x - kx, y - ky) >= BLOCK_GAP_M for kx, ky in kept) and _fits(area, _block(x, y)):
+            kept.append((round(x, 2), round(y, 2)))
+    return kept
+
+
+def _check_placement(area: BaseGeometry, a: tuple[float, float], placement: Placement) -> None:
+    """The rules of ``gameplay_layout`` for a placement chosen elsewhere: same attackers, defenders' block inside and 30 m away, Uplink on the area."""
+    if placement.attack != a:
+        raise LayoutError(f"the placement moves the attackers to {placement.attack}; they stay at {a}")
+    if not _fits(area, _block(*placement.defend)):
+        raise LayoutError("the placed defenders' block does not fit the free area")
+    gap = math.dist(a, placement.defend)
+    if gap < TEAM_SEPARATION_M:
+        raise LayoutError(f"the placement holds the teams only {gap:.1f} m apart; {TEAM_SEPARATION_M:.0f} m are required")
+    if not area.covers(Point(placement.uplink)):
+        raise LayoutError("the placed Uplink is not on the free area")
+
+
+K_DEFENDERS = 4
+"""Defenders' positions tried by ``choose_placement``; each gets two Uplinks, so at most 8 candidates (plan C6)."""
+
+
+def _objective_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tuple[BaseGeometry, list[BaseGeometry]]:
+    """The free ground inside the core and its pieces with 1 m clearance, where AI, ammo, objectives and the second blocks go."""
+    free = _free_inside(base, detail_manifest)
+    parts = [p for p in polygons_of(free.buffer(-1.0)) if p.area > 0]
+    if not parts:
+        raise LayoutError("no walkable ground with 1 m clearance for AI and ammo")
+    return free, parts
+
+
+def _second_blocks(parts: Sequence[BaseGeometry], attack: tuple[float, float], defend: tuple[float, float], uplink: tuple[float, float]) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Assault's second block of each team, as ``playable_layout`` places them."""
+    area = component_holding(parts, uplink)
+    attack_b = extra_spawn_block(area, attack, [attack, defend])
+    defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
+    return attack_b, defend_b
+
+
+def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tuple[Placement | None, Choice]:
+    """The most balanced of a few candidate placements on the B4 navigation graph (plan C6, off by default).
+
+    Candidates, in this order: for each of up to ``K_DEFENDERS`` defenders' positions (``_defender_candidates``),
+    the Uplink at the teams' midpoint (today's rule), then the Uplink at the node of the shortest
+    attackers-to-defenders path where both teams' distances differ least, kept inside the spawn area.
+    The attackers stay where ``gameplay_layout`` puts them, and the second blocks come from
+    ``extra_spawn_block`` as in ``playable_layout``. Candidate 0 is today's placement. A candidate whose
+    second blocks do not fit is invalid. The placement is None when candidate 0 is kept, with the reason
+    in the choice. Raises LayoutError only where ``gameplay_layout`` does. Estimated from the 2D navmesh,
+    not the baked one.
+    """
+    from onward_generator.gameplay.metrics import nav_graph, snap
+    from onward_generator.gameplay.placement import Placement, score_all, select
+
+    area, a = _spawn_site(base, detail_manifest)
+    _, parts = _objective_ground(base, detail_manifest)
+    graph = nav_graph(nav_islands(base, playable_area(detail_manifest)))
+    allowed = set(np.flatnonzero(contains_xy(area, graph.xy[:, 0], graph.xy[:, 1])).tolist())
+    attack_node = snap(graph, a)
+    candidates: list[Placement | str] = []
+    for d in _defender_candidates(area, a, K_DEFENDERS):
+        midpoint = _placed(parts, a, d, _midpoint_on(area, a, d))
+        candidates.append(midpoint)
+        if isinstance(midpoint, str):
+            continue
+        even = _even_uplink(graph, allowed, attack_node, midpoint)
+        if even is not None and even != midpoint.uplink:
+            candidates.append(_placed(parts, a, d, even))
+    choice = select(score_all(graph, candidates))
+    chosen = candidates[choice.index] if choice.reason is None else None
+    return (chosen if isinstance(chosen, Placement) else None), choice
+
+
+def _placed(parts: Sequence[BaseGeometry], a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> Placement | str:
+    """The candidate with Assault's second blocks, or why they do not fit."""
+    from onward_generator.gameplay.placement import Placement
+
+    try:
+        attack_b, defend_b = _second_blocks(parts, a, d, uplink)
+    except LayoutError as exc:
+        return str(exc)
+    return Placement(a, d, uplink, attack_b, defend_b)
+
+
+def _even_uplink(graph: NavGraph, allowed: set[int], attack_node: int | None, placement: Placement) -> tuple[float, float] | None:
+    """The even-contact node (``gameplay.placement.even_contact_node``) for ``placement``'s blocks, as metres, or None."""
+    from onward_generator.gameplay.metrics import shortest_path, snap
+    from onward_generator.gameplay.placement import even_contact_node, team_distances
+
+    nodes = [snap(graph, centre) for centre in (placement.attack_b, placement.defend, placement.defend_b)]
+    if attack_node is None or any(node is None for node in nodes):
+        return None
+    attack_b, defend, defend_b = (int(node) for node in nodes if node is not None)
+    path = shortest_path(graph, attack_node, defend)
+    if path is None:
+        return None
+    node = even_contact_node(team_distances(graph, [attack_node, attack_b]), team_distances(graph, [defend, defend_b]), path, allowed)
+    if node is None:
+        return None
+    return (round(float(graph.xy[node][0]), 2), round(float(graph.xy[node][1]), 2))
 
 
 def yaw_toward(x: float, y: float, focus_x: float, focus_y: float) -> float:
@@ -714,7 +859,10 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
     ])
 
 
-def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False, footprints: Mapping[str, BaseGeometry] | None = None) -> dict[str, Any]:
+def playable_layout(
+    base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False,
+    footprints: Mapping[str, BaseGeometry] | None = None, placement: Placement | None = None,
+) -> dict[str, Any]:
     """Spawns, Hunt anchors, SDK audio names and the urban profile of ``time_of_day``.
 
     The measurement fixture stays ``perf_layout``. This document is what a
@@ -725,22 +873,17 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     the pile seen in game. Audio names are copied from the SDK v1.15 library. A night map has no
     birds and a light under each street lamp (ADR-026).
     Rules that the adapter applies from the same guide live in ``docs/11-onward-sdk.md``.
+    A ``placement`` from ``choose_placement`` (plan C6) sets the four spawn blocks and the Uplink;
+    everything else follows from them as without it.
     """
     if time_of_day not in TIME_OF_DAY_SETTINGS:
         raise LayoutError(f"time_of_day must be one of {', '.join(sorted(TIME_OF_DAY_SETTINGS))}, not {time_of_day!r}")
     if storm and time_of_day != "night":
         raise LayoutError("storm needs a night map: a daytime flash looks wrong (ADR-028)")
     sdk_time, profile = TIME_OF_DAY_SETTINGS[time_of_day]
-    doc = gameplay_layout(base, detail_manifest, farthest=True)
-    urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
-    free = free_ground(base, urban)
+    doc = gameplay_layout(base, detail_manifest, farthest=True, placement=placement)
+    free, parts = _objective_ground(base, detail_manifest)
     inside = playable_area(detail_manifest)
-    if inside is not None:
-        free = free.intersection(inside)
-    region = free.buffer(-1.0)
-    parts = [p for p in polygons_of(region) if p.area > 0]
-    if not parts:
-        raise LayoutError("no walkable ground with 1 m clearance for AI and ammo")
     uplink = tuple(doc["uplink_m"])
     area = component_holding(parts, uplink)
     focus = _focus_xy(base, heights) or uplink
@@ -750,8 +893,11 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
     ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
     attack = (float(doc["attackers"]["centre_m"][0]), float(doc["attackers"]["centre_m"][1]))
     defend = (float(doc["defenders"]["centre_m"][0]), float(doc["defenders"]["centre_m"][1]))
-    attack_b = extra_spawn_block(area, attack, [attack, defend])
-    defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
+    if placement is None:
+        attack_b = extra_spawn_block(area, attack, [attack, defend])
+        defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
+    else:
+        attack_b, defend_b = _checked_second_blocks(area, placement)
     spawn_pts = [point for centre in (attack, defend, attack_b, defend_b) for point in _block(*centre)]
     occupied_pts = [uplink, *spawn_pts]
 
@@ -820,6 +966,46 @@ def playable_layout(base: GeneratedScene, detail_manifest: Mapping[str, Any], he
         "lightning": 1 if storm else 0,
     })
     return doc
+
+
+def _checked_second_blocks(area: BaseGeometry, placement: Placement) -> tuple[tuple[float, float], tuple[float, float]]:
+    """A placement's second blocks, refused unless they fit ``area`` and keep ``BLOCK_GAP_M`` from the other centres."""
+    centres = [placement.attack, placement.defend, placement.attack_b, placement.defend_b]
+    for i, centre in enumerate(centres[2:], start=2):
+        if not _fits(area, _block(*centre)):
+            raise LayoutError(f"the placed second block at {centre} does not fit the Uplink's ground")
+        if any(math.dist(centre, other) < BLOCK_GAP_M - 1e-6 for other in centres[:i]):
+            raise LayoutError(f"the placed second block at {centre} is closer than {BLOCK_GAP_M:g} m to another block")
+    return placement.attack_b, placement.defend_b
+
+
+def balanced_playable_layout(
+    base: GeneratedScene, detail_manifest: Mapping[str, Any], heights: Mapping[str, Any], *, time_of_day: str = "day", storm: bool = False,
+    footprints: Mapping[str, BaseGeometry] | None = None,
+) -> tuple[dict[str, Any], str]:
+    """``playable_layout`` with the placement ``choose_placement`` picks, and the ``placement:`` line (plan C6).
+
+    The current placement is kept, and the line says why, when no candidate beats it, when none can be
+    scored or when the chosen one cannot be built. It never raises where ``playable_layout`` succeeds.
+    """
+    from onward_generator.gameplay.metrics import GameplayError
+    from onward_generator.gameplay.placement import KEPT, note
+
+    def current(reason: str) -> tuple[dict[str, Any], str]:
+        doc = playable_layout(base, detail_manifest, heights, time_of_day=time_of_day, storm=storm, footprints=footprints)
+        return doc, f"placement: {KEPT}: {reason} (estimated from the 2D navmesh)"
+
+    try:
+        chosen, choice = choose_placement(base, detail_manifest)
+    except (LayoutError, GameplayError) as exc:
+        return current(str(exc))
+    if chosen is None:
+        return playable_layout(base, detail_manifest, heights, time_of_day=time_of_day, storm=storm, footprints=footprints), note(choice)
+    try:
+        doc = playable_layout(base, detail_manifest, heights, time_of_day=time_of_day, storm=storm, footprints=footprints, placement=chosen)
+    except LayoutError as exc:
+        return current(f"candidate {choice.index} cannot be built: {exc}")
+    return doc, note(choice)
 
 
 def load_detail_manifest(detail_dir: str | Path) -> dict[str, Any]:

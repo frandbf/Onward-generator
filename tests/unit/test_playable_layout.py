@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import pytest
@@ -782,3 +783,211 @@ def test_reachable_ground_stays_inside_the_core() -> None:
     partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
     ground = reachable_ground(_base(street, partition=partition), {"core": {"half_side_m": 60.0}}, (0.0, -20.0))  # type: ignore[arg-type]
     assert ground.covers(Point(59.5, 0)) and not ground.covers(Point(59.7, 0))  # the core less its 0.4 m wall
+
+
+# ------------------------------------------------------------------------------------------------ balanced spawns (plan C6)
+
+
+def _plaza_base(site: BaseGeometry | None = None) -> object:
+    street = LinearWay("street", "vehicular", LineString([(-60, -200), (-60, -190)]), 2.0, "config_default")
+    partition = build_partition(site if site is not None else box(-60, -60, 60, 60), [], [street], [], load_generation_config())
+    return _base(street, partition=partition)
+
+
+L_SITE = Polygon([(0, 0), (120, 0), (120, 12), (12, 12), (12, 80), (0, 80)])
+
+
+def test_defender_candidates_follow_the_farthest_first_order() -> None:
+    from onward_generator.perf.layout import _defender_candidates
+
+    strip = box(0, 0, 80, 3)
+    found = _defender_candidates(strip, (8.0, 2.0), 10)
+    # 10 m apart from each other, and the last one exactly 30 m from the attackers.
+    assert found == [(78.0, 2.0), (68.0, 2.0), (58.0, 2.0), (48.0, 2.0), (38.0, 2.0)]
+    assert all(type(v) is float for point in found for v in point)
+    assert found[0] == _defenders(strip, (8.0, 2.0), farthest=True)
+    assert _defender_candidates(strip, (8.0, 2.0), 4) == found[:4]
+    assert _defender_candidates(strip, (8.0, 2.0), 1) == found[:1]
+    assert _defender_candidates(strip, (8.0, 2.0), 0) == []
+    # Ties on the distance go north, then east, as in _defenders.
+    assert _defender_candidates(box(-40, -40, 40, 40), (0.0, 0.0), 2) == [(38.0, 38.0), (-38.0, 38.0)]
+    # One point fits 30 m away; none fits farther.
+    assert _defender_candidates(box(0, 0, 35.9, 3), (4.0, 2.0), 4) == [(34.0, 2.0)]
+    assert _defender_candidates(box(0, 0, 33.9, 3), (4.0, 2.0), 4) == []
+    for x, y in _defender_candidates(PLAZA.buffer(-1.5), (0.0, 0.0), 4):
+        assert math.hypot(x, y) >= TEAM_SEPARATION_M
+    plaza = _defender_candidates(PLAZA.buffer(-1.5), (0.0, 0.0), 4)
+    assert len(plaza) == 4
+    assert all(math.dist(p, q) >= BLOCK_GAP_M for i, p in enumerate(plaza) for q in plaza[i + 1:])
+
+
+def test_a_placement_sets_the_defenders_and_the_uplink() -> None:
+    from onward_generator.gameplay.placement import Placement
+    from onward_generator.perf.layout import gameplay_layout
+
+    base = _plaza_base()
+    manifest: dict = {"objects": []}
+    today = gameplay_layout(base, manifest, farthest=True)  # type: ignore[arg-type]
+    assert gameplay_layout(base, manifest, farthest=True, placement=None) == today  # type: ignore[arg-type]
+    a = (today["attackers"]["centre_m"][0], today["attackers"]["centre_m"][1])
+    moved = gameplay_layout(base, manifest, farthest=True, placement=Placement(a, (40.0, -40.0), (10.0, -10.0), a, a))  # type: ignore[arg-type]
+    assert moved["defenders"]["centre_m"] == [40.0, -40.0] and moved["uplink_m"] == [10.0, -10.0]
+    assert moved["attackers"] == today["attackers"]
+    assert moved["defenders"]["points_m"][0] == {"x": 38.2, "y": -40.6}
+    assert {k: v for k, v in moved.items() if k not in ("defenders", "uplink_m")} == {k: v for k, v in today.items() if k not in ("defenders", "uplink_m")}
+    # Exactly 30 m apart is enough.
+    assert gameplay_layout(base, manifest, placement=Placement(a, (30.0, 0.0), (15.0, 0.0), a, a))["defenders"]["centre_m"] == [30.0, 0.0]  # type: ignore[arg-type]
+    for placement, message in (
+        (Placement((1.0, 0.0), (40.0, -40.0), (10.0, -10.0), a, a), r"^the placement moves the attackers to \(1.0, 0.0\); they stay at \(0.0, 0.0\)$"),
+        (Placement(a, (29.9, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
+        (Placement(a, (57.0, 0.0), (10.0, 0.0), a, a), r"^the placed defenders' block does not fit the free area$"),
+        (Placement(a, (40.0, -40.0), (58.6, 0.0), a, a), r"^the placed Uplink is not on the free area$"),
+    ):
+        with pytest.raises(LayoutError, match=message):
+            gameplay_layout(base, manifest, placement=placement)  # type: ignore[arg-type]
+    # The boundary of the free area is on it.
+    assert gameplay_layout(base, manifest, placement=Placement(a, (40.0, -40.0), (58.5, 0.0), a, a))["uplink_m"] == [58.5, 0.0]  # type: ignore[arg-type]
+
+
+def test_placed_second_blocks_must_fit_and_keep_their_gap() -> None:
+    from onward_generator.gameplay.placement import Placement
+    from onward_generator.perf.layout import _checked_second_blocks
+
+    area = PLAZA.buffer(-1.0)
+    a, d, u = (0.0, 0.0), (40.0, 0.0), (20.0, 0.0)
+    assert _checked_second_blocks(area, Placement(a, d, u, (0.0, -10.0), (40.0, -10.0))) == ((0.0, -10.0), (40.0, -10.0))
+    assert _checked_second_blocks(area, Placement(a, d, u, (0.0, -10.0 + 5e-7), (40.0, -10.0)))[0] == (0.0, -10.0 + 5e-7)
+    for attack_b, defend_b, message in (
+        ((0.0, -9.9), (40.0, -10.0), r"^the placed second block at \(0.0, -9.9\) is closer than 10 m to another block$"),
+        ((0.0, -10.0), (9.9, -10.0), r"^the placed second block at \(9.9, -10.0\) is closer than 10 m to another block$"),
+        ((0.0, -10.0), (40.0, 9.9), r"^the placed second block at \(40.0, 9.9\) is closer than 10 m to another block$"),
+        ((78.0, 0.0), (40.0, -10.0), r"^the placed second block at \(78.0, 0.0\) does not fit the Uplink's ground$"),
+        ((0.0, -10.0), (40.0, -78.5), r"^the placed second block at \(40.0, -78.5\) does not fit the Uplink's ground$"),
+    ):
+        with pytest.raises(LayoutError, match=message):
+            _checked_second_blocks(area, Placement(a, d, u, attack_b, defend_b))
+
+
+@pytest.mark.parametrize("site", [None, L_SITE])
+def test_the_balanced_uplink_stays_on_the_spawn_area_and_the_island_of_today(site: BaseGeometry | None) -> None:
+    from onward_generator.gameplay.metrics import SNAP_M, nav_graph
+    from onward_generator.gameplay.placement import Placement
+    from onward_generator.perf.layout import CLEARANCE_M, choose_placement, gameplay_layout
+
+    base = _plaza_base(site)
+    manifest: dict = {"objects": [], "core": {"half_side_m": 60.0}} if site is None else {"objects": []}
+    placement, choice = choose_placement(base, manifest)  # type: ignore[arg-type]
+    assert (placement, choice) == choose_placement(base, manifest)  # type: ignore[arg-type]
+    assert isinstance(placement, Placement) and choice.reason is None and choice.index > 0
+    assert choice.chosen.diff_pct is not None and choice.baseline.diff_pct is not None
+    assert choice.chosen.diff_pct < choice.baseline.diff_pct
+    today = gameplay_layout(base, manifest, farthest=True)  # type: ignore[arg-type]
+    assert list(placement.attack) == today["attackers"]["centre_m"]
+    inside = playable_area(manifest)
+    free = free_ground(base, [])  # type: ignore[arg-type]
+    if inside is not None:
+        free = free.intersection(inside)
+        assert inside.covers(Point(placement.uplink))
+    assert free.buffer(-CLEARANCE_M).covers(Point(placement.uplink))
+    islands = nav_islands(base, inside)  # type: ignore[arg-type]
+    assert component_holding(islands, tuple(today["uplink_m"])).covers(Point(placement.uplink))
+    graph = nav_graph(islands)
+    for centre in (placement.uplink, *placement.blocks().values()):
+        assert min(math.dist(centre, (float(x), float(y))) for x, y in graph.xy) <= SNAP_M
+    assert math.dist(placement.attack, placement.defend) >= TEAM_SEPARATION_M
+    centres = list(placement.blocks().values())
+    assert all(math.dist(p, q) >= BLOCK_GAP_M - 1e-6 for i, p in enumerate(centres) for q in centres[i + 1:])
+
+
+def test_candidates_whose_second_blocks_do_not_fit_are_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.perf.layout as layout
+
+    base = _plaza_base()
+    manifest: dict = {"objects": []}
+    real = layout._second_blocks
+    calls: list[tuple[float, float]] = []
+
+    def first_only(parts: list, a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> object:
+        calls.append(uplink)
+        if len(calls) > 1:
+            raise LayoutError("no second spawn block fits for Assault")
+        return real(parts, a, d, uplink)
+
+    monkeypatch.setattr(layout, "_second_blocks", first_only)
+    placement, choice = layout.choose_placement(base, manifest)  # type: ignore[arg-type]
+    assert placement is None and choice.index == 0
+    assert choice.reason == "kept the current placement: no candidate beats the current placement"
+    # Candidate 0 and its even Uplink, then the midpoint of each other defenders' position.
+    assert choice.count == len(calls) == 2 + 3
+
+    calls.clear()
+
+    def never(parts: list, a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> object:
+        calls.append(uplink)
+        raise LayoutError("no second spawn block fits for Assault")
+
+    monkeypatch.setattr(layout, "_second_blocks", never)
+    placement, choice = layout.choose_placement(base, manifest)  # type: ignore[arg-type]
+    assert placement is None and choice.count == 4
+    assert choice.reason == "kept the current placement: candidate 0 cannot be scored (no second spawn block fits for Assault)"
+
+
+def test_balanced_layout_keeps_the_current_placement_when_it_must(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.perf.layout as layout
+    from onward_generator.gameplay.metrics import GameplayError
+    from onward_generator.gameplay.placement import Choice, Placement, Score
+
+    built: list[object] = []
+
+    def fake_layout(base: object, manifest: object, heights: object, **kwargs: object) -> dict:
+        built.append(kwargs.get("placement"))
+        if kwargs.get("placement") is not None and kwargs["placement"].uplink == (9.0, 9.0):  # type: ignore[attr-defined]
+            raise LayoutError("no ground left for Escort, Evac and Retrieval")
+        return {"placement": kwargs.get("placement"), "time_of_day": kwargs["time_of_day"], "storm": kwargs["storm"], "footprints": kwargs["footprints"]}
+
+    monkeypatch.setattr(layout, "playable_layout", fake_layout)
+    tail = " (estimated from the 2D navmesh)"
+    good = Placement((0.0, 0.0), (40.0, 0.0), (20.0, 0.0), (0.0, -10.0), (40.0, -10.0))
+    chosen = Choice(3, 8, Score(0, 20.0, 3, 0.2), Score(3, 2.0, 3, 0.2))
+
+    def returning(result: object) -> object:
+        return lambda base, manifest: result
+
+    monkeypatch.setattr(layout, "choose_placement", returning((good, chosen)))
+    doc, line = layout.balanced_playable_layout(None, {}, {}, time_of_day="night", storm=True, footprints={"a": None})  # type: ignore[arg-type,dict-item]
+    assert doc == {"placement": good, "time_of_day": "night", "storm": True, "footprints": {"a": None}}
+    assert line.startswith("placement: balanced, candidate 3 of 8, contact diff 20.00 -> 2.00 %")
+
+    kept = Choice(0, 8, Score(0, 20.0, 3, 0.2), Score(0, 20.0, 3, 0.2), "kept the current placement: no candidate beats the current placement")
+    monkeypatch.setattr(layout, "choose_placement", returning((None, kept)))
+    built.clear()
+    doc, line = layout.balanced_playable_layout(None, {}, {})  # type: ignore[arg-type]
+    assert doc["placement"] is None and built == [None] and (doc["time_of_day"], doc["storm"], doc["footprints"]) == ("day", False, None)
+    assert line == "placement: kept the current placement: no candidate beats the current placement" + tail
+
+    monkeypatch.setattr(layout, "choose_placement", returning((dataclasses.replace(good, uplink=(9.0, 9.0)), chosen)))
+    built.clear()
+    doc, line = layout.balanced_playable_layout(None, {}, {}, time_of_day="night")  # type: ignore[arg-type]
+    assert doc["placement"] is None and doc["time_of_day"] == "night" and len(built) == 2
+    assert line == "placement: kept the current placement: candidate 3 cannot be built: no ground left for Escort, Evac and Retrieval" + tail
+
+    for error in (LayoutError("no free walkable area with 1.5 m clearance"), GameplayError("the navmesh has no island")):
+        def raising(base: object, manifest: object, error: Exception = error) -> object:
+            raise error
+
+        monkeypatch.setattr(layout, "choose_placement", raising)
+        built.clear()
+        doc, line = layout.balanced_playable_layout(None, {}, {}, storm=True)  # type: ignore[arg-type]
+        assert doc["placement"] is None and doc["storm"] is True and built == [None]
+        assert line == f"placement: kept the current placement: {error}" + tail
+
+
+def test_balanced_layout_raises_where_the_current_one_does(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.perf.layout as layout
+
+    def failing(*args: object, **kwargs: object) -> dict:
+        raise LayoutError("no free walkable area with 1.5 m clearance")
+
+    monkeypatch.setattr(layout, "playable_layout", failing)
+    with pytest.raises(LayoutError, match="1.5 m clearance"):
+        layout.balanced_playable_layout(_plaza_base(box(0, 0, 2, 2)), {"objects": []}, {})  # type: ignore[arg-type]

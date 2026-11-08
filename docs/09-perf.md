@@ -26,6 +26,7 @@ Those numbers are one scene, one route, one player, no bots. A match with player
 | `onward-generator perf measure DIRS [--combine-cell-m …] --out` | Counts nodes, meshes, primitives, triangles, vertices, materials, textures, and lights in `scene_visual.glb` and `scene_collision.glb`, and estimates texture memory (`texture_memory`: every embedded image with mips as RGBA32 and as ASTC 6×6). With `--combine-cell-m`, predicts draw calls if primitives were merged by (cell, material). Offline |
 | `onward-generator perf layout --scene --heights --base --detail --out` | Without `--playable`: the measurement fixture (`perf_layout` 0.1.0). Spawns, Uplink, map quad, and tent. With `--playable`: `gameplay_layout` 0.3.0, the layout of a new map. See [01-pipeline.md](01-pipeline.md) |
 | `onward-generator perf layout … --playable --gameplay-report` | Also writes `gameplay_report.json` beside `--out`: routes between the spawns, overlap, longest open sightline, cover per 25 m stretch and the teams' times to the Uplink, estimated on the 2D navmesh. A report only, off by default ([ADR-032](decisions/ADR-032-gameplay-metrics.md), [Gameplay metrics](#gameplay-metrics)) |
+| `onward-generator perf layout … --playable --balanced-spawns` | Places the defenders' block and the Uplink by the gameplay metrics: the most balanced of up to 8 candidates, or today's placement when none is strictly better. Prints one `placement:` line; `layout.json` keeps its keys. Off by default ([ADR-032 C6 amendment](decisions/ADR-032-gameplay-metrics.md#c6-amendment-proposed--spawns-and-the-uplink-placed-by-these-metrics), [Balanced spawns](#balanced-spawns)) |
 | `onward-generator perf device --csv [--logcat] --label --time-column "Time Stamp" --skip-first-s --until-s [--note] --out` | Per-column statistics (n, mean, min, p05, p50, p95, max) of an OVR Metrics CSV inside a time window, plus load times from `logcat` |
 | `onward-generator perf drawcalls LABEL=PATH… --out` | Counts draw calls of each command buffer in `ovrgpuprofiler -t -x=…` traces |
 | `tools/unity/perf_harness/Editor/MurciaPerfBuilder.cs` | Editor tool copied into the phase-0 project. Loads the generator's GLB subset, builds a scene with the SDK prefabs, bakes lighting, and calls the Onward Launcher. Writes `unity_stats.json` |
@@ -180,7 +181,30 @@ Pending (not done; the option stays a report until they pass):
 - [ ] Playtest (plan 4.2): two or three real matches on a bench map, Hunt and Uplink, comparing the reported routes, open sightlines and first-contact balance with what players feel. It calibrates the §1 thresholds, the 8 m corridor and N.
 - [ ] Headset, on a `bench_murcia` package: stand at the four spawn blocks and at both ends of the longest reported sightline, (90.49, 12.49) and (−25.44, −54.44) in local metres (Unity x, z), and confirm that the open stretches are open ground in the game and that the 2D grid matches the baked navmesh there.
 
-Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check, or acting on it (C6, C7), comes after that.
+Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check comes after that. C6 acts on the metrics behind an option that is off by default ([Balanced spawns](#balanced-spawns)); turning it on by default waits for the playtest.
+
+## Balanced spawns
+
+Plan C6, the ADR-032 C6 amendment (proposed), off by default (`perf layout --playable --balanced-spawns`, `map.json` `"balanced_spawns": true`, `bench.py run --balanced-spawns`). The defenders' block and the Uplink are the most balanced of up to 8 candidates (4 defenders' positions, each with the midpoint Uplink and the even-contact Uplink), scored with the gameplay report's own measures; today's placement is kept unless one is strictly better. Docker on an Apple M4 Pro, frozen bench inputs, `--offline --gameplay-report`, runs in a scratch copy of the bench folder because the repository volume was full:
+
+- **Off.** Run `c6_off` against `head_off` (workshop/c5): `bench.py check` finds no difference outside timings; `layout.json`, `gameplay_report.json` and every package file but `onward_export.json` are byte-identical.
+- **On.** Runs `c6_on` and `c6_on2` are the same apart from timings, with byte-identical `layout.json` and `gameplay_report.json`. Triangles, draws and lightmap pages are those of `c6_off`.
+
+| Map | Candidate | Contact difference off → on | Distinct routes off → on | Max overlap off → on | Layout stage off → on |
+| --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 7 of 8 | 5.23 → 2.29 % | 2 → 2 | 16.9 → 9.89 % | 1.2 → 1.6 s |
+| bench_madrid r300, Catastro | 5 of 8 | 29.48 → 0.57 % | 3 → 3 | 43.35 → 38.3 % | 3.5 → 5.1 s |
+| bench_paris r50, no core | 3 of 8 | 0.67 → 0.13 % | 4 → 4 | 32.02 → 31.89 % | 0.5 → 0.9 s |
+| bench_krakow r150 | 1 of 8 | 20.48 → 0.49 % | 6 → 6 | 45.46 → 45.46 % | 1.6 → 2.2 s |
+
+Layout seconds include the gameplay report. All four maps pass the 15 % contact proposal with the option on; Murcia still misses the 3-route proposal (2 routes on and off). The figures are estimates on the 2D navmesh at 4 m/s.
+
+Pending (not done):
+
+- [ ] Playtest (plan 4.2): Hunt and Uplink on a bench map with the option on and off, comparing the reported balance, routes and sightlines with what players feel.
+- [ ] Headset, a `bench_murcia` package with the option on: the four spawn blocks and the Uplink load; Assault, Uplink and Hunt validate in the SDK (Unity 2021.3.23f1 build without validator errors); bots patrol from their starts; no spawn stands in or against a prop; the spawns are on the baked navmesh.
+- [ ] Headset: ≥ 72 fps and ≤ 150 draws at views A and B with the option off and on; no long open sightline joins the two teams' spawns.
+- [ ] Unity (A3): the Uplink, the navigation origin, is within 0.25 m of the baked mesh, and the `Navmesh islands` log line still shows the origin island holding most of the area.
 
 ## Repetition per cell
 

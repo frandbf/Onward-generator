@@ -21,6 +21,7 @@ from pathlib import Path
 
 from onward_generator.maps.workspace import (
     MapError,
+    balanced_spawns_enabled,
     core_budget,
     gameplay_report_enabled,
     load_map,
@@ -179,6 +180,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
         "--time-of-day", map_time_of_day(root),
         *(["--storm"] if map_storm(root) else []),
         *(["--gameplay-report"] if gameplay_report_enabled(root) else []),
+        *(["--balanced-spawns"] if balanced_spawns_enabled(root) else []),
         "--out", show(layout_path),
     ).argv)
     export_argv = list(export_invocation(
