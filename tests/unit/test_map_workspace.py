@@ -598,3 +598,17 @@ def test_map_create_chooses_from_the_default_pools(tmp_path: Path) -> None:
     plan = json.loads((root / "config" / "texture_plan.json").read_text(encoding="utf-8"))
     seed = int(load_map(root).get("seed") or 0)
     assert {row["id"]: row["library_id"] for row in plan["entries"]} == deterministic_choices(library_rows(), seed)
+
+
+def test_map_create_hands_the_brief_and_the_provider_to_the_texture_plan(tmp_path: Path) -> None:
+    from onward_generator.ai.providers import StaticProvider
+    from onward_generator.materials.library_plan import deterministic_choices, library_rows
+
+    rows = library_rows()
+    reply = json.dumps({"choices": [{"slot": k, "library_id": v} for k, v in deterministic_choices(rows, 9).items()]})
+    root = tmp_path / "abandoned"
+    create_map(root, map_id="abandoned", name="Abandoned", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+               radius_m=100, brief="an abandoned town", texture_provider=StaticProvider("replay", reply, "test"))
+    plan = json.loads((root / "config" / "texture_plan.json").read_text(encoding="utf-8"))
+    assert plan["atmosphere"] == "abandoned"
+    assert plan["selector"] == "ollama"
