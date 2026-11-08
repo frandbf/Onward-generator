@@ -225,7 +225,7 @@ def gameplay_layout(
     area, a = _spawn_site(base, detail_manifest)
     if placement is None:
         bx, by = _defenders(area, a, farthest=farthest)
-        b = (round(bx, 2), round(by, 2))
+        b = (round(bx, 2), round(by, 2))  # pragma: no mutate: grid points are whole multiples of GRID_M, so any rounding keeps them
         uplink = _midpoint_on(area, a, b)
     else:
         _check_placement(area, a, placement)
@@ -294,7 +294,8 @@ def _defender_candidates(area: BaseGeometry, a: tuple[float, float], limit: int)
         if len(kept) >= limit or math.hypot(x - a[0], y - a[1]) < TEAM_SEPARATION_M:
             break
         if all(math.hypot(x - kx, y - ky) >= BLOCK_GAP_M for kx, ky in kept) and _fits(area, _block(x, y)):
-            kept.append((round(x, 2), round(y, 2)))
+            # Grid points are whole multiples of GRID_M, exact in floating point.
+            kept.append((x, y))
     return kept
 
 
@@ -318,7 +319,8 @@ K_DEFENDERS = 4
 def _objective_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tuple[BaseGeometry, list[BaseGeometry]]:
     """The free ground inside the core and its pieces with 1 m clearance, where AI, ammo, objectives and the second blocks go."""
     free = _free_inside(base, detail_manifest)
-    parts = [p for p in polygons_of(free.buffer(-1.0)) if p.area > 0]
+    # An area is never negative, so a nonzero area is a positive one.
+    parts = [p for p in polygons_of(free.buffer(-1.0)) if p.area]
     if not parts:
         raise LayoutError("no walkable ground with 1 m clearance for AI and ammo")
     return free, parts
@@ -350,7 +352,6 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     area, a = _spawn_site(base, detail_manifest)
     _, parts = _objective_ground(base, detail_manifest)
     graph = nav_graph(nav_islands(base, playable_area(detail_manifest)))
-    allowed = set(np.flatnonzero(contains_xy(area, graph.xy[:, 0], graph.xy[:, 1])).tolist())
     attack_node = snap(graph, a)
     candidates: list[Placement | str] = []
     for d in _defender_candidates(area, a, K_DEFENDERS):
@@ -358,12 +359,15 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
         candidates.append(midpoint)
         if isinstance(midpoint, str):
             continue
-        even = _even_uplink(graph, allowed, attack_node, midpoint)
+        even = _even_uplink(graph, area, attack_node, midpoint)
         if even is not None and even != midpoint.uplink:
             candidates.append(_placed(parts, a, d, even))
     choice = select(score_all(graph, candidates))
-    chosen = candidates[choice.index] if choice.reason is None else None
-    return (chosen if isinstance(chosen, Placement) else None), choice
+    if choice.reason is not None:
+        return None, choice
+    chosen = candidates[choice.index]
+    assert isinstance(chosen, Placement)  # pragma: no mutate: an admissible candidate is a placement
+    return chosen, choice
 
 
 def _placed(parts: Sequence[BaseGeometry], a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> Placement | str:
@@ -377,8 +381,11 @@ def _placed(parts: Sequence[BaseGeometry], a: tuple[float, float], d: tuple[floa
     return Placement(a, d, uplink, attack_b, defend_b)
 
 
-def _even_uplink(graph: NavGraph, allowed: set[int], attack_node: int | None, placement: Placement) -> tuple[float, float] | None:
-    """The even-contact node (``gameplay.placement.even_contact_node``) for ``placement``'s blocks, as metres, or None."""
+def _even_uplink(graph: NavGraph, area: BaseGeometry, attack_node: int | None, placement: Placement) -> tuple[float, float] | None:
+    """The even-contact node (``gameplay.placement.even_contact_node``) for ``placement``'s blocks, as metres, or None.
+
+    Only nodes inside ``area``, the spawn area, are allowed. Nodes are whole multiples of the 2 m grid, exact in floating point.
+    """
     from onward_generator.gameplay.metrics import shortest_path, snap
     from onward_generator.gameplay.placement import even_contact_node, team_distances
 
@@ -389,10 +396,11 @@ def _even_uplink(graph: NavGraph, allowed: set[int], attack_node: int | None, pl
     path = shortest_path(graph, attack_node, defend)
     if path is None:
         return None
+    allowed = {node for node in path if area.covers(Point(graph.xy[node]))}
     node = even_contact_node(team_distances(graph, [attack_node, attack_b]), team_distances(graph, [defend, defend_b]), path, allowed)
     if node is None:
         return None
-    return (round(float(graph.xy[node][0]), 2), round(float(graph.xy[node][1]), 2))
+    return (float(graph.xy[node][0]), float(graph.xy[node][1]))
 
 
 def yaw_toward(x: float, y: float, focus_x: float, focus_y: float) -> float:

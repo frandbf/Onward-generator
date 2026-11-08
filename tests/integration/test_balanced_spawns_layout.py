@@ -78,7 +78,8 @@ def test_balanced_spawns_off_is_head_and_on_is_better_and_valid(
     args, walled = playable
     off, on, again = tmp_path / "off", tmp_path / "on", tmp_path / "again"
     assert main([*args, "--out", str(off / "layout.json")]) == 0
-    assert "placement:" not in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert "placement:" not in printed and "" not in printed.splitlines()
     assert (_sha(off / "layout.json"), _sha(off / REPORT_FILE)) == (HEAD_LAYOUT_SHA256, HEAD_REPORT_SHA256)
 
     lines = []
@@ -169,3 +170,26 @@ def test_balanced_spawns_needs_the_playable_layout(playable: tuple[list[str], Pa
     assert main([*plain, "--balanced-spawns", "--out", str(tmp_path / "layout.json")]) == 1
     assert capsys.readouterr().err == "perf: --balanced-spawns needs --playable\n"
     assert not (tmp_path / "layout.json").exists()
+
+
+def test_balanced_spawns_pass_the_time_of_day_storm_and_footprints(
+    playable: tuple[list[str], Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    import onward_generator.perf.__main__ as perf_main
+
+    args, _ = playable
+    seen: list[dict[str, Any]] = []
+    real = perf_main.balanced_playable_layout
+
+    def spy(*positional: Any, **kwargs: Any) -> Any:
+        seen.append(kwargs)
+        return real(*positional, **kwargs)
+
+    monkeypatch.setattr(perf_main, "balanced_playable_layout", spy)
+    assert main([*args, "--balanced-spawns", "--time-of-day", "night", "--storm", "--out", str(tmp_path / "layout.json")]) == 0
+    assert [(k["time_of_day"], k["storm"]) for k in seen] == [("night", True)]
+    scene = json.loads(Path(args[args.index("--scene") + 1]).read_text(encoding="utf-8"))
+    assert sorted(seen[0]["footprints"]) == sorted(f["id"] for f in scene["features"]) and seen[0]["footprints"]
+    doc = _read(tmp_path / "layout.json")
+    assert (doc["time_of_day"], doc["lightning"]) == ("Night", 1)
+    assert "placement: " in capsys.readouterr().out

@@ -62,7 +62,7 @@ def test_select_breaks_ties_on_routes_then_overlap_then_index() -> None:
 
 def test_select_keeps_candidate_0_unless_another_is_strictly_better() -> None:
     choice = select([_s(0), _s(1), _s(2)])
-    assert (choice.index, choice.chosen) == (0, _s(0))
+    assert (choice.index, choice.count, choice.baseline, choice.chosen) == (0, 3, _s(0), _s(0))
     assert choice.reason == f"{KEPT}: no candidate beats the current placement"
     assert select([_s(0)]).reason == f"{KEPT}: no candidate beats the current placement"
 
@@ -99,11 +99,13 @@ def test_an_invalid_or_unscored_candidate_is_never_admissible(candidate: Score) 
 def test_select_keeps_the_current_placement_when_candidate_0_cannot_be_scored() -> None:
     off = select([_s(0, None, None, None, "attackers is off the navmesh"), _s(1, 0.0)])
     assert (off.index, off.count) == (0, 2)
+    assert off.baseline == off.chosen == _s(0, None, None, None, "attackers is off the navmesh")
     assert off.reason == f"{KEPT}: candidate 0 cannot be scored (attackers is off the navmesh)"
     unscored = select([_s(0, 20.0, None, None), _s(1, 0.0)])
     assert unscored.reason == f"{KEPT}: candidate 0 cannot be scored (it has no route score)"
     missing = select([_s(1, 0.0)])
-    assert (missing.index, missing.reason) == (0, f"{KEPT}: candidate 0 was not scored")
+    assert missing == Choice(0, 1, Score(0, reason="candidate 0 was not scored"), Score(0, reason="candidate 0 was not scored"),
+                             f"{KEPT}: candidate 0 was not scored")
     assert select([]).reason == f"{KEPT}: candidate 0 was not scored"
 
 
@@ -128,8 +130,8 @@ def test_a_centre_snaps_up_to_2_m_from_a_node() -> None:
 
 def test_an_uplink_on_another_island_has_no_path() -> None:
     graph = from_edges([(0.0, 0.0), (2.0, 0.0), (4.0, 0.0), (40.0, 0.0)], {(0, 1): 2000, (1, 2): 2000})
-    assert contact_score(graph, _place((0.0, 0.0), (4.0, 0.0), (40.0, 0.0)), 0).reason == "no path from the attackers to the Uplink"
-    assert contact_score(graph, _place((0.0, 0.0), (40.0, 0.0), (2.0, 0.0)), 0).reason == "no path from the defenders to the Uplink"
+    assert contact_score(graph, _place((0.0, 0.0), (4.0, 0.0), (40.0, 0.0)), 2) == Score(2, reason="no path from the attackers to the Uplink")
+    assert contact_score(graph, _place((0.0, 0.0), (40.0, 0.0), (2.0, 0.0)), 3) == Score(3, reason="no path from the defenders to the Uplink")
     split = route_score(graph, _place((0.0, 0.0), (40.0, 0.0), (2.0, 0.0)), Score(0, diff_pct=0.0))
     assert split.reason == "no path from attackers to defenders" and split.routes is None
     off = route_score(graph, _place((0.0, 9.0), (4.0, 0.0), (2.0, 0.0)), Score(0, diff_pct=0.0))
@@ -182,15 +184,28 @@ def test_route_score_reuses_the_routes_of_a_pair() -> None:
     assert again.routes == 1 and first.routes is not None and first.routes > 1
 
 
+def test_route_score_rounds_the_overlap_to_4_places_and_is_0_with_one_route() -> None:
+    # Route 1 runs 0 -> 1 (90 m). Route 2 runs 0 -> 2 -> 3 -> 1 in three 1 m-cost edges, the first beside route 1.
+    graph = from_edges([(0.0, 0.0), (30.0, 0.0), (0.0, 5.0), (30.0, 40.0)], {(0, 1): 90000, (0, 2): 1000, (2, 3): 1000, (1, 3): 1000})
+    long, short = Route((0, 1), 90000, 1), Route((0, 2, 3, 1), 3000, 2)
+    placement = _place((0.0, 0.0), (30.0, 0.0), (0.0, 5.0))
+    score = route_score(graph, placement, Score(0, diff_pct=1.0), {(0, 1): [long, short]})
+    assert (score.routes, score.max_overlap) == (2, 0.3333)
+    single = route_score(_chain(11), _place((0.0, 0.0), (20.0, 0.0), (10.0, 0.0)), Score(0, diff_pct=0.0))
+    assert (single.routes, single.max_overlap, single.reason) == (1, 0.0, None)
+
+
 # ------------------------------------------------------------------------------------------------ stage 2
 
 
 def test_stage_2_runs_only_where_it_can_change_the_choice() -> None:
     graph = _chain(11)
     calls: list[int] = []
+    caches: list[Routes] = []
 
     def fake(graph: NavGraph, placement: Placement, score: Score, cache: Routes) -> Score:
         calls.append(score.index)
+        caches.append(cache)
         return dataclasses.replace(score, routes=3, max_overlap=0.2)
 
     a, d = (0.0, 0.0), (20.0, 0.0)
@@ -204,6 +219,8 @@ def test_stage_2_runs_only_where_it_can_change_the_choice() -> None:
     ]
     scores = score_all(graph, candidates, routes=fake)
     assert calls == [0, 4]
+    # One cache, shared by every candidate.
+    assert caches[0] == {} and caches[0] is caches[1]
     assert [s.index for s in scores] == [0, 1, 2, 3, 4, 5]
     assert scores[1].routes is None and scores[1].diff_pct is not None and scores[1].diff_pct > scores[0].diff_pct  # type: ignore[operator]
     assert scores[2] == Score(2, reason="no second block fits")
@@ -225,6 +242,18 @@ def test_stage_2_moves_on_while_the_better_balance_is_not_admissible() -> None:
     # 2 is even but has fewer routes; 1 and 3 tie on 20 %, so both are scored, and 1 wins on the index.
     assert calls == [0, 2, 1, 3]
     assert select(scores).index == 1
+
+
+def test_stage_2_scores_a_candidate_as_balanced_as_candidate_0() -> None:
+    graph = _chain(11)
+
+    def fake(graph: NavGraph, placement: Placement, score: Score, cache: Routes) -> Score:
+        return dataclasses.replace(score, routes=3 + score.index, max_overlap=0.2)
+
+    a, d = (0.0, 0.0), (20.0, 0.0)
+    scores = score_all(graph, [_place(a, d, (6.0, 0.0)), _place(a, d, (14.0, 0.0))], routes=fake)
+    assert scores[0].diff_pct == scores[1].diff_pct
+    assert scores[1].routes == 4 and select(scores).index == 1
 
 
 def test_stage_2_stops_when_candidate_0_has_no_route() -> None:

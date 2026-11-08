@@ -198,8 +198,8 @@ def select(scores: Sequence[Score]) -> Choice:
     """
     baseline = next((score for score in scores if score.index == 0), None)
     if baseline is None:
-        missing = Score(0, reason="no candidate")
-        return Choice(0, len(scores), missing, missing, f"{KEPT}: candidate 0 was not scored")
+        missing = Score(0, reason="candidate 0 was not scored")
+        return Choice(0, len(scores), missing, missing, f"{KEPT}: {missing.reason}")
     if not baseline.valid or baseline.routes is None:
         why = baseline.reason or "it has no route score"
         return Choice(0, len(scores), baseline, baseline, f"{KEPT}: candidate 0 cannot be scored ({why})")
@@ -216,7 +216,7 @@ def team_distances(graph: NavGraph, sources: Sequence[int]) -> list[int | None]:
         best, _ = dijkstra(graph, source)
         for node, value in enumerate(best):
             known = result[node]
-            if value is not None and (known is None or value < known):
+            if value is not None and (known is None or value < known):  # pragma: no mutate: replacing an equal distance keeps it
                 result[node] = value
     return result
 
@@ -231,7 +231,7 @@ def even_contact_node(
         if node not in allowed or a is None or d is None:
             continue
         key = (abs(a - d), node)
-        if best is None or key < best:
+        if best is None or key < best:  # pragma: no mutate: keys end with the node, so two are equal only for a node listed twice
             best = key
     return None if best is None else best[1]
 
