@@ -510,3 +510,47 @@ def test_asc_part_keeps_a_blank_line_inside_the_grid_part_and_cuts_a_long_error(
     with pytest.raises(SourceError) as caught:
         asc_part(long)
     assert str(caught.value) == f"WCS response is neither a grid nor multipart: {long[:120]!r}"
+
+
+def test_the_lidar_roofs_switch_hands_the_report_to_detail_and_marks_detail_stale(tmp_path: Path) -> None:
+    import os
+
+    from onward_generator.maps.workspace import store_lidar_roofs
+    from onward_generator.next_step import detail_command
+    from onward_generator.pipeline_run import output_ready, third_party_plan
+
+    root = (tmp_path / "murcia").resolve()
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    processed = root / "data" / "processed"
+    split = processed / "cadastre" / "geo_scene.json"
+    report = processed / "es.pnoa_ndsm" / "es.pnoa_ndsm_report.json"
+    off = PnoaNdsmPlugin().steps(root, split)
+    assert off.roof_spread is None
+    plan_off = dict(plan_steps(root))
+    assert "--lidar-roofs" not in plan_off["detail"]
+    assert third_party_plan(root, processed / "geo" / "geo_scene.json")[3] is None
+    store_lidar_roofs(root, True)
+    on = PnoaNdsmPlugin().steps(root, split)
+    assert on.roof_spread == report and on.stages == off.stages and on.overrides == off.overrides
+    plan_on = dict(plan_steps(root))
+    assert plan_on["detail"][plan_on["detail"].index("--lidar-roofs") + 1] == str(report)
+    assert [a for a in plan_on["detail"] if a not in ("--lidar-roofs", str(report))] == plan_off["detail"]
+    places = processed / "overture" / "overture_places.json"
+    places_arg = places if "--places" in plan_on["detail"] else None
+    assert plan_on["detail"][:-1] == list(detail_command(split, processed / "heights" / "heights.json", processed / "scene3d", places_arg,
+                                                         None, report).argv)
+    assert third_party_plan(root, processed / "geo" / "geo_scene.json")[3] == report
+    for name, when in (("scene3d/scene_visual.glb", 1), ("scene_detail/scene_visual.glb", 2)):
+        path = processed / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+        os.utime(path, (1_000_000 + when, 1_000_000 + when))
+    assert not output_ready("detail", root)  # no report yet
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("{}", encoding="utf-8")
+    os.utime(report, (1_000_000, 1_000_000))
+    assert output_ready("detail", root)
+    os.utime(report, (1_000_003, 1_000_003))  # a new report makes detail stale
+    assert not output_ready("detail", root)
+    store_lidar_roofs(root, False)
+    assert output_ready("detail", root)

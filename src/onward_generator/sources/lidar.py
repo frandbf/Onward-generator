@@ -119,7 +119,11 @@ class RasterHeights(Protocol):
 
 
 def raster_steps(plugin: RasterHeights, root: Path, scene: Path) -> SourceSteps:
-    """The two ``run`` stages of a raster plugin: ``source fetch`` (network) and ``source normalize``."""
+    """The two ``run`` stages of a raster plugin: ``source fetch`` (network) and ``source normalize``.
+
+    With ``map.json`` ``"lidar_roofs": true`` (plan C3) the report is also handed to ``detail`` as ``roof_spread``.
+    """
+    from onward_generator.maps.workspace import lidar_roofs_enabled  # the workspace imports the registry, which imports the plugins
     from onward_generator.next_step import invoke, show
 
     raw = root / "data" / "raw" / plugin.id
@@ -134,6 +138,7 @@ def raster_steps(plugin: RasterHeights, root: Path, scene: Path) -> SourceSteps:
             SourceStage(normalize_name, normalize, overrides, (sidecar_path(raw), scene)),
         ),
         overrides=overrides,
+        roof_spread=out / report_name(plugin.id) if lidar_roofs_enabled(root) else None,
     )
 
 

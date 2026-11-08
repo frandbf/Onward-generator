@@ -111,13 +111,14 @@ class HipRoof:
 
 @dataclass(frozen=True, slots=True)
 class PitchedRoof:
-    """A roof the OSM ``roof:*`` tags describe (``detail/roofs.py``). Observed, never from the template."""
+    """A roof the OSM ``roof:*`` tags describe (``detail/roofs.py``), or, with ``rise_rule`` ``ndsm_spread``, the gable
+    a LiDAR spread estimated (plan C3, ``detail/lidar_roofs.py``). Never from the template."""
 
     shape: str  # drawn: gabled | hipped | pyramidal | skillion | dome
     tag: str  # the OSM roof:shape value
     material: str
     rise_m: float | None  # roof:height or roof:levels × storey; None leaves it to roof:angle or the default pitch
-    rise_rule: str  # roof:height | roof:levels | roof:angle | default_pitch
+    rise_rule: str  # roof:height | roof:levels | roof:angle | default_pitch | ndsm_spread
     angle_deg: float | None
     direction_deg: float | None  # roof:direction, the compass bearing the slope faces
     across: bool  # roof:orientation=across

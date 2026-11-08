@@ -344,3 +344,27 @@ def test_gables_rise_only_where_the_roof_leaves_the_eaves() -> None:
     assert _gables(narrow, EAVE, near).triangle_count == 2 + 1 + 1
     normals = gables.face_normals()
     assert normals[0][0] > 0 and normals[-1][0] < 0 and all(n[1] > 0 for n in normals[1:4])
+
+
+@pytest.mark.parametrize(("rule", "origin"), [("ndsm_spread", "estimated"), ("default_pitch", "estimated"), ("roof:height", "observed"),
+                                               ("roof:levels", "observed"), ("roof:angle", "observed")])
+def test_a_rise_from_no_tag_is_estimated(rule: str, origin: str) -> None:
+    spec = PitchedRoof("gabled", "gabled", "roof_tile", 1.5, rule, None, None, False)
+    built = build_roof(box(0, 0, 20, 10), EAVE, spec)
+    assert isinstance(built, BuiltRoof)
+    assert built.record["rise_rule"] == rule and built.record["rise_origin"] == origin and built.record["direction_origin"] == "estimated"
+
+
+def test_an_ndsm_gable_runs_its_ridge_along_the_long_side_and_falls_back_on_a_courtyard() -> None:
+    from onward_generator.detail.lidar_roofs import RoofSpread, spread_spec
+
+    spec = spread_spec(RoofSpread("measured", 10.0, 11.5, 20, 24), "roof_tile")
+    built = build_roof(box(0, 0, 20, 10), EAVE, spec)
+    assert isinstance(built, BuiltRoof) and built.rise_m == 1.5
+    ridge = built.roof.vertices[built.roof.vertices[:, 2] > EAVE + 1e-6]
+    assert np.allclose(ridge[:, 1], 5.0) and sorted(set(ridge[:, 0].round(6))) == [0.0, 20.0]
+    turned = build_roof(box(0, 0, 10, 20), EAVE, spec)
+    assert isinstance(turned, BuiltRoof)
+    assert np.allclose(turned.roof.vertices[turned.roof.vertices[:, 2] > EAVE + 1e-6][:, 0], 5.0)
+    courtyard = box(0, 0, 20, 20).difference(box(5, 5, 15, 15))
+    assert build_roof(courtyard, EAVE, spec) == "footprint_has_courtyard"

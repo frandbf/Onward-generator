@@ -51,6 +51,8 @@ DOME_BANDS = 3
 EAVE_SNAP_M = 1e-6  # a field value this close to the eaves is the eaves (no sliver gable)
 ON_EDGE_M = 1e-7
 MIN_PIECE_M2 = 1e-9
+# Rise rules that come from no tag: the default pitch, and the nDSM spread of plan C3 (``detail/lidar_roofs.py``).
+ESTIMATED_RISE_RULES = frozenset({"default_pitch", "ndsm_spread"})
 
 
 def pitched_spec(tags: Mapping[str, str], material: str, storey_m: float) -> PitchedRoof | None:
@@ -117,7 +119,7 @@ def build_roof(polygon: Polygon, eave_z: float, spec: PitchedRoof) -> BuiltRoof 
         "rise_m": round(rise, 3),
         "pitch_deg": round(math.degrees(math.atan2(rise, half_span)), 1),
         "rise_rule": spec.rise_rule,
-        "rise_origin": "estimated" if spec.rise_rule == "default_pitch" else "observed",
+        "rise_origin": "estimated" if spec.rise_rule in ESTIMATED_RISE_RULES else "observed",
     }
     if shape in ("gabled", "skillion"):
         record["direction_origin"] = "observed" if spec.direction_deg is not None or spec.across else "estimated"

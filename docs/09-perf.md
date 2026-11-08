@@ -256,3 +256,38 @@ Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `f
 - Draw calls were measured in two views, not at the worst view of the whole map.
 - `ovrgpuprofiler -r` has no timestamp. It is aligned to the first `logcat` line (±2 s), so it is a relative signal. In one session the fragment counter returned −1.
 - On that headset, OVR Metrics returned 0 for `main_thread_cpu_time`, `render_thread_cpu_time`, and `avg_vertices_per_frame`.
+
+## Roof form from the nDSM spread
+
+Plan C3 is covered by the ADR-023 amendment *Roof form from the nDSM spread* (proposed) and is off by default. It is turned on by `map.json` `"lidar_roofs": true`, `detail --lidar-roofs REPORT` or `bench.py run --lidar-roofs`. The rules are in [07-detail.md](07-detail.md) (*Roofs*). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline`, on 8 November 2026.
+
+- **Off.** `bench.py check` finds no difference outside timings between run `c3_off` and the baseline `c3_baseline` (HEAD of plan C2), and every export package GLB is the same bytes. `detail` run from the plan C2 tree and from this branch on the same `c3_off` inputs writes byte-identical `scene_visual.glb`, `scene_collision.glb`, `scene_detail.json` and `detail_report.json` on all four maps.
+- **On.** Run `c3_on` against `c3_off`. Kraków has no LiDAR plugin and is the control (delta 0).
+
+| Map | Triangles total (core) | Draws total (core) | View draws median / p90 / max | Lightmap pages | Core buildings | Flat | Pitched | Classified |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 150 339 → 150 178, −161 (125 052 → 124 891) | 213 → 213 (165 → 165) | 85 / 181 / 213, 0 | 4, 0 | 228 | 2 | 4 | 2.6 % |
+| bench_madrid r300 | 398 025 → 397 041, −984 (270 361 → 269 377) | 504 → 505 (352 → 354) | 175 / 375 / 449, +0 / +1 / +1 | 11, 0 | 629 | 9 | 12 | 3.3 % |
+| bench_paris r50 | 47 585, 0 | 91, 0 | 34 / 77 / 91, 0 | 3, 0 | 2 | 0 | 0 | 0 % |
+| bench_krakow r150 | 72 884, 0 | 272, 0 | 95 / 219 / 268, 0 | 2, 0 | — | — | — | no LiDAR |
+
+Unclassified core buildings, by reason (`counts.lidar_roofs.unclassified`, scenic shells left out):
+
+| Map | tagged | terrace | no_data | too_few_cells | not_rectangular | mixed | ambiguous | fallback |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia | 0 | 150 | 13 | 41 | 17 | 1 | 0 | 0 |
+| bench_madrid | 176 | 304 | 7 | 69 | 50 | 2 | 0 | 0 |
+| bench_paris | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
+
+A gable replaces a parapet ring, so the triangles go down. Murcia's core stays under the 220 000 target trajectory (124 891). Madrid's core was already over it (270 361) and drops by 984. Madrid's core draws grow by 2 (total by 1): a gable's `roof_tile` or a flat class's template flat material appears in a combine cell that had none. The Catastro split makes most parts the lower part of a parcel with a taller one, so the terrace rule stops more buildings than the spread does; small parts lack the 8 valid cells. Murcia keeps its 14 coin hips; Madrid loses one hip to a flat class and one stair roof access (7 → 6) to a gable. Pitched rises: Murcia 1.43–2.13 m, Madrid 0.65–4.0 m (median about 1.0 m). These are generator figures, not device measurements.
+
+Pending (not done; the switch stays off until they pass):
+
+- [ ] Headset, on bench_murcia or a Murcia map with `"lidar_roofs": true`, from both spawns and fixed views A and B: the estimated gables read as roofs, the ridge runs along the long side, and there is no gap or z-fighting at the gable pieces and no lightmap seam on slopes or gables.
+- [ ] Headset: the same street with the switch off and on. No building looks a whole roof taller, and the Catastro setback terraces stay flat.
+- [ ] Headset: a building that turned pitched shows no roof ladder or lift, and no roof a player used to reach has lost its access (ADR-029).
+- [ ] Headset, OVR Metrics in views A and B, switch on vs off: median 72 fps or more and 150 draws or fewer.
+- [ ] Optional playtest: pitched roofs do not change sniper lines or roof routes in a way that hurts balance. Run `bench.py run --gameplay-report --lidar-roofs` first.
+
+Then the ADR-023 amendment goes from proposed to accepted, or the thresholds are corrected.
+

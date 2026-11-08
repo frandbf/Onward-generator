@@ -14,13 +14,14 @@ import numpy as np
 from onward_generator.contracts import is_schema
 from onward_generator.detail.budget import detail_scene_budget
 from onward_generator.detail.config import DetailConfigError, load_detail_config
+from onward_generator.detail.lidar_roofs import RoofSpread, SpreadReport
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
 from onward_generator.detail.typology import TypologyConfigError, load_typology_config
 from onward_generator.generation.config import GenerationConfigError, Material, load_generation_config
 from onward_generator.generation.gltf import build_glb
 from onward_generator.generation.preview import render_rgb, side_by_side
 from onward_generator.generation.scene import GenerationError
-from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs, sha256_file
 from onward_generator.next_step import dress_command, emit
 from onward_generator.tiers import SCENIC_WALLS, check_target, core_square
 
@@ -52,6 +53,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)")
     parser.add_argument("--overture-tints",
                         help="overture_tints.json from overture match --tints: Overture colours below the OSM wall and roof tags (plan C2)")
+    parser.add_argument("--lidar-roofs", metavar="REPORT",
+                        help="<id>_report.json of a LiDAR source plugin for this scene: flat or pitched roofs from the nDSM spread (plan C3)")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -114,6 +117,67 @@ def load_tints(path: str | None, scene_path: str) -> list[dict[str, Any]] | None
     return list(doc["tints"])
 
 
+SPREAD_REPORT_SCHEMA = "onward_generator.source_heights_report"
+SPREAD_META = ("source", "provider", "license", "attribution")
+
+
+def _is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _is_metres(value: object) -> bool:
+    return value is None or (isinstance(value, int | float) and not isinstance(value, bool))
+
+
+def _spread(entry: object, buildings: set[str]) -> tuple[str, RoofSpread] | str:
+    """One ``buildings`` entry of a raster report as ``(id, RoofSpread)``, or why it is malformed."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not isinstance(entry.get("status"), str):
+        return "an entry needs id and status"
+    bid = entry["id"]
+    if bid not in buildings:
+        return f"building {bid!r} is not in the scene"
+    p25, p75, valid, cells = (entry.get(k) for k in ("p25_m", "p75_m", "valid", "cells"))
+    if not (_is_metres(p25) and _is_metres(p75)) or "p25_m" not in entry or "p75_m" not in entry:
+        return f"building {bid}: p25_m and p75_m must be numbers or null"
+    if not (_is_count(valid) and _is_count(cells)):
+        return f"building {bid}: valid and cells must be counts"
+    assert isinstance(valid, int) and isinstance(cells, int)  # _is_count checked both
+    if valid > cells:
+        return f"building {bid}: {valid} valid cells of {cells}"
+    if p25 is not None and p75 is not None and p25 > p75:
+        return f"building {bid}: p25_m {p25} is above p75_m {p75}"
+    return bid, RoofSpread(entry["status"], None if p25 is None else float(p25), None if p75 is None else float(p75), valid, cells)
+
+
+def load_roof_spread(path: str | None, scene_path: str) -> SpreadReport | None:
+    """The spreads of a raster plugin's ``<id>_report.json`` (plan C3), after checking it was made for this scene, or ``None`` without a path.
+
+    A missing file, another schema, a report of another scene (its ``scene.sha256``), a building the scene does not
+    have, or an entry whose percentiles or cell counts are not numbers in order is refused.
+    """
+    if path is None:
+        return None
+    source = Path(path).expanduser()
+    if not source.is_file():
+        raise DetailError(f"{path} not found; rerun source normalize for this scene")
+    doc = json.loads(source.read_bytes())
+    if not is_schema(doc.get("schema"), SPREAD_REPORT_SCHEMA):
+        raise DetailError(f"{path} is not {SPREAD_REPORT_SCHEMA}")
+    if any(not isinstance(doc.get(k), str) for k in SPREAD_META):
+        raise DetailError(f"{path}: the report needs {', '.join(SPREAD_META)}")
+    if (doc.get("scene") or {}).get("sha256") != sha256_file(Path(scene_path).expanduser()):
+        raise DetailError(f"{path} was measured on another scene than {scene_path}")
+    scene = json.loads(Path(scene_path).expanduser().read_bytes())
+    buildings = {str(f["id"]) for f in scene.get("features", []) if f.get("kind") == "building"}
+    spreads: dict[str, RoofSpread] = {}
+    for entry in doc.get("buildings") or []:
+        found = _spread(entry, buildings)
+        if isinstance(found, str):
+            raise DetailError(f"{path}: {found}")
+        spreads[found[0]] = found[1]
+    return SpreadReport(str(path), sha256_file(source), doc["source"], doc["provider"], doc["license"], doc["attribution"], spreads)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
@@ -135,16 +199,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         base_dir = Path(args.base)
         places = load_places(args.places, args.scene)
         tints = load_tints(args.overture_tints, args.scene)
+        roof_spread = load_roof_spread(args.lidar_roofs, args.scene)
         protected = (Path(args.scene), Path(args.heights), base_dir / "scene3d.json", base_dir / "generation_report.json",
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
         if args.core_target_triangles is None:
             detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
-                                    typology=typology, tints=tints)
+                                    typology=typology, tints=tints, roof_spread=roof_spread)
         else:
             detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
-                                           max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints)
+                                           max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints,
+                                           roof_spread=roof_spread)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1

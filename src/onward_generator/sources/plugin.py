@@ -68,6 +68,8 @@ class SourceSteps:
     """Third-party POIs that ``detail --places`` ranks as shop evidence by ``config/sources.json`` ``evidence`` (Overture, ADR-021)."""
     tints: Path | None = None
     """Third-party colours that ``detail --overture-tints`` reads below the OSM wall and roof tags (Overture, plan C2; opt-in)."""
+    roof_spread: Path | None = None
+    """A raster plugin's report, whose nDSM spreads ``detail --lidar-roofs`` reads as flat or pitched roofs (plan C3; opt-in)."""
 
 
 class SourcePlugin(Protocol):

@@ -1,6 +1,6 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
-    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints]
+    python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints] [--lidar-roofs]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -55,6 +55,7 @@ from onward_generator.maps.workspace import (
     load_map,
     refresh_texture_plan,
     store_gameplay_report,
+    store_lidar_roofs,
     store_overture_tints,
     store_repetition,
     store_sources,
@@ -311,13 +312,14 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 
 
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
-              repetition: bool = False, overture_tints: bool = False) -> MapRun:
+              repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
     ``repetition`` switches the plan C1 option on in the run copy only and chooses its textures
     again from the extended pools, so a saved plan with an over-limit roof or paving tile is replaced.
     ``overture_tints`` switches the plan C2 Overture colours on in the run copy only.
+    ``lidar_roofs`` switches the plan C3 roofs from the nDSM spread on in the run copy only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -330,6 +332,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         refresh_texture_plan(root)
     if overture_tints:
         store_overture_tints(root, True)
+    if lidar_roofs:
+        store_lidar_roofs(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -575,8 +579,38 @@ def repetition_metrics(root: Path) -> dict[str, Any] | None:
     }
 
 
+def detail_report_path(root: Path) -> Path:
+    return root / "data" / "processed" / "scene_detail" / "detail_report.json"
+
+
+def lidar_roofs_metrics(root: Path) -> dict[str, Any] | None:
+    """The plan C3 summary of the map's ``detail_report.json``, or None when it has no ``counts.lidar_roofs`` block.
+
+    ``flat`` and ``pitched`` are the roofs the nDSM spread decided, ``unclassified`` the other buildings, and
+    ``classified_pct`` the share of core buildings it decided (1 place). A malformed block is an error.
+    """
+    path = detail_report_path(root)
+    if not path.is_file():
+        return None
+    counts = _object(_read_object(path), "counts", str(path))
+    if "lidar_roofs" not in counts:
+        return None
+    block = _object(counts, "lidar_roofs", f"{path}: counts")
+    unclassified = block.get("unclassified")
+    numbers = [block.get(k) for k in ("core_buildings", "flat", "pitched")]
+    if not isinstance(unclassified, dict) or not all(isinstance(v, int) and not isinstance(v, bool) for v in [*numbers, *unclassified.values()]):
+        raise BenchError(f"{path}: counts.lidar_roofs needs integer core_buildings, flat, pitched and unclassified counts")
+    core, flat, pitched = (int(v) for v in numbers)
+    return {
+        "flat": flat,
+        "pitched": pitched,
+        "unclassified": sum(unclassified.values()),
+        "classified_pct": round(100.0 * (flat + pitched) / core, 1) if core else None,
+    }
+
+
 def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None = None) -> dict[str, Any]:
-    """The comparable figures of one map; ``gameplay`` and ``repetition`` only when ``root`` holds their reports."""
+    """The comparable figures of one map; ``gameplay``, ``repetition`` and ``lidar_roofs`` only when ``root`` holds their reports."""
     entry = {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
     gameplay = gameplay_metrics(root) if root is not None else None
     if gameplay is not None:
@@ -584,6 +618,9 @@ def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None 
     repetition = repetition_metrics(root) if root is not None else None
     if repetition is not None:
         entry["repetition"] = repetition
+    lidar_roofs = lidar_roofs_metrics(root) if root is not None else None
+    if lidar_roofs is not None:
+        entry["lidar_roofs"] = lidar_roofs
     return entry
 
 
@@ -693,6 +730,9 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("repetition slots measured", "maps", ("repetition", "slots_measured")),
     ("repetition max contrast/limit", "maps", ("repetition", "max_ratio")),
     ("repetition tiles over limit", "maps", ("repetition", "over_limit_count")),
+    ("lidar roofs flat", "maps", ("lidar_roofs", "flat")),
+    ("lidar roofs pitched", "maps", ("lidar_roofs", "pitched")),
+    ("lidar roofs classified %", "maps", ("lidar_roofs", "classified_pct")),
     ("python s", "timings", ("python_s",)),
     ("setup s", "timings", ("setup_s",)),
     ("unity bake s", "timings", ("unity", "seconds", "scene.bake")),
@@ -700,7 +740,7 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 # Rows of an opt-in block are left out of the table when neither report has the block.
-_OPTIONAL_BLOCKS = frozenset({"repetition"})
+_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs"})
 
 
 def _value(report: Mapping[str, Any] | None, map_id: str, where: str, keys: tuple[str, ...]) -> Any:
@@ -816,7 +856,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
     for item in prepared:
         print(f"bench: {item.ref.id}", flush=True)
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
-                        overture_tints=args.overture_tints)
+                        overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -840,6 +880,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         repetition = repetition_metrics(run_dir / map_id)
         if repetition is not None:
             entry["repetition"] = repetition
+        lidar_roofs = lidar_roofs_metrics(run_dir / map_id)
+        if lidar_roofs is not None:
+            entry["lidar_roofs"] = lidar_roofs
         timing = report.setdefault("timings", {}).setdefault("maps", {}).setdefault(map_id, {})
         timing["unity"] = unity_timings(package)
     write_report(report, run_dir / REPORT_FILE)
@@ -878,6 +921,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="switch the plan C1 repetition option on in each run copy and add its summary to the report")
     run.add_argument("--overture-tints", action="store_true",
                      help="switch the plan C2 Overture colour tints on in each run copy (map.json overture_tints)")
+    run.add_argument("--lidar-roofs", action="store_true",
+                     help="switch the plan C3 flat or pitched roofs from the nDSM spread on in each run copy (map.json lidar_roofs)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")
