@@ -100,8 +100,9 @@ def test_the_rise_is_the_spread_within_the_builder_limits() -> None:
     assert spread_spec(_spread(10.0, 10.0), "roof_tile").rise_m == MIN_RISE_M
     assert spread_spec(_spread(10.0, 12.25), "roof_flat_grey").rise_m == 2.25
     for missing in (_spread(p25=None), _spread(p75=None)):
-        with pytest.raises(ValueError, match="a gable needs both percentiles"):
+        with pytest.raises(ValueError) as raised:
             spread_spec(missing, "roof_tile")
+        assert str(raised.value) == "a gable needs both percentiles; classify gives pitched only with both"
 
 
 def test_half_span_and_fill_read_the_minimum_rotated_rectangle() -> None:

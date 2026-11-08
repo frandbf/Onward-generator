@@ -482,6 +482,13 @@ def _lidar_classes(ids: Sequence[str], footprints: Mapping[str, BaseGeometry], t
             for bid in ids}
 
 
+def _lidar_inputs(report: SpreadReport, classes: dict[str, str]) -> tuple[
+        dict[str, str], dict[str, tuple[str, RoofSpread]], dict[str, dict[str, object]]]:
+    """``(classes, plans, evidence)``: every class, the ``(class, spread)`` of the buildings classified flat or pitched, and their ``roof.lidar``."""
+    plans = {bid: (c, report.buildings[bid]) for bid, c in classes.items() if c in (FLAT, PITCHED)}
+    return classes, plans, {bid: report.evidence(spread, c) for bid, (c, spread) in plans.items()}
+
+
 def _lidar_record(detailed: DetailedScene, objects: Sequence[DetailObject], classes: Mapping[str, str], report: SpreadReport) -> None:
     """``counts.lidar_roofs`` and, when a classified roof was kept, the plugin's attribution line (plan C3).
 
@@ -1091,9 +1098,9 @@ def detail_scene(
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     tags_of = {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids}
     tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
-    lidar_classes = {} if roof_spread is None else _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg)
-    lidar_plans = {} if roof_spread is None else {bid: (c, roof_spread.buildings[bid]) for bid, c in lidar_classes.items() if c in (FLAT, PITCHED)}
-    lidar_evidence = {} if roof_spread is None else {bid: roof_spread.evidence(spread, c) for bid, (c, spread) in lidar_plans.items()}
+    lidar_classes, lidar_plans, lidar_evidence = _lidar_inputs(
+        roof_spread, _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg),
+    ) if roof_spread is not None else ({}, {}, {})
     roof_plans = _roof_plans(ids, footprints, tree, key_of, tags_of, templates, heights_m, cfg, storey_heights, lent_roofs, lidar_plans)
     setbacks: Counter[str] = Counter()
 
