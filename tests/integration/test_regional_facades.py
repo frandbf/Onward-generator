@@ -76,6 +76,7 @@ def test_regional_atlases_against_the_per_material_path(runs: dict[str, Path]) -
         assert facades["era_bands"]["era_origin"] == "observed" and facades["era_bands"]["band_origin"] == "estimated"
         assert sum(facades["era_bands"]["buildings"].values()) == facades["stats"]["buildings"] >= 3
         assert all(s["license"].startswith("CC0") for s in facades["atlas"]["sources"])
+        assert facades["atlas"]["size"] == [1024, 1024]  # the regional table passed in, not the shipped one
         materials = {m["name"] for m in read_glb(_glb(runs[style]))[0]["materials"]}
         assert f"facade_trim_{style}" in materials and not {"plaster_ochre", "frame_stone", "glass_dark"} & materials
         assert len(materials) < len(legacy_materials) - 3

@@ -981,6 +981,8 @@ def test_a_band_limits_the_window_families_and_counts_the_eras() -> None:
         trim_building(node, _era("1960_1979"), "central_european", atlas, layout, windows, stats)
     assert {name[:8] for name in stats.cells if name.startswith("window")} == {"window_2"}
     assert stats.eras == {"1960_1979": 12}
+    # The band's tone (1960_1979: tone 1 only) reaches the look of every building.
+    assert {k: v for k, v in stats.looks.items() if k.startswith("tone_")} == {"tone_1": 12}
     free = TrimStats()
     for i in range(12):
         trim_building(replace(_building(), name=f"building/b{i}"), RECORD, "central_european", atlas, layout, windows, free)

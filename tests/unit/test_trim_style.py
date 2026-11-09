@@ -256,6 +256,7 @@ def test_regional_table_refusals(tmp_path: Path) -> None:
         with pytest.raises(StyleError, match=message):
             load_regional_table(table, _write_regional(tmp_path, doc))
 
+    refused(lambda d: d.update(extra=1), r"regional.json: \(root\): Additional properties")
     refused(lambda d: d.update(schema="onward_generator.facade_styles"), r"schema: 'onward_generator.facade_styles_regional' was expected")
     refused(lambda d: d["atlases"].update(nordic=d["atlases"]["anglo"]), "style 'nordic' is not in the style table")
     refused(lambda d: d["atlases"].update(mediterranean=d["atlases"]["anglo"]), "style mediterranean already has an atlas in the style table")

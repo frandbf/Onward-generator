@@ -342,3 +342,21 @@ def test_regional_bakes_are_deterministic_and_differ_by_style() -> None:
     iron = linear_to_srgb8(np.asarray(atlas["window_families"][0]["iron"]))
     block = images["latin_american"][cell.row0 : cell.row1, cell.col0 : cell.col1, :3]
     assert (block == iron).all(axis=-1).any()
+
+
+# The new window kinds (plan D1) at closed 0, 0.3 and 0.7 (176 x 368), rounded to 9 decimals. New bytes in
+# a regional atlas change its cache key only through the recipe, so a painter change must be deliberate.
+WINDOW_KINDS_GOLDEN = {
+    "casement": "1024e87fd015d4f0e5f2be555d32fd949b76a5e7c9758ec4633e9e274c3ec240",
+    "sash": "69c2c7cdbef24d5596dce4c60b81ac953cfd7f7e4e3aff348696d6ec2279f7bb",
+    "grille": "2f3d4732468f009cfaadb0caa8608bbd18e4bcba7ebcd9aaffdd0ff848748b89",
+}
+
+
+@pytest.mark.parametrize(("kind", "paint"), [("casement", casement_pixels), ("sash", sash_pixels), ("grille", grille_pixels)])
+def test_each_window_kind_keeps_its_bytes(kind: str, paint: Any) -> None:
+    family = {"frame": [0.9, 0.88, 0.84], "shutter": [0.3, 0.6, 0.2], "iron": [0.05, 0.05, 0.06]}
+    digest = hashlib.sha256()
+    for closed in (0.0, 0.3, 0.7):
+        digest.update(np.round(paint(176, 368, family, closed), 9).tobytes())
+    assert digest.hexdigest() == WINDOW_KINDS_GOLDEN[kind]

@@ -104,7 +104,7 @@ def load_regional_table(table: StyleTable, path: str | Path | None = None) -> Re
     except json.JSONDecodeError as exc:
         raise StyleError(f"{source}: not JSON: {exc}") from exc
     schema = json.loads(STYLE_SCHEMA_PATH.read_bytes())
-    regional = {"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": "#/$defs/regional_table"}
+    regional = {"$defs": schema["$defs"], "$ref": "#/$defs/regional_table"}
     first = best_match(Draft202012Validator(regional).iter_errors(doc))
     if first is not None:
         where = "/".join(str(p) for p in first.absolute_path) or "(root)"
