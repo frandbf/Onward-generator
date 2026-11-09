@@ -276,3 +276,34 @@ def test_a_landmark_with_an_interior_keeps_its_placeholder(block: tuple[Path, Pa
         ("landmark_lod2_not_used", "info", "osm-way-314", "it has an interior; the placeholder and its tower stay")]
     assert [o for o in on.objects if o.type == "landmark_part" and o.record["source_ids"][0] == "osm-way-314"]
     assert on.stats["lod2_landmarks"]["matched"] == 0
+
+
+@pytest.fixture(scope="module")
+def block_with_neighbour(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path, Path]:
+    """The same block with a house (920) against the church's west wall; the church's LoD2 nave is 14 m."""
+    root = tmp_path_factory.mktemp("lod2_neighbour")
+    buildings = {**FIXTURE_BUILDINGS, 920: ([(22, 6), (30, 6), (30, 20), (22, 20)], {"building": "residential", "building:levels": "6"})}
+    scene, heights, base = _detail_inputs(root, buildings, POIS)
+    origin = frame_origin(scene)
+    groups = [("church_nave", box_group(30, 6, 50.4, 22, 14.0)), ("church_tower", box_group(36, 22, 44, 30, 35.0))]
+    index = write_index(root / "raw" / "madrid_lod2", {"M-000214": obj_zip(obj_text(groups, origin))})
+    return scene, heights, base, index
+
+
+def test_a_neighbour_keeps_its_party_wall_against_a_landmark_drawn_with_lod2(block_with_neighbour: tuple[Path, Path, Path, Path]) -> None:
+    off, on = _detail(block_with_neighbour, False), _detail(block_with_neighbour, True)
+    assert "lod2" in _object(on, "building/osm-way-314").record
+    before = _object(off, "building/osm-way-920").record["facade"]["wall_area_m2"]
+    after = _object(on, "building/osm-way-920").record["facade"]["wall_area_m2"]
+    # Off, the placeholder shell hides the house's west wall; on, the LoD2 volume may be lower or leave the edge open,
+    # so the house keeps that wall, in the party material, and nothing of it is hidden.
+    assert before["hidden"] > 0.0
+    assert after["hidden"] == 0.0 and after["party"] == pytest.approx(before["party"] + before["hidden"])
+    def party_area(detailed: Any) -> float:
+        house = _object(detailed, "building/osm-way-920")
+        return float(sum(p.mesh.triangle_areas().sum() for p in house.visual if p.material.startswith("party_")))
+
+    assert party_area(on) == pytest.approx(after["party"], abs=0.1) and party_area(on) > party_area(off) + 100.0
+    # The church's own shell gives way to its LoD2 volume either way, and the other buildings do not change.
+    for bid in ("osm-way-316", "osm-way-317", "osm-way-311"):
+        assert _object(off, f"building/{bid}").record == _object(on, f"building/{bid}").record

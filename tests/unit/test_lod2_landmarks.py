@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from shapely import LineString, MultiPoint, Polygon, box
+from shapely import LineString, MultiPoint, Point, Polygon, box
 
 from onward_generator.detail.lod2 import (
+    Clip,
     LocalGroup,
     Lod2Error,
     Lod2Index,
@@ -16,6 +17,7 @@ from onward_generator.detail.lod2 import (
     ObjMesh,
     build_lod2_part,
     clip_to_footprint,
+    close_cut,
     cluster_simplify,
     ground_offset,
     group_colliders,
@@ -222,15 +224,21 @@ def test_no_overlap_and_the_neighbours_group_give_no_part() -> None:
 # ---------------------------------------------------------------------------------------------------- clip
 
 
-def _clip(mesh: Mesh, footprint: Polygon, tolerance: float = 1.0) -> tuple[np.ndarray, np.ndarray, int]:
+def _clip(mesh: Mesh, footprint: Polygon, tolerance: float = 1.0) -> Clip:
     return clip_to_footprint(mesh.vertices, mesh.triangles, footprint, tolerance)
+
+
+def _faces_on(vertices: np.ndarray, triangles: np.ndarray, axis: int, value: float) -> np.ndarray:
+    """The triangles whose corners all lie on the plane ``axis = value`` (to 1e-5 m)."""
+    return triangles[np.all(np.abs(vertices[triangles][:, :, axis] - value) < 1e-5, axis=1)]
 
 
 def test_a_vertex_just_outside_moves_onto_the_footprint_edge() -> None:
     footprint = box(0, 0, 10, 10)
     before = footprint.wkt
-    vertices, triangles, dropped = _clip(box_group(0, 0, 10.4, 10, 8.0), footprint)
-    assert dropped == 0 and len(triangles) == 10
+    clip = _clip(box_group(0, 0, 10.4, 10, 8.0), footprint)
+    vertices, triangles = clip.vertices, clip.triangles
+    assert (clip.dropped, clip.cut, clip.closure) == (0, 0, 0) and len(triangles) == 10
     assert vertices[:, 0].max() == pytest.approx(10.0)
     grown = footprint.buffer(1e-6)
     assert all(grown.covers(Polygon([(x, y), (x, y + 1e-9), (x + 1e-9, y)]).centroid) for x, y in vertices[:, :2])
@@ -238,49 +246,121 @@ def test_a_vertex_just_outside_moves_onto_the_footprint_edge() -> None:
     assert footprint.wkt == before
 
 
-def test_a_vertex_past_the_tolerance_drops_its_triangles_and_one_at_it_is_kept() -> None:
+def test_a_vertex_past_the_tolerance_is_cut_at_the_edge_and_the_cut_is_walled_down() -> None:
     footprint = box(0, 0, 10, 10)
-    _, triangles, dropped = _clip(box_group(0, 0, 11.0, 10, 8.0), footprint)
-    assert (len(triangles), dropped) == (10, 0)
-    vertices, triangles, dropped = _clip(box_group(0, 0, 11.01, 10, 8.0), footprint)
-    # Every face but the -x wall has a corner at x = 11.01: only its two triangles stay.
-    assert dropped == 8 and len(triangles) == 2
-    assert vertices[:, 0].max() == pytest.approx(0.0)
+    clip = _clip(box_group(0, 0, 11.0, 10, 8.0), footprint)
+    assert (len(clip.triangles), clip.dropped, clip.cut, clip.closure) == (10, 0, 0, 0)
+    house = box_group(0, 0, 11.01, 10, 8.0)
+    clip = _clip(Mesh(house.vertices - np.array([0.0, 0.0, GROUND_Z]), house.triangles), footprint)  # on the street, as build sets it
+    vertices, triangles = clip.vertices, clip.triangles
+    # The +x wall at x = 11.01 goes; the roof and the two side walls are cut at x = 10; the cut roof edge, in two
+    # pieces, is walled down with two triangles each.
+    assert (clip.dropped, clip.cut, clip.closure) == (2, 6, 4)
+    assert vertices[:, 0].max() == pytest.approx(10.0, abs=1e-5)
     assert outside_area_m2(vertices, triangles, footprint) == 0.0
+    mesh = Mesh(vertices, triangles)
+    roof = triangles[mesh.face_normals()[:, 2] > 0.5]
+    assert Mesh(vertices, roof).triangle_areas().sum() == pytest.approx(100.0)  # the roof reaches the edge, no farther
+    closure = _faces_on(vertices, triangles, 0, 10.0)
+    assert Mesh(vertices, closure).triangle_areas().sum() == pytest.approx(80.0)  # 10 m wide, 8 m high, down to the street
+    assert (Mesh(vertices, closure).face_normals()[:, 0] > 0).all()  # facing out, like the wall it stands for
+    for y in (0.0, 10.0):  # each side wall now ends at the edge: 10 m by 8 m
+        assert Mesh(vertices, _faces_on(vertices, triangles, 1, y)).triangle_areas().sum() == pytest.approx(80.0)
 
 
-def test_a_triangle_whose_centroid_is_outside_goes() -> None:
+def test_a_triangle_whose_centroid_is_outside_is_cut_to_the_footprint() -> None:
     ell = Polygon([(0, 0), (10, 0), (10, 4), (4, 4), (4, 10), (0, 10)])
     # All three corners are inside the L, but the plan centroid (4.67, 4.67) is in its notch.
     vertices = np.array([[9.0, 2.0, 5.0], [2.0, 9.0, 5.0], [3.0, 3.0, 5.0], [0, 0, 5], [3, 0, 5], [0, 3, 5]])
-    out_v, out_t, dropped = clip_to_footprint(vertices, np.array([[0, 1, 2]]), ell, 1.0)
-    assert dropped == 1 and len(out_t) == 0 and len(out_v) == 0
-    out_v, out_t, dropped = clip_to_footprint(vertices, np.array([[3, 4, 5]]), ell, 1.0)
-    assert dropped == 0 and out_t.tolist() == [[0, 1, 2]] and out_v.tolist() == [[0, 0, 5], [3, 0, 5], [0, 3, 5]]
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), ell, 1.0)
+    assert (clip.dropped, clip.cut) == (0, 1)
+    expected = Polygon(vertices[:3, :2]).intersection(ell).area
+    flat = clip.triangles[np.all(clip.vertices[clip.triangles][:, :, 2] == 5.0, axis=1)]
+    pieces = Mesh(clip.vertices, flat)
+    assert pieces.triangle_areas().sum() == pytest.approx(expected)
+    assert (pieces.face_normals()[:, 2] > 0).all()  # wound like the triangle, which faces up
+    assert outside_area_m2(clip.vertices, clip.triangles, ell) == 0.0
+    # Its two cuts along the notch, 3 m each, are walled down from z 5: 30 m² in four triangles.
+    walls = Mesh(clip.vertices, clip.triangles[len(flat):])
+    assert clip.closure == 4 and walls.triangle_areas().sum() == pytest.approx(30.0)
+    clip = clip_to_footprint(vertices, np.array([[3, 4, 5]]), ell, 1.0)
+    assert (clip.dropped, clip.cut, clip.closure) == (0, 0, 0)
+    assert clip.triangles.tolist() == [[0, 1, 2]] and clip.vertices.tolist() == [[0, 0, 5], [3, 0, 5], [0, 3, 5]]
 
 
-def test_on_a_concave_footprint_a_triangle_across_the_notch_goes() -> None:
+def test_a_sloped_triangle_keeps_its_plane_where_it_is_cut() -> None:
+    footprint = box(0, 0, 10, 10)
+    vertices = np.array([[0.0, 0.0, 0.0], [20.0, 0.0, 10.0], [0.0, 10.0, 0.0]])
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), footprint, 1.0)
+    assert clip.cut == 1
+    sloped = clip.triangles[Mesh(clip.vertices, clip.triangles).face_normals()[:, 2] != 0.0]  # the closure walls are vertical
+    kept = clip.vertices[sloped].reshape(-1, 3)
+    np.testing.assert_allclose(kept[:, 2], kept[:, 0] / 2.0, atol=1e-6)  # z = x / 2, the triangle's own plane
+    assert kept[:, 0].max() == pytest.approx(10.0, abs=1e-5)
+
+
+def test_on_a_concave_footprint_a_triangle_across_the_notch_is_cut() -> None:
     ell = Polygon([(0, 0), (10, 0), (10, 4), (4, 4), (4, 10), (0, 10)])
     before = ell.wkt
     vertices = np.array([[9.5, 0.5, 5], [0.5, 9.5, 5], [0.5, 0.5, 5], [9.5, 3.5, 5], [1, 1, 5], [3, 9, 5]], dtype=np.float64)
     triangles = np.array([[2, 0, 1], [4, 3, 2], [2, 5, 1]])
-    out_v, out_t, dropped = clip_to_footprint(vertices, triangles, ell, 1.0)
-    assert dropped == 1 and len(out_t) == 2
-    assert outside_area_m2(out_v, out_t, ell) == 0.0
+    clip = clip_to_footprint(vertices, triangles, ell, 1.0)
+    assert (clip.dropped, clip.cut) == (0, 1)
+    assert outside_area_m2(clip.vertices, clip.triangles, ell) == 0.0
     assert outside_area_m2(vertices, triangles, ell) > 0.0
-    # A vertical wall across the notch has no plan area, but its line still leaves the footprint.
+    # A vertical wall across the notch has no plan area: it is cut along its line into the two parts on the L.
     wall = np.array([[9.5, 3.5, 0], [3.5, 9.5, 0], [3.5, 9.5, 5]], dtype=np.float64)
-    assert clip_to_footprint(wall, np.array([[0, 1, 2]]), ell, 1.0)[2] == 1
+    cut = clip_to_footprint(wall, np.array([[0, 1, 2]]), ell, 1.0)
+    assert (cut.dropped, cut.cut) == (0, 1)
+    plan = cut.vertices[:, :2]
+    assert all(ell.buffer(1e-5).covers(Point(x, y)) for x, y in plan)
+    assert np.allclose(plan.sum(axis=1), 13.0)  # still on the wall's own line x + y = 13
+    area = Mesh(cut.vertices, cut.triangles).triangle_areas().sum()
+    whole = Mesh(wall, np.array([[0, 1, 2]])).triangle_areas().sum()
+    assert 0.0 < area < whole
+    normal = Mesh(wall, np.array([[0, 1, 2]])).face_normals()[0]
+    assert (Mesh(cut.vertices, cut.triangles).face_normals() @ normal > 0).all()
     inside_wall = np.array([[1, 1, 0], [3, 3, 0], [3, 3, 5]], dtype=np.float64)
-    assert clip_to_footprint(inside_wall, np.array([[0, 1, 2]]), ell, 1.0)[2] == 0
+    assert clip_to_footprint(inside_wall, np.array([[0, 1, 2]]), ell, 1.0).cut == 0
     assert ell.wkt == before
 
 
+def test_a_wall_or_triangle_wholly_outside_goes() -> None:
+    footprint = box(0, 0, 10, 10)
+    wall = np.array([[20, 0, 0], [30, 0, 0], [30, 0, 5]], dtype=np.float64)
+    flat = np.array([[20, 0, 5], [30, 0, 5], [30, 5, 5]], dtype=np.float64)
+    for tri in (wall, flat):
+        clip = clip_to_footprint(tri, np.array([[0, 1, 2]]), footprint, 1.0)
+        assert (clip.dropped, clip.cut, len(clip.triangles)) == (1, 0, 0)
+
+
 def test_clip_of_nothing_and_outside_area_of_vertical_triangles() -> None:
-    out_v, out_t, dropped = clip_to_footprint(np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64), box(0, 0, 1, 1), 1.0)
-    assert (out_v.shape, out_t.shape, dropped) == ((0, 3), (0, 3), 0)
+    clip = clip_to_footprint(np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64), box(0, 0, 1, 1), 1.0)
+    assert (clip.vertices.shape, clip.triangles.shape, clip.dropped, clip.cut, clip.closure) == ((0, 3), (0, 3), 0, 0, 0)
     wall = np.array([[20, 0, 0], [30, 0, 0], [30, 0, 5]], dtype=np.float64)
     assert outside_area_m2(wall, np.array([[0, 1, 2]]), box(0, 0, 1, 1)) == 0.0
+
+
+def test_close_cut_walls_down_only_the_edges_the_cut_opened() -> None:
+    roof = np.array([[0.0, 0.0, 6.0], [10.0, 0.0, 6.0], [10.0, 10.0, 6.0], [0.0, 10.0, 6.0]])
+    whole = np.array([[0, 1, 2], [0, 2, 3]])
+    # Nothing new is open: nothing is added, even though the roof's own edges are open.
+    diagonal = LineString([(0, 0), (10, 10)])
+    v, t, added = close_cut(roof, whole, roof, whole, diagonal)
+    assert added == 0 and v is roof and t is whole
+    # One triangle cut away opens the diagonal 0-2: one wall below it, two triangles, facing where the cut one did.
+    assert close_cut(roof, whole, roof, whole[:1], LineString([(0, 1), (10, 11)]))[2] == 0  # off the footprint edge: no wall
+    v, t, added = close_cut(roof, whole, roof, whole[:1], diagonal)
+    assert added == 2 and len(t) == 3
+    skirt = Mesh(v, t[1:])
+    assert skirt.triangle_areas().sum() == pytest.approx(np.hypot(10, 10) * 6.0)
+    assert skirt.vertices[skirt.triangles][:, :, 2].min() == 0.0
+    normals = skirt.face_normals()
+    assert (normals @ np.array([-1.0, 1.0, 0.0]) > 0).all()  # toward the cut half, which lay at y > x
+    # An edge at the street gives a wall with no area, which goes.
+    low = roof.copy()
+    low[:, 2] = 0.0
+    assert close_cut(low, whole, low, whole[:1], diagonal)[2] == 0
 
 
 # ---------------------------------------------------------------------------------------------------- cap and simplification
@@ -312,7 +392,7 @@ def test_one_triangle_over_the_cap_is_simplified_under_it() -> None:
     assert simplification["cell_m"] == 2.0 and simplification["max_triangles"] == 135
     assert simplification["triangles_before"] == 136 and simplification["triangles_after"] <= 135
     drawn = sum(p.mesh.triangle_count for p in part.visual)
-    assert drawn == simplification["triangles_after"]
+    assert drawn == simplification["triangles_after"] + part.record["clip"]["floor_triangles"]
     again, _ = build(box(0, 0, 10, 10), [group("g", house)], settings)
     assert again is not None
     assert [(p.mesh.vertices.tobytes(), p.mesh.triangles.tobytes()) for p in part.visual] == [
@@ -432,7 +512,7 @@ def test_the_record_says_what_is_observed_and_what_is_estimated() -> None:
         "ground_offset": {"origin": "estimated", "method": "highest_outer_wall_base", "orthometric_m": 650.0,
                           "lowest_orthometric_m": 650.0, "sunk_vertices": 0, "height_m": 12.0},
         "clip": {"origin": "estimated", "method": "clip_to_osm_footprint", "tolerance_m": 1.0, "dropped_triangles": 0,
-                 "outside_area_m2": 0.0, "floor_triangles": 0},
+                 "cut_triangles": 0, "closure_triangles": 0, "outside_area_m2": 0.0, "floor_triangles": 0},
         "simplification": {"origin": "estimated", "method": "vertex_clustering", "cell_m": None, "max_triangles": 2000,
                            "triangles_before": 10, "triangles_after_clip": 10, "triangles_after": 10},
         "collider": {"method": "group_hull_prism_clipped_to_footprint", "parts": 1, "triangles": 12},
@@ -442,10 +522,10 @@ def test_the_record_says_what_is_observed_and_what_is_estimated() -> None:
 
 def test_nothing_left_after_the_clip_keeps_the_placeholder() -> None:
     footprint = box(0, 0, 10, 10)
-    # The hull lies on the footprint, but every triangle reaches 3 m past its edge.
-    spikes = Mesh(np.array([[1, 1, 650], [9, 1, 650], [5, 13, 660], [1, 9, 650], [9, 9, 650], [5, -3, 660]], dtype=np.float64),
-                  np.array([[0, 1, 2], [3, 5, 4]]))
-    part, issues = build(footprint, [group("g", spikes)], Lod2Settings(min_footprint_cover=0.0, min_group_overlap=0.0))
+    # The hull spans the footprint, but both triangles stand beside it, one on each side.
+    beside = Mesh(np.array([[-5, 1, 650], [-2, 1, 650], [-2, 9, 660], [12, 1, 650], [15, 1, 650], [15, 9, 660]], dtype=np.float64),
+                  np.array([[0, 1, 2], [3, 4, 5]]))
+    part, issues = build(footprint, [group("g", beside)], Lod2Settings(min_footprint_cover=0.0, min_group_overlap=0.0))
     assert part is None
     assert [(i.code, i.message) for i in issues] == [
         ("landmark_lod2_no_match", "nothing of the LoD2 groups is left on the footprint; the placeholder and its tower stay")]

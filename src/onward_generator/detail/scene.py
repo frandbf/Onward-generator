@@ -1788,7 +1788,7 @@ def _assemble_detail(
     """The rest of ``detail_scene`` once every building is drawn: party walls, building parts, ground, urban elements, checks and the report.
 
     It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
-    wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
+    wall_areas = _split_party_walls(core_shells, footprints, tree, ids, lod2_swap)
     _swap_lod2(building_objs, emitted, lod2_built, lod2_swap)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     for x in objects:
@@ -1995,13 +1995,15 @@ def _lod2_record(detailed: DetailedScene, objects: Sequence[DetailObject], index
 
 
 def _split_party_walls(shells: Mapping[str, tuple[Shell, list[Segment], DetailObject]], footprints: Mapping[str, Any],
-                       tree: STRtree, ids: list[str]) -> WallAreas:
+                       tree: STRtree, ids: list[str], lod2_swap: set[str]) -> WallAreas:
     """Drop the party walls hidden by a neighbour's wall and give the visible ones the party material.
 
     Runs once every shell is built, since a neighbour's wall top is only known then
-    (an interior can raise it). Updates each building's visual and its record.
+    (an interior can raise it). Updates each building's visual and its record. A landmark of ``lod2_swap`` hides no
+    neighbour's wall: its shell is about to give way to the LoD2 volume (``_swap_lod2``), which can be lower than the
+    shell or leave part of the footprint open, so its neighbours keep their party walls against it (plan D6).
     """
-    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items()}
+    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items() if bid not in lod2_swap}
     total = WallAreas()
     for bid, (shell, segments, obj) in shells.items():
         found = tree.query(footprints[bid].buffer(HIDDEN_GAP_M))  # pragma: no mutate: a wider query only adds candidates that wall_cover finds nothing in
