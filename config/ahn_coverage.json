@@ -1,0 +1,14 @@
+{
+  "schema": "onward_generator.source_coverage",
+  "schema_version": "1.0.0",
+  "source": "nl.ahn",
+  "description": "Where run may use AHN (ADR-018, plan D4; opt-in, so only with run --source nl.ahn): a coarse WGS84 longitude/latitude ring around the Netherlands, drawn by hand for this repository (CC0) and generous over the sea and the borders. Outside the AHN extent the service returns no data and no override is written. Checked 2026-11-09 against the WCS DescribeCoverage envelope (EPSG:28992 x 10000..280000, y 306250..618750).",
+  "polygons": [
+    [[
+      [3.3, 51.4], [3.85, 51.2], [4.25, 51.35], [4.8, 51.42], [5.1, 51.42], [5.55, 51.25], [5.8, 51.12],
+      [5.6, 50.98], [5.62, 50.74], [6.05, 50.74], [6.12, 50.92], [5.9, 51.06], [6.22, 51.26], [6.25, 51.5], [5.95, 51.75],
+      [6.4, 51.86], [6.85, 51.98], [7.1, 52.25], [7.1, 52.65], [7.25, 53.2], [7.25, 53.4], [6.9, 53.55],
+      [5.9, 53.55], [4.75, 53.25], [4.45, 52.9], [4.35, 52.45], [3.9, 51.95], [3.3, 51.4]
+    ]]
+  ]
+}
