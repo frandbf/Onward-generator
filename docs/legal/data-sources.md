@@ -98,6 +98,20 @@ Obligations: none under CC0. The overrides and the report still name the source,
 
 Obligations: none; the licence allows any use without conditions, and Geobasis NRW excludes liability for currency, accuracy and availability. The tiles stay in `maps/<id>/data/raw/de.nrw_ndom/`, outside git. Coverage is `config/nrw_coverage.json`, a coarse hand-drawn ring around North Rhine-Westphalia. Checked 2026-11-09: the WCS capabilities of `wcs_nw_ndom`, `wcs_nw_dom` and `wcs_nw_dgm`, `DescribeCoverage` of `nw_ndom`, a real `GetCoverage` over Cologne Cathedral (200 × 200 float32 cells, −1.0 to 108.1 m), and https://www.govdata.de/dl-de/zero-2-0.
 
+### Madrid 3D building model (`es.madrid_lod2`)
+
+Plan D6 (9 November 2026), opt-in like the plugins of plan D4: it runs only on a map that switches it on (`run --source es.madrid_lod2`). The licence below was read on the publisher's catalogue before any code was written.
+
+| Field | Value |
+| --- | --- |
+| Provider | Ayuntamiento de Madrid (Área de Urbanismo, cartografía base municipal), published on datos.madrid.es and the Geoportal |
+| Dataset | Modelo tridimensional de edificaciones de la cartografía base municipal: LoD2 buildings extruded from the roof lines of the 1:1000 municipal base map. CKAN package `300722-0-ancho-viario-mapas`, `metadata_modified` 2026-07-23. The per-block OBJ files are FME output in ETRS89 / UTM 30N (EPSG:25830) with absolute orthometric heights, triangles only, one `usemtl` group per building or part |
+| Service | ArcGIS FeatureServer `https://services-eu1.arcgis.com/UrtTdLP2PYSxwtI6/arcgis/rest/services/MANZANAS_PARA_DESCARGA/FeatureServer/0` (fields `COD_MANZAN` and `URL_OBJ`, one row per city block), whose `URL_OBJ` points at one ZIP per block on `https://geoportal.madrid.es/fsdescargas/IDEAM_WBGEOPORTAL/CARTOGRAFIA/CARTOGRAFIA_ACTUALIZADA/3D_EDIFICACIONES_CONSTRUCCIONES/MANZANAS/OBJ_ACTUALIZADO/<COD_MANZAN>.zip` (an `.obj` and a `materials.mtl`). The whole-city I3S/SLPK (2.2 GB) and the 2D `01_EDIFICIO_P` layer are not used |
+| Licence | Creative Commons Attribution 4.0 International, SPDX `CC-BY-4.0`. CKAN `package_show` returns `license_id: cc-by`, `license_title: Creative Commons Attribution 4.0 International (CC BY 4.0)`. `CC-BY-4.0` is already on `config/sources.json` `licence_allowlist`, so the allowlist does not change |
+| Attribution | `Origen de los datos: Ayuntamiento de Madrid. Modelo tridimensional de edificaciones de la cartografía base municipal (actualizado 2026-07-23)` |
+
+Obligations, from CC BY 4.0 and the attribution the Ayuntamiento asks for: credit "Origen de los datos: Ayuntamiento de Madrid" with the date of the data, link the licence, and indicate the changes. The landmark volumes are a derived work: the LoD2 geometry is clipped to the OpenStreetMap footprint, moved to the map's local grid and ground and simplified to a triangle cap, and the provenance of each landmark says so (`docs/07-detail.md`). Do not suggest that the Ayuntamiento endorses the map. The line reaches the package attribution through the detail attribution, next to the OSM line. The ZIPs stay in `maps/<id>/data/raw/madrid_lod2/`, outside git. Coverage is `config/madrid_coverage.json`, a coarse hand-drawn ring around the municipality of Madrid (CC0). Checked 2026-11-09: CKAN `package_show` of `300722-0-ancho-viario-mapas`, the FeatureServer layer description and an envelope query near Puerta del Sol, and one real block ZIP (`M-000214.zip`, 70 KB, 7112 triangles in 16 groups).
+
 ### Blocked and deferred in plan D4
 
 | Dataset | Planned id | State | Why |
