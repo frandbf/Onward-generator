@@ -84,27 +84,40 @@ class Effect:
     adr: str
 
 
-def _effects() -> dict[tuple[str, str], Effect]:
-    rows: list[Effect] = []
-    for style in STYLE_IDS:
-        rows.append(Effect("dominant_typology", style, "/materials/facade_style", style, "materials", "--facade-style",
-                           f"the map-wide facade atlas style is {style}; no building is reclassified", "ADR-020, ADR-027"))
-    rows.append(Effect("palette", "extended_pools", "/materials/repetition", True, "materials", "--repetition",
-                       "the calm roof and paving pools and the per-cell ground phase", "ADR-009"))
-    for group, conditions in CONDITION_GROUPS.items():
-        rows.append(Effect("props_profile", group, "/overgrow/selection", f"config/{SELECTION_FILE}", "overgrow", "--selection",
-                           f"overgrow places only library props whose condition is {', '.join(conditions)}, or that have none",
-                           "ADR-010"))
-    for name, years in PROFILE_YEARS.items():
-        rows.append(Effect("abandonment", name, "/overgrow/profile_years", years, "overgrow", "--profile",
-                           f"grass, vines and trees follow the {years}-year profile", "ADR-010"))
-    for name, count in COVER_PROPS.items():
-        rows.append(Effect("cover", name, "/cover/max_props", count, "cover", "--max-props",
-                           f"sightline cover places at most {count} props", "ADR-032"))
-    return {(row.field, row.id): row for row in rows}
-
-
-EFFECTS: Mapping[tuple[str, str], Effect] = _effects()
+# One row per id that is not map_default. A literal, so every value is read here and tests compare it whole.
+_ROWS = (
+    Effect("dominant_typology", "anglo", "/materials/facade_style", "anglo", "materials", "--facade-style",
+           "the map-wide facade atlas style is anglo; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("dominant_typology", "central_european", "/materials/facade_style", "central_european", "materials", "--facade-style",
+           "the map-wide facade atlas style is central_european; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("dominant_typology", "generic", "/materials/facade_style", "generic", "materials", "--facade-style",
+           "the map-wide facade atlas style is generic; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("dominant_typology", "latin_american", "/materials/facade_style", "latin_american", "materials", "--facade-style",
+           "the map-wide facade atlas style is latin_american; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("dominant_typology", "mediterranean", "/materials/facade_style", "mediterranean", "materials", "--facade-style",
+           "the map-wide facade atlas style is mediterranean; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("palette", "extended_pools", "/materials/repetition", True, "materials", "--repetition",
+           "the calm roof and paving pools and the per-cell ground phase", "ADR-009"),
+    Effect("props_profile", "intact", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
+           "overgrow places only library props whose condition is intact, or that have none", "ADR-010"),
+    Effect("props_profile", "worn", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
+           "overgrow places only library props whose condition is damaged, worn, or that have none", "ADR-010"),
+    Effect("props_profile", "wrecked", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
+           "overgrow places only library props whose condition is burned, damaged, wrecked, or that have none", "ADR-010"),
+    Effect("abandonment", "years_10", "/overgrow/profile_years", 10, "overgrow", "--profile",
+           "grass, vines and trees follow the 10-year profile", "ADR-010"),
+    Effect("abandonment", "years_30", "/overgrow/profile_years", 30, "overgrow", "--profile",
+           "grass, vines and trees follow the 30-year profile", "ADR-010"),
+    Effect("abandonment", "years_100", "/overgrow/profile_years", 100, "overgrow", "--profile",
+           "grass, vines and trees follow the 100-year profile", "ADR-010"),
+    Effect("cover", "off", "/cover/max_props", 0, "cover", "--max-props",
+           "sightline cover places at most 0 props", "ADR-032"),
+    Effect("cover", "light", "/cover/max_props", 8, "cover", "--max-props",
+           "sightline cover places at most 8 props", "ADR-032"),
+    Effect("cover", "full", "/cover/max_props", 24, "cover", "--max-props",
+           "sightline cover places at most 24 props", "ADR-032"),
+)
+EFFECTS: Mapping[tuple[str, str], Effect] = {(row.field, row.id): row for row in _ROWS}
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,7 +177,7 @@ def parse_street_profile(text: str) -> StreetProfile:
         raise StreetProfileError("AI_PROFILE_SCHEMA", f"the reply must be a JSON object, got {type(document).__name__}")
     errors = sorted(Draft202012Validator(profile_schema()).iter_errors(document), key=lambda e: (list(map(str, e.absolute_path)), e.message))
     if errors:
-        problems = "; ".join(f"{''.join(f'/{p}' for p in e.absolute_path) or '/'}: {e.message}" for e in errors)
+        problems = "; ".join(f"{e.json_path[1:].replace('.', '/') or '/'}: {e.message}" for e in errors)
         raise StreetProfileError("AI_PROFILE_SCHEMA", problems)
     return StreetProfile(
         dominant_typology=str(document["dominant_typology"]),
@@ -190,10 +203,14 @@ Every field takes exactly one id from its list. map_default keeps what the map a
 You cannot change the area, the coordinates, the data sources, the export, the budgets or any building. Choose map_default when the brief does not ask for a field."""
 
 
+# Quotes the brief as JSON and keeps its accents readable.
+_QUOTE = json.JSONEncoder(ensure_ascii=False)
+
+
 def instruction(brief: str, center: Mapping[str, Any], library: Sequence[tuple[str, str]]) -> str:
     groups = {group: sum(1 for _ident, condition in library if condition in conditions) for group, conditions in CONDITION_GROUPS.items()}
     return (
-        f"Brief (quoted exactly):\n{json.dumps(brief, ensure_ascii=False)}\n\n"
+        f"Brief (quoted exactly):\n{_QUOTE.encode(brief)}\n\n"
         f"Map centre (WGS84): {_round(center.get('latitude'))}, {_round(center.get('longitude'))}\n\n"
         f"Library props per props_profile: {json.dumps(groups)}\n"
     )

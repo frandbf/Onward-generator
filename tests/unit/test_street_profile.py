@@ -1041,3 +1041,14 @@ def test_the_run_command_passes_the_switch(monkeypatch: pytest.MonkeyPatch) -> N
     base = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]
     assert main(base) == 0 and received["street_profile"] is False
     assert main([*base, "--street-profile"]) == 0 and received["street_profile"] is True
+
+
+def test_a_map_without_a_brief_hashes_an_empty_one(root: Path) -> None:
+    document = load_map(root)
+    del document["brief"]
+    (root / "map.json").write_text(json.dumps(document))
+    stub = Stub(reply())
+    record = resolve(root, stub)
+    centre = {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON}
+    assert record["inputs_sha256"] == sp.inputs_sha256("", centre, LIBRARY, False)
+    assert stub.calls == [sp.instruction("", centre, LIBRARY)] and '\n""\n' in stub.calls[0]
