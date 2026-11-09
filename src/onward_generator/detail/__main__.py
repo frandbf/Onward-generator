@@ -59,9 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="overture_tints.json from overture match --tints: Overture colours below the OSM wall and roof tags (plan C2)")
     parser.add_argument("--lidar-roofs", metavar="REPORT",
                         help="<id>_report.json of a LiDAR source plugin for this scene: flat or pitched roofs from the nDSM spread (plan C3)")
-    parser.add_argument("--lod2-landmarks", metavar="INDEX",
-                        help="lod2_index.json of a landmark_mesh source plugin (es.madrid_lod2): observed LoD2 volumes clipped to the "
-                             "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)")
+    parser.add_argument(
+        "--lod2-landmarks",
+        metavar="INDEX",  # pragma: no mutate: help text
+        help="lod2_index.json of a landmark_mesh source plugin (es.madrid_lod2): observed LoD2 volumes clipped to the "  # pragma: no mutate: help text
+             "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 

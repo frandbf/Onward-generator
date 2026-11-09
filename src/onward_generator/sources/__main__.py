@@ -128,9 +128,16 @@ def build_parser() -> argparse.ArgumentParser:
     normalize.add_argument("--out", required=True)
     normalize.add_argument("--overwrite", action="store_true")
     normalize.set_defaults(handler=_normalize)
-    lod2 = sub.add_parser("madrid-lod2", help="download the Madrid LoD2 blocks under the scene's landmarks into data/raw (network, plan D6)")
+    lod2 = sub.add_parser(
+        "madrid-lod2",
+        help="download the Madrid LoD2 blocks under the scene's landmarks into data/raw (network, plan D6)",  # pragma: no mutate: help text
+    )
     lod2.add_argument("--scene", required=True)
-    lod2.add_argument("--out", required=True, help="directory under data/raw/ that receives the block ZIPs and lod2_index.json")
+    lod2.add_argument(
+        "--out",
+        required=True,
+        help="directory under data/raw/ that receives the block ZIPs and lod2_index.json",  # pragma: no mutate: help text
+    )
     lod2.add_argument("--overwrite", action="store_true")
     lod2.set_defaults(handler=_madrid_lod2)
     merge = sub.add_parser("merge", help="merge plugin overrides by priority into one heights_overrides.json (offline)")

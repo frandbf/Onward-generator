@@ -1809,7 +1809,7 @@ def _assemble_detail(
     )
     issues.extend(part_issues)
     # A building:part of a landmark drawn with its LoD2 volume would stand inside that volume; the volume holds it.
-    replaced = Counter(p.record["source_ids"][0] for p in part_objects if p.record["source_ids"][0] in lod2_swap)
+    replaced = sum(p.record["source_ids"][0] in lod2_swap for p in part_objects)
     part_objects = [p for p in part_objects if p.record["source_ids"][0] not in lod2_swap]
     if core is not None:
         for piece in part_objects:
@@ -1969,13 +1969,13 @@ def _swap_lod2(building_objs: Sequence[SceneObject], emitted: Mapping[str, tuple
         x.record["collider"] = {"source": "lod2_group_prisms", "parts": len(x.colliders),
                                 "triangles": sum(m.triangle_count for m in x.colliders), "balconies": 0, "glass_panes": 0}
         x.record["generation"] = {**x.record["generation"], "method": "observed LoD2 volume clipped to the OSM footprint"}
-        x.record["facade"].update({"representation": "observed_lod2", "representative_of_real_facade": False,
-                                   "representative_of_real_volume": True, "needs_custom_model": False})
+        # representative_of_real_facade stays False, as every building record has it: the LoD2 faces carry no facade.
+        x.record["facade"].update({"representation": "observed_lod2", "representative_of_real_volume": True, "needs_custom_model": False})
         x.record["lod2"] = dict(part.record)
 
 
 def _lod2_record(detailed: DetailedScene, objects: Sequence[DetailObject], index: Lod2Index, swap: set[str],
-                 replaced: Counter[str]) -> None:
+                 replaced: int) -> None:
     """``inputs.lod2_landmarks``, ``counts.lod2_landmarks`` and, when a landmark was drawn with it, the CC BY attribution line."""
     detailed.inputs["lod2_landmarks"] = {"path": index.path, "sha256": index.sha256, "source": index.source}
     drawn = [o for o in objects if o.type == "building" and "lod2" in o.record]
@@ -1985,7 +1985,7 @@ def _lod2_record(detailed: DetailedScene, objects: Sequence[DetailObject], index
         "issues": dict(sorted(codes.items())),
         "visual_triangles": sum(p.mesh.triangle_count for o in drawn for p in o.visual),
         "collision_triangles": sum(m.triangle_count for o in drawn for m in o.colliders),
-        "building_parts_replaced": sum(replaced.values()),
+        "building_parts_replaced": replaced,
     }
     if swap:
         lines = {(a["text"], a["license"]): a for a in detailed.extra_attribution}

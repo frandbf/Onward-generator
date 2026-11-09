@@ -239,3 +239,158 @@ def test_the_real_fetch_refuses_an_oversized_body() -> None:
     with pytest.raises(SourceError, match="larger than 20 bytes"):
         net.fetch_bytes(OBJ_URL, allowed_hosts=frozenset({"geoportal.madrid.es"}), max_bytes=20, timeout=1.0, headers={},
                         error=SourceError, opener=lambda request, timeout: Big())
+
+
+# ---------------------------------------------------------------------------------------------------- edges
+
+
+def test_a_failed_query_quotes_the_service_error() -> None:
+    body = json.dumps({"error": {"code": 400, "message": "Invalid query"}}).encode()
+    with pytest.raises(SourceError, match=r"^es\.madrid_lod2: the block query failed: \{'code': 400, 'message': 'Invalid query'\}$"):
+        parse_block_reply(body)
+
+
+@pytest.mark.parametrize(("attributes", "message"), [
+    ({"COD_MANZAN": "M-1", "URL_OBJ": 5}, "a block needs COD_MANZAN and URL_OBJ"),
+    ({"COD_MANZAN": "-", "URL_OBJ": OBJ_URL}, "block code '-' is not a plain code"),
+    ({"COD_MANZAN": "--", "URL_OBJ": OBJ_URL}, "block code '--' is not a plain code"),
+])
+def test_a_block_row_needs_a_text_url_and_a_code_with_letters_or_digits(attributes: dict[str, Any], message: str) -> None:
+    with pytest.raises(SourceError, match=message):
+        parse_block_reply(json.dumps({"features": [{"attributes": attributes}]}).encode())
+
+
+def test_candidates_of_a_scene_without_features_and_after_a_non_building() -> None:
+    assert candidate_ids({}) == []
+    features = [{"kind": "poi", "id": "p", "tags": {}}, {"kind": "building", "id": "b", "tags": {"historic": "yes"}}]
+    assert candidate_ids({"features": features}) == ["b"]
+
+
+def _two_landmarks(tmp_path: Path, scene_path: Path) -> Path:
+    """The fixture scene with a second church on the first one's footprint: two candidates, two block queries."""
+    scene = json.loads(scene_path.read_bytes())
+    church = next(f for f in scene["features"] if f["id"] == "osm-way-314")
+    scene["features"].append({**church, "id": "osm-way-999"})
+    path = tmp_path / "two" / "geo_scene.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(scene), encoding="utf-8")
+    return path
+
+
+class CountingFetch(FakeFetch):
+    """Each block query answers a new block code."""
+
+    def __call__(self, url: str, max_bytes: int) -> bytes:
+        self.calls.append((url, max_bytes))
+        if "FeatureServer" in url:
+            n = sum("FeatureServer" in u for u, _ in self.calls)
+            return reply((f"M-00000{n}", OBJ_URL.replace("M-000214", f"M-00000{n}")))
+        return self.zip_body
+
+
+def test_the_union_of_the_replies_is_held_to_the_limit(tmp_path: Path, detail_inputs: tuple[Path, Path, Path]) -> None:
+    scene = _two_landmarks(tmp_path, detail_inputs[0])
+    assert candidate_ids(json.loads(scene.read_bytes())) == ["osm-way-314", "osm-way-999"]
+    with pytest.raises(SourceError, match=r"^es\.madrid_lod2: 2 blocks is over the limit of 1$"):
+        fetch_lod2(scene, tmp_path / "over", fetch=CountingFetch(_zip()), now=NOW, max_blocks=1)
+    index = fetch_lod2(scene, tmp_path / "at", fetch=CountingFetch(_zip()), now=NOW, max_blocks=2)
+    assert [b["cod_manzan"] for b in index["blocks"]] == ["M-000001", "M-000002"]
+
+
+def test_a_reply_may_hold_more_than_the_default_limit_when_the_map_allows_it(tmp_path: Path, detail_inputs: tuple[Path, Path, Path]) -> None:
+    rows = [(f"M-{k:06d}", OBJ_URL.replace("M-000214", f"M-{k:06d}")) for k in range(41)]
+
+    class Many(FakeFetch):
+        def __call__(self, url: str, max_bytes: int) -> bytes:
+            self.calls.append((url, max_bytes))
+            return reply(*rows) if "FeatureServer" in url else self.zip_body
+
+    index = fetch_lod2(detail_inputs[0], tmp_path / "many", fetch=Many(_zip()), now=NOW, max_blocks=41)
+    assert len(index["blocks"]) == 41
+
+
+def test_a_sidecar_alone_blocks_the_download(tmp_path: Path, detail_inputs: tuple[Path, Path, Path]) -> None:
+    out = tmp_path / "madrid_lod2"
+    (tmp_path / "madrid_lod2.source.json").write_text("{}", encoding="utf-8")
+    fetch = FakeFetch(_zip())
+    with pytest.raises(FileExistsError, match=f"^refusing to overwrite {out}$"):
+        fetch_lod2(detail_inputs[0], out, fetch=fetch, now=NOW)
+    assert fetch.calls == []
+
+
+def test_the_download_dates_itself_in_utc_and_makes_its_folders(tmp_path: Path, detail_inputs: tuple[Path, Path, Path]) -> None:
+    out = tmp_path / "data" / "raw" / "madrid_lod2"
+    index = fetch_lod2(detail_inputs[0], out, fetch=FakeFetch(_zip()))
+    side = json.loads((out.parent / "madrid_lod2.source.json").read_bytes())
+    assert side["retrieved_at"].endswith("+00:00")
+    assert side == {
+        "source": "es.madrid_lod2",
+        "provider": plugin_module.PROVIDER,
+        "license": "CC-BY-4.0",
+        "license_name": "Creative Commons Attribution 4.0 International (Ayuntamiento de Madrid)",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "attribution": ATTRIBUTION,
+        "obligations": plugin_module.LICENCE.obligations,
+        "data_date": "2026-07-23",
+        "crs": "EPSG:25830",
+        "scene": index["scene"],
+        "retrieved_at": side["retrieved_at"],
+        "user_agent": plugin_module.USER_AGENT,
+        "service": plugin_module.FEATURE_SERVER,
+        "blocks": index["blocks"],
+    }
+    assert index["provider"] == plugin_module.PROVIDER and plugin_module.PROVIDER.startswith("Ayuntamiento de Madrid")
+
+
+def test_a_failure_while_writing_removes_the_staging_folder(tmp_path: Path, detail_inputs: tuple[Path, Path, Path],
+                                                           monkeypatch: pytest.MonkeyPatch) -> None:
+    removed: list[tuple[Path, dict[str, Any]]] = []
+    real_rmtree = plugin_module.shutil.rmtree
+
+    def rmtree(path: Path, **kwargs: Any) -> None:
+        removed.append((Path(path), kwargs))
+        real_rmtree(path, **kwargs)
+
+    def broken(path: Path, document: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(plugin_module.shutil, "rmtree", rmtree)
+    monkeypatch.setattr(plugin_module, "atomic_write_json", broken)
+    with pytest.raises(OSError, match="disk full"):
+        fetch_lod2(detail_inputs[0], tmp_path / "madrid_lod2", fetch=FakeFetch(_zip()), now=NOW)
+    assert list(tmp_path.iterdir()) == []
+    assert [(p.name.startswith(".madrid_lod2."), kwargs) for p, kwargs in removed] == [(True, {"ignore_errors": True})]
+
+
+def test_the_retry_asks_for_the_same_cap(tmp_path: Path, detail_inputs: tuple[Path, Path, Path]) -> None:
+    fetch = FakeFetch(_zip(), fail=1, fail_on="geoportal")
+    fetch_lod2(detail_inputs[0], tmp_path / "madrid_lod2", fetch=fetch, now=NOW)
+    assert [cap for url, cap in fetch.calls if "geoportal" in url] == [MAX_ZIP_BYTES, MAX_ZIP_BYTES]
+
+
+def test_the_http_fetch_waits_two_minutes_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(plugin_module, "fetch_bytes", lambda url, **kwargs: seen.update(kwargs) or b"")
+    http_fetch()(OBJ_URL, 1)
+    assert seen["timeout"] == 120.0
+
+
+def test_the_source_command_runs_the_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.sources import __main__ as source_cli
+
+    calls: list[tuple[Path, Path, bool]] = []
+
+    def fake(scene: Path, out: Path, *, overwrite: bool) -> dict[str, Any]:
+        calls.append((scene, out, overwrite))
+        return {"blocks": [{}], "candidates": [{}, {}], "license": "CC-BY-4.0"}
+
+    monkeypatch.setattr(source_cli, "fetch_lod2", fake)
+    scene, out = tmp_path / "geo_scene.json", tmp_path / "raw" / "madrid_lod2"
+    assert source_cli.main(["madrid-lod2", "--scene", str(scene), "--out", str(out)]) == 0
+    assert source_cli.main(["madrid-lod2", "--scene", str(scene), "--out", str(out), "--overwrite"]) == 0
+    assert calls == [(scene, out, False), (scene, out, True)]
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[:2] == ["1 block(s) for 2 landmark candidate(s); licence CC-BY-4.0", f"wrote {out} and its .source.json sidecar"]
+    assert source_cli.main(["madrid-lod2", "--out", str(out)]) == 2
+    assert source_cli.main(["madrid-lod2", "--scene", str(scene)]) == 2
+    assert len(calls) == 2

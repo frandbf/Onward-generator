@@ -8,6 +8,7 @@ not be matched to the church) and a kiosk that stands on no footprint. The frame
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import json
 import zipfile
@@ -18,6 +19,7 @@ import pytest
 from shapely.geometry import shape
 
 from onward_generator.detail import detail_scene, load_base, load_detail_config
+from onward_generator.detail import scene as scene_module
 from onward_generator.detail.__main__ import load_lod2
 from onward_generator.detail.__main__ import main as detail_main
 from onward_generator.generation import load_generation_config
@@ -164,7 +166,7 @@ def test_the_cli_refuses_another_crs_and_a_broken_index_without_writing(
     code = detail_main(["--scene", str(other), "--heights", str(heights), "--base", str(base), "--out", str(tmp_path / "crs"),
                         "--no-preview", "--lod2-landmarks", str(index)])
     assert code == 1 and not (tmp_path / "crs").exists()
-    assert "the LoD2 volumes are in EPSG:25830, but" in capsys.readouterr().err
+    assert f"the LoD2 volumes are in EPSG:25830, but {other} is in EPSG:32630; nothing is reprojected" in capsys.readouterr().err
     empty_zip = io.BytesIO()
     zipfile.ZipFile(empty_zip, "w").close()
     empty = write_index(tmp_path / "empty", {"M-000001": empty_zip.getvalue()})
@@ -174,3 +176,103 @@ def test_the_cli_refuses_another_crs_and_a_broken_index_without_writing(
     assert _cli(block, out, "--lod2-landmarks", str(empty), "--overwrite") == 1
     assert "block M-000001: the ZIP holds 0 .obj files" in capsys.readouterr().err
     assert (out / "scene_detail.json").read_text(encoding="utf-8") == "old"
+
+
+def test_the_church_record_says_what_replaced_the_placeholder(block: tuple[Path, Path, Path, Path]) -> None:
+    on = _detail(block, True)
+    church = _object(on, "building/osm-way-314")
+    record = church.record
+    assert record["materials"] == [p.material for p in church.visual] == [CFG.landmarks.wall_material, CFG.landmarks.roof_material]
+    assert record["visual"] == {"triangles": sum(p.mesh.triangle_count for p in church.visual)}
+    assert record["collider"] == {"source": "lod2_group_prisms", "parts": 2, "triangles": sum(m.triangle_count for m in church.colliders),
+                                  "balconies": 0, "glass_panes": 0}
+    assert record["generation"]["method"] == "observed LoD2 volume clipped to the OSM footprint"
+    assert record["lod2"]["objects"] == ["M-000214:church_nave", "M-000214:church_tower"]
+    assert on.inputs["lod2_landmarks"] == {"path": str(block[3]), "sha256": on.inputs["lod2_landmarks"]["sha256"], "source": "es.madrid_lod2"}
+    assert len(on.inputs["lod2_landmarks"]["sha256"]) == 64
+    assert on.stats["lod2_landmarks"] == {
+        "matched": 1,
+        "issues": {"landmark_lod2_no_match": 1},
+        "visual_triangles": sum(p.mesh.triangle_count for p in church.visual),
+        "collision_triangles": sum(m.triangle_count for m in church.colliders),
+        "building_parts_replaced": 0,
+    }
+
+
+def test_the_madrid_line_joins_the_other_attribution_lines_once(block: tuple[Path, Path, Path, Path]) -> None:
+    on = _detail(block, True)
+    index = load_lod2(str(block[3]), str(block[0]))
+    assert index is not None
+    madrid = index.attribution_line()
+    other = {"text": "Another source", "license": "ODbL-1.0", "license_url": "https://example.org"}
+    on.extra_attribution = [dict(madrid), other]
+    scene_module._lod2_record(on, on.objects, index, {"osm-way-314"}, 0)
+    assert on.extra_attribution == [other, madrid]
+
+
+def test_only_core_landmarks_are_offered_to_the_lod2_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    offered: list[list[str]] = []
+
+    def record(landmarks: dict[str, Any], *args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        offered.append(sorted(landmarks))
+        return {}, {}
+
+    monkeypatch.setattr(scene_module, "lod2_parts", record)
+    ids = ["core-landmark", "core-house", "scenic-landmark"]
+    height_of = {"core-landmark": {"landmark": True}, "core-house": {"landmark": False}, "scenic-landmark": {"landmark": True}}
+    tier_of = {"core-landmark": "core", "core-house": "core", "scenic-landmark": "scenic"}
+    footprints = dict.fromkeys(ids, None)
+    assert scene_module._lod2_inputs(object(), ids, footprints, height_of, tier_of, {}, CFG) == ({}, {})  # type: ignore[arg-type]
+    assert offered == [["core-landmark"]]
+    off = dataclasses.replace(CFG, landmarks=dataclasses.replace(CFG.landmarks, enabled=False))
+    assert scene_module._lod2_inputs(object(), ids, footprints, height_of, tier_of, {}, off) == ({}, {})  # type: ignore[arg-type]
+    assert scene_module._lod2_inputs(None, ids, footprints, height_of, tier_of, {}, CFG) == ({}, {})
+    assert offered == [["core-landmark"]]
+
+
+def test_the_budget_cli_passes_the_index_and_prints_the_counts(
+        block: tuple[Path, Path, Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _cli(block, tmp_path / "budget", "--core-target-triangles", "400000", "--core-radius-m", "150", "--lod2-landmarks", str(block[3])) == 0
+    report = json.loads((tmp_path / "budget" / "detail_report.json").read_bytes())
+    counts = report["counts"]["lod2_landmarks"]
+    assert counts["matched"] == 1
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("lod2_landmarks ")]
+    assert lines == [f"lod2_landmarks matched=1 visual_triangles={counts['visual_triangles']} "
+                     f"collision_triangles={counts['collision_triangles']} issues={counts['issues']}"]
+
+
+@pytest.fixture(scope="module")
+def block_with_part(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path, Path]:
+    """The same block with a building:part on the church (911) and two on the house (912, 913)."""
+    root = tmp_path_factory.mktemp("lod2_part")
+    buildings = {**FIXTURE_BUILDINGS,
+                 911: ([(32, 8), (36, 8), (36, 12), (32, 12)], {"building:part": "yes", "height": "30"}),
+                 912: ([(54, 8), (58, 8), (58, 12), (54, 12)], {"building:part": "yes", "height": "12"}),
+                 913: ([(54, 14), (58, 14), (58, 18), (54, 18)], {"building:part": "yes", "height": "12"})}
+    scene, heights, base = _detail_inputs(root, buildings, POIS)
+    origin = frame_origin(scene)
+    groups = [("church_nave", box_group(30, 6, 50.4, 22, 14.0)), ("church_tower", box_group(36, 22, 44, 30, 35.0))]
+    index = write_index(root / "raw" / "madrid_lod2", {"M-000214": obj_zip(obj_text(groups, origin))})
+    return scene, heights, base, index
+
+
+def test_a_building_part_inside_the_lod2_volume_is_replaced_by_it(block_with_part: tuple[Path, Path, Path, Path]) -> None:
+    off, on = _detail(block_with_part, False), _detail(block_with_part, True)
+    parents = sorted(o.record["source_ids"][0] for o in off.objects if o.type == "building_part")
+    assert parents == ["osm-way-314", "osm-way-317", "osm-way-317"]
+    assert sorted(o.record["source_ids"][0] for o in on.objects if o.type == "building_part") == ["osm-way-317", "osm-way-317"]
+    assert on.stats["lod2_landmarks"]["building_parts_replaced"] == 1
+
+
+def test_a_landmark_with_an_interior_keeps_its_placeholder(block: tuple[Path, Path, Path, Path]) -> None:
+    scene, heights, base, index = block
+    cfg = dataclasses.replace(CFG, interiors=dataclasses.replace(CFG.interiors, include_ids=("osm-way-314",)))
+    generated, ref = load_base(base, scene, heights, GEN)
+    on = detail_scene(generated, ref, heights, scene, cfg, lod2_landmarks=load_lod2(str(index), str(scene)))
+    assert any(o.id == "interior/osm-way-314" for o in on.objects)
+    church = _object(on, "building/osm-way-314")
+    assert "lod2" not in church.record
+    assert [(i.code, i.severity, i.object_id, i.message) for i in on.issues if i.code == "landmark_lod2_not_used"] == [
+        ("landmark_lod2_not_used", "info", "osm-way-314", "it has an interior; the placeholder and its tower stay")]
+    assert [o for o in on.objects if o.type == "landmark_part" and o.record["source_ids"][0] == "osm-way-314"]
+    assert on.stats["lod2_landmarks"]["matched"] == 0

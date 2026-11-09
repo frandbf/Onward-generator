@@ -123,14 +123,14 @@ class Lod2Index:
 
 
 def _index_of(token: str, count: int, line: int) -> int:
-    head = token.split("/", 1)[0]
+    head = token.split("/", 1)[0]  # pragma: no mutate: only the head before the first slash is read, however many splits follow
     try:
         value = int(head)
     except ValueError as exc:
         raise Lod2Error(f"OBJ line {line}: face index {token!r} is not an integer") from exc
     if value == 0:
         raise Lod2Error(f"OBJ line {line}: face index 0 (OBJ counts from 1)")
-    index = value - 1 if value > 0 else count + value
+    index = value - 1 if value > 0 else count + value  # pragma: no mutate: 0 is refused just above, so > and >= agree
     if not 0 <= index < count:
         raise Lod2Error(f"OBJ line {line}: face index {value} is outside the {count} vertices read so far")
     return index
@@ -188,8 +188,8 @@ def parse_obj(text: str, *, max_vertices: int = 400_000, max_faces: int = 800_00
     if not faces:
         raise Lod2Error("OBJ has no faces")
     return ObjMesh(
-        np.asarray(vertices, dtype=np.float64),
-        tuple(ObjGroup(name, np.asarray(tris, dtype=np.int64)) for name, tris in groups.items()),
+        np.asarray(vertices, dtype=np.float64),  # pragma: no mutate: numpy reads a list of Python floats as float64 already
+        tuple(ObjGroup(name, np.asarray(tris, dtype=np.int64)) for name, tris in groups.items()),  # pragma: no mutate: numpy reads Python ints as int64 on the 64-bit image already
         crs,
     )
 
@@ -268,7 +268,7 @@ def load_index(path: str | Path, settings: Lod2Settings = DEFAULT_SETTINGS) -> L
         if hashlib.sha256(body).hexdigest() != entry["sha256"]:
             raise Lod2Error(f"{path}: block {entry['cod_manzan']} does not match its sha256")
         try:
-            mesh, obj_date = read_obj_zip(body, settings, crs=doc["crs"])
+            mesh, obj_date = read_obj_zip(body, settings)  # the index CRS was checked to be CRS, the default
         except Lod2Error as exc:
             raise Lod2Error(f"{path}: block {entry['cod_manzan']}: {exc}") from exc
         blocks.append(Lod2Block(entry["cod_manzan"], entry["path"], entry["sha256"], entry["url"], obj_date, mesh))
@@ -312,7 +312,7 @@ def local_groups(index: Lod2Index, frame: Mapping[str, Any]) -> list[LocalGroup]
         for group in block.mesh.groups:
             used, inverse = np.unique(group.triangles, return_inverse=True)
             vertices = moved[used]
-            triangles = inverse.reshape(-1, 3).astype(np.int64)
+            triangles = inverse.astype(np.int64)  # np.unique keeps the (m, 3) shape of its input in its inverse
             hull = MultiPoint([tuple(p) for p in vertices[:, :2]]).convex_hull
             found.append(LocalGroup(f"{block.cod_manzan}:{group.name}", block.cod_manzan, block.obj_date, vertices, triangles, hull))
     return found
@@ -348,29 +348,25 @@ def match_landmark(footprint: BaseGeometry, groups: Sequence[LocalGroup], settin
 
 def cluster_simplify(vertices: np.ndarray, triangles: np.ndarray, cell_m: float) -> tuple[np.ndarray, np.ndarray]:
     """Vertex clustering: every vertex in one ``cell_m`` cube becomes their mean; collapsed and repeated triangles go."""
-    keys = np.floor(vertices / cell_m).astype(np.int64)
-    unique, inverse = np.unique(keys, axis=0, return_inverse=True)
-    inverse = inverse.reshape(-1)
-    sums = np.zeros((unique.shape[0], 3), dtype=np.float64)
+    unique, inverse = np.unique(np.floor(vertices / cell_m), axis=0, return_inverse=True)
+    sums = np.zeros((unique.shape[0], 3))
     np.add.at(sums, inverse, vertices)
-    counts = np.bincount(inverse, minlength=unique.shape[0]).astype(np.float64)
-    merged = sums / counts[:, None]
+    merged = sums / np.bincount(inverse)[:, None]  # every cell holds at least one vertex
     remapped = inverse[triangles]
-    distinct = (remapped[:, 0] != remapped[:, 1]) & (remapped[:, 1] != remapped[:, 2]) & (remapped[:, 0] != remapped[:, 2])
-    remapped = remapped[distinct]
     if remapped.size:
-        _, first = np.unique(np.sort(remapped, axis=1), axis=0, return_index=True)
+        _, first = np.unique(np.sort(remapped), axis=0, return_index=True)
         remapped = remapped[np.sort(first)]
-    mesh, _ = Mesh(merged, remapped.reshape(-1, 3)).drop_degenerate()
+    # A collapsed triangle repeats a vertex, so it has no area and drop_degenerate removes it.
+    mesh, _ = Mesh(merged, remapped).drop_degenerate()
     return compact(mesh.vertices, mesh.triangles)
 
 
 def compact(vertices: np.ndarray, triangles: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Drop the vertices no triangle uses."""
     if not triangles.size:
-        return np.zeros((0, 3), dtype=np.float64), np.zeros((0, 3), dtype=np.int64)
+        return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)
     used, inverse = np.unique(triangles, return_inverse=True)
-    return vertices[used], inverse.reshape(-1, 3).astype(np.int64)
+    return vertices[used], inverse.astype(np.int64)  # np.unique keeps the (m, 3) shape of its input in its inverse
 
 
 def clip_to_footprint(vertices: np.ndarray, triangles: np.ndarray, footprint: BaseGeometry,
@@ -382,41 +378,39 @@ def clip_to_footprint(vertices: np.ndarray, triangles: np.ndarray, footprint: Ba
     (across a concave corner). Nothing kept lies outside the footprint, and the footprint is not changed.
     """
     if not triangles.size:
-        return compact(vertices, triangles) + (0,)
+        return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64), 0
     moved = vertices.copy()
     xs, ys = moved[:, 0], moved[:, 1]
-    inside = shapely.contains_xy(footprint, xs, ys) | shapely.intersects_xy(footprint.boundary, xs, ys)
-    outside = np.flatnonzero(~inside)
-    far = np.zeros(len(moved), dtype=bool)
+    outside = np.flatnonzero(~shapely.intersects_xy(footprint, xs, ys))  # a point on the edge intersects the footprint
     if outside.size:
         points = shapely.points(xs[outside], ys[outside])
-        distance = shapely.distance(footprint, points)
+        near = shapely.distance(footprint, points) <= tolerance_m
         boundary = footprint.boundary
-        near = distance <= tolerance_m
-        far[outside[~near]] = True
         snapped = shapely.line_interpolate_point(boundary, shapely.line_locate_point(boundary, points[near]))
         moved[outside[near], 0] = shapely.get_x(snapped)
         moved[outside[near], 1] = shapely.get_y(snapped)
-    keep = ~far[triangles].any(axis=1)
-    plan = moved[:, :2][triangles]
+    # A vertex left farther out than the tolerance fails the cover test below with each of its triangles.
+    plan = moved[:, :2][triangles]  # pragma: no mutate: shapely's predicates are planar and every later read takes x and y only
     centroids = plan.mean(axis=1)
-    keep &= shapely.contains_xy(footprint, centroids[:, 0], centroids[:, 1]) | shapely.intersects_xy(footprint.boundary, centroids[:, 0], centroids[:, 1])
+    keep = shapely.intersects_xy(footprint, centroids[:, 0], centroids[:, 1])
     grown = footprint.buffer(_EDGE_M)
-    shapely.prepare(grown)
+    shapely.prepare(grown)  # pragma: no mutate: preparing only speeds the cover tests up
     for k in np.flatnonzero(keep):
-        tri = plan[k]
-        area = 0.5 * abs((tri[1, 0] - tri[0, 0]) * (tri[2, 1] - tri[0, 1]) - (tri[2, 0] - tri[0, 0]) * (tri[1, 1] - tri[0, 1]))
-        shape: BaseGeometry = Polygon(tri) if area > 1e-9 else LineString(tri[np.lexsort((tri[:, 1], tri[:, 0]))][[0, -1]])
-        if not grown.covers(shape):
-            keep[k] = False
+        keep[k] = grown.covers(_plan_shape(plan[k]))
     kept_v, kept_t = compact(moved, triangles[keep])
     return kept_v, kept_t, int((~keep).sum())
 
 
+def _plan_shape(tri: np.ndarray) -> BaseGeometry:
+    """A triangle in plan as a polygon, or as the line through its corners when it has no area (a vertical wall)."""
+    shape = Polygon(tri)
+    return shape if shape.area > 1e-9 else LineString(tri)  # pragma: no mutate: no triangle's plan area is exactly 1e-9 m², so > and >= agree
+
+
 def outside_area_m2(vertices: np.ndarray, triangles: np.ndarray, footprint: BaseGeometry) -> float:
     """Plan area of the triangles outside the footprint, rounded to 1e-6 m²: the clip's own check."""
-    shapes = [Polygon(t) for t in vertices[:, :2][triangles]]
-    shapes = [s for s in shapes if s.area > 1e-9]
+    shapes = [Polygon(t) for t in vertices[:, :2][triangles]]  # pragma: no mutate: shapely areas are planar, so a z coordinate changes none
+    shapes = [s for s in shapes if s.area > 1e-9]  # pragma: no mutate: no triangle's plan area is exactly 1e-9 m², so > and >= agree
     if not shapes:
         return 0.0
     return round(float(union_all(shapes).difference(footprint).area), 6)
@@ -436,9 +430,7 @@ def ground_offset(vertices: np.ndarray, footprint: BaseGeometry, near_m: float) 
     the street, and the walls on the lower side sink into it. Without an outer wall column it is the lowest vertex.
     """
     lowest = float(vertices[:, 2].min())
-    keys = np.floor(vertices[:, :2] / _COLUMN_M).astype(np.int64)
-    cells, inverse = np.unique(keys, axis=0, return_inverse=True)
-    inverse = inverse.reshape(-1)
+    cells, inverse = np.unique(np.floor(vertices[:, :2] / _COLUMN_M), axis=0, return_inverse=True)
     low = np.full(len(cells), np.inf)
     high = np.full(len(cells), -np.inf)
     np.minimum.at(low, inverse, vertices[:, 2])
@@ -448,7 +440,7 @@ def ground_offset(vertices: np.ndarray, footprint: BaseGeometry, near_m: float) 
     walls = np.flatnonzero(high - low >= _WALL_SPAN_M)
     if not walls.size:
         return lowest, lowest
-    xy = vertices[first[walls], :2]
+    xy = vertices[first[walls]]
     edge = shapely.distance(footprint.boundary, shapely.points(xy[:, 0], xy[:, 1])) <= near_m
     if not edge.any():
         return lowest, lowest
@@ -459,7 +451,7 @@ def split_roof_wall(vertices: np.ndarray, triangles: np.ndarray, roof_min_normal
     """Triangles whose unit normal points up by at least ``roof_min_normal_z`` are roof; the rest are wall."""
     normals = Mesh(vertices, triangles).face_normals()
     length = np.linalg.norm(normals, axis=1)
-    nz = np.divide(normals[:, 2], length, out=np.zeros_like(length), where=length > 0)
+    nz = normals[:, 2] / np.where(length > 0, length, np.inf)  # a triangle with no area has nz 0
     roof = nz >= roof_min_normal_z
     return triangles[roof], triangles[~roof]
 
@@ -475,7 +467,7 @@ def group_colliders(footprint: BaseGeometry, groups: Sequence[tuple[str, BaseGeo
     colliders: list[Mesh] = []
     issues: list[Issue] = []
     for group_id, hull, top in groups:
-        parts = [p for p in polygons_of(hull.intersection(footprint)) if p.area > 1e-6]
+        parts = [p for p in polygons_of(hull.intersection(footprint)) if p.area > 1e-6]  # pragma: no mutate: no clipped hull is exactly 1e-6 m², so > and >= agree; test_a_small_group_gets_its_collider pins the threshold
         if not parts or top <= 0:
             issues.append(Issue("landmark_lod2_collider_not_closed", "critical", building_id, f"{group_id}: no closed collider (empty plan or height)"))
             continue
@@ -550,7 +542,7 @@ def build_lod2_part(
     vertices, triangles, dropped = clip_to_footprint(vertices, triangles, footprint, settings.clip_tolerance_m)
     clipped = int(len(triangles))
     vertices, triangles, cell = _simplify_to_cap(vertices, triangles, settings)
-    if cell is not None and cell < 0:
+    if cell == -1.0:
         return None, [Issue("landmark_lod2_over_cap", "warning", building_id,
                             f"{clipped} triangles stay over the cap of {settings.max_triangles} after "
                             f"{settings.max_simplify_passes} passes; the placeholder stays")]
@@ -570,9 +562,9 @@ def build_lod2_part(
         visual.append(Primitive(Mesh(*compact(vertices, wall_t)), wall_material))
     roof_meshes = [Mesh(*compact(vertices, roof_t))] if len(roof_t) else []
     floor_triangles = 0
-    if floor.area > 1e-6:
+    if floor.area > 1e-6:  # pragma: no mutate: no uncovered area is exactly 1e-6 m², so > and >= agree; test_a_small_uncovered_strip_gets_a_floor pins the threshold
         # The part of the footprint no group covers gets a floor at street level, so the ground under it is not open.
-        filler = cap(floor, 0.0, up=True)
+        filler = cap(floor, 0.0)  # facing up, cap's default
         floor_triangles = filler.triangle_count
         roof_meshes.append(filler)
     if roof_meshes:
