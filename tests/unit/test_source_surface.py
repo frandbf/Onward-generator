@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -60,7 +61,8 @@ def test_parse_maps_only_the_sentinel_to_nan() -> None:
 
 
 def test_parse_refuses_an_exception_report() -> None:
-    body = b'<?xml version="1.0"?><ows:ExceptionReport><ows:Exception exceptionCode="NoSuchCoverage"/></ows:ExceptionReport>'
+    body = b'<?xml version="1.0"?><ows:ExceptionReport><ows:Exception exceptionCode="NoSuchCoverage"/></ows:ExceptionReport>' + b" " * 40
+    assert len(body) > 121
     with pytest.raises(SourceError) as caught:
         surface.parse_tiff_float32(body, BBOX, 3, 2, nodata=None)
     assert str(caught.value) == f"reply is not a TIFF: {body[:120]!r}"
@@ -112,6 +114,9 @@ def test_georeference_checks_each_axis_and_tolerates_a_millimetre() -> None:
     surface.check_georeference(None, None, BBOX, 0.5)
     with pytest.raises(SourceError, match="cells"):
         surface.check_georeference((0.5, 0.25, 0.0), None, BBOX, 0.5)
+    with pytest.raises(SourceError) as caught:
+        surface.check_georeference((0.25, 0.5, 0.0), None, BBOX, 0.5)
+    assert str(caught.value) == "TIFF reply has 0.25 x 0.5 m cells, asked for 0.5 m"
     with pytest.raises(SourceError, match="starts at"):
         surface.check_georeference(None, (0, 0, 0, 100.0011, 201.0, 0), BBOX, 0.5)
     with pytest.raises(SourceError, match="starts at"):
@@ -133,6 +138,7 @@ def test_fill_restores_a_flat_terrain_exactly_and_meets_in_the_middle_of_a_slope
     flat[2:6, 2:6] = np.nan
     filled = surface.fill_ground(Grid(flat, 0.0, 8.0, 1.0), 2.0)
     assert filled.values.tolist() == np.full((8, 8), 2.0).tolist()
+    assert filled.values.dtype == np.float32
     assert (filled.west, filled.north, filled.cell) == (0.0, 8.0, 1.0)
     assert np.isnan(flat[3, 3])  # the input is not changed
     row = np.array([[0.0, np.nan, np.nan, np.nan, 4.0]], dtype=np.float32)
@@ -164,6 +170,18 @@ def test_fill_takes_the_mean_of_the_valid_neighbours_at_each_step() -> None:
     assert np.isnan(filled[1, 1])  # its neighbours were all empty at the step
     two = surface.fill_ground(Grid(values, 0.0, 2.0, 1.0), 2.0).values
     assert two[1, 1] == pytest.approx((4.0 + 2.0 + 6.0) / 3)
+    kept = surface.fill_ground(Grid(np.array([[0.0, 3.0, np.nan]], dtype=np.float32), 0.0, 1.0, 1.0), 1.0).values
+    assert kept.tolist() == [[0.0, 3.0, 3.0]]  # valid cells keep their value
+
+
+def test_fill_divides_only_where_a_neighbour_is_valid() -> None:
+    values = np.full((3, 6), np.nan, dtype=np.float32)
+    values[:, 0] = 1.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # 0 / 0 for a cell without a valid neighbour would warn
+        filled = surface.fill_ground(Grid(values, 0.0, 3.0, 1.0), 2.0).values
+    assert filled[:, :3].tolist() == [[1.0, 1.0, 1.0]] * 3
+    assert np.isnan(filled[:, 3:]).all()
 
 
 def test_fill_without_steps_and_without_holes_returns_the_terrain() -> None:
@@ -207,7 +225,9 @@ def test_a_surface_cell_without_data_stays_empty() -> None:
 def test_swapped_layers_are_refused() -> None:
     dsm = np.full((4, 4), 2.0, dtype=np.float32)
     dsm[:, :2] = 9.0  # trees over half the shared cells
-    terrain = Grid(np.full((4, 4), 2.0, dtype=np.float32), 0.0, 2.0, 0.5)
+    ground = np.full((4, 4), 2.0, dtype=np.float32)
+    ground[3, 3] = np.nan  # a cell only one layer has: left out of the check
+    terrain = Grid(ground, 0.0, 2.0, 0.5)
     surface.height_above_ground(Grid(dsm, 0.0, 2.0, 0.5), terrain, 1.0)
     with pytest.raises(SourceError) as caught:
         surface.height_above_ground(terrain, Grid(dsm, 0.0, 2.0, 0.5), 1.0)

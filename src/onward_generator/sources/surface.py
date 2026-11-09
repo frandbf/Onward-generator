@@ -44,7 +44,7 @@ def parse_tiff_float32(data: bytes, bbox: BBox, columns: int, rows: int, *, noda
         with Image.open(io.BytesIO(data)) as image:
             mode, size = image.mode, image.size
             scale, tie = image.tag_v2.get(PIXEL_SCALE_TAG), image.tag_v2.get(TIEPOINT_TAG)
-            values = np.array(image, dtype=np.float32) if mode == "F" else None
+            values = np.array(image) if mode == "F" else None  # Pillow's mode F is native float32
     except (OSError, ValueError, SyntaxError) as exc:  # how Pillow reports a damaged or unsupported TIFF
         raise SourceError(f"TIFF reply cannot be decoded: {exc}") from exc
     if values is None:
@@ -80,11 +80,11 @@ def fill_ground(dtm: Grid, fill_m: float) -> Grid:
     neighbours, all at once, so the result does not depend on any order. Cells still empty
     after ``fill_steps`` steps stay NaN.
     """
-    values = dtm.values.astype(np.float32, copy=True)
+    values = dtm.values.astype(np.float32)  # a copy: astype copies by default
     for _step in range(fill_steps(fill_m, dtm.cell)):
-        padded = np.pad(values, 1, constant_values=np.nan)
-        total = np.zeros(values.shape, dtype=np.float32)
-        count = np.zeros(values.shape, dtype=np.int8)
+        padded = np.pad(values, 1, constant_values=np.nan)  # pragma: no mutate: None also pads NaN in a float array
+        total = np.zeros(values.shape, dtype=np.float32)  # pragma: no mutate: float64 gives the same float32 result, only with more memory
+        count = np.zeros(values.shape, dtype=np.int8)  # pragma: no mutate: a wider count gives the same result, only with more memory
         for near in (padded[:-2, 1:-1], padded[2:, 1:-1], padded[1:-1, :-2], padded[1:-1, 2:]):
             valid = np.isfinite(near)
             total += np.where(valid, near, np.float32(0.0))
