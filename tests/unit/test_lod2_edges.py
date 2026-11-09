@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from shapely import MultiPoint, Polygon, box
+from shapely import LineString, MultiPoint, Polygon, box
 
 from onward_generator.detail import lod2 as lod2_module
 from onward_generator.detail.lod2 import (
@@ -23,6 +23,7 @@ from onward_generator.detail.lod2 import (
     ObjMesh,
     build_lod2_part,
     clip_to_footprint,
+    close_cut,
     cluster_simplify,
     compact,
     ground_offset,
@@ -549,3 +550,98 @@ def test_the_notch_of_an_l_shaped_group_gets_a_floor() -> None:
     floor = roof.vertices[roof.triangles][:, :, 2].max(axis=1) == 0.0
     assert roof.triangle_areas()[floor].sum() == pytest.approx(36.0)  # the 6 m by 6 m notch is not a hole into the void
     assert roof.triangle_areas()[~floor].sum() == pytest.approx(64.0)
+
+
+def test_the_second_clip_adds_what_it_drops_whole() -> None:
+    walls = box_mesh(0, 20, 0, 20, GROUND_Z, GROUND_Z + 8.0, omit=("-z", "+z"))
+    mesh = merge([walls, grid_roof(0, 0, 20, 16, GROUND_Z + 8.0)])
+    settings = Lod2Settings(max_triangles=100, simplify_cell_m=4.0, clip_tolerance_m=0.2)
+    part, issues = build(ELL, [group("g", mesh)], settings)
+    assert issues == [] and part is not None
+    first = clip_to_footprint(mesh.vertices - np.array([0.0, 0.0, GROUND_Z]), outward(mesh.vertices, mesh.triangles), ELL, 0.2)
+    second = clip_to_footprint(*cluster_simplify(first.vertices, first.triangles, 4.0), ELL, 0.2)
+    assert first.dropped > 0 and second.dropped > 0  # a simplified triangle moved wholly into the notch
+    clip = part.record["clip"]
+    assert (clip["dropped_triangles"], clip["cut_triangles"], clip["closure_triangles"]) == (
+        first.dropped + second.dropped, first.cut + second.cut, first.closure + second.closure)
+
+
+def test_a_triangle_with_a_unit_normal_is_cut_too() -> None:
+    # Its cross product is exactly (0, 0, 1): its normal has length 1, which says nothing about whether it has an area.
+    vertices = np.array([[9.5, 0.5, 5.0], [10.5, 0.5, 5.0], [9.5, 1.5, 5.0]])
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), box(0, 0, 10, 10), 0.1)
+    assert (clip.dropped, clip.cut) == (0, 1)
+    flat = clip.triangles[np.all(clip.vertices[clip.triangles][:, :, 2] == 5.0, axis=1)]
+    assert Mesh(clip.vertices, flat).triangle_areas().sum() == pytest.approx(0.5 - 0.125)
+
+
+def test_a_triangle_with_no_area_across_the_edge_goes() -> None:
+    vertices = np.array([[5.0, 5.0, 5.0], [15.0, 5.0, 5.0], [25.0, 5.0, 5.0]])
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), box(0, 0, 10, 10), 0.1)
+    assert (clip.dropped, clip.cut, len(clip.triangles)) == (1, 0, 0)
+
+
+def test_a_nearly_vertical_triangle_is_cut_as_a_wall_on_its_plan_line() -> None:
+    # Unit normal z about 6.7e-4: a wall. Its top leans 2 cm off the line y = 5; the cut keeps it on that line.
+    vertices = np.array([[0.0, 5.0, 0.0], [20.0, 5.0, 0.0], [10.0, 5.02, 30.0]])
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), box(0, 0, 10, 10), 0.1)
+    assert clip.cut == 1
+    assert np.all(clip.vertices[:, 1] == 5.0) and clip.vertices[:, 0].max() == pytest.approx(10.0, abs=1e-5)
+    # Half the wall's base and the whole apex column x = 10 stand on the footprint: half the triangle's area.
+    area = Mesh(clip.vertices, clip.triangles).triangle_areas().sum()
+    assert area == pytest.approx(0.5 * 20 * 30 / 2, rel=1e-3)
+
+
+def test_a_sloped_triangle_away_from_the_origin_keeps_its_plane() -> None:
+    footprint = box(0, 0, 12, 12)
+    vertices = np.array([[2.0, 1.0, 3.0], [22.0, 1.0, 13.0], [2.0, 11.0, 3.0]])
+    clip = clip_to_footprint(vertices, np.array([[0, 1, 2]]), footprint, 0.1)
+    assert clip.cut == 1
+    sloped = clip.triangles[Mesh(clip.vertices, clip.triangles).face_normals()[:, 2] != 0.0]
+    kept = clip.vertices[sloped].reshape(-1, 3)
+    np.testing.assert_allclose(kept[:, 2], 3.0 + (kept[:, 0] - 2.0) / 2.0, atol=1e-9)  # z = 3 + (x - 2) / 2
+    np.testing.assert_allclose(kept[:, 1].min(), 1.0)
+
+
+def test_cut_pieces_keep_the_facing_of_their_triangle_whichever_way_it_faces() -> None:
+    footprint = box(0, 0, 10, 10)
+    up = np.array([[8.0, 1.0, 5.0], [10.6, 1.0, 5.0], [8.0, 1.3, 5.0]])  # small: 0.39 m², the cut pieces under 0.5 m²
+    down = up[::-1].copy()
+    for tri, sign in ((up, 1.0), (down, -1.0)):
+        clip = clip_to_footprint(tri, np.array([[0, 1, 2]]), footprint, 0.1)
+        flat = clip.triangles[np.all(clip.vertices[clip.triangles][:, :, 2] == 5.0, axis=1)]
+        normals = Mesh(clip.vertices, flat).face_normals()
+        assert clip.cut == 1 and len(normals) and (np.sign(normals[:, 2]) == sign).all()
+        assert (Mesh(clip.vertices, flat).triangle_areas() < 0.5).all()
+
+
+def test_close_cut_walls_an_edge_exactly_at_its_reach_and_not_past_it() -> None:
+    plan = np.array([[0.0, -5.0, 6.0], [10.0, -5.0, 6.0], [10.0, 0.0, 6.0], [0.0, 0.0, 6.0], [10.0, 5.0, 6.0], [0.0, 5.0, 6.0]])
+    both = np.array([[0, 1, 2], [0, 2, 3], [3, 2, 4], [3, 4, 5]])  # two strips sharing the edge y = 0
+    kept = both[2:]
+    assert close_cut(plan, both, plan, kept, LineString([(0, 1e-4), (10, 1e-4)]))[2] == 2
+    assert close_cut(plan, both, plan, kept, LineString([(0, 2e-4), (10, 2e-4)]))[2] == 0
+
+
+def test_a_cover_exactly_at_the_threshold_after_a_low_group_goes_is_kept() -> None:
+    nave = box_group(0, 0, 10, 6, 8.0, base=2.0)
+    low = box_group(0, 6, 10, 10, 1.0, base=-2.0)
+    part, issues = build(box(0, 0, 10, 10), [group("nave", nave), group("low", low)])
+    assert part is not None and part.record["match"]["footprint_cover"] == 0.6
+    assert [(i.code, i.object_id) for i in issues] == [("landmark_lod2_group_below_ground", "osm-way-1")]
+
+
+def test_the_refusal_after_a_low_group_goes_names_the_building() -> None:
+    nave = box_group(0, 0, 10, 5, 8.0, base=2.0)
+    low = box_group(0, 5, 10, 10, 1.0, base=-2.0)
+    part, issues = build(box(0, 0, 10, 10), [group("nave", nave), group("low", low)])
+    assert part is None
+    assert [(i.code, i.object_id) for i in issues] == [("landmark_lod2_group_below_ground", "osm-way-1"), ("landmark_lod2_no_match", "osm-way-1")]
+
+
+def test_a_matched_group_too_small_for_a_collider_names_the_building() -> None:
+    nave = box_group(0, 0, 10, 10, 8.0)
+    speck = box_group(5, 5, 5.0001, 5.0001, 3.0)  # a 1e-8 m² plan: matched, but no collider prism
+    part, issues = build(box(0, 0, 10, 10), [group("nave", nave), group("speck", speck)])
+    assert part is not None and len(part.colliders) == 1
+    assert [(i.code, i.severity, i.object_id) for i in issues] == [("landmark_lod2_collider_not_closed", "critical", "osm-way-1")]

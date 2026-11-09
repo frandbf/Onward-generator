@@ -412,14 +412,15 @@ def clip_to_footprint(vertices: np.ndarray, triangles: np.ndarray, footprint: Ba
         snapped = shapely.line_interpolate_point(boundary, shapely.line_locate_point(boundary, points[near]))
         moved[outside[near], 0] = shapely.get_x(snapped)
         moved[outside[near], 1] = shapely.get_y(snapped)
-    grown = footprint.buffer(_EDGE_M, join_style="mitre")
+    grown = footprint.buffer(_EDGE_M)
     shapely.prepare(grown)  # pragma: no mutate: preparing only speeds the cover tests up
+    plan = moved[:, :2][triangles]  # pragma: no mutate: shapely's predicates are planar, so a z coordinate changes none
     normals = Mesh(moved, triangles).face_normals()
     whole: list[int] = []
     pieces: list[np.ndarray] = []
     dropped = cut = 0
     for k, tri in enumerate(moved[triangles]):
-        if grown.covers(_plan_shape(tri[:, :2])):
+        if grown.covers(_plan_shape(plan[k])):
             whole.append(k)
             continue
         found = _clip_triangle(tri, normals[k], footprint, grown)
@@ -428,10 +429,7 @@ def clip_to_footprint(vertices: np.ndarray, triangles: np.ndarray, footprint: Ba
             pieces.extend(found)
         else:
             dropped += 1
-    kept = Mesh(*compact(moved, triangles[whole]))
-    if pieces:
-        loose = np.concatenate(pieces)
-        kept = merge([kept, Mesh(loose, np.arange(len(loose)).reshape(-1, 3))])
+    kept = merge([Mesh(*compact(moved, triangles[whole])), _soup(pieces)])
     closed_v, closed_t, closure = close_cut(moved, triangles, kept.vertices, kept.triangles, footprint.boundary)
     return Clip(closed_v, closed_t, dropped, cut, closure)
 
@@ -452,7 +450,7 @@ def _clip_triangle(tri: np.ndarray, normal: np.ndarray, footprint: BaseGeometry,
         return []
     unit = normal / length
     out: list[np.ndarray] = []
-    if abs(unit[2]) >= _WALL_NZ:
+    if abs(unit[2]) >= _WALL_NZ:  # pragma: no mutate: no unit normal z is exactly 1e-3, so >= and > agree
         # Sloped or flat: cut in plan, each new corner on the triangle's own plane.
         origin = tri[0]
         frame = np.array([tri[1, :2] - origin[:2], tri[2, :2] - origin[:2]]).T
@@ -470,30 +468,44 @@ def _clip_triangle(tri: np.ndarray, normal: np.ndarray, footprint: BaseGeometry,
         if span <= 1e-9:  # pragma: no mutate: a wall triangle with a plan span of exactly 1e-9 m does not occur
             return []
         axis = (plan[j] - plan[i]) / span
+        low, high = float(tri[:, 2].min()), float(tri[:, 2].max())
         strips = []
         for line in shapely.get_parts(LineString([plan[i], plan[j]]).intersection(grown)):
             if line.geom_type == "LineString" and not line.is_empty:
                 along = (np.asarray(line.coords) - plan[i]) @ axis
-                strips.append(shapely.box(float(along.min()), float(tri[:, 2].min()) - 1.0, float(along.max()), float(tri[:, 2].max()) + 1.0))
+                strips.append(shapely.box(float(along.min()), low, float(along.max()), high))
         section = Polygon(np.column_stack([(plan - plan[i]) @ axis, tri[:, 2]]))
         if strips:
             for polygon in polygons_of(section.intersection(union_all(strips))):
                 for piece in _triangles_of(polygon):
                     out.append(np.column_stack([plan[i] + piece[:, :1] * axis, piece[:, 1]]))
-    return [p if np.dot(np.cross(p[1] - p[0], p[2] - p[0]), unit) >= 0 else p[::-1].copy() for p in out]
+    if not out:
+        return []
+    stack = np.array(out)
+    flip = np.signbit(_soup(out).face_normals() @ unit)  # a piece wound against the triangle
+    stack[flip] = stack[flip][:, ::-1]
+    return list(stack)
 
 
-_Corner = tuple[int, ...]
+def _soup(pieces: Sequence[np.ndarray]) -> Mesh:
+    """(3, 3) triangles as one mesh, each with its own three vertices."""
+    count = len(pieces)
+    if not count:
+        return Mesh.empty()
+    return Mesh(np.array(pieces).reshape(3 * count, 3), np.arange(3 * count).reshape(count, 3))
+
+
+_Corner = tuple[float, ...]
 
 
 def _open_edges(vertices: np.ndarray, triangles: np.ndarray) -> dict[tuple[_Corner, _Corner], tuple[np.ndarray, np.ndarray]]:
     """Edges one triangle uses, welded at ``_WELD_M``: their key (both welded corners, sorted) and the edge as its triangle runs it."""
-    cells, first, inverse = np.unique(np.round(vertices / _WELD_M).astype(np.int64), axis=0, return_index=True, return_inverse=True)
-    welded = inverse.reshape(-1)[triangles]
+    cells, first, inverse = np.unique(np.round(vertices / _WELD_M), axis=0, return_index=True, return_inverse=True)
+    welded = inverse[triangles]  # with axis=0 the inverse is flat
     runs = np.concatenate([welded[:, [0, 1]], welded[:, [1, 2]], welded[:, [2, 0]]])
     runs = runs[runs[:, 0] != runs[:, 1]]
-    undirected, counts = np.unique(np.sort(runs, axis=1), axis=0, return_counts=True)
-    single = {(int(a), int(b)) for (a, b), n in zip(undirected.tolist(), counts.tolist(), strict=True) if n == 1}
+    undirected, counts = np.unique(np.sort(runs), axis=0, return_counts=True)
+    single = {(a, b) for a, b in undirected[counts == 1].tolist()}
     found: dict[tuple[_Corner, _Corner], tuple[np.ndarray, np.ndarray]] = {}
     for a, b in runs.tolist():
         if (min(a, b), max(a, b)) in single:
@@ -517,11 +529,10 @@ def close_cut(before_v: np.ndarray, before_t: np.ndarray, vertices: np.ndarray, 
         if key in was_open or shapely.distance(edge, shapely.points([a[:2], b[:2]])).max() > _CUT_M:
             continue
         a0, b0 = np.array([a[0], a[1], 0.0]), np.array([b[0], b[1], 0.0])
-        walls += [(b, a, a0), (b, a0, b0)]
+        walls += [np.array([b, a, a0]), np.array([b, a0, b0])]
     if not walls:
         return vertices, triangles, 0
-    loose = np.array(walls).reshape(-1, 3)
-    skirt, _ = Mesh(loose, np.arange(len(loose)).reshape(-1, 3)).drop_degenerate()
+    skirt, _ = _soup(walls).drop_degenerate()
     closed = merge([Mesh(vertices, triangles), skirt])
     return closed.vertices, closed.triangles, skirt.triangle_count
 
@@ -536,7 +547,7 @@ def plan_cover(vertices: np.ndarray, triangles: np.ndarray) -> BaseGeometry:
     """The plan area the triangles cover (walls cover none)."""
     shapes = [Polygon(t) for t in vertices[:, :2][triangles]]  # pragma: no mutate: shapely areas are planar, so a z coordinate changes none
     shapes = [s for s in shapes if s.area > 1e-9]  # pragma: no mutate: no triangle's plan area is exactly 1e-9 m², so > and >= agree
-    return union_all(shapes) if shapes else Polygon()
+    return union_all(shapes)  # empty when no triangle has plan area
 
 
 def outside_area_m2(vertices: np.ndarray, triangles: np.ndarray, footprint: BaseGeometry) -> float:
@@ -619,7 +630,8 @@ class Lod2Part:
 
 
 def _simplify_to_cap(vertices: np.ndarray, triangles: np.ndarray, settings: Lod2Settings) -> tuple[np.ndarray, np.ndarray, float | None]:
-    """Vertex clustering with a doubling cell until the cap holds; the cell used, None when no pass was needed."""
+    """Vertex clustering with a doubling cell until the cap holds; the cell used. None, and the mesh as it came, when no
+    pass was needed or none reached the cap (the caller checks the cap)."""
     if len(triangles) <= settings.max_triangles:
         return vertices, triangles, None
     cell = settings.simplify_cell_m
@@ -628,7 +640,7 @@ def _simplify_to_cap(vertices: np.ndarray, triangles: np.ndarray, settings: Lod2
         if len(out_t) <= settings.max_triangles:
             return out_v, out_t, cell
         cell *= 2.0
-    return vertices, triangles, -1.0
+    return vertices, triangles, None
 
 
 def build_lod2_part(
@@ -686,15 +698,15 @@ def build_lod2_part(
     dropped, cut, closure = clip.dropped, clip.cut, clip.closure
     clipped = int(len(triangles))
     vertices, triangles, cell = _simplify_to_cap(vertices, triangles, settings)
-    if cell is not None and cell != -1.0:
+    if cell is not None:
         again = clip_to_footprint(vertices, triangles, footprint, settings.clip_tolerance_m)
         vertices, triangles = again.vertices, again.triangles
         dropped, cut, closure = dropped + again.dropped, cut + again.cut, closure + again.closure
     mesh, _ = Mesh(vertices, triangles).drop_degenerate()
     vertices, triangles = compact(mesh.vertices, mesh.triangles)
-    if cell == -1.0 or len(triangles) > settings.max_triangles:
+    if len(triangles) > settings.max_triangles:
         return None, [*issues, Issue("landmark_lod2_over_cap", "warning", building_id,
-                                     f"{max(clipped, len(triangles))} triangles stay over the cap of {settings.max_triangles} after "
+                                     f"{len(triangles)} triangles stay over the cap of {settings.max_triangles} after "
                                      f"{settings.max_simplify_passes} passes; the placeholder stays")]
     if not len(triangles):
         return None, [*issues, Issue("landmark_lod2_no_match", "info", building_id,
