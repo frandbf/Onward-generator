@@ -400,6 +400,7 @@ def apply_materials(
     regional_table: str | Path | None = None,
     repetition: bool = False,
     cell_m: float = 100.0,
+    street_profile: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
 
@@ -686,6 +687,9 @@ def apply_materials(
     }
     if repetition_block is not None:
         materials_report["repetition"] = repetition_block
+    if street_profile is not None:
+        # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
+        materials_report["street_profile"] = dict(street_profile)
     atomic_write_json(targets[5], materials_report)
     if not compare["identical"]:
         raise MaterialsError("materials apply mutated geographic object records; this is a bug")

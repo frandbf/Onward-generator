@@ -527,3 +527,14 @@ def test_skipped_targets_are_counted_and_the_next_ones_still_placed() -> None:
     plan = choose_cover(targets, [_cover()], _site())
     assert [item.target.length_m for item in plan.placements] == [100.0, 80.0]
     assert plan.rejects == {"covered": 1, "spacing": 2}
+
+
+def test_a_props_cap_of_zero_places_nothing_and_says_so() -> None:
+    from onward_generator.gameplay.cover import MAX_PROPS_CHOICES, NO_CAP
+
+    plan = choose_cover(_grid(4), [_cover()], _site(), Caps(props=0))
+    assert (plan.placements, plan.rejects, plan.targets, plan.reason) == ((), {}, 4, NO_CAP)
+    assert note(plan) == "cover: nothing placed (max props is 0)"
+    assert choose_cover([], [_cover()], _site(), Caps(props=0)).reason == NO_TARGET
+    assert len(choose_cover(_grid(4), [_cover()], _site(), Caps(props=1)).placements) == 1
+    assert MAX_PROPS_CHOICES == (0, 8, 16, 24) and Caps().props == 24

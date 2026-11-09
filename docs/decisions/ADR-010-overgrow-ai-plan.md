@@ -28,3 +28,14 @@ The installed library is every `manifest.json` in a direct child of `assets` (`a
 - A new city does not need new code. A new gesture needs a schema change, a realizer, and tests.
 - An existing `scene_overgrow` is not rebuilt on its own. Resume `run` from `overgrow`.
 - Reproducibility is the stored file, not a second call to the model.
+
+## Amendment (8 November 2026): the street profile may choose the years and the props, behind an option
+
+Status: proposed until a headset session checks a map with the option on (plan 2026-11-07, increment D2). Off by default.
+
+`overgrow_plan.schema.json` stays at 0.1.0 and `intent.schema.json` is not widened (§6). With `map.json` `"street_profile": true` (`run --street-profile`), a separate contract, `config/street_profile.schema.json` (ADR-006 amendment of the same day), may set two existing `overgrow place` flags from enumerated ids:
+
+- `abandonment` `years_10`, `years_30` or `years_100` replaces the `--profile 100` that `run` passes. Before this amendment "the profile does not change because of the map's sentence"; with the option on, it may, but only to one of the three existing profiles.
+- `props_profile` `intact`, `worn` or `wrecked` writes `config/street_profile_selection.json` (the `prop_selection` format) with the library ids whose curated `condition` is in the group (intact; worn and damaged; damaged, wrecked and burned), plus the rows without a condition, and passes it as `--selection`. An empty group passes nothing (reason `props_profile_empty`); a map with its own `config/prop_selection.json` keeps it (reason `user_setting`).
+
+The resolution follows §5: two attempts, the second quoting the first failure, then the neutral profile with the reason stored; a later run with the same inputs replays the stored reply. The overgrow placement plan of this record is unchanged and still optional. `overgrow_report.json` gains a `street_profile` block (ids, provenance `ai_generated` or `estimated`, the reply's hash) only when `--street-profile` is given. Off, the command and every output are as before.

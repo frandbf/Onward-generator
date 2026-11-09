@@ -61,6 +61,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="measure roof and paving tiles and phase the ground UVs per combine cell (plan C1)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--street-profile", default=None,
+        help="config/street_profile.json; adds its block to materials_report.json (plan D2)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--cell-m", type=cell_metres, default=100.0,
         help="combine cell in metres for --repetition (ADR-005)",  # pragma: no mutate: help text only
     )
@@ -68,6 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run_apply(args: argparse.Namespace) -> int:
+    from onward_generator.ai.street_profile import report_block
+
+    block = report_block(args.street_profile) if args.street_profile is not None else None
     report = apply_materials(
         args.base,
         args.out,
@@ -84,6 +91,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         regional_facades=args.regional_facades,
         repetition=args.repetition,
         cell_m=args.cell_m,
+        street_profile=block,
     )
     applied = report["applied"]
     skipped = report["skipped"]

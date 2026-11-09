@@ -106,6 +106,7 @@ def overgrow(
     brief: str | None = None,
     ai: bool | None = None,
     provider=None,
+    street_profile: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -448,6 +449,9 @@ def overgrow(
     }
     if furniture.nodes:
         summary["furnishing"] = furniture.report()
+    if street_profile is not None:
+        # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
+        summary["street_profile"] = dict(street_profile)
     atomic_write_json(targets[4], summary)
     if composed is not None:
         atomic_write_json(out / "ambient_plan.json", composed.record)

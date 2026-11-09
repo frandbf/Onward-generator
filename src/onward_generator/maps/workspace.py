@@ -369,6 +369,33 @@ def store_regional_facades(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def street_profile_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"street_profile": true`` (plan D2, ADR-006/010 amendments, off by default).
+
+    ``run`` then asks the local model for a street profile of enumerated ids and passes the
+    stage flags they stand for (docs/10-ai.md, Street profile). A map without ``map.json`` or
+    without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("street_profile", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "street_profile" must be true or false, got {value!r}')
+    return value
+
+
+def store_street_profile(directory: str | Path, enabled: bool) -> None:
+    """Record the street profile switch on an existing map. Does not rewrite scenes."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"street_profile" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["street_profile"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 

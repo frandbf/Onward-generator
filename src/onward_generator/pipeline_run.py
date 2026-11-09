@@ -19,6 +19,9 @@ from collections.abc import Callable, Mapping, Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from onward_generator.ai.providers import Provider
+from onward_generator.ai.street_profile import describe as describe_profile
+from onward_generator.ai.street_profile import profile_flags, resolve_street_profile
 from onward_generator.maps.workspace import (
     MapError,
     balanced_spawns_enabled,
@@ -34,7 +37,9 @@ from onward_generator.maps.workspace import (
     store_panoramax,
     store_sources,
     store_storm,
+    store_street_profile,
     store_time_of_day,
+    street_profile_enabled,
 )
 from onward_generator.next_step import (
     STAGE_DIRS,
@@ -197,6 +202,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
             "--detail", show(playable),
             "--layout", show(layout_path),
             "--library", show(Path("assets")),
+            *profile_flags(root).get("cover", []),
             "--out", show(exported),
         ).argv)))
     export_argv = list(export_invocation(
@@ -816,6 +822,8 @@ def run_map(
     brief: str | None = None,
     ambient_ai: bool = False,
     panoramax: bool = False,
+    street_profile: bool = False,
+    profile_provider: Provider | None = None,
     time_of_day: str | None = None,
     storm: bool | None = None,
     sources: Mapping[str, bool] | None = None,
@@ -919,9 +927,12 @@ def run_map(
         if sources:
             store_sources(root, sources)
         try:
+            if street_profile:
+                store_street_profile(root, True)
             say(describe(choices(load_map(root))))
+            resolve_profile(root, profile_provider)
             steps = plan_steps(out, preview=preview)
-        except PipelineError as exc:
+        except (MapError, PipelineError) as exc:
             print(f"FAILED plan (exit 1). The following steps were not started.\n{exc}", flush=True)
             return 1
         code = run_steps(steps, execute=runner, log=log)
@@ -936,6 +947,8 @@ def run_map(
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
             if panoramax:
                 store_panoramax(root, True)
+            if street_profile:
+                store_street_profile(root, True)
             if sources:
                 store_sources(root, sources)
             # Off first and on last: --time-of-day day --no-storm and --time-of-day night --storm are both valid.
@@ -946,6 +959,7 @@ def run_map(
             if storm and store_storm(root, True):
                 say("storm is on: run again with --from layout, then bake a new package")
             say(describe(choices(load_map(root))))
+            resolve_profile(root, profile_provider)
             steps = resume_steps(root, preview=preview)
             done = [step for step, _argv in steps if output_ready(step, root)]
             done.insert(0, "map")
@@ -986,6 +1000,16 @@ def run_map(
         push=push if push is not None else lambda package: _push_package(package, host=host),
         build=build if build is not None else lambda package, steps: _build_package(package, steps, host=host),
     )
+
+
+def resolve_profile(root: Path, provider: Provider | None = None) -> None:
+    """With ``map.json`` ``street_profile`` on, resolve the profile before the stages are planned (plan D2).
+
+    Off, nothing is read or written. A provider that fails falls back to the neutral profile; it never stops the run.
+    """
+    if not street_profile_enabled(root):
+        return
+    say(describe_profile(resolve_street_profile(root, provider=provider)))
 
 
 def print_unity_command(package: Path) -> int:

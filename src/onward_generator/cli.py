@@ -111,6 +111,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         brief=args.brief,
         ambient_ai=args.ai,
         panoramax=args.panoramax,
+        street_profile=args.street_profile,
         time_of_day=args.time_of_day,
         storm=args.storm,
         sources=sources,
@@ -239,6 +240,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     run.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
+    run.add_argument("--street-profile", action="store_true", help="store map.json street_profile: local Ollama picks enumerated ids (facade style, palette, props, abandonment, cover) that code turns into stage flags; off unless this flag is set (plan D2)")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
         "--catastro", action=argparse.BooleanOptionalAction,

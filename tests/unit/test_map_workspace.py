@@ -779,3 +779,37 @@ def test_store_regional_facades_needs_a_map(tmp_path: Path) -> None:
 
     with pytest.raises(MapError, match="not found"):
         store_regional_facades(tmp_path / "nowhere", True)
+
+
+def test_the_street_profile_is_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_street_profile, street_profile_enabled
+
+    assert street_profile_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "street_profile" not in load_map(root)
+    assert street_profile_enabled(root) is False
+    before = load_map(root)
+    store_street_profile(root, True)
+    assert load_map(root) == before | {"street_profile": True} and street_profile_enabled(root) is True
+    store_street_profile(root, False)
+    assert load_map(root) == before | {"street_profile": False} and street_profile_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_the_street_profile_refuses_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import store_street_profile, street_profile_enabled
+
+    root = _atlas_map(tmp_path, street_profile=value)
+    with pytest.raises(MapError) as caught:
+        street_profile_enabled(root)
+    assert str(caught.value) == f'map.json "street_profile" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_street_profile(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"street_profile" must be true or false, got {value!r}'
+
+
+def test_store_street_profile_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_street_profile
+
+    with pytest.raises(MapError, match="not found"):
+        store_street_profile(tmp_path / "nowhere", True)

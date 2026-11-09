@@ -560,3 +560,40 @@ def test_regional_facades_run_switches_the_run_copy_only(workdir: Path) -> None:
     assert bench.inputs_sha256(inputs) == digest
     assert "regional_facades" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
     assert json.loads((root / "runs" / "r2" / "bench_murcia" / "map.json").read_text(encoding="utf-8"))["regional_facades"] is True
+
+
+def test_street_profile_run_switches_the_run_copy_only_and_never_calls_a_model(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    assert all("--street-profile" not in argv for argv in off.calls)
+    assert not (root / "runs" / "r1" / "bench_murcia" / "config" / "street_profile.json").exists()
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    reply = REPO / "tests" / "fixtures" / "street_profile" / "applied.json"
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--street-profile", "--street-profile-reply", str(reply)) == 0
+    copy = root / "runs" / "r2" / "bench_murcia"
+    record = json.loads((copy / "config" / "street_profile.json").read_text(encoding="utf-8"))
+    assert record["origin"] == "ai_generated" and record["provider"]["provider"] == "replay"
+    assert record["raw"] == reply.read_text(encoding="utf-8")
+    overgrow = next(argv for argv in on.calls if argv[:2] == ["overgrow", "place"])
+    assert overgrow[overgrow.index("--profile") + 1] == "30" and "--street-profile" in overgrow
+    materials = next(argv for argv in on.calls if argv[:2] == ["materials", "apply"])
+    assert materials[materials.index("--facade-style") + 1] == "mediterranean"
+    assert bench.inputs_sha256(inputs) == digest
+    assert "street_profile" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["street_profile"] is True
+    rules = Stub()
+    assert _run(root, "r3", rules, "--offline", "--street-profile") == 0
+    record = json.loads((root / "runs" / "r3" / "bench_murcia" / "config" / "street_profile.json").read_text(encoding="utf-8"))
+    assert record["origin"] == "rules" and record["provider"] is None
+    assert [argv for argv in rules.calls if tuple(argv[:2]) not in DOWNLOADS] == [
+        [arg.replace("/r1/", "/r3/") for arg in argv] for argv in off.calls if tuple(argv[:2]) not in DOWNLOADS
+    ]
+
+
+def test_a_street_profile_reply_needs_the_switch(workdir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    reply = REPO / "tests" / "fixtures" / "street_profile" / "neutral.json"
+    assert _run(workdir / "bench", "r1", Stub(), "--street-profile-reply", str(reply)) != 0
+    assert "--street-profile-reply needs --street-profile" in capsys.readouterr().err

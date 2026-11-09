@@ -64,6 +64,9 @@ COVER_ROLES = frozenset({"barrier", "barrel", "wreck", "debris", "fence"})
 NO_TARGET = f"no open sightline over {MAX_SIGHTLINE_M:g} m"
 NO_PROP = "no solid catalogue prop meets the cover rule"
 NO_SPOT = "no valid spot"
+NO_CAP = "max props is 0"
+# perf cover --max-props: the counts a street profile may ask for (plan D2); MAX_COVER_PROPS stays the default.
+MAX_PROPS_CHOICES = (0, 8, 16, MAX_COVER_PROPS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -386,6 +389,8 @@ def choose_cover(
     ranked = sorted(props, key=CoverProp.key)
     if not ordered:
         return CoverPlan(0, (), {}, caps, NO_TARGET)
+    if caps.props <= 0:
+        return CoverPlan(len(ordered), (), {}, caps, NO_CAP)
     if not ranked:
         return CoverPlan(len(ordered), (), {}, caps, NO_PROP)
     rejects: Counter[str] = Counter()

@@ -315,8 +315,14 @@ def apply_cover(
     *,
     library: str | Path | None,
     overwrite: bool = False,
+    max_props: int | None = None,
+    street_profile: Mapping[str, Any] | None = None,
 ) -> CoverResult:
-    """Write ``out_dir``: the playable scene with cover props, or a verbatim copy with none. Inputs are not modified."""
+    """Write ``out_dir``: the playable scene with cover props, or a verbatim copy with none. Inputs are not modified.
+
+    ``max_props`` (``perf cover --max-props``, plan D2) lowers the props cap; None keeps ``MAX_COVER_PROPS``.
+    ``street_profile`` is the record's report block, added to the report only when given.
+    """
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     layout_file = Path(layout_path).expanduser().resolve()
@@ -334,7 +340,7 @@ def apply_cover(
     props, _library_rejects = read_library(library)
     candidates, refused = cover_props(fitted_props(props), catalogue_licences(library), _scene_assets(materials))
     overgrown = _overgrow_triangles(nodes)
-    caps = Caps(triangles=triangle_cap(overgrown))
+    caps = Caps(triangles=triangle_cap(overgrown)) if max_props is None else Caps(props=max_props, triangles=triangle_cap(overgrown))
     site = build_site(base, manifest, layout, layout_file, scene_file, collision_path)
     plan = choose_cover(
         targets, candidates, site, caps,
@@ -388,6 +394,8 @@ def apply_cover(
             "before": _stretches(before_report),
             "after": _stretches(after_report),
         }
+        if street_profile is not None:
+            report["street_profile"] = dict(street_profile)
         atomic_write_bytes(work / COVER_REPORT, report_text(report).encode("utf-8"))
         _swap(work, out)
     except BaseException:

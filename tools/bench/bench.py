@@ -2,6 +2,7 @@
 
     python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints] [--lidar-roofs]
         [--scenic-out-of-lightmap] [--lightmap-pages-max N] [--balanced-spawns] [--sightline-cover]
+        [--regional-facades] [--street-profile [--street-profile-reply FILE]]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -47,6 +48,8 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 from shapely import box
 
+from onward_generator.ai.providers import StaticProvider
+from onward_generator.ai.street_profile import resolve_street_profile
 from onward_generator.export.package import MANIFEST_FILE, THUMBNAIL_FILE
 from onward_generator.export.thumbnail import THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH
 from onward_generator.gameplay.cover_stage import COVER_DIR, COVER_REPORT
@@ -65,6 +68,7 @@ from onward_generator.maps.workspace import (
     store_repetition,
     store_sightline_cover,
     store_sources,
+    store_street_profile,
 )
 from onward_generator.next_step import geo_command
 from onward_generator.osm.acquire import osm_target
@@ -361,7 +365,8 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
-              balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False) -> MapRun:
+              balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False,
+              street_profile: bool = False, street_profile_reply: Path | None = None) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -374,6 +379,9 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``balanced_spawns`` switches the plan C6 spawn and Uplink placement on in the run copy's ``map.json`` only.
     ``sightline_cover`` switches the plan C7 cover stage on in the run copy's ``map.json`` only.
     ``regional_facades`` switches the plan D1 regional atlases on in the run copy's ``map.json`` only.
+    ``street_profile`` switches the plan D2 street profile on in the run copy's ``map.json`` only and resolves it
+    without a model: the reply is ``street_profile_reply`` (provider ``replay``), or nothing (provider ``none``,
+    which gives the neutral rules profile).
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -398,6 +406,9 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_sightline_cover(root, True)
     if regional_facades:
         store_regional_facades(root, True)
+    if street_profile:
+        store_street_profile(root, True)
+        resolve_street_profile(root, provider=profile_provider(street_profile_reply))
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -415,6 +426,13 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         raise BenchError(f"{ref.id}: the plan has no export stage")
     _run(ref, root, prepared.inputs, steps, execute, log, targets)
     return MapRun(ref, root, package, list(log.times), frozenset(targets))
+
+
+def profile_provider(reply: Path | None) -> StaticProvider:
+    """The bench never calls a live model: a stored reply is replayed, and without one the reply is empty (rules)."""
+    if reply is None:
+        return StaticProvider("none", "", "none")
+    return StaticProvider("replay", reply.read_text(encoding="utf-8"), str(reply))
 
 
 def _run(
@@ -953,6 +971,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
     if not _RUN_ID.fullmatch(run_id):
         raise BenchError(f"run id {run_id!r} must be letters, digits, '.', '_' or '-'")
     run_dir = root / "runs" / run_id
+    if args.street_profile_reply is not None and not args.street_profile:
+        raise BenchError("--street-profile-reply needs --street-profile")
     if run_dir.exists():
         raise BenchError(f"{run_dir} already exists; a bench run never writes over another")
     refs = [reference(map_id) for map_id in args.only] if args.only else list(REFERENCE_MAPS)
@@ -966,7 +986,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
                         scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
                         balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover,
-                        regional_facades=args.regional_facades)
+                        regional_facades=args.regional_facades, street_profile=args.street_profile,
+                        street_profile_reply=args.street_profile_reply)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -1046,6 +1067,10 @@ def build_parser() -> argparse.ArgumentParser:
                      help="stand catalogue cover on the long open sightlines in each run copy (plan C7, map.json sightline_cover)")
     run.add_argument("--regional-facades", action="store_true",
                      help="bake the central_european, anglo and latin_american atlases in each run copy (plan D1, map.json regional_facades)")
+    run.add_argument("--street-profile", action="store_true",
+                     help="switch the plan D2 street profile on in each run copy (map.json street_profile); never calls a live model")
+    run.add_argument("--street-profile-reply", type=Path, default=None, metavar="FILE",
+                     help="with --street-profile: the profile reply to replay in each run copy (default: none, the neutral rules profile)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")
