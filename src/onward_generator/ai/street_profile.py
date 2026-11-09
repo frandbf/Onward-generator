@@ -205,6 +205,8 @@ You cannot change the area, the coordinates, the data sources, the export, the b
 
 # Quotes the brief as JSON and keeps its accents readable.
 _QUOTE = json.JSONEncoder(ensure_ascii=False)
+# Canonical JSON for the inputs hash: sorted keys, no spaces, UTF-8 text as it is.
+_CANONICAL = json.JSONEncoder(sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def instruction(brief: str, center: Mapping[str, Any], library: Sequence[tuple[str, str]]) -> str:
@@ -232,7 +234,7 @@ def inputs_sha256(brief: str, center: Mapping[str, Any], library: Sequence[tuple
         "library": sorted([ident, condition] for ident, condition in library),
         "sightline_cover": sightline_cover,
     }
-    return _sha(json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    return _sha(_CANONICAL.encode(payload))
 
 
 def library_conditions(library: str | Path | None) -> list[tuple[str, str]]:
