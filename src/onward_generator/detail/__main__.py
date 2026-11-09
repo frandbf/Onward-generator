@@ -23,7 +23,7 @@ from onward_generator.generation.preview import render_rgb, side_by_side
 from onward_generator.generation.scene import GenerationError
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs, sha256_file
 from onward_generator.next_step import dress_command, emit
-from onward_generator.tiers import SCENIC_WALLS, check_target, core_square
+from onward_generator.tiers import SCENIC_WALLS, check_mid_ring, check_target, core_square
 
 VISUAL_FILE = "scene_visual.glb"
 COLLISION_FILE = "scene_collision.glb"
@@ -49,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--core-target-triangles", type=int,
                         help="budget mode (ADR-017 amendment): solve the core half-side for this many core visual triangles, "
                              "1000 to 2000000; --core-radius-m is then the largest half-side")
+    parser.add_argument("--mid-ring-m", type=float,
+                        help="intermediate ring (plan D3, opt-in): buildings outside the core within this many metres of it are boxes "
+                             "with painted windows and their roof form, 10 to 1000; needs --core-radius-m")
     parser.add_argument("--places",
                         help="overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)")
     parser.add_argument("--overture-tints",
@@ -188,6 +191,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise DetailError("--core-target-triangles needs --core-radius-m")
             check_target(args.core_target_triangles)
             core_square(args.core_radius_m)
+        if args.mid_ring_m is not None:
+            if args.core_radius_m is None:
+                raise DetailError("--mid-ring-m needs --core-radius-m")
+            check_mid_ring(args.mid_ring_m)
         cfg = load_detail_config(args.config)
         typology = load_typology_config(args.typology_config)
         gen_cfg = load_generation_config(args.generation_config)
@@ -205,11 +212,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
         if args.core_target_triangles is None:
             detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
-                                    typology=typology, tints=tints, roof_spread=roof_spread)
+                                    typology=typology, tints=tints, roof_spread=roof_spread, mid_ring_m=args.mid_ring_m)
         else:
             detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
                                            max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints,
-                                           roof_spread=roof_spread)
+                                           roof_spread=roof_spread, mid_ring_m=args.mid_ring_m)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
@@ -250,6 +257,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         core = detailed.core
         print(f"core half_side_m={core['half_side_m']:g} target={core['target_triangles']} predicted={core['predicted_triangles']} "
               f"achieved={core['achieved_triangles']} within_tolerance={core['within_tolerance']}")
+    if detailed.core is not None and "mid_ring_m" in detailed.core:
+        mid = c["tiers"]["mid"]
+        spread = mid["triangles_per_building"]
+        print(f"mid ring_m={detailed.core['mid_ring_m']:g} buildings={mid['buildings']} visual_triangles={mid['visual_triangles']} "
+              f"per_building mean={spread['mean']} min={spread['min']} max={spread['max']}")
     print(f"severity={report['severity']}")
     for path in targets:
         print(f"wrote {path}")

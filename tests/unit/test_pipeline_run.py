@@ -1828,3 +1828,26 @@ def test_with_sightline_cover_the_export_is_stale_until_the_covered_copy_is_newe
     assert output_ready("export", root)
     files["covered"].unlink()
     assert not output_ready("export", root)
+
+
+def test_a_changed_mid_ring_makes_detail_stale(tmp_path: Path) -> None:
+    """Plan D3: the width is a map.json key, not a file, so detail compares it with the one its scene recorded."""
+    from onward_generator.maps.workspace import store_mid_ring
+
+    root = _ready_map(tmp_path)
+    assert output_ready("detail", root)  # no key, and the fake scene records no width
+    manifest = root / "data" / "processed" / "scene_detail" / "scene_detail.json"
+    store_mid_ring(root, 100)
+    assert not output_ready("detail", root)  # the scene cannot be read: it records no width
+    manifest.write_text(json.dumps({"core": {"half_side_m": 150.0, "mid_ring_m": 100.0}}), encoding="utf-8")
+    assert output_ready("detail", root)
+    store_mid_ring(root, 80)
+    assert not output_ready("detail", root)
+    store_mid_ring(root, None)
+    assert not output_ready("detail", root)  # removed: the scene still has a ring
+    manifest.write_text(json.dumps({"core": None}), encoding="utf-8")
+    assert output_ready("detail", root)
+    assert output_ready("dress", root)  # only detail reads the key
+    document = json.loads((root / "map.json").read_text(encoding="utf-8")) | {"mid_ring_m": 5}
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert not output_ready("detail", root)  # a refused width: run plans detail again and reports it

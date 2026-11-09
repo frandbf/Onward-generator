@@ -813,3 +813,60 @@ def test_store_street_profile_needs_a_map(tmp_path: Path) -> None:
 
     with pytest.raises(MapError, match="not found"):
         store_street_profile(tmp_path / "nowhere", True)
+
+
+def _ring_map(tmp_path: Path, name: str = "ring", **kwargs: object) -> Path:
+    root = tmp_path / name
+    create_map(root, map_id=name, name=name.title(), latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=300, **kwargs)  # type: ignore[arg-type]
+    return root
+
+
+def test_mid_ring_is_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import mid_ring_m, store_mid_ring
+
+    assert mid_ring_m(tmp_path / "nowhere") is None
+    root = _ring_map(tmp_path)
+    before = load_map(root)
+    assert "mid_ring_m" not in before and mid_ring_m(root) is None
+    store_mid_ring(root, 100)
+    assert load_map(root) == before | {"mid_ring_m": 100.0} and mid_ring_m(root) == 100.0
+    assert isinstance(load_map(root)["mid_ring_m"], float)
+    store_mid_ring(root, None)
+    assert load_map(root) == before and mid_ring_m(root) is None
+    store_mid_ring(root, None)  # removing an absent key changes nothing
+    assert load_map(root) == before
+    budget = _ring_map(tmp_path, "budget", core_target_triangles=150000)
+    store_mid_ring(budget, 10)
+    assert mid_ring_m(budget) == 10.0
+
+
+@pytest.mark.parametrize("value", [True, "100", float("nan"), 5, 9.99, 5000, 1000.5, None, [100]])
+def test_mid_ring_refuses_a_value_out_of_range(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import mid_ring_m, store_mid_ring
+
+    root = _ring_map(tmp_path)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8")) | {"mid_ring_m": value}
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match=r"^map\.json mid_ring_m must be a number of metres from 10 to 1000, got "):
+        mid_ring_m(root)
+    if value is not None:
+        with pytest.raises(MapError, match="from 10 to 1000"):
+            store_mid_ring(root, value)  # type: ignore[arg-type]
+
+
+def test_mid_ring_needs_a_core(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import mid_ring_m, store_mid_ring
+
+    root = tmp_path / "small"
+    create_map(root, map_id="small", name="Small", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=300, core_radius_m=0)
+    before = (root / "map.json").read_bytes()
+    message = r'^map\.json "mid_ring_m" needs a playable core \("core_radius_m" or a budget "core"\)$'
+    with pytest.raises(MapError, match=message):
+        store_mid_ring(root, 100)
+    assert (root / "map.json").read_bytes() == before
+    document = json.loads(before) | {"mid_ring_m": 100}
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match=message):
+        mid_ring_m(root)
+    store_mid_ring(root, None)  # removing it needs no core
+    assert "mid_ring_m" not in load_map(root)

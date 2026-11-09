@@ -167,13 +167,27 @@ def core_budget(start: Path) -> tuple[float, int] | None:
     return read_budget(json.loads((root / "map.json").read_bytes()))
 
 
+def mid_ring(start: Path) -> float | None:
+    """``mid_ring_m`` of the map that contains ``start`` (plan D3), or None without the key or a map."""
+    root = map_root(start)
+    if root is None:
+        return None
+    from onward_generator.maps.workspace import mid_ring_m
+
+    return mid_ring_m(root)
+
+
 def _core_flags(scene: Path) -> tuple[str, ...]:
-    """The core flags of ``detail``: the budget pair on a budget map, the fixed half-side otherwise."""
+    """The core flags of ``detail``: the budget pair on a budget map, the fixed half-side otherwise, then the
+    intermediate ring when ``map.json`` has ``mid_ring_m`` (plan D3)."""
     budget = core_budget(scene)
     if budget is not None:
-        return ("--core-radius-m", f"{budget[0]:g}", "--core-target-triangles", str(budget[1]))
-    core = core_radius(scene)
-    return ("--core-radius-m", f"{core:g}") if core is not None else ()
+        flags: tuple[str, ...] = ("--core-radius-m", f"{budget[0]:g}", "--core-target-triangles", str(budget[1]))
+    else:
+        core = core_radius(scene)
+        flags = ("--core-radius-m", f"{core:g}") if core is not None else ()
+    ring = mid_ring(scene)
+    return (*flags, "--mid-ring-m", f"{ring:g}") if ring is not None else flags
 
 
 def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,

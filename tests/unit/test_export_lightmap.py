@@ -423,3 +423,13 @@ def test_page_budget_refusal_counts_pages_with_the_class_scales() -> None:
     assert pages_at_least(areas, 4.0, max_size=64) == 3
     with pytest.raises(LightmapBudgetError, match="needs at least 2 pages at 4 texels/m"):
         page_budget_density(areas, requested=10.0, pages_max=1, max_size=64, scales=scales)
+
+
+def test_a_mid_shell_bakes_and_leaves_the_lightmap_as_a_scenic_one() -> None:
+    """Plan D3: a mid building's walls and windows are one scenic_trim primitive, so C4 covers them too."""
+    from onward_generator.materials.trim import scenic_trim_material
+
+    name = scenic_trim_material("mediterranean")
+    assert surface_class(name) == "scenic"
+    assert contributes_gi(name) is True
+    assert contributes_gi(name, scenic_out_of_lightmap=True) is False

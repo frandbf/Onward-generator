@@ -50,6 +50,7 @@ from onward_generator.materials.trim_style import (
     style_atlas,
     trim_layout,
 )
+from onward_generator.tiers import MID
 
 TRIM_PREFIX = "facade_trim_"
 SCENIC_TRIM_PREFIX = "scenic_trim_"
@@ -402,10 +403,12 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
         windows = [windows[i] for i in band["window_families"]]
     merged: dict[str, tuple[list[Mesh], list[np.ndarray]]] = {}
     kept: list[Primitive] = []
+    # A mid building (plan D3) is all scenic: its painted windows join its walls in the scenic material and lightmap class.
+    mid = (record or {}).get("tier") == MID
     for prim in node.primitives:
         # A blank party wall (``party_<wall>``) samples its wall's strip under its own lightmap class.
         material = party_base(prim.material)
-        target = scenic_trim_material(style) if material in scenic else trim_material(style)
+        target = scenic_trim_material(style) if material in scenic or mid else trim_material(style)
         if material != prim.material:
             target = party_material(target)
         if not prim.mesh.triangle_count:

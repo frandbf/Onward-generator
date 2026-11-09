@@ -1011,3 +1011,43 @@ def test_an_era_band_changes_the_cache_key() -> None:
     base = trim_cache_key("central_european", REGIONAL_ATLAS, tints, {"plaster": "x"})
     eras = {**REGIONAL_ATLAS["eras"], "pre_1900": {"tones": [1], "window_families": [0]}}
     assert trim_cache_key("central_european", {**REGIONAL_ATLAS, "eras": eras}, tints, {"plaster": "x"}) != base
+
+
+MID_RECORD = {"tier": "mid", "facade": {"storeys": {"count": 2, "height_m": 3.0}}, "roof": {"type": "flat"}}
+
+
+def _mid_shell(name: str = "building/m1") -> Node:
+    holes = [(0.9 + 3.0 * c, 0.9 + 3.0 * r, 2.1 + 3.0 * c, 2.3 + 3.0 * r) for c in range(3) for r in range(2)]
+    glass = merge([_back(1.2, 1.4, 0.9 + 3.0 * r, x0=0.9 + 3.0 * c) for c in range(3) for r in range(2)])
+    return Node(name, (Primitive(facade(9.0, 6.0, holes), "scenic_wall_warm"), Primitive(glass, "glass_dark"),
+                       Primitive(_back(2.0, 2.0, 6.0), "roof_tile")), {"type": "building", "object_id": name})
+
+
+def test_a_mid_shell_joins_its_painted_windows_to_the_scenic_trim() -> None:
+    """Plan D3: walls and glass of a mid node are one scenic_trim primitive; the windows sit in window cells."""
+    stats = TrimStats()
+    node = trim_building(_mid_shell(), MID_RECORD, "mediterranean", ATLAS, LAYOUT, WINDOWS, stats)
+    assert [p.material for p in node.primitives] == ["scenic_trim_mediterranean", "roof_tile"]
+    trim = node.primitives[0]
+    glass_vertices = 6 * 4
+    uvs = trim.uvs[-glass_vertices:]
+    assert sum(stats.cells.values()) == 6 and all(name.startswith("window_") for name in stats.cells)
+    cells = [LAYOUT.cells[name] for name in stats.cells]
+    for u, v in uvs:
+        assert any(c.u0 - 1e-6 <= u <= c.u1 + 1e-6 and c.v0 - 1e-6 <= v <= c.v1 + 1e-6 for c in cells)
+    assert stats.primitives_merged == 2
+
+
+def test_without_the_mid_tier_the_same_node_keeps_its_glass_on_the_facade_trim() -> None:
+    node = trim_building(_mid_shell(), {**MID_RECORD, "tier": "scenic"}, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    assert [p.material for p in node.primitives] == ["facade_trim_mediterranean", "scenic_trim_mediterranean", "roof_tile"]
+    plain = trim_building(_mid_shell(), None, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    assert [p.material for p in plain.primitives] == ["facade_trim_mediterranean", "scenic_trim_mediterranean", "roof_tile"]
+
+
+def test_a_mid_building_part_takes_the_scenic_trim() -> None:
+    part = Node("building_part/m1/p", (Primitive(facade(6.0, 9.0, []), "plaster_ochre"),), {"type": "building_part"})
+    node = trim_building(part, {"tier": "mid"}, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    assert [p.material for p in node.primitives] == ["scenic_trim_mediterranean"]
+    core = trim_building(part, {"tier": "core"}, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    assert [p.material for p in core.primitives] == ["facade_trim_mediterranean"]

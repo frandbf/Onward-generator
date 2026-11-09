@@ -319,3 +319,34 @@ def test_materials_command_carries_the_regional_facades_switch(tmp_path: Path) -
     both = list(materials_command(dress).argv)
     assert both[both.index("--regional-facades") + 1] == "--repetition"
     assert "--regional-facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+
+
+def test_detail_command_carries_the_mid_ring_after_the_core(tmp_path: Path) -> None:
+    """Plan D3: ``mid_ring_m`` of map.json follows the fixed or the budget core flags, and only when set."""
+    from onward_generator.maps.workspace import store_mid_ring
+    from onward_generator.next_step import mid_ring
+
+    fixed = tmp_path / "fixed"
+    create_map(fixed, map_id="fixed", name="Fixed", latitude=40.40657, longitude=-3.719187, radius_m=300)
+    scene = fixed / "data" / "processed" / "geo" / "geo_scene.json"
+    heights = fixed / "data" / "processed" / "heights" / "heights.json"
+    base = fixed / "data" / "processed" / "scene3d"
+    head = ("detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+            "--out", str(fixed / "data" / "processed" / "scene_detail"))
+    assert mid_ring(scene) is None and mid_ring(tmp_path / "elsewhere" / "x.json") is None
+    store_mid_ring(fixed, 100)
+    assert mid_ring(scene) == 100.0
+    assert detail_command(scene, heights, base).argv == (*head, "--core-radius-m", "150", "--mid-ring-m", "100")
+    store_mid_ring(fixed, 37.5)
+    assert detail_command(scene, heights, base).argv[-2:] == ("--mid-ring-m", "37.5")
+    budget = tmp_path / "budget"
+    create_map(budget, map_id="budget", name="Budget", latitude=40.40657, longitude=-3.719187, radius_m=300,
+               core_target_triangles=150000)
+    scene = budget / "data" / "processed" / "geo" / "geo_scene.json"
+    store_mid_ring(budget, 50)
+    assert detail_command(scene, heights, base).argv[-6:] == (
+        "--core-radius-m", "250", "--core-target-triangles", "150000", "--mid-ring-m", "50")
+    document = json.loads((budget / "map.json").read_text(encoding="utf-8")) | {"mid_ring_m": 5000}
+    (budget / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match="from 10 to 1000"):
+        detail_command(scene, heights, base)
