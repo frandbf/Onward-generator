@@ -339,5 +339,8 @@ def test_mid_buildings_take_their_neighbours_roof_tags_and_lent_colours(tmp_path
     lent = records["osm-way-318"]["facade"]["materials"]
     assert lent["roof_source"] == "overture:roof_color" and lent["roof_evidence"] == _evidence("osm-way-318", "#b43c28")
     assert records["osm-way-317"]["facade"]["materials"]["roof_source"] is None
+    # Each wall is drawn from the configured seed and the building (317 and 318 would differ under another seed).
+    for bid in ("osm-way-314", "osm-way-315", "osm-way-317", "osm-way-318"):
+        assert records[bid]["facade"]["materials"]["wall"] == scenic_wall(CFG.seed, bid)
     church = records["osm-way-314"]["facade"]
     assert church["needs_custom_model"] is True and church["mid"]["windows"] == 0
