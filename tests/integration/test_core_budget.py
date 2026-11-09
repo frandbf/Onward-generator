@@ -394,6 +394,12 @@ def test_detail_cli_passes_places_and_typology_to_the_budget(ring_inputs: tuple[
                  "--no-preview", "--core-radius-m", "60", "--core-target-triangles", "5000"]) == 1
     assert seen["places"] == [] and seen["typology"] is not None
     assert (seen["target_triangles"], seen["max_half_side_m"]) == (5000, 60.0)
+    assert seen["mid_ring_m"] is None
+    # Plan D3: the ring reaches the budget solve too.
+    seen.clear()
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(tmp_path / "d"),
+                 "--no-preview", "--core-radius-m", "60", "--core-target-triangles", "5000", "--mid-ring-m", "20"]) == 1
+    assert seen["mid_ring_m"] == 20.0 and seen["target_triangles"] == 5000
 
 
 @pytest.mark.parametrize("grid", [150], indirect=True, ids=["r150"])

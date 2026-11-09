@@ -77,7 +77,7 @@ class MidShell:
 
 def bays(length: float) -> int:
     """How many MID_BAY_M bays a wall of ``length`` metres holds; one window per bay."""
-    return int(length // MID_BAY_M)
+    return int(length // MID_BAY_M)  # pragma: no mutate: for a length >= 0, int() of / and of // agree
 
 
 def window_rows(segments: Sequence[Segment], storeys: Storeys, eave_m: float, base_triangles: int, *,
@@ -91,18 +91,20 @@ def window_rows(segments: Sequence[Segment], storeys: Storeys, eave_m: float, ba
     if not MID_WINDOWS_ENABLED:
         return []
     head = MID_SILL_M + MID_WINDOW_H_M + MID_HEAD_M
-    ranked: list[tuple[float, int, int, Row]] = []
+    candidates: list[Row] = []
+    length_of: dict[int, float] = {}
     for seg in segments:
         n = bays(seg.length)
         if not seg.exposed or n < 1:
             continue
+        length_of[seg.index] = seg.length
         for storey in range(storeys.count):
             if storey * storeys.height_m + head > min((storey + 1) * storeys.height_m, eave_m):
                 break
-            ranked.append((-seg.length, storey, seg.index, Row(seg.index, storey, n)))
+            candidates.append(Row(seg.index, storey, n))
     chosen: list[Row] = []
     total = base_triangles
-    for *_, row in sorted(ranked, key=lambda r: r[:3]):
+    for row in sorted(candidates, key=lambda r: (-length_of[r.segment], r.storey, r.segment)):
         if total + row.triangles <= cap_triangles:
             chosen.append(row)
             total += row.triangles
@@ -127,7 +129,7 @@ def face_with_windows(seg: Segment, z_top: float, origins: Sequence[tuple[float,
         return quad(a0, b0, b1, a1), Mesh.empty()
     rects = [(s0, v0, s0 + MID_WINDOW_W_M, v0 + MID_WINDOW_H_M) for s0, v0 in origins]
     wall = transform(cap(face_with_openings(seg.length, 0.0, z_top, rects), 0.0), wall_frame(seg))
-    ((_, pane),) = flat_opening(MID_WINDOW_W_M, MID_WINDOW_H_M, MID_GLASS).parts
+    ((_, pane),) = flat_opening(MID_WINDOW_W_M, MID_WINDOW_H_M, MID_GLASS).parts  # pragma: no mutate: only the pane's mesh is kept, not its material
     glass = merge([transform(pane, seg.module_matrix(s0, v0)) for s0, v0 in origins])
     return wall, glass
 
@@ -182,12 +184,12 @@ def build_mid_shell(footprint: BaseGeometry, segments: Sequence[Segment], storey
         by_segment[row.segment].extend(window_origins(segment_of[row.segment], row, storeys.height_m))
     parts: dict[str, list[Mesh]] = defaultdict(list)
     for seg in segments:
-        wall, glass = face_with_windows(seg, eave_m, by_segment.get(seg.index, []))
+        wall, glass = face_with_windows(seg, eave_m, by_segment[seg.index])
         parts[wall_material].append(wall)
         if glass.triangle_count:
             parts[MID_GLASS].append(glass)
     for material, mesh in roof_parts:
         parts[material].append(mesh)
     merged = {material: merge(meshes) for material, meshes in sorted(parts.items())}
-    defects = open_edge_defects(merge(list(merged.values())), z_base=0.0, allowed=[], quantum=WELD_M)
+    defects = open_edge_defects(merge(list(merged.values())), z_base=0.0, quantum=WELD_M)
     return MidShell(merged, roof, sum(r.windows for r in rows), sum(seg.exposed for seg in segments), defects)

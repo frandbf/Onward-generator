@@ -133,6 +133,7 @@ def test_window_rows_need_an_exposed_wall_of_a_bay() -> None:
     (2.6, 1, 2.59, []),     # under the eave
     (3.0, 2, 5.6, [0, 1]),
     (3.0, 2, 5.59, [0]),    # the upper window would touch the eave
+    (2.59, 2, 10.0, []),    # under the storey line, with the eave far above
 ])
 def test_window_rows_keep_the_head_under_the_storey_and_the_eave(storey_m: float, count: int, eave: float, storeys: list[int]) -> None:
     rows = window_rows([_segment(0, 3.0)], Storeys(count, storey_m, "heights_levels"), eave, 0)
@@ -196,8 +197,7 @@ def test_mid_roof_gabled_puts_its_gables_in_the_wall() -> None:
 def test_mid_roof_hip_follows_the_core_rule() -> None:
     parts, record = mid_roof(box(110, 0, 118, 8), 6.0, MINOR, "roof_flat_grey", WALL)
     assert [m for m, _ in parts] == ["roof_tile"]
-    assert record == {"type": "hip", "rise_m": record["rise_m"], "pitch_deg": 22.0, "material": "roof_tile"}
-    assert 0.1 < float(record["rise_m"]) <= 2.5  # type: ignore[arg-type]
+    assert record == {"type": "hip", "rise_m": 1.616, "pitch_deg": 22.0, "material": "roof_tile"}  # 1.6161049... to the mm
     # The estimated hip of a parapet template (``choose_roof`` drops the parapet with it).
     estimated = replace(FLAT, parapet_m=0.0, hip=HipRoof(160.0, 28.0, 2.5, "roof_tile"))
     assert mid_roof(box(110, 0, 118, 8), 6.0, estimated, "roof_tile", WALL)[1]["type"] == "hip"
@@ -241,3 +241,61 @@ def test_a_gabled_shell_is_closed_and_within_the_cap() -> None:
     assert shell.roof["type"] == "gabled" and shell.defects == 0
     assert 50 <= shell.triangles <= MID_MAX_TRIANGLES
     assert set(shell.parts) == {MID_GLASS, "roof_tile", WALL}
+
+
+def test_a_pitched_roof_without_gables_adds_no_wall_part() -> None:
+    spec = pitched_spec({"roof:shape": "hipped"}, "roof_tile", 3.0)
+    assert spec is not None
+    parts, record = mid_roof(box(110, 0, 120, 6), 6.0, replace(FLAT, parapet_m=0.0, hip=None, pitched=spec), "roof_tile", WALL)
+    assert [m for m, _ in parts] == ["roof_tile"] and record["type"] == "hipped"
+
+
+def test_a_roof_at_the_cap_is_kept_and_one_over_it_is_drawn_flat(monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = pitched_spec({"roof:shape": "gabled"}, "roof_tile", 3.0)
+    template = replace(FLAT, parapet_m=0.0, hip=None, pitched=spec)
+    refined, segments = refine_exposure(box(110, 0, 120, 6), Polygon(), CFG)
+    cost = WALL_TRIANGLES * len(segments) + sum(m.triangle_count for _, m in mid_roof(refined, 6.0, template, "roof_tile", WALL)[0])
+    monkeypatch.setattr(mid_module, "MID_MAX_TRIANGLES", cost)
+    assert build_mid_shell(refined, segments, TWO, 6.0, template, WALL, "roof_tile").roof["type"] == "gabled"
+    monkeypatch.setattr(mid_module, "MID_MAX_TRIANGLES", cost - 1)
+    assert build_mid_shell(refined, segments, TWO, 6.0, template, WALL, "roof_tile").roof == {
+        "type": "flat", "material": "roof_tile", "fallback": CAP_FALLBACK}
+
+
+def test_the_shell_is_checked_at_the_facade_weld(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.detail.facades import WELD_M
+
+    seen: list[dict[str, object]] = []
+
+    def spy(mesh: object, **kwargs: object) -> int:
+        seen.append(kwargs)
+        return open_edge_defects(mesh, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(mid_module, "open_edge_defects", spy)
+    refined, segments = refine_exposure(box(110, 0, 122, 8), Polygon(), CFG)
+    assert build_mid_shell(refined, segments, TWO, 6.0, FLAT, WALL, "roof_flat_grey").defects == 0
+    assert seen == [{"z_base": 0.0, "quantum": WELD_M}]
+
+
+def _tiered(kind: str, tier: str, triangles: int) -> object:
+    from types import SimpleNamespace
+
+    from onward_generator.generation.mesh import Mesh
+
+    mesh = Mesh(np.zeros((3, 3)), np.zeros((triangles, 3), dtype=np.int64))
+    return SimpleNamespace(type=kind, record={"tier": tier}, visual=[SimpleNamespace(mesh=mesh)], colliders=[], glass_colliders=[])
+
+
+def test_tier_counts_give_the_mid_shells_mean_min_and_max() -> None:
+    from onward_generator.detail.scene import _tier_counts
+
+    objects = [_tiered("building", "mid", 10), _tiered("building", "mid", 11), _tiered("building", "mid", 11),
+               _tiered("building", "core", 500), _tiered("building_part", "mid", 7), _tiered("building", "scenic", 12)]
+    counts = _tier_counts(objects, 3, mid=True)  # type: ignore[arg-type]
+    assert list(counts) == ["core", "scenic", "mid"]
+    assert counts["mid"] == {"buildings": 3, "visual_triangles": 39, "collision_triangles": 0,
+                             "triangles_per_building": {"mean": 10.7, "min": 10, "max": 11}}
+    assert counts["scenic"] == {"buildings": 1, "visual_triangles": 12, "collision_triangles": 0, "urban_elements_dropped": 3}
+    empty = _tier_counts(objects[3:4], 0, mid=True)  # type: ignore[arg-type]
+    assert empty["mid"]["triangles_per_building"] == {"mean": None, "min": None, "max": None}
+    assert list(_tier_counts(objects[3:4], 0, mid=False)) == ["core", "scenic"]  # type: ignore[arg-type]

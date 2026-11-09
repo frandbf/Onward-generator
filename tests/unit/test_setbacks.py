@@ -397,3 +397,7 @@ def test_why_a_lent_colour_decided_nothing() -> None:
     assert _tint_not_used(record("roof:colour", "observed"), "roof", "overture:roof_color") == "osm_tag"
     assert _tint_not_used(record(None, "estimated"), "roof", "overture:roof_color") == "estimated_roof"
     assert _tint_not_used(record(None, "generated"), "wall", "overture:facade_color") == "no_tint_material"
+    # A mid building (plan D3): its wall is scenic, its roof is decided as a core building's.
+    assert _tint_not_used(record(None, "generated", tier="mid"), "wall", "overture:facade_color") == "scenic"
+    assert _tint_not_used(record(None, "generated", tier="mid"), "roof", "overture:roof_color") == "no_tint_material"
+    assert _tint_not_used(record("overture:roof_color", "observed", tier="mid"), "roof", "overture:roof_color") is None

@@ -45,12 +45,14 @@ def _detail(ring_inputs: tuple[Path, Path, Path], **options: Any) -> Any:
     return detail_scene(generated, ref, heights, scene, CFG, **options)
 
 
-@pytest.fixture(scope="module")
+# Function scope: each test runs detail itself, so mutation testing maps every test that reads the scene to the code
+# that built it (a module-scoped scene would be built under the first test only).
+@pytest.fixture
 def off(ring_inputs: tuple[Path, Path, Path]) -> Any:
     return _detail(ring_inputs, core_half_side_m=CORE_M)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def on(ring_inputs: tuple[Path, Path, Path]) -> Any:
     return _detail(ring_inputs, core_half_side_m=CORE_M, mid_ring_m=RING_M)
 
@@ -124,15 +126,22 @@ def test_a_mid_building_is_a_shell_with_painted_windows_and_no_collider(on: Any,
         "use": facade["use"], "typology": facade["typology"], "door": "none", "doors_m": [],
     }
     assert facade["mid"]["windows"] > 0
+    # One estimated level of the heights stage: the storey and the UV frame follow it.
+    assert facade["storeys"] == {"count": 1, "height_m": 3.0, "origin": "heights_levels"}
     # The shed's minor template has a hip: the mid shell draws it, as the core would.
-    assert record["roof"]["type"] == "hip" and record["roof"]["origin"] == "generated"
+    assert record["roof"] == {"type": "hip", "rise_m": 1.01, "pitch_deg": 22.0, "material": "roof_tile", "origin": "generated",
+                              "roof_shape": None}
+    # Phase 03's keys keep their order, its checks give way to the shell's, and the tier keys follow.
+    assert list(record) == ["id", "type", "source_ids", "source", "name", "generation", "footprint_area_m2", "height",
+                            "geometry_repaired", "materials", "visual", "collider", "tier", "facade", "roof", "interior", "checks"]
     assert record["interior"] is False
     assert record["collider"] == {"source": "none_mid", "parts": 0, "triangles": 0, "balconies": 0, "glass_panes": 0}
     assert record["checks"] == {"facade_open_edges": 0}
     assert shed.colliders == [] and shed.glass_colliders == []
     assert set(record["materials"]) == {wall, MID_GLASS, record["roof"]["material"]}
     assert record["visual"]["triangles"] == sum(p.mesh.triangle_count for p in shed.visual) <= MID_MAX_TRIANGLES
-    assert shed.uv_frame is not None
+    assert shed.uv_frame == {"runs": [[[-60.0, 30.0, -54.0, 30.0], [-54.0, 30.0, -54.0, 35.0], [-54.0, 35.0, -60.0, 35.0],
+                                       [-60.0, 35.0, -60.0, 30.0]]], "storey_h": 3.0, "storeys_origin": "heights_levels"}
     zs = np.concatenate([p.mesh.vertices[:, 2] for p in shed.visual])
     assert zs.min() == 0.0 and zs.max() > record["height"]["height_m"]  # the hip rises over the eave
     assert not [o for o in on.objects if o.type in ("interior", "landmark_part") and o.record["source_ids"][0] == "osm-way-315"]
@@ -239,3 +248,96 @@ def test_detail_cli_help_describes_the_ring() -> None:
     assert action.type is float and action.default is None
     assert action.help == ("intermediate ring (plan D3, opt-in): buildings outside the core within this many metres of it are boxes "
                            "with painted windows and their roof form, 10 to 1000; needs --core-radius-m")
+
+
+def _shed_args(ring_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, tuple[Any, ...]]:
+    """The real ``_mid_building`` and the arguments ``detail_scene`` gives it for the shed."""
+    import onward_generator.detail.scene as detail_module
+
+    original = detail_module._mid_building
+    calls: list[tuple[Any, ...]] = []
+
+    def spy(*args: Any) -> Any:
+        calls.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(detail_module, "_mid_building", spy)
+    _detail(ring_inputs, core_half_side_m=CORE_M, mid_ring_m=RING_M)
+    monkeypatch.undo()
+    (args,) = calls
+    return original, args
+
+
+def test_a_mid_roof_from_the_lidar_is_estimated_and_keeps_its_evidence(ring_inputs: tuple[Path, Path, Path],
+                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
+    mid_building, args = _shed_args(ring_inputs, monkeypatch)
+    assert args[8] is None and mid_building(*args)[1] == []
+    lidar = {"p25_m": 2.0, "p75_m": 4.5}
+    shed, issues = mid_building(*args[:8], lidar, args[9])
+    assert shed.record["roof"]["origin"] == "estimated"
+    assert shed.record["roof"]["lidar"] == lidar and shed.record["roof"]["lidar"] is not lidar
+    assert issues == []
+
+
+def test_a_mid_landmark_draws_one_band_and_no_window(ring_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    mid_building, args = _shed_args(ring_inputs, monkeypatch)
+    landmark, _ = mid_building(*args[:4], True, *args[5:])
+    facade = landmark.record["facade"]
+    assert facade["needs_custom_model"] is True and facade["mid"]["windows"] == 0
+    assert facade["storeys"] == {"count": 1, "height_m": 3.0, "origin": "single_band"}
+    assert MID_GLASS not in landmark.record["materials"]
+    assert landmark.uv_frame["storey_h"] is None
+
+
+def test_a_mid_shell_reports_its_flat_fallback_and_open_edges(ring_inputs: tuple[Path, Path, Path],
+                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    import dataclasses
+
+    import onward_generator.detail.scene as detail_module
+    from onward_generator.detail.facades import Storeys
+    from onward_generator.generation.scene import Issue
+
+    mid_building, args = _shed_args(ring_inputs, monkeypatch)
+    real = detail_module.build_mid_shell
+    monkeypatch.setattr(detail_module, "build_mid_shell", lambda *a, **k: dataclasses.replace(
+        real(*a, **k), roof={"type": "flat", "material": "roof_tile", "fallback": "mid_triangle_cap"}, defects=3))
+    monkeypatch.setattr(detail_module, "storeys_for", lambda *a: Storeys(1, 3.14159, "heights_levels"))
+    shed, issues = mid_building(*args)
+    assert issues == [Issue("roof_shape_fallback", "info", "osm-way-315", "mid shell roof drawn flat: mid_triangle_cap"),
+                      Issue("facade_mesh_not_watertight", "critical", "osm-way-315", "mid shell: 3 open or non-manifold edges")]
+    assert shed.record["checks"] == {"facade_open_edges": 3}
+    assert shed.record["roof"]["fallback"] == "mid_triangle_cap"
+    assert shed.record["facade"]["storeys"] == {"count": 1, "height_m": 3.142, "origin": "heights_levels"}
+
+
+# Around the 50 m core and its 10 m band: the shed with a roof colour tag and a second shed 0.5 m north of it (within
+# the exposure probe, their boxes apart), a third shed that takes an Overture roof colour, and the church moved into
+# the band (a landmark).
+NEAR_BUILDINGS = {
+    **RING_BUILDINGS,
+    314: ([(59, 6), (79, 6), (79, 30), (59, 30)], RING_BUILDINGS[314][1]),
+    315: (RING_BUILDINGS[315][0], {"building": "shed", "roof:colour": "red"}),
+    317: ([(-60, 35.5), (-54, 35.5), (-54, 40), (-60, 40)], {"building": "shed"}),
+    318: ([(-60, -40), (-54, -40), (-54, -35), (-60, -35)], {"building": "shed"}),
+}
+
+
+def test_mid_buildings_take_their_neighbours_roof_tags_and_lent_colours(tmp_path: Path) -> None:
+    from tests.integration.test_s3db_detail import _evidence, _tint
+
+    scene, heights, base = _detail_inputs(tmp_path, NEAR_BUILDINGS, RING_POIS)
+    generated, ref = load_base(base, scene, heights, GEN)
+    tints = [_tint("osm-way-315", facade=None), _tint("osm-way-318", facade=None)]
+    d = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=CORE_M, mid_ring_m=RING_M, tints=tints)
+    records = {o.record["source_ids"][0]: o.record for o in d.objects if o.type == "building"}
+    assert {bid: records[bid]["tier"] for bid in ("osm-way-314", "osm-way-315", "osm-way-317", "osm-way-318")} == dict.fromkeys(
+        ("osm-way-314", "osm-way-315", "osm-way-317", "osm-way-318"), MID)
+    # The facing walls of the two sheds 0.5 m apart are party walls.
+    assert [records[b]["facade"]["mid"]["exposed_faces"] for b in ("osm-way-315", "osm-way-317", "osm-way-318")] == [3, 3, 4]
+    tagged = records["osm-way-315"]["facade"]["materials"]
+    assert tagged["roof_origin"] == "observed" and tagged["roof_source"] == "roof:colour" and "roof_evidence" not in tagged
+    lent = records["osm-way-318"]["facade"]["materials"]
+    assert lent["roof_source"] == "overture:roof_color" and lent["roof_evidence"] == _evidence("osm-way-318", "#b43c28")
+    assert records["osm-way-317"]["facade"]["materials"]["roof_source"] is None
+    church = records["osm-way-314"]["facade"]
+    assert church["needs_custom_model"] is True and church["mid"]["windows"] == 0

@@ -1087,7 +1087,7 @@ def _mid_building(o: Any, geom: BaseGeometry, others: BaseGeometry, levels: int 
     return DetailObject(o.id, "building", visual, [], record, uv_frame=frame), issues
 
 
-def _tier_counts(objects: list[DetailObject], dropped_elements: int, mid: bool = False) -> dict[str, Any]:
+def _tier_counts(objects: list[DetailObject], dropped_elements: int, *, mid: bool) -> dict[str, Any]:
     """Buildings, visual and collision triangles of the objects that carry a tier (ADR-017).
 
     With the intermediate ring (``mid``, plan D3) the ``mid`` tier is added, with the visual triangles of each

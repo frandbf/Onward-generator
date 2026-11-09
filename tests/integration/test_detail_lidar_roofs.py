@@ -175,6 +175,21 @@ def test_a_scenic_shell_is_counted_apart_and_keeps_its_cap(block: tuple[Path, Pa
     assert _building(on, "osm-way-901").record["roof"]["type"] == "gabled"
 
 
+def test_a_mid_shell_takes_its_roof_form_and_evidence_from_the_spread(block: tuple[Path, Path, Path, Path], tmp_path: Path) -> None:
+    """Plan D3: 905 lies in a 20 m ring around the 50 m core; a mid shell draws the roof form the spread gives it."""
+    scene, heights, base, _ = block
+    entry = {"id": "osm-way-905", "status": "measured", "date": "PNOA-LiDAR 1st coverage, 2008-2015", "buffer_m": 1.0,
+             "height_m": 5.75, "valid": 20, "cells": 24, "p25_m": 5.0, "p75_m": 6.5}
+    report = tmp_path / "es.pnoa_ndsm_report.json"
+    report.write_text(json.dumps(_report(scene, buildings=[entry])), encoding="utf-8")
+    generated, ref = load_base(base, scene, heights, GEN)
+    on = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0, mid_ring_m=20.0,
+                      roof_spread=load_roof_spread(str(report), str(scene)))
+    mid = _building(on, "osm-way-905").record
+    assert mid["tier"] == "mid" and mid["roof"]["origin"] == "estimated"
+    assert mid["roof"]["lidar"]["p25_m"] == 5.0 and mid["roof"]["lidar"]["p75_m"] == 6.5
+
+
 def _cli(block: tuple[Path, Path, Path, Path], out: Path, *extra: str) -> int:
     scene, heights, base, _ = block
     return detail_main(["--scene", str(scene), "--heights", str(heights), "--base", str(base), "--no-preview", "--out", str(out), *extra])

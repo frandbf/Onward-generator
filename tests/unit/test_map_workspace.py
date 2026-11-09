@@ -870,3 +870,13 @@ def test_mid_ring_needs_a_core(tmp_path: Path) -> None:
         mid_ring_m(root)
     store_mid_ring(root, None)  # removing it needs no core
     assert "mid_ring_m" not in load_map(root)
+
+
+def test_mid_ring_value_accepts_a_budget_core_without_a_radius() -> None:
+    from onward_generator.maps.workspace import _mid_ring_value
+
+    budget = {"mode": "budget", "target_triangles": 150000, "max_half_side_m": 250.0}
+    assert _mid_ring_value({"core_radius_m": 0, "core": budget}, 20) == 20.0
+    assert _mid_ring_value({"core_radius_m": 100.0}, 20) == 20.0
+    with pytest.raises(MapError, match="needs a playable core"):
+        _mid_ring_value({"core_radius_m": 0}, 20)
