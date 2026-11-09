@@ -83,7 +83,14 @@ from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
-from onward_generator.detail.typology import TypologyConfig, building_typologies, facade_style, load_typology_config, styled_template
+from onward_generator.detail.typology import (
+    FacadeStyle,
+    TypologyConfig,
+    building_typologies,
+    facade_style,
+    load_typology_config,
+    styled_template,
+)
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -99,7 +106,7 @@ from onward_generator.generation.mesh import (
     signed_volume,
     walls,
 )
-from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
+from onward_generator.generation.scene import GeneratedScene, Issue, SceneObject, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
@@ -1519,6 +1526,114 @@ def detail_scene(
                 x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
+    return _assemble_detail(
+        base=base,
+        base_ref=base_ref,
+        cfg=cfg,
+        tcfg=tcfg,
+        prototypes=prototypes,
+        extra_urban=extra_urban,
+        core_half_side_m=core_half_side_m,
+        mid_ring_m=mid_ring_m,
+        places=places,
+        tints=tints,
+        roof_spread=roof_spread,
+        core=core,
+        heights=heights,
+        height_of=height_of,
+        features=features,
+        footprints=footprints,
+        ids=ids,
+        tree=tree,
+        key_of=key_of,
+        tier_of=tier_of,
+        building_objs=building_objs,
+        facade_walls=facade_walls,
+        typologies=typologies,
+        facade_styles=facade_styles,
+        lent_walls=lent_walls,
+        lent_roofs=lent_roofs,
+        lidar_classes=lidar_classes,
+        third_party=third_party,
+        objects=objects,
+        issues=issues,
+        leading_issues=leading_issues,
+        emitted=emitted,
+        core_shells=core_shells,
+        lit=lit,
+        every_footprint=every_footprint,
+        door_fronts=door_fronts,
+        counts=counts,
+        templates_used=templates_used,
+        roof_types=roof_types,
+        roof_shapes=roof_shapes,
+        door_rules=door_rules,
+        setbacks=setbacks,
+        interiors_built=interiors_built,
+        shop_interiors=shop_interiors,
+        budgets=budgets,
+        furnishing=furnishing,
+        flat_openings=flat_openings,
+        exposed_m=exposed_m,
+        party_m=party_m,
+    )
+
+
+def _assemble_detail(
+    *,
+    base: GeneratedScene,
+    base_ref: Mapping[str, Any],
+    cfg: DetailConfig,
+    tcfg: TypologyConfig,
+    prototypes: Mapping[str, Prototype] | None,
+    extra_urban: ExtraUrban | None,
+    core_half_side_m: float | None,
+    mid_ring_m: float | None,
+    places: Sequence[Mapping[str, Any]],
+    tints: Sequence[Mapping[str, Any]] | None,
+    roof_spread: SpreadReport | None,
+    core: Polygon | None,
+    heights: dict[str, Any],
+    height_of: dict[str, Any],
+    features: list[Any],
+    footprints: dict[str, BaseGeometry],
+    ids: list[str],
+    tree: STRtree,
+    key_of: dict[str, str],
+    tier_of: dict[str, str],
+    building_objs: list[SceneObject],
+    facade_walls: dict[str, tuple[FacadeUse, str, str]],
+    typologies: dict[str, dict[str, Any]],
+    facade_styles: dict[str, FacadeStyle],
+    lent_walls: dict[str, dict[str, Any]],
+    lent_roofs: dict[str, dict[str, Any]],
+    lidar_classes: dict[str, str],
+    third_party: set[str],
+    objects: list[DetailObject],
+    issues: list[Issue],
+    leading_issues: int,
+    emitted: dict[str, tuple[list[DetailObject], list[Issue]]],
+    core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]],
+    lit: list[tuple[bool, dict[str, Any]]],
+    every_footprint: BaseGeometry,
+    door_fronts: list[Polygon],
+    counts: Counter[str],
+    templates_used: Counter[str],
+    roof_types: Counter[str],
+    roof_shapes: Counter[str],
+    door_rules: Counter[str],
+    setbacks: Counter[str],
+    interiors_built: list[str],
+    shop_interiors: list[str],
+    budgets: dict[bool, InteriorBudget],
+    furnishing: ShopFurnishing | None,
+    flat_openings: int,
+    exposed_m: float,
+    party_m: float,
+) -> DetailedScene:
+    """The rest of ``detail_scene`` once every building is drawn: party walls, building parts, ground, urban elements, checks and the report.
+
+    It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
     wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     for x in objects:
