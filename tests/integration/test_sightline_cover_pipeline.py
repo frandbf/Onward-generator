@@ -347,5 +347,6 @@ def test_max_props_from_a_street_profile_caps_the_cover_and_records_its_block(st
     two = tmp_path / "two"
     assert main([*_args(stage, two)[:-2], "--max-props", "8", *_args(stage, two)[-2:]]) == 0
     capped = json.loads((two / COVER_REPORT).read_text(encoding="utf-8"))
-    assert capped["caps"]["props"] == 8 and len(capped["placed"]) <= 8 and "street_profile" not in capped
+    assert capped["caps"] == {**report["caps"], "props": 8} and report["caps"]["triangles"] == 12_000
+    assert len(capped["placed"]) <= 8 and "street_profile" not in capped
     assert main([*_args(stage, tmp_path / "bad")[:-2], "--max-props", "9", *_args(stage, tmp_path / "bad")[-2:]]) == 2

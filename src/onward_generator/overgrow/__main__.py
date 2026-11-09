@@ -43,7 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--library", default=None, help="one catalogue directory, or a parent of catalogues; missing means procedural only")
     place.add_argument("--selection", default=None, help="prop_selection.json; only those installed ids are placed")
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
-    place.add_argument("--street-profile", default=None, help="config/street_profile.json; adds its block to overgrow_report.json (plan D2)")
+    place.add_argument(
+        "--street-profile",
+        help="config/street_profile.json; adds its block to overgrow_report.json (plan D2)",  # pragma: no mutate: help text
+    )
     place.add_argument("--overwrite", action="store_true")
     fit = sub.add_parser("fit", help="reject props whose size or footprint does not fit the street")
     fit.add_argument("--base", required=True, help="overgrow output directory")

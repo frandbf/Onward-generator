@@ -684,3 +684,360 @@ def test_a_stage_given_a_bad_record_exits_1(tmp_path: Path, capsys: pytest.Captu
     assert overgrow_main(["place", "--base", str(tmp_path), "--scene", "s", "--out", str(tmp_path / "o"),
                           "--street-profile", str(record)]) == 1
     assert "AI_PROFILE_RECORD" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------------------------------------------ pinned values
+
+GOLDEN_EFFECTS = [
+    ('dominant_typology', 'anglo', '/materials/facade_style', 'anglo', 'materials', '--facade-style', 'the map-wide facade atlas style is anglo; no building is reclassified', 'ADR-020, ADR-027'),
+    ('dominant_typology', 'central_european', '/materials/facade_style', 'central_european', 'materials', '--facade-style', 'the map-wide facade atlas style is central_european; no building is reclassified', 'ADR-020, ADR-027'),
+    ('dominant_typology', 'generic', '/materials/facade_style', 'generic', 'materials', '--facade-style', 'the map-wide facade atlas style is generic; no building is reclassified', 'ADR-020, ADR-027'),
+    ('dominant_typology', 'latin_american', '/materials/facade_style', 'latin_american', 'materials', '--facade-style', 'the map-wide facade atlas style is latin_american; no building is reclassified', 'ADR-020, ADR-027'),
+    ('dominant_typology', 'mediterranean', '/materials/facade_style', 'mediterranean', 'materials', '--facade-style', 'the map-wide facade atlas style is mediterranean; no building is reclassified', 'ADR-020, ADR-027'),
+    ('palette', 'extended_pools', '/materials/repetition', True, 'materials', '--repetition', 'the calm roof and paving pools and the per-cell ground phase', 'ADR-009'),
+    ('props_profile', 'intact', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is intact, or that have none', 'ADR-010'),
+    ('props_profile', 'worn', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is damaged, worn, or that have none', 'ADR-010'),
+    ('props_profile', 'wrecked', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is burned, damaged, wrecked, or that have none', 'ADR-010'),
+    ('abandonment', 'years_10', '/overgrow/profile_years', 10, 'overgrow', '--profile', 'grass, vines and trees follow the 10-year profile', 'ADR-010'),
+    ('abandonment', 'years_30', '/overgrow/profile_years', 30, 'overgrow', '--profile', 'grass, vines and trees follow the 30-year profile', 'ADR-010'),
+    ('abandonment', 'years_100', '/overgrow/profile_years', 100, 'overgrow', '--profile', 'grass, vines and trees follow the 100-year profile', 'ADR-010'),
+    ('cover', 'off', '/cover/max_props', 0, 'cover', '--max-props', 'sightline cover places at most 0 props', 'ADR-032'),
+    ('cover', 'light', '/cover/max_props', 8, 'cover', '--max-props', 'sightline cover places at most 8 props', 'ADR-032'),
+    ('cover', 'full', '/cover/max_props', 24, 'cover', '--max-props', 'sightline cover places at most 24 props', 'ADR-032'),
+]
+
+
+def test_effects_golden() -> None:
+    assert [(e.field, e.id, e.pointer, e.value, e.stage, e.flag, e.effect, e.adr) for e in EFFECTS.values()] == GOLDEN_EFFECTS
+
+
+def test_inputs_and_prompt_hashes_are_pinned() -> None:
+    library = [("b", "worn"), ("a", "")]
+    centre = {"latitude": 37.984071234, "longitude": -1.12863}
+    assert sp.inputs_sha256("ñ calle", centre, library, True) == "b11c4aa74ba9d6458f18b0eaa31e56b0f41d8769694499fc350c2e60518bf477"
+    assert sp.inputs_sha256("ñ calle", centre, list(reversed(library)), True) == sp.inputs_sha256("ñ calle", centre, library, True)
+    assert sp.inputs_sha256("ñ calle", centre, library, False) != sp.inputs_sha256("ñ calle", centre, library, True)
+    assert sp.prompt_sha256("x") == "cee7ccb0ae72693dfb4558a025d15b462d18caa9cd4fe40754553803b1183b49"
+    assert (sp._round(1.123456), sp._round(2), sp._round(True), sp._round("1"), sp._round(None)) == (1.12346, 2.0, None, None, None)
+
+
+def test_instruction_golden() -> None:
+    text = sp.instruction("ñ", {"latitude": 37.984071234, "longitude": -1.1}, [("b", "worn"), ("a", ""), ("c", "damaged")])
+    assert text == ('Brief (quoted exactly):\n"ñ"\n\nMap centre (WGS84): 37.98407, -1.1\n\n'
+                    'Library props per props_profile: {"intact": 0, "worn": 2, "wrecked": 1}\n')
+
+
+def test_parse_messages_are_exact() -> None:
+    def message(text: str) -> str:
+        with pytest.raises(StreetProfileError) as caught:
+            parse_street_profile(text)
+        return caught.value.message
+
+    assert message(" ") == "the reply is empty"
+    assert message("[]") == "the reply must be a JSON object, got list"
+    assert message("{") .startswith("the reply is not strict JSON (") and message("{").endswith("; only one JSON object is accepted")
+    two = message(json.dumps({**NEUTRAL_REPLY, "cover": "max", "palette": "neon"})).split("; ")
+    assert len(two) == 2 and two[0].startswith("/cover: 'max' is not one of") and two[1].startswith("/palette: 'neon' is not one of")
+    document = dict(NEUTRAL_REPLY)
+    del document["cover"]
+    assert message(json.dumps(document)) == "/: 'cover' is a required property"
+
+
+def test_effective_settings_golden(root: Path) -> None:
+    from onward_generator.io import sha256_file
+
+    osm = root / "data" / "raw" / "murcia.osm"
+    osm.parent.mkdir(parents=True, exist_ok=True)
+    osm.write_text("<osm/>")
+    document = load_map(root)
+    document.update(sources={"es.catastro": False}, facades={"mode": "legacy"}, core_radius_m=60.0)
+    (root / "map.json").write_text(json.dumps(document))
+    card = sha256_file(root / "config" / "export.json")
+    assert sp.effective_settings(root) == {
+        "area": {"radius_m": 150.0, "margin_m": 30.0, "crs": "EPSG:25830"},
+        "center": {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON},
+        "sources": {"es.catastro": False},
+        "export": {"sha256": card},
+        "budgets": {"export_card_sha256": card},
+        "core": {"core_radius_m": 60.0, "core": None},
+        "buildings_sha256": sha256_file(osm),
+        "sightline_cover": False,
+        "materials": {"facade_style": "auto", "repetition": False},
+        "overgrow": {"profile_years": 100, "selection": None},
+        "cover": {"max_props": 24},
+    }
+    del document["sources"]
+    (root / "map.json").write_text(json.dumps(document))
+    assert sp.effective_settings(root)["sources"] == {}
+
+
+def test_translate_leaves_its_input_alone() -> None:
+    before = _before()
+    translate(StreetProfile("anglo", "extended_pools", "wrecked", "years_30", "off"), before, Context(True, tuple(LIBRARY)))
+    assert before == _before()
+
+
+def test_paths_are_fixed(root: Path) -> None:
+    assert selection_path(root) == root / "config" / "street_profile_selection.json"
+    assert record_path(root) == root / "config" / "street_profile.json"
+    result = resolve_street_profile(root, provider=Stub(reply()), library=None)  # type: ignore[arg-type]
+    assert result.path == record_path(root) and result.origin == "ai_generated"
+
+
+def test_record_golden_keys_and_hashes(root: Path) -> None:
+    record = resolve(root, Stub(ProviderError("Ollama is down"), ProviderError("Ollama is down")))
+    assert list(record) == [
+        "schema", "schema_version", "profile_version", "prompt_version", "origin", "provenance", "attempts", "reason",
+        "diagnostics", "raw", "raw_sha256", "schema_sha256", "prompt_sha256", "inputs_sha256", "ids", "summary",
+        "summary_status", "provider", "changes",
+    ]
+    assert (record["schema"], record["schema_version"], record["profile_version"], record["prompt_version"]) == (
+        "onward_generator.street_profile_record", "0.1.0", "0.1.0", "0.1.0")
+    assert record["raw"] == "" and record["raw_sha256"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert record["diagnostics"] == [{"code": "AI_PROFILE_PROVIDER", "message": "Ollama is down"}] * 2
+    assert record["reason"] == "Ollama is down [AI_PROFILE_PROVIDER]"
+    centre = {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON}
+    assert record["inputs_sha256"] == sp.inputs_sha256("", centre, LIBRARY, False)
+    assert record["prompt_sha256"] == sp.prompt_sha256(sp.instruction("", centre, LIBRARY))
+    assert record["schema_sha256"] == sp.schema_sha256()
+    resolve(root, Stub(reply(abandonment="years_10")))
+    replay = resolve(root, Refuse())
+    assert replay["reason"] is None and replay["diagnostics"] == [] and replay["provider"] == {"provider": "stub"}
+
+
+def test_the_instruction_sent_is_the_one_hashed(root: Path) -> None:
+    store_brief(root, "una calle abandonada")
+    stub = Stub(reply())
+    record = resolve(root, stub)
+    centre = {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON}
+    assert stub.calls == [sp.instruction("una calle abandonada", centre, LIBRARY)]
+    assert record["inputs_sha256"] == sp.inputs_sha256("una calle abandonada", centre, LIBRARY, False)
+
+
+def test_the_retry_text_is_exact(root: Path) -> None:
+    stub = Stub("[]", reply())
+    resolve(root, stub)
+    assert stub.calls[1] == (stub.calls[0] + "\nThe previous reply was rejected:\n"
+                             "the reply must be a JSON object, got list [AI_PROFILE_SCHEMA]\n"
+                             "Reply again with one JSON object. Use only the ids listed in the system message.\n")
+
+
+def test_diagnostics_are_exact(root: Path) -> None:
+    resolve(root, Stub("[]", reply(abandonment="years_10")))
+    assert load_record(record_path(root))["diagnostics"] == [
+        {"code": "AI_PROFILE_SCHEMA", "message": "the reply must be a JSON object, got list"}]
+    store_brief(root, "other")
+    assert resolve(root, Stub(reply()))["diagnostics"] == [
+        {"code": "AI_PROFILE_STALE", "message": "the stored reply was made for other inputs; it was archived"}]
+
+
+def test_two_protected_pointers_are_listed(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = sp.translate
+
+    def leaky(profile: StreetProfile, before: Any, context: Context) -> Any:
+        after, rows = real(profile, before, context)
+        after["area"], after["sources"] = "a", "b"
+        return after, rows
+
+    monkeypatch.setattr(sp, "translate", leaky)
+    record = resolve(root, Stub(reply(abandonment="years_10")))
+    assert record["diagnostics"] == [{"code": "AI_PROFILE_PROTECTED", "message": "AI_PROFILE_PROTECTED: the profile would change /area, /sources"}]
+
+
+def _pad(path: Path, size: int) -> None:
+    text = path.read_text()
+    path.write_text(text + " " * (size - len(text.encode())))
+    assert path.stat().st_size == size
+
+
+def test_records_at_the_size_limit_are_read(root: Path) -> None:
+    resolve(root, Stub(reply(abandonment="years_10")))
+    _pad(record_path(root), sp.MAX_RECORD_BYTES)
+    assert load_record(record_path(root))["ids"]["abandonment"] == "years_10"
+    assert resolve(root, Refuse())["origin"] == "replay"
+    _pad(record_path(root), sp.MAX_RECORD_BYTES + 1)
+    stub = Stub(reply())
+    assert resolve(root, stub)["origin"] == "ai_generated" and len(stub.calls) == 1
+
+
+@pytest.mark.parametrize("stored", ["[]", '{"schema": "other"}', "\xff"])
+def test_a_stored_file_that_is_not_a_record_is_asked_again(root: Path, stored: str) -> None:
+    resolve(root, Stub(reply(abandonment="years_10")))
+    document = json.loads(record_path(root).read_text())
+    if stored == '{"schema": "other"}':
+        record_path(root).write_text(json.dumps({**document, "schema": "other"}))
+    elif stored == "\xff":
+        record_path(root).write_bytes(b"\xff")
+    else:
+        record_path(root).write_text(stored)
+    stub = Stub(reply())
+    assert resolve(root, stub)["diagnostics"] == [] and len(stub.calls) == 1
+
+
+def test_a_stored_record_without_a_raw_string_is_asked_again(root: Path) -> None:
+    resolve(root, Stub(reply(abandonment="years_10")))
+    document = json.loads(record_path(root).read_text())
+    record_path(root).write_text(json.dumps({**document, "raw": None}))
+    stub = Stub(reply())
+    assert resolve(root, stub)["origin"] == "ai_generated" and len(stub.calls) == 1
+
+
+def test_the_default_provider_is_loopback_ollama(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.ai import providers
+
+    made: list[Stub] = []
+
+    def ollama() -> Stub:
+        made.append(Stub(reply(cover="off")))
+        return made[-1]
+
+    monkeypatch.setattr(providers, "OllamaProvider", ollama)
+    record = resolve_street_profile(root).record
+    assert len(made) == 1 and record["ids"]["cover"] == "off" and record["origin"] == "ai_generated"
+
+
+def test_the_default_library_is_assets(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(sp, "library_conditions", lambda library: seen.append(library) or [])
+    resolve_street_profile(root, provider=Stub(reply()))  # type: ignore[arg-type]
+    assert seen == ["assets"]
+
+
+def test_calm_plan_checks_a_library_plan_with_the_extended_pools(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import library_plan
+
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(library_plan, "assert_library_entries", lambda document, **kwargs: calls.append(kwargs))
+    plan = root / "config" / "texture_plan.json"
+    assert json.loads(plan.read_text())["provider"] == "library"
+    assert sp._calm_plan(root) is True and calls == [{"extended": True}]
+    plan.write_text(json.dumps({"provider": "urls"}))
+    assert sp._calm_plan(root) is True and len(calls) == 1
+
+    def refuse(document: Any, **kwargs: Any) -> None:
+        raise library_plan.PlanError("not calm")
+
+    monkeypatch.setattr(library_plan, "assert_library_entries", refuse)
+    plan.write_text(json.dumps({"provider": "library"}))
+    assert sp._calm_plan(root) is False
+
+
+def test_the_selection_file_bytes(root: Path) -> None:
+    resolve(root, Stub(reply(props_profile="intact")))
+    assert selection_path(root).read_text() == (
+        '{\n  "schema": "onward_generator.prop_selection",\n  "schema_version": "0.1.0",\n  "ids": [\n    "bin_intact",\n    "tree"\n  ]\n}\n')
+
+
+@pytest.mark.parametrize(("edit", "message"), [
+    (lambda d: d.update(schema="other"), "not a onward_generator.street_profile_record 0.1.0 record"),
+    (lambda d: d.update(schema_version="0.2.0"), "not a onward_generator.street_profile_record 0.1.0 record"),
+    (lambda d: d["ids"].update(cover="max"), "ids must name one allowed id per field"),
+    (lambda d: d.update(origin="rules"), "origin and provenance do not match"),
+    (lambda d: d.update(changes=[1]), "changes must be a list of objects"),
+    (lambda d: d["changes"][0].update(pointer="/area"), "change '/area' is not the effect of its id"),
+])
+def test_load_record_messages(root: Path, edit: Any, message: str) -> None:
+    resolve(root, Stub(reply(abandonment="years_10")))
+    path = record_path(root)
+    document = json.loads(path.read_text())
+    edit(document)
+    path.write_text(json.dumps(document))
+    with pytest.raises(StreetProfileError) as caught:
+        load_record(path)
+    assert caught.value.message == f"{path}: {message}"
+
+
+def test_load_record_file_messages(tmp_path: Path) -> None:
+    path = tmp_path / "r.json"
+    with pytest.raises(StreetProfileError) as caught:
+        load_record(path)
+    assert caught.value.message == f"{path}: street profile record not found"
+    path.write_text(" " * (64 * 1024 + 1))
+    with pytest.raises(StreetProfileError) as caught:
+        load_record(path)
+    assert caught.value.message == f"{path}: the record is over 65536 bytes"
+    path.write_text("{")
+    with pytest.raises(StreetProfileError) as caught:
+        load_record(path)
+    assert caught.value.message.startswith(f"{path}: not strict JSON (")
+
+
+def test_flags_follow_the_live_selection_and_cover_switch(root: Path) -> None:
+    store_sightline_cover(root, True)
+    resolve(root, Stub(reply(props_profile="wrecked", cover="light")))
+    assert set(profile_flags(root)) == {"overgrow", "cover"}
+    selection_path(root).unlink()
+    assert set(profile_flags(root)) == {"cover"}
+    store_sightline_cover(root, False)
+    assert profile_flags(root) == {}
+
+
+def test_describe_is_exact(root: Path) -> None:
+    result = resolve_street_profile(root, provider=Stub(reply(cover="off")), library=None)  # type: ignore[arg-type]
+    assert sp.describe(result) == "street profile: ai_generated, cover=off"
+    store_brief(root, "x")
+    result = resolve_street_profile(root, provider=Stub("[]", "[]"), library=None)  # type: ignore[arg-type]
+    assert sp.describe(result) == ("street profile: rules, all map_default "
+                                   "(the reply must be a JSON object, got list [AI_PROFILE_SCHEMA])")
+
+
+def _run_map(root: Path, provider: Any, street_profile: bool = True, out: str | None = None) -> int:
+    from onward_generator.pipeline_run import run_map
+
+    return run_map(
+        map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150, margin_m=30,
+        out=out or str(root), execute=lambda _argv: 2, interactive=False, no_unity=True,
+        street_profile=street_profile, profile_provider=provider,
+    )
+
+
+def test_run_on_an_existing_map_stores_the_switch_and_resolves_with_the_given_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sp, "library_conditions", lambda _library: [])
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150)
+    assert _run_map(root, Refuse(), street_profile=False) == 2
+    assert "street_profile" not in load_map(root) and not record_path(root).exists()
+    assert _run_map(root, Stub(reply(abandonment="years_10"))) == 2
+    assert load_map(root)["street_profile"] is True
+    record = load_record(record_path(root))
+    assert record["origin"] == "ai_generated" and record["provider"] == {"provider": "stub"}
+
+
+def test_run_on_a_new_map_stores_the_switch_and_resolves_with_the_given_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sp, "library_conditions", lambda _library: [])
+    from onward_generator.pipeline_run import run_map
+
+    def execute(argv: list[str]) -> int:
+        if argv[:2] == ["map", "create"]:
+            create_map(Path("maps/murcia"), map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT,
+                       longitude=MURCIA_CENTER_LON, radius_m=150)
+            return 0
+        return 2
+
+    code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150,
+                   margin_m=30, out="maps/murcia", execute=execute, interactive=False, no_unity=True,
+                   street_profile=True, profile_provider=Stub(reply(cover="off")))  # type: ignore[arg-type]
+    root = tmp_path / "maps" / "murcia"
+    assert code == 2 and load_map(root)["street_profile"] is True
+    record = load_record(record_path(root))
+    assert record["origin"] == "ai_generated" and record["ids"]["cover"] == "off"
+
+
+def test_the_run_command_passes_the_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.cli import main
+
+    received: dict[str, object] = {}
+
+    def fake_run_map(**kwargs: object) -> int:
+        received.update(kwargs)
+        return 0
+
+    monkeypatch.setattr("onward_generator.pipeline_run.run_map", fake_run_map)
+    base = ["run", "--name", "Murcia", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]
+    assert main(base) == 0 and received["street_profile"] is False
+    assert main([*base, "--street-profile"]) == 0 and received["street_profile"] is True

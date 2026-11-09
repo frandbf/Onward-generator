@@ -166,14 +166,13 @@ def parse_street_profile(text: str) -> StreetProfile:
     if errors:
         problems = "; ".join(f"{''.join(f'/{p}' for p in e.absolute_path) or '/'}: {e.message}" for e in errors)
         raise StreetProfileError("AI_PROFILE_SCHEMA", problems)
-    summary = document.get("summary")
     return StreetProfile(
         dominant_typology=str(document["dominant_typology"]),
         palette=str(document["palette"]),
         props_profile=str(document["props_profile"]),
         abandonment=str(document["abandonment"]),
         cover=str(document["cover"]),
-        summary=summary if isinstance(summary, str) else None,
+        summary=document.get("summary"),  # the schema allows only a string here
     )
 
 
@@ -192,15 +191,11 @@ You cannot change the area, the coordinates, the data sources, the export, the b
 
 
 def instruction(brief: str, center: Mapping[str, Any], library: Sequence[tuple[str, str]]) -> str:
-    counts: dict[str, int] = {}
-    for _ident, condition in library:
-        key = condition or "none"
-        counts[key] = counts.get(key, 0) + 1
-    groups = {group: sum(counts.get(c, 0) for c in conditions) for group, conditions in CONDITION_GROUPS.items()}
+    groups = {group: sum(1 for _ident, condition in library if condition in conditions) for group, conditions in CONDITION_GROUPS.items()}
     return (
         f"Brief (quoted exactly):\n{json.dumps(brief, ensure_ascii=False)}\n\n"
         f"Map centre (WGS84): {_round(center.get('latitude'))}, {_round(center.get('longitude'))}\n\n"
-        f"Library props per props_profile: {json.dumps(groups, sort_keys=True)}\n"
+        f"Library props per props_profile: {json.dumps(groups)}\n"
     )
 
 
@@ -247,22 +242,22 @@ def selection_for(props_profile: str, library: Sequence[tuple[str, str]]) -> lis
 def effective_settings(root: Path) -> dict[str, Any]:
     """The settings a profile is checked against: the five it may reach, and the protected ones around them."""
     from onward_generator.maps.workspace import load_map, repetition_enabled, sightline_cover_enabled
+    from onward_generator.osm.acquire import osm_target
     from onward_generator.overgrow.profiles import PROFILES
 
     document = load_map(root)
-    paths = document.get("paths") or {}
-    card = root / str(paths.get("export") or "config/export.json")
+    card = root / document["paths"]["export"]
     facades = document.get("facades")
     style = facades.get("style", "auto") if isinstance(facades, dict) else "auto"
-    osm = root / str(paths.get("raw") or "data/raw") / f"{document.get('id')}.osm"
+    osm = osm_target(root)
     user_selection = root / "config" / "prop_selection.json"
     return {
         "area": {key: document.get(key) for key in ("radius_m", "margin_m", "crs")},
-        "center": document.get("center"),
-        "sources": document.get("sources") or {},
+        "center": document["center"],
+        "sources": document.get("sources", {}),
         "export": {"sha256": _file_sha(card)},
         "budgets": {"export_card_sha256": _file_sha(card)},
-        "core": {"core_radius_m": document.get("core_radius_m"), "core": document.get("core")},
+        "core": {key: document.get(key) for key in ("core_radius_m", "core")},
         "buildings_sha256": _file_sha(osm),
         "sightline_cover": sightline_cover_enabled(root),
         "materials": {"facade_style": style, "repetition": repetition_enabled(root)},
@@ -289,13 +284,13 @@ class Context:
 
 def _get(document: Mapping[str, Any], pointer: str) -> Any:
     node: Any = document
-    for part in pointer.strip("/").split("/"):
+    for part in pointer[1:].split("/"):
         node = node[part]
     return node
 
 
 def _set(document: dict[str, Any], pointer: str, value: Any) -> None:
-    *parents, last = pointer.strip("/").split("/")
+    *parents, last = pointer[1:].split("/")
     node = document
     for part in parents:
         node = node[part]
@@ -379,22 +374,25 @@ def _read_stored(path: Path) -> dict[str, Any] | None:
     if not path.is_file() or path.stat().st_size > MAX_RECORD_BYTES:
         return None
     try:
-        document = loads_strict(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        document = loads_strict(path.read_bytes().decode())
+    except (OSError, ValueError):  # UnicodeDecodeError and JSONDecodeError are ValueErrors
         return None
     return document if isinstance(document, dict) and document.get("schema") == RECORD_SCHEMA else None
 
 
-def _stored_reply(stored: Mapping[str, Any] | None, hashes: Mapping[str, str]) -> str | None:
-    """The raw reply of a stored record whose hashes all match, as ``realize._stored_reply``; rules are never replayed."""
+def _replay(stored: Mapping[str, Any] | None, hashes: Mapping[str, str]) -> tuple[str, StreetProfile] | None:
+    """The reply of a stored record whose hashes all match, as ``realize._stored_reply``; rules are never replayed."""
     if stored is None or any(stored.get(key) != value for key, value in hashes.items()):
         return None
     if stored.get("origin") not in REPLAYABLE:
         return None
     raw = stored.get("raw")
-    if not isinstance(raw, str) or not raw or _sha(raw) != stored.get("raw_sha256"):
+    if not isinstance(raw, str) or _sha(raw) != stored.get("raw_sha256"):
         return None
-    return raw
+    try:
+        return raw, parse_street_profile(raw)
+    except StreetProfileError:
+        return None
 
 
 def _ask(provider: Provider | None, message: str) -> tuple[str, dict[str, Any] | None]:
@@ -430,9 +428,8 @@ def resolve_street_profile(
 
     base = Path(root).expanduser().resolve()
     document = load_map(base)
-    brief = str(document.get("brief") or "")
-    stored_center = document.get("center")
-    center: Mapping[str, Any] = stored_center if isinstance(stored_center, dict) else {}
+    brief = str(document.get("brief", ""))
+    center: Mapping[str, Any] = document["center"]
     rows = tuple(library_conditions(library))
     before = effective_settings(base)
     message = instruction(brief, center, rows)
@@ -444,34 +441,25 @@ def resolve_street_profile(
     path = record_path(base)
     stored = _read_stored(path)
     diagnostics: list[dict[str, str]] = []
-    raw = _stored_reply(stored, hashes)
-    profile: StreetProfile | None = None
-    origin: Origin = "rules"
-    attempts = 0
-    reason: str | None = None
-    provider_info: Any = None
-    if raw is not None and stored is not None:
-        try:
-            profile = parse_street_profile(raw)
-        except StreetProfileError:
-            raw = None
-        else:
-            origin, provider_info = "replay", stored.get("provider")
-    if profile is None:
+    replayed = _replay(stored, hashes)
+    origin: Origin
+    if replayed is not None and stored is not None:
+        (raw, profile), attempts, reason, provider_info = replayed, 0, None, stored.get("provider")
+        origin = "replay"
+    else:
         if stored is not None and stored.get("origin") in REPLAYABLE:
             _archive(path, stored)
             diagnostics.append({"code": "AI_PROFILE_STALE", "message": "the stored reply was made for other inputs; it was archived"})
-        raw, profile, attempts, reason, provider_info = _ask_twice(provider, message, diagnostics)
-        origin = "rules" if profile is None else "ai_generated"
-        profile = profile or RULES_PROFILE
-    context = Context(_calm_plan(base), rows)
-    after, change_rows = translate(profile, before, context)
+        raw, answer, attempts, reason, provider_info = _ask_twice(provider, message, diagnostics)
+        origin = "rules" if answer is None else "ai_generated"
+        profile = answer or RULES_PROFILE
+    after, change_rows = translate(profile, before, Context(_calm_plan(base), rows))
     protected = guard(before, after)
     if protected:
         reason = f"AI_PROFILE_PROTECTED: the profile would change {', '.join(protected)}"
         diagnostics.append({"code": "AI_PROFILE_PROTECTED", "message": reason})
-        profile, origin = RULES_PROFILE, "rules"
-        after, change_rows = translate(profile, before, context)
+        # The neutral profile writes nothing, so there is nothing to translate.
+        profile, origin, change_rows = RULES_PROFILE, "rules", []
     record = {
         "schema": RECORD_SCHEMA,
         "schema_version": RECORD_VERSION,
@@ -482,8 +470,8 @@ def resolve_street_profile(
         "attempts": attempts,
         "reason": reason,
         "diagnostics": diagnostics,
-        "raw": raw or "",
-        "raw_sha256": _sha(raw or ""),
+        "raw": raw,
+        "raw_sha256": _sha(raw),
         **hashes,
         "ids": profile.ids(),
         "summary": profile.summary,
@@ -492,8 +480,7 @@ def resolve_street_profile(
         "changes": changes(change_rows, origin),
     }
     _write_selection(base, profile, change_rows, rows)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(path, record)
+    atomic_write_json(path, record)  # map create always writes config/
     return ProfileResult(record, path)
 
 
@@ -527,7 +514,7 @@ def _ask_twice(
 
 def _archive(path: Path, stored: Mapping[str, Any]) -> None:
     """Keep a stale reply as ``street_profile.<raw_sha256[:12]>.json``; one already archived is left as it is."""
-    target = path.with_name(f"street_profile.{str(stored.get('raw_sha256') or '')[:12]}.json")
+    target = path.with_name(f"street_profile.{str(stored.get('raw_sha256'))[:12]}.json")
     if not target.exists():
         atomic_write_bytes(target, path.read_bytes())
 
@@ -542,7 +529,6 @@ def _write_selection(root: Path, profile: StreetProfile, rows: Sequence[Mapping[
             target.unlink()
         return
     document = {"schema": SELECTION_SCHEMA, "schema_version": SELECTION_VERSION, "ids": selection_for(profile.props_profile, library)}
-    target.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_bytes(target, (json.dumps(document, indent=2) + "\n").encode("utf-8"))
 
 
@@ -557,7 +543,7 @@ def load_record(path: str | Path) -> dict[str, Any]:
     if source.stat().st_size > MAX_RECORD_BYTES:
         raise StreetProfileError("AI_PROFILE_RECORD", f"{source}: the record is over {MAX_RECORD_BYTES} bytes")
     try:
-        record = loads_strict(source.read_text(encoding="utf-8"))
+        record = loads_strict(source.read_bytes().decode())
     except (OSError, ValueError) as exc:
         raise StreetProfileError("AI_PROFILE_RECORD", f"{source}: not strict JSON ({exc})") from exc
     if not isinstance(record, dict) or record.get("schema") != RECORD_SCHEMA or record.get("schema_version") != RECORD_VERSION:
