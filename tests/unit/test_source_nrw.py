@@ -115,6 +115,38 @@ def test_nrw_covers_the_state_and_none_of_the_bench_cities() -> None:
     assert len(load_coverage(nrw_ndom.COVERAGE_PATH)) == 1
 
 
+@pytest.mark.parametrize(("lon", "lat"), [
+    (5.87, 51.05),  # Selfkant, the western tip
+    (6.16, 51.87),  # Elten, by the Dutch border
+    (6.83, 52.035),  # Vreden
+    (7.04, 52.21),  # Gronau
+    (7.72, 52.37),  # Recke, the north-west corner
+    (8.97, 52.38),  # Petershagen, the north-east corner
+    (9.25, 51.95),  # Lügde
+    (9.38, 51.65),  # Beverungen, the eastern tip
+    (8.62, 51.11),  # Hallenberg
+    (8.42, 50.93),  # Bad Laasphe
+    (8.085, 50.745),  # Burbach, the southern tip of Siegen-Wittgenstein
+    (8.1, 50.815),  # Wilnsdorf
+    (6.43, 50.48),  # Hellenthal, by the Belgian border
+    (6.48, 50.36),  # Dahlem-Kronenburg, the southern tip
+    (6.02, 50.77),  # Aachen-Vaalserquartier
+])
+def test_nrw_covers_the_border_towns(lon: float, lat: float) -> None:
+    assert NRW.covers(lon, lat)
+
+
+@pytest.mark.parametrize(("lon", "lat"), [
+    (7.59, 50.36),  # Koblenz
+    (9.48, 51.31),  # Kassel
+    (9.73, 52.37),  # Hannover
+    (5.90, 51.98),  # Arnhem
+    (5.69, 50.85),  # Maastricht
+])
+def test_nrw_leaves_out_the_cities_beyond_its_borders(lon: float, lat: float) -> None:
+    assert not NRW.covers(lon, lat)
+
+
 def test_requests_keep_the_native_grid_and_split_past_max_cells() -> None:
     (only,) = NRW.requests((356500.2, 5645250.3, 356599.9, 5645349.6))
     assert only.bbox == (356500.0, 5645250.0, 356600.0, 5645350.0)
