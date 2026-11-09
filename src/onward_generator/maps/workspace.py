@@ -342,6 +342,33 @@ def store_lidar_roofs(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def regional_facades_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"regional_facades": true`` (plan D1, ADR-020 amendment, off by default).
+
+    ``materials apply`` then gives central_european, anglo and latin_american their atlas from
+    ``config/facade_styles.regional.json``. A map without ``map.json`` or without the key stays off.
+    A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("regional_facades", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "regional_facades" must be true or false, got {value!r}')
+    return value
+
+
+def store_regional_facades(directory: str | Path, enabled: bool) -> None:
+    """Record the regional facades switch on an existing map. Does not rewrite scenes."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"regional_facades" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["regional_facades"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 

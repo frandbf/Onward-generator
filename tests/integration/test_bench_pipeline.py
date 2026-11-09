@@ -543,3 +543,20 @@ def test_the_gameplay_headline_comes_from_the_covered_scene_when_there_is_one(tm
     (covered / "gameplay_report.json").write_text(json.dumps(COVERED_GAMEPLAY), encoding="utf-8")
     assert bench.gameplay_path(tmp_path) == covered / "gameplay_report.json"
     assert bench.gameplay_metrics(tmp_path)["longest_open_sight_m"] == 129.42
+
+
+def test_regional_facades_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    materials = next(argv for argv in off.calls if argv[:2] == ["materials", "apply"])
+    assert "--regional-facades" not in materials
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--regional-facades") == 0
+    materials = next(argv for argv in on.calls if argv[:2] == ["materials", "apply"])
+    assert materials.count("--regional-facades") == 1
+    assert bench.inputs_sha256(inputs) == digest
+    assert "regional_facades" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert json.loads((root / "runs" / "r2" / "bench_murcia" / "map.json").read_text(encoding="utf-8"))["regional_facades"] is True

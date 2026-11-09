@@ -61,6 +61,7 @@ from onward_generator.maps.workspace import (
     store_gameplay_report,
     store_lidar_roofs,
     store_overture_tints,
+    store_regional_facades,
     store_repetition,
     store_sightline_cover,
     store_sources,
@@ -360,7 +361,7 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
-              balanced_spawns: bool = False, sightline_cover: bool = False) -> MapRun:
+              balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -372,6 +373,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``lightmap_pages_max`` sets the plan C5 lightmap page budget in the run copy's export card only.
     ``balanced_spawns`` switches the plan C6 spawn and Uplink placement on in the run copy's ``map.json`` only.
     ``sightline_cover`` switches the plan C7 cover stage on in the run copy's ``map.json`` only.
+    ``regional_facades`` switches the plan D1 regional atlases on in the run copy's ``map.json`` only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -394,6 +396,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_balanced_spawns(root, True)
     if sightline_cover:
         store_sightline_cover(root, True)
+    if regional_facades:
+        store_regional_facades(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -961,7 +965,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
                         scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
-                        balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover)
+                        balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover,
+                        regional_facades=args.regional_facades)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -1039,6 +1044,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="place the defenders and the Uplink by the gameplay metrics in each run copy (plan C6, map.json balanced_spawns)")
     run.add_argument("--sightline-cover", action="store_true",
                      help="stand catalogue cover on the long open sightlines in each run copy (plan C7, map.json sightline_cover)")
+    run.add_argument("--regional-facades", action="store_true",
+                     help="bake the central_european, anglo and latin_american atlases in each run copy (plan D1, map.json regional_facades)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

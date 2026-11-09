@@ -298,3 +298,24 @@ def test_detail_command_reads_the_roof_spread_only_when_given(tmp_path: Path) ->
     at = argv.index("--lidar-roofs")
     assert argv[at + 1] == str(report) and argv[:at] + argv[at + 2:] == plain
     assert argv[at + 2] == "--out"
+
+
+def test_materials_command_carries_the_regional_facades_switch(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_regional_facades, store_repetition
+    from onward_generator.next_step import materials_command
+
+    root = tmp_path / "krakow"
+    create_map(root, map_id="krakow", name="Krakow", latitude=50.0614, longitude=19.9366, radius_m=150)
+    dress = root / "data" / "processed" / "scene_dress"
+    off = list(materials_command(dress).argv)
+    assert "--regional-facades" not in off
+    store_regional_facades(root, False)
+    assert list(materials_command(dress).argv) == off
+    store_regional_facades(root, True)
+    on = list(materials_command(dress).argv)
+    assert on.count("--regional-facades") == 1
+    assert on[:-2] == off[:-2] + ["--regional-facades"] and on[-2:] == off[-2:]
+    store_repetition(root, True)
+    both = list(materials_command(dress).argv)
+    assert both[both.index("--regional-facades") + 1] == "--repetition"
+    assert "--regional-facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv

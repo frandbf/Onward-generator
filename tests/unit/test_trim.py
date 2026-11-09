@@ -25,7 +25,9 @@ from onward_generator.materials.trim import (
     band_mesh,
     building_bands,
     building_look,
+    era_band,
     look_key,
+    observed_period,
     opening_cell,
     opening_uvs,
     scenic_trim_material,
@@ -39,7 +41,14 @@ from onward_generator.materials.trim import (
     wall_uvs,
     window_families,
 )
-from onward_generator.materials.trim_style import STYLE_TABLE_PATH, StyleError, load_style_table, trim_layout
+from onward_generator.materials.trim_style import (
+    REGIONAL_TABLE_PATH,
+    STYLE_TABLE_PATH,
+    StyleError,
+    load_regional_table,
+    load_style_table,
+    trim_layout,
+)
 from tests.conftest import MURCIA_CENTER
 
 SHIPPED = load_style_table().styles["mediterranean"].atlas or {}
@@ -813,3 +822,190 @@ def test_an_rgba_scene_colour_tints_its_strip_by_rgb_only(small_table: Path) -> 
     tints = {wall: tuple(float(c) for c in COLORS[wall]) for wall in sorted(atlas["walls"])}
     sources = {s["key"]: s["sha256"] for s in result.report["atlas"]["sources"]}
     assert result.report["atlas"]["cache_key"] == trim_cache_key("mediterranean", atlas, tints, sources)
+
+
+# ------------------------------------------------------------------ plan D1: regional atlases and era bands
+
+KRAKOW = [19.9366, 50.0614]
+LONDON = [-0.1276, 51.5072]
+MEXICO_CITY = [-99.1332, 19.4326]
+CENTRES = {"central_european": KRAKOW, "anglo": LONDON, "latin_american": MEXICO_CITY}
+REGIONAL_ATLAS = load_regional_table(load_style_table()).atlases["central_european"]
+
+
+def _era(period: object, origin: str = "observed") -> dict[str, object]:
+    return {**RECORD, "facade": {**RECORD["facade"], "typology": {"era": {"year": 1890, "period": period, "origin": origin}}}}
+
+
+@pytest.fixture
+def small_regional_table(tmp_path: Path) -> Path:
+    """The shipped regional recipes at 1024 px, so a bake is quick."""
+    doc = json.loads(REGIONAL_TABLE_PATH.read_text(encoding="utf-8"))
+    for atlas in doc["atlases"].values():
+        atlas.update(size_px=1024, height_px=1024, fit_row_px=192, fit_cell_px=96, cornice_px=64, zocalo_px=64, stone_px=32)
+    path = tmp_path / "regional.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    return path
+
+
+def test_without_the_option_the_regional_styles_keep_the_legacy_path() -> None:
+    nodes = [_building()]
+    for style, centre in CENTRES.items():
+        for options in ({}, {"regional": False}, {"regional": True, "mode": "legacy"}):
+            result = apply_trim(nodes, {"frame": {"origin_wgs84": centre}}, COLORS, **options)  # type: ignore[arg-type]
+            assert result.mode == "legacy" and result.style == style and result.nodes == nodes and result.png == b""
+            assert set(result.report) == {"mode", "reason", "style", "style_origin", "style_table_sha256"}
+            reason = "config" if options.get("mode") == "legacy" else "style_has_no_atlas"
+            assert result.report["reason"] == reason
+
+
+def test_the_legacy_path_never_reads_the_regional_table(tmp_path: Path) -> None:
+    broken = tmp_path / "broken.json"
+    broken.write_text("{", encoding="utf-8")
+    manifest = {"frame": {"origin_wgs84": KRAKOW}}
+    assert apply_trim([], manifest, COLORS, regional_table_path=broken).mode == "legacy"
+    assert apply_trim([], manifest, COLORS, mode="legacy", regional=True, regional_table_path=broken).mode == "legacy"
+    with pytest.raises(StyleError, match="broken.json: not JSON"):
+        apply_trim([], manifest, COLORS, regional=True, regional_table_path=broken)
+    # A style with an atlas in the main table never reads it either.
+    assert apply_trim([], MANIFEST, COLORS, regional=True, regional_table_path=broken).mode == "trim"
+
+
+def test_a_style_without_a_regional_recipe_stays_legacy(small_regional_table: Path) -> None:
+    tokyo = apply_trim([_building()], {"frame": {"origin_wgs84": [139.6503, 35.6762]}}, COLORS, regional=True,
+                       regional_table_path=small_regional_table)
+    assert tokyo.mode == "legacy" and tokyo.style == "generic" and tokyo.report["reason"] == "style_has_no_atlas"
+    assert "regional_table_sha256" not in tokyo.report
+
+
+@pytest.mark.parametrize("style", ["central_european", "anglo", "latin_american"])
+def test_the_option_bakes_the_regional_atlas(style: str, small_regional_table: Path, tmp_path: Path) -> None:
+    manifest = {"frame": {"origin_wgs84": CENTRES[style]}, "objects": [{"id": "building/b1", **_era("1900_1939")}]}
+    result = apply_trim([_building()], manifest, COLORS, regional=True, regional_table_path=small_regional_table)
+    assert result.mode == "trim" and result.style == style
+    assert result.materials == (f"facade_trim_{style}",)
+    report = result.report
+    assert report["style_origin"] == "map_centre"
+    assert report["regional_table_sha256"] == hashlib.sha256(small_regional_table.read_bytes()).hexdigest()
+    assert report["atlas_origin"] == "regional"
+    assert report["atlas"]["size"] == [1024, 1024]
+    recipe = json.loads(small_regional_table.read_text())["atlases"][style]
+    assert sorted(s["asset_id"] for s in report["atlas"]["sources"]) == sorted(recipe["sources"].values())
+    for source in report["atlas"]["sources"]:
+        assert source["license"].startswith("CC0") and len(source["sha256"]) == 64
+    assert report["era_bands"] == {"era_origin": "observed", "band_origin": "estimated", "buildings": {"1900_1939": 1}}
+    assert report["stats"]["eras"] == {"1900_1939": 1}
+    assert list(report)[:6] == ["mode", "style", "style_origin", "style_table_sha256", "regional_table_sha256", "atlas_origin"]
+    again = apply_trim([_building()], manifest, COLORS, regional=True, regional_table_path=small_regional_table,
+                       cache=TileCache(tmp_path / "tiles"))
+    assert again.png == result.png and again.report == report
+
+
+def test_a_regional_source_must_be_cc0(monkeypatch: pytest.MonkeyPatch, small_regional_table: Path) -> None:
+    manifest = {"frame": {"origin_wgs84": KRAKOW}}
+    with pytest.raises(StyleError, match="style central_european: no colour for wall strips brick_red"):
+        apply_trim([], manifest, {k: v for k, v in COLORS.items() if k != "brick_red"}, regional=True,
+                   regional_table_path=small_regional_table)
+    real = trim_module.texture_record
+    monkeypatch.setattr(trim_module, "texture_record", lambda i: replace(real(i), license="CC-BY-4.0") if i == "acg_rock022" else real(i))
+    with pytest.raises(StyleError, match=r"style central_european: source stone \(acg_rock022\) is CC-BY-4.0, not CC0"):
+        apply_trim([], manifest, COLORS, regional=True, regional_table_path=small_regional_table)
+
+
+def test_the_option_changes_nothing_on_a_mediterranean_map(small_table: Path, small_regional_table: Path) -> None:
+    off = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
+    on = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, regional=True, regional_table_path=small_regional_table)
+    assert on.png == off.png and on.report == off.report
+    for a, b in zip(on.nodes, off.nodes, strict=True):
+        assert [p.material for p in a.primitives] == [p.material for p in b.primitives]
+        for pa, pb in zip(a.primitives, b.primitives, strict=True):
+            assert np.array_equal(pa.mesh.vertices, pb.mesh.vertices) and np.array_equal(pa.mesh.triangles, pb.mesh.triangles)
+            assert (pa.uvs is None) == (pb.uvs is None) and (pa.uvs is None or np.array_equal(pa.uvs, pb.uvs))
+    assert "regional_table_sha256" not in on.report and "eras" not in on.report["stats"]
+
+
+def test_observed_period_reads_only_an_observed_era() -> None:
+    assert observed_period(_era("pre_1900")) == "pre_1900"
+    assert observed_period(_era("pre_1900", origin="estimated")) is None
+    assert observed_period(_era(1890)) is None
+    assert observed_period({"facade": {"typology": {"era": None}}}) is None
+    assert observed_period({"facade": {"typology": None}}) is None
+    assert observed_period({"facade": {}}) is None
+    assert observed_period({"facade": "brick"}) is None
+    assert observed_period({"facade": {"typology": "terrace"}}) is None
+    assert observed_period({"facade": {"typology": {"era": "1890"}}}) is None
+    assert observed_period({}) is None
+    assert observed_period(None) is None
+
+
+def test_era_band_needs_a_period_and_a_band() -> None:
+    assert era_band(REGIONAL_ATLAS, None) is None
+    assert era_band(REGIONAL_ATLAS, "pre_1900") == REGIONAL_ATLAS["eras"]["pre_1900"]
+    assert era_band(SHIPPED, "pre_1900") is None
+    assert era_band({**REGIONAL_ATLAS, "eras": {"pre_1900": REGIONAL_ATLAS["eras"]["pre_1900"]}}, "2000_plus") is None
+
+
+def test_building_look_without_a_band_is_unchanged() -> None:
+    for k in (f"building/b{i}" for i in range(50)):
+        expected = Look(stable_index(3, k, "tone"), stable_unit(k, "zocalo") < 0.8, stable_unit(k, "cornice") < 0.75,
+                        stable_unit(k, "courses") < 0.6)
+        assert building_look(k, REGIONAL_ATLAS) == building_look(k, REGIONAL_ATLAS, None) == expected
+
+
+def test_an_era_band_narrows_the_tones_and_overrides_the_dress() -> None:
+    keys = [f"building/b{i}" for i in range(80)]
+    assert {building_look(k, REGIONAL_ATLAS, {"tones": [2], "window_families": [0]}).tone for k in keys} == {2}
+    spread = {building_look(k, REGIONAL_ATLAS, {"tones": [0, 2], "window_families": [0]}).tone for k in keys}
+    assert spread == {0, 2}
+    assert all(building_look(k, REGIONAL_ATLAS, {"tones": [0, 2], "window_families": [0]}).tone ==
+               [0, 2][stable_index(2, k, "tone")] for k in keys)
+    never = {"tones": [0], "window_families": [0], "dress": {"zocalo_share": 0.0}}
+    always = {"tones": [0], "window_families": [0], "dress": {"zocalo_share": 1.0}}
+    assert not any(building_look(k, REGIONAL_ATLAS, never).zocalo for k in keys)
+    assert all(building_look(k, REGIONAL_ATLAS, always).zocalo for k in keys)
+    # The shares a band does not name stay the style's.
+    for k in keys:
+        look = building_look(k, REGIONAL_ATLAS, never)
+        assert (look.cornice, look.courses) == (stable_unit(k, "cornice") < 0.75, stable_unit(k, "courses") < 0.6)
+    plain = {"tones": [1], "window_families": [0]}
+    assert all(_dress(building_look(k, REGIONAL_ATLAS, plain)) == _dress(building_look(k, REGIONAL_ATLAS)) for k in keys)
+
+
+def test_a_band_limits_the_window_families_and_counts_the_eras() -> None:
+    atlas = {**REGIONAL_ATLAS, "tones": [[1.0, 1.0, 1.0]] * 3}
+    layout = trim_layout(atlas)
+    windows = window_families(atlas)
+    stats = TrimStats()
+    for i in range(12):
+        node = replace(_building(), name=f"building/b{i}")
+        trim_building(node, _era("1960_1979"), "central_european", atlas, layout, windows, stats)
+    assert {name[:8] for name in stats.cells if name.startswith("window")} == {"window_2"}
+    assert stats.eras == {"1960_1979": 12}
+    free = TrimStats()
+    for i in range(12):
+        trim_building(replace(_building(), name=f"building/b{i}"), RECORD, "central_european", atlas, layout, windows, free)
+    assert {name[:8] for name in free.cells if name.startswith("window")} == {"window_0", "window_1", "window_2"}
+    assert free.eras == {"unknown": 12}
+    other = TrimStats()
+    no_band = {**atlas, "eras": {"pre_1900": atlas["eras"]["pre_1900"]}}
+    trim_building(_building(), _era("2000_plus"), "central_european", no_band, layout, windows, other)
+    trim_building(_building(), _era("pre_1900"), "central_european", no_band, layout, windows, other)
+    trim_building(_building(), _era("pre_1900", origin="estimated"), "central_european", no_band, layout, windows, other)
+    assert other.as_dict()["eras"] == {"no_band": 1, "pre_1900": 1, "unknown": 1}
+    assert list(other.as_dict())[-1] == "eras"
+    # An atlas without eras counts none, and the report keeps today's keys.
+    plain = TrimStats()
+    trim_building(_building(), _era("pre_1900"), "mediterranean", ATLAS, LAYOUT, WINDOWS, plain)
+    assert plain.eras == {} and "eras" not in plain.as_dict()
+    # A building no part of which the atlas covers counts no era.
+    bare = TrimStats()
+    trim_building(Node("building/x", (Primitive(_back(1.2, 1.5, 4.0), "glass_view"),), {"type": "building"}),
+                  _era("pre_1900"), "central_european", atlas, layout, windows, bare)
+    assert bare.eras == {}
+
+
+def test_an_era_band_changes_the_cache_key() -> None:
+    tints = {"w": (1.0, 0.5, 0.2)}
+    base = trim_cache_key("central_european", REGIONAL_ATLAS, tints, {"plaster": "x"})
+    eras = {**REGIONAL_ATLAS["eras"], "pre_1900": {"tones": [1], "window_families": [0]}}
+    assert trim_cache_key("central_european", {**REGIONAL_ATLAS, "eras": eras}, tints, {"plaster": "x"}) != base

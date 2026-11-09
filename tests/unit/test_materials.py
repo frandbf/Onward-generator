@@ -771,3 +771,20 @@ def test_apply_reports_every_tile_over_its_limit(tmp_path: Path, monkeypatch: py
     measured = [row for row in block["slots"] if row["status"] == "measured"]
     assert measured and all(row["over_limit"] for row in measured)
     assert block["over_limit"] == sorted({row["asset_id"] for row in measured})
+
+
+def test_cli_passes_the_regional_facades_switch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import __main__ as cli
+
+    seen: list[dict[str, Any]] = []
+
+    def fake(base: str, out: str, **kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs)
+        return {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False}
+
+    monkeypatch.setattr(cli, "apply_materials", fake)
+    monkeypatch.setattr(cli, "emit", lambda _command: None)
+    args = ["apply", "--base", str(tmp_path / "b"), "--out", str(tmp_path / "o")]
+    assert cli.main(args) == 0
+    assert cli.main([*args, "--regional-facades"]) == 0
+    assert [row["regional_facades"] for row in seen] == [False, True]

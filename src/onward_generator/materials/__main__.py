@@ -53,6 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="a style of config/facade_styles.json, or auto (from the map centre)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--regional-facades", action="store_true",
+        help="give central_european, anglo and latin_american their atlas from config/facade_styles.regional.json (plan D1)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--repetition", action="store_true",
         help="measure roof and paving tiles and phase the ground UVs per combine cell (plan C1)",  # pragma: no mutate: help text only
     )
@@ -77,6 +81,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         tile_cache=not args.no_tile_cache,
         facades=args.facades,
         facade_style=args.facade_style,
+        regional_facades=args.regional_facades,
         repetition=args.repetition,
         cell_m=args.cell_m,
     )

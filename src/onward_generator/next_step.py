@@ -197,15 +197,17 @@ def materials_command(base: Path) -> StageCommand:
     """``materials apply`` with the map's own plan. ``--download`` is the explicit network step."""
     root = map_root(base)
     plan = (root / "config" / "texture_plan.json") if root is not None else base.parent / "texture_plan.json"
-    from onward_generator.maps.workspace import combine_cell_m, facade_options, repetition_enabled
+    from onward_generator.maps.workspace import combine_cell_m, facade_options, regional_facades_enabled, repetition_enabled
 
     repetition = ["--repetition", "--cell-m", str(combine_cell_m(root))] if root is not None and repetition_enabled(root) else []
+    regional = ["--regional-facades"] if root is not None and regional_facades_enabled(root) else []
     return invoke(
         "materials", "apply",
         "--base", show(base),
         "--plan", show(plan),
         "--download",
         *(facade_options(root) if root is not None else []),
+        *regional,
         *repetition,
         "--out", show(stage_path(base, STAGE_DIRS["materials"])),
     )

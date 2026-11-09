@@ -396,6 +396,8 @@ def apply_materials(
     facades: str = "trim",
     facade_style: str = AUTO,
     style_table: str | Path | None = None,
+    regional_facades: bool = False,
+    regional_table: str | Path | None = None,
     repetition: bool = False,
     cell_m: float = 100.0,
 ) -> dict[str, Any]:
@@ -407,7 +409,9 @@ def apply_materials(
 
     ``facades`` is ``trim`` (the regional trim-sheet atlas, ADR-020) or ``legacy`` (one
     material per facade part). ``facade_style`` names a style of ``style_table``, or
-    ``auto`` to choose it from the map centre.
+    ``auto`` to choose it from the map centre. ``regional_facades`` (the map.json switch, plan D1,
+    off by default) gives a style whose atlas is null in ``style_table`` its recipe from
+    ``regional_table`` (default ``config/facade_styles.regional.json``). Off, nothing changes.
     """
     base = Path(base_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -462,7 +466,8 @@ def apply_materials(
         name: m.color for name, m in vis_mats.items()
     }
     trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
-                      cache=None if trim_root is None else TileCache(trim_root))
+                      cache=None if trim_root is None else TileCache(trim_root),
+                      regional=regional_facades, regional_table_path=regional_table)
     visual_nodes = trim.nodes
     # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
     # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.
