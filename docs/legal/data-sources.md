@@ -70,7 +70,41 @@ The fixtures `tests/fixtures/cadastre/synthetic_bu.gml` and `synthetic_bu_buildi
 
 ## Source plugins
 
-Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`, plus the Overture place licences `CDLA-Permissive-2.0`, `Apache-2.0` and `CC0-1.0`, checked per place by `overture match`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+Datasets that only cover some countries are source plugins ([ADR-018](../decisions/ADR-018-source-plugins.md)). Each declares its licence (SPDX id, URL, attribution, obligations). `config/sources.json` `licence_allowlist` lists the licences a plugin may be fetched under: `CC-BY-4.0`, `etalab-2.0` (Licence Ouverte 2.0) and `ODbL-1.0`, plus the Overture place licences `CDLA-Permissive-2.0`, `Apache-2.0` and `CC0-1.0`, checked per place by `overture match`, and `DL-DE-ZERO-2.0` (Datenlizenz Deutschland – Zero 2.0, for `de.nrw_ndom`). `nl.ahn` uses `CC0-1.0`. A plugin whose licence is not on the list stops `run` before any request. `onward-generator source list` prints each plugin's licence and whether the list accepts it. When several plugins give a building a height, the merged overrides keep the winning source's licence and attribution, and name both when a second source lends the storey count.
+
+Plan D4 (9 November 2026) adds opt-in plugins outside Spain and France. An opt-in plugin runs only on a map that switches it on (`run --source <id>`), never by coverage alone ([ADR-018](../decisions/ADR-018-source-plugins.md), amendment of 9 November 2026). Each licence below was read on the publisher's own page or service before any code was written; a dataset whose licence could not be confirmed there is recorded as blocked and has no plugin.
+
+### AHN (`nl.ahn`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Rijkswaterstaat (AHN, with the provinces and the water boards), published by PDOK |
+| Dataset | Actueel Hoogtebestand Nederland, DSM and DTM rasters 0.5 m, RD New (EPSG:28992), heights in metres above NAP. The service abstract names AHN4, flown 2020–2022; ahn.nl announces AHN5 and the first part of AHN6, which this service did not name on the check date |
+| Service | WCS 2.0.1 `https://service.pdok.nl/rws/actueel-hoogtebestand-nederland/wcs/v1_0`, coverages `dsm_05m` and `dtm_05m`, `format=image/tiff` (float32, deflate with floating-point predictor, no data `3.4028234663852886e+38`). Grid origin (cell centre) 10000.25, 618749.75, so cell edges lie on multiples of 0.5 m |
+| Licence | CC0 1.0, SPDX `CC0-1.0`. The capabilities state `AccessConstraints: otherRestrictions; Geen beperkingen; http://creativecommons.org/publicdomain/zero/1.0/deed.nl` and `Fees: NONE`; the PDOK AHN page calls the data open data, free of charge and without restrictions |
+| Attribution | `Actueel Hoogtebestand Nederland (AHN), Rijkswaterstaat / PDOK` (not required by CC0; kept as good practice) |
+
+Obligations: none under CC0. The overrides and the report still name the source, the series and that the heights are derived (DSM minus a filled DTM, [04-heights.md](../04-heights.md#lidar-heights)). The tiles stay in `maps/<id>/data/raw/nl.ahn/`, outside git. Coverage is `config/ahn_coverage.json`, a coarse hand-drawn ring around the Netherlands. Checked 2026-11-09: the WCS capabilities and `DescribeCoverage` of both coverages, two real `GetCoverage` replies over Amsterdam (Dam square: DSM median 18.2 m, DTM 86 % no data under the palace, ground about 2.0 m NAP; Pillow 11.3 decodes them), the error reply of an unknown coverage (`ows:ExceptionReport`), https://www.pdok.nl/introductie/-/article/actueel-hoogtebestand-nederland-ahn and https://www.ahn.nl/.
+
+### nDOM50 NRW (`de.nrw_ndom`)
+
+| Field | Value |
+| --- | --- |
+| Provider | Bezirksregierung Köln, Geobasis NRW |
+| Dataset | Normalisiertes Digitales Oberflächenmodell nDOM50, 0.5 m, ETRS89 / UTM 32N (EPSG:25832): an image-based, leaf-on surface model (bDOM50, summer flights) minus a 0.5 m LiDAR terrain model, so height above ground of buildings and trees. Continuously updated; the service gives no flight date per tile |
+| Service | WCS 2.0.1 `https://www.wcs.nrw.de/geobasis/wcs_nw_ndom`, coverage `nw_ndom`, `FORMAT=image/tiff` (float32, uncompressed on the check date). Grid origin (cell centre) 278000.25, 5827999.75, so cell edges lie on multiples of 0.5 m. The capabilities limit a request to one original tile (4000 × 4000 cells) |
+| Licence | Datenlizenz Deutschland – Zero – Version 2.0, SPDX `DL-DE-ZERO-2.0`. The capabilities `Fees` state: "Es gelten die … Lizenzbedingungen „Datenlizenz Deutschland – Zero“ (https://www.govdata.de/dl-de/zero-2-0). Jede Nutzung ist ohne Einschränkungen oder Bedingungen zulässig." The same text is on the DOM and DGM services |
+| Attribution | `Geobasis NRW, nDOM50 (dl-de/zero-2-0)` (not required; kept as good practice) |
+
+Obligations: none; the licence allows any use without conditions, and Geobasis NRW excludes liability for currency, accuracy and availability. The tiles stay in `maps/<id>/data/raw/de.nrw_ndom/`, outside git. Coverage is `config/nrw_coverage.json`, a coarse hand-drawn ring around North Rhine-Westphalia. Checked 2026-11-09: the WCS capabilities of `wcs_nw_ndom`, `wcs_nw_dom` and `wcs_nw_dgm`, `DescribeCoverage` of `nw_ndom`, a real `GetCoverage` over Cologne Cathedral (200 × 200 float32 cells, −1.0 to 108.1 m), and https://www.govdata.de/dl-de/zero-2-0.
+
+### Blocked and deferred in plan D4
+
+| Dataset | Planned id | State | Why |
+| --- | --- | --- | --- |
+| Environment Agency LIDAR Composite DSM and DTM 1 m (England) | `gb.ea_lidar` | Blocked by licence | The data.gov.uk records of both datasets (`lidar-composite-dsm-2022-1m`, `lidar-composite-digital-terrain-model-dtm-1m`) and their ISO metadata (`useLimitation`) say only "Open Government Licence", with no version, while the same record's attribution reads "© Environment Agency copyright and/or database right 2022. All rights reserved."; the WCS capabilities say `AccessConstraints: NONE`. The only explicit "Open Government Licence v3.0" on the page is the data.gov.uk site footer, which covers the site, not the dataset. Plan D4 builds the plugin only when the publisher states OGL v3 for the data. Endpoints found and working: `https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-last-return-dsm-1m/wcs` and `…/lidar-composite-digital-terrain-model-dtm-1m/wcs` (EPSG:27700, `image/tiff`). Checked 2026-11-09 |
+| USGS 3D Elevation Program (US) | `us.3dep` | Blocked by dependency | USGS states 3DEP products are free of charge and without use restrictions (US public domain). Outside Alaska (IfSAR DSM) the raster products are bare-earth DEMs; a surface model needs the LiDAR point clouds (LAZ), and reading LAZ needs a new dependency, which plan D4 does not allow. Checked 2026-11-09: https://www.usgs.gov/3d-elevation-program/about-3dep-products-services |
+| Basisregistratie Adressen en Gebouwen (Netherlands) | `nl.bag` | Deferred | Kadaster publishes the BAG under the Creative Commons Public Domain Mark 1.0 (https://www.kadaster.nl/zakelijk/registraties/basisregistraties/bag, checked 2026-11-09). A BAG plugin would add a construction year or a use to existing OSM buildings only, never a footprint, and needs the ADR-022 and ADR-024 consumers generalised first; it is not part of this increment |
 
 ## Overture Maps
 

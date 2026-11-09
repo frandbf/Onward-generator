@@ -100,7 +100,7 @@ def two_plugins(monkeypatch: pytest.MonkeyPatch) -> tuple[Any, ...]:
 def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_licences() -> None:
     config = load_source_config()
     assert config.priority == ("es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture")
-    assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0", "CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0"})
+    assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0", "CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0", "DL-DE-ZERO-2.0"})
     assert config.evidence == ("osm", "es.catastro", "overture")
     for plugin in (CatastroPlugin(), PnoaNdsmPlugin()):
         check_licence(plugin, config)
