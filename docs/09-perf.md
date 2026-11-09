@@ -395,6 +395,35 @@ Pending (not done; the switch stays off until they pass):
 Then the ADR-023 amendment goes from proposed to accepted, or the thresholds are corrected.
 
 
+## Intermediate HLOD ring
+
+Plan D3, [ADR-017 amendment of 9 November 2026](decisions/ADR-017-playable-core.md#amendment-9-november-2026-an-intermediate-hlod-ring-plan-d3), off by default. Bench runs on the frozen inputs, Docker on an Apple M4 Pro, workshop/d3: `d3_off` (no option) against the baseline `20261109T041434Z` is identical apart from timings (`bench.py check`), and `d3_on100` and `d3_on100b` (`--mid-ring-m 100`) are identical to each other. Package figures from `onward_export.json`, not a bake and not a headset measurement.
+
+| Map | Triangles total (core / mid / scenic) | Draws total (core / mid / scenic) | View draws median / p90 / max | Lightmap pages | Mid buildings | Mid triangles per building mean / min / max | `detail` s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150, off | 150 339 (125 052 / – / 18 448) | 213 (165 / – / 32) | 85 / 181 / 213 | 4 | – | – | 2.9 |
+| bench_murcia r150, on | 170 603 (125 052 / 38 608 / 104) | 222 (165 / 35 / 12) | 88 / 186 / 221 | 4 | 319 | 74.2 / 10 / 234 | 3.6 |
+| bench_madrid r300, off | 398 025 (270 361 / – / 108 602) | 504 (352 / – / 191) | 175 / 374 / 448 | 11 | – | – | 10.5 |
+| bench_madrid r300, on | 460 922 (270 361 / 126 022 / 45 477) | 535 (352 / 134 / 143) | 187 / 391 / 473 | 10 | 928 | 84.6 / 10 / 496 | 12.7 |
+| bench_paris r50, off and on | 47 585 (no core) | 91 | 34 / 77 / 91 | 3 | – | – | 0.1 |
+| bench_krakow r150, off | 72 884 (58 115 / – / 5 832) | 272 (215 / – / 51) | 95 / 219 / 268 | 2 | – | – | 0.9 |
+| bench_krakow r150, on | 79 940 (58 115 / 12 836 / 52) | 302 (215 / 85 / 5) | 107 / 235 / 293 | 2 | 111 | 115.6 / 12 / 184 | 1.2 |
+
+- The core does not change: core triangles, draws and the gameplay headline are the same off and on. Paris has no core and cannot have a ring.
+- With a 100 m ring nearly every scenic building of these maps becomes mid (Murcia and Kraków keep none past it). The ring costs 2.1 times the scenic shells it replaces in Murcia, 1.7 in Madrid and 2.2 in Kraków.
+- Against the plan's 220 000 Unity triangles: Murcia stays under it (170 603), Kraków too (79 940); Madrid r300 was already over (398 025) and rises by 62 897. On Madrid the option needs a smaller ring or a budget core.
+- The mid tier brings no new material family; its roofs add (cell, roof material) groups, and the ring's draws rise by 9 (Murcia), 31 (Madrid) and 30 (Kraków); the view-draw p90 by 5, 17 and 16. Views A and B are measured on the headset.
+- Per building: the cap is 150, and no building with painted windows passes it. The maxima above it (Murcia 3 of 319 buildings, Madrid 23 of 928, Kraków 3 of 111) are footprints whose plain shell, walls and flat cap, is already over 150; they draw what the scenic shell draws, with no window. Under 50 (Murcia 158, Madrid 349, Kraków 10) are buildings with few exposed walls of a bay (terraced blocks) or one low storey; the shell is not padded.
+- Lightmap pages: Madrid 11 → 10 in the estimate, the others unchanged; the mid walls and windows stay in the scenic class at 0.25.
+
+Pending on the headset (A2) and in Unity (A3), not done; the option stays off until they pass:
+- Unity 2021.3.23f1: bench_madrid r300 with the ring off and on, `task unity -- --bake draft` and `--bake final`; `scene_report.json` triangles and bake seconds with `tools/unity/report_timings.py`; lightmap pages within the estimate.
+- Quest 3, the same map off and on: at least 72 fps median on the route, at most 150 draws in views A and B (OVR Metrics), triangles within 220 000.
+- How the ring reads from the core wall and through the fog (which still starts at `core_radius_m`): atlas seams or a smeared window treatment on the mid walls, roof forms against the sky.
+- The seams core / mid / scenic: brightness steps between baked core walls and mid walls, with `build.scenic_out_of_lightmap` on and off; popping or z-fighting where tiers share a cell.
+- No player or bot reaches a mid building: the perimeter wall stays on the core edge, no ladder, lift or spawn outside the core.
+- After the session, move the ADR-017 D3 amendment to accepted or correct it.
+
 ## Scenic walls out of the lightmap
 
 Plan C4 is covered by the ADR-017 amendment of 8 November 2026 (proposed) and is off by default. It is turned on by the export card's `build.scenic_out_of_lightmap: true` or `bench.py run --scenic-out-of-lightmap`, which sets it in each run copy's card. The rules are in [12-export.md](12-export.md#lighting). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline`, on 8 November 2026.
