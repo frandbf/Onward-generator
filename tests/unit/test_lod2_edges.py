@@ -242,6 +242,13 @@ def test_clip_keeps_a_vertex_on_a_courtyard_edge_where_it_is() -> None:
     assert out_v.tolist() == [[8.0, 9.0, 3.0], [2.0, 2.0, 3.0], [2.0, 9.0, 3.0]]
 
 
+def test_a_triangle_over_a_courtyard_goes_although_its_corners_and_edges_stand_on_the_footprint() -> None:
+    yard = box(0, 0, 20, 20).difference(box(8, 8, 10, 10))
+    vertices = np.array([[1.0, 1.0, 5.0], [19.0, 1.0, 5.0], [1.0, 19.0, 5.0]])
+    out_v, out_t, dropped = clip_to_footprint(vertices, np.array([[0, 1, 2]]), yard, 1.0)
+    assert (dropped, len(out_t)) == (1, 0)
+
+
 def test_a_vertex_past_the_tolerance_is_not_snapped() -> None:
     footprint = box(0, 0, 10, 10)
     vertices = np.array([[1.0, 1.0, 0.0], [9.0, 1.0, 0.0], [12.0, 5.0, 0.0], [10.5, 5.0, 0.0]])
@@ -363,7 +370,11 @@ def test_a_flat_group_beside_the_walls_gets_a_collider_issue_with_the_building()
 
 def test_three_groups_keep_their_own_triangles() -> None:
     meshes = [box_group(0, 0, 4, 10, 6.0), box_group(4, 0, 8, 10, 9.0), box_group(8, 0, 12, 10, 12.0)]
-    part, issues = build(box(0, 0, 12, 10), [group(n, m) for n, m in zip("abc", meshes, strict=True)])
+    groups = [group(n, m) for n, m in zip("abc", meshes, strict=True)]
+    # The last group carries one vertex no triangle uses, so the groups differ in size and each offset counts.
+    spare = np.vstack([groups[2].vertices, [[10.0, 5.0, GROUND_Z + 5.0]]])
+    groups[2] = LocalGroup(groups[2].id, groups[2].cod_manzan, groups[2].obj_date, spare, groups[2].triangles, groups[2].hull)
+    part, issues = build(box(0, 0, 12, 10), groups)
     assert issues == [] and part is not None
     assert part.record["clip"]["floor_triangles"] == 0
     assert soup([p.mesh for p in part.visual]) == soup(meshes, GROUND_Z)

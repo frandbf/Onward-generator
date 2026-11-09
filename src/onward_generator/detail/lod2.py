@@ -46,6 +46,11 @@ _EDGE_M = 1e-6
 """How far outside the footprint a clamped vertex may sit from floating-point rounding."""
 
 
+MAX_VERTICES = 400_000
+MAX_FACES = 800_000
+"""The default caps of one OBJ, shared by ``Lod2Settings`` and ``parse_obj``."""
+
+
 class Lod2Error(ValueError):
     """An LoD2 index, ZIP or OBJ is invalid, or does not fit the scene."""
 
@@ -63,8 +68,8 @@ class Lod2Settings:
     min_footprint_area_m2: float = 20.0
     roof_min_normal_z: float = 0.35
     max_unzipped_bytes: int = 32 * 1024 * 1024
-    max_vertices: int = 400_000
-    max_faces: int = 800_000
+    max_vertices: int = MAX_VERTICES
+    max_faces: int = MAX_FACES
 
     def to_record(self) -> dict[str, Any]:
         return {
@@ -136,7 +141,7 @@ def _index_of(token: str, count: int, line: int) -> int:
     return index
 
 
-def parse_obj(text: str, *, max_vertices: int = 400_000, max_faces: int = 800_000) -> ObjMesh:
+def parse_obj(text: str, *, max_vertices: int = MAX_VERTICES, max_faces: int = MAX_FACES) -> ObjMesh:
     """Vertices and ``usemtl`` groups of an OBJ. Polygons are fan-triangulated; a malformed line raises with its number."""
     vertices: list[tuple[float, float, float]] = []
     groups: dict[str, list[tuple[int, int, int]]] = {}
