@@ -265,10 +265,13 @@ def _sill_shadow(y: np.ndarray, rgb: np.ndarray) -> np.ndarray:
 
 
 def _blind(x: np.ndarray, y: np.ndarray, rgb: np.ndarray, color: Sequence[float], closed: float, top: float) -> np.ndarray:
-    """An inner blind lowered from ``top`` over ``closed`` of the glass, seen through it: folds, no slats."""
+    """An inner blind lowered from ``top`` over ``closed`` of the glass, seen through it: folds, no slats.
+
+    It spans the cell's width: the caller paints the frame over its sides afterwards.
+    """
     bottom = top - closed * (top - 0.05)
     folds = 0.8 + 0.06 * np.cos(x * 2 * np.pi * 9)
-    drawn = between(y, bottom, top) & between(x, 0.06, 0.94)
+    drawn = between(y, bottom, top)
     return np.where(drawn[..., None], np.asarray(color) * folds[..., None], rgb)
 
 
@@ -315,7 +318,8 @@ def grille_pixels(width: int, height: int, family: Mapping[str, Any], closed: fl
     x, y = _cell_grid(width, height)
     rgb = _glass(x, y, 0.05)
     reach = closed * 0.44
-    leaves = (between(x, 0.06, 0.06 + reach) | between(x, 0.94 - reach, 0.94)) & between(y, 0.05, 0.95)
+    # Full height, from each side: the frame painted next covers what lies outside the glass.
+    leaves = between(x, -INF, 0.06 + reach) | between(x, 0.94 - reach, INF)
     panel = 0.85 + 0.1 * between((y * 4.0) % 1.0, 0.1, 0.9)
     rgb = np.where(leaves[..., None], np.asarray(family["shutter"]) * panel[..., None], rgb)
     frame = ~between(x, 0.06, 0.94) | ~between(y, 0.05, 0.95) | between(np.abs(x - 0.5), -INF, 0.012)
