@@ -2,7 +2,7 @@
 
     python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints] [--lidar-roofs]
         [--scenic-out-of-lightmap] [--lightmap-pages-max N] [--balanced-spawns] [--sightline-cover]
-        [--regional-facades] [--street-profile [--street-profile-reply FILE]]
+        [--regional-facades] [--street-profile [--street-profile-reply FILE]] [--lod2-landmarks]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -77,7 +77,7 @@ from onward_generator.osm.acquire import osm_target
 from onward_generator.pipeline_run import PipelineError, plan_steps, run_steps, source_plan
 from onward_generator.run_log import SETUP_STEPS, RunLog
 from onward_generator.sources.plugin import SourceError
-from onward_generator.sources.registry import choices
+from onward_generator.sources.registry import choices, plugin_by_id
 from onward_generator.tiers import CORE, MID, SCENIC, SHARED, CoreError, check_mid_ring, tier_summary
 
 SCHEMA = "onward-bench"
@@ -373,7 +373,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
               lit_normal_material: str | None = None, balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False,
-              street_profile: bool = False, street_profile_reply: Path | None = None, mid_ring_m: float | None = None) -> MapRun:
+              street_profile: bool = False, street_profile_reply: Path | None = None, mid_ring_m: float | None = None,
+              lod2_landmarks: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -392,7 +393,9 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     which gives the neutral rules profile).
     ``mid_ring_m`` sets the plan D3 intermediate ring in the run copy's ``map.json`` only, on a map with a core;
     a map without one (bench_paris) has no ring to draw and runs as without it.
-    The frozen inputs and their digest do not change.
+    ``lod2_landmarks`` switches the plan D6 plugin ``es.madrid_lod2`` on in the run copy's ``map.json`` only, on a map it
+    covers (bench_madrid); its block ZIPs are frozen like any other download.
+    The frozen inputs and their digest do not change, except that a first networked run freezes the new downloads.
     """
     ref = prepared.ref
     root = run_dir / ref.id
@@ -423,6 +426,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         resolve_street_profile(root, provider=profile_provider(street_profile_reply))
     if mid_ring_m is not None and has_core(load_map(root)):
         store_mid_ring(root, mid_ring_m)
+    if lod2_landmarks and plugin_by_id(LOD2_PLUGIN).covers(ref.longitude, ref.latitude):
+        store_sources(root, {LOD2_PLUGIN: True})
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -794,6 +799,30 @@ def mid_ring_metrics(root: Path) -> dict[str, Any] | None:
             "triangles_per_building_max": shape["max"]}
 
 
+LOD2_PLUGIN = "es.madrid_lod2"
+
+
+def lod2_landmarks_metrics(root: Path) -> dict[str, Any] | None:
+    """The plan D6 summary of the map's ``detail_report.json``, or None when it has no ``counts.lod2_landmarks`` block.
+
+    ``matched`` landmarks drawn with their LoD2 volume, ``unmatched`` the ``landmark_lod2_no_match`` issues, and the
+    visual and collision triangles of the matched landmarks. A malformed block is an error.
+    """
+    path = detail_report_path(root)
+    if not path.is_file():
+        return None
+    counts = _object(_read_object(path), "counts", str(path))
+    if "lod2_landmarks" not in counts:
+        return None
+    where = f"{path}: counts.lod2_landmarks"
+    block = _object(counts, "lod2_landmarks", f"{path}: counts")
+    issues = _object(block, "issues", where)
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in issues.values()):
+        raise BenchError(f"{where}: issues needs integer counts")
+    return {"matched": _int(block, "matched", where), "unmatched": int(issues.get("landmark_lod2_no_match", 0)),
+            "visual_triangles": _int(block, "visual_triangles", where), "collision_triangles": _int(block, "collision_triangles", where)}
+
+
 def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None = None) -> dict[str, Any]:
     """The comparable figures of one map; ``gameplay``, ``repetition`` and ``lidar_roofs`` only when ``root`` holds their reports."""
     entry = {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
@@ -812,6 +841,9 @@ def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None 
     cover = cover_metrics(root) if root is not None else None
     if cover is not None:
         entry["cover"] = cover
+    lod2 = lod2_landmarks_metrics(root) if root is not None else None
+    if lod2 is not None:
+        entry["lod2_landmarks"] = lod2
     return entry
 
 
@@ -932,6 +964,9 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("mid tris per building mean", "maps", ("mid_ring", "triangles_per_building_mean")),
     ("mid tris per building min", "maps", ("mid_ring", "triangles_per_building_min")),
     ("mid tris per building max", "maps", ("mid_ring", "triangles_per_building_max")),
+    ("lod2 landmarks matched", "maps", ("lod2_landmarks", "matched")),
+    ("lod2 landmarks unmatched", "maps", ("lod2_landmarks", "unmatched")),
+    ("lod2 landmark triangles", "maps", ("lod2_landmarks", "visual_triangles")),
     ("cover props", "maps", ("cover", "props")),
     ("cover triangles", "maps", ("cover", "triangles")),
     ("uncovered stretches after cover", "maps", ("cover", "after", "uncovered_stretches")),
@@ -943,7 +978,7 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 # Rows of an opt-in block are left out of the table when neither report has the block.
-_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover", "mid_ring", "lit_normal"})
+_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover", "mid_ring", "lit_normal", "lod2_landmarks"})
 # Rows of an opt-in tier: the plan D3 mid ring is in the tiers only when a run drew one.
 _OPTIONAL_PATHS = frozenset({("visual_triangles", MID), ("draws", MID)})
 
@@ -1068,7 +1103,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
                         lit_normal_material=args.lit_normal_material,
                         balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover,
                         regional_facades=args.regional_facades, street_profile=args.street_profile,
-                        street_profile_reply=args.street_profile_reply, mid_ring_m=args.mid_ring_m)
+                        street_profile_reply=args.street_profile_reply, mid_ring_m=args.mid_ring_m,
+                        lod2_landmarks=args.lod2_landmarks)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -1160,6 +1196,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="with --street-profile: the profile reply to replay in each run copy (default: none, the neutral rules profile)")
     run.add_argument("--mid-ring-m", type=_mid_ring, default=None, metavar="M",
                      help="draw the plan D3 intermediate ring M metres wide in each run copy with a core (map.json mid_ring_m)")
+    run.add_argument("--lod2-landmarks", action="store_true",
+                     help="switch the plan D6 Madrid LoD2 landmarks (es.madrid_lod2) on in the run copy of a map it covers")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

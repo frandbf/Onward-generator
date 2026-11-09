@@ -48,6 +48,8 @@ A building is a landmark when it has a key in `landmark.keys` (`historic`, `heri
 - with only storeys (`building:levels` or a storey override), those are used and `landmark_height_from_levels` is set. If `landmark.levels_floor_at_category_default` is `true` (the default), the height does not fall below the category default. Catastro records some naves as one storey; without that floor the height would be 4 m;
 - with no data, the marker is `landmark_without_authoritative_height`.
 
+The same flag picks the candidates of the opt-in LoD2 landmarks (plan D6): `es.madrid_lod2` downloads the blocks under them, and `detail --lod2-landmarks` draws a matched core landmark with its observed volume ([07-detail.md](07-detail.md#lod2-landmarks)). The height in `heights.json` does not change.
+
 The right fix is an override from an authorised source, not an invented number. An OSM tower point with `height` can add a clipped prism later (ADR-008). It does not change this height record.
 
 ### Neighbourhood

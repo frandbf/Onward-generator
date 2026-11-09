@@ -1,0 +1,15 @@
+{
+  "schema": "onward_generator.source_coverage",
+  "schema_version": "1.0.0",
+  "source": "es.madrid_lod2",
+  "description": "Where run may use the Madrid municipal 3D building model (ADR-018, plan D6; opt-in, so only with run --source es.madrid_lod2): a coarse WGS84 longitude/latitude ring around the municipality of Madrid, drawn by hand for this repository (CC0) a little outside the municipal border, so El Pardo, Barajas, Vicálvaro, Villaverde and Aravaca are inside. It also takes in strips of the neighbouring municipalities, where the FeatureServer simply returns no block and every landmark keeps its placeholder.",
+  "polygons": [
+    [
+      [
+        [-3.80, 40.66], [-3.70, 40.66], [-3.62, 40.58], [-3.51, 40.52], [-3.50, 40.44], [-3.53, 40.36],
+        [-3.62, 40.30], [-3.72, 40.30], [-3.80, 40.35], [-3.85, 40.40], [-3.90, 40.48], [-3.90, 40.58],
+        [-3.80, 40.66]
+      ]
+    ]
+  ]
+}

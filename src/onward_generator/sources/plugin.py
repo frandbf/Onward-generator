@@ -17,10 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
-Kind = Literal["footprints", "height_m", "levels", "use"]
+Kind = Literal["footprints", "height_m", "levels", "use", "landmark_mesh"]
 """What a plugin contributes. ``footprints``: it writes a new scene that later stages read.
 ``height_m`` and ``levels``: it writes a ``heights_overrides.<id>.json`` (``config/heights.overrides.schema.json``).
-``use``: it labels the buildings of its scene with an observed use that ``detail`` reads as shop evidence (ADR-022)."""
+``use``: it labels the buildings of its scene with an observed use that ``detail`` reads as shop evidence (ADR-022).
+``landmark_mesh``: it downloads observed 3D volumes that ``detail --lod2-landmarks`` draws on landmark footprints (plan D6, ADR-008);
+it writes no overrides, so it needs no rank in the priority."""
 
 OVERRIDE_KINDS: frozenset[Kind] = frozenset({"height_m", "levels"})
 
@@ -71,6 +73,8 @@ class SourceSteps:
     """Third-party colours that ``detail --overture-tints`` reads below the OSM wall and roof tags (Overture, plan C2; opt-in)."""
     roof_spread: Path | None = None
     """A raster plugin's report, whose nDSM spreads ``detail --lidar-roofs`` reads as flat or pitched roofs (plan C3; opt-in)."""
+    landmark_meshes: Path | None = None
+    """A ``lod2_index.json`` whose observed LoD2 volumes ``detail --lod2-landmarks`` draws on landmark footprints (plan D6, ADR-008; opt-in)."""
 
 
 class SourcePlugin(Protocol):

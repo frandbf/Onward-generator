@@ -974,3 +974,59 @@ def test_compare_shows_lit_normal_rows_only_when_a_report_has_them() -> None:
     assert "| bench_murcia | lit normal png bytes | - | 123456 | - |" in lines
     assert "| bench_murcia | lit normal astc6x6 bytes | - | 4988080 | - |" in lines
     assert not any("lit normal" in line for line in lines if "bench_madrid" in line)
+
+
+# ---------------------------------------------------------------------------------------------------- LoD2 landmarks (plan D6)
+
+
+LOD2 = {"matched": 2, "issues": {"landmark_lod2_no_match": 1, "landmark_lod2_over_cap": 1}, "visual_triangles": 1485,
+        "collision_triangles": 524, "building_parts_replaced": 2}
+
+
+def test_lod2_landmarks_metrics_read_the_detail_report(tmp_path: Path) -> None:
+    assert bench.lod2_landmarks_metrics(tmp_path) is None
+    root = _detail_report(tmp_path, {"counts": {"roofs": {}}})
+    assert bench.lod2_landmarks_metrics(root) is None
+    _detail_report(tmp_path, {"counts": {"lod2_landmarks": LOD2}})
+    assert bench.lod2_landmarks_metrics(root) == {"matched": 2, "unmatched": 1, "visual_triangles": 1485, "collision_triangles": 524}
+    _detail_report(tmp_path, {"counts": {"lod2_landmarks": LOD2 | {"issues": {}}}})
+    assert bench.lod2_landmarks_metrics(root)["unmatched"] == 0
+
+
+@pytest.mark.parametrize(("block", "message"), [
+    ([], "lod2_landmarks must be an object"),
+    (LOD2 | {"issues": []}, "issues must be an object"),
+    (LOD2 | {"issues": {"landmark_lod2_no_match": 1.5}}, "issues needs integer counts"),
+    (LOD2 | {"issues": {"landmark_lod2_no_match": True}}, "issues needs integer counts"),
+    (LOD2 | {"matched": "2"}, "matched must be an integer"),
+    ({k: v for k, v in LOD2.items() if k != "visual_triangles"}, "visual_triangles must be an integer"),
+    (LOD2 | {"collision_triangles": None}, "collision_triangles must be an integer"),
+])
+def test_lod2_landmarks_metrics_refuse_a_broken_block(tmp_path: Path, block: Any, message: str) -> None:
+    with pytest.raises(bench.BenchError, match=message):
+        bench.lod2_landmarks_metrics(_detail_report(tmp_path, {"counts": {"lod2_landmarks": block}}))
+
+
+def test_map_entry_has_lod2_landmarks_only_when_the_block_exists_and_compare_shows_the_rows(tmp_path: Path) -> None:
+    package = _package(tmp_path / "pkg")
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "map.json").write_text("{}", encoding="utf-8")
+    ref = bench.REFERENCE_MAPS[1]
+    root = _detail_report(tmp_path / "run", {"counts": {}})
+    plain = bench.map_entry(ref, package, inputs, root)
+    assert "lod2_landmarks" not in plain
+    _detail_report(root, {"counts": {"lod2_landmarks": LOD2}})
+    assert bench.map_entry(ref, package, inputs, root)["lod2_landmarks"]["matched"] == 2
+    old, new = _report(), _report()
+    assert "lod2 landmark" not in bench.compare(old, new, old_name="r1", new_name="r2")
+    new["maps"]["bench_murcia"]["lod2_landmarks"] = {"matched": 2, "unmatched": 1, "visual_triangles": 1485, "collision_triangles": 524}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    assert "| bench_murcia | lod2 landmarks matched | - | 2 | - |" in lines
+    assert "| bench_murcia | lod2 landmarks unmatched | - | 1 | - |" in lines
+    assert "| bench_murcia | lod2 landmark triangles | - | 1485 | - |" in lines
+
+
+def test_the_run_parser_takes_the_lod2_landmarks_switch() -> None:
+    assert bench.build_parser().parse_args(["run", "--lod2-landmarks"]).lod2_landmarks is True
+    assert bench.build_parser().parse_args(["run"]).lod2_landmarks is False

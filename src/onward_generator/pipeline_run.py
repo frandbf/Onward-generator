@@ -149,12 +149,13 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
     sources, scene, overrides = source_plan(root, geo_scene)
     secondary, places, tints, roof_spread = third_party_plan(root, geo_scene)
+    lod2_landmarks = landmark_mesh_plan(root, geo_scene)
     source_steps = [(stage.name, list(stage.argv)) for stage in sources]
     heights_argv = list(heights_command(scene, overrides, secondary).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = [*detail_command(scene, heights, scene3d, places, tints, roof_spread).argv, *no_preview]
+    detail_argv = [*detail_command(scene, heights, scene3d, places, tints, roof_spread, lod2_landmarks).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -294,6 +295,23 @@ def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None,
         tints = steps.tints or tints
         roof_spread = steps.roof_spread or roof_spread
     return secondary, places, tints, roof_spread
+
+
+def landmark_mesh_plan(root: Path, scene: Path) -> Path | None:
+    """The ``lod2_index.json`` ``detail --lod2-landmarks`` reads, from the last plugin that writes one (plan D6; opt-in)."""
+    found: Path | None = None
+    for _plugin_id, steps in _plugin_steps(root, scene):
+        found = steps.landmark_meshes or found
+    return found
+
+
+def _lod2_input(root: Path) -> list[Path]:
+    """The LoD2 index ``detail`` reads when a ``landmark_mesh`` plugin is switched on (plan D6), so a new index makes detail stale."""
+    try:
+        index = landmark_mesh_plan(root, root / GEO_SCENE)
+    except (MapError, PipelineError):
+        return []
+    return [index] if index is not None else []
 
 
 def _roof_spread_input(root: Path) -> list[Path]:
@@ -542,7 +560,7 @@ def output_ready(name: str, root: Path) -> bool:
     if marker is None:
         return False
     # With "lidar_roofs" detail also reads the LiDAR report (plan C3), so a newer report makes it stale.
-    fresh = _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) if name == "detail" else []))
+    fresh = _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) + _lod2_input(root) if name == "detail" else []))
     return fresh and (name != "detail" or _mid_ring_current(root))
 
 
