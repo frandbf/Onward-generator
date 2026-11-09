@@ -146,7 +146,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 Paris Contrescarpe  maps/paris_contrescarpe
 48.84044803797855, 2.3498059975093395  r 50 m  margin 30 m  lightmap 40 t/m
 
-sources  fr.lidar_hd, overture  (not here: es.catastro, es.pnoa_ndsm)
+sources  fr.lidar_hd, overture  (not here: es.catastro, es.pnoa_ndsm, nl.ahn, de.nrw_ndom)
  [ 1/16] geo        0.1 s  EPSG:32631  kept 453  dropped 87
  [ 2/16] lidar_hd   6.0 s  566 KiB  1 tile  etalab-2.0
  [ 3/16] lidar_hd_heights  0.1 s  measured 60/65  2.67–23.43 m
