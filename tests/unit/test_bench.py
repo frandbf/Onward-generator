@@ -896,3 +896,81 @@ def test_mid_ring_option_messages() -> None:
 ])
 def test_has_core(document: dict[str, Any], core: bool) -> None:
     assert bench.has_core(document) is core
+
+
+# ---------------------------------------------------------------------------------------------------- plan D5
+
+
+def test_the_run_parser_takes_the_lit_normal_material() -> None:
+    args = bench.build_parser().parse_args(["run", "--lit-normal-material", "facade_trim_mediterranean"])
+    assert args.lit_normal_material == "facade_trim_mediterranean"
+    assert bench.build_parser().parse_args(["run"]).lit_normal_material is None
+
+
+@pytest.mark.parametrize("export", ["config/export.json", "config/other.json", None])
+def test_store_lit_normal_material_sets_the_card_key(tmp_path: Path, export: str | None) -> None:
+    root = _scenic_map(tmp_path / "m", {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0}}, export)
+    bench.store_lit_normal_material(root, "facade_trim_mediterranean")
+    card = json.loads((root / (export or "config/export.json")).read_text(encoding="utf-8"))
+    assert card == {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0, "lit_normal_material": "facade_trim_mediterranean"}}
+
+
+@pytest.mark.parametrize(("card", "match"), [
+    (None, "has no export card for --lit-normal-material"),
+    ("{not json", "not valid JSON"),
+    ({"build": []}, r"build must be an object, got \[\]"),
+    ({"map": {}}, "build must be an object, got None"),
+])
+def test_store_lit_normal_material_refuses_a_bad_card(tmp_path: Path, card: Any, match: str) -> None:
+    root = _scenic_map(tmp_path / "m", card)
+    with pytest.raises(bench.BenchError, match=match):
+        bench.store_lit_normal_material(root, "facade_trim_mediterranean")
+
+
+def test_store_lit_normal_material_needs_a_map(tmp_path: Path) -> None:
+    with pytest.raises(bench.BenchError, match="no map.json to find the export card"):
+        bench.store_lit_normal_material(tmp_path, "facade_trim_mediterranean")
+
+
+def _lit_manifest() -> dict[str, Any]:
+    manifest = _manifest()
+    manifest.setdefault("files", []).append({"role": "lit_normal", "path": "lit_normal.png", "sha256": "ab" * 32,
+                                             "bytes": 123456, "source": "generated"})
+    manifest["lit_normal"] = {"material": "facade_trim_mediterranean", "strength": 2.0, "path": "lit_normal.png",
+                              "width": 2048, "height": 4096, "astc6x6_bytes": 4988080, "source": "generated",
+                              "derived_from": "albedo"}
+    return manifest
+
+
+def test_map_metrics_reads_the_lit_normal_block_only_when_present(tmp_path: Path) -> None:
+    plain = bench.map_metrics(_package(tmp_path / "a"))
+    assert "lit_normal" not in plain
+    lit = bench.map_metrics(_package(tmp_path / "b", _lit_manifest()))
+    assert lit == {**plain, "lit_normal": {"material": "facade_trim_mediterranean", "png_bytes": 123456,
+                                           "astc6x6_bytes": 4988080}}
+
+
+@pytest.mark.parametrize(("edit", "message"), [
+    (lambda m: m.update(lit_normal=None), "lit_normal must be an object, got None"),
+    (lambda m: m.update(files=[f for f in m["files"] if f["role"] != "lit_normal"]), "exactly one 'lit_normal' file, found 0"),
+    (lambda m: m["files"].append(dict(m["files"][-1])), "exactly one 'lit_normal' file, found 2"),
+    (lambda m: m["lit_normal"].update(material=3), "material must be a string, got 3"),
+    (lambda m: m["lit_normal"].update(astc6x6_bytes="big"), "astc6x6_bytes must be an integer"),
+    (lambda m: m["files"][-1].update(bytes=None), "files lit_normal: bytes must be an integer"),
+])
+def test_map_metrics_refuses_a_broken_lit_normal_block(tmp_path: Path, edit: Any, message: str) -> None:
+    manifest = _lit_manifest()
+    edit(manifest)
+    with pytest.raises(bench.BenchError, match=re.escape(message)):
+        bench.map_metrics(_package(tmp_path, manifest))
+
+
+def test_compare_shows_lit_normal_rows_only_when_a_report_has_them() -> None:
+    old, new = _report(), _report()
+    assert "lit normal" not in bench.compare(old, new, old_name="r1", new_name="r2")
+    new["maps"]["bench_murcia"]["lit_normal"] = {"material": "facade_trim_mediterranean", "png_bytes": 123456,
+                                                 "astc6x6_bytes": 4988080}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    assert "| bench_murcia | lit normal png bytes | - | 123456 | - |" in lines
+    assert "| bench_murcia | lit normal astc6x6 bytes | - | 4988080 | - |" in lines
+    assert not any("lit normal" in line for line in lines if "bench_madrid" in line)

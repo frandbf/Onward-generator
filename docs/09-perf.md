@@ -488,3 +488,27 @@ Pending on the headset (A2) and in Unity (A3), not done; the amendment stays pro
 - `de.nrw_ndom`: whether trees beside facades (leaf-on surface) lift the median of narrow footprints.
 - Attribution of the dataset in the map's Workshop description.
 - After the session, move the ADR-018 D4 amendment to accepted or correct it.
+
+## Lit normal spike (plan D5)
+
+Plan D5, [ADR-033](decisions/ADR-033-lit-normal-spike.md) (proposed), off by default. The export card's `build.lit_normal_material: "facade_trim_<style>"` draws that one material with the SDK's `PP_Opaque_Lit` and a normal map `export package` derives from its albedo (`lit_normal.png`); `bench.py run --lit-normal-material NAME` sets it in each run copy's card. The rules are in [12-export.md](12-export.md#lit-normal-spike-plan-d5). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline --gameplay-report`, on 9 November 2026.
+
+- **Off.** `bench.py check` finds no difference outside timings between run `d5_off` and the baseline `20261109T143845Z` (HEAD of plan D4). The four packages are byte-identical apart from `onward_export.json` (`created_at` and the run paths in `inputs`), with the same `package_id`, and none has a `lit_normal.png`.
+- **On, `facade_trim_mediterranean`.** Run `d5_on` against `d5_off`, Murcia and Madrid only: bench_paris and bench_krakow have no `facade_trim_mediterranean` (Paris has no trim facades, Kraków uses another style), and `export package` refuses a material that is not in the visual GLB.
+
+| Map | Triangles, draws, view draws, pages | Normal map | PNG bytes | ASTC 6×6 estimate, mips | Export stage |
+| --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 150 339; 213; 85 / 181 / 213; 4: 0 | 2048 × 4096 | 5 502 650 | 4 988 080 (4.8 MiB) | 1.3 → 3.9 s |
+| bench_madrid r300 | 398 025; 504; 175 / 374 / 448; 11: 0 | 2048 × 4096 | 5 502 650 | 4 988 080 (4.8 MiB) | 3.2 → 5.8 s |
+
+Both maps use the same mediterranean atlas, so the map is the same. Draws do not change because the promoted material already had its own group per combine cell, and its siblings `party_facade_trim_mediterranean` and `scenic_trim_mediterranean` keep `PP_Opaque_Simple_Lit` (the dedupe key holds the shader name). About 67 % of the normal map's pixels are within 2 of flat. `export package` warns on both maps that `build.lightmap_directional` is false. The figures are offline estimates: the fragment cost of `PP_Opaque_Lit`, the bake and the look are not measured (`unity.status` is `missing` on every bench map).
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Unity 2021.3.23f1 on the macOS host: `task unity` builds bench_murcia with the key off and on, and the adapter compiles. The scene log names the promoted material, `PP_Opaque_Lit` and the normal map import (`NormalMap`, linear, ASTC 6×6 on Android), and how many combined meshes got tangents. Only that one material is on `PP_Opaque_Lit` in the Unity project.
+- [ ] A second "on" package with `build.lightmap_directional: true` as well, since with non-directional baked lightmaps the normal map may not show. Compare `lightmaps`, `lightmap_texels`, `seconds.gi_bake` and `seconds.bake` with `python tools/unity/report_timings.py <pkgOff> <pkgOn>`.
+- [ ] Editor views A and B and one close facade: the normals read as relief (cornices, window reveals, plaster), with no inverted green channel, no seams at the atlas strip boundaries and no shimmer at a distance.
+- [ ] Headset (Quest 3), off, on, and on with directional lightmaps, on the same route: median at least 72 fps with no drops outside loading, views A and B at or under 150 draws and unchanged by the option, graphics memory at or under 1 GB (note the delta), and the frame GPU time from OVR Metrics.
+- [ ] A visual judgment of the facade on the 1–5 rubric, on against off, and whether the gain is worth the cost.
+
+Then ADR-033 goes from proposed to accepted, followed by a separate decision on ADR-009 decision 7, ADR-020 and the AGENTS.md material rule, or the option is dropped. `quest_acceptance.md` is not marked without the user.

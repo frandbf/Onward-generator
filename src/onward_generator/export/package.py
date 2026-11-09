@@ -35,6 +35,17 @@ from onward_generator.export.lightmap import (
     page_budget_density,
     summarise,
 )
+from onward_generator.export.normal_map import (
+    DEFAULT_STRENGTH,
+    LIT_NORMAL_FILE,
+    LIT_NORMAL_ROLE,
+    NormalMapError,
+    albedo_png,
+    astc6x6_bytes,
+    decode_rgb,
+    encode_png,
+    normal_map,
+)
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
@@ -325,6 +336,29 @@ def _apply_page_budget(options: dict[str, Any], visual: bytes, *, scenic_out_of_
     return {**found, "texels_per_m_requested": requested, "lightmap_pages_max": pages_max}
 
 
+def _lit_normal(options: Mapping[str, Any], visual: bytes, warnings: list[str]) -> tuple[bytes, dict[str, Any]]:
+    """Plan D5: the PNG of the normal map derived from the named material's albedo, and the manifest block.
+
+    ``ExportError`` when the material is not in the visual GLB or has no PNG albedo, so nobody measures a no-op
+    on the headset. A warning when the lightmaps are not directional: everything is baked, and a non-directional
+    lightmap gives the baked diffuse no direction for the normal map to bend.
+    """
+    material = str(options["lit_normal_material"])
+    strength = float(options.get("lit_normal_strength", DEFAULT_STRENGTH))
+    try:
+        pixels = normal_map(decode_rgb(albedo_png(visual, material)), strength)
+    except NormalMapError as exc:
+        raise ExportError([f"export config: /build/lit_normal_material: {exc}"]) from exc
+    if options.get("lightmap_directional") is not True:
+        warnings.append(f"build.lit_normal_material {material}: build.lightmap_directional is not true, so the baked "
+                        "diffuse ignores the normal map and the relief shows only in the specular term; set "
+                        "build.lightmap_directional true for the headset measurement (ADR-033)")
+    height, width = int(pixels.shape[0]), int(pixels.shape[1])
+    block = {"material": material, "strength": strength, "path": LIT_NORMAL_FILE, "width": width, "height": height,
+             "astc6x6_bytes": astc6x6_bytes(width, height), "source": "generated", "derived_from": "albedo"}
+    return encode_png(pixels), block
+
+
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
     return fit_listing_description(f"{config['map']['description']} Data: {credits}.")
@@ -385,6 +419,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     # Plan C5: only a card with the key runs the page budget, so a card without it keeps its package_id.
     budget_estimate = (_apply_page_budget(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
                        if "lightmap_pages_max" in options else None)
+    # Plan D5 (ADR-033, proposed): read, never written or normalised, so a card without the key keeps its package_id.
+    lit_normal = _lit_normal(options, visual_bytes, warnings) if "lit_normal_material" in options else None
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
@@ -412,6 +448,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         atomic_write_json(out / OPTIONS_FILE, options)
         files.append({"role": "options", "path": OPTIONS_FILE, "sha256": sha256_file(out / OPTIONS_FILE),
                       "bytes": (out / OPTIONS_FILE).stat().st_size, "source": str(cfg_path)})
+        if lit_normal is not None:
+            png, _block = lit_normal
+            atomic_write_bytes(out / LIT_NORMAL_FILE, png)
+            files.append({"role": LIT_NORMAL_ROLE, "path": LIT_NORMAL_FILE, "sha256": sha256_file(out / LIT_NORMAL_FILE),
+                          "bytes": (out / LIT_NORMAL_FILE).stat().st_size, "source": "generated"})
 
         attribution = list(detail_manifest["attribution"])
         manifest = {
@@ -444,6 +485,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             "view_draws": _view_draws(visual_bytes, detail_manifest, layout_doc, float(options["combine_cell_m"])),
             "warnings": warnings,
         }
+        if lit_normal is not None:
+            manifest["lit_normal"] = lit_normal[1]
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

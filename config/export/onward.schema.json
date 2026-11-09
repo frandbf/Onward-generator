@@ -40,6 +40,7 @@
     "build": {
       "type": "object",
       "additionalProperties": false,
+      "dependentRequired": { "lit_normal_strength": ["lit_normal_material"] },
       "required": ["combine_cell_m", "static_batching", "occlusion_culling", "lightmap_texels_per_m", "lightmap_max_size", "lightmap_directional"],
       "properties": {
         "combine_cell_m": { "type": "number", "minimum": 0, "maximum": 1000 },
@@ -74,6 +75,18 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 64
+        },
+        "lit_normal_material": {
+          "description": "Plan D5, ADR-033 (proposed): spike, off when absent. One facade_trim_* glTF material the adapter draws with the SDK's PP_Opaque_Lit and a tangent-space normal map that export package derives from that material's albedo (lit_normal.png). Every other material keeps PP_Opaque_Simple_Lit. The relief shows in the baked diffuse only with lightmap_directional true",
+          "type": "string",
+          "pattern": "^facade_trim_[a-z0-9_]+$",
+          "maxLength": 64
+        },
+        "lit_normal_strength": {
+          "description": "Plan D5, ADR-033 (proposed): relief strength of the derived normal map (slope scale of the albedo luma); 2 when absent. Needs lit_normal_material",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8
         },
         "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
         "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
