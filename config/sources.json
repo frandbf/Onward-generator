@@ -3,6 +3,6 @@
   "schema_version": "1.0.0",
   "description": "Optional data-source plugins (ADR-018). licence_allowlist: SPDX ids a plugin may be fetched under. priority: the single ranking of building-height sources, first wins per building; a winner with height_m and no levels takes levels from the next source that has them. OSM height, OSM levels and the estimate rank below every entry here (docs/04-heights.md). evidence: the single ranking of ground-floor shop evidence (ADR-022), first source with evidence wins per building; osm is the OSM shop, amenity, office and craft POIs and a commercial building category. overture (ADR-021) keeps its height rank here but its overrides go to heights --secondary-overrides, below an OSM height; run stops when priority ranks it above a plugin of the map that writes authoritative overrides. Its places and heights must carry a licence on the allowlist: CDLA-Permissive-2.0, Apache-2.0 and CC0-1.0 are the Overture place licences. CC0-1.0 is also nl.ahn's licence and DL-DE-ZERO-2.0 de.nrw_ndom's (plan D4, docs/legal/data-sources.md).",
   "licence_allowlist": ["CC-BY-4.0", "etalab-2.0", "ODbL-1.0", "CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0", "DL-DE-ZERO-2.0"],
-  "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "es.catastro", "overture"],
+  "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "de.nrw_ndom", "es.catastro", "overture"],
   "evidence": ["osm", "es.catastro", "overture"]
 }

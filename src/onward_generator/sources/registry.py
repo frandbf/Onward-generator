@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from onward_generator.contracts import is_schema
+from onward_generator.sources.de.nrw_ndom import NrwNdomPlugin
 from onward_generator.sources.es.catastro import CatastroPlugin
 from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
 from onward_generator.sources.fr.lidar_hd import LidarHdPlugin
@@ -31,7 +32,7 @@ SCHEMA = "onward_generator.sources"
 OSM_EVIDENCE = "osm"
 """The evidence rank of the OSM shop, amenity, office and craft POIs and of a commercial building category."""
 
-PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), AhnPlugin(), OverturePlugin())
+PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), AhnPlugin(), NrwNdomPlugin(), OverturePlugin())
 
 
 @dataclass(frozen=True, slots=True)

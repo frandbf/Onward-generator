@@ -403,7 +403,7 @@ def test_cli_fetch_refuses_catastro_and_a_licence_off_the_allowlist(tmp_path: Pa
     assert main(["source", "normalize", "es.catastro", "--scene", str(scene_file), "--raw", "x", "--out", str(tmp_path / "o")]) == 1
     assert "es.catastro has its own commands" in capsys.readouterr().err
     config = tmp_path / "sources.json"
-    config.write_text(json.dumps({"schema": "onward_generator.sources", "licence_allowlist": ["ODbL-1.0"], "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "es.catastro"], "evidence": ["osm", "es.catastro"]}), encoding="utf-8")
+    config.write_text(json.dumps({"schema": "onward_generator.sources", "licence_allowlist": ["ODbL-1.0"], "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "de.nrw_ndom", "es.catastro"], "evidence": ["osm", "es.catastro"]}), encoding="utf-8")
     assert main(["source", "--config", str(config), "fetch", "es.pnoa_ndsm", "--scene", str(scene_file), "--out", str(tmp_path / "r")]) == 1
     assert "es.pnoa_ndsm: licence CC-BY-4.0 is not in licence_allowlist" in capsys.readouterr().err
     assert not (tmp_path / "r").exists()

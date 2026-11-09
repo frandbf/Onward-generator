@@ -1,0 +1,13 @@
+{
+  "schema": "onward_generator.source_coverage",
+  "schema_version": "1.0.0",
+  "source": "de.nrw_ndom",
+  "description": "Where run may use the Geobasis NRW nDOM50 (ADR-018, plan D4; opt-in, so only with run --source de.nrw_ndom): a coarse WGS84 longitude/latitude ring around North Rhine-Westphalia, drawn by hand for this repository (CC0) and generous over the borders. Outside the state the service returns no data and no override is written. Checked 2026-11-09 against the WCS DescribeCoverage envelope (EPSG:25832 x 278000..536000, y 5560000..5828000).",
+  "polygons": [
+    [[
+      [5.85, 50.75], [6.4, 50.3], [7.2, 50.55], [7.7, 50.6], [8.1, 50.85], [8.5, 51.0], [8.95, 51.25],
+      [9.5, 51.6], [9.45, 52.0], [9.0, 52.25], [8.7, 52.55], [8.0, 52.5], [7.1, 52.25], [6.7, 51.9],
+      [6.0, 51.85], [5.85, 51.0], [5.85, 50.75]
+    ]]
+  ]
+}
