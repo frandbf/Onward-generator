@@ -578,3 +578,13 @@ def test_a_broken_lidar_roofs_switch_leaves_detail_freshness_to_the_base(tmp_pat
     assert output_ready("detail", root)
     os.utime(processed / "scene3d" / "scene_visual.glb", (1_000_003, 1_000_003))
     assert not output_ready("detail", root)
+
+
+def test_a_single_grid_plugin_keeps_its_sidecar_entries_and_mosaic(tmp_path: Path, scene_file: Path) -> None:
+    raw = _fetched(tmp_path, scene_file)
+    record = json.loads(lidar.sidecar_path(raw).read_text(encoding="utf-8"))
+    assert all(set(entry) == {"file", "url", "bbox", "columns", "rows", "sha256", "size_bytes"} for entry in record["tiles"])
+    assert not isinstance(PNOA, lidar.SurfaceModelHeights)
+    _record, grid = lidar.load_raster(PNOA, raw)
+    bodies = [(entry, PNOA.decode((raw / entry["file"]).read_bytes(), entry)) for entry in record["tiles"]]
+    assert lidar.join_tiles(PNOA, bodies, "x").values.tobytes() == grid.values.tobytes()
