@@ -80,7 +80,7 @@ def albedo_png(visual: bytes, material: str) -> bytes:
 def decode_rgb(png: bytes) -> np.ndarray:
     """An 8-bit H x W x 3 array of the PNG's colour; alpha is dropped."""
     with Image.open(BytesIO(png)) as image:
-        return np.asarray(image.convert("RGB"), dtype=np.uint8)
+        return np.asarray(image.convert("RGB"))
 
 
 def normal_map(rgb: np.ndarray, strength: float) -> np.ndarray:
@@ -90,7 +90,7 @@ def normal_map(rgb: np.ndarray, strength: float) -> np.ndarray:
     pixels = np.asarray(rgb)
     if pixels.ndim != 3 or pixels.shape[2] not in (3, 4):
         raise ValueError(f"expected an H x W x 3 or H x W x 4 image, got shape {pixels.shape}")
-    height = pixels[:, :, :3].astype(np.float64) @ np.array(LUMA) / 255.0
+    height = pixels[:, :, :3] @ np.array(LUMA) / 255.0
     padded = np.pad(height, 1, mode="edge")
 
     def at(dy: int, dx: int) -> np.ndarray:
@@ -111,7 +111,7 @@ def encode_png(pixels: np.ndarray) -> bytes:
     if array.ndim != 3 or array.shape[2] != 3:
         raise ValueError(f"expected an H x W x 3 normal map, got shape {array.shape}")
     out = BytesIO()
-    Image.fromarray(array).save(out, format="PNG", compress_level=_PNG_COMPRESS_LEVEL)
+    Image.fromarray(array).save(out, format="PNG", compress_level=_PNG_COMPRESS_LEVEL)  # pragma: no mutate: Pillow's default level is also 6, so dropping the argument writes the same bytes; it is kept to pin the level
     return out.getvalue()
 
 

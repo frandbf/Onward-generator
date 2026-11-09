@@ -385,7 +385,9 @@ def test_lit_normal_warns_without_directional_lightmaps(trim_inputs: tuple[Path,
     found = [w for w in result.warnings if w.startswith("build.lit_normal_material facade_trim_test: ")]
     assert bool(found) is warned
     if warned:
-        assert "build.lightmap_directional is not true" in found[0] and "ADR-033" in found[0]
+        assert found == ["build.lit_normal_material facade_trim_test: build.lightmap_directional is not true, so the baked "
+                         "diffuse ignores the normal map and the relief shows only in the specular term; set "
+                         "build.lightmap_directional true for the headset measurement (ADR-033)"]
     assert result.manifest["warnings"] == list(result.warnings)
 
 

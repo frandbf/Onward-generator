@@ -167,6 +167,11 @@ def test_output_is_deterministic_and_pinned() -> None:
     assert first[first.index(b"IDAT") + 4 : first.index(b"IDAT") + 6] == b"\x78\x9c"
 
 
+def test_encode_png_takes_any_integer_array_as_8_bit() -> None:
+    pixels = normal_map(_fixture(), DEFAULT_STRENGTH)
+    assert encode_png(pixels.astype(np.int64)) == encode_png(pixels)
+
+
 @pytest.mark.parametrize("shape", [(8, 8), (8, 8, 4), (8, 8, 1)])
 def test_encode_png_refuses_anything_but_rgb(shape: tuple[int, ...]) -> None:
     with pytest.raises(ValueError, match="expected an H x W x 3 normal map"):
@@ -275,6 +280,15 @@ def test_albedo_png_refuses_a_material_without_a_texture() -> None:
 def test_albedo_png_refuses_a_broken_image(edit, match: str) -> None:  # type: ignore[no-untyped-def]
     with pytest.raises(NormalMapError, match=match):
         albedo_png(_edited(_quad_glb(), edit), "facade_trim_test")
+
+
+def test_albedo_png_reads_a_view_without_byte_offset_from_the_start() -> None:
+    png = _png((9, 8, 7))
+    doc = {"asset": {"version": "2.0"}, "materials": [{"name": "facade_trim_x", "pbrMetallicRoughness": {
+        "baseColorTexture": {"index": 0}}}], "textures": [{"source": 0}],
+        "images": [{"mimeType": "image/png", "bufferView": 0}],
+        "bufferViews": [{"buffer": 0, "byteLength": len(png)}], "buffers": [{"byteLength": len(png)}]}
+    assert albedo_png(pack_glb(doc, png), "facade_trim_x") == png
 
 
 def test_albedo_png_uses_the_view_offset() -> None:
