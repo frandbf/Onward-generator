@@ -118,6 +118,7 @@ class LidarHdPlugin:
         obligations="Mention the source (IGN, LiDAR HD) and the date of the data; say the heights are derived from it.",
     )
     produces: frozenset[Kind] = frozenset({"height_m"})
+    opt_in: bool = False
     stage_names: tuple[str, str] = ("lidar_hd", "lidar_hd_heights")
     raster_crs: str = CRS
     hosts: frozenset[str] = frozenset({"data.geopf.fr"})

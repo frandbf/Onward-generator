@@ -51,6 +51,7 @@ class FakeHeights:
     licence: LicenceRecord = OPEN
     produces: frozenset[Kind] = frozenset({"height_m"})
     west: float = -180.0
+    opt_in: bool = False
 
     def covers(self, longitude: float, latitude: float) -> bool:
         return longitude >= self.west

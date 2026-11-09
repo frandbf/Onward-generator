@@ -83,6 +83,9 @@ class RasterHeights(Protocol):
     def produces(self) -> frozenset[Kind]: ...
 
     @property
+    def opt_in(self) -> bool: ...
+
+    @property
     def stage_names(self) -> tuple[str, str]: ...
 
     @property

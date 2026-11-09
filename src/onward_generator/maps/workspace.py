@@ -474,7 +474,8 @@ def source_enabled(directory: str | Path, plugin_id: str) -> bool:
     The map centre must be inside the plugin's coverage, and ``map.json`` must
     not switch it off (``run --no-source <id>``; for ``es.catastro`` also the
     older ``"catastro": false``). A map without a switch uses every plugin
-    that covers it.
+    that covers it, except an opt-in plugin (plan D4), which needs
+    ``run --source <id>`` (``"sources": {"<id>": true}``).
     """
     try:
         document = load_map(directory)

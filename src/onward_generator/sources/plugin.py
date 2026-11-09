@@ -4,6 +4,7 @@ A source plugin is a dataset that only covers part of the world: a national
 cadastre, a LiDAR height model. The generic core (OSM, ``geo``, ``heights``)
 never depends on one. ``run`` asks every registered plugin whether it covers
 the map centre and adds the stages of those that do and are not switched off.
+An opt-in plugin runs only where ``map.json`` switches it on (ADR-018, plan D4).
 
 A plugin never imports the exporter. It writes into ``data/raw`` (the
 download and its ``.source.json``) and ``data/processed`` (an overrides file,
@@ -85,6 +86,11 @@ class SourcePlugin(Protocol):
 
     @property
     def produces(self) -> frozenset[Kind]: ...
+
+    @property
+    def opt_in(self) -> bool:
+        """True: the plugin runs only on a map that switches it on (``run --source <id>``). False: wherever it covers the centre."""
+        ...
 
     def covers(self, longitude: float, latitude: float) -> bool:
         """True when the map centre is inside the plugin's coverage. A static table in the repository, no network."""

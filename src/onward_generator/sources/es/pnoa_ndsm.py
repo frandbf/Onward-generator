@@ -95,6 +95,7 @@ class PnoaNdsmPlugin:
         ),
     )
     produces: frozenset[Kind] = frozenset({"height_m"})
+    opt_in: bool = False
     stage_names: tuple[str, str] = ("pnoa_ndsm", "pnoa_heights")
     raster_crs: str = CRS
     hosts: frozenset[str] = frozenset({"wcs-mds.idee.es"})
