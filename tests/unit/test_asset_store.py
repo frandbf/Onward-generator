@@ -234,9 +234,10 @@ def test_local_rows_per_slot_are_capped_lightest_first(tmp_path: Path, monkeypat
 
 
 def test_no_tracked_file_carries_the_asset_store_licence_or_a_local_catalogue() -> None:
-    tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=False)
-    if tracked.returncode != 0:
-        pytest.skip("not a git checkout")
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=REPO, capture_output=True, text=True, check=False)
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != REPO.resolve():
+        pytest.skip("REPO is not the root of a git checkout (a copy such as the mutation sandbox)")
+    tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True)
     names = tracked.stdout.splitlines()
     assert not [n for n in names if n.startswith("assets/asset_store_")]
     for name in names:
