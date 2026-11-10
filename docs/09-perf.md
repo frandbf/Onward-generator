@@ -512,3 +512,35 @@ Pending (not done; the option stays off until they pass):
 - [ ] A visual judgment of the facade on the 1–5 rubric, on against off, and whether the gain is worth the cost.
 
 Then ADR-033 goes from proposed to accepted, followed by a separate decision on ADR-009 decision 7, ADR-020 and the AGENTS.md material rule, or the option is dropped. `quest_acceptance.md` is not marked without the user.
+
+## D6: landmarks from open LoD2 data (opt-in)
+
+Plan D6, [ADR-008 amendment](decisions/ADR-008-landmark-volumes.md) (proposed), [ADR-018 amendment](decisions/ADR-018-source-plugins.md) (proposed), off by default. `run --source es.madrid_lod2` downloads the Madrid municipal LoD2 blocks (CC BY 4.0) under the scene's landmarks, and `detail --lod2-landmarks` draws a matched core landmark with its observed volume instead of the placeholder shell and tower ([07-detail.md](07-detail.md#lod2-landmarks)); `bench.py run --lod2-landmarks` switches the plugin on in the run copy of a map it covers (bench_madrid only). Docker on an Apple M4 Pro, frozen bench inputs, `--gameplay-report`, 9 November 2026, workshop/d6.
+
+- **Off.** Run `d6_off` against the baseline `20261109T153955Z`: `bench.py check` finds no difference outside timings. The detail GLBs and every package file are byte-identical; `scene_detail.json`, `detail_report.json` and `onward_export.json` differ only in run paths and the hashes of files that hold them, as between any two runs. The off run came before the first on run, so its inputs digest is the baseline's.
+- **On.** Runs `d6_on` (networked: 13 block ZIPs, 1.16 MB, `madrid_lod2` stage 26.1 s, then frozen into `output/bench/inputs/bench_madrid/data/raw/madrid_lod2/`) and `d6_on2` (`--offline`): `bench.py check` finds no difference outside timings. bench_murcia, bench_paris and bench_krakow lie outside the coverage and show delta 0 in every row. bench_madrid against `d6_off`:
+
+| bench_madrid r300 | Off | On | Delta |
+| --- | --- | --- | --- |
+| Triangles total / core / scenic | 398 025 / 270 361 / 108 602 | 400 663 / 272 999 / 108 602 | +2 638 / +2 638 / 0 |
+| Draws total; view draws median / p90 / max | 504; 175 / 374 / 448 | 504; 175 / 374 / 448 | 0 |
+| Lightmap pages | 11 | 11 | 0 |
+| Gameplay: routes, overlap, sightline, contact | 3, 43.4 %, 291.2 m, 29.5 % | the same | 0 |
+| LoD2 landmarks matched / unmatched | – | 2 / 0 | |
+| LoD2 visual / collision triangles | – | 2 187 / 524 | |
+
+heights.json flags 10 landmarks on bench_madrid; 2 are in the 150 m core (`osm-relation-4098953`, the Real Casa de Correos, 1 313 triangles, 37.8 m over its ground; `osm-way-256390693`, 874 triangles, 42.0 m). The other 8 are scenic and keep their shells. Run on all 10 for the record, 9 match with a footprint cover of 0.996 to 0.999 and 1 (`osm-relation-1609614`, 7 356 triangles) stays over the 2 000-triangle cap after four passes. No draw is added: the volumes use `stone_warm` and `roof_tile`, which the placeholder already used. The ground of a landmark is set 4 to 13 m above its lowest LoD2 vertex (the highest outer wall base on Madrid's slopes), so the walls on the lower side are shortened by up to that much. The Madrid line is in the package `attribution`; the length-capped map description cuts it, as it does several Overture lines.
+
+**Review round 1** (runs `d6_r2_off`, `d6_r2_on`, `d6_r2_on2`, same frozen inputs). Three defects found in review are fixed, and the numbers above are from these runs. (1) A group whose top is not above the landmark's ground (a low annex on a slope) is left out with a warning, and the cover is checked again; before, it gave a critical collider issue and a flattened part. (2) The clip used to drop every triangle that left the footprint, which left the volume open. A ray probe (one ray per metre of footprint edge, from 3 m outside to 2 m inside, at 1, 5, 10 and 15 m) found 47 to 49 rays through the Casa de Correos at each height and 37 to 77 through `osm-way-256390693`, where the raw, unclipped LoD2 groups let through 1 at each height and 52 at 15 m only. Now a triangle is cut exactly at the footprint edge and the cut is walled down to the street (`clip.cut_triangles` 78 and 66, `closure_triangles` 143 and 88), and the probe finds exactly the raw groups' counts. The floor fills the plan the kept triangles leave open (104 and 26 floor triangles). (3) Neighbours keep their party walls against a landmark drawn with LoD2, because the LoD2 volume can be lower than the placeholder shell that hid them. Together these add 909 triangles over the first on run and no draw or page. Off: every metric shows delta 0 against `20261109T153955Z`, and `bench.py check` matches `d6_r1_off` (taken after the LoD2 blocks were frozen, so with the same inputs digest). The detail GLBs and the package files other than `onward_export.json` are byte-identical to the baseline; `scene_materials/scene_visual.glb` holds the run path, so it differs between any two runs. On: `bench.py check d6_r2_on d6_r2_on2` finds no difference outside timings, and Murcia, Paris and Krakow show delta 0.
+
+Pending on the headset (A2) and in Unity (A3), not done; the amendments stay proposed until they pass:
+
+- [ ] Unity 2021.3.23f1: build bench_madrid with the option off and on and load both on the Quest 3.
+- [ ] Each LoD2 landmark is recognisable, with no gaps or seams where it meets the street and its neighbours' walls, no z-fighting (the placeholder shell and the old tower prism are gone), nothing outside the OSM footprint, and roofs that read correctly in lightmapped light. Note the thin slivers seen at the base corners of the Casa de Correos in the Python preview.
+- [ ] No wall floats over a sloping street, and the shortened low side does not read as wrong.
+- [ ] Where a landmark was cut at its footprint edge, the closing wall reads as part of the building (wall material, generic UVs), with no crack along the cut and no see-through; the floor patches inside the footprint are not visible from the street.
+- [ ] The neighbours' party walls kept against an LoD2 landmark do not z-fight with its walls where both stand on the shared edge.
+- [ ] At least 72 fps median and at most 150 draws in fixed views A and B, option on and off; graphics memory at or under 1 GB.
+- [ ] Walk around and against each LoD2 landmark: no walking through walls, no snagging on simplified roof edges, and no route sealed or newly opened (the group prism colliders reach each group's top).
+- [ ] Attribution: "Origen de los datos: Ayuntamiento de Madrid" with the date appears in the map credits next to the OSM line, or the description is changed so it does.
+- [ ] Then move the ADR-008 and ADR-018 D6 amendments from proposed to accepted, or correct them. `quest_acceptance.md` is not marked without the user.

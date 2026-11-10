@@ -78,6 +78,7 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.lidar_roofs import FLAT, PITCHED, REASONS, RoofSpread, SpreadReport, classify, is_roof_tagged
+from onward_generator.detail.lod2 import Lod2Index, Lod2Part, lod2_parts
 from onward_generator.detail.mid import MID_MAX_TRIANGLES, MID_REPRESENTATION, build_mid_shell
 from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
@@ -1138,6 +1139,7 @@ def detail_scene(
     tints: Sequence[Mapping[str, Any]] | None = None,
     roof_spread: SpreadReport | None = None,
     mid_ring_m: float | None = None,
+    lod2_landmarks: Lod2Index | None = None,
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
@@ -1150,7 +1152,9 @@ def detail_scene(
     without a roof tag takes a flat or pitched roof from its nDSM spread (``lidar_roofs.classify``). ``None`` (the
     default) reads none, adds no key and draws the roofs as before. ``mid_ring_m`` (plan D3, needs a core) makes a building
     outside the core that meets a band that wide around it a ``mid`` shell (``tiers.ring_tier``); ``None`` (the default)
-    adds no tier and no key."""
+    adds no tier and no key. ``lod2_landmarks`` (plan D6, ADR-008 amendment) is a checked ``lod2_index.json``: a core
+    landmark whose footprint it matches is drawn with the observed LoD2 volume clipped to that footprint instead of the
+    placeholder shell and its tower (``detail.lod2``); ``None`` (the default) reads none and adds no key."""
     if mid_ring_m is not None:
         if core_half_side_m is None:
             raise CoreError("mid_ring_m needs a core (core_half_side_m)")
@@ -1197,6 +1201,7 @@ def detail_scene(
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     tags_of = {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids}
     tier_of = {bid: ring_tier(footprints[bid], core, mid) for bid in ids}
+    lod2_built, lod2_issues = _lod2_inputs(lod2_landmarks, ids, footprints, height_of, tier_of, scene.get("frame") or {}, cfg)
     lidar_classes, lidar_plans, lidar_evidence = _lidar_inputs(
         roof_spread, _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg),
     ) if roof_spread is not None else ({}, {}, {})
@@ -1257,6 +1262,9 @@ def detail_scene(
         places=places,
         tints=tints,
         roof_spread=roof_spread,
+        lod2_landmarks=lod2_landmarks,
+        lod2_built=lod2_built,
+        lod2_issues=lod2_issues,
         core=core,
         heights=heights,
         height_of=height_of,
@@ -1323,6 +1331,9 @@ def _detail_buildings(
     places: Sequence[Mapping[str, Any]],
     tints: Sequence[Mapping[str, Any]] | None,
     roof_spread: SpreadReport | None,
+    lod2_landmarks: Lod2Index | None,
+    lod2_built: dict[str, Lod2Part],
+    lod2_issues: dict[str, list[Issue]],
     core: Polygon | None,
     heights: dict[str, Any],
     height_of: dict[str, Any],
@@ -1377,6 +1388,7 @@ def _detail_buildings(
     """The building loop of ``detail_scene``: each building in ``order`` drawn as a core, mid or scenic one, then ``_assemble_detail``.
 
     It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
+    lod2_swap: set[str] = set()
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1649,10 +1661,16 @@ def _detail_buildings(
         objects.append(DetailObject(o.id, "building", visual, colliders, record, glass_colliders=glass_colliders, uv_frame=frame))
         core_shells[bid] = (shell, segments, objects[-1])
         if landmark:
-            towers, tower_issues = attach_towers(bid, geom, features, cfg)
-            issues.extend(tower_issues)
-            for part in towers:
-                objects.append(DetailObject(part.id, "landmark_part", list(part.visual), [part.collider], part.record))
+            issues.extend(lod2_issues.get(bid, ()))
+            if bid in lod2_built and interior_record is not None:
+                issues.append(Issue("landmark_lod2_not_used", "info", bid, "it has an interior; the placeholder and its tower stay"))
+            if bid in lod2_built and interior_record is None:
+                lod2_swap.add(bid)  # drawn with its LoD2 volume once the party walls are split (``_swap_lod2``): no tower prism
+            else:
+                towers, tower_issues = attach_towers(bid, geom, features, cfg)
+                issues.extend(tower_issues)
+                for part in towers:
+                    objects.append(DetailObject(part.id, "landmark_part", list(part.visual), [part.collider], part.record))
         if core is not None:
             for x in objects[first_object:]:
                 x.record["tier"] = CORE
@@ -1670,6 +1688,9 @@ def _detail_buildings(
         places=places,
         tints=tints,
         roof_spread=roof_spread,
+        lod2_landmarks=lod2_landmarks,
+        lod2_built=lod2_built,
+        lod2_swap=lod2_swap,
         core=core,
         heights=heights,
         height_of=height_of,
@@ -1723,6 +1744,9 @@ def _assemble_detail(
     places: Sequence[Mapping[str, Any]],
     tints: Sequence[Mapping[str, Any]] | None,
     roof_spread: SpreadReport | None,
+    lod2_landmarks: Lod2Index | None,
+    lod2_built: dict[str, Lod2Part],
+    lod2_swap: set[str],
     core: Polygon | None,
     heights: dict[str, Any],
     height_of: dict[str, Any],
@@ -1764,7 +1788,8 @@ def _assemble_detail(
     """The rest of ``detail_scene`` once every building is drawn: party walls, building parts, ground, urban elements, checks and the report.
 
     It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
-    wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
+    wall_areas = _split_party_walls(core_shells, footprints, tree, ids, lod2_swap)
+    _swap_lod2(building_objs, emitted, lod2_built, lod2_swap)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     for x in objects:
         if x.type == "building":
@@ -1783,6 +1808,9 @@ def _assemble_detail(
                     if x.type == "building" and "parapet_m" in x.record["roof"]},
     )
     issues.extend(part_issues)
+    # A building:part of a landmark drawn with its LoD2 volume would stand inside that volume; the volume holds it.
+    replaced = sum(p.record["source_ids"][0] in lod2_swap for p in part_objects)
+    part_objects = [p for p in part_objects if p.record["source_ids"][0] not in lod2_swap]
     if core is not None:
         for piece in part_objects:
             piece.record["tier"] = tier_of[piece.record["source_ids"][0]]
@@ -1871,6 +1899,8 @@ def _assemble_detail(
     if roof_spread is not None:
         detailed.inputs["roof_spread"] = {"path": roof_spread.path, "sha256": roof_spread.sha256, "source": roof_spread.source}
         _lidar_record(detailed, objects, lidar_classes, roof_spread)
+    if lod2_landmarks is not None:
+        _lod2_record(detailed, objects, lod2_landmarks, lod2_swap, replaced)
     detailed.stats["roof_shapes"] = dict(sorted(roof_shapes.items()))
     detailed.stats["building_parts"] = {
         "kept": len(part_objects),
@@ -1896,14 +1926,84 @@ def _assemble_detail(
     return detailed
 
 
+def _lod2_inputs(
+    index: Lod2Index | None,
+    ids: Sequence[str],
+    footprints: Mapping[str, BaseGeometry],
+    height_of: Mapping[str, Any],
+    tier_of: Mapping[str, str],
+    frame: Mapping[str, Any],
+    cfg: DetailConfig,
+) -> tuple[dict[str, Lod2Part], dict[str, list[Issue]]]:
+    """The LoD2 volume of each core landmark the index matches, and each core landmark's LoD2 issues (plan D6).
+
+    Only a core landmark (``heights.json`` ``landmark``, ADR-008) is a candidate: a scenic or mid landmark keeps its shell.
+    Nothing without an index, and nothing with ``landmarks.enabled`` false.
+    """
+    if index is None or not cfg.landmarks.enabled:
+        return {}, {}
+    landmarks = {bid: footprints[bid] for bid in ids if height_of[bid].get("landmark") and tier_of[bid] == CORE}
+    return lod2_parts(landmarks, index, frame, wall_material=cfg.landmarks.wall_material, roof_material=cfg.landmarks.roof_material,
+                      max_height_m=cfg.landmarks.max_tower_height_m)
+
+
+def _swap_lod2(building_objs: Sequence[SceneObject], emitted: Mapping[str, tuple[list[DetailObject], list[Issue]]],
+               built: Mapping[str, Lod2Part], swap: set[str]) -> None:
+    """Draw each landmark of ``swap`` with its LoD2 volume and colliders instead of the placeholder shell (plan D6).
+
+    Runs after ``_split_party_walls``, which redraws every core shell. The building keeps its id, its OSM footprint
+    and its record; the record says the volume is observed LoD2 (``lod2``) and the facade still is not the real one.
+    """
+    for o in building_objs:
+        bid = o.record["source_ids"][0]
+        if bid not in swap:
+            continue
+        x = next(obj for obj in emitted[o.id][0] if obj.type == "building")
+        part = built[bid]
+        x.visual = list(part.visual)
+        x.colliders = list(part.colliders)
+        x.glass_colliders = []
+        x.uv_frame = None  # the LoD2 faces are not the template's wall runs (ADR-012): generic surface UVs
+        x.record["materials"] = [p.material for p in x.visual]
+        x.record["visual"] = {"triangles": sum(p.mesh.triangle_count for p in x.visual)}
+        x.record["collider"] = {"source": "lod2_group_prisms", "parts": len(x.colliders),
+                                "triangles": sum(m.triangle_count for m in x.colliders), "balconies": 0, "glass_panes": 0}
+        x.record["generation"] = {**x.record["generation"], "method": "observed LoD2 volume clipped to the OSM footprint"}
+        # representative_of_real_facade stays False, as every building record has it: the LoD2 faces carry no facade.
+        x.record["facade"].update({"representation": "observed_lod2", "representative_of_real_volume": True, "needs_custom_model": False})
+        x.record["lod2"] = dict(part.record)
+
+
+def _lod2_record(detailed: DetailedScene, objects: Sequence[DetailObject], index: Lod2Index, swap: set[str],
+                 replaced: int) -> None:
+    """``inputs.lod2_landmarks``, ``counts.lod2_landmarks`` and, when a landmark was drawn with it, the CC BY attribution line."""
+    detailed.inputs["lod2_landmarks"] = {"path": index.path, "sha256": index.sha256, "source": index.source}
+    drawn = [o for o in objects if o.type == "building" and "lod2" in o.record]
+    codes = Counter(i.code for i in detailed.issues if i.code.startswith("landmark_lod2_"))
+    detailed.stats["lod2_landmarks"] = {
+        "matched": len(swap),
+        "issues": dict(sorted(codes.items())),
+        "visual_triangles": sum(p.mesh.triangle_count for o in drawn for p in o.visual),
+        "collision_triangles": sum(m.triangle_count for o in drawn for m in o.colliders),
+        "building_parts_replaced": replaced,
+    }
+    if swap:
+        lines = {(a["text"], a["license"]): a for a in detailed.extra_attribution}
+        line = index.attribution_line()
+        lines.setdefault((line["text"], line["license"]), line)
+        detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
+
+
 def _split_party_walls(shells: Mapping[str, tuple[Shell, list[Segment], DetailObject]], footprints: Mapping[str, Any],
-                       tree: STRtree, ids: list[str]) -> WallAreas:
+                       tree: STRtree, ids: list[str], lod2_swap: set[str]) -> WallAreas:
     """Drop the party walls hidden by a neighbour's wall and give the visible ones the party material.
 
     Runs once every shell is built, since a neighbour's wall top is only known then
-    (an interior can raise it). Updates each building's visual and its record.
+    (an interior can raise it). Updates each building's visual and its record. A landmark of ``lod2_swap`` hides no
+    neighbour's wall: its shell is about to give way to the LoD2 volume (``_swap_lod2``), which can be lower than the
+    shell or leave part of the footprint open, so its neighbours keep their party walls against it (plan D6).
     """
-    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items()}
+    tops = {bid: shell.z_top for bid, (shell, _, _) in shells.items() if bid not in lod2_swap}
     total = WallAreas()
     for bid, (shell, segments, obj) in shells.items():
         found = tree.query(footprints[bid].buffer(HIDDEN_GAP_M))  # pragma: no mutate: a wider query only adds candidates that wall_cover finds nothing in

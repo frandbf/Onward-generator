@@ -11,6 +11,8 @@ from pathlib import Path
 from onward_generator.geo.sources import sha256_file
 from onward_generator.io import atomic_write_json, prepare_outputs
 from onward_generator.sources import registry
+from onward_generator.sources.es.madrid_lod2 import PLUGIN_ID as MADRID_LOD2
+from onward_generator.sources.es.madrid_lod2 import describe_blocks, fetch_lod2
 from onward_generator.sources.lidar import RasterHeights, fetch_raster, normalize_raster
 from onward_generator.sources.merge import MERGED_FILE, REPORT_FILE, REPORT_SCHEMA, merge_overrides
 from onward_generator.sources.plugin import SourceError
@@ -96,6 +98,15 @@ def _normalize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _madrid_lod2(args: argparse.Namespace) -> int:
+    check_licence(plugin_by_id(MADRID_LOD2), load_source_config(Path(args.config)))
+    out = Path(args.out).expanduser().resolve()
+    index = fetch_lod2(Path(args.scene).expanduser().resolve(), out, overwrite=args.overwrite)
+    print(f"{describe_blocks(index)}; licence {index['license']}")
+    print(f"wrote {out} and its .source.json sidecar")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="onward-generator source", description="optional data-source plugins (ADR-018)")
     parser.add_argument("--config", default=str(CONFIG_PATH), help="licence allowlist and priority (default config/sources.json)")
@@ -117,6 +128,18 @@ def build_parser() -> argparse.ArgumentParser:
     normalize.add_argument("--out", required=True)
     normalize.add_argument("--overwrite", action="store_true")
     normalize.set_defaults(handler=_normalize)
+    lod2 = sub.add_parser(
+        "madrid-lod2",
+        help="download the Madrid LoD2 blocks under the scene's landmarks into data/raw (network, plan D6)",  # pragma: no mutate: help text
+    )
+    lod2.add_argument("--scene", required=True)
+    lod2.add_argument(
+        "--out",
+        required=True,
+        help="directory under data/raw/ that receives the block ZIPs and lod2_index.json",  # pragma: no mutate: help text
+    )
+    lod2.add_argument("--overwrite", action="store_true")
+    lod2.set_defaults(handler=_madrid_lod2)
     merge = sub.add_parser("merge", help="merge plugin overrides by priority into one heights_overrides.json (offline)")
     merge.add_argument("--overrides", action="append", required=True, help="<plugin id>=<heights_overrides file>; repeat per plugin")
     merge.add_argument("--out", required=True)

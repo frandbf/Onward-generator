@@ -86,6 +86,11 @@ class Stub:
             out.mkdir(parents=True)
             (out / "tile_000.bin").write_bytes(b"\x00\x01")
             out.with_name(out.name + ".source.json").write_text("{}")
+        elif head == ("source", "madrid-lod2"):
+            out.mkdir(parents=True)
+            (out / "M-000214.zip").write_bytes(b"PK")
+            (out / "lod2_index.json").write_text("{}")
+            out.with_name(out.name + ".source.json").write_text("{}")
         elif head == ("overture", "fetch"):
             out.mkdir(parents=True, exist_ok=True)
             (out / "overture_buildings.parquet").write_bytes(b"PAR1")
@@ -634,3 +639,35 @@ def test_mid_ring_run_switches_the_run_copy_only(workdir: Path) -> None:
     detail = next(argv for argv in on.calls if argv[0] == "detail")
     assert detail[detail.index("--mid-ring-m") + 1] == "100"
     assert detail.index("--mid-ring-m") > detail.index("--core-radius-m")
+
+
+def test_lod2_landmarks_run_switches_the_madrid_run_copy_only_and_freezes_the_blocks(workdir: Path) -> None:
+    """Plan D6: ``--lod2-landmarks`` turns es.madrid_lod2 on in bench_madrid's run copy; bench_murcia is outside Madrid."""
+    root = workdir / "bench"
+
+    def run(run_id: str, stub: Stub, only: str, *extra: str) -> int:
+        return bench.main(["run", "--only", only, "--root", str(root), "--run-id", run_id, *extra], execute=stub)
+
+    murcia = Stub()
+    assert run("m1", murcia, "bench_murcia", "--lod2-landmarks") == 0
+    assert all("madrid-lod2" not in argv for argv in murcia.calls)
+    assert "es.madrid_lod2" not in json.dumps(json.loads((root / "runs" / "m1" / "bench_murcia" / "map.json").read_text(encoding="utf-8")))
+    off = Stub()
+    assert run("r1", off, "bench_madrid") == 0
+    assert all("madrid-lod2" not in argv for argv in off.calls)
+    assert "--lod2-landmarks" not in next(argv for argv in off.calls if argv[0] == "detail")
+    inputs = root / "inputs" / "bench_madrid"
+    before = json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    on = Stub()
+    assert run("r2", on, "bench_madrid", "--lod2-landmarks") == 0
+    assert [argv[:2] for argv in on.calls if "madrid-lod2" in argv] == [["source", "madrid-lod2"]]
+    detail = next(argv for argv in on.calls if argv[0] == "detail")
+    assert detail[detail.index("--lod2-landmarks") + 1].endswith("data/raw/madrid_lod2/lod2_index.json")
+    assert json.loads((inputs / "map.json").read_text(encoding="utf-8")) == before
+    copy = json.loads((root / "runs" / "r2" / "bench_madrid" / "map.json").read_text(encoding="utf-8"))
+    assert copy["sources"] == {"es.catastro": True, "es.madrid_lod2": True}
+    assert (inputs / "data" / "raw" / "madrid_lod2" / "lod2_index.json").is_file()
+    again = Stub()
+    assert run("r3", again, "bench_madrid", "--offline", "--lod2-landmarks") == 0
+    assert all("madrid-lod2" not in argv for argv in again.calls)  # the frozen blocks are reused
+    assert "--lod2-landmarks" in next(argv for argv in again.calls if argv[0] == "detail")

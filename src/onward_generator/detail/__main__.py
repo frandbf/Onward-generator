@@ -15,6 +15,7 @@ from onward_generator.contracts import is_schema
 from onward_generator.detail.budget import detail_scene_budget
 from onward_generator.detail.config import DetailConfigError, load_detail_config
 from onward_generator.detail.lidar_roofs import RoofSpread, SpreadReport
+from onward_generator.detail.lod2 import Lod2Error, Lod2Index, load_index
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
 from onward_generator.detail.typology import TypologyConfigError, load_typology_config
 from onward_generator.generation.config import GenerationConfigError, Material, load_generation_config
@@ -58,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="overture_tints.json from overture match --tints: Overture colours below the OSM wall and roof tags (plan C2)")
     parser.add_argument("--lidar-roofs", metavar="REPORT",
                         help="<id>_report.json of a LiDAR source plugin for this scene: flat or pitched roofs from the nDSM spread (plan C3)")
+    parser.add_argument(
+        "--lod2-landmarks",
+        metavar="INDEX",  # pragma: no mutate: help text
+        help="lod2_index.json of a landmark_mesh source plugin (es.madrid_lod2): observed LoD2 volumes clipped to the "  # pragma: no mutate: help text
+             "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -180,6 +187,20 @@ def load_roof_spread(path: str | None, scene_path: str) -> SpreadReport | None:
     return SpreadReport(str(path), sha256_file(source), doc["source"], doc["provider"], doc["license"], doc["attribution"], spreads)
 
 
+def load_lod2(path: str | None, scene_path: str) -> Lod2Index | None:
+    """The checked ``lod2_index.json`` (plan D6), or ``None`` without a path. The scene frame must be in the index's CRS."""
+    if path is None:
+        return None
+    try:
+        index = load_index(path)
+    except Lod2Error as exc:
+        raise DetailError(str(exc)) from exc
+    frame = json.loads(Path(scene_path).expanduser().read_bytes()).get("frame") or {}
+    if frame.get("crs") != index.crs:
+        raise DetailError(f"{path}: the LoD2 volumes are in {index.crs}, but {scene_path} is in {frame.get('crs')}; nothing is reprojected")
+    return index
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
@@ -206,17 +227,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         places = load_places(args.places, args.scene)
         tints = load_tints(args.overture_tints, args.scene)
         roof_spread = load_roof_spread(args.lidar_roofs, args.scene)
+        lod2 = load_lod2(args.lod2_landmarks, args.scene)
         protected = (Path(args.scene), Path(args.heights), base_dir / "scene3d.json", base_dir / "generation_report.json",
                      base_dir / "scene_visual.glb", base_dir / "scene_collision.glb")
         targets = prepare_outputs(args.out, names, overwrite=args.overwrite, protected=protected)
         base, base_ref = load_base(args.base, args.scene, args.heights, gen_cfg)
         if args.core_target_triangles is None:
             detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
-                                    typology=typology, tints=tints, roof_spread=roof_spread, mid_ring_m=args.mid_ring_m)
+                                    typology=typology, tints=tints, roof_spread=roof_spread, mid_ring_m=args.mid_ring_m,
+                                    lod2_landmarks=lod2)
         else:
             detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
                                            max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints,
-                                           roof_spread=roof_spread, mid_ring_m=args.mid_ring_m)
+                                           roof_spread=roof_spread, mid_ring_m=args.mid_ring_m, lod2_landmarks=lod2)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1
@@ -262,6 +285,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         spread = mid["triangles_per_building"]
         print(f"mid ring_m={detailed.core['mid_ring_m']:g} buildings={mid['buildings']} visual_triangles={mid['visual_triangles']} "
               f"per_building mean={spread['mean']} min={spread['min']} max={spread['max']}")
+    if "lod2_landmarks" in c:
+        lod2_counts = c["lod2_landmarks"]
+        print(f"lod2_landmarks matched={lod2_counts['matched']} visual_triangles={lod2_counts['visual_triangles']} "
+              f"collision_triangles={lod2_counts['collision_triangles']} issues={lod2_counts['issues']}")
     print(f"severity={report['severity']}")
     for path in targets:
         print(f"wrote {path}")

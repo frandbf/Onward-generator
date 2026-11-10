@@ -20,6 +20,7 @@ from typing import Any
 from onward_generator.contracts import is_schema
 from onward_generator.sources.de.nrw_ndom import NrwNdomPlugin
 from onward_generator.sources.es.catastro import CatastroPlugin
+from onward_generator.sources.es.madrid_lod2 import MadridLod2Plugin
 from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
 from onward_generator.sources.fr.lidar_hd import LidarHdPlugin
 from onward_generator.sources.nl.ahn import AhnPlugin
@@ -32,7 +33,9 @@ SCHEMA = "onward_generator.sources"
 OSM_EVIDENCE = "osm"
 """The evidence rank of the OSM shop, amenity, office and craft POIs and of a commercial building category."""
 
-PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), AhnPlugin(), NrwNdomPlugin(), OverturePlugin())
+PLUGINS: tuple[SourcePlugin, ...] = (
+    CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), AhnPlugin(), NrwNdomPlugin(), MadridLod2Plugin(), OverturePlugin(),
+)
 
 
 @dataclass(frozen=True, slots=True)

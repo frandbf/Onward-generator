@@ -157,3 +157,40 @@ def test_switch_coerces_a_non_boolean_value_with_bool() -> None:
     assert registry.switch({"sources": {"xx.optional": 1}}, "xx.optional") is True
     assert registry.switch({"sources": {"xx.optional": ""}}, "xx.optional") is False
     assert registry.switch({"sources": {"xx.optional": "no"}}, "xx.optional") is True
+
+
+MADRID = {"center": {"latitude": 40.41690, "longitude": -3.70350}}
+
+
+def test_madrid_lod2_runs_only_when_switched_on_and_only_in_madrid() -> None:
+    found = {c.plugin.id: c for c in choices(MADRID)}
+    assert _row(found["es.madrid_lod2"]) == ("es.madrid_lod2", True, False, False, False)
+    assert describe(choices(MADRID)) == (
+        "sources  es.catastro, es.pnoa_ndsm, overture  (opt-in: es.madrid_lod2)  (not here: fr.lidar_hd, nl.ahn, de.nrw_ndom)")
+    on = {c.plugin.id: c for c in choices({**MADRID, "sources": {"es.madrid_lod2": True}})}
+    assert on["es.madrid_lod2"].runs
+    at_murcia = {c.plugin.id: c for c in choices({**CENTRE, "sources": {"es.madrid_lod2": True}})}
+    assert _row(at_murcia["es.madrid_lod2"]) == ("es.madrid_lod2", False, False, True, False)
+    assert "(not here: fr.lidar_hd, nl.ahn, de.nrw_ndom, es.madrid_lod2)" in describe(choices(CENTRE))
+
+
+def test_madrid_lod2_needs_no_priority_rank() -> None:
+    config = registry.load_source_config()
+    assert "es.madrid_lod2" not in config.priority
+    assert not registry.plugin_by_id("es.madrid_lod2").produces & registry.OVERRIDE_KINDS
+    document = {"schema": "onward_generator.sources", "licence_allowlist": ["CC-BY-4.0"], "priority": list(config.priority),
+                "evidence": list(config.evidence)}
+    assert source_config(document).priority == config.priority
+
+
+def test_madrid_lod2_never_imports_the_exporter() -> None:
+    import ast
+
+    from onward_generator.detail import lod2
+    from onward_generator.sources.es import madrid_lod2
+
+    for module in (madrid_lod2, lod2):
+        tree = ast.parse(Path(module.__file__ or "").read_text(encoding="utf-8"))
+        names = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+        names |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+        assert not {n for n in names if n.startswith(("onward_generator.export", "tools.unity"))}
