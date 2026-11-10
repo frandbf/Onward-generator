@@ -15,15 +15,19 @@ from onward_generator.overture.acquire import FetchRecord
 from onward_generator.overture.match import (
     DEFAULT_CONFIG_PATH,
     BuildingMatch,
+    BuildingTint,
     OvertureConfigError,
+    TintLend,
     load_config,
     match_buildings,
     match_report,
+    match_tints,
     overrides_document,
     place_tag,
     places_document,
     read_places,
     scene_frame,
+    tints_document,
 )
 from tests.overture_fixture import BLOCK, building, frame, place, scene, source, wgs84, write_buildings, write_places
 
@@ -430,3 +434,195 @@ def test_match_report_counts_by_origin_and_licence(tmp_path: Path) -> None:
                              {"dataset": "OpenStreetMap", "license": "ODbL-1.0", "buildings": 1}]
     assert b["matches"][0]["tint_hints"] == {"facade_color": "#a", "roof_color": "#b"}
     assert b["matches"][1] == matches[1].to_dict()
+
+
+# Plan C2: Overture colours as tints, a pairing apart from the heights.
+
+ESRI = "Esri Community Maps"
+
+
+def _tints(tmp_path: Path, rows: list, cfg: object = CFG, allowed: frozenset[str] = BUILDING_ALLOWED) -> tuple[list, dict[str, int]]:
+    return match_tints(_buildings(tmp_path, rows), scene(BLOCK), cfg, allowed)  # type: ignore[arg-type]
+
+
+def test_an_observed_colour_is_lent_with_its_evidence(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("o1", box(0, 0, 10, 10), facade="#C88C3C", roof="#b43c28",
+                 sources=[source("OpenStreetMap", "ODbL-1.0"), source(ESRI, None, "/properties/facade_color"),
+                          source(ESRI, "CC-BY-4.0", "/properties/roof_color")]),
+    ])
+    (tint,) = tints
+    assert (tint.building_id, tint.gers_id, tint.iou) == ("osm-way-1", "o1", 1.0)
+    assert tint.facade == TintLend("#C88C3C", ESRI, "CC-BY-4.0", "observed")
+    assert tint.roof == TintLend("#b43c28", ESRI, "CC-BY-4.0", "observed")
+    assert skipped == {"unmatched": 0}
+    assert tint.to_dict() == {
+        "building_id": "osm-way-1", "gers_id": "o1", "iou": 1.0,
+        "facade": {"colour": "#C88C3C", "dataset": ESRI, "license": "CC-BY-4.0", "origin": "observed",
+                   "attribution": {"text": "Esri Community Maps contributors; Overture Maps Foundation", "license": "CC-BY-4.0",
+                                   "license_url": "https://creativecommons.org/licenses/by/4.0/"}},
+        "roof": {"colour": "#b43c28", "dataset": ESRI, "license": "CC-BY-4.0", "origin": "observed",
+                 "attribution": {"text": "Esri Community Maps contributors; Overture Maps Foundation", "license": "CC-BY-4.0",
+                                 "license_url": "https://creativecommons.org/licenses/by/4.0/"}},
+    }
+    assert "roof" not in BuildingTint("a", "g", 0.5, tint.facade, None).to_dict()
+    assert "facade" not in BuildingTint("a", "g", 0.5, None, tint.roof).to_dict()
+
+
+def test_an_openstreetmap_colour_is_not_lent_and_the_property_source_wins(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("osm", box(0, 0, 10, 10), facade="#ffffff", roof="#778899", sources=[source("OpenStreetMap", "ODbL-1.0")]),
+        # The property's own source decides, either way.
+        building("prop-osm", box(12, 0, 22, 10), facade="#ffffff",
+                 sources=[source(ESRI, None), source("OpenStreetMap", "ODbL-1.0", "/properties/facade_color")]),
+        building("prop-esri", box(0, 20, 10, 30), roof="#778899",
+                 sources=[source("OpenStreetMap", "ODbL-1.0"), source(ESRI, None, "/properties/roof_color")]),
+    ])
+    assert [(t.building_id, t.gers_id, t.facade, t.roof is not None) for t in tints] == [("osm-way-3", "prop-esri", None, True)]
+    assert skipped == {"skipped_dataset": 3, "unmatched": 0}
+
+
+def test_a_licence_off_the_allowlist_is_refused(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("unknown", box(0, 0, 10, 10), facade="#ffffff", sources=[source("Esri Community Maps", "unknown")]),
+        building("odd", box(12, 0, 22, 10), roof="#ffffff", sources=[source("Esri Community Maps", "Proprietary-1.0")]),
+    ])
+    assert tints == [] and skipped == {"licence_not_allowed": 2, "unmatched": 0}
+    # Without any stated or documented licence the dataset is unknown too.
+    tints, skipped = _tints(tmp_path, [building("bare", box(0, 0, 10, 10), facade="#ffffff", sources=[])])
+    assert tints == [] and skipped == {"licence_not_allowed": 1, "unmatched": 0}
+
+
+def test_a_dataset_that_is_not_observed_is_refused(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("ml", box(0, 0, 10, 10), facade="#ffffff", sources=[source("Microsoft ML Buildings", "ODbL-1.0")]),
+        building("other", box(12, 0, 22, 10), facade="#ffffff", sources=[source("Someone", "CC0-1.0")]),  # estimated by default
+        building("ign", box(0, 20, 10, 30), facade="#ffffff", sources=[source("Instituto Geográfico Nacional (España)", None)]),
+    ])
+    assert [(t.building_id, t.facade.dataset if t.facade else None) for t in tints] == [
+        ("osm-way-3", "Instituto Geográfico Nacional (España)")]
+    assert skipped == {"origin_not_observed": 2, "unmatched": 0}
+    # The refusal order: a skipped dataset before the licence, the licence before the origin, the origin before the value.
+    order = _tints(tmp_path, [
+        building("a", box(0, 0, 10, 10), facade="nope", sources=[source("OpenStreetMap", "unknown")]),
+        building("b", box(12, 0, 22, 10), facade="nope", sources=[source("Microsoft ML Buildings", "unknown")]),
+        building("c", box(0, 20, 10, 30), facade="nope", sources=[source("Microsoft ML Buildings", "ODbL-1.0")]),
+    ])
+    assert order == ([], {"licence_not_allowed": 1, "origin_not_observed": 1, "skipped_dataset": 1, "unmatched": 0})
+
+
+def test_a_value_that_is_not_a_colour_is_refused(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("word", box(0, 0, 10, 10), facade="notacolour"),
+        building("short", box(12, 0, 22, 10), facade="#12"),
+        building("empty", box(0, 20, 10, 30), facade=""),
+    ])
+    assert tints == [] and skipped == {"colour_unparseable": 3, "unmatched": 0}
+    tints, skipped = _tints(tmp_path, [building("half", box(0, 0, 10, 10), facade="#aabbcc", roof="#zz")])
+    assert [(t.facade.colour if t.facade else None, t.roof) for t in tints] == [("#aabbcc", None)]
+    assert skipped == {"colour_unparseable": 1, "unmatched": 0}
+
+
+def test_tints_pair_by_intersection_over_union(tmp_path: Path) -> None:
+    from onward_generator.overture.match import _iou
+
+    exact = _iou(BLOCK["osm-way-1"], frame().to_local(wgs84(box(0, 0, 5, 10))))
+    at = dataclasses.replace(CFG, min_iou=exact)
+    tints, skipped = _tints(tmp_path, [building("half", box(0, 0, 5, 10), facade="#ffffff")], at)
+    assert [(t.building_id, t.iou) for t in tints] == [("osm-way-1", 0.5)] and skipped == {"unmatched": 0}
+    above = dataclasses.replace(CFG, min_iou=exact + 1e-9)
+    assert _tints(tmp_path, [building("half", box(0, 0, 5, 10), facade="#ffffff")], above) == ([], {"unmatched": 1})
+    # 0.49 with way-3, and one row far from every footprint: both unmatched. A point is no footprint.
+    tints, skipped = _tints(tmp_path, [
+        building("low", box(0, 20, 4.9, 30), facade="#ffffff"),
+        building("far", box(100, 100, 110, 110), facade="#ffffff"),
+        building("dot", Point(15, 5), facade="#ffffff"),
+    ])
+    assert tints == [] and skipped == {"no_footprint": 1, "unmatched": 2}
+
+
+def test_one_footprint_takes_one_colour_the_best_overlap_first(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("worse", box(0.5, 0, 10, 10), facade="#000000"),  # IoU 0.95 with way-1
+        building("best", box(0, 0, 10, 10), facade="#ffffff"),  # IoU 1
+    ])
+    assert [(t.building_id, t.gers_id) for t in tints] == [("osm-way-1", "best")] and skipped == {"unmatched": 1}
+    loose = dataclasses.replace(CFG, min_iou=0.2)
+    tie, _ = _tints(tmp_path, [
+        building("b", box(5, 0, 17, 10), facade="#000000"),  # IoU 0.294 with way-1 and with way-2
+        building("a", box(5, 0, 17, 10), facade="#ffffff"),
+    ], loose)
+    assert [(t.building_id, t.gers_id) for t in tie] == [("osm-way-1", "a"), ("osm-way-2", "b")]
+
+
+def test_a_colour_is_lent_without_a_height_and_the_overrides_stay_as_they_were(tmp_path: Path) -> None:
+    rows = [
+        building("o1", box(0, 0, 10, 10), height=14.5, floors=None, facade="#aa8866", roof="#552211",
+                 sources=[source(ESRI, "CC-BY-4.0")]),
+        # A colour-only row over the same footprint: it lends only a colour.
+        building("c1", box(0, 0, 10, 10), height=None, floors=None, facade="#ffffff", sources=[source(ESRI, None)]),
+        building("o2", box(12, 0, 19, 10), height=None, floors=3, sources=[source(ESRI, None)]),
+        building("c3", box(0, 20, 10, 30), height=None, floors=None, roof="#ffffff", sources=[source(ESRI, None)]),
+    ]
+    path = _buildings(tmp_path, rows)
+    matches, skipped = match_buildings(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    assert [(m.building_id, m.gers_id) for m in matches] == [("osm-way-1", "o1"), ("osm-way-2", "o2")]
+    assert skipped == {"no_height_or_floors": 2, "unmatched": 0}
+    record = _record(path, rows=4)
+    golden = {
+        "version": "0.1.0", "overrides": [
+            {"id": "osm-way-1", "height_m": 14.5, "source": "Overture Maps buildings 2026-10-21.0: Esri Community Maps",
+             "license": "CC-BY-4.0", "retrieved_at": "2026-10-30T12:00:00+00:00", "confidence": 0.8, "origin": "observed",
+             "note": "IoU 1.00 with Overture o1"},
+            {"id": "osm-way-2", "levels": 3, "source": "Overture Maps buildings 2026-10-21.0: Esri Community Maps",
+             "license": "CC-BY-4.0", "retrieved_at": "2026-10-30T12:00:00+00:00", "confidence": 0.8, "origin": "observed",
+             "note": "IoU 0.70 with Overture o2"},
+        ],
+    }
+    assert overrides_document(matches, record, CFG) == golden
+    assert [m.to_dict()["tint_hints"] for m in matches] == [{"facade_color": "#aa8866", "roof_color": "#552211"},
+                                                             {"facade_color": None, "roof_color": None}]
+    tints, tint_skips = match_tints(path, scene(BLOCK), CFG, BUILDING_ALLOWED)
+    # Rows are read in id order: c1 ties with o1 for way-1 and comes first, so way-1 takes its height from o1 and its
+    # colour from c1 (ADR-021 amendment: two pairings). c3 lends way-3 a roof though it has no height.
+    assert [(t.building_id, t.gers_id) for t in tints] == [("osm-way-1", "c1"), ("osm-way-3", "c3")]
+    assert tint_skips == {"unmatched": 1}
+
+
+def test_the_tints_document_lists_licences_and_attribution(tmp_path: Path) -> None:
+    tints, skipped = _tints(tmp_path, [
+        building("o3", box(0, 20, 10, 30), facade="#ffffff", roof="#778899", sources=[source(ESRI, None)]),
+        building("o1", box(0, 0, 10, 10), roof="#778899", sources=[source("Instituto Geográfico Nacional (España)", None)]),
+        building("x", box(12, 0, 22, 10), facade="#ffffff", sources=[source("OpenStreetMap", "ODbL-1.0")]),
+    ])
+    doc = tints_document(tints, _record(tmp_path / "b.parquet", rows=3), skipped, frame())
+    assert doc["schema"] == "onward_generator.overture_tints" and doc["schema_version"] == "0.1.0"
+    assert doc["source"] == {"path": str(tmp_path / "b.parquet"), "sha256": "0" * 64, "release": "2026-10-21.0",
+                             "retrieved_at": "2026-10-30T12:00:00+00:00"}
+    assert doc["frame"] == frame().to_dict()
+    assert doc["counts"] == {"rows": 3, "matched": 2, "facade": 1, "roof": 2, "skipped": {"skipped_dataset": 1, "unmatched": 0}}
+    assert doc["licenses"] == [{"dataset": ESRI, "license": "CC-BY-4.0", "colours": 2},
+                               {"dataset": "Instituto Geográfico Nacional (España)", "license": "CC-BY-4.0", "colours": 1}]
+    assert [a["text"] for a in doc["attribution"]] == ["Esri Community Maps contributors; Overture Maps Foundation",
+                                                       "Work derived from BTN 2024 ign.es; Overture Maps Foundation"]
+    assert [t["building_id"] for t in doc["tints"]] == ["osm-way-1", "osm-way-3"]
+    assert doc["tints"] == [t.to_dict() for t in tints]
+    assert tints_document([], _record(tmp_path / "b.parquet"), {}, frame())["counts"] == {
+        "rows": 0, "matched": 0, "facade": 0, "roof": 0, "skipped": {}}
+
+
+def test_an_unlisted_dataset_follows_the_default_origin(tmp_path: Path) -> None:
+    observed = dataclasses.replace(CFG, default_origin="observed")
+    tints, skipped = _tints(tmp_path, [building("o1", box(0, 0, 10, 10), facade="#ffffff", sources=[source("Someone", "CC0-1.0")])], observed)
+    assert [(t.facade.dataset, t.facade.origin) for t in tints if t.facade] == [("Someone", "observed")] and skipped == {"unmatched": 0}
+
+
+def test_without_osm_footprints_or_with_a_point_no_colour_is_paired(tmp_path: Path) -> None:
+    rows = [building("o1", box(0, 0, 10, 10), facade="#ffffff"), building("o2", box(0, 0, 10, 10), roof="#ffffff")]
+    assert match_tints(_buildings(tmp_path, rows), scene({}), CFG, BUILDING_ALLOWED) == ([], {"no_footprint": 2, "unmatched": 0})
+    tints, skipped = _tints(tmp_path, [
+        building("pair", MultiPolygon([box(12, 0, 22, 10), box(12, 20, 13, 21)]), facade="#ffffff"),
+        building("dot", Point(5, 5), facade="#ffffff"),
+        building("dot2", Point(5, 5), facade="#ffffff"),
+    ])
+    assert [(t.building_id, t.gers_id) for t in tints] == [("osm-way-2", "pair")] and skipped == {"no_footprint": 2, "unmatched": 0}

@@ -32,3 +32,7 @@ The rules come from the scheme's wiki description. The ideas follow what OSM2Wor
 - A courtyard block keeps a flat roof under a gabled tag. A straight skeleton would be needed to draw it.
 - The trim-sheet atlas (in flight on `feat/trim-sheets`) keeps a wall colour without a strip as its own material, so a tint stays a material of its own there. The tint is a colour over a base texture, so a future strip can be baked from the base's grain × the palette colour, with no new photograph. Twelve wall strips do not fit the current atlas layout, so that would be its own decision.
 - A colour that is not a CSS name or a hex value (`#rgb` or `#rrggbb`) is ignored, and the material tag or the palette by use stands.
+
+## Amendment — A second colour source (plan C2, 8 November 2026)
+
+Decision 7 named OSM `building:colour` and `roof:colour` as the only colours. With `map.json` `"overture_tints": true` (off by default), an Overture `facade_color` or `roof_color` from an observed dataset other than OpenStreetMap is a third source. It ranks below every OSM wall or roof tag and above the generated palette or template, and takes the same palettes and bases. The record names its source `overture:facade_color` or `overture:roof_color`. See the ADR-021 amendment "Overture colours as tints".

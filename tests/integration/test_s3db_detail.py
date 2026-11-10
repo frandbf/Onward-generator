@@ -204,3 +204,125 @@ def test_the_report_and_manifest_carry_the_new_records(s3db, tmp_path: Path) -> 
     manifest = s3db.manifest()
     parts = [o for o in manifest["objects"] if o["type"] == "building_part"]
     assert len(parts) == 6 and all("roof" in o and "eave_m" in o["height"] for o in parts)
+
+
+# Plan C2: Overture colours lent to OSM footprints, below every OSM tag.
+
+ESRI_LINE = {"text": "Esri Community Maps contributors; Overture Maps Foundation", "license": "CC-BY-4.0",
+             "license_url": "https://creativecommons.org/licenses/by/4.0/"}
+
+
+def _lend(colour: str, dataset: str = "Esri Community Maps", line: dict | None = None) -> dict:
+    return {"colour": colour, "dataset": dataset, "license": "CC-BY-4.0", "origin": "observed", "attribution": line or ESRI_LINE}
+
+
+def _tint(bid: str, facade: str | None = "#c88c3c", roof: str | None = "#b43c28") -> dict:
+    entry: dict = {"building_id": bid, "gers_id": f"g-{bid}", "iou": 0.9}
+    if facade is not None:
+        entry["facade"] = _lend(facade)
+    if roof is not None:
+        entry["roof"] = _lend(roof)
+    return entry
+
+
+def _evidence(bid: str, colour: str) -> dict:
+    return {"provider": "overture", "gers_id": f"g-{bid}", "dataset": "Esri Community Maps", "license": "CC-BY-4.0",
+            "origin": "observed", "colour": colour, "iou": 0.9}
+
+
+@pytest.fixture
+def s3db_inputs(tmp_path_factory: pytest.TempPathFactory):
+    from tests.detail_fixture import S3DB_BUILDINGS, S3DB_RELATIONS
+
+    scene, heights, base = _detail_inputs(tmp_path_factory.mktemp("s3db_tints"), S3DB_BUILDINGS, {}, S3DB_RELATIONS)
+    generated, ref = load_base(base, scene, heights, GEN)
+    return generated, ref, heights, scene
+
+
+def test_a_lent_colour_tints_a_plain_building_and_names_its_evidence(s3db_inputs) -> None:
+    generated, ref, heights, scene = s3db_inputs
+    # 808 lends only a roof colour: the wall is not lent, and the roof still is.
+    tints = [_tint(b) for b in ("osm-way-801", "osm-way-802", "osm-way-803", "osm-way-806", "osm-way-811")] + [_tint("osm-way-808", facade=None)]
+    tinted = detail_scene(generated, ref, heights, scene, CFG, tints=tints)
+    assert not tinted.critical
+    plain = _obj(tinted, "building/osm-way-806").record["facade"]["materials"]
+    assert plain == {
+        "wall": "plaster_white__tint_ochre", "wall_origin": "observed", "wall_source": "overture:facade_color",
+        "wall_evidence": _evidence("osm-way-806", "#c88c3c"),
+        "roof": "roof_flat_grey__tint_red", "roof_origin": "observed", "roof_source": "overture:roof_color",
+        "roof_evidence": _evidence("osm-way-806", "#b43c28"),
+    }
+    # A pitched roof:shape takes the tile tint.
+    hipped = _obj(tinted, "building/osm-way-802").record
+    assert hipped["roof"]["material"] == "roof_tile__tint_red" and hipped["facade"]["materials"]["roof_source"] == "overture:roof_color"
+    roof_only = _obj(tinted, "building/osm-way-808").record["facade"]["materials"]
+    assert roof_only["wall_source"] is None and roof_only["roof"] == "roof_flat_grey__tint_red"
+    # OSM colours win and carry no evidence; an OSM material keeps the wall while the roof still takes the lent colour.
+    osm = _obj(tinted, "building/osm-way-801").record["facade"]["materials"]
+    assert osm == {"wall": "plaster_white__tint_white", "wall_origin": "observed", "wall_source": "building:colour",
+                   "roof": "roof_tile__tint_grey", "roof_origin": "observed", "roof_source": "roof:colour"}
+    brick = _obj(tinted, "building/osm-way-803").record["facade"]["materials"]
+    assert (brick["wall"], brick["wall_source"], "wall_evidence" in brick) == ("brick_red", "building:material", False)
+    assert brick["roof_source"] == "overture:roof_color" and brick["roof_evidence"] == _evidence("osm-way-803", "#b43c28")
+    # An estimated hip keeps its tile, as it does under an OSM roof:colour.
+    hip = _obj(tinted, "building/osm-way-811").record
+    assert hip["roof"]["type"] == "hip" and hip["roof"]["material"] == "roof_tile"
+    assert hip["facade"]["materials"]["roof_source"] is None and "roof_evidence" not in hip["facade"]["materials"]
+    assert hip["facade"]["materials"]["wall_source"] == "overture:facade_color"
+    # The shell draws the tinted materials, and building parts take none.
+    assert {p.material for p in _obj(tinted, "building/osm-way-806").visual} >= {"plaster_white__tint_ochre", "roof_flat_grey__tint_red"}
+    parts = [o for o in tinted.objects if o.type == "building_part"]
+    assert parts and not any("overture" in str(o.record["materials"]) for o in parts)
+    assert tinted.stats["third_party_tints"] == {
+        "matched": 6, "walls": 3, "roofs": 4, "by_dataset": {"Esri Community Maps": 7},
+        "not_used": {"osm_tag": 3, "landmark": 0, "scenic": 0, "estimated_roof": 1, "no_tint_material": 0},
+    }
+    assert tinted.extra_attribution == [ESRI_LINE]
+    assert tinted.attribution[-1] == ESRI_LINE
+    # The visual node says when every tint on it is Overture's: not on 801, whose tints are OSM's.
+    sources = {n.name: n.extras.get("tint_source") for n in tinted.visual_nodes() if n.name.startswith("building/")}
+    assert {k for k, v in sources.items() if v == "overture"} == {f"building/osm-way-{b}" for b in (802, 803, 806, 808, 811)}
+    tints_used = {p.material for n in tinted.visual_nodes() for p in n.primitives if "__tint_" in p.material}
+    assert tints_used == {"plaster_white__tint_white", "roof_tile__tint_grey", "plaster_white__tint_red", "plaster_white__tint_ochre",
+                          "roof_tile__tint_red", "roof_flat_grey__tint_red"}
+
+
+def test_without_tints_the_scene_is_unchanged_and_an_empty_file_adds_only_its_count(s3db_inputs) -> None:
+    import json
+
+    from onward_generator.generation.gltf import build_glb
+
+    generated, ref, heights, scene = s3db_inputs
+    before = detail_scene(generated, ref, heights, scene, CFG)
+    off = detail_scene(generated, ref, heights, scene, CFG, tints=None)
+    assert json.dumps(off.manifest()) == json.dumps(before.manifest())
+    assert json.dumps(off.report()) == json.dumps(before.report())
+    materials = dict(GEN.materials) | dict(CFG.materials)
+    assert build_glb(off.visual_nodes(), materials) == build_glb(before.visual_nodes(), materials)
+    assert "third_party_tints" not in off.stats and all("tint_source" not in n.extras for n in off.visual_nodes())
+    empty = detail_scene(generated, ref, heights, scene, CFG, tints=[])
+    assert json.dumps(empty.manifest()) == json.dumps(before.manifest())
+    counts = empty.report()["counts"]
+    assert counts.pop("third_party_tints") == {
+        "matched": 0, "walls": 0, "roofs": 0, "by_dataset": {},
+        "not_used": {"osm_tag": 0, "landmark": 0, "scenic": 0, "estimated_roof": 0, "no_tint_material": 0},
+    }
+    assert counts == before.report()["counts"]
+
+
+def test_a_landmark_keeps_its_walls_and_a_scenic_shell_takes_no_colour(detail_inputs) -> None:
+    scene, heights, base = detail_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    tints = [_tint("osm-way-314"), _tint("osm-way-315"), _tint("osm-way-999")]
+    plain = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0)
+    tinted = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0, tints=tints)
+    church = _obj(tinted, "building/osm-way-314").record
+    assert church["facade"]["needs_custom_model"] is True
+    assert church["facade"]["materials"]["wall"] == _obj(plain, "building/osm-way-314").record["facade"]["materials"]["wall"]
+    assert church["facade"]["materials"]["wall_source"] is None and "wall_evidence" not in church["facade"]["materials"]
+    shed = _obj(tinted, "building/osm-way-315").record
+    assert shed["tier"] == "scenic" and shed["facade"]["materials"] == _obj(plain, "building/osm-way-315").record["facade"]["materials"]
+    counts = tinted.stats["third_party_tints"]
+    assert counts["matched"] == 2  # osm-way-999 is not in this scene
+    assert counts["not_used"]["landmark"] == 1 and counts["not_used"]["scenic"] == 2
+    assert counts["walls"] == 0

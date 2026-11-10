@@ -74,7 +74,7 @@ Veredicto: **Hacer** (falta y encaja), **Ajustar** (falta, pero la propuesta cho
 | Luces interiores | El adaptador crea una luz puntual horneada por habitación y un `LightProbeGroup` (hasta 160 por mapa). No verificado en casco (ADR-013) | **Validar** | Sesión de casco. Si funciona, cerrar el `todo.md` |
 | Tiendas amuebladas | Catálogos en `assets/`, todos `placement: interior`; «Nothing places these yet» (`overgrow/manifest.py`) | **Hacer** | Colocador de interiores. Ver §3, B3 |
 | Más LiDAR (EE. UU., Reino Unido, Alemania, Países Bajos, Australia) | Plugins: `es.pnoa_ndsm`, `fr.lidar_hd`, `es.catastro`, `overture` (ADR-018) | **Hacer** | Un plugin por país, con la licencia comprobada antes: AHN (NL), Environment Agency (UK), 3DEP (US), NRW/Bayern (DE). Ninguna verificada hoy |
-| Huellas de Microsoft, Google y Overture | Llegan conflacionadas por Overture (ADR-021); solo prestan atributos a edificios OSM por IoU ≥ 0,5 | **Descartar** añadirlas como geometría (AGENTS.md: no inventar edificios). **Hacer**: usar `facade_color` y `roof_color` de Overture, que hoy se leen y no se usan (ADR-021) |
+| Huellas de Microsoft, Google y Overture | Llegan conflacionadas por Overture (ADR-021); solo prestan atributos a edificios OSM por IoU ≥ 0,5 | **Descartar** añadirlas como geometría (AGENTS.md: no inventar edificios). **Hecho (C2, desactivado por defecto)**: `facade_color` y `roof_color` de Overture se prestan como tintes `observed` con `map.json` `"overture_tints": true` (enmienda de ADR-021) |
 | Catastros de otros países | Solo España | **Hacer** caso a caso, como plugin | Por ejemplo, BAG (NL), cadastre FR (PCI). Licencias por verificar |
 | IA local más agresiva | La intención solo admite cuatro parámetros (ADR-006). El overgrow con IA admite 24 gestos (ADR-010). El brief se reduce a `street_blocking` | **Ajustar** | Ampliar el esquema por **elección entre ids enumerados** (tipología, paleta, perfil de props, nivel de abandono), nunca valores libres. Validación por lista blanca y repetición byte a byte, como hoy. Ver §3, D2 |
 
@@ -128,6 +128,8 @@ Cada línea es un PR propio con su prueba. Lleva ADR cuando cambia una decisión
 | C5 | `lightmap_pages_max` (U2) | A3 |
 | C6 | Spawns y objetivos **colocados por las métricas de B4**: varias posiciones candidatas, se elige la más equilibrada. Más rutas por callejones y patios (`todo.md`) | B4 |
 | C7 | Cobertura en tramos con línea de visión larga: props sólidos del catálogo en los puntos que B4 marca, sin tapar el paso de 1,2 m | B4 |
+
+**Estado de C2 (8 de noviembre de 2026):** hecho en la rama `workshop/c2`, desactivado por defecto (`map.json` `"overture_tints": true`, `overture match --tints`, `detail --overture-tints`, `bench.py run --overture-tints`). Un color de Overture solo se presta desde un dataset `observed` que no sea OpenStreetMap, con licencia de la lista, y por debajo de toda etiqueta OSM de muro o tejado. Va con la evidencia en `wall_evidence` y `roof_evidence` (proveedor `overture`, GERS id, dataset, licencia). El emparejamiento va aparte del de alturas, así que `heights_overrides.overture.json` no cambia. En los cuatro mapas del bench no se presta nada: todos sus colores de Overture vienen de OpenStreetMap, con delta 0 en triángulos, draws y páginas ([09-perf.md](../09-perf.md#overture-colours-as-tints)). El efecto se prueba solo con el parquet sintético. La enmienda de ADR-021 queda `proposed` hasta encontrar una ciudad con colores que no sean de OSM y pasar la sesión de casco.
 
 ### Bloque D: ampliaciones mayores
 

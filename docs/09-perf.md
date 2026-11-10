@@ -206,6 +206,31 @@ Pending (not done; the switch stays off until they pass):
 
 Then the ADR-009 amendment goes from proposed to accepted, or the limits are corrected.
 
+## Overture colours as tints
+
+Plan C2 is covered by the ADR-021 amendment *Overture colours as tints* (proposed) and is off by default. It is turned on by `map.json` `"overture_tints": true`, `overture match --tints`, `detail --overture-tints PATH` or `bench.py run --overture-tints`. The rules are in [07-detail.md](07-detail.md). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline`.
+
+- **Off.** `bench.py check` finds no difference outside timings between run `c2_off` and the baseline `20261108T022003Z` (HEAD of plan C1). The objects, attribution, counts and issues of every `scene_detail.json` and `detail_report.json` are equal, and `scene_visual.glb` and every export package file are the same bytes once the run folder name is normalised. `onward_export.json` differs only in paths, `created_at` and the hashes of files that hold those paths.
+- **On.** Run `c2_on` against `c2_off` shows a delta of 0 in triangles (total, core, scenic), draws (total, core, scenic), view draws and lightmap pages on all four maps. Nothing is lent, because every Overture colour on the bench maps comes from OpenStreetMap, which the extract already holds:
+
+| Map | Overture rows | Colours refused as OpenStreetMap (`skipped_dataset`) | Lent | `third_party_tints` walls / roofs |
+| --- | --- | --- | --- | --- |
+| bench_murcia r150 | 206 | 0 | 0 | 0 / 0 |
+| bench_madrid r300 | 749 | 50 | 0 | 0 / 0 |
+| bench_paris r50 | 11 | 1 | 0 | 0 / 0 |
+| bench_krakow r150 | 221 | 132 | 0 | 0 / 0 |
+
+- **Synthetic block** (`tests/integration/test_overture_pipeline.py`). One Esri facade and roof colour lent to building 312 gives `plaster_white__tint_ochre` and `roof_flat_grey__tint_red`. After `materials apply` the tinted wall is under `facades.stats.kept_materials` and off the trim atlas. Draws (`combine_groups`, 100 m cells) go from 29 to 32. Each distinct tint is one material outside the atlas, so at most 12 × 4 wall and 7 × 2 roof tints plus `party_` copies are possible. These are generator figures, not device measurements.
+
+Pending (not done; the switch stays off until they pass):
+
+- [ ] Find a real city where Overture colours come from a dataset other than OpenStreetMap (Esri, IGN), so the switch has a measurable effect. None of the four bench maps qualifies.
+- [ ] Headset, on that map with the switch on: check that a tinted plaster or brick wall reads as its colour under the baked light and does not clash with the palette walls beside it.
+- [ ] Headset: check from the spawns that a tinted roof (`roof_tile` or `roof_flat_grey` tint) reads correctly and shows no seam against the trim-atlas facades below it.
+- [ ] Headset, OVR Metrics in fixed views A and B: check that the draws the tint materials add keep the views within 150 draws.
+
+Then the ADR-021 amendment goes from proposed to accepted.
+
 ## Hunt with bots on a small map
 
 Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.

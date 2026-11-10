@@ -96,6 +96,60 @@ def test_match_writes_three_files_and_a_summary(fetched: tuple[Path, Path], tmp_
     assert "output would overwrite an input file" in capsys.readouterr().err
 
 
+@pytest.fixture
+def coloured(tmp_path: Path) -> tuple[Path, Path]:
+    """A fetched map whose first footprint lends an Esri facade colour and an OSM roof colour, and no height."""
+    root = tmp_path / "map"
+    create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150)
+    places = write_places(tmp_path / "r" / "places.parquet", [place("p", 5, 5)])
+    buildings = write_buildings(tmp_path / "r" / "buildings.parquet", [
+        building("b", BLOCK["osm-way-1"], height=None, floors=None, facade="#c88c3c", roof="#b43c28",
+                 sources=[source("Esri Community Maps", None), source("OpenStreetMap", "ODbL-1.0", "/properties/roof_color")]),
+        building("c", BLOCK["osm-way-2"], height=9.0, floors=3),
+    ])
+    fetch_map(root, release="2026-10-21.0", sources={"places": str(places), "buildings": str(buildings)}, connect=local_connect)
+    scene_path = tmp_path / "geo_scene.json"
+    scene_path.write_text(json.dumps(scene(BLOCK)), encoding="utf-8")
+    return root, scene_path
+
+
+def test_match_without_tints_writes_no_colours(coloured: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, scene_path = coloured
+    out = tmp_path / "out"
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out)]) == 0
+    assert sorted(p.name for p in out.iterdir()) == sorted((cli.OVERRIDES_FILE, cli.PLACES_FILE, cli.REPORT_FILE))
+    assert capsys.readouterr().out.splitlines() == [
+        "places=1 of 1 buildings matched=1 of 3 height=1 levels=1",
+        *(f"wrote {out.resolve() / name}" for name in (cli.OVERRIDES_FILE, cli.PLACES_FILE, cli.REPORT_FILE)),
+    ]
+
+
+def test_match_with_tints_writes_the_colours_too(coloured: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, scene_path = coloured
+    out = tmp_path / "out"
+    plain = tmp_path / "plain"
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(plain)]) == 0
+    capsys.readouterr()
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--tints"]) == 0
+    names = (cli.OVERRIDES_FILE, cli.PLACES_FILE, cli.REPORT_FILE, cli.TINTS_FILE)
+    assert capsys.readouterr().out.splitlines() == [
+        "places=1 of 1 buildings matched=1 of 3 height=1 levels=1", "tints facade=1 roof=0",
+        *(f"wrote {out.resolve() / name}" for name in names),
+    ]
+    assert cli.TINTS_FILE == "overture_tints.json"
+    # The heights overrides do not move with the colours.
+    assert (out / cli.OVERRIDES_FILE).read_bytes() == (plain / cli.OVERRIDES_FILE).read_bytes()
+    doc = json.loads((out / cli.TINTS_FILE).read_text(encoding="utf-8"))
+    assert doc["schema"] == "onward_generator.overture_tints" and doc["counts"]["skipped"] == {"skipped_dataset": 1, "unmatched": 0}
+    assert [(t["building_id"], t["gers_id"], t["facade"]["colour"]) for t in doc["tints"]] == [("osm-way-1", "b", "#c88c3c")]
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--tints"]) == 1
+    assert "refusing to overwrite" in capsys.readouterr().err
+    (out / cli.TINTS_FILE).unlink()
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--tints"]) == 1
+    assert "refusing to overwrite" in capsys.readouterr().err
+    assert cli.main(["match", "--scene", str(scene_path), "--map", str(root), "--out", str(out), "--tints", "--overwrite"]) == 0
+
+
 def test_match_refuses_bad_inputs(fetched: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root, scene_path = fetched
     out = str(tmp_path / "out")
@@ -156,6 +210,8 @@ def test_the_overture_parser_is_described_as_documented() -> None:
         "map": (("--map",), None, True, "map directory holding data/raw/overture_*.parquet", None),
         "out": (("--out",), None, True, "output directory", None),
         "config": (("--config",), None, False, "Overture configuration (default: config/overture.default.json)", None),
+        "tints": (("--tints",), False, False,
+                  "also lend observed Overture facade and roof colours to matched OSM footprints: overture_tints.json (plan C2)", 0),
         "overwrite": (("--overwrite",), False, False, None, 0),
     }
     assert sub.choices["fetch"].get_default("handler") is cli._fetch
@@ -176,6 +232,10 @@ def test_the_main_parser_lists_overture_and_the_new_flags() -> None:
     )
     assert _actions(detail_parser())["places"] == (
         ("--places",), None, False, "overture_places.json from overture match: shop evidence ranked by config/sources.json evidence (ADR-021)", None,
+    )
+    assert _actions(detail_parser())["overture_tints"] == (
+        ("--overture-tints",), None, False,
+        "overture_tints.json from overture match --tints: Overture colours below the OSM wall and roof tags (plan C2)", None,
     )
 
 

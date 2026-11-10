@@ -238,6 +238,32 @@ def store_repetition(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def overture_tints_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"overture_tints": true`` (plan C2, ADR-021 amendment, off by default).
+
+    ``overture match`` then lends observed Overture facade and roof colours, and ``detail`` reads them below the
+    OSM tags. A map without ``map.json`` or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("overture_tints", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "overture_tints" must be true or false, got {value!r}')
+    return value
+
+
+def store_overture_tints(directory: str | Path, enabled: bool) -> None:
+    """Record the Overture tints switch on an existing map. Does not rewrite scenes."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"overture_tints" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["overture_tints"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 

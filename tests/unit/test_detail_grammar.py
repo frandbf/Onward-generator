@@ -9,7 +9,17 @@ from shapely import Polygon, affinity, box
 
 from onward_generator.detail.config import HipRoof, load_detail_config
 from onward_generator.detail.facades import _hip_roof
-from onward_generator.detail.grammar import FacadeUse, choose_roof, choose_wall, facade_use, resolve_use, tagged_roof, tagged_wall
+from onward_generator.detail.grammar import (
+    OVERTURE_FACADE,
+    OVERTURE_ROOF,
+    FacadeUse,
+    choose_roof,
+    choose_wall,
+    facade_use,
+    resolve_use,
+    tagged_roof,
+    tagged_wall,
+)
 from onward_generator.generation.mesh import upward_area
 
 CFG = load_detail_config("config/detail.default.json")
@@ -211,3 +221,62 @@ def test_an_unknown_shape_tag_gets_no_estimated_hip() -> None:
     assert "estimated" in hips
     tagged = [choose_roof({"roof:shape": "crosspitched"}, RESIDENTIAL, CFG.seed, f"b{i}", 100.0) for i in range(40)]
     assert all(t is RESIDENTIAL and origin == "generated" and shape == "crosspitched" for t, _, origin, shape in tagged)
+
+
+# Plan C2: an Overture colour lent to the footprint, below every OSM tag.
+
+
+def test_a_lent_facade_colour_ranks_below_the_osm_wall_tags() -> None:
+    colours = CFG.materials
+    assert (OVERTURE_FACADE, OVERTURE_ROOF) == ("overture:facade_color", "overture:roof_color")
+    assert tagged_wall({}, colours, lent="#c88c3c") == ("plaster_white__tint_ochre", OVERTURE_FACADE)
+    assert tagged_wall({"building:colour": "blue"}, colours, lent="#c88c3c") == ("plaster_white__tint_blue", "building:colour")
+    assert tagged_wall({"building:material": "brick"}, colours, lent="#c88c3c") == ("brick_red", "building:material")
+    assert tagged_wall({"material": "limestone"}, colours, lent="#c88c3c") == ("stone_light", "material")
+    # A material the table does not know names nothing, so the lent colour tints plain plaster.
+    assert tagged_wall({"building:material": "glass"}, colours, lent="#c88c3c") == ("plaster_white__tint_ochre", OVERTURE_FACADE)
+    # An unreadable OSM colour falls to the lent one.
+    assert tagged_wall({"building:colour": "nope"}, colours, lent="#FFFFFF") == ("plaster_white__tint_white", OVERTURE_FACADE)
+    # No colours defined, no such tint, or a lent value that is not a colour: the generated wall.
+    assert tagged_wall({}, None, lent="#c88c3c") is None
+    assert tagged_wall({}, {"plaster_white": colours["plaster_white"]}, lent="#c88c3c") is None
+    assert tagged_wall({}, colours, lent="nope") is None
+    assert tagged_wall({}, colours) is None
+    palette = CFG.facade_palettes["residential"]
+    assert choose_wall({}, palette, CFG.seed, "b", colours=colours, lent="#c88c3c") == ("plaster_white__tint_ochre", "observed")
+    assert choose_wall({}, palette, CFG.seed, "b", colours=colours, lent="nope") == choose_wall({}, palette, CFG.seed, "b", colours=colours)
+    assert choose_wall({}, palette, CFG.seed, "b", colours=colours, lent="nope")[1] == "generated"
+
+
+def test_a_lent_roof_colour_ranks_below_the_osm_roof_tags_and_above_the_template() -> None:
+    colours = CFG.materials
+    assert tagged_roof({}, colours, lent="#b43c28") == ("roof_flat_grey__tint_red", OVERTURE_ROOF)
+    assert tagged_roof({"roof:shape": "gabled"}, colours, lent="#b43c28") == ("roof_tile__tint_red", OVERTURE_ROOF)
+    assert tagged_roof({"roof:shape": "flat"}, colours, lent="#b43c28") == ("roof_flat_grey__tint_red", OVERTURE_ROOF)
+    assert tagged_roof({"roof:colour": "grey"}, colours, lent="#b43c28") == ("roof_flat_grey__tint_grey", "roof:colour")
+    assert tagged_roof({"roof:material": "tiles"}, colours, lent="#b43c28") == ("roof_tile", "roof:material")
+    assert tagged_roof({}, colours, lent="nope") is None
+    assert tagged_roof({}, None, lent="#b43c28") is None
+    assert tagged_roof({}, {"roof_tile": colours["roof_tile"]}, lent="#b43c28") is None
+    big = 400.0  # no estimated hip
+    template, material, origin, shape = choose_roof({}, RESIDENTIAL, CFG.seed, "osm-way-311", big, colours=colours, lent="#b43c28")
+    assert (material, origin, shape) == ("roof_flat_grey__tint_red", "observed", None) and template == RESIDENTIAL
+    _, material, origin, _ = choose_roof({}, RESIDENTIAL, CFG.seed, "osm-way-311", big, colours=colours)
+    assert origin == "generated" and "__tint_" not in material
+    pitched, material, origin, shape = choose_roof({"roof:shape": "gabled"}, RESIDENTIAL, CFG.seed, "b", 100.0, colours=colours, lent="#b43c28")
+    assert (material, origin, shape) == ("roof_tile__tint_red", "observed", "gabled") and pitched.pitched is not None
+    assert pitched.pitched.material == "roof_tile__tint_red"
+    _, material, _, _ = choose_roof({"roof:shape": "flat"}, RESIDENTIAL, CFG.seed, "b", 100.0, colours=colours, lent="#b43c28")
+    assert material == "roof_flat_grey__tint_red"
+
+
+@pytest.mark.parametrize("tags", [{}, {"building:colour": "red"}, {"building:material": "brick"}, {"roof:shape": "gabled", "roof:colour": "grey"},
+                                  {"roof:material": "tiles"}, {"roof:shape": "flat"}])
+def test_without_a_lent_colour_nothing_changes(tags: dict[str, str]) -> None:
+    colours = CFG.materials
+    palette = CFG.facade_palettes["residential"]
+    assert choose_wall(tags, palette, CFG.seed, "b", colours=colours, lent=None) == choose_wall(tags, palette, CFG.seed, "b", colours=colours)
+    for area in (100.0, 400.0):
+        assert choose_roof(tags, RESIDENTIAL, CFG.seed, "b", area, colours=colours, lent=None) == choose_roof(tags, RESIDENTIAL, CFG.seed, "b", area, colours=colours)
+    assert tagged_wall(tags, colours, lent=None) == tagged_wall(tags, colours)
+    assert tagged_roof(tags, colours, lent=None) == tagged_roof(tags, colours)

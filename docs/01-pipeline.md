@@ -216,6 +216,8 @@ The generator extrudes footprints the extract kept. It does not invent buildings
 
 `overture fetch --map DIR [--out RAW]` uses the network: it writes `overture_places.parquet` and `overture_buildings.parquet` (default `data/raw/`), clipped to the map bbox, each with a `.source.json` (release, query, SHA-256, records per dataset and licence, attribution). It never overwrites without `--overwrite`. `overture match --scene --map --out` is offline: `heights_overrides.overture.json` (Overture heights by footprint intersection over union, each with its dataset, licence and origin), `overture_places.json` (confident, open places with an allowed licence, mapped to a shop, amenity or office tag) and `overture_match_report.json`. A geometry column stored as GeoParquet `GEOMETRY` or as WKB `BLOB` is read the same way. `heights --secondary-overrides` ranks the Overture values below an OSM `height` and the authoritative overrides, above OSM `building:levels`. [ADR-021](decisions/ADR-021-overture-evidence.md).
 
+**Overture colours (opt-in, plan C2).** `overture match --tints` also writes `overture_tints.json` (`onward_generator.overture_tints` 0.1.0). It holds `source` (path, SHA-256, release, `retrieved_at`), `frame`, `counts` (`rows`, `matched`, `facade`, `roof`, `skipped` by `skipped_dataset`, `licence_not_allowed`, `origin_not_observed`, `colour_unparseable`, `no_footprint`, `unmatched`), `licenses`, `attribution` and `tints[]`. Each entry is `{building_id, gers_id, iou, facade?, roof?}`, and each colour is `{colour, dataset, license, origin: "observed", attribution}`. Only a colour from an observed dataset that is not OpenStreetMap, under an allowed licence, is lent. The pairing is separate from the heights, so the other three files are the same with or without the flag, and the command prints one more line, `tints facade=N roof=M`. `detail --overture-tints PATH` reads the file below the OSM wall and roof tags ([07-detail.md](07-detail.md)). `map.json` `"overture_tints": true` makes `run` pass both flags and makes `overture_tints.json` the match stage's marker. Absent or `false`, the argv and every output are unchanged byte for byte. Any other value stops with `map.json "overture_tints" must be true or false`. Switching it off does not make `detail` stale; rerun from `detail`. The ADR-021 amendment *Overture colours as tints* is proposed until the headset session.
+
 ## 4. Generate
 
 `onward-generator generate`. [06-generation.md](06-generation.md). [ADR-003](decisions/ADR-003-geometry-engine.md).
@@ -301,7 +303,7 @@ Panoramax runs on trim facades (ADR-020) as on the per-material ones: the decals
 | `decal_cells` | one row per cell: `cell` `[cx, cy]`, `material`, `decals`, `buildings`, `side_px`, `scale` (1 when nothing shrank) |
 | `draws_added` | decal draws the adapter's (cell, material) combine adds: one per cell |
 | `tints` | `building_id`, `rgb` (the median sRGB), `from` and `to` (`wall`, `tone`), `picture_ids`, `authors`, origin `observed`, source `panoramax`. The same record, without the id, is the node's `panoramax_tint` extra |
-| `tint_skipped` | `building_id` and `reason`: `no_trim_atlas`, `layout_mismatch`, `osm_colour`, `no_wall_strip` or `unchanged` |
+| `tint_skipped` | `building_id` and `reason`: `no_trim_atlas`, `layout_mismatch`, `osm_colour`, `overture_colour` (every tint on the building came from Overture, plan C2), `no_wall_strip` or `unchanged` |
 
 The step prints `coverage=<pct>% draws_added=<n>` after the assignments, and `run` adds `coverage <pct> %  +<n> draws` to its `panoramax` line. The other stages read `scene_panoramax` as before: `dress` copies the stored UVs of the decals, and a later stage can move a node's centre across a cell line, so the export package's `tiers` remain the draw figure of record.
 
@@ -534,6 +536,7 @@ The first run downloads OSM and the source plugins' data, then copies what it do
 - `lightmap.pages_at_least` and `texels`;
 - with `run --gameplay-report`, `gameplay`: the headline of each map's `gameplay_report.json`;
 - with `run --repetition` (plan C1), `repetition`: `slots_measured`, `max_ratio` (largest coarse contrast over its limit) and `over_limit_count` from the `repetition` block of `scene_materials/materials_report.json`. The flag sets `"repetition": true` in the run copy's `map.json` and rewrites the run copy's texture plan from the extended pools; the frozen inputs do not change. A report without the flag has no `repetition` key, and `bench_diff.md` shows the rows only when a report has them.
+- with `run --overture-tints` (plan C2), nothing new in the report: the flag sets `"overture_tints": true` in the run copy's `map.json`, so `overture match --tints` and `detail --overture-tints` run; the frozen inputs do not change. Its effect shows in the triangles and draws.
 
 `created_at`, `package_id` and every path are left out. Everything that cannot be reproduced sits under `timings`:
 

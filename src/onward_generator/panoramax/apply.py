@@ -483,7 +483,7 @@ _CELL_SHRINK = 0.75
 _CELL_GAP_PX = 2
 # Half a pixel of the atlas: V this close to a strip edge is inside it. The gutters are wider.
 _STRIP_TOLERANCE_PX = 0.5
-TINT_SKIP_REASONS = ("no_trim_atlas", "layout_mismatch", "osm_colour", "no_wall_strip", "unchanged")
+TINT_SKIP_REASONS = ("no_trim_atlas", "layout_mismatch", "osm_colour", "overture_colour", "no_wall_strip", "unchanged")
 
 
 @dataclass(frozen=True, slots=True)
@@ -925,7 +925,9 @@ def tint_node(node: Node, patches: Sequence[Patch], atlas: TintAtlas | str) -> t
     if isinstance(atlas, str):
         return node, {"reason": atlas}
     if any(TINT_SEPARATOR in prim.material for prim in node.primitives):
-        return node, {"reason": "osm_colour"}
+        # ``detail`` marks a building whose tints all came from Overture colours (plan C2); any other tint is an OSM colour.
+        overture = (node.extras or {}).get("tint_source") == "overture"
+        return node, {"reason": "overture_colour" if overture else "osm_colour"}
     source = current_strip(node, atlas)
     if source is None:
         return node, {"reason": "no_wall_strip"}

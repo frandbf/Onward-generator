@@ -12,6 +12,13 @@ configuration does not call observed is ``estimated``, and an ML footprint
 dataset is ``ai_generated``. The result is ``heights_overrides.overture.json``,
 read by ``heights --secondary-overrides`` below Catastro and above OSM
 ``building:levels`` (docs/04-heights.md).
+
+With ``--tints`` (plan C2, off by default), a second, independent pairing lends the
+``facade_color`` and ``roof_color`` of an Overture footprint to the OSM footprint it
+overlaps best, one colour at a time: only from an observed dataset that is not in
+``skip_datasets`` and whose licence is allowed, and only a value that reads as a
+colour. The result is ``overture_tints.json``, read by ``detail --overture-tints``
+below every OSM wall and roof tag (ADR-021 amendment "Overture colours as tints").
 """
 
 from __future__ import annotations
@@ -32,6 +39,7 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.detail.s3db import parse_colour
 from onward_generator.geo.projection import LocalFrame
 from onward_generator.overture.acquire import DOCUMENTED_LICENSES, FetchRecord, attribution_lines
 
@@ -41,6 +49,9 @@ SCHEMA_PATH = REPO_ROOT / "config" / "overture.schema.json"
 OVERRIDES_VERSION = "0.1.0"
 PLACES_SCHEMA = "onward_generator.overture_places"
 REPORT_SCHEMA = "onward_generator.overture_match_report"
+TINTS_SCHEMA = "onward_generator.overture_tints"
+TINT_PROPERTIES = ("facade_color", "roof_color")
+"""The Overture building properties a footprint can lend as a wall tint and as a roof tint."""
 SCHEMA_VERSION = "0.1.0"
 HEIGHT_BOUNDS_M = (2.5, 120.0)
 """``bounds_m`` of config/heights.default.json: the heights stage refuses an override outside it."""
@@ -388,4 +399,137 @@ def match_report(
                          for (d, lic), n in sorted(Counter((m.dataset, m.license) for m in matches).items())],
             "matches": [m.to_dict() for m in matches],
         },
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class TintLend:
+    """One Overture colour an OSM footprint may take: the value as Overture gives it, its dataset, licence and origin."""
+
+    colour: str
+    dataset: str
+    license: str
+    origin: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"colour": self.colour, "dataset": self.dataset, "license": self.license, "origin": self.origin,
+                "attribution": attribution_lines([(self.dataset, self.license)])[0]}
+
+
+@dataclass(frozen=True, slots=True)
+class BuildingTint:
+    """The colours one Overture footprint lends the OSM footprint it was paired with (``match_tints``)."""
+
+    building_id: str
+    gers_id: str
+    iou: float
+    facade: TintLend | None
+    roof: TintLend | None
+
+    def to_dict(self) -> dict[str, Any]:
+        entry: dict[str, Any] = {"building_id": self.building_id, "gers_id": self.gers_id, "iou": self.iou}
+        if self.facade is not None:
+            entry["facade"] = self.facade.to_dict()
+        if self.roof is not None:
+            entry["roof"] = self.roof.to_dict()
+        return entry
+
+
+def _lent_colour(raw: object, sources: Sequence[Mapping[str, Any]] | None, prop: str, cfg: OvertureConfig,
+                 allowed: frozenset[str], skipped: Counter[str]) -> TintLend | None:
+    """The colour ``raw`` of ``prop`` (``facade_color`` or ``roof_color``) when it may be lent, else None.
+
+    The dataset is the property's own source, else the whole record's. In this order: a missing value lends
+    nothing; a dataset in ``skip_datasets`` (OpenStreetMap: the extract already has the tag) is
+    ``skipped_dataset``; a licence not in ``allowed`` (so also ``unknown``) is ``licence_not_allowed``; a dataset
+    the configuration does not call ``observed`` (ML footprints, any unlisted dataset) is ``origin_not_observed``,
+    refused rather than recorded as an estimate; a value ``parse_colour`` cannot read is ``colour_unparseable``.
+    Each refusal counts once per colour value.
+    """
+    if raw is None:
+        return None
+    dataset, lic = _license(_record_source(sources, f"/properties/{prop}"))
+    if dataset in cfg.skip_datasets:
+        skipped["skipped_dataset"] += 1
+        return None
+    if lic not in allowed:
+        skipped["licence_not_allowed"] += 1
+        return None
+    origin = cfg.origins.get(dataset, cfg.default_origin)
+    if origin != "observed":
+        skipped["origin_not_observed"] += 1
+        return None
+    if parse_colour(raw) is None:
+        skipped["colour_unparseable"] += 1
+        return None
+    return TintLend(str(raw), dataset, lic, origin)
+
+
+def match_tints(
+    parquet: Path, scene: Mapping[str, Any], cfg: OvertureConfig, allowed: frozenset[str],
+) -> tuple[list[BuildingTint], dict[str, int]]:
+    """The colours Overture footprints lend OSM footprints, and the count of each refusal.
+
+    A pairing of its own, apart from ``match_buildings``, so the height overrides cannot change: every
+    polygon row with at least one colour that may be lent (``_lent_colour``) takes part, whatever its height
+    or floors. Best intersection over union first, at least ``min_iou``, each footprint on either side used
+    once; a tie keeps row order, then id order. A row that pairs with nothing is ``unmatched``.
+    """
+    frame = scene_frame(scene)
+    rows = _rows(parquet, "id, facade_color, roof_color, sources, ST_AsWKB(geometry)")  # pragma: no mutate: SQL names are case-insensitive
+    footprints = _footprints(scene)
+    ids = sorted(footprints)
+    tree = STRtree([footprints[i] for i in ids]) if ids else None
+    skipped: Counter[str] = Counter()
+    pairs: list[tuple[float, str, int]] = []
+    candidates: list[tuple[str, TintLend | None, TintLend | None]] = []
+    for gers, facade, roof, sources, wkb in rows:
+        facade_lend = _lent_colour(facade, sources, TINT_PROPERTIES[0], cfg, allowed, skipped)
+        roof_lend = _lent_colour(roof, sources, TINT_PROPERTIES[1], cfg, allowed, skipped)
+        if facade_lend is None and roof_lend is None:
+            continue
+        geom = frame.to_local(shapely.from_wkb(wkb))
+        if tree is None or geom.geom_type not in ("Polygon", "MultiPolygon"):
+            skipped["no_footprint"] += 1
+            continue
+        index = len(candidates)
+        candidates.append((str(gers), facade_lend, roof_lend))
+        for k in sorted(int(x) for x in tree.query(geom)):  # bbox candidates; the IoU threshold decides
+            bid = ids[k]
+            iou = _iou(footprints[bid], geom)
+            if iou >= cfg.min_iou:
+                pairs.append((iou, bid, index))
+    used_osm: set[str] = set()
+    used_overture: set[int] = set()
+    tints: list[BuildingTint] = []
+    for iou, bid, index in sorted(pairs, key=lambda p: -p[0]):  # stable: ties keep row order, then id order
+        if bid in used_osm or index in used_overture:
+            continue
+        used_osm.add(bid)
+        used_overture.add(index)
+        gers, facade_lend, roof_lend = candidates[index]
+        tints.append(BuildingTint(bid, gers, round(iou, 4), facade_lend, roof_lend))
+    skipped["unmatched"] = len(candidates) - len(used_overture)
+    return sorted(tints, key=lambda t: t.building_id), dict(sorted(skipped.items()))
+
+
+def tints_document(tints: Sequence[BuildingTint], record: FetchRecord, skipped: Mapping[str, int], frame: LocalFrame) -> dict[str, Any]:
+    """``overture_tints.json``: the colours lent, each with its dataset, licence and attribution line."""
+    lends = [lend for t in tints for lend in (t.facade, t.roof) if lend is not None]
+    datasets = Counter((lend.dataset, lend.license) for lend in lends)
+    return {
+        "schema": TINTS_SCHEMA,
+        "schema_version": SCHEMA_VERSION,
+        "source": {"path": record.path, "sha256": record.sha256, "release": record.release, "retrieved_at": record.retrieved_at},
+        "frame": frame.to_dict(),
+        "counts": {
+            "rows": record.rows,
+            "matched": len(tints),
+            "facade": sum(t.facade is not None for t in tints),
+            "roof": sum(t.roof is not None for t in tints),
+            "skipped": dict(skipped),
+        },
+        "licenses": [{"dataset": d, "license": lic, "colours": n} for (d, lic), n in sorted(datasets.items())],
+        "attribution": attribution_lines((lend.dataset, lend.license) for lend in lends),
+        "tints": [t.to_dict() for t in tints],
     }

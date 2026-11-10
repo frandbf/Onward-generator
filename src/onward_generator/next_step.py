@@ -114,9 +114,10 @@ def overture_fetch_command(root: Path) -> StageCommand:
     return invoke("overture", "fetch", "--map", show(root), "--out", show(root / "data" / "raw"))
 
 
-def overture_match_command(scene: Path, root: Path) -> StageCommand:
-    """``overture match``: third-party height overrides and POIs for the scene (offline, ADR-021)."""
-    return invoke("overture", "match", "--scene", show(scene), "--map", show(root), "--out", show(stage_path(scene, "overture")))
+def overture_match_command(scene: Path, root: Path, *, tints: bool = False) -> StageCommand:
+    """``overture match``: third-party height overrides and POIs for the scene (offline, ADR-021), and colours with ``tints`` (plan C2)."""
+    return invoke("overture", "match", "--scene", show(scene), "--map", show(root), "--out", show(stage_path(scene, "overture")),
+                  *(("--tints",) if tints else ()))
 
 
 def catastro_command(scene: Path, gml: Path) -> StageCommand:
@@ -174,14 +175,15 @@ def _core_flags(scene: Path) -> tuple[str, ...]:
     return ("--core-radius-m", f"{core:g}") if core is not None else ()
 
 
-def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None) -> StageCommand:
-    """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), and Overture places when given."""
+def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None) -> StageCommand:
+    """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), and Overture places and colours when given."""
     return invoke(
         "detail",
         "--scene", show(scene),
         "--heights", show(heights),
         "--base", show(base),
         *(("--places", show(places)) if places is not None else ()),
+        *(("--overture-tints", show(tints)) if tints is not None else ()),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *_core_flags(scene),
     )

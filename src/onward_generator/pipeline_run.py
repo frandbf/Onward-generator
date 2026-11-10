@@ -140,13 +140,13 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     geo_argv = list(geo_command(root).argv)
     geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
     sources, scene, overrides = source_plan(root, geo_scene)
-    secondary, places = third_party_plan(root, geo_scene)
+    secondary, places, tints = third_party_plan(root, geo_scene)
     source_steps = [(stage.name, list(stage.argv)) for stage in sources]
     heights_argv = list(heights_command(scene, overrides, secondary).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = [*detail_command(scene, heights, scene3d, places).argv, *no_preview]
+    detail_argv = [*detail_command(scene, heights, scene3d, places, tints).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -252,14 +252,19 @@ def _plugin_steps(root: Path, scene: Path) -> list[tuple[str, SourceSteps]]:
     return found
 
 
-def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None]:
-    """The secondary overrides ``heights`` reads and the places ``detail`` reads, from the last plugin that writes each (ADR-021)."""
+def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None, Path | None]:
+    """The secondary overrides ``heights`` reads, and the places and colours ``detail`` reads, from the last plugin that writes each.
+
+    Overture writes all three (ADR-021); its colours only with ``map.json`` ``"overture_tints": true`` (plan C2).
+    """
     secondary: Path | None = None
     places: Path | None = None
+    tints: Path | None = None
     for _plugin_id, steps in _plugin_steps(root, scene):
         secondary = steps.secondary_overrides or secondary
         places = steps.places or places
-    return secondary, places
+        tints = steps.tints or tints
+    return secondary, places, tints
 
 
 def _source_stages(root: Path) -> list[SourceStage]:
