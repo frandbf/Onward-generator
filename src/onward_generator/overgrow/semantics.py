@@ -226,7 +226,7 @@ def describe(row: Mapping[str, Any], catalogue: str) -> dict[str, Any]:
     previous = row.get("semantic")
     if isinstance(previous, Mapping) and previous.get("origin") == "reviewed":
         return dict(previous)
-    file_words = words_of(PurePosixPath(str(row.get("file"))).stem) if row.get("file") else set()
+    file_words = words_of(PurePosixPath(str(row.get("file"))).stem) if row.get("file") else set()  # pragma: no mutate: without a file str(None) gives the word "none", which no rule reads
     # A local Asset Store id carries its package's name (as_<package>_<model>): "kitchen" in every row of a kitchen
     # pack. Its file name is the model's own name; the shared catalogues' ids are that name with a short prefix.
     asset_id = str(row["id"])

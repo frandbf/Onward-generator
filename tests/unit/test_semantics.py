@@ -224,6 +224,10 @@ def test_a_shared_id_adds_its_words_to_the_file_name_and_a_local_id_does_not() -
     local = describe({"id": "as_sofa_pack_Thing", "file": "Thing.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.0,
                       "height_m": 0.8}, "asset_store_sofa_pack")
     assert local["kind"] == "other"
+    # A lowercase model name defeats the prefix strip: the "as_" rule alone keeps the pack's word out.
+    lower = describe({"id": "as_sofa_pack_thing", "file": "thing.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.0,
+                      "height_m": 0.8}, "asset_store_sofa_pack")
+    assert lower["kind"] == "other"
     # The file's own name, whatever its folder and dots.
     for file in ("deep/dir.v2/Chair.glb", "Chair.lod0.glb"):
         assert describe({"id": "as_x_Thing", "file": file, "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 0.9},
