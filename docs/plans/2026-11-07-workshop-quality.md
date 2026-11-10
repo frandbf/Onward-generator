@@ -33,7 +33,7 @@ Sin una definición medible, «calidad» no se puede cerrar. Propongo cuatro gru
 | Grupo | Criterio | Fuente de la medida | Umbral propuesto |
 |---|---|---|---|
 | Rendimiento | fps en la ruta y en Hunt con bots | OVR Metrics (docs/09-perf.md) | mediana ≥ 72, sin caídas fuera de la carga |
-| Rendimiento | triángulos en Unity con prefabs del SDK | `scene_report.json` | ≤ 220 000 (deja margen a los jugadores, sobre 250 000 de ADR-005). Desde B1 se puede apuntar con `--core-target-triangles`, que cuenta los triángulos del núcleo en `detail`, no en Unity: el export los multiplica por 1,5 a 1,7 en el bench y añade el anillo ([09-perf.md](../09-perf.md#budget-core)) |
+| Rendimiento | triángulos en Unity con prefabs del SDK | `scene_report.json` | **≤ 250 000**, el máximo oficial de la guía de Onward (ADR-005), por decisión del mantenedor del 10 de noviembre de 2026; antes ≤ 220 000. La guía cuenta también jugadores y objetivos, que `scene_report.json` no incluye. Desde B1 se puede apuntar con `--core-target-triangles`, que cuenta los triángulos del núcleo en `detail`, no en Unity: el export los multiplica por 1,5 a 1,7 en el bench y añade el anillo ([09-perf.md](../09-perf.md#budget-core)) |
 | Rendimiento | draws en las vistas fijas A y B | OVR Metrics | ≤ 150 |
 | Rendimiento | memoria gráfica | OVR Metrics | ≤ 1 GB |
 | Generación | Unity `final` en r150 a 10 t/m | `seconds.bake` | ≤ 5 min. `draft` ≤ 1,5 min (sin medir hoy) |

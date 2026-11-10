@@ -64,3 +64,7 @@ The name keeps the `prop_` prefix, so the adapter's lighting rules are unchanged
 
 On the same map the draws drop from 423 to 279. Per view, the median goes from 144 to 113 and the p90 from 321 to 204. A new model no longer costs a draw, so the furnishing `max_assets` caps rise from 16 to 40 (shops) and from 12 to 30 (floors); the schema maximum is 64.
 
+## Amendment (10 November 2026): the triangle target is the official maximum
+
+The maintainer set the triangle target to the guide's figure: at most 250 000 triangles in Unity (`scene_report.json` `triangles`), no longer 220 000. That count holds the scene and the SDK prefabs. It does not hold the players' avatars or weapons, which the guide's figure includes, so a map near 250 000 leaves no margin for them. The headset session decides whether that holds at 72 fps. Madrid Sol Quest r200 is at 226 750.
+
