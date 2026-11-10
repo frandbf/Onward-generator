@@ -283,3 +283,18 @@ def test_materials_command_carries_the_repetition_switch(tmp_path: Path) -> None
     on = list(materials_command(dress).argv)
     assert on[on.index("--repetition") : on.index("--repetition") + 3] == ["--repetition", "--cell-m", "50.0"]
     assert "--repetition" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+
+
+def test_detail_command_reads_the_roof_spread_only_when_given(tmp_path: Path) -> None:
+    root = tmp_path / "small"
+    create_map(root, map_id="small", name="Small", latitude=40.40657, longitude=-3.719187, radius_m=120, core_radius_m=0)
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    base = root / "data" / "processed" / "scene3d"
+    report = root / "data" / "processed" / "es.pnoa_ndsm" / "es.pnoa_ndsm_report.json"
+    plain = list(detail_command(scene, scene, base).argv)
+    assert "--lidar-roofs" not in plain
+    assert list(detail_command(scene, scene, base, None, None, None).argv) == plain
+    argv = list(detail_command(scene, scene, base, roof_spread=report).argv)
+    at = argv.index("--lidar-roofs")
+    assert argv[at + 1] == str(report) and argv[:at] + argv[at + 2:] == plain
+    assert argv[at + 2] == "--out"

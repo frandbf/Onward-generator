@@ -584,3 +584,84 @@ def test_report_command_reads_the_repetition_block_again(tmp_path: Path) -> None
     assert bench.main(["report", str(run_dir)]) == 0
     again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
     assert again["maps"]["bench_murcia"]["repetition"]["slots_measured"] == 2
+
+
+# ---------------------------------------------------------------------------------------------------- lidar roofs (plan C3)
+
+
+def _detail_report(root: Path, report: Any) -> Path:
+    path = root / "data" / "processed" / "scene_detail" / "detail_report.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return root
+
+
+LIDAR = {"source": "es.pnoa_ndsm", "buildings": 10, "core_buildings": 8, "flat": 2, "pitched": 3,
+         "unclassified": {"tagged": 1, "scenic": 2, "too_few_cells": 2}}
+
+
+def test_lidar_roofs_metrics_summarise_the_classes(tmp_path: Path) -> None:
+    assert bench.lidar_roofs_metrics(tmp_path) is None
+    root = _detail_report(tmp_path, {"counts": {"roofs": {}}})
+    assert bench.lidar_roofs_metrics(root) is None
+    _detail_report(tmp_path, {"counts": {"lidar_roofs": LIDAR}})
+    assert bench.lidar_roofs_metrics(root) == {"flat": 2, "pitched": 3, "unclassified": 5, "classified_pct": 62.5}
+    _detail_report(tmp_path, {"counts": {"lidar_roofs": LIDAR | {"core_buildings": 0, "flat": 0, "pitched": 0}}})
+    assert bench.lidar_roofs_metrics(root) == {"flat": 0, "pitched": 0, "unclassified": 5, "classified_pct": None}
+    _detail_report(tmp_path, {"counts": {"lidar_roofs": LIDAR | {"core_buildings": 3, "flat": 1, "pitched": 0}}})
+    assert bench.lidar_roofs_metrics(root)["classified_pct"] == 33.3
+
+
+@pytest.mark.parametrize(("report", "message"), [
+    ({}, "counts must be an object"),
+    ({"counts": {"lidar_roofs": []}}, "lidar_roofs must be an object"),
+    ({"counts": {"lidar_roofs": LIDAR | {"unclassified": []}}}, "needs integer core_buildings"),
+    ({"counts": {"lidar_roofs": LIDAR | {"flat": "2"}}}, "needs integer core_buildings"),
+    ({"counts": {"lidar_roofs": LIDAR | {"pitched": True}}}, "needs integer core_buildings"),
+    ({"counts": {"lidar_roofs": LIDAR | {"core_buildings": None}}}, "needs integer core_buildings"),
+    ({"counts": {"lidar_roofs": LIDAR | {"unclassified": {"mixed": 1.5}}}}, "needs integer core_buildings"),
+])
+def test_lidar_roofs_metrics_refuse_a_broken_block(tmp_path: Path, report: Any, message: str) -> None:
+    with pytest.raises(bench.BenchError, match=message):
+        bench.lidar_roofs_metrics(_detail_report(tmp_path, report))
+
+
+def test_map_entry_and_report_have_lidar_roofs_only_when_the_block_exists(tmp_path: Path) -> None:
+    package = _package(tmp_path / "pkg")
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "map.json").write_text("{}", encoding="utf-8")
+    ref = bench.REFERENCE_MAPS[0]
+    plain = bench.map_entry(ref, package, inputs)
+    root = _detail_report(tmp_path / "run", {"counts": {}})
+    assert bench.map_entry(ref, package, inputs, root) == plain
+    _detail_report(root, {"counts": {"lidar_roofs": LIDAR}})
+    assert bench.map_entry(ref, package, inputs, root)["lidar_roofs"]["pitched"] == 3
+    run_dir = tmp_path / "r1"
+    _package(run_dir / "bench_murcia" / "data" / "processed" / "export")
+    report = _report()
+    report["maps"] = {"bench_murcia": report["maps"]["bench_murcia"]}
+    (run_dir / bench.REPORT_FILE).write_text(json.dumps(report), encoding="utf-8")
+    assert bench.main(["report", str(run_dir)]) == 0
+    assert "lidar_roofs" not in json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))["maps"]["bench_murcia"]
+    _detail_report(run_dir / "bench_murcia", {"counts": {"lidar_roofs": LIDAR}})
+    assert bench.main(["report", str(run_dir)]) == 0
+    again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert again["maps"]["bench_murcia"]["lidar_roofs"] == {"flat": 2, "pitched": 3, "unclassified": 5, "classified_pct": 62.5}
+
+
+def test_compare_shows_lidar_roof_rows_only_when_a_report_has_them() -> None:
+    old, new = _report(), _report()
+    assert "lidar roofs" not in bench.compare(old, new, old_name="r1", new_name="r2")
+    new["maps"]["bench_murcia"]["lidar_roofs"] = {"flat": 2, "pitched": 3, "unclassified": 5, "classified_pct": 62.5}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    assert "| bench_murcia | lidar roofs flat | - | 2 | - |" in lines
+    assert "| bench_murcia | lidar roofs pitched | - | 3 | - |" in lines
+    assert "| bench_murcia | lidar roofs classified % | - | 62.5 | - |" in lines
+    assert not any("lidar roofs" in line for line in lines if "bench_madrid" in line)
+
+
+def test_the_run_parser_takes_the_lidar_roofs_switch() -> None:
+    args = bench.build_parser().parse_args(["run", "--lidar-roofs"])
+    assert args.lidar_roofs is True
+    assert bench.build_parser().parse_args(["run"]).lidar_roofs is False

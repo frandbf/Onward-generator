@@ -72,3 +72,8 @@ The landing (1.6 × 1.5 m) and the roof cabin with its apron now lie on the deck
 On Barcelona Sarria two ladders stood over a ground-floor door: a ladder goes on a building with no interior, and the 3 m keep-out of rule 4 counted only the interiors' street doors. `detail` now records every ground-floor door of a building in `facade.doors_m` (docs/07-detail.md), and `climb_keep_out` keeps a ladder's foot and a cabin 3 m from each of them too. A manifest from before has no `doors_m` and keeps the earlier rule.
 
 A ladder or a cabin no longer stands only at the middle of a wall. It slides along it, 0.5 m at a time (`SLIDE_STEP_M`), nearest the middle first, as long as it stays on the wall, before the next wall is tried: almost every building has a door, so the middle rule alone left Barcelona Sarria with no access at all. With both changes its 100 m core has no ladder and one lift pair, on a 10.8 m roof whose cabin stands 10.7 m from the nearest door. The one ladder of the previous amendment stood 0.14 m from a door, and its walls are too short to clear it by 3 m.
+
+## Amendment, 8 November 2026: roofs from the nDSM spread (plan C3)
+
+With `map.json` `"lidar_roofs": true`, `detail` may draw an estimated gable on a building that had a flat roof (ADR-023 amendment "Roof form from the nDSM spread"). Such a roof is pitched, so it gets no stair to the roof and no ladder or lift, as any pitched roof. A building classified flat keeps its access, and one whose coin hip the flat class drops can get it. On the bench, Madrid loses one stair roof access (7 to 6) with the switch on; Murcia keeps its 3. A route or sniper line that used a roof that turned pitched is lost, which the headset session and a playtest must check.
+

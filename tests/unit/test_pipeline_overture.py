@@ -129,7 +129,7 @@ def test_fetch_and_match_run_after_the_split_and_feed_heights_and_detail(tmp_pat
     assert by_name["heights"] == list(heights_command(scene, processed / "cadastre" / "heights_overrides.catastro.json", secondary).argv)
     assert by_name["detail"][by_name["detail"].index("--places") + 1] == str(places)
     assert by_name["detail"][:-1] == list(detail_command(scene, processed / "heights" / "heights.json", processed / "scene3d", places).argv)
-    assert third_party_plan(root, processed / "geo" / "geo_scene.json") == (secondary, places, None)
+    assert third_party_plan(root, processed / "geo" / "geo_scene.json") == (secondary, places, None, None)
     # Plan C2 is off by default: neither the match nor detail asks for colours.
     assert "--tints" not in by_name["overture-match"] and "--overture-tints" not in by_name["detail"]
     assert by_name["overture-match"] == list(overture_match_command(scene, root).argv)
@@ -150,11 +150,11 @@ def test_no_source_overture_leaves_heights_and_detail_as_before(tmp_path: Path) 
     by_name = dict(plan_steps(root))
     assert "overture" not in by_name and "overture-match" not in by_name
     assert "--secondary-overrides" not in by_name["heights"] and "--places" not in by_name["detail"]
-    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None)
+    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None, None)
     store_overture_tints(root, True)  # the colour switch alone adds no stage and no flag
     by_name = dict(plan_steps(root))
     assert "overture-match" not in by_name and "--overture-tints" not in by_name["detail"]
-    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None)
+    assert third_party_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json") == (None, None, None, None)
 
 
 def test_a_priority_that_ranks_overture_above_catastro_stops_the_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

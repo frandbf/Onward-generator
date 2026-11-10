@@ -175,8 +175,10 @@ def _core_flags(scene: Path) -> tuple[str, ...]:
     return ("--core-radius-m", f"{core:g}") if core is not None else ()
 
 
-def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None) -> StageCommand:
-    """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), and Overture places and colours when given."""
+def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,
+                   roof_spread: Path | None = None) -> StageCommand:
+    """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), Overture places and colours when given,
+    and a LiDAR plugin's report for the roofs when given (plan C3)."""
     return invoke(
         "detail",
         "--scene", show(scene),
@@ -184,6 +186,7 @@ def detail_command(scene: Path, heights: Path, base: Path, places: Path | None =
         "--base", show(base),
         *(("--places", show(places)) if places is not None else ()),
         *(("--overture-tints", show(tints)) if tints is not None else ()),
+        *(("--lidar-roofs", show(roof_spread)) if roof_spread is not None else ()),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *_core_flags(scene),
     )

@@ -384,3 +384,23 @@ def test_overture_tints_run_switches_the_run_copy_only(workdir: Path) -> None:
     assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["overture_tints"] is True
     assert bench.inputs_sha256(inputs) == digest
     assert "overture_tints" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+
+
+def test_lidar_roofs_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    assert all("--lidar-roofs" not in argv for argv in off.calls)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--lidar-roofs") == 0
+    copy = root / "runs" / "r2" / "bench_murcia"
+    assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["lidar_roofs"] is True
+    assert bench.inputs_sha256(inputs) == digest
+    assert "lidar_roofs" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    detail = next(argv for argv in on.calls if argv[0] == "detail")
+    assert [argv[2] for argv in on.calls if argv[:2] == ["source", "normalize"]] == ["es.pnoa_ndsm"]
+    report = copy / "data" / "processed" / "es.pnoa_ndsm" / "es.pnoa_ndsm_report.json"
+    assert Path(detail[detail.index("--lidar-roofs") + 1]).resolve() == report.resolve()

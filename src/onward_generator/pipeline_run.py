@@ -140,13 +140,13 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
     geo_argv = list(geo_command(root).argv)
     geo_scene = _flag(geo_argv, "--out") / "geo_scene.json"
     sources, scene, overrides = source_plan(root, geo_scene)
-    secondary, places, tints = third_party_plan(root, geo_scene)
+    secondary, places, tints, roof_spread = third_party_plan(root, geo_scene)
     source_steps = [(stage.name, list(stage.argv)) for stage in sources]
     heights_argv = list(heights_command(scene, overrides, secondary).argv)
     heights = _flag(heights_argv, "--out") / "heights.json"
     generate_argv = [*generate_command(scene, heights).argv, *no_preview]
     scene3d = _flag(generate_argv, "--out")
-    detail_argv = [*detail_command(scene, heights, scene3d, places, tints).argv, *no_preview]
+    detail_argv = [*detail_command(scene, heights, scene3d, places, tints, roof_spread).argv, *no_preview]
     detail = _flag(detail_argv, "--out")
     dress_argv = list(dress_command(detail, scene, heights).argv)
     dress = _flag(dress_argv, "--out")
@@ -252,24 +252,40 @@ def _plugin_steps(root: Path, scene: Path) -> list[tuple[str, SourceSteps]]:
     return found
 
 
-def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None, Path | None]:
-    """The secondary overrides ``heights`` reads, and the places and colours ``detail`` reads, from the last plugin that writes each.
+def third_party_plan(root: Path, scene: Path) -> tuple[Path | None, Path | None, Path | None, Path | None]:
+    """The secondary overrides ``heights`` reads, and the places, colours and roof spreads ``detail`` reads, from the last plugin that writes each.
 
-    Overture writes all three (ADR-021); its colours only with ``map.json`` ``"overture_tints": true`` (plan C2).
+    Overture writes the first three (ADR-021); its colours only with ``map.json`` ``"overture_tints": true`` (plan C2).
+    A LiDAR plugin hands its report as the roof spreads only with ``"lidar_roofs": true`` (plan C3).
     """
     secondary: Path | None = None
     places: Path | None = None
     tints: Path | None = None
+    roof_spread: Path | None = None
     for _plugin_id, steps in _plugin_steps(root, scene):
         secondary = steps.secondary_overrides or secondary
         places = steps.places or places
         tints = steps.tints or tints
-    return secondary, places, tints
+        roof_spread = steps.roof_spread or roof_spread
+    return secondary, places, tints, roof_spread
+
+
+def _roof_spread_input(root: Path) -> list[Path]:
+    """The LiDAR report ``detail`` reads with ``"lidar_roofs": true`` (plan C3), so a new report makes detail stale."""
+    try:
+        roof_spread = third_party_plan(root, root / GEO_SCENE)[3]
+    except (MapError, PipelineError):
+        return []
+    return [roof_spread] if roof_spread is not None else []
+
+
+# The scene the source plugins of a map start from (``plan_steps`` reads it from the geo stage's ``--out``).
+GEO_SCENE = Path("data") / "processed" / "geo" / "geo_scene.json"
 
 
 def _source_stages(root: Path) -> list[SourceStage]:
     try:
-        return source_plan(root, root / "data" / "processed" / "geo" / "geo_scene.json")[0]
+        return source_plan(root, root / GEO_SCENE)[0]
     except (MapError, PipelineError):
         return []
 
@@ -499,7 +515,8 @@ def output_ready(name: str, root: Path) -> bool:
     marker = _canon(root, name)
     if marker is None:
         return False
-    return _fresh(marker, _input_markers(root, name))
+    # With "lidar_roofs" detail also reads the LiDAR report (plan C3), so a newer report makes it stale.
+    return _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) if name == "detail" else []))
 
 
 # The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.

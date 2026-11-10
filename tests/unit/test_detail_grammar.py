@@ -20,6 +20,7 @@ from onward_generator.detail.grammar import (
     tagged_roof,
     tagged_wall,
 )
+from onward_generator.detail.lidar_roofs import RoofSpread
 from onward_generator.generation.mesh import upward_area
 
 CFG = load_detail_config("config/detail.default.json")
@@ -280,3 +281,71 @@ def test_without_a_lent_colour_nothing_changes(tags: dict[str, str]) -> None:
         assert choose_roof(tags, RESIDENTIAL, CFG.seed, "b", area, colours=colours, lent=None) == choose_roof(tags, RESIDENTIAL, CFG.seed, "b", area, colours=colours)
     assert tagged_wall(tags, colours, lent=None) == tagged_wall(tags, colours)
     assert tagged_roof(tags, colours, lent=None) == tagged_roof(tags, colours)
+
+
+# Plan C3: a roof class from the nDSM spread, below every OSM roof tag.
+
+SPREAD = RoofSpread("measured", 10.0, 11.5, 20, 24)
+
+
+def _coin_hip_id() -> str:
+    """A building id whose roof_grammar coin draws the estimated hip on a 100 m² convex parapet footprint."""
+    return next(f"b{i}" for i in range(100) if choose_roof({}, RESIDENTIAL, CFG.seed, f"b{i}", 100.0)[2] == "estimated")
+
+
+def test_a_pitched_class_draws_an_estimated_gable_on_any_area() -> None:
+    for area in (100.0, 400.0, 5000.0):
+        template, material, origin, shape = choose_roof({}, RESIDENTIAL, CFG.seed, "b", area, convex=False, lidar=("pitched", SPREAD))
+        assert (material, origin, shape) == ("roof_tile", "estimated", None)
+        assert template.parapet_m == 0 and template.hip is None and template.pitched is not None
+        assert template.pitched == replace(template.pitched, shape="gabled", tag="gabled", material="roof_tile", rise_m=1.5,
+                                           rise_rule="ndsm_spread", direction_deg=None, across=False)
+        assert replace(template, parapet_m=RESIDENTIAL.parapet_m, pitched=None) == RESIDENTIAL
+
+
+def test_a_pitched_class_takes_a_tagged_or_lent_colour_as_a_tile_tint() -> None:
+    colours = CFG.materials
+    template, material, origin, _ = choose_roof({"roof:colour": "grey"}, RESIDENTIAL, CFG.seed, "b", 100.0, colours=colours,
+                                                lidar=("pitched", SPREAD))
+    assert (material, origin) == ("roof_tile__tint_grey", "observed") and template.pitched is not None
+    assert template.pitched.material == material
+    _, material, origin, _ = choose_roof({}, RESIDENTIAL, CFG.seed, "b", 100.0, colours=colours, lent="#b43c28", lidar=("pitched", SPREAD))
+    assert (material, origin) == ("roof_tile__tint_red", "observed")
+    _, material, origin, _ = choose_roof({"roof:material": "concrete"}, RESIDENTIAL, CFG.seed, "b", 100.0, lidar=("pitched", SPREAD))
+    assert (material, origin) == ("roof_flat_grey", "observed")
+
+
+def test_a_pitched_class_drops_a_template_hip() -> None:
+    hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 30.0, 4.0, "roof_flat_light"))
+    template, material, *_ = choose_roof({}, hipped, CFG.seed, "b", 100.0, lidar=("pitched", SPREAD))
+    assert template.hip is None and template.pitched is not None and material == "roof_tile"
+
+
+def test_a_flat_class_drops_a_template_hip() -> None:
+    hipped = replace(RESIDENTIAL, hip=HipRoof(200.0, 22.0, 2.5, "roof_tile"))
+    template, material, origin, shape = choose_roof({}, hipped, CFG.seed, "b", 100.0, lidar=("flat", SPREAD))
+    assert template == replace(hipped, hip=None) and template.pitched is None
+    assert material in RESIDENTIAL.flat_roof_materials and origin == "generated" and shape is None
+    assert choose_roof({}, hipped, CFG.seed, "b", 100.0)[0].hip is not None
+
+
+def test_a_flat_class_keeps_the_template_and_draws_no_estimated_hip() -> None:
+    bid = _coin_hip_id()
+    assert choose_roof({}, RESIDENTIAL, CFG.seed, bid, 100.0, lidar=None)[0].hip is not None
+    template, material, origin, shape = choose_roof({}, RESIDENTIAL, CFG.seed, bid, 100.0, lidar=("flat", SPREAD))
+    assert template is RESIDENTIAL and origin == "generated" and shape is None
+    assert material == choose_roof({}, RESIDENTIAL, CFG.seed, bid, 400.0)[1]
+
+
+@pytest.mark.parametrize("tags", [{"roof:shape": "hipped"}, {"roof:shape": "flat"}, {"roof:shape": "crosspitched"}])
+@pytest.mark.parametrize("lidar_class", ["pitched", "flat"])
+def test_a_roof_shape_tag_wins_over_the_class(tags: dict[str, str], lidar_class: str) -> None:
+    bid = _coin_hip_id()
+    assert choose_roof(tags, RESIDENTIAL, CFG.seed, bid, 100.0, lidar=(lidar_class, SPREAD)) == choose_roof(tags, RESIDENTIAL, CFG.seed, bid, 100.0)
+
+
+@pytest.mark.parametrize("tags", [{}, {"roof:colour": "red"}, {"roof:shape": "gabled", "roof:levels": "1"}, {"roof:levels": "1"}])
+def test_without_a_class_nothing_changes(tags: dict[str, str]) -> None:
+    for bid in ("b", _coin_hip_id()):
+        for area in (100.0, 400.0):
+            assert choose_roof(tags, RESIDENTIAL, CFG.seed, bid, area, lidar=None) == choose_roof(tags, RESIDENTIAL, CFG.seed, bid, area)

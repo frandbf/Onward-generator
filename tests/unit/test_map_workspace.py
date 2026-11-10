@@ -645,3 +645,37 @@ def test_store_overture_tints_needs_a_map(tmp_path: Path) -> None:
 
     with pytest.raises(MapError, match="not found"):
         store_overture_tints(tmp_path / "nowhere", True)
+
+
+def test_lidar_roofs_are_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import lidar_roofs_enabled, store_lidar_roofs
+
+    assert lidar_roofs_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "lidar_roofs" not in load_map(root)
+    assert lidar_roofs_enabled(root) is False
+    before = load_map(root)
+    store_lidar_roofs(root, True)
+    assert load_map(root) == before | {"lidar_roofs": True} and lidar_roofs_enabled(root) is True
+    store_lidar_roofs(root, False)
+    assert load_map(root)["lidar_roofs"] is False and lidar_roofs_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_lidar_roofs_refuse_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import lidar_roofs_enabled, store_lidar_roofs
+
+    root = _atlas_map(tmp_path, lidar_roofs=value)
+    with pytest.raises(MapError) as caught:
+        lidar_roofs_enabled(root)
+    assert str(caught.value) == f'map.json "lidar_roofs" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_lidar_roofs(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"lidar_roofs" must be true or false, got {value!r}'
+
+
+def test_store_lidar_roofs_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_lidar_roofs
+
+    with pytest.raises(MapError, match="not found"):
+        store_lidar_roofs(tmp_path / "nowhere", True)

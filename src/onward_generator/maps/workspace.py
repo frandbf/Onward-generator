@@ -264,6 +264,32 @@ def store_overture_tints(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def lidar_roofs_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"lidar_roofs": true`` (plan C3, ADR-023 amendment, off by default).
+
+    ``detail`` then reads the LiDAR plugin's report and draws a flat or pitched roof from each footprint's nDSM spread.
+    A map without ``map.json`` or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("lidar_roofs", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "lidar_roofs" must be true or false, got {value!r}')
+    return value
+
+
+def store_lidar_roofs(directory: str | Path, enabled: bool) -> None:
+    """Record the LiDAR roofs switch on an existing map. Does not rewrite scenes."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"lidar_roofs" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["lidar_roofs"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 

@@ -74,6 +74,8 @@ onward-generator source normalize es.pnoa_ndsm --scene <scene> --raw maps/<id>/d
 
 A height outside the `heights` bounds (2.5–120 m) is not written (`out_of_bounds`); a footprint without enough valid cells is `no_data`. Both stay in `<id>_report.json` with the cell counts. The median of a pitched roof lies between eave and ridge, so it is above the wall height `levels × storey height` describes.
 
+`heights` does not read the spread: the override note carries it as text only. With `map.json` `"lidar_roofs": true` (plan C3, off by default) `detail --lidar-roofs` reads `p25_m`, `p75_m`, `valid` and `cells` from `<id>_report.json` and draws a flat or pitched roof from them ([07-detail.md](07-detail.md), *Roofs*). The rise is the spread itself (about half the real rise), capped at 4 m, on top of the recorded median, so the ridge lands near the measured one and the walls and the collider keep the height above. Only footprints with at least 8 valid cells are classified: at 2.5 m a cell, PNOA gives a median of 7 valid cells in Madrid and 3–4 on small Murcia parts.
+
 | Plugin | Data | Cell | Buffer | `min_cells` | Confidence | Data date |
 | --- | --- | --- | --- | --- | --- | --- |
 | `es.pnoa_ndsm` | IGN MDSn, building class (trees already removed) | 2.5 m | 1 m | 3 | 0.8 | PNOA-LiDAR first coverage, 2008–2015 (per sheet, not per building) |

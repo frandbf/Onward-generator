@@ -77,6 +77,7 @@ from onward_generator.detail.interiors import (
     visual_triangles,
 )
 from onward_generator.detail.landmarks import attach_towers
+from onward_generator.detail.lidar_roofs import FLAT, PITCHED, REASONS, RoofSpread, SpreadReport, classify, is_roof_tagged
 from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
@@ -443,11 +444,13 @@ def _roof_plans(
     tags_of: Mapping[str, dict[str, str]], templates: Mapping[str, Template], heights_m: Mapping[str, float], cfg: DetailConfig,
     storeys_m: Mapping[str, float],
     lent: Mapping[str, Mapping[str, Any]] | None = None,
+    lidar: Mapping[str, tuple[str, RoofSpread]] | None = None,
 ) -> dict[str, RoofPlan]:
     """``choose_roof`` per building, drawn for its ``appearance_key`` so the parts of one parcel share a roof.
 
     ``storeys_m`` is each building's storey height, the height of one ``roof:levels``. ``lent`` holds the
-    Overture roof colour of each key (``_lent_by_key``, plan C2).
+    Overture roof colour of each key (``_lent_by_key``, plan C2). ``lidar`` holds the class and spread of each building
+    the nDSM classified ``flat`` or ``pitched`` (plan C3).
 
     A part with a taller part of its own parcel within ``probe_m`` gets no estimated hip: its roof is
     the terrace under the setback, flat behind its parapet.
@@ -455,12 +458,59 @@ def _roof_plans(
     plans: dict[str, RoofPlan] = {}
     for bid in ids:
         geom = footprints[bid]
-        near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m)]
-        terrace = any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
+        terrace = _terrace(bid, ids, footprints, tree, key_of, heights_m, cfg)
         convex = geom.geom_type == "Polygon" and not geom.interiors and geom.convex_hull.area <= geom.area * 1.02
         plans[bid] = choose_roof(tags_of[bid], templates[bid], cfg.seed, key_of[bid], geom.area, convex=convex and not terrace,
-                                 storey_m=storeys_m[bid], colours=cfg.materials, lent=_lent_colour((lent or {}).get(key_of[bid])))
+                                 storey_m=storeys_m[bid], colours=cfg.materials, lent=_lent_colour((lent or {}).get(key_of[bid])),
+                                 lidar=(lidar or {}).get(bid))
     return plans
+
+
+def _terrace(bid: str, ids: Sequence[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, key_of: Mapping[str, str],
+             heights_m: Mapping[str, float], cfg: DetailConfig) -> bool:
+    """True when a taller part of the building's own parcel stands within ``probe_m``: its roof is the terrace under the setback."""
+    near = [ids[k] for k in tree.query(footprints[bid], predicate="dwithin", distance=cfg.probe_m)]
+    return any(key_of[n] == key_of[bid] and heights_m[n] > heights_m[bid] for n in near)
+
+
+def _lidar_classes(ids: Sequence[str], footprints: Mapping[str, BaseGeometry], tree: STRtree, key_of: Mapping[str, str],
+                   tags_of: Mapping[str, Mapping[str, str]], heights_m: Mapping[str, float], tier_of: Mapping[str, str],
+                   report: SpreadReport, cfg: DetailConfig) -> dict[str, str]:
+    """``lidar_roofs.classify`` of every building (plan C3): ``flat``, ``pitched`` or the reason it is not classified."""
+    return {bid: classify(report.buildings.get(bid), footprints[bid], tagged=is_roof_tagged(tags_of[bid]), scenic=tier_of[bid] == SCENIC,
+                          terrace=_terrace(bid, ids, footprints, tree, key_of, heights_m, cfg))
+            for bid in ids}
+
+
+def _lidar_inputs(report: SpreadReport, classes: dict[str, str]) -> tuple[
+        dict[str, str], dict[str, tuple[str, RoofSpread]], dict[str, dict[str, object]]]:
+    """``(classes, plans, evidence)``: every class, the ``(class, spread)`` of the buildings classified flat or pitched, and their ``roof.lidar``."""
+    plans = {bid: (c, report.buildings[bid]) for bid, c in classes.items() if c in (FLAT, PITCHED)}
+    return classes, plans, {bid: report.evidence(spread, c) for bid, (c, spread) in plans.items()}
+
+
+def _lidar_record(detailed: DetailedScene, objects: Sequence[DetailObject], classes: Mapping[str, str], report: SpreadReport) -> None:
+    """``counts.lidar_roofs`` and, when a classified roof was kept, the plugin's attribution line (plan C3).
+
+    ``buildings`` is every building, ``core_buildings`` those detailed in the core; ``flat`` and ``pitched`` the roofs
+    the spread decided, and ``unclassified`` the others by reason (``REASONS``), a pitched roof drawn flat as ``fallback``.
+    """
+    outcomes = dict(classes)
+    for o in objects:
+        if o.type == "building" and "fallback" in o.record["roof"] and outcomes[o.record["source_ids"][0]] == PITCHED:
+            outcomes[o.record["source_ids"][0]] = "fallback"
+    counts = Counter(outcomes.values())
+    detailed.stats["lidar_roofs"] = {
+        "source": report.source,
+        "buildings": len(outcomes),
+        "core_buildings": len(outcomes) - counts["scenic"],
+        FLAT: counts[FLAT], PITCHED: counts[PITCHED],
+        "unclassified": {reason: counts[reason] for reason in REASONS},
+    }
+    if counts[FLAT] or counts[PITCHED]:
+        lines = {(a["text"], a["license"]): a for a in detailed.extra_attribution}
+        lines.setdefault((report.attribution, report.license), {"text": report.attribution, "license": report.license})
+        detailed.extra_attribution = [dict(lines[key]) for key in sorted(lines)]
 
 
 def _lent_colour(lend: Mapping[str, Any] | None) -> str | None:
@@ -995,6 +1045,7 @@ def detail_scene(
     places: Sequence[Mapping[str, Any]] = (),
     typology: TypologyConfig | None = None,
     tints: Sequence[Mapping[str, Any]] | None = None,
+    roof_spread: SpreadReport | None = None,
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
@@ -1003,7 +1054,9 @@ def detail_scene(
     ranked by ``config/sources.json`` ``evidence`` (ADR-022). ``typology`` (default ``config/typology.default.json``)
     names each building's typology and era (ADR-024); it changes nothing that is drawn. ``tints`` are the entries of
     ``overture_tints.json`` (plan C2): Overture colours a wall or roof takes when no OSM tag names it. ``None``
-    (the default) reads none and adds no count."""
+    (the default) reads none and adds no count. ``roof_spread`` is a raster plugin's report (plan C3): a building
+    without a roof tag takes a flat or pitched roof from its nDSM spread (``lidar_roofs.classify``). ``None`` (the
+    default) reads none, adds no key and draws the roofs as before."""
     tcfg = typology or load_typology_config()
     core = core_square(core_half_side_m) if core_half_side_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
@@ -1043,11 +1096,14 @@ def detail_scene(
         evidence[bid] = place_evidence[bid]
     # One roof:levels is a storey of the building, a landmark's too: its single facade band is not a storey.
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
-    roof_plans = _roof_plans(ids, footprints, tree, key_of, {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids},
-                             templates, heights_m, cfg, storey_heights, lent_roofs)
+    tags_of = {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids}
+    tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
+    lidar_classes, lidar_plans, lidar_evidence = _lidar_inputs(
+        roof_spread, _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg),
+    ) if roof_spread is not None else ({}, {}, {})
+    roof_plans = _roof_plans(ids, footprints, tree, key_of, tags_of, templates, heights_m, cfg, storey_heights, lent_roofs, lidar_plans)
     setbacks: Counter[str] = Counter()
 
-    tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
     # An interior needs the whole building inside the core: past its edge the ground colliders end and the
     # perimeter wall stands, so a room there has no floor and a stair there cannot be reached.
     whole_in_core = {bid for bid in ids if core is None or core.covers(footprints[bid])}
@@ -1201,8 +1257,13 @@ def detail_scene(
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
+        if bid in lidar_evidence:
+            # The form is the nDSM's estimate; facade.materials keeps the material's own origin.
+            shell.roof["origin"] = "estimated"
+            shell.roof["lidar"] = lidar_evidence[bid]
         if "fallback" in shell.roof:
-            issues.append(Issue("roof_shape_fallback", "info", bid, f"roof:shape={roof_shape} drawn flat: {shell.roof['fallback']}"))
+            shape_text = "the estimated gable (nDSM spread)" if bid in lidar_evidence else f"roof:shape={roof_shape}"
+            issues.append(Issue("roof_shape_fallback", "info", bid, f"{shape_text} drawn flat: {shell.roof['fallback']}"))
         if shell.defects:
             issues.append(Issue("facade_mesh_not_watertight", "critical", bid, f"{shell.defects} open or non-manifold edges"))
         if shell.roof_area_error > max(0.02, 1e-3 * geom.area):
@@ -1455,6 +1516,9 @@ def detail_scene(
     _third_party_record(detailed, objects, places, third_party)
     if tints is not None:
         _third_party_tints(detailed, objects, tints, ids, key_of, (lent_walls, lent_roofs))
+    if roof_spread is not None:
+        detailed.inputs["roof_spread"] = {"path": roof_spread.path, "sha256": roof_spread.sha256, "source": roof_spread.source}
+        _lidar_record(detailed, objects, lidar_classes, roof_spread)
     detailed.stats["roof_shapes"] = dict(sorted(roof_shapes.items()))
     detailed.stats["building_parts"] = {
         "kept": len(part_objects),
