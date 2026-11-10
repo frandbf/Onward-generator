@@ -249,7 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--catastro", action=argparse.BooleanOptionalAction,
         help="same as --source es.catastro / --no-source es.catastro: split OSM blocks into Catastro constructions (default on in Spain outside Navarre and the Basque Country)",
     )
-    run.add_argument("--source", action="append", default=[], metavar="ID", help="use this source plugin for the map when it covers the centre (stored in map.json; see: source list)")
+    run.add_argument("--source", action="append", default=[], metavar="ID", help="use this source plugin for the map when it covers the centre; an opt-in plugin runs only with it (stored in map.json; see: source list)")
     run.add_argument("--no-source", action="append", default=[], metavar="ID", help="do not use this source plugin for the map (stored in map.json)")
     run.add_argument("--overwrite", action="store_true", help="replace map.json when processed/ is empty")
     run.add_argument("--from", dest="start", default=None, help="stage to run, skipping the question when work already exists")

@@ -51,6 +51,7 @@ class FakeHeights:
     licence: LicenceRecord = OPEN
     produces: frozenset[Kind] = frozenset({"height_m"})
     west: float = -180.0
+    opt_in: bool = False
 
     def covers(self, longitude: float, latitude: float) -> bool:
         return longitude >= self.west
@@ -99,8 +100,8 @@ def two_plugins(monkeypatch: pytest.MonkeyPatch) -> tuple[Any, ...]:
 
 def test_the_repository_config_ranks_lidar_above_catastro_and_allows_the_plugin_licences() -> None:
     config = load_source_config()
-    assert config.priority == ("es.pnoa_ndsm", "fr.lidar_hd", "es.catastro", "overture")
-    assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0", "CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0"})
+    assert config.priority == ("es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "de.nrw_ndom", "es.catastro", "overture")
+    assert config.licence_allowlist == frozenset({"CC-BY-4.0", "etalab-2.0", "ODbL-1.0", "CDLA-Permissive-2.0", "Apache-2.0", "CC0-1.0", "DL-DE-ZERO-2.0"})
     assert config.evidence == ("osm", "es.catastro", "overture")
     for plugin in (CatastroPlugin(), PnoaNdsmPlugin()):
         check_licence(plugin, config)
@@ -293,7 +294,7 @@ def test_merge_refuses_an_unranked_source_and_a_duplicate_id() -> None:
 
 def test_source_list_prints_rank_kinds_licence_and_coverage(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["source", "list", "--lat", "42.8125", "--lon", "-1.6432"]) == 0
-    assert capsys.readouterr().out == "es.catastro  rank 3  footprints,levels,use  CC-BY-4.0 (allowed)  not here\n"
+    assert capsys.readouterr().out == "es.catastro  rank 5  footprints,levels,use  CC-BY-4.0 (allowed)  not here\n"
     assert main(["source", "list", "--lat", str(MURCIA_CENTER_LAT), "--lon", str(MURCIA_CENTER_LON)]) == 0
     assert capsys.readouterr().out.endswith("(allowed)  covers\n")
     assert main(["source", "list", "--lat", str(MURCIA_CENTER_LAT)]) == 0

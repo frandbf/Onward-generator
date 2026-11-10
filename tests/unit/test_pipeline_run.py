@@ -1535,7 +1535,7 @@ def test_run_help_describes_the_source_switches() -> None:
         "same as --source es.catastro / --no-source es.catastro: split OSM blocks into Catastro constructions "
         "(default on in Spain outside Navarre and the Basque Country)"
     )
-    assert helps["source"] == "use this source plugin for the map when it covers the centre (stored in map.json; see: source list)"
+    assert helps["source"] == "use this source plugin for the map when it covers the centre; an opt-in plugin runs only with it (stored in map.json; see: source list)"
     assert helps["no_source"] == "do not use this source plugin for the map (stored in map.json)"
     metavars = {action.dest: action.metavar for action in run._actions}
     assert metavars["source"] == metavars["no_source"] == "ID"

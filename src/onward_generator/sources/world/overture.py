@@ -40,6 +40,7 @@ class OverturePlugin:
         obligations=OBLIGATIONS,
     )
     produces: frozenset[Kind] = frozenset({"height_m", "levels", "use"})
+    opt_in: bool = False
 
     def covers(self, longitude: float, latitude: float) -> bool:
         return -180.0 <= longitude <= 180.0 and -90.0 <= latitude <= 90.0

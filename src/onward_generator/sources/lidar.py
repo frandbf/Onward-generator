@@ -69,6 +69,13 @@ class TileRequest:
     rows: int
 
 
+@dataclass(frozen=True, slots=True)
+class LayerTileRequest(TileRequest):
+    """A tile of one layer of a surface and terrain pair (plan D4); only its sidecar entry holds ``layer``."""
+
+    layer: str
+
+
 @runtime_checkable
 class RasterHeights(Protocol):
     """A plugin whose data is a height-above-ground raster. It also satisfies ``SourcePlugin``."""
@@ -81,6 +88,9 @@ class RasterHeights(Protocol):
 
     @property
     def produces(self) -> frozenset[Kind]: ...
+
+    @property
+    def opt_in(self) -> bool: ...
 
     @property
     def stage_names(self) -> tuple[str, str]: ...
@@ -116,6 +126,19 @@ class RasterHeights(Protocol):
     def data_date(self, longitude: float, latitude: float, metadata: Mapping[str, Any]) -> str:
         """When the data at this point was acquired, as text for the override note and the report."""
         ...
+
+
+@runtime_checkable
+class SurfaceModelHeights(RasterHeights, Protocol):
+    """A raster plugin whose service gives the surface and the terrain separately (plan D4, ADR-018 amendment).
+
+    Its requests are ``LayerTileRequest``s; ``load_raster`` joins the tiles of each layer and ``combine`` makes them one height-above-ground grid.
+    """
+
+    @property
+    def layers(self) -> tuple[str, ...]: ...
+
+    def combine(self, grids: Mapping[str, Grid]) -> Grid: ...
 
 
 def raster_steps(plugin: RasterHeights, root: Path, scene: Path) -> SourceSteps:
@@ -283,13 +306,26 @@ def load_raster(plugin: RasterHeights, raw: Path) -> tuple[dict[str, Any], Grid]
     record = json.loads(side.read_bytes())
     if record.get("source") != plugin.id:
         raise SourceError(f"{side} was written by {record.get('source')!r}, not {plugin.id}")
-    grids = []
+    tiles = []
     for entry in record["tiles"]:
         body = (raw / entry["file"]).read_bytes()
         if hashlib.sha256(body).hexdigest() != entry["sha256"]:
             raise SourceError(f"{raw / entry['file']} does not match the sha256 recorded in {side.name}")
-        grids.append(plugin.decode(body, entry))
-    return record, mosaic(grids)
+        tiles.append((entry, plugin.decode(body, entry)))
+    return record, join_tiles(plugin, tiles, side.name)
+
+
+def join_tiles(plugin: RasterHeights, tiles: Sequence[tuple[Mapping[str, Any], Grid]], sidecar: str) -> Grid:
+    """One grid from the decoded tiles: their mosaic, or for a ``SurfaceModelHeights`` plugin its ``combine`` of each layer's mosaic."""
+    if not isinstance(plugin, SurfaceModelHeights):
+        return mosaic([grid for _entry, grid in tiles])
+    layers = {}
+    for layer in plugin.layers:
+        grids = [grid for entry, grid in tiles if entry.get("layer") == layer]
+        if not grids:
+            raise SourceError(f"{sidecar} has no {layer} tiles")
+        layers[layer] = mosaic(grids)
+    return plugin.combine(layers)
 
 
 @dataclass(frozen=True, slots=True)

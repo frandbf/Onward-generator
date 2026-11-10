@@ -1,0 +1,14 @@
+{
+  "schema": "onward_generator.source_coverage",
+  "schema_version": "1.0.0",
+  "source": "de.nrw_ndom",
+  "description": "Where run may use the Geobasis NRW nDOM50 (ADR-018, plan D4; opt-in, so only with run --source de.nrw_ndom): a coarse WGS84 longitude/latitude ring around North Rhine-Westphalia, drawn by hand for this repository (CC0) outside the state border on every side, by a few kilometres at the closest, so border towns such as Selfkant, Elten, Vreden, Gronau, Recke, Petershagen, Lügde, Beverungen, Hallenberg, Bad Laasphe, Burbach and Hellenthal are inside. It also takes in strips of the Netherlands, Belgium, Lower Saxony, Hesse and Rhineland-Palatinate, where the service returns no data and no override is written. Checked 2026-11-09 against the WCS DescribeCoverage envelope (EPSG:25832 x 278000..536000, y 5560000..5828000).",
+  "polygons": [
+    [[
+      [5.8, 50.65], [6.1, 50.4], [6.5, 50.25], [7.0, 50.45], [7.3, 50.55], [7.8, 50.6], [8.15, 50.6],
+      [8.35, 50.75], [8.75, 50.95], [8.85, 51.15], [9.2, 51.35], [9.6, 51.55], [9.55, 52.0], [9.2, 52.15],
+      [9.2, 52.6], [8.3, 52.6], [7.5, 52.5], [7.0, 52.4], [6.6, 52.15], [6.4, 52.0], [6.1, 52.0],
+      [5.85, 51.85], [5.8, 51.05], [5.8, 50.65]
+    ]]
+  ]
+}

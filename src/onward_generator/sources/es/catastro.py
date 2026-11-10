@@ -32,6 +32,7 @@ class CatastroPlugin:
         obligations=LICENSE_NOTES,
     )
     produces: frozenset[Kind] = frozenset({"footprints", "levels", "use"})
+    opt_in: bool = False
 
     def covers(self, longitude: float, latitude: float) -> bool:
         return catastro_zone(longitude, latitude) is not None

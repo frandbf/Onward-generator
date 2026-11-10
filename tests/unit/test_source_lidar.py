@@ -403,7 +403,7 @@ def test_cli_fetch_refuses_catastro_and_a_licence_off_the_allowlist(tmp_path: Pa
     assert main(["source", "normalize", "es.catastro", "--scene", str(scene_file), "--raw", "x", "--out", str(tmp_path / "o")]) == 1
     assert "es.catastro has its own commands" in capsys.readouterr().err
     config = tmp_path / "sources.json"
-    config.write_text(json.dumps({"schema": "onward_generator.sources", "licence_allowlist": ["ODbL-1.0"], "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "es.catastro"], "evidence": ["osm", "es.catastro"]}), encoding="utf-8")
+    config.write_text(json.dumps({"schema": "onward_generator.sources", "licence_allowlist": ["ODbL-1.0"], "priority": ["es.pnoa_ndsm", "fr.lidar_hd", "nl.ahn", "de.nrw_ndom", "es.catastro"], "evidence": ["osm", "es.catastro"]}), encoding="utf-8")
     assert main(["source", "--config", str(config), "fetch", "es.pnoa_ndsm", "--scene", str(scene_file), "--out", str(tmp_path / "r")]) == 1
     assert "es.pnoa_ndsm: licence CC-BY-4.0 is not in licence_allowlist" in capsys.readouterr().err
     assert not (tmp_path / "r").exists()
@@ -578,3 +578,13 @@ def test_a_broken_lidar_roofs_switch_leaves_detail_freshness_to_the_base(tmp_pat
     assert output_ready("detail", root)
     os.utime(processed / "scene3d" / "scene_visual.glb", (1_000_003, 1_000_003))
     assert not output_ready("detail", root)
+
+
+def test_a_single_grid_plugin_keeps_its_sidecar_entries_and_mosaic(tmp_path: Path, scene_file: Path) -> None:
+    raw = _fetched(tmp_path, scene_file)
+    record = json.loads(lidar.sidecar_path(raw).read_text(encoding="utf-8"))
+    assert all(set(entry) == {"file", "url", "bbox", "columns", "rows", "sha256", "size_bytes"} for entry in record["tiles"])
+    assert not isinstance(PNOA, lidar.SurfaceModelHeights)
+    _record, grid = lidar.load_raster(PNOA, raw)
+    bodies = [(entry, PNOA.decode((raw / entry["file"]).read_bytes(), entry)) for entry in record["tiles"]]
+    assert lidar.join_tiles(PNOA, bodies, "x").values.tobytes() == grid.values.tobytes()

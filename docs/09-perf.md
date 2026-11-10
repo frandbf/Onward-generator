@@ -476,3 +476,15 @@ Pending (not done; the option stays off until they pass):
 - [ ] Headset (Quest 3), budget on and off on bench_madrid or another r300 map: shadow and contact-shadow quality on facades and streets acceptable, median at least 72 fps, views A and B at or under 150 draws, graphics memory at or under 1 GB, load time noted.
 
 Then the ADR-005 amendment goes from proposed to accepted, or the option is dropped.
+
+## Source plugins outside Spain and France
+
+Plan D4, [ADR-018 amendment of 9 November 2026](decisions/ADR-018-source-plugins.md#amendment--opt-in-plugins-outside-spain-and-france-plan-d4-9-november-2026), opt-in: `nl.ahn` and `de.nrw_ndom` run only with `run --source <id>` inside their coverage. Bench on the frozen inputs, Docker on an Apple M4 Pro, workshop/d4 with every option off: run `20261109T123425Z` against the baseline `20261109T120348Z` is the same apart from timings (`bench.py check`), and the four export packages are byte-identical apart from `onward_export.json`. None of the four reference maps lies in a new plugin's coverage, so this shows only that nothing else moved. A switched-on plugin changes only `height_m` overrides: no new mesh, material or collider.
+
+Pending on the headset (A2) and in Unity (A3), not done; the amendment stays proposed until they pass:
+- One r150 map per plugin (Amsterdam or Rotterdam for `nl.ahn`, Köln or Düsseldorf for `de.nrw_ndom`), built with the plugin on and off: `source normalize` counts (measured, `no_data`) and the measured heights against OSM `building:levels`, as in [04-heights.md](04-heights.md#lidar-heights). This networked run also confirms that Pillow decodes the real tiled or compressed replies of a whole map box.
+- Quest 3, each map on and off: no floating or sunken building, no parapet or roof seam where a measured height meets an estimated neighbour, at least 72 fps median on the route, at most 150 draws in views A and B.
+- `nl.ahn` in a dense block: whether the 20 m terrain fill carries a raised courtyard or a neighbouring roof into the ground (heights too low), and whether wide buildings fall back to `no_data` as intended.
+- `de.nrw_ndom`: whether trees beside facades (leaf-on surface) lift the median of narrow footprints.
+- Attribution of the dataset in the map's Workshop description.
+- After the session, move the ADR-018 D4 amendment to accepted or correct it.

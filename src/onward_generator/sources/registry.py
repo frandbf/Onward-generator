@@ -18,9 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from onward_generator.contracts import is_schema
+from onward_generator.sources.de.nrw_ndom import NrwNdomPlugin
 from onward_generator.sources.es.catastro import CatastroPlugin
 from onward_generator.sources.es.pnoa_ndsm import PnoaNdsmPlugin
 from onward_generator.sources.fr.lidar_hd import LidarHdPlugin
+from onward_generator.sources.nl.ahn import AhnPlugin
 from onward_generator.sources.plugin import OVERRIDE_KINDS, SourceError, SourcePlugin
 from onward_generator.sources.world.overture import OverturePlugin
 
@@ -30,7 +32,7 @@ SCHEMA = "onward_generator.sources"
 OSM_EVIDENCE = "osm"
 """The evidence rank of the OSM shop, amenity, office and craft POIs and of a commercial building category."""
 
-PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), OverturePlugin())
+PLUGINS: tuple[SourcePlugin, ...] = (CatastroPlugin(), PnoaNdsmPlugin(), LidarHdPlugin(), AhnPlugin(), NrwNdomPlugin(), OverturePlugin())
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,15 +105,19 @@ def check_secondary_rank(primary: Sequence[str], secondary: Sequence[str], confi
 
 @dataclass(frozen=True, slots=True)
 class SourceChoice:
-    """What ``run`` does with one plugin for one map."""
+    """What ``run`` does with one plugin for one map.
+
+    An opt-in plugin (plan D4) runs only when the map switches it on; the others run unless it switches them off.
+    """
 
     plugin: SourcePlugin
     covers: bool
     switched_off: bool
+    switched_on: bool = False
 
     @property
     def runs(self) -> bool:
-        return self.covers and not self.switched_off
+        return self.covers and not self.switched_off and (self.switched_on or not self.plugin.opt_in)
 
 
 def switch(document: Mapping[str, Any], plugin_id: str) -> bool | None:
@@ -130,18 +136,25 @@ def choices(document: Mapping[str, Any]) -> list[SourceChoice]:
     """Every registered plugin, in registry order, with its coverage of the map centre and its switch."""
     center = document["center"]
     longitude, latitude = float(center["longitude"]), float(center["latitude"])
-    return [
-        SourceChoice(plugin, plugin.covers(longitude, latitude), switch(document, plugin.id) is False)
-        for plugin in PLUGINS
-    ]
+    found = []
+    for plugin in PLUGINS:
+        stored = switch(document, plugin.id)
+        found.append(SourceChoice(plugin, plugin.covers(longitude, latitude), stored is False, stored is True))
+    return found
 
 
 def describe(found: Sequence[SourceChoice]) -> str:
-    """``sources  es.catastro  (off: …)  (not here: …)``: the line ``run`` prints."""
+    """``sources  es.catastro  (opt-in: …)  (off: …)  (not here: …)``: the line ``run`` prints.
+
+    ``opt-in`` names the covering opt-in plugins the map has not switched on (``run --source <id>``).
+    """
     running = [c.plugin.id for c in found if c.runs]
     parts = ["sources", ", ".join(running) if running else "none"]
+    pending = [c.plugin.id for c in found if c.covers and not c.switched_off and not c.runs]
     off = [c.plugin.id for c in found if c.covers and c.switched_off]
     absent = [c.plugin.id for c in found if not c.covers]
+    if pending:
+        parts.append(f"(opt-in: {', '.join(pending)})")
     if off:
         parts.append(f"(off: {', '.join(off)})")
     if absent:
