@@ -12,7 +12,7 @@ from shapely import Point
 from onward_generator.cli import main
 from onward_generator.geo.aoi import load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame
-from onward_generator.maps.workspace import MapError, create_map, source_enabled, store_sources
+from onward_generator.maps.workspace import MapError, core_budget, create_map, load_map, source_enabled, store_sources
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -276,3 +276,133 @@ def test_core_radius_refuses_a_bad_value(tmp_path: Path, core: object, message: 
         create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
                    radius_m=300, core_radius_m=core)  # type: ignore[arg-type]
     assert not (tmp_path / "m").exists()
+
+
+# The budget core (ADR-017 amendment, 7 November 2026). Without a target, map.json and export.json are the
+# documents map create wrote before the budget mode existed (checked against fix/overrides-size, a57265a).
+def _golden_map(radius: int, core: float) -> dict[str, object]:
+    return {
+        "schema": "onward_generator.map", "schema_version": "0.1.0", "id": f"golden_r{radius}", "name": f"Golden r{radius}",
+        "description": (f"Golden r{radius}: generated map centred at 37.98407, -1.12863. Generic facades; not a faithful "
+                        "reconstruction. Data: © OpenStreetMap contributors (ODbL-1.0)."),
+        "brief": "", "ambient_ai": False, "panoramax": False, "time_of_day": "day", "storm": False,
+        "center": {"latitude": 37.98407, "longitude": -1.12863}, "radius_m": float(radius), "margin_m": 30.0,
+        "core_radius_m": core, "crs": "EPSG:25830", "seed": 3789291155,
+        "paths": {"project": "config/project.json", "export": "config/export.json", "aoi": "reference/aoi.geojson",
+                  "raw": "data/raw", "processed": "data/processed"},
+    }
+
+
+@pytest.mark.parametrize(("radius", "core"), [(150, 100.0), (300, 150.0)])
+def test_without_a_target_map_json_and_export_json_are_unchanged(tmp_path: Path, radius: int, core: float) -> None:
+    root = tmp_path / f"golden_r{radius}"
+    document = create_map(root, map_id=f"golden_r{radius}", name=f"Golden r{radius}", latitude=MURCIA_CENTER_LAT,
+                          longitude=MURCIA_CENTER_LON, radius_m=radius)
+    stored = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    assert stored == document == _golden_map(radius, core)
+    assert list(stored) == list(_golden_map(radius, core))
+    build = json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]
+    assert build == {
+        "combine_cell_m": 100.0, "static_batching": False, "occlusion_culling": False, "lightmap_texels_per_m": 10.0,
+        "lightmap_max_size": 2048, "lightmap_directional": False, "fog_enabled": True, "fog_start_m": core,
+        "fog_end_m": core + 600.0, "fog_color": "#C8CDD2", "interior_light_intensity": 3.0, "interior_lights_max": 160,
+    }
+    assert core_budget(stored) is None
+
+
+@pytest.mark.parametrize(("radius", "core", "target", "cap"), [
+    (300, None, 150_000, 250.0),     # the largest half-side keeps the 50 m ring
+    (300, 120, 150_000, 120.0),      # an explicit core is the largest half-side
+    (150, None, 1000, 100.0),
+    (300, 250, 2_000_000, 250.0),
+    (100, None, 5000, 50.0),
+])
+def test_a_target_writes_the_budget_core(tmp_path: Path, radius: float, core: float | None, target: int, cap: float) -> None:
+    root = tmp_path / "m"
+    document = create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                          radius_m=radius, core_radius_m=core, core_target_triangles=target)
+    assert document["core"] == {"mode": "budget", "target_triangles": target, "max_half_side_m": cap}
+    stored = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    assert stored == document
+    assert list(stored).index("core") == list(stored).index("core_radius_m") + 1
+    # core_radius_m and the fog are written as without a target.
+    fixed = create_map(tmp_path / "f", map_id="f", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                       radius_m=radius, core_radius_m=core)
+    assert {k: v for k, v in document.items() if k not in ("core", "id")} == {k: v for k, v in fixed.items() if k != "id"}
+    assert (json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]
+            == json.loads((tmp_path / "f" / "config" / "export.json").read_text(encoding="utf-8"))["build"])
+    assert core_budget(stored) == (cap, target)
+    assert load_map(root) == stored
+
+
+@pytest.mark.parametrize(("kwargs", "message"), [
+    ({"core_target_triangles": True}, "^target_triangles must be an integer from 1000 to 2000000, got True$"),
+    ({"core_target_triangles": "150000"}, "got '150000'$"),
+    ({"core_target_triangles": 150000.0}, r"got 150000\.0$"),
+    ({"core_target_triangles": 999}, "got 999$"),
+    ({"core_target_triangles": 2_000_001}, "got 2000001$"),
+    ({"core_target_triangles": 5000, "radius_m": 90}, "^a budget core needs a playable core: core_radius_m 0, or a radius under 100 m, plays the whole map$"),
+    ({"core_target_triangles": 5000, "core_radius_m": 0}, "^a budget core needs a playable core"),
+    ({"core_target_triangles": 5000, "core_radius_m": 300}, "^a budget core needs a playable core"),
+    ({"core_target_triangles": 5000, "core_radius_m": 250.5},
+     r"^the largest core half-side must be between 50 and 250 m \(radius_m - 50\), got 250\.5$"),
+    ({"core_target_triangles": 5000, "core_radius_m": 299}, "got 299$"),
+])
+def test_a_bad_budget_core_is_refused(tmp_path: Path, kwargs: dict[str, object], message: str) -> None:
+    arguments: dict[str, object] = {"radius_m": 300, **kwargs}
+    with pytest.raises(MapError, match=message):
+        create_map(tmp_path / "m", map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, **arguments)  # type: ignore[arg-type]
+    assert not (tmp_path / "m").exists()
+
+
+@pytest.mark.parametrize(("block", "message"), [
+    ({"mode": "polygon", "target_triangles": 150000, "max_half_side_m": 250.0}, '^map.json core mode must be "budget", got \'polygon\'$'),
+    ({"mode": "budget", "target_triangles": 150000}, '^map.json "core" must be'),
+    ({"mode": "budget", "target_triangles": 150000, "max_half_side_m": 250.0, "seed": "spawns"}, '^map.json "core" must be'),
+    ("budget", '^map.json "core" must be'),
+    ({"mode": "budget", "target_triangles": 500, "max_half_side_m": 250.0}, "got 500$"),
+    ({"mode": "budget", "target_triangles": 150000, "max_half_side_m": 260.0}, r"got 260\.0$"),
+    ({"mode": "budget", "target_triangles": 150000, "max_half_side_m": 49.0}, r"got 49\.0$"),
+    ({"mode": "budget", "target_triangles": 150000, "max_half_side_m": "250"}, "got '250'$"),
+])
+def test_a_hand_edited_budget_core_is_refused_on_reading(tmp_path: Path, block: object, message: str) -> None:
+    root = tmp_path / "m"
+    create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=300,
+               core_target_triangles=150_000)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["core"] = block
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match=message):
+        load_map(root)
+    # A map without a playable core cannot keep a budget core either.
+    document["core"] = {"mode": "budget", "target_triangles": 150000, "max_half_side_m": 250.0}
+    document["core_radius_m"] = None
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match="^a budget core needs a playable core"):
+        load_map(root)
+
+
+def test_map_create_cli_stores_the_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from types import SimpleNamespace
+
+    import onward_generator.maps.__main__ as map_cli
+
+    monkeypatch.setattr(map_cli, "download_map_osm", lambda directory, overwrite=False: SimpleNamespace(
+        size_bytes=1, sha256="abc", path=str(Path(directory) / "data" / "raw" / "x.osm")))
+    monkeypatch.chdir(tmp_path)
+    assert main(["map", "create", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", "--radius-m", "300",
+                 "--core-target-triangles", "150000"]) == 0
+    stored = json.loads((tmp_path / "maps" / "lorca" / "map.json").read_text(encoding="utf-8"))
+    assert stored["core"] == {"mode": "budget", "target_triangles": 150000, "max_half_side_m": 250.0}
+    assert stored["core_radius_m"] == 150.0
+    assert main(["map", "create", "--name", "Yecla", "--lat", "38.61", "--lon", "-1.11", "--radius-m", "300"]) == 0
+    assert "core" not in json.loads((tmp_path / "maps" / "yecla" / "map.json").read_text(encoding="utf-8"))
+    assert main(["map", "create", "--name", "Jumilla", "--lat", "38.47", "--lon", "-1.32", "--radius-m", "300",
+                 "--core-target-triangles", "10"]) == 1
+    assert "map: target_triangles must be an integer from 1000 to 2000000, got 10" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        main(["map", "create", "--help"])
+    shown = " ".join(capsys.readouterr().out.split()).replace("- ", "-")
+    assert ("--core-target-triangles CORE_TARGET_TRIANGLES budget core (ADR-017 amendment): solve the core half-side for this "
+            "many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest "
+            "half-side") in shown

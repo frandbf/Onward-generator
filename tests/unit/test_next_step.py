@@ -9,11 +9,12 @@ from pathlib import Path
 import pytest
 
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
-from onward_generator.maps.workspace import create_map
+from onward_generator.maps.workspace import MapError, create_map
 from onward_generator.next_step import (
     StageCommand,
     cadastre_split_command,
     catastro_command,
+    core_budget,
     core_radius,
     detail_command,
     dress_command,
@@ -229,3 +230,31 @@ def test_signs_and_overgrow_read_the_scene_detail_built_from(tmp_path: Path, com
     assert scene_of(command(materials)) == str(split)  # type: ignore[operator]
     # The runner passes its own scene, and that one wins.
     assert scene_of(command(materials, osm)) == str(osm)  # type: ignore[operator]
+
+
+def test_detail_command_on_a_budget_map_carries_the_largest_core_and_the_target(tmp_path: Path) -> None:
+    fixed = tmp_path / "fixed"
+    create_map(fixed, map_id="fixed", name="Fixed", latitude=40.40657, longitude=-3.719187, radius_m=300)
+    scene = fixed / "data" / "processed" / "geo" / "geo_scene.json"
+    heights = fixed / "data" / "processed" / "heights" / "heights.json"
+    base = fixed / "data" / "processed" / "scene3d"
+    assert detail_command(scene, heights, base).argv == (
+        "detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+        "--out", str(fixed / "data" / "processed" / "scene_detail"), "--core-radius-m", "150",
+    )
+    assert core_budget(scene) is None
+    root = tmp_path / "madrid"
+    create_map(root, map_id="madrid", name="Madrid", latitude=40.40657, longitude=-3.719187, radius_m=300,
+               core_target_triangles=150000)
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    argv = list(detail_command(scene, heights, base).argv)
+    assert argv[-4:] == ["--core-radius-m", "250", "--core-target-triangles", "150000"]
+    assert argv.count("--core-radius-m") == 1
+    assert core_budget(scene) == (250.0, 150000)
+    assert core_radius(scene) == 150.0
+    assert core_budget(tmp_path / "elsewhere" / "geo_scene.json") is None
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["core"]["mode"] = "polygon"
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(MapError, match='core mode must be "budget"'):
+        detail_command(scene, heights, base)

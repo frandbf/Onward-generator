@@ -99,6 +99,28 @@ ADR-017. Madrid, 40.40657, −3.719187, with Catastro, on fork/main of 30 Octobe
 - With a 150 m core the map is about 209 000 triangles before the SDK prefabs and the players, against the guide's 250 000 for all of it (ADR-005). A 120 m core leaves about 82 000. Which margin a match needs is a headset question.
 - The scenic shells bake at scale 0.25: 3.4 M texels of the 34.7 M at r300.
 
+## Budget core
+
+ADR-017 amendment of 7 November 2026 (plan B1). `detail --core-radius-m M --core-target-triangles N` on the frozen inputs of the bench run `output/bench/runs/20261107T134307Z` (fix/overrides-size, a57265a), written to a scratch folder, one run per target, Docker on an Apple M4 Pro. The r500 row is a scratch map, `maps/b1_madrid_r500` (same centre as bench_madrid, `--source es.catastro`), made with `run --no-unity --core-target-triangles 250000`; its Catastro download took 15 min 55 s and succeeded the first time. "Achieved" is `counts.tiers.core.visual_triangles` of the kept run. The times are the whole `detail` command, probe and kept run. Python and GLB figures, not a headset measurement.
+
+| Map | M | N | Half-side | Predicted | Achieved | Off | Issue | `detail` s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 100 | 50 000 | 79.3 | 49 863 | 50 203 | +0.4 % | | 6.3 |
+| bench_murcia r150 | 100 | 74 590 | 99.9 | 74 590 | 74 590 | 0 | | 6.2 |
+| bench_murcia r150 | 100 | 100 000 | 100 | 74 590 | 74 590 | −25 % | `core_budget_ceiling` | 3.3 |
+| bench_madrid r300 | 250 | 120 000 | 127.2 | 119 975 | 120 287 | +0.2 % | | 35.8 |
+| bench_madrid r300 | 250 | 179 479 | 150.1 | 179 371 | 179 693 | +0.1 % | | 34.8 |
+| bench_madrid r300 | 250 | 250 000 | 176.2 | 249 987 | 250 405 | +0.2 % | | 34.9 |
+| B1 Madrid r500, Catastro (`run --no-unity`, a new map) | 450 | 250 000 | 176.2 | 250 057 | 250 405 | +0.2 % | | 98 |
+- 74 590 and 179 479 are the core triangles of the fixed 100 m and 150 m cores in that bench run; the budget core lands on 99.9 m and 150.1 m.
+- At r500 the probe details nearly all of the 5 817 buildings, those within 450 m, so `detail` takes 1 min 38 s; the kept core is the same 176.2 m as at r300 for the same target, as it should be around one centre.
+- The r500 run went on through `export`: `bounds` put the wall on the solved 176.24 m core, and the package has 360 717 core triangles (1.44 times `detail`'s), 344 458 scenic and 53 248 shared, 764 draws at 100 m, `view_draws` 260 / 509 / 605. The ring of a 500 m map costs as much as its core: the target does not bound it.
+- The fixed-core `detail` took 3.1 s (Murcia) and 11.0 s (Madrid) in the bench. The budget mode runs it twice, the first time at the largest core, so Madrid's `detail` goes from 11 s to about 35 s.
+- What N does not count: in that bench run the exported core is 125 052 triangles for 74 590 in `detail` on Murcia (1.68), and 270 361 for 179 479 on Madrid (1.51); the scenic ring adds 18 448 and 108 602. Dress, overgrow, signs, the ground and the SDK prefabs make the difference. To aim at the plan's 220 000 in Unity, N is about (220 000 − ring) / ratio; for Madrid r300, about 74 000.
+- Synthetic grids (`tests/integration/test_core_budget.py`, half the triangles of the largest core as N): r150 +2.0 %, r300 −1.3 %, r500 +1.5 %. The first model, one interior reserve for the whole map, missed r150 by 33 %: buildings across the edge lose their interiors.
+
+Pending on the headset (A2), not measured: Unity `scene_report.json` triangles against N, draws in the fixed views A and B (at most 150), median fps on the route (at least 72), and how the ring reads through the fog, which still starts at `core_radius_m`, not at the solved wall.
+
 ## Hunt with bots on a small map
 
 Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.

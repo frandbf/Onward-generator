@@ -116,6 +116,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         sources=sources,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         core_radius_m=args.core_radius_m,
+        core_target_triangles=args.core_target_triangles,
         overwrite=args.overwrite,
         start=args.start,
         host=host,
@@ -236,6 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--storm", action=argparse.BooleanOptionalAction, default=None, help="night maps only: lightning and thunder (default: what map.json has, else none; ADR-028)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     run.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
+    run.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(

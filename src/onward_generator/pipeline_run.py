@@ -21,6 +21,7 @@ from pathlib import Path
 
 from onward_generator.maps.workspace import (
     MapError,
+    core_budget,
     load_map,
     map_directory,
     map_storm,
@@ -94,6 +95,7 @@ def map_create_argv(
     storm: bool = False,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float | None = None,
+    core_target_triangles: int | None = None,
     overwrite: bool = False,
 ) -> list[str]:
     argv = [
@@ -105,6 +107,7 @@ def map_create_argv(
         "--margin-m", str(margin_m),
         "--lightmap-texels-per-m", str(lightmap_texels_per_m),
         *(("--core-radius-m", str(core_radius_m)) if core_radius_m is not None else ()),
+        *(("--core-target-triangles", str(core_target_triangles)) if core_target_triangles is not None else ()),
     ]
     if seed is not None:
         argv.extend(["--seed", str(seed)])
@@ -767,6 +770,7 @@ def run_map(
     sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float | None = None,
+    core_target_triangles: int | None = None,
     overwrite: bool = False,
     start: str | None = None,
     execute: Execute | None = None,
@@ -851,6 +855,7 @@ def run_map(
                     storm=bool(storm),
                     lightmap_texels_per_m=lightmap_texels_per_m,
                     core_radius_m=core_radius_m,
+                    core_target_triangles=core_target_triangles,
                     overwrite=overwrite,
                 ),
             )],
@@ -874,6 +879,8 @@ def run_map(
         header(root)
         try:
             _same_request(root, map_id, latitude, longitude, radius_m, margin_m)
+            if core_target_triangles is not None:
+                _same_core_target(root, core_target_triangles)
             if brief is not None or ambient_ai:
                 store_brief(root, brief, ambient_ai=True if ambient_ai else None)
             if panoramax:
@@ -1113,6 +1120,20 @@ def _same_request(root: Path, map_id: str, latitude: float, longitude: float, ra
         raise PipelineError(
             f"{root} already records {', '.join(mismatches)}. "
             "Use the same centre, radius and margin, or another name."
+        )
+
+
+def _same_core_target(root: Path, target: int) -> None:
+    """Refuse ``--core-target-triangles`` on a map that records another one: the budget core is set at map create.
+
+    Called after ``_same_request``, which has already read and checked ``map.json``.
+    """
+    recorded = core_budget(load_map(root))
+    if recorded is None or recorded[1] != target:
+        has = f"core target {recorded[1]}" if recorded else "no core target"
+        raise PipelineError(
+            f"{root} already records {has}. The budget core is set at map create: "
+            "drop --core-target-triangles, or use another name."
         )
 
 

@@ -595,6 +595,33 @@ def _ready_map(tmp_path):
     return root
 
 
+def _run_existing(root: Path, target: int) -> int:
+    return run_map(
+        map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+        radius_m=400, margin_m=30, out=str(root), core_target_triangles=target,
+        push=lambda _path: 0, build=lambda _path, _steps: 0,
+    )
+
+
+def test_a_core_target_on_a_map_without_one_is_refused(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _ready_map(tmp_path)
+    before = (root / "map.json").read_bytes()
+    assert _run_existing(root, 150_000) == 1
+    out = capsys.readouterr().out
+    assert "FAILED plan" in out and "already records no core target. The budget core is set at map create: drop --core-target-triangles, or use another name.\n" in out
+    assert (root / "map.json").read_bytes() == before
+
+
+def test_another_core_target_is_refused_and_the_same_one_runs(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+               radius_m=400, core_target_triangles=150_000)
+    _finish_python_stages(root)
+    assert _run_existing(root, 120_000) == 1
+    assert "already records core target 150000" in capsys.readouterr().out
+    assert "FAILED plan" not in (_run_existing(root, 150_000), capsys.readouterr().out)[1]
+
+
 def test_a_yes_uploads_the_built_package(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _ready_map(tmp_path)
     package = root / "data" / "processed" / "export" / "pkg_01"
@@ -1577,6 +1604,55 @@ def test_run_stores_the_playable_core_through_map_create(tmp_path: Path, monkeyp
     run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
             radius_m=300, margin_m=30, out="maps/murcia", execute=execute, interactive=False, palette=Palette())
     assert "--core-radius-m" not in seen[0]
+
+
+def test_run_passes_the_core_target_only_when_given(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    seen: list[list[str]] = []
+
+    def execute(argv: list[str]) -> int:
+        seen.append(list(argv))
+        return 4
+
+    run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+            radius_m=300, margin_m=30, core_target_triangles=150000, out="maps/murcia", execute=execute, interactive=False,
+            palette=Palette())
+    create = seen[0]
+    assert create[create.index("--core-target-triangles") + 1] == "150000"
+    assert "--core-radius-m" not in create
+    plain = map_create_argv(name="M", latitude=1.0, longitude=2.0, radius_m=300, margin_m=30)
+    assert "--core-target-triangles" not in plain
+    assert map_create_argv(name="M", latitude=1.0, longitude=2.0, radius_m=300, margin_m=30, core_target_triangles=5000) == [
+        *plain[:plain.index("--lightmap-texels-per-m") + 2], "--core-target-triangles", "5000"]
+
+
+def test_run_command_passes_the_core_target(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: dict[str, object] = {}
+
+    def fake_run_map(**kwargs: object) -> int:
+        received.update(kwargs)
+        return 0
+
+    monkeypatch.setattr("onward_generator.pipeline_run.run_map", fake_run_map)
+    args = ["run", "--name", "Madrid", "--lat", "40.40657", "--lon", "-3.719187"]
+    assert main(args) == 0
+    assert received["core_target_triangles"] is None
+    assert main([*args, "--core-target-triangles", "150000"]) == 0
+    assert received["core_target_triangles"] == 150000
+    subparsers = next(action for action in build_parser()._actions if isinstance(action, argparse._SubParsersAction))
+    action = {a.dest: a for a in subparsers.choices["run"]._actions}["core_target_triangles"]
+    assert action.type is int and action.default is None
+    assert action.help == ("budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, "
+                           "1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
+
+
+def test_plan_steps_carry_the_budget_core_to_detail(tmp_path: Path) -> None:
+    root = tmp_path / "madrid"
+    create_map(root, map_id="madrid", name="Madrid", latitude=40.40657, longitude=-3.719187, radius_m=300,
+               core_target_triangles=150000)
+    detail = dict(plan_steps(root))["detail"]
+    assert detail[detail.index("--core-radius-m") + 1] == "250"
+    assert detail[detail.index("--core-target-triangles") + 1] == "150000"
 
 
 def test_run_and_detail_help_describe_the_core() -> None:

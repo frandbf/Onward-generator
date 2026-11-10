@@ -24,7 +24,7 @@ from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_f
 from onward_generator.io import atomic_write_json
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.sources.registry import choices, plugin_by_id
-from onward_generator.tiers import MIN_CORE_HALF_SIDE_M
+from onward_generator.tiers import CORE_BUDGET_MODE, MIN_CORE_HALF_SIDE_M, CoreError, check_target
 
 MAP_SCHEMA = "onward_generator.map"
 MAP_VERSION = "0.1.0"
@@ -73,10 +73,15 @@ def create_map(
     storm: bool = False,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
     core_radius_m: float | None = None,
+    core_target_triangles: int | None = None,
     overwrite: bool = False,
     texture_provider: Provider | None = None,
 ) -> dict[str, Any]:
-    """Write ``map.json``, configs and a metric AOI. The CLI then fetches OSM."""
+    """Write ``map.json``, configs and a metric AOI. The CLI then fetches OSM.
+
+    ``core_target_triangles`` turns on the budget core (ADR-017 amendment): ``map.json`` then gets
+    ``core: {mode: "budget", target_triangles, max_half_side_m}``, the largest half-side being
+    ``core_radius_m`` when given and ``radius_m - CORE_RING_DEFAULT_M`` otherwise."""
     root = Path(directory).expanduser().resolve()
     map_id = _map_id(map_id)
     title = _title(name)
@@ -87,6 +92,7 @@ def create_map(
     brief = _brief(brief)
     texels = _texels(lightmap_texels_per_m)
     core = _core(core_radius_m, radius_m)
+    budget = _core_budget(core_target_triangles, core_radius_m, core, radius_m)
     _guard_directory(root, overwrite=overwrite)
 
     try:
@@ -136,6 +142,7 @@ def create_map(
         "radius_m": radius_m,
         "margin_m": margin_m,
         "core_radius_m": core,
+        **({"core": budget} if budget is not None else {}),
         "crs": frame.crs,
         "seed": seed,
         "paths": {
@@ -231,7 +238,27 @@ def load_map(directory: str | Path) -> dict[str, Any]:
     document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict) or not is_schema(document.get("schema"), MAP_SCHEMA):
         raise MapError(f"{path} is not a {MAP_SCHEMA} document")
+    core_budget(document)
     return document
+
+
+def core_budget(document: Mapping[str, Any]) -> tuple[float, int] | None:
+    """``(max_half_side_m, target_triangles)`` of a budget core in ``map.json``, or None without the ``core`` key.
+
+    The block is checked again on reading: a hand-edited mode, target or largest half-side is refused.
+    """
+    block = document.get("core")
+    if block is None:
+        return None
+    if not isinstance(block, dict) or set(block) != {"mode", "target_triangles", "max_half_side_m"}:
+        raise MapError('map.json "core" must be {"mode": "budget", "target_triangles": <int>, "max_half_side_m": <metres>}')
+    if block["mode"] != CORE_BUDGET_MODE:
+        raise MapError(f'map.json core mode must be "{CORE_BUDGET_MODE}", got {block["mode"]!r}')
+    radius = float(document["radius_m"])
+    core = document.get("core_radius_m")
+    checked = _core_budget(block["target_triangles"], block["max_half_side_m"], float(core) if core else None, radius)
+    assert checked is not None  # the target is set, so the block is built or refused
+    return float(checked["max_half_side_m"]), int(checked["target_triangles"])
 
 
 def _square_ring(frame: LocalFrame, radius_m: float) -> list[list[float]]:
@@ -356,6 +383,27 @@ def _core(core_radius_m: float | None, radius_m: float) -> float | None:
     if not MIN_CORE_HALF_SIDE_M <= core_radius_m:
         raise MapError(f"core_radius_m must be 0 or at least {MIN_CORE_HALF_SIDE_M:g}")
     return float(core_radius_m)
+
+
+def _core_budget(target: object, core_radius_m: object, core: float | None, radius_m: float) -> dict[str, Any] | None:
+    """The ``map.json`` ``core`` block of a budget core, or None without a target.
+
+    ``core`` is the stored ``core_radius_m``: a map without a playable core has nothing to solve. The largest
+    half-side is ``core_radius_m`` when given, else ``radius_m - CORE_RING_DEFAULT_M``, and keeps the ring.
+    """
+    if target is None:
+        return None
+    try:
+        target = check_target(target)
+    except CoreError as exc:
+        raise MapError(str(exc)) from exc
+    if core is None:
+        raise MapError("a budget core needs a playable core: core_radius_m 0, or a radius under 100 m, plays the whole map")
+    cap = radius_m - CORE_RING_DEFAULT_M if core_radius_m is None else core_radius_m
+    if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not MIN_CORE_HALF_SIDE_M <= cap <= radius_m - CORE_RING_DEFAULT_M:
+        raise MapError(f"the largest core half-side must be between {MIN_CORE_HALF_SIDE_M:g} and {radius_m - CORE_RING_DEFAULT_M:g} m "
+                       f"(radius_m - {CORE_RING_DEFAULT_M:g}), got {cap!r}")
+    return {"mode": CORE_BUDGET_MODE, "target_triangles": target, "max_half_side_m": float(cap)}
 
 
 def _texels(value: float) -> float:
