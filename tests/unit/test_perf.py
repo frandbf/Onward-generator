@@ -16,7 +16,7 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb
 from onward_generator.generation.mesh import box
 from onward_generator.perf.__main__ import main as perf_main
 from onward_generator.perf.device import drawcall_trace, load_times, summarize_csv
-from onward_generator.perf.measure import combine_groups, measure_glb, png_size, texture_bytes, texture_memory
+from onward_generator.perf.measure import combine_groups, furniture_building, measure_glb, png_size, texture_bytes, texture_memory
 
 MATERIALS = {"a": Material((0.5, 0.5, 0.5, 1.0), 0.9), "b": Material((0.8, 0.2, 0.2, 1.0), 0.9)}
 
@@ -60,6 +60,25 @@ def test_combine_groups_merges_per_cell_and_material(small_glb: Path) -> None:
     coarse = combine_groups(small_glb, 1000.0)
     assert coarse["cells"] == 1 and coarse["draws"] == 2  # one draw per material
     assert coarse["max_group_triangles"] == 3 * 12
+
+
+def test_furniture_is_combined_per_building_and_storey_not_per_cell(tmp_path: Path) -> None:
+    """As the adapter: furnish/<building>/<n> nodes group by (building, storey, material), lit by their rooms' probes."""
+    piece = box(0, 1, 0, 0.5, 0, 1.5)
+    nodes = [
+        Node("furnish/osm-way-1/0", (Primitive(piece, "a"),)),
+        Node("furnish/osm-way-1/1", (Primitive(box(5, 6, 0, 0.5, 0, 1.5), "a"),)),          # same building, storey, material
+        Node("furnish/osm-way-1/2", (Primitive(box(5, 6, 0, 0.5, 2.8, 4.3), "a"),)),        # the floor above
+        Node("furnish/osm-way-2/0", (Primitive(box(8, 9, 0, 0.5, 0, 1.5), "a"),)),          # another building, same cell
+        Node("furnish/collider/osm-way-2/0", (Primitive(box(8, 9, 0, 0.5, 0, 1.5), "a"),)),  # not a furniture node: the cell
+        Node("prop/barrel", (Primitive(box(2, 3, 0, 1, 0, 1), "a"),)),                       # a street prop in the same cell
+    ]
+    path = tmp_path / "furniture.glb"
+    path.write_bytes(build_glb(nodes, MATERIALS))
+    groups = combine_groups(path, 100.0)
+    assert groups["draws"] == 4 and groups["primitives_merged"] == 6
+    assert furniture_building("furnish/osm-way-7/3") == "osm-way-7"
+    assert furniture_building("furnish/collider/osm-way-7/3") is None and furniture_building("prop/x") is None
 
 
 @pytest.mark.parametrize("cell", [0.0, -5.0, float("nan")])

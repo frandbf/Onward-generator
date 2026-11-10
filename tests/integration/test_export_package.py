@@ -711,7 +711,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     # They stay in the bake to cast its shadows; only the horizon backdrop leaves GI.
     assert "renderer.receiveGI = ReceiveGI.LightProbes;" in source
     # A combined probe-lit renderer would sample one probe for a whole 100 m cell: it takes the ambient light.
-    assert "renderer.lightProbeUsage = LightProbeUsage.Off;" in source
+    # Furniture is combined per building and storey instead, inside its rooms, and blends their probes (ADR-031).
+    assert "renderer.lightProbeUsage = furnitureMeshes.Contains(name) ? LightProbeUsage.BlendProbes : LightProbeUsage.Off;" in source
+    assert 'nodeName.StartsWith("furnish/", StringComparison.Ordinal) && nodeName.Split(\'/\').Length == 3' in source
+    assert "cx = FurnitureCellBase - index;" in source and "private const float FurnitureStoreyM = 2.5f;" in source
     assert "if (mats.Any(m => !CastsBakedShadow(m))) flags &= ~StaticEditorFlags.ContributeGI;" in source
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source

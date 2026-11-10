@@ -142,8 +142,14 @@ def _corner(token: str, nv: int, nt: int, nn: int) -> tuple[int, int | None, int
     return v, index(fields[1], nt) if len(fields) > 1 else None, index(fields[2], nn) if len(fields) > 2 else None
 
 
+MAX_TEXTURE_PX = 512
+
+
 def _png(data: bytes) -> bytes:
+    """The albedo as an RGB PNG, at most ``MAX_TEXTURE_PX`` on its long side."""
     picture = Image.open(io.BytesIO(data)).convert("RGB")
+    if max(picture.size) > MAX_TEXTURE_PX:
+        picture.thumbnail((MAX_TEXTURE_PX, MAX_TEXTURE_PX), Image.Resampling.LANCZOS)
     out = io.BytesIO()
     picture.save(out, format="PNG", optimize=True)
     return out.getvalue()

@@ -9,6 +9,7 @@ gitignored: the files stay on the user's machine, as the Unity Asset Store EULA 
 from __future__ import annotations
 
 import datetime
+import io
 import json
 import shutil
 import subprocess
@@ -19,11 +20,12 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from PIL import Image
 
 from onward_generator.assetstore.classify import classify
 from onward_generator.assetstore.objglb import ObjError, obj_to_glb
 from onward_generator.assetstore.packages import LICENCE_NAME, Package, PackageError, unpack
-from onward_generator.generation.gltf import scene_primitives
+from onward_generator.generation.gltf import read_glb, scene_primitives
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.overgrow.library_catalog import LibraryError
 from onward_generator.overgrow.manifest import check_manifest
@@ -35,6 +37,8 @@ DEFAULT_EXPORT = REPO_ROOT / "cache" / "asset_store" / "export"
 DEFAULT_MAX_TRIANGLES = 8000
 DEFAULT_MAX_MB = 400.0
 CENTIMETRE_SUSPECT_M = 0.05
+FLAT_STD = 2.0
+BLANK_MEAN = 225.0
 SEMANTICS = {
     "origin": "estimated",
     "basis": "written by onward_generator.assetstore from each model name, package category and bounding box; no person reviewed a rendered view",
@@ -108,6 +112,22 @@ def _size(data: bytes) -> tuple[int, float, float, float]:
     return sum(p.mesh.triangle_count for p in primitives), length, depth, height
 
 
+def blank_albedo(data: bytes) -> bool:
+    """Whether every material of a GLB is one near-white colour: a model whose texture was lost reads as a blank shape."""
+    doc, blob = read_glb(data)
+    images = doc.get("images") or []
+    if not images:
+        return True
+    for image in images:
+        view = doc["bufferViews"][image["bufferView"]]
+        start = int(view.get("byteOffset", 0))
+        pixels = np.asarray(Image.open(io.BytesIO(blob[start:start + int(view["byteLength"])])).convert("RGB"), dtype=np.float32)
+        flat = pixels.reshape(-1, 3)
+        if float(flat.std(axis=0).max()) >= FLAT_STD or float(flat.mean()) < BLANK_MEAN:
+            return False
+    return True
+
+
 def unit_factor(items: Sequence[dict[str, Any]]) -> float:
     """100 when every exported model of a package is under ``CENTIMETRE_SUSPECT_M`` on its longest side, else 1.
 
@@ -143,16 +163,20 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
         except (OSError, ObjError, ValueError) as exc:
             result.skipped[f"convert: {type(exc).__name__}"] += 1
             continue
+        if blank_albedo(data):
+            result.skipped["untextured_white"] += 1
+            continue
         triangles, length, depth, height = _size(data)
         decision = classify(stem, (length, depth, height), triangles, package.name, package.category)
         if decision.row is None:
             result.skipped[decision.reason] += 1
             continue
         seen.add(asset_id)
+        turn = {"yaw_deg": 90} if decision.row["placement"] != "interior" and depth > 1.2 * length else {}
         target.mkdir(parents=True, exist_ok=True)
         atomic_write_bytes(target / f"{stem}.glb", data)
         rows.append({"id": asset_id, "file": f"{stem}.glb", **decision.row, "triangles": triangles, "length_m": length,
-                     "depth_m": depth, "height_m": height, "collider": "none", "license": "LicenseRef-Unity-Asset-Store-EULA",
+                     "depth_m": depth, "height_m": height, **turn, "collider": "none", "license": "LicenseRef-Unity-Asset-Store-EULA",
                      "source_prefab": str(item.get("prefab", ""))})
     result.rows = len(rows)
     if not rows:

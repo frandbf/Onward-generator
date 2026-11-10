@@ -33,6 +33,15 @@ The project is public. Each user has a Unity account with their own Asset Store 
 6. **Furnishing takes them when they are there.** `load_detail_config` adds hinted rows to the enabled furnishing sets (`with_local_furnishing`). It adds at most two per set slot, lightest first (four pushed Madrid r200 from 34 triangle-budget refusals to 35 `asset_cap` ones), so the distinct rows stay near `max_assets`. Each row passes the same checks as the shared rows.
 7. **Reproducible output.** `ONWARD_LOCAL_CATALOGUES=0` hides every local catalogue from the library and from furnishing. The test suite sets it, so tests give the same result on every machine. Each placed piece records its catalogue, its GLB SHA-256 and its licence.
 
+## Amendment (10 November 2026): textures read on the CPU
+
+The first conversion lost every texture: the headset showed white and pale-blue cars, barriers and furniture. The exporter drew each texture through the GPU (`Graphics.Blit`), and batch mode runs with `-nographics`, where that returns a blank grey (205, 205, 205), so all 1 395 models came out flat. URP and HDRP packs had a second fault: their shaders do not exist in the Built-in export project, so `HasProperty` and `GetTexture` found nothing. The exporter now:
+
+- reads the textures and colours from the material's saved properties (`m_SavedProperties`), which the `.mat` keeps whatever its shader;
+- makes the texture importer readable, uncompressed, sRGB and at most 1024 px, then reads the pixels on the CPU (`GetPixels32`).
+
+Python scales the albedo to 512 px at most. Outdoor rows with their long side on the file's Z get `yaw_deg: 90`.
+
 ## Consequences
 
 - Two users with different packs get different furniture and props on the same map. The map records which local rows it used.

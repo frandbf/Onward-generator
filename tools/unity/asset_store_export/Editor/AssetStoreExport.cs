@@ -19,8 +19,7 @@ using UnityEngine;
 
 public static class AssetStoreExport
 {
-    const int TexturePx = 512;
-    static readonly string[] AlbedoNames = { "_BaseMap", "_BaseColorMap", "_MainTex", "_Albedo", "_AlbedoMap", "_Diffuse" };
+    static readonly string[] AlbedoNames = { "_BaseMap", "_BaseColorMap", "_MainTex", "_Albedo", "_AlbedoMap", "_Diffuse", "_MainTexture", "_BaseTexture", "_ColorMap", "_Texture", "_BaseColorTexture" };
     static readonly string[] ColourNames = { "_BaseColor", "_Color", "_AlbedoColor" };
 
     [Serializable] class Item { public string prefab; public string file; public int triangles; public float[] size; public string status; public string[] materials; }
@@ -195,39 +194,92 @@ public static class AssetStoreExport
         if (written.TryGetValue(mat, out var known)) return known;
         string name = Safe(stem + "_" + mat.name);
         written[mat] = name;
-        Color colour = Color.white;
-        foreach (var c in ColourNames) if (mat.HasProperty(c)) { colour = mat.GetColor(c); break; }
-        Texture tex = null; Vector2 scale = Vector2.one, offset = Vector2.zero;
-        foreach (var t in AlbedoNames)
-            if (mat.HasProperty(t) && mat.GetTexture(t) != null) { tex = mat.GetTexture(t); scale = mat.GetTextureScale(t); offset = mat.GetTextureOffset(t); break; }
+        // The saved properties, not the shader's: a URP or HDRP material in this Built-in project has no shader,
+        // so HasProperty and GetTexture find nothing, but the .mat still names its textures and colours.
+        Color colour = SavedColour(mat);
+        var (tex, scale, offset) = SavedAlbedo(mat);
+        byte[] png = tex != null ? Readable(tex, colour) : null;
         var lin = colour.linear;
         mtl.AppendFormat(CultureInfo.InvariantCulture, "newmtl {0}\nKd {1} {2} {3}\n", name, lin.r, lin.g, lin.b);
-        if (tex != null)
+        if (png != null)
         {
-            string png = name + ".png";
-            File.WriteAllBytes(Path.Combine(target, png), Readable(tex, colour));
-            mtl.AppendFormat(CultureInfo.InvariantCulture, "map_Kd -s {0} {1} 1 -o {2} {3} 0 {4}\n", scale.x, scale.y, offset.x, offset.y, png);
+            string file = name + ".png";
+            File.WriteAllBytes(Path.Combine(target, file), png);
+            mtl.AppendFormat(CultureInfo.InvariantCulture, "map_Kd -s {0} {1} 1 -o {2} {3} 0 {4}\n", scale.x, scale.y, offset.x, offset.y, file);
         }
         return name;
     }
 
-    // Any texture, readable or not, compressed or not: blit it at most TexturePx wide and read it back, tinted by the
-    // material colour (the albedo the shader would show: _BaseColor x _BaseMap).
+    static readonly string[] NotAlbedo = { "normal", "bump", "mask", "metal", "rough", "smooth", "occlusion", "ao", "emiss", "height",
+                                           "parallax", "detail", "spec", "gloss", "light", "cube", "noise", "curv", "thick", "flow" };
+
+    static IEnumerable<(string name, SerializedProperty value)> Saved(Material mat, string list)
+    {
+        var array = new SerializedObject(mat).FindProperty("m_SavedProperties." + list);
+        if (array == null) yield break;
+        for (int i = 0; i < array.arraySize; i++)
+        {
+            var pair = array.GetArrayElementAtIndex(i);
+            yield return (pair.FindPropertyRelative("first").stringValue, pair.FindPropertyRelative("second"));
+        }
+    }
+
+    static Color SavedColour(Material mat)
+    {
+        var colours = Saved(mat, "m_Colors").ToList();
+        foreach (var wanted in ColourNames)
+            foreach (var (name, value) in colours)
+                if (name == wanted) return value.colorValue;
+        return Color.white;
+    }
+
+    // The base colour texture: a known property name first, then any texture whose name reads like an albedo.
+    static (Texture, Vector2, Vector2) SavedAlbedo(Material mat)
+    {
+        var textures = Saved(mat, "m_TexEnvs")
+            .Select(p => (p.name, tex: p.value.FindPropertyRelative("m_Texture").objectReferenceValue as Texture,
+                          scale: p.value.FindPropertyRelative("m_Scale").vector2Value, offset: p.value.FindPropertyRelative("m_Offset").vector2Value))
+            .Where(p => p.tex != null).ToList();
+        foreach (var wanted in AlbedoNames)
+            foreach (var p in textures)
+                if (p.name == wanted) return (p.tex, p.scale, p.offset);
+        foreach (var p in textures)
+        {
+            string lower = p.name.ToLowerInvariant();
+            if ((lower.Contains("albedo") || lower.Contains("base") || lower.Contains("main") || lower.Contains("diffuse") || lower.Contains("color") || lower.Contains("colour"))
+                && !NotAlbedo.Any(lower.Contains))
+                return (p.tex, p.scale, p.offset);
+        }
+        return (null, Vector2.one, Vector2.zero);
+    }
+
+    // Read the texture on the CPU (batch mode runs with -nographics, where a GPU blit returns a blank grey): make its
+    // importer readable, uncompressed, sRGB and at most 1024 px, reimport, and read the pixels, tinted by the material
+    // colour (the albedo the shader shows: _BaseColor x _BaseMap). Null when the texture cannot be read.
     static byte[] Readable(Texture tex, Color tint)
     {
-        float k = Mathf.Min(1f, TexturePx / (float)Mathf.Max(tex.width, tex.height));
-        int w = Mathf.Max(1, Mathf.RoundToInt(tex.width * k)), h = Mathf.Max(1, Mathf.RoundToInt(tex.height * k));
-        var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-        Graphics.Blit(tex, rt);
-        var previous = RenderTexture.active;
-        RenderTexture.active = rt;
-        var copy = new Texture2D(w, h, TextureFormat.RGB24, false);
-        copy.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-        RenderTexture.active = previous;
-        RenderTexture.ReleaseTemporary(rt);
-        var px = copy.GetPixels();
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(px[i].r * tint.r, px[i].g * tint.g, px[i].b * tint.b, 1f);
-        copy.SetPixels(px);
+        string path = AssetDatabase.GetAssetPath(tex);
+        if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+        {
+            bool dirty = false;
+            if (!importer.isReadable) { importer.isReadable = true; dirty = true; }
+            if (importer.textureCompression != TextureImporterCompression.Uncompressed) { importer.textureCompression = TextureImporterCompression.Uncompressed; dirty = true; }
+            if (importer.textureType != TextureImporterType.Default) { importer.textureType = TextureImporterType.Default; dirty = true; }
+            if (!importer.sRGBTexture) { importer.sRGBTexture = true; dirty = true; }
+            if (importer.maxTextureSize > 1024) { importer.maxTextureSize = 1024; dirty = true; }
+            if (dirty) importer.SaveAndReimport();
+            tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path) ?? tex;
+        }
+        if (!(tex is Texture2D source) || !source.isReadable) return null;
+        Color32[] pixels;
+        try { pixels = source.GetPixels32(); }
+        catch (Exception) { return null; }
+        var copy = new Texture2D(source.width, source.height, TextureFormat.RGB24, false);
+        var tinted = new Color32[pixels.Length];
+        for (int i = 0; i < pixels.Length; i++)
+            tinted[i] = new Color32((byte)(pixels[i].r * tint.r), (byte)(pixels[i].g * tint.g), (byte)(pixels[i].b * tint.b), 255);
+        copy.SetPixels32(tinted);
+        copy.Apply();
         var bytes = copy.EncodeToPNG();
         UnityEngine.Object.DestroyImmediate(copy);
         return bytes;

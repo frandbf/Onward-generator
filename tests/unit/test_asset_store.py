@@ -14,7 +14,7 @@ from PIL import Image
 
 from onward_generator.assetstore import local
 from onward_generator.assetstore.classify import classify, words_of
-from onward_generator.assetstore.importer import build_catalogue, unit_factor
+from onward_generator.assetstore.importer import blank_albedo, build_catalogue, unit_factor
 from onward_generator.assetstore.objglb import ObjError, obj_to_glb, parse_mtl, parse_obj
 from onward_generator.assetstore.packages import Package, find_packages, slug, unpack
 from onward_generator.detail.config import load_detail_config, with_local_furnishing
@@ -157,6 +157,15 @@ def test_furnish_hints_name_the_slot_the_sets_and_the_floors() -> None:
     assert words_of("SM_KitchenCabinet02_Blue") == ["sm", "kitchen", "cabinet", "blue"]
 
 
+def test_a_blank_white_model_is_refused_and_a_coloured_one_kept(tmp_path: Path) -> None:
+    quad = "v 0 0 0\nv 1 0 0\nv 1 1 0\nusemtl m\nf 1 2 3\n"
+    assert blank_albedo(obj_to_glb(quad, "newmtl m\nKd 1 1 1\n", "white"))
+    assert not blank_albedo(obj_to_glb(quad, "newmtl m\nKd 0.8 0.1 0.1\n", "red"))
+    Image.fromarray(np.tile(np.array([[0, 255]], dtype=np.uint8), (8, 4)).astype(np.uint8)).convert("RGB").save(tmp_path / "t.png")
+    assert not blank_albedo(obj_to_glb("v 0 0 0\nv 1 0 0\nv 1 1 0\nvt 0 0\nvt 1 0\nvt 1 1\nusemtl t\nf 1/1 2/2 3/3\n",
+                                       "newmtl t\nKd 1 1 1\nmap_Kd t.png\n", "textured", tmp_path))
+
+
 def test_unit_factor_fixes_a_centimetre_package_only() -> None:
     tiny = [{"status": "exported", "size": [0.003, 0.006, 0.003]}, {"status": "exported", "size": [0.01, 0.008, 0.005]}]
     assert unit_factor(tiny) == 100.0
@@ -169,7 +178,7 @@ def test_unit_factor_fixes_a_centimetre_package_only() -> None:
 def _export(tmp_path: Path) -> tuple[Package, Path]:
     exported = tmp_path / "export" / "shop_props"
     exported.mkdir(parents=True)
-    quad = "v -0.5 0 -0.2\nv 0.5 0 -0.2\nv 0.5 1.6 -0.2\nv -0.5 1.6 -0.2\nv -0.5 0 0.2\nv 0.5 0 0.2\nf 1 2 3 4\nf 5 6 2 1\n"
+    quad = "v -0.5 0 -0.2\nv 0.5 0 -0.2\nv 0.5 1.6 -0.2\nv -0.5 1.6 -0.2\nv -0.5 0 0.2\nv 0.5 0 0.2\nusemtl m\nf 1 2 3 4\nf 5 6 2 1\n"
     for stem in ("Shelf_Tall", "Mystery_Thing", "SM_Wall_Plain"):
         (exported / f"{stem}.obj").write_text(quad, encoding="utf-8")
         (exported / f"{stem}.mtl").write_text("newmtl m\nKd 0.5 0.5 0.5\n", encoding="utf-8")

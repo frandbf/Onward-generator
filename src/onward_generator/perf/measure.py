@@ -141,8 +141,18 @@ def _node_centre(node: dict[str, Any], mesh: dict[str, Any], accessors: list[dic
     return tuple(m[r] * c[0] + m[4 + r] * c[1] + m[8 + r] * c[2] + m[12 + r] for r in range(3))  # type: ignore[return-value]
 
 
+FURNITURE_CELL_BASE = -1_000_000
+FURNITURE_STOREY_M = 2.5
+
+
+def furniture_building(node_name: str) -> str | None:
+    """The building of a furniture node (``furnish/<building>/<n>``, ADR-031/034), else ``None``."""
+    parts = node_name.split("/")
+    return parts[1] if len(parts) == 3 and parts[0] == "furnish" else None
+
+
 def combine_groups(path: str | Path, cell_m: float) -> dict[str, Any]:
-    """Visual draws left if primitives are merged per (ground cell, material).
+    """Visual draws left if primitives are merged per (ground cell, material), furniture per (building, storey, material).
 
     Cells are squares of ``cell_m`` metres on the glTF ground plane (x, z = east,
     -north); a node goes to the cell holding its bounds centre. This predicts the
@@ -154,10 +164,16 @@ def combine_groups(path: str | Path, cell_m: float) -> dict[str, Any]:
     accessors, meshes = doc.get("accessors", []), doc.get("meshes", [])
     groups: Counter[tuple[int, int, int]] = Counter()
     tris: Counter[tuple[int, int, int]] = Counter()
+    furniture: dict[str, int] = {}
     for node in (n for n in doc.get("nodes", []) if "mesh" in n):
         mesh = meshes[node["mesh"]]
-        x, _, z = _node_centre(node, mesh, accessors)
+        x, y, z = _node_centre(node, mesh, accessors)
         cell = (int(x // cell_m), int(z // cell_m))
+        building = furniture_building(str(node.get("name", "")))
+        if building is not None:
+            # As the adapter: interior furniture is combined per building and storey, lit by its rooms' probes.
+            index = furniture.setdefault(building, len(furniture))
+            cell = (FURNITURE_CELL_BASE - index, int(y // FURNITURE_STOREY_M))
         for prim in mesh["primitives"]:
             key = (cell[0], cell[1], prim.get("material", -1))
             groups[key] += 1
