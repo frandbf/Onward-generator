@@ -252,9 +252,9 @@ def test_a_courtyard_shop_has_walls_round_the_hole_and_a_see_through_courtyard_w
     assert len(room.polygon.interiors) == 1
     assert pierce_room_windows(layout, [SEG, YARD], plan.ground, COURTYARD, T, 2.8, plan.hosts) == (2, 0)
     built = build_interior(plan, 3.0, COURTYARD, CFG, room_window_cuts(layout, [SEG, YARD]), glass_penetrations(layout, [SEG, YARD]))
-    # The courtyard window keeps its pane; the shopfront is frameless shop glass with no pane.
+    # The courtyard window and the frameless shop glass each keep a #glass pane.
     assert [h.back for h in layout.holes if h.kind != "interior_door"] == [SHOP_GLASS, GLASS_VIEW]
-    assert built.defects == 0 and (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (1, 1)
+    assert built.defects == 0 and (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (2, 1)
     [walls] = built.visual["interior_shop_bakery"]
     ceiling = 3.0 - CFG.interiors.slab_m
     assert _area(walls) == pytest.approx((81.6 + 30.4) * ceiling - 1.2 * 2.4 - 1.2 * 1.4 - 3.0 * 2.3)
@@ -270,9 +270,10 @@ def test_a_courtyard_shop_has_walls_round_the_hole_and_a_see_through_courtyard_w
     assert any(_inside(m, np.array([12.0, 6.0 - T / 2, 0.5])) for m in concrete)
     assert not any(_inside(m, np.array([12.0, 6.0 - T / 2, 1.6])) for m in concrete)
     assert sum(_inside(m, np.array([12.0, 6.0 - T / 2, 1.6])) for m in built.glass_colliders) == 1
-    # The shopfront (x 0.5 to 3.5) is open above its stallriser: no wall and no pane stops a shot.
+    # The shopfront (x 0.5 to 3.5) above its stallriser: no wall (a shot crosses its glass), one #glass pane (a body stops).
     assert any(_inside(m, np.array([2.0, T / 2, 0.1])) for m in concrete)
-    assert not any(_inside(m, np.array([2.0, T / 2, 1.2])) for m in [*concrete, *built.glass_colliders])
+    assert not any(_inside(m, np.array([2.0, T / 2, 1.2])) for m in concrete)
+    assert sum(_inside(m, np.array([2.0, T / 2, 1.2])) for m in built.glass_colliders) == 1
     # The light moves out of the courtyard into the room.
     [anchor] = built.light_anchors["rooms"]
     assert room.polygon.contains(Point(anchor["light_m"][:2])) and not Polygon(COURTYARD.interiors[0]).contains(Point(anchor["light_m"][:2]))

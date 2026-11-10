@@ -231,3 +231,8 @@ D1, D2, D4, D5, D6 después del casco de B
 ## 6. Primer paso recomendado
 
 **A1 (`task bench`)**, porque todo lo demás se valida con él, y **A2** en paralelo. Después, B1 y B3, que son los que más se notan con menos riesgo. B4 da la base para el diseño de juego.
+
+## Nota del 10 de noviembre de 2026: menos mapa fuera de alcance
+
+En el casco se veían una o dos manzanas de ciudad tras el muro, gastando triángulos que nadie pisa. Con Madrid Sol Quest (r200: núcleo de unos 100 m más 100 m de anillos intermedio y exterior) frente a Madrid Sol Arena (r150, núcleo de 100 m por defecto, sin anillo intermedio, 50 m de anillo exterior con niebla), los anillos de fondo bajan de 47 500 a 14 600 triángulos. El ahorro va al núcleo: se amueblan las 42 tiendas y las 9 plantas. Recomendación para mapas nuevos: radio = núcleo + 50 m, sin `mid_ring_m`.
+

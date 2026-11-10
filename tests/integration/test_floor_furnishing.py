@@ -109,7 +109,7 @@ def test_on_residential_floors_get_pieces_inside_their_floor_and_out_of_the_stai
     assert stats["pieces"] == len(pieces) == sum(stats["pieces_by_asset"].values())
     assert stats["visual_triangles"] == sum(p["triangles"] for p in pieces)
     assert stats["collision_triangles"] == 12 * sum(p["solid"] for p in pieces)
-    assert stats["max_triangles"] == 12000 and stats["assets"] == len(stats["pieces_by_asset"])
+    assert stats["max_triangles"] == 16000 and stats["assets"] == len(stats["pieces_by_asset"])
     for key in ("interior_visual_triangles", "interior_collision_triangles", "shop_interior_visual_triangles", "interiors"):
         assert on.stats[key] == off.stats[key]
     assert "shop_furnishing" not in on.stats

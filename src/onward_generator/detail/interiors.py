@@ -666,7 +666,8 @@ def _pierced_walls(
     z_top: float,
 ) -> tuple[list[tuple[str, Mesh]], list[Mesh]]:
     """Concrete bands with each door ``(gap, height)`` and each see-through opening removed, plus one pane per
-    ``glass_view`` opening. A ``shop_glass`` opening gets no pane: a shot crosses it, and so can a body.
+    see-through opening (``glass_view`` and the shop display window ``shop_glass``): the adapter makes it Glass with
+    AISeeThrough, so a shot crosses it and a body does not.
 
     Bands split on the door heads and on every opening edge, so a band is either fully
     open or fully solid. The band above an opening keeps the full ring: a downward
@@ -703,7 +704,9 @@ def _pierced_walls(
         if poly.is_empty or float(poly.area) < 1e-4:
             continue
         walls_out.append((f"walls_{index}", prism(poly, za, zb, bottom=True)))
-    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations if hole.back == GLASS_VIEW]
+    # Every see-through opening gets a #glass pane, the shop display windows too: Glass with AISeeThrough lets a shot
+    # through and stops a body (players walked into closed shops through the display window, headset 10 November 2026).
+    panes = [_pane(seg, hole, thickness) for seg, hole in penetrations if hole.back in SEE_THROUGH]
     return walls_out, panes
 
 

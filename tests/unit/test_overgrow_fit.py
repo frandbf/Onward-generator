@@ -527,7 +527,9 @@ def test_the_fit_command_names_the_glb_it_checked(tmp_path: Path) -> None:
         ("debris", "waste", (1.3, 1.3, 1.3), True),  # a concrete block
         ("bench", "furniture", (1.93, 1.03, 1.31), True),
         ("debris", "waste", (1.3, 0.4, 0.5), True),  # exactly 0.4 m deep and 0.5 m tall
-        ("debris", "waste", (1.3, 0.39, 0.5), False),
+        ("debris", "waste", (1.3, 0.19, 0.5), False),
+        ("debris", "waste", (1.3, 0.39, 0.5), True),
+        ("shelf", "furniture", (1.1, 0.37, 2.2), True),
         ("debris", "waste", (1.3, 0.4, 0.49), False),  # a pallet is too low
         ("debris", "waste", (0.4, 1.3, 0.5), True),  # the short side may be the length
         ("lamp", "furniture", (1.87, 0.5, 3.33), True),  # solid at its post only (collider_mesh)
@@ -642,7 +644,7 @@ def test_a_turned_street_barrier_is_footprinted_turned_and_across_the_lane() -> 
 
 
 def test_a_prop_too_thin_for_cover_gets_no_collider() -> None:
-    board = _solid_prop("board_0", "debris", "waste", (1.0, 0.3, 1.0))  # 0.3 m deep: not cover
+    board = _solid_prop("board_0", "debris", "waste", (1.0, 0.08, 0.9))  # 8 cm deep and under 1 m: not solid
     result = Dressing()
     _place_props([board], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
                  None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())

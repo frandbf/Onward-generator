@@ -33,7 +33,7 @@ The SDK enum has no plaster, brick, or cobble. Those floors and walls are Concre
 | Name contains `water` | Water | Penetrates and lowers damage |
 | Name contains `green` or `grass` | Grass | Impenetrable |
 | Node name contains `#glass` | Glass + `AISeeThrough` | The see-through pane. The concrete wall is cut on the same opening, so a shot from either side meets this volume and not the wall. The type is the SDK enum `Glass` (1), not `GlassUnpenetratable` (8) and not `GlassVfx` (9) |
-| A shop's display window (`shop_glass`) | none | No collider at all: the wall collider is open on the pane above the 0.25 m stallriser, so a shot crosses it from either side. The guide documents no player-only collision layer, so a body can step through too, into the closed shop room (`docs/07-detail.md`, *Shop interiors*). That risk is open on the headset checklist |
+| A shop's display window (`shop_glass`) | Glass + `AISeeThrough` | Since 10 November 2026 it has the same `#glass` pane as `glass_view`: the wall collider is open on the pane above the 0.25 m stallriser and the pane fills it, so a shot crosses it and a body does not. Before, it had no collider and players walked into the closed shop rooms through it (headset, Madrid Sol Quest) |
 | Door, wall, sill, header, pier, cobble, asphalt, sidewalk | Concrete | Impenetrable. The guide's default |
 
 `AISeeThrough` belongs only on a collider that can actually be seen through. A concrete wall with that flag lets the AI shoot through the facade. The visual shader does not decide penetration. `glass_dark` and `glass_boarded` stay concrete because they are not openings.

@@ -128,8 +128,8 @@
     "lights_max": 160,
     "furnish": {
       "enabled": true,
-      "max_triangles": 12000,
-      "max_collision_triangles": 1200,
+      "max_triangles": 16000,
+      "max_collision_triangles": 2400,
       "max_pieces_per_room": 6,
       "max_assets": 30,
       "walk_width_m": 1.2,
@@ -166,9 +166,9 @@
       "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" },
       "furnish": {
         "enabled": true,
-        "max_triangles": 16000,
-        "max_collision_triangles": 1200,
-        "max_pieces_per_room": 4,
+        "max_triangles": 38000,
+        "max_collision_triangles": 4000,
+        "max_pieces_per_room": 5,
         "max_assets": 40,
         "walk_width_m": 1.2,
         "wall_gap_m": 0.03,
