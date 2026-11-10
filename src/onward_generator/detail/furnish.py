@@ -590,18 +590,19 @@ class _Planner:
                 self.add(piece)
                 return
 
-    def place_center(self, quota: int) -> int:
+    def place_center(self) -> int:
         """Rows of free-standing islands (shelving, display cases) parallel to the longest wall, an aisle
         ``walk_width_m`` wide in front of each; one model for the whole room, so the rows line up."""
-        return self._grid(self.room_set().center, "center", quota, group=False)
+        return self._grid(self.room_set().center, "center", group=False)
 
-    def place_tables(self, quota: int) -> int:
+    def place_tables(self) -> int:
         """Tables in a grid, each with its seats on its two long sides facing it, ``GROUP_CLEAR_M`` round each group."""
-        return self._grid(self.room_set().table, "table", quota, group=True)
+        return self._grid(self.room_set().table, "table", group=True)
 
-    def _grid(self, slot_entries: Sequence[FurnishEntry], slot: str, quota: int, *, group: bool) -> int:
+    def _grid(self, slot_entries: Sequence[FurnishEntry], slot: str, *, group: bool) -> int:
+        """Units of the first model that fits, row after row, until the room is full; how many were placed."""
         entries = _ordered(slot_entries, self.seed, self.building_id, self.room.room_id, slot)
-        if not entries or quota <= 0 or self.full:
+        if not entries or self.full:
             return 0
         frame, s0, s1, d0, d1 = self.frame()
         walk = self.cfg.walk_width_m
@@ -615,9 +616,9 @@ class _Planner:
             margin = (seat_depth + GROUP_CLEAR_M) if group else 0.0
             placed = 0
             d = d0 + walk + margin
-            while d + depth + margin <= d1 - (walk if not group else 0.0) and placed < quota and not self.full:
+            while d + depth + margin <= d1 - (walk if not group else 0.0) and not self.full:
                 s = s0 + walk / 2 + margin
-                while s + along + margin <= s1 - walk / 2 and placed < quota and not self.full:
+                while s + along + margin <= s1 - walk / 2 and not self.full:
                     if self._try_unit(frame, entry, slot, s, d, seat, group):
                         placed += 1
                         s += along + (2 * margin if group else self.cfg.piece_gap_m)
@@ -732,8 +733,8 @@ def plan_room(room: FurnishRoom, furnish: ShopFurnish, catalogue: Mapping[str, F
     planner.place_walls(quota=2, slot="wall_deep")
     planner.place_corners(CORNER_PIECES)  # before the wall runs, which start in the corners
     planner.place_walls(quota=max(1, math.ceil(WALL_SHARE * planner.cap)))
-    planner.place_tables(planner.cap - planner.floor_count)
-    planner.place_center(planner.cap - planner.floor_count)
+    planner.place_tables()
+    planner.place_center()
     planner.place_tops()
     planner.place_walls()  # whatever the floor left, back to the walls
     if not [p for p in planner.pieces if p.slot not in ON_TOP]:

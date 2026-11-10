@@ -116,12 +116,23 @@ def test_the_shop_and_home_settings_are_settings() -> None:
     assert set(SHOPS) <= set(SETTINGS) and set(HOME) <= set(SETTINGS)
 
 
-def test_every_tracked_manifest_row_has_a_valid_semantic_block() -> None:
+def _tracked_manifests() -> list[Path]:
     from onward_generator.detail.config import REPO_ROOT
 
-    for manifest in sorted((REPO_ROOT / "assets").glob("*/manifest.json")):
-        if manifest.parent.name.startswith("asset_store_"):
-            continue  # gitignored, local to one machine (ADR-035)
+    # The local Asset Store catalogues are gitignored, one machine's own (ADR-035).
+    return [m for m in sorted((REPO_ROOT / "assets").glob("*/manifest.json")) if not m.parent.name.startswith("asset_store_")]
+
+
+def test_every_tracked_manifest_is_what_annotate_writes() -> None:
+    """The committed blocks are the rules' output, row for row: ``tools/describe_library.py --check`` as a test. A rule
+    change that moves a block must come with the rewritten manifests."""
+    for manifest in _tracked_manifests():
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        assert annotate(document, manifest.parent.name, manifest.parent) == document, manifest.parent.name
+
+
+def test_every_tracked_manifest_row_has_a_valid_semantic_block() -> None:
+    for manifest in _tracked_manifests():
         for row in json.loads(manifest.read_text(encoding="utf-8")).get("assets") or []:
             block = row["semantic"]
             assert block["kind"] in KINDS and block["mount"] in MOUNTS, (manifest.parent.name, row["id"])

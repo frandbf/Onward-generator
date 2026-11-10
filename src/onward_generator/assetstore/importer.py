@@ -191,7 +191,7 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
         "semantics": {**SEMANTICS, "reviewed_on": datetime.date.today().isoformat()}, "package": {"publisher": package.publisher, "category": package.category, "name": package.name},
         "skipped": dict(sorted(result.skipped.items())), "unit_factor": factor, "assets": rows,
     }
-    document = annotate(document, package.catalogue, target)  # the semantic block of every row (ADR-036)
+    document = annotate(document, package.catalogue)  # the semantic block of every row (ADR-036); objglb writes opaque GLBs only
     check_manifest(document, package.catalogue)
     atomic_write_json(target / "manifest.json", document)
     (target / "License.txt").write_text(

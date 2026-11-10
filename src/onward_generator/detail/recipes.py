@@ -92,8 +92,8 @@ def _fits(slot: str, c: Candidate) -> tuple[bool, int]:
         "seat": biggest <= 1.1 and height >= 0.4,
         "corner": max(along, across) <= 1.0 and height >= 0.3,
         "rug": height <= 0.06 and max(along, across) <= 3.5 and min(along, across) >= 0.5,
-        "decor": biggest <= 0.45 and height <= 0.5,
-        "top": biggest <= 0.45 and height <= 0.5,
+        "decor": biggest <= 0.45,
+        "top": biggest <= 0.45,
     }
     return bool(limits.get(slot, False)), turn
 
@@ -139,24 +139,23 @@ def choose(slot: str, kinds: Sequence[str], settings: Sequence[str], pool: Seque
         if lightest:
             start = int(stable_unit(seed, key, slot, kind) * len(lightest))
             by_kind[kind] = lightest[start:] + lightest[:start]
+    # One row of each kind in turn; a row has one kind, so no model comes twice.
     chosen: list[FurnishEntry] = []
-    seen: set[str] = set()
-    limit = MODELS_PER_SLOT.get(slot, 2)
-    depth = 0
-    while len(chosen) < limit and any(len(rows) > depth for rows in by_kind.values()):
+    for depth in range(POOL):
         for kind in kinds:
             rows = by_kind.get(kind, [])
-            if depth < len(rows) and len(chosen) < limit and rows[depth][0].asset_id not in seen:
+            if depth < len(rows):
+                if len(chosen) == MODELS_PER_SLOT[slot]:
+                    return chosen
                 c, turn = rows[depth]
                 chosen.append(FurnishEntry(c.asset_id, turn))
-                seen.add(c.asset_id)
-        depth += 1
     return chosen
 
 
 def semantic_sets(furnish: ShopFurnish, recipes: Mapping[str, Mapping[str, Any]], pool: Sequence[Candidate], seed: int,
                   scope: str) -> tuple[dict[str, FurnishSet], set[str]]:
-    """Each recipe's set, filled from ``pool``; a slot nothing fills keeps the hand-written set's entries."""
+    """Each recipe's set, filled from ``pool``; a slot nothing fills keeps the entries of the hand-written set of the
+    same name, or of ``generic``."""
     sets: dict[str, FurnishSet] = {}
     used: set[str] = set()
     catalogue_of = {c.asset_id: c.catalogue for c in pool}
@@ -164,10 +163,8 @@ def semantic_sets(furnish: ShopFurnish, recipes: Mapping[str, Mapping[str, Any]]
         written = furnish.sets.get(name) or furnish.sets.get("generic")
         slots: dict[str, tuple[FurnishEntry, ...]] = {}
         for slot in ALL_SLOTS:
-            kinds = recipe["slots"].get(slot, ())
-            picked = choose(slot, kinds, recipe["settings"], pool, seed, f"{scope}:{name}") if kinds else []
-            fallback = written.slot(slot) if written is not None and slot in ("counter", "wall", "decor") else ()
-            slots[slot] = tuple(picked) or tuple(fallback)
+            picked = choose(slot, recipe["slots"].get(slot, ()), recipe["settings"], pool, seed, f"{scope}:{name}")
+            slots[slot] = tuple(picked) or (written.slot(slot) if written is not None else ())
             used |= {catalogue_of[e.id] for e in picked}
         sets[name] = FurnishSet(**slots)
     return sets, used
