@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,16 @@ from shapely import Point
 from onward_generator.cli import main
 from onward_generator.geo.aoi import load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame
-from onward_generator.maps.workspace import MapError, core_budget, create_map, load_map, source_enabled, store_sources
+from onward_generator.maps.workspace import (
+    MapError,
+    combine_cell_m,
+    core_budget,
+    create_map,
+    load_map,
+    panoramax_atlas_enabled,
+    source_enabled,
+    store_sources,
+)
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 
@@ -406,3 +416,98 @@ def test_map_create_cli_stores_the_target(tmp_path: Path, monkeypatch: pytest.Mo
     assert ("--core-target-triangles CORE_TARGET_TRIANGLES budget core (ADR-017 amendment): solve the core half-side for this "
             "many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest "
             "half-side") in shown
+
+
+def _atlas_map(tmp_path: Path, **values: object) -> Path:
+    root = tmp_path / "atlas"
+    if not (root / "map.json").is_file():
+        create_map(root, map_id="atlas", name="Atlas", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=100)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document.update(values)
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    return root
+
+
+def test_panoramax_atlas_is_off_without_the_key_and_on_only_for_true(tmp_path: Path) -> None:
+    assert panoramax_atlas_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert panoramax_atlas_enabled(root) is False
+    assert "panoramax_atlas" not in load_map(root)
+    for value, expected in ((False, False), (True, True)):
+        _atlas_map(tmp_path, panoramax_atlas=value)
+        assert panoramax_atlas_enabled(root) is expected
+
+
+@pytest.mark.parametrize("value", ["yes", 1, 0, {}, None])
+def test_panoramax_atlas_refuses_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    root = _atlas_map(tmp_path, panoramax_atlas=value)
+    with pytest.raises(MapError, match='"panoramax_atlas" must be true or false'):
+        panoramax_atlas_enabled(root)
+
+
+def test_combine_cell_m_reads_the_export_card(tmp_path: Path) -> None:
+    assert combine_cell_m(tmp_path / "nowhere") == 100.0
+    root = _atlas_map(tmp_path)
+    assert combine_cell_m(root) == 100.0
+    card_path = root / "config" / "export.json"
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    for value, expected in ((50, 50.0), (0, 100.0), (0.0, 100.0), (12.5, 12.5), (0.5, 0.5)):
+        card["build"]["combine_cell_m"] = value
+        card_path.write_text(json.dumps(card), encoding="utf-8")
+        assert combine_cell_m(root) == expected
+    del card["build"]["combine_cell_m"]
+    card_path.write_text(json.dumps(card), encoding="utf-8")
+    assert combine_cell_m(root) == 100.0
+    card_path.write_text(json.dumps({"map": {}}), encoding="utf-8")
+    assert combine_cell_m(root) == 100.0
+    card_path.write_text("[]", encoding="utf-8")
+    assert combine_cell_m(root) == 100.0
+    card_path.unlink()
+    assert combine_cell_m(root) == 100.0
+
+
+@pytest.mark.parametrize("value", ["100", True, -5, None])
+def test_combine_cell_m_refuses_a_value_that_is_not_metres(tmp_path: Path, value: object) -> None:
+    root = _atlas_map(tmp_path)
+    card_path = root / "config" / "export.json"
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    card["build"]["combine_cell_m"] = value
+    card_path.write_text(json.dumps(card), encoding="utf-8")
+    with pytest.raises(MapError, match="combine_cell_m must be a number of metres"):
+        combine_cell_m(root)
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (b'{"build": {"combine_cell_m": 10', "not valid JSON"),
+        (b"\xff\xfe not utf-8", "not valid JSON"),
+        (b'{"build": [100]}', "build must be an object, got \\[100\\]"),
+    ],
+)
+def test_combine_cell_m_refuses_a_card_that_is_not_json_or_has_no_build_object(
+    tmp_path: Path, content: bytes, message: str
+) -> None:
+    root = _atlas_map(tmp_path)
+    card_path = root / "config" / "export.json"
+    card_path.write_bytes(content)
+    with pytest.raises(MapError, match=f"^{re.escape(str(card_path))}: {message}"):
+        combine_cell_m(root)
+
+
+def test_combine_cell_m_follows_the_export_path_of_the_map(tmp_path: Path) -> None:
+    root = _atlas_map(tmp_path)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["paths"]["export"] = "config/other.json"
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    (root / "config" / "other.json").write_text(json.dumps({"build": {"combine_cell_m": 25}}), encoding="utf-8")
+    assert combine_cell_m(root) == 25.0
+
+
+def test_combine_cell_m_defaults_to_config_export_json(tmp_path: Path) -> None:
+    root = _atlas_map(tmp_path)
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    del document["paths"]["export"]
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    (root / "config" / "export.json").write_text(json.dumps({"build": {"combine_cell_m": 40}}), encoding="utf-8")
+    assert combine_cell_m(root) == 40.0

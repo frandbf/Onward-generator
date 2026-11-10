@@ -11,7 +11,13 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from onward_generator.maps.workspace import panoramax_enabled
+from onward_generator.maps.workspace import (
+    DEFAULT_COMBINE_CELL_M,
+    MapError,
+    combine_cell_m,
+    panoramax_atlas_enabled,
+    panoramax_enabled,
+)
 from onward_generator.next_step import emit, map_root, signs_command
 from onward_generator.panoramax.apply import apply_pictures
 from onward_generator.panoramax.cache import PanoramaxError, PanoramaxTransport, UrllibTransport, cache_pictures
@@ -44,12 +50,19 @@ def run_apply(
         return 0
     output = Path(out).expanduser()
     try:
+        atlas = panoramax_atlas_enabled(root)
+        # The cell matters only to the atlas: a bad export card must not break the default stage.
+        cell_m = combine_cell_m(root) if atlas else DEFAULT_COMBINE_CELL_M
         cached = cache_pictures(root, client=client or UrllibTransport())
-        written = apply_pictures(Path(base).expanduser(), output, overwrite=overwrite)
-    except (PanoramaxError, FileExistsError) as exc:
+        written = apply_pictures(Path(base).expanduser(), output, overwrite=overwrite, atlas=atlas, cell_m=cell_m)
+    except (MapError, PanoramaxError, FileExistsError) as exc:
         print(f"panoramax: {exc}", file=sys.stderr)
         return 1
-    print(f"panoramax: kept={cached.kept} assignments={len(written['assignments'])}")
+    summary = f"panoramax: kept={cached.kept} assignments={len(written['assignments'])}"
+    if "coverage" in written:
+        percent = written["coverage"]["percent"]
+        summary += f" coverage={'n/a' if percent is None else f'{percent}%'} draws_added={written['draws_added']}"
+    print(summary)
     emit(signs_command(output))
     return 0
 

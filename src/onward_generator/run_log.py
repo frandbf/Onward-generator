@@ -282,7 +282,12 @@ def _materials(out: Path) -> StageReport:
 
 def _panoramax(out: Path) -> StageReport:
     report = _read(out / "panoramax_report.json")
-    return StageReport(f"{len(report['assignments'])} facades")
+    summary = f"{len(report['assignments'])} facades"
+    covered = report.get("coverage")
+    if isinstance(covered, dict):
+        percent = covered.get("percent")
+        summary += f"  coverage {'n/a' if percent is None else percent} %  +{int(report.get('draws_added') or 0)} draws"
+    return StageReport(summary)
 
 
 def _signs(out: Path) -> StageReport:

@@ -28,6 +28,7 @@ from onward_generator.tiers import (
     building_costs,
     building_tier,
     check_target,
+    combine_cell,
     core_extent,
     core_of,
     core_reach,
@@ -496,3 +497,27 @@ def test_segment_reach_takes_both_ends() -> None:
 def test_within_tolerance_is_five_percent_either_way(achieved: int, within: bool) -> None:
     assert within_tolerance(achieved, 100) is within
     assert within_tolerance(achieved * 1000, 100_000) is within
+
+
+@pytest.mark.parametrize(
+    ("x0", "y0", "x1", "y1", "cell"),
+    [
+        (0.0, 0.0, 10.0, 10.0, (0, -1)),
+        (99.98, -20.0, 100.0, -10.0, (0, 0)),
+        (99.99, -20.0, 100.01, -10.0, (1, 0)),
+        (100.0, -20.0, 100.0, -10.0, (1, 0)),
+        (-0.02, -20.0, 0.0, -10.0, (-1, 0)),
+        (-250.0, 140.0, -230.0, 160.0, (-3, -2)),
+        (10.0, -100.0, 20.0, -100.0, (0, 1)),
+        (10.0, -99.98, 20.0, -100.0, (0, 0)),
+    ],
+)
+def test_combine_cell_floors_the_plan_centre_on_x_and_minus_y(x0: float, y0: float, x1: float, y1: float, cell: tuple[int, int]) -> None:
+    assert combine_cell((Primitive(_floor(x0, y0, x1, y1), "ground"),), 100.0) == cell
+
+
+def test_combine_cell_takes_the_bounds_of_every_primitive_and_its_size() -> None:
+    parts = (Primitive(_floor(0, 0, 10, 10), "ground"), Primitive(_floor(180, -10, 190, 0), "wall"))
+    assert combine_cell(parts, 100.0) == (0, 0)
+    assert combine_cell(parts, 50.0) == (1, 0)
+    assert combine_cell(parts[:1], 4.0) == (1, -2)

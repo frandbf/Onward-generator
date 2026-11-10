@@ -256,6 +256,10 @@ def test_materials_names_the_facade_path(tmp_path: Path) -> None:
 def test_panoramax_signs_fit_bounds(tmp_path: Path) -> None:
     _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [1, 2]})
     assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("2 facades")
+    _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [1], "coverage": {"percent": 12.5}, "draws_added": 3})
+    assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("1 facades  coverage 12.5 %  +3 draws")
+    _write(tmp_path / "pano" / "panoramax_report.json", {"assignments": [], "coverage": {"percent": None}, "draws_added": 0})
+    assert summarize("panoramax", ["--out", str(tmp_path / "pano")]) == StageReport("0 facades  coverage n/a %  +0 draws")
     _write(tmp_path / "signs" / "signs_report.json", {"count": 1})
     assert summarize("signs", ["--out", str(tmp_path / "signs")]) == StageReport("1 plate  0 shop signs")
     _write(tmp_path / "signs" / "signs_report.json", {"count": 2, "shop_signs": {"count": 3}})

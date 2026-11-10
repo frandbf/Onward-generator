@@ -12,6 +12,9 @@ import hashlib
 import io
 import json
 import math
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +24,8 @@ from shapely import union_all
 from shapely.geometry import Polygon, shape
 
 from onward_generator.detail.config import load_detail_config
-from onward_generator.detail.facades import Segment, refine_exposure
+from onward_generator.detail.facades import Segment, party_material, refine_exposure
+from onward_generator.detail.s3db import TINT_SEPARATOR
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import (
     Node,
@@ -33,7 +37,9 @@ from onward_generator.generation.gltf import (
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.geo.projection import LocalFrame
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
-from onward_generator.maps.workspace import MapError, load_map
+from onward_generator.maps.workspace import DEFAULT_COMBINE_CELL_M, MapError, load_map
+from onward_generator.materials.trim import scenic_trim_material, trim_material
+from onward_generator.materials.trim_style import Strip, TrimLayout, load_style_table, trim_layout
 from onward_generator.next_step import map_root
 from onward_generator.panoramax.cache import PanoramaxError, cache_directory
 from onward_generator.panoramax.match import (
@@ -43,6 +49,7 @@ from onward_generator.panoramax.match import (
     picture_from_feature,
 )
 from onward_generator.panoramax.project import BASE_COLOR, FacadeImage, ProjectionError, project_facade
+from onward_generator.tiers import combine_cell
 
 REPORT_SCHEMA = "onward_generator.panoramax_scene"
 _INSET = 0.001
@@ -62,8 +69,20 @@ OUTPUT_FILES = (
 )
 
 
-def apply_pictures(base: Path, out: Path, *, overwrite: bool = False) -> dict[str, Any]:
-    """Write ``scene_panoramax`` from a materials directory and the local cache."""
+def apply_pictures(
+    base: Path,
+    out: Path,
+    *,
+    overwrite: bool = False,
+    atlas: bool = False,
+    cell_m: float = DEFAULT_COMBINE_CELL_M,
+) -> dict[str, Any]:
+    """Write ``scene_panoramax`` from a materials directory and the local cache.
+
+    ``atlas`` (map.json ``"panoramax_atlas": true``) packs the decals into one
+    image per combine cell of ``cell_m`` metres and tints the photographed
+    buildings' trim walls; off, the stage writes what it always wrote.
+    """
     root = map_root(base)
     if root is None:
         raise PanoramaxError(f"{base} is not inside a map")
@@ -79,14 +98,29 @@ def apply_pictures(base: Path, out: Path, *, overwrite: bool = False) -> dict[st
     report_path = base / "detail_report.json"
     detail_report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
     pictures = _cached_pictures(cache_directory(root))
-    visual, report = _compose(
-        source.read_bytes(),
-        manifest,
-        json.loads(geo_path.read_text(encoding="utf-8")),
-        detail_report,
-        pictures,
-        _local_frame(root),
-    )
+    geo = json.loads(geo_path.read_bytes())
+    if atlas:
+        materials_report_path = base / "materials_report.json"
+        materials_report = json.loads(materials_report_path.read_bytes()) if materials_report_path.is_file() else {}
+        visual, report = _compose_atlas(
+            source.read_bytes(),
+            manifest,
+            geo,
+            detail_report,
+            pictures,
+            _local_frame(root),
+            cell_m=cell_m,
+            facades=materials_report.get("facades"),
+        )
+    else:
+        visual, report = _compose(
+            source.read_bytes(),
+            manifest,
+            geo,
+            detail_report,
+            pictures,
+            _local_frame(root),
+        )
     collision = collision_path.read_bytes()
     report["collision_sha256"] = hashlib.sha256(collision).hexdigest()
     prepare_outputs(out, OUTPUT_FILES, overwrite=overwrite)
@@ -438,3 +472,474 @@ def _cached_pictures(cache: Path) -> list[tuple[StreetPicture, Path, float]]:
 
 def _safe(value: str) -> str:
     return "".join(ch if ch.isalnum() else "-" for ch in value)
+
+
+# --- The decal atlas per combine cell and the photo tint (map.json "panoramax_atlas": true, ADR-020) ---
+
+_CELL_SIDE = 2048
+_CELL_SMALL_SIDES = (256, 512, 1024)
+_CELL_ATTEMPTS = 12
+_CELL_SHRINK = 0.75
+_CELL_GAP_PX = 2
+# Half a pixel of the atlas: V this close to a strip edge is inside it. The gutters are wider.
+_STRIP_TOLERANCE_PX = 0.5
+TINT_SKIP_REASONS = ("no_trim_atlas", "layout_mismatch", "osm_colour", "no_wall_strip", "unchanged")
+
+
+@dataclass(frozen=True, slots=True)
+class Patch:
+    """One applied crop: the decal quad, its CC BY-SA image and its note."""
+
+    node: str
+    mesh: Mesh
+    image: FacadeImage
+    note: dict[str, Any]
+
+    @property
+    def key(self) -> tuple[str, int, float, str]:
+        """(building, face, start along the face, picture id): the packing order."""
+        return (self.node, int(self.note["segment"]), float(self.note["s0_m"]), str(self.note["picture_id"]))
+
+
+@dataclass(frozen=True, slots=True)
+class TintAtlas:
+    """The trim atlas a photographed building's wall strip can move inside."""
+
+    style: str
+    layout: TrimLayout
+    families: Mapping[str, str]
+    colours: Mapping[tuple[str, int], tuple[float, float, float]]
+    materials: frozenset[str]
+
+
+def _compose_atlas(
+    visual: bytes,
+    manifest: dict[str, Any],
+    geo: dict[str, Any],
+    detail_report: dict[str, Any],
+    pictures: list[tuple[StreetPicture, Path, float]],
+    frame: LocalFrame,
+    *,
+    cell_m: float,
+    facades: Mapping[str, Any] | None,
+) -> tuple[bytes, dict[str, Any]]:
+    """The scene with one decal image and material per combine cell, the tint and the coverage."""
+    nodes, materials = nodes_from_glb(visual)
+    images = images_by_material(visual)
+    tint_atlas = tint_atlas_for(facades, images)
+    footprints = _footprints(geo, manifest)
+    interiors = _interior_object_ids(manifest, listed_interiors(detail_report.get("counts") or {}))
+    match = match_facades(footprints, [item[0] for item in pictures], frame=frame, interior_ids=interiors)
+    matched = _rows(match["assignments"])
+    by_building: dict[str, list[dict[str, Any]]] = {}
+    for row in matched:
+        by_building.setdefault(str(row["building_id"]), []).append(row)
+    used = {str(row["picture_id"]) for row in matched}
+    blobs = {item[0].id: _decode(item[1]) for item in pictures if item[0].id in used}
+    azimuths = {item[0].id: item[2] for item in pictures}
+    cameras = {item[0].id: item[0] for item in pictures}
+    applied: set[int] = set()
+    patches_of: dict[str, list[Patch]] = {}
+    for node in nodes:
+        rows = by_building.get(node.name)
+        if not rows or node.matrix is not None:
+            continue
+        # In match order: faces in ring order, stretches along each face. The cells sort their own.
+        found = _node_patches(node, rows, footprints, blobs, azimuths, cameras, frame, applied)
+        if found:
+            patches_of[node.name] = found
+    cells = group_cells(nodes, patches_of, cell_m)
+    decal_uvs: dict[tuple[str, int, float, str], tuple[str, np.ndarray]] = {}
+    decal_cells: list[dict[str, Any]] = []
+    for cell, ordered in cells.items():
+        png, uv_list, side, scale = _pack_cell([patch.image for patch in ordered])
+        name = cell_material(cell)
+        images[name] = png
+        materials[name] = Material(BASE_COLOR, 0.9)
+        for index, patch in enumerate(ordered):
+            decal_uvs[patch.key] = (name, uv_list[index])
+        decal_cells.append(cell_row(cell, ordered, side, scale))
+    tints: list[dict[str, Any]] = []
+    tint_skipped: list[dict[str, str]] = []
+    replaced: list[Node] = []
+    for node in nodes:
+        patches = patches_of.get(node.name)
+        if not patches:
+            replaced.append(node)
+            continue
+        tinted, row = tint_node(node, patches, tint_atlas)
+        if "reason" in row:
+            tint_skipped.append({"building_id": node.name, "reason": str(row["reason"])})
+        else:
+            tints.append({"building_id": node.name, **row})
+        added = tuple(Primitive(patch.mesh, *decal_uvs[patch.key]) for patch in patches)
+        extras = {**tinted.extras, "panoramax": [patch.note for patch in patches]}
+        if "reason" not in row:
+            extras["panoramax_tint"] = row
+        # A node with a matrix gets no photo (see above), so the default matrix and mesh key are its own.
+        replaced.append(Node(node.name, tuple(tinted.primitives) + added, extras))
+    assignments: list[dict[str, Any]] = [row for row in matched if id(row) in applied]
+    skipped_faces = _rows(match["skipped_faces"])
+    skipped_faces.extend(
+        {
+            "building_id": str(row["building_id"]),
+            "segment_index": int(row["segment_index"]),
+            "reason": "elevation_window",
+        }
+        for row in matched
+        if id(row) not in applied
+    )
+    extras_doc = {
+        "manifest": "scene_detail.json",
+        "panoramax": {"assignments": assignments, "license": "CC-BY-SA-4.0", "origin": "observed"},
+    }
+    written = build_glb(replaced, materials, extras=extras_doc, preserve_uvs=True, repeat_images=images)
+    faces = _rows(match["faces"])
+    report = {
+        "schema": REPORT_SCHEMA,
+        "schema_version": "0.1.0",
+        "assignments": assignments,
+        "skipped_faces": skipped_faces,
+        "skipped_buildings": match["skipped_buildings"],
+        "license": "CC-BY-SA-4.0",
+        "origin": "observed",
+        "atlas": {"cell_m": cell_m, "side_px": _CELL_SIDE},
+        "coverage": coverage(faces, assignments),
+        "decal_cells": decal_cells,
+        "draws_added": len(decal_cells),
+        "tints": tints,
+        "tint_skipped": tint_skipped,
+    }
+    return written, report
+
+
+def group_cells(
+    nodes: Sequence[Node],
+    patches_of: Mapping[str, Sequence[Patch]],
+    cell_m: float,
+) -> dict[tuple[int, int], list[Patch]]:
+    """The crops of each combine cell, sorted. A node's cell counts its decals, as the adapter will."""
+    cells: dict[tuple[int, int], list[Patch]] = {}
+    for node in nodes:
+        patches = patches_of.get(node.name)
+        if not patches:
+            continue
+        decals = [Primitive(patch.mesh, "") for patch in patches]  # pragma: no mutate: combine_cell reads only the mesh, never the material name
+        cells.setdefault(combine_cell((*node.primitives, *decals), cell_m), []).extend(patches)
+    return {cell: sorted(patches, key=lambda patch: patch.key) for cell, patches in sorted(cells.items())}
+
+
+def _rows(value: object) -> list[dict[str, Any]]:
+    """The dict rows of a ``match_facades`` list."""
+    if not isinstance(value, list):
+        raise TypeError(f"match_facades gave {type(value).__name__}, not a list")
+    return [row for row in value if isinstance(row, dict)]
+
+
+def cell_row(cell: tuple[int, int], ordered: Sequence[Patch], side: int, scale: float) -> dict[str, Any]:
+    """The ``decal_cells`` row of one combine cell."""
+    return {
+        "cell": [cell[0], cell[1]],
+        "material": cell_material(cell),
+        "decals": len(ordered),
+        "buildings": sorted({patch.node for patch in ordered}),
+        "side_px": side,
+        "scale": round(scale, 4),
+    }
+
+
+def cell_material(cell: tuple[int, int]) -> str:
+    """The one decal material of a combine cell."""
+    return f"pano-cell-{cell[0]}_{cell[1]}"
+
+
+def _node_patches(
+    node: Node,
+    rows: list[dict[str, Any]],
+    footprints: list[BuildingFootprint],
+    blobs: dict[str, Image.Image],
+    azimuths: dict[str, float],
+    cameras: dict[str, StreetPicture],
+    frame: LocalFrame,
+    applied: set[int],
+) -> list[Patch]:
+    """The crops of one building, as ``_replace_node`` builds them; the ids of the applied rows go in ``applied``."""
+    height = _facade_height(node.primitives)
+    segments = {segment.index: segment for segment in _ring_segments(node.name, footprints)}
+    found: list[Patch] = []
+    for row in rows:
+        # match_facades took the row from these same exposed segments, so its face is there.
+        segment = segments[int(row["segment_index"])]
+        picture = cameras[str(row["picture_id"])]
+        patch = _photo_patch(segment, row, picture, azimuths[picture.id], frame, height, blobs[picture.id])
+        if patch is not None:
+            applied.add(id(row))
+            found.append(Patch(node.name, *patch))
+    return found
+
+
+def _shelf(sizes: list[tuple[int, int]], side: int) -> list[tuple[int, int]] | None:
+    """Top-left corners of ``sizes`` packed in rows across a ``side`` square, or None when they do not fit."""
+    corners: list[tuple[int, int]] = []
+    cursor_x = cursor_y = row_height = 0
+    for width, height in sizes:
+        if cursor_x + width > side:
+            cursor_x = 0
+            cursor_y += row_height + _CELL_GAP_PX
+            row_height = 0  # pragma: no mutate: every crop is at least 1 px tall, so the max below overwrites 0 or 1 alike
+        if cursor_x + width > side or cursor_y + height > side:
+            return None
+        corners.append((cursor_x, cursor_y))
+        cursor_x += width + _CELL_GAP_PX
+        row_height = max(row_height, height)
+    return corners
+
+
+def _pack_cell(patches: list[FacadeImage]) -> tuple[bytes, list[np.ndarray], int, float]:
+    """One square image for the crops of a cell: ``(png, uvs, side_px, scale)``.
+
+    The side is the smallest of 256, 512 and 1024 px that holds every crop at
+    full size, else ``_CELL_SIDE``, where the crops shrink by 0.75 at a time.
+    Each crop's UVs sit half a pixel inside its rectangle. Nothing is dropped:
+    a set that does not fit raises :class:`PanoramaxError`.
+    """
+    if not patches:
+        raise PanoramaxError("a decal cell needs at least one photograph")
+    # Pasting onto the RGB canvas converts any other mode.
+    images = [Image.open(io.BytesIO(patch.png)) for patch in patches]
+    full = [(image.width, image.height) for image in images]
+    plan: tuple[int, float, list[tuple[int, int]], list[tuple[int, int]]] | None = None
+    # The full-size try at _CELL_SIDE is the first attempt below, so trying it here as well changes nothing.
+    for side in [side for side in _CELL_SMALL_SIDES if side < _CELL_SIDE]:  # pragma: no mutate: see the comment above
+        corners = _shelf(full, side)
+        if corners is not None:
+            plan = (side, 1.0, full, corners)
+            break
+    scale = 1.0
+    for _attempt in range(_CELL_ATTEMPTS):
+        if plan is not None:
+            break
+        sizes = [(max(1, int(width * scale)), max(1, int(height * scale))) for width, height in full]
+        corners = _shelf(sizes, _CELL_SIDE)
+        if corners is not None:
+            plan = (_CELL_SIDE, scale, sizes, corners)
+            break
+        scale *= _CELL_SHRINK
+    if plan is None:
+        raise PanoramaxError(f"the facade photographs of one combine cell do not fit in {_CELL_SIDE} px")
+    side, scale, sizes, corners = plan
+    canvas = Image.new("RGB", (side, side))  # black between the crops
+    uvs: list[np.ndarray] = []
+    for index, image in enumerate(images):
+        (width, height), (left, top) = sizes[index], corners[index]
+        # Pillow returns a copy when the size is unchanged.
+        canvas.paste(image.resize((width, height), Image.Resampling.LANCZOS), (left, top))
+        u0 = (left + 0.5) / side
+        u1 = (left + width - 0.5) / side
+        v_top = 1.0 - (top + 0.5) / side
+        v_bottom = 1.0 - (top + height - 0.5) / side
+        uvs.append(np.array([[u0, v_bottom], [u1, v_bottom], [u1, v_top], [u0, v_top]], dtype=np.float32))
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="PNG")
+    return buffer.getvalue(), uvs, side, scale
+
+
+def coverage(faces: Sequence[Mapping[str, Any]], applied: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Exposed frontage and the part of it under an applied photo, in metres, per building and in all.
+
+    Spans on one face are merged (overlapping or touching) and clipped to the
+    face. A row for a face that is not in ``faces`` adds nothing.
+    """
+    lengths = {(str(face["building_id"]), int(face["segment_index"])): float(face["length_m"]) for face in faces}
+    spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
+    for row in applied:
+        key = (str(row["building_id"]), int(row["segment_index"]))
+        if key not in lengths:
+            continue
+        s0 = max(0.0, float(row["s0_m"]))
+        s1 = min(lengths[key], float(row["s1_m"]))
+        if s1 > s0:  # pragma: no mutate: a zero-length span adds nothing to the merged length
+            spans.setdefault(key, []).append((s0, s1))
+    exposed: dict[str, float] = {}
+    photo: dict[str, float] = {}
+    for (building, _index), length in lengths.items():
+        exposed[building] = exposed.get(building, 0.0) + length
+        photo.setdefault(building, 0.0)
+    for (building, _index), items in spans.items():
+        photo[building] += _merged_length(items)
+    rows = [
+        {
+            "building_id": building,
+            "exposed_m": round(exposed[building], 3),
+            "photo_m": round(photo[building], 3),
+            "percent": _percent(photo[building], exposed[building]),
+        }
+        for building in sorted(exposed)
+    ]
+    total_exposed = sum(exposed.values())
+    total_photo = sum(photo.values())
+    return {
+        "exposed_m": round(total_exposed, 3),
+        "photo_m": round(total_photo, 3),
+        "percent": _percent(total_photo, total_exposed),
+        "buildings": rows,
+    }
+
+
+def _merged_length(spans: list[tuple[float, float]]) -> float:
+    total = 0.0
+    start, end = sorted(spans)[0]
+    for s0, s1 in sorted(spans)[1:]:
+        if s0 <= end:  # pragma: no mutate: touching spans give the same total merged or apart
+            end = max(end, s1)
+            continue
+        total += end - start
+        start, end = s0, s1
+    return total + end - start
+
+
+def _percent(part: float, whole: float) -> float | None:
+    return round(100.0 * part / whole, 1) if whole > 0 else None
+
+
+def tint_atlas_for(facades: Mapping[str, Any] | None, images: Mapping[str, bytes]) -> TintAtlas | str:
+    """The trim atlas of the materials scene, or the reason no wall can be tinted.
+
+    A materials scene baked from another style table is refused: its strips may
+    not be where the current table puts them.
+    """
+    if not isinstance(facades, Mapping) or facades.get("mode") != "trim":
+        return "no_trim_atlas"
+    table = load_style_table()
+    if facades.get("style_table_sha256") != table.sha256:
+        raise PanoramaxError("the materials scene was built with another facade style table; rerun materials")
+    style = str(facades.get("style"))
+    entry = table.styles.get(style)
+    png = images.get(trim_material(style))
+    if entry is None or entry.atlas is None or png is None:
+        return "no_trim_atlas"
+    layout = trim_layout(entry.atlas)
+    with Image.open(io.BytesIO(png)) as image:
+        if image.size != (layout.size, layout.height):
+            return "layout_mismatch"
+        rgb = np.asarray(image.convert("RGB"))
+    trims = (trim_material(style), scenic_trim_material(style))
+    return TintAtlas(
+        style,
+        layout,
+        {str(wall): str(family) for wall, family in entry.atlas["walls"].items()},
+        strip_colours(rgb, layout),
+        frozenset([*trims, *(party_material(name) for name in trims)]),
+    )
+
+
+def strip_colours(rgb: np.ndarray, layout: TrimLayout) -> dict[tuple[str, int], tuple[float, float, float]]:
+    """Mean sRGB of each wall strip, inside its gutters, keyed by (wall, tone)."""
+    found: dict[tuple[str, int], tuple[float, float, float]] = {}
+    for wall, strips in sorted(layout.tones.items()):
+        for tone, strip in enumerate(strips):
+            mean = rgb[strip.row0 + layout.gutter : strip.row1 - layout.gutter].mean(axis=(0, 1))
+            found[(wall, tone)] = (float(mean[0]), float(mean[1]), float(mean[2]))
+    return found
+
+
+def dominant_rgb(pngs: Sequence[bytes]) -> tuple[int, int, int]:
+    """The per-channel median of every pixel of the crops: an outlier block does not move it, the order does not matter."""
+    # numpy reads any negative size as "the rest".
+    pixels = np.vstack([np.asarray(Image.open(io.BytesIO(png)).convert("RGB")).reshape(-1, 3) for png in pngs])  # pragma: no mutate: see the comment above
+    median = np.median(pixels, axis=0)
+    return (int(round(median[0])), int(round(median[1])), int(round(median[2])))
+
+
+def nearest_strip(
+    rgb: Sequence[float],
+    colours: Mapping[tuple[str, int], Sequence[float]],
+    families: Mapping[str, str],
+    wall: str,
+) -> tuple[str, int]:
+    """The strip of ``wall``'s family (any tone) closest to ``rgb`` by squared sRGB distance; a tie goes to the first key."""
+    family = families[wall]
+    candidates = sorted(key for key in colours if families.get(key[0]) == family)
+
+    target = np.asarray(rgb)
+
+    def distance(key: tuple[str, int]) -> float:
+        return float(np.sum((target - np.asarray(colours[key])) ** 2))
+
+    return min(candidates, key=lambda key: (distance(key), key))
+
+
+def _inside(v: np.ndarray, strip: Strip, layout: TrimLayout) -> np.ndarray:
+    tolerance = _STRIP_TOLERANCE_PX / layout.height
+    return np.asarray((v >= strip.v0 - tolerance) & (v <= strip.v1 + tolerance))
+
+
+def current_strip(node: Node, atlas: TintAtlas) -> tuple[str, int] | None:
+    """The wall strip most of the node's trim wall vertices sample, or None when none does."""
+    counts: Counter[tuple[str, int]] = Counter()
+    for prim in node.primitives:
+        if prim.material not in atlas.materials or prim.uvs is None:
+            continue
+        for wall, strips in atlas.layout.tones.items():
+            for tone, strip in enumerate(strips):
+                counts[(wall, tone)] += int(_inside(prim.uvs[:, 1], strip, atlas.layout).sum())
+    if not counts:
+        return None
+    best = min(counts, key=lambda key: (-counts[key], key))
+    return best if counts[best] else None
+
+
+def retint(node: Node, atlas: TintAtlas, source: tuple[str, int], target: tuple[str, int]) -> Node:
+    """Move the V of the vertices inside the ``source`` strip to the same place in ``target``.
+
+    Only the trim primitives change, and only their V inside the source strip:
+    positions, indices, U, materials and the other strips stay. A triangle with
+    corners inside and outside the source strip is refused.
+    """
+    layout = atlas.layout
+    old = layout.tones[source[0]][source[1]]
+    new = layout.tones[target[0]][target[1]]
+    out: list[Primitive] = []
+    for prim in node.primitives:
+        if prim.material not in atlas.materials or prim.uvs is None:
+            out.append(prim)
+            continue
+        uvs = prim.uvs.copy()
+        v = uvs[:, 1]
+        inside = _inside(v, old, layout)
+        corners = inside[prim.mesh.triangles]
+        if np.any(corners.any(axis=1) & ~corners.all(axis=1)):
+            raise PanoramaxError(f"{node.name}: a {prim.material} triangle straddles the {source[0]} strip")
+        moved = new.v0 + (v - old.v0) / (old.v1 - old.v0) * (new.v1 - new.v0)
+        uvs[:, 1] = np.where(inside, moved, v)
+        out.append(Primitive(prim.mesh, prim.material, uvs))
+    return replace(node, primitives=tuple(out))
+
+
+def tint_node(node: Node, patches: Sequence[Patch], atlas: TintAtlas | str) -> tuple[Node, dict[str, Any]]:
+    """The node with its wall strip moved to the strip nearest its photo colour, and the record of that choice.
+
+    The record is ``{"reason": ...}`` when the node keeps its strip. The colour is
+    observed (source panoramax); no photo pixel enters the CC0 atlas.
+    """
+    if isinstance(atlas, str):
+        return node, {"reason": atlas}
+    if any(TINT_SEPARATOR in prim.material for prim in node.primitives):
+        return node, {"reason": "osm_colour"}
+    source = current_strip(node, atlas)
+    if source is None:
+        return node, {"reason": "no_wall_strip"}
+    rgb = dominant_rgb([patch.image.png for patch in patches])
+    target = nearest_strip(rgb, atlas.colours, atlas.families, source[0])
+    if target == source:
+        return node, {"reason": "unchanged"}
+    record = {
+        "rgb": list(rgb),
+        "from": {"wall": source[0], "tone": source[1]},
+        "to": {"wall": target[0], "tone": target[1]},
+        "picture_ids": sorted({str(patch.note["picture_id"]) for patch in patches}),
+        "authors": sorted({str(patch.note["author"]) for patch in patches}),
+        "origin": "observed",
+        "source": "panoramax",
+    }
+    return retint(node, atlas, source, target), record
