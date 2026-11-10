@@ -31,6 +31,7 @@ STAGE_DIRS: Mapping[str, str] = MappingProxyType({
     "fit": "scene_overgrow",
     "bounds": "scene_playable",
     "layout": "layout",
+    "cover": "scene_covered",
 })
 
 

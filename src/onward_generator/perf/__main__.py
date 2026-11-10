@@ -72,6 +72,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lay.add_argument("--overwrite", action="store_true")
 
+    cov = sub.add_parser("cover", help="copy the playable scene and stand solid catalogue props on its long open sightlines (plan C7)")  # pragma: no mutate: help text
+    cov.add_argument("--scene", required=True)
+    cov.add_argument("--heights", required=True)
+    cov.add_argument("--base", required=True, help="validated phase 03 directory")  # pragma: no mutate: help text
+    cov.add_argument("--detail", required=True, help="the bounds output (scene_playable)")  # pragma: no mutate: help text
+    cov.add_argument("--layout", required=True, help="the playable layout.json (perf layout --playable)")  # pragma: no mutate: help text
+    cov.add_argument("--library", default="assets", help="catalogue folder (default assets)")  # pragma: no mutate: help text
+    cov.add_argument("--generation-config", default=None)  # pragma: no mutate: argparse's default is None
+    cov.add_argument("--out", required=True, help="new output directory (scene_covered)")  # pragma: no mutate: help text
+    cov.add_argument("--overwrite", action="store_true")
+
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
     dev.add_argument("--csv", required=True)
     dev.add_argument("--logcat", default=None)
@@ -90,6 +101,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
         return 0 if exc.code in (0, None) else 2
+    if args.command == "cover":
+        return _cover(args)
     want_report = args.command == "layout" and args.gameplay_report
     if want_report and not args.playable:
         print("perf: --gameplay-report needs --playable", file=sys.stderr)
@@ -187,6 +200,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         command = export_command(Path(args.detail), Path(args.out))
         if command:
             emit(command)
+    return 0
+
+
+def _cover(args: argparse.Namespace) -> int:
+    """``perf cover``: exit 0 when the directory is written, with or without props; 1 on a refusal, which writes nothing."""
+    from onward_generator.gameplay.cover_stage import apply_cover, cover_note
+
+    try:
+        base, _ = load_base(args.base, args.scene, args.heights, load_generation_config(args.generation_config))
+        result = apply_cover(base, args.scene, args.detail, args.layout, args.out, library=args.library, overwrite=args.overwrite)
+    except (DetailError, GenerationError, GenerationConfigError, FileNotFoundError, ValueError) as exc:
+        print(f"perf: {exc}", file=sys.stderr)
+        return 1
+    for line in cover_note(result):
+        print(line)
+    print(f"wrote {result.out}")
     return 0
 
 

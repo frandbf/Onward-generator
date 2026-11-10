@@ -1,7 +1,7 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
     python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints] [--lidar-roofs]
-        [--scenic-out-of-lightmap] [--lightmap-pages-max N] [--balanced-spawns]
+        [--scenic-out-of-lightmap] [--lightmap-pages-max N] [--balanced-spawns] [--sightline-cover]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -49,6 +49,7 @@ from shapely import box
 
 from onward_generator.export.package import MANIFEST_FILE, THUMBNAIL_FILE
 from onward_generator.export.thumbnail import THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH
+from onward_generator.gameplay.cover_stage import COVER_DIR, COVER_REPORT
 from onward_generator.gameplay.headline import REPORT_FILE as GAMEPLAY_FILE
 from onward_generator.io import atomic_write_json
 from onward_generator.maps.workspace import (
@@ -61,6 +62,7 @@ from onward_generator.maps.workspace import (
     store_lidar_roofs,
     store_overture_tints,
     store_repetition,
+    store_sightline_cover,
     store_sources,
 )
 from onward_generator.next_step import geo_command
@@ -358,7 +360,7 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
-              balanced_spawns: bool = False) -> MapRun:
+              balanced_spawns: bool = False, sightline_cover: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -369,6 +371,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``scenic_out_of_lightmap`` sets the plan C4 export option in the run copy's export card only.
     ``lightmap_pages_max`` sets the plan C5 lightmap page budget in the run copy's export card only.
     ``balanced_spawns`` switches the plan C6 spawn and Uplink placement on in the run copy's ``map.json`` only.
+    ``sightline_cover`` switches the plan C7 cover stage on in the run copy's ``map.json`` only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -389,6 +392,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_lightmap_pages_max(root, lightmap_pages_max)
     if balanced_spawns:
         store_balanced_spawns(root, True)
+    if sightline_cover:
+        store_sightline_cover(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -570,7 +575,9 @@ GAMEPLAY_KEYS = ("distinct_routes", "max_overlap_pct", "longest_open_sight_m", "
 
 
 def gameplay_path(root: Path) -> Path:
-    return root / "data" / "processed" / "layout" / GAMEPLAY_FILE
+    """The report on the exported scene: ``scene_covered``'s when the plan C7 stage wrote one, else the layout's."""
+    covered = root / "data" / "processed" / COVER_DIR / GAMEPLAY_FILE
+    return covered if covered.is_file() else root / "data" / "processed" / "layout" / GAMEPLAY_FILE
 
 
 def gameplay_metrics(root: Path) -> dict[str, Any] | None:
@@ -597,6 +604,40 @@ def gameplay_metrics(root: Path) -> dict[str, Any] | None:
     if not isinstance(status, str):
         raise BenchError(f"{where}: status must be a string, got {status!r}")
     return {**metrics, "status": status}
+
+
+COVER_STRETCH_KEYS = ("uncovered_stretches", "stretches_over_sightline", "stretches")
+
+
+def cover_metrics(root: Path) -> dict[str, Any] | None:
+    """The plan C7 summary of the map's ``cover_report.json``, or None when the run did not cover (option off).
+
+    A missing or mistyped figure is an error, never a zero.
+    """
+    path = root / "data" / "processed" / COVER_DIR / COVER_REPORT
+    if not path.is_file():
+        return None
+    report = _read_object(path)
+    where = str(path)
+    added = _object(report, "added", where)
+    summary: dict[str, Any] = {
+        "targets": _int(report, "targets", where),
+        "props": _int(added, "props", f"{where}: added"),
+        "triangles": _int(added, "triangles", f"{where}: added"),
+        "primitives": _int(added, "primitives", f"{where}: added"),
+    }
+    assets = added.get("new_assets")
+    if not isinstance(assets, list) or not all(isinstance(item, str) for item in assets):
+        raise BenchError(f"{where}: added.new_assets must be a list of asset ids, got {assets!r}")
+    summary["new_assets"] = assets
+    reason = report.get("nothing_placed")
+    if reason is not None and not isinstance(reason, str):
+        raise BenchError(f"{where}: nothing_placed must be a string or null, got {reason!r}")
+    summary["nothing_placed"] = reason
+    for side in ("before", "after"):
+        block = _object(report, side, where)
+        summary[side] = {key: _int(block, key, f"{where}: {side}") for key in COVER_STRETCH_KEYS}
+    return summary
 
 
 def materials_report_path(root: Path) -> Path:
@@ -676,6 +717,9 @@ def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None 
     lidar_roofs = lidar_roofs_metrics(root) if root is not None else None
     if lidar_roofs is not None:
         entry["lidar_roofs"] = lidar_roofs
+    cover = cover_metrics(root) if root is not None else None
+    if cover is not None:
+        entry["cover"] = cover
     return entry
 
 
@@ -788,6 +832,10 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("lidar roofs flat", "maps", ("lidar_roofs", "flat")),
     ("lidar roofs pitched", "maps", ("lidar_roofs", "pitched")),
     ("lidar roofs classified %", "maps", ("lidar_roofs", "classified_pct")),
+    ("cover props", "maps", ("cover", "props")),
+    ("cover triangles", "maps", ("cover", "triangles")),
+    ("uncovered stretches after cover", "maps", ("cover", "after", "uncovered_stretches")),
+    ("stretches over sightline after cover", "maps", ("cover", "after", "stretches_over_sightline")),
     ("python s", "timings", ("python_s",)),
     ("setup s", "timings", ("setup_s",)),
     ("unity bake s", "timings", ("unity", "seconds", "scene.bake")),
@@ -795,7 +843,7 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 # Rows of an opt-in block are left out of the table when neither report has the block.
-_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs"})
+_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover"})
 
 
 def _value(report: Mapping[str, Any] | None, map_id: str, where: str, keys: tuple[str, ...]) -> Any:
@@ -913,7 +961,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
                         scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
-                        balanced_spawns=args.balanced_spawns)
+                        balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -940,6 +988,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         lidar_roofs = lidar_roofs_metrics(run_dir / map_id)
         if lidar_roofs is not None:
             entry["lidar_roofs"] = lidar_roofs
+        cover = cover_metrics(run_dir / map_id)
+        if cover is not None:
+            entry["cover"] = cover
         timing = report.setdefault("timings", {}).setdefault("maps", {}).setdefault(map_id, {})
         timing["unity"] = unity_timings(package)
     write_report(report, run_dir / REPORT_FILE)
@@ -986,6 +1037,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="cap the lightmap estimate at N pages in each run copy (plan C5, export card build.lightmap_pages_max)")
     run.add_argument("--balanced-spawns", action="store_true",
                      help="place the defenders and the Uplink by the gameplay metrics in each run copy (plan C6, map.json balanced_spawns)")
+    run.add_argument("--sightline-cover", action="store_true",
+                     help="stand catalogue cover on the long open sightlines in each run copy (plan C7, map.json sightline_cover)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

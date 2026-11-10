@@ -24,7 +24,7 @@ The generation engine does not know the adapter. The adapter only reads the pack
   --out     maps/<id>/data/processed/export/pkg_01
 ```
 
-`--detail` for a `gameplay_layout` must be the `bounds` copy (`envelope/perimeter_wall`). `--project` is the configuration with `export.enabled`. `--config` is the card (`config/export.json` in that folder, or `config/export/onward.default.json` when it is omitted).
+`--detail` for a `gameplay_layout` must be the `bounds` copy (`envelope/perimeter_wall`), or the `scene_covered` copy `perf cover` makes of it when `map.json` has `"sightline_cover": true` (plan C7, [01-pipeline.md](01-pipeline.md#sightline-cover-off-by-default)); that copy keeps the wall and adds the cover colliders to `scene_collision.glb` only. `--project` is the configuration with `export.enabled`. `--config` is the card (`config/export.json` in that folder, or `config/export/onward.default.json` when it is omitted).
 
 The command writes nothing when:
 

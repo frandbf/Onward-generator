@@ -355,3 +355,79 @@ def test_read_colliders_refuses_a_corrupt_file(tmp_path: Path) -> None:
         read_colliders(path)
     with pytest.raises(FileNotFoundError):
         read_colliders(tmp_path / "missing.glb")
+
+
+# ------------------------------------------------------------------------------------------------ open_sight_points (plan C7)
+
+
+def _one_sample(east_wall_x: float) -> tuple[list[Polygon], Polygon, dict[str, Any]]:
+    """Every spawn on (0, 0): one route of one node, one sample. A frame of buildings 1 m away except east, at ``east_wall_x``."""
+    frame = box(-400, -400, 400, 400).difference(box(-1, -1, east_wall_x, 1))
+    spot = {"centre_m": [0.0, 0.0]}
+    return [box(-1, -1, 3, 1)], frame, _layout(defenders=spot, attackers_b=spot, defenders_b=spot)
+
+
+@pytest.mark.parametrize(("east", "kept"), [(59.9, False), (60.0, False), (60.1, True)])
+def test_open_sight_points_keep_only_a_ray_strictly_longer_than_60_m(east: float, kept: bool) -> None:
+    from onward_generator.gameplay.report import OpenPoint, open_sight_points
+
+    islands, buildings, layout = _one_sample(east)
+    found = open_sight_points(islands, buildings, [], layout)
+    assert found == ([OpenPoint((0.0, 0.0), (60.1, 0.0), 60.1)] if kept else [])
+
+
+def test_open_sight_points_skip_a_sample_with_cover_within_reach() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    islands, buildings, layout = _one_sample(100.0)
+    assert len(open_sight_points(islands, buildings, [], layout)) == 1
+    near = _prop((-0.5, 1.4, 0.5, 1.9), 0.6)
+    assert open_sight_points(islands, buildings, [near], layout) == []
+    far = _prop((-0.5, 1.6, 0.5, 2.1), 0.6)
+    assert len(open_sight_points(islands, buildings, [far], layout)) == 1
+
+
+def test_open_sight_points_are_sorted_longest_first_then_by_position_whatever_the_pair_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.gameplay import report as module
+
+    found = module.open_sight_points(CORRIDOR, Polygon(), [BARREL], _layout())
+    # The corridor is open to the 300 m cap: every sample of both pairs but the barrel's at 25 m.
+    main = {(float(x), 0.0) for x in range(0, 61, 5)} - {(25.0, 0.0)}
+    second = {(float(x), 0.0) for x in range(2, 58, 5)} | {(58.0, 0.0)}
+    assert {p.point for p in found} == main | second
+    assert {p.length_m for p in found} == {300.0}
+    keys = [(-p.length_m, p.point, p.ray_to_m) for p in found]
+    assert keys == sorted(keys)
+    assert all(p.length_m > 60.0 for p in found)
+    monkeypatch.setattr(module, "PAIRS", tuple(reversed(module.PAIRS)))
+    assert module.open_sight_points(CORRIDOR, Polygon(), [BARREL], _layout()) == found
+
+
+def test_open_sight_points_refuse_another_layout_and_skip_a_missing_spawn() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    with pytest.raises(GameplayError, match="cover reads a onward_generator.gameplay_layout 0.3.0 layout, not 'x' '0.3.0'"):
+        open_sight_points(CORRIDOR, Polygon(), [], {**_layout(), "schema": "x"})
+    with pytest.raises(GameplayError, match="not 'onward_generator.gameplay_layout' '0.2.0'"):
+        open_sight_points(CORRIDOR, Polygon(), [], {**_layout(), "schema_version": "0.2.0"})
+    assert open_sight_points(CORRIDOR, Polygon(), [], _layout(attackers=None, attackers_b=None)) == []
+    off = {"centre_m": [30.0, 40.0]}
+    assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=off, defenders_b=off)) == []
+    # One pair still routed: its samples count.
+    assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=off)) != []
+
+
+def test_open_sight_points_are_longest_first_along_a_walled_corridor() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    frame = box(-400, -400, 400, 400).difference(box(-20, -1, 80, 1))
+    found = open_sight_points(CORRIDOR, frame, [], _layout())
+    lengths = [p.length_m for p in found]
+    assert lengths == sorted(lengths, reverse=True) and lengths[0] == 80.0 and lengths[-1] > 60.0
+    assert found[0].point == (0.0, 0.0) and found[1].point == (60.0, 0.0)
+
+
+def test_open_sight_points_skip_a_pair_without_its_defenders() -> None:
+    from onward_generator.gameplay.report import open_sight_points
+
+    assert open_sight_points(CORRIDOR, Polygon(), [], _layout(defenders=None, defenders_b=None)) == []

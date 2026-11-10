@@ -48,6 +48,15 @@ GAMEPLAY = {
 }
 
 
+COVERED_GAMEPLAY = {"status": "ok", "headline": {**GAMEPLAY["headline"], "longest_open_sight_m": 129.42}}
+COVER = {
+    "targets": 97, "nothing_placed": None,
+    "added": {"props": 17, "triangles": 934, "primitives": 17, "new_assets": ["kenney_urban_detail_block"]},
+    "before": {"uncovered_stretches": 17, "stretches_over_sightline": 32, "stretches": 38, "headline": {}},
+    "after": {"uncovered_stretches": 4, "stretches_over_sightline": 29, "stretches": 38, "headline": {}},
+}
+
+
 class Stub:
     """Writes each stage's output; ``fail`` is the stage (first argv word) that returns 1."""
 
@@ -95,6 +104,9 @@ class Stub:
             (out / "stub.json").write_text("{}")
             if head == ("materials", "apply") and "--repetition" in argv:
                 (out / "materials_report.json").write_text(json.dumps({"repetition": REPETITION}), encoding="utf-8")
+            if head == ("perf", "cover"):
+                (out / "cover_report.json").write_text(json.dumps(COVER), encoding="utf-8")
+                (out / "gameplay_report.json").write_text(json.dumps(COVERED_GAMEPLAY), encoding="utf-8")
         return 0
 
 
@@ -463,3 +475,71 @@ def test_lightmap_pages_max_run_switches_the_run_copy_only(workdir: Path) -> Non
     assert _run(root, "r3", Stub(), "--offline", "--lightmap-pages-max", "6", "--scenic-out-of-lightmap") == 0
     both = json.loads((root / "runs" / "r3" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
     assert both["build"] == {**off_card["build"], "scenic_out_of_lightmap": True, "lightmap_pages_max": 6}
+
+
+def test_sightline_cover_run_adds_the_stage_reads_the_covered_report_and_keeps_the_inputs(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off, "--gameplay-report") == 0
+    assert not any(argv[:2] == ["perf", "cover"] for argv in off.calls)
+    first = json.loads((root / "runs" / "r1" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert "cover" not in first["maps"]["bench_murcia"]
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--gameplay-report", "--sightline-cover") == 0
+    names = [argv[:2] for argv in on.calls]
+    assert names.index(["perf", "cover"]) == names.index(["perf", "layout"]) + 1
+    export = next(argv for argv in on.calls if argv[:2] == ["export", "package"])
+    assert Path(export[export.index("--detail") + 1]).name == "scene_covered"
+    assert bench.inputs_sha256(inputs) == digest
+    assert "sightline_cover" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert json.loads((root / "runs" / "r2" / "bench_murcia" / "map.json").read_text(encoding="utf-8"))["sightline_cover"] is True
+    second = json.loads((root / "runs" / "r2" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    entry = second["maps"]["bench_murcia"]
+    assert entry["inputs_sha256"] == first["maps"]["bench_murcia"]["inputs_sha256"]
+    assert entry["gameplay"]["longest_open_sight_m"] == 129.42
+    assert entry["cover"] == {
+        "targets": 97, "props": 17, "triangles": 934, "primitives": 17, "new_assets": ["kenney_urban_detail_block"],
+        "nothing_placed": None,
+        "before": {"uncovered_stretches": 17, "stretches_over_sightline": 32, "stretches": 38},
+        "after": {"uncovered_stretches": 4, "stretches_over_sightline": 29, "stretches": 38},
+    }
+    diff = (root / "runs" / "r2" / bench.DIFF_FILE).read_text(encoding="utf-8")
+    assert "| bench_murcia | cover props | - | 17 | - |" in diff
+    assert "| bench_murcia | longest open sight m | 133.9 | 129.4 | -4.4 |" in diff
+    third = Stub()
+    assert _run(root, "r3", third, "--offline", "--gameplay-report", "--against", str(root / "runs" / "r1")) == 0
+    # Neither report has the block: its rows are left out of the table.
+    assert "cover" not in (root / "runs" / "r3" / bench.DIFF_FILE).read_text(encoding="utf-8").replace("cover per 100 m", "")
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    ({"targets": "97"}, "targets must be an integer"),
+    ({"added": {"props": 1, "triangles": 2, "primitives": 3, "new_assets": "x"}}, "added.new_assets must be a list of asset ids"),
+    ({"added": {"props": 1, "triangles": 2.5, "primitives": 3, "new_assets": []}}, "triangles must be an integer"),
+    ({"nothing_placed": 3}, "nothing_placed must be a string or null"),
+    ({"after": {"uncovered_stretches": None, "stretches_over_sightline": 1, "stretches": 2}}, "uncovered_stretches must be an integer"),
+    ({"before": []}, "before must be an object"),
+])
+def test_a_malformed_cover_report_is_a_bench_error(tmp_path: Path, change: dict[str, Any], message: str) -> None:
+    covered = tmp_path / "data" / "processed" / "scene_covered"
+    covered.mkdir(parents=True)
+    assert bench.cover_metrics(tmp_path) is None
+    (covered / "cover_report.json").write_text(json.dumps({**COVER, **change}), encoding="utf-8")
+    with pytest.raises(bench.BenchError, match=message):
+        bench.cover_metrics(tmp_path)
+
+
+def test_the_gameplay_headline_comes_from_the_covered_scene_when_there_is_one(tmp_path: Path) -> None:
+    layout = tmp_path / "data" / "processed" / "layout"
+    layout.mkdir(parents=True)
+    (layout / "gameplay_report.json").write_text(json.dumps(GAMEPLAY), encoding="utf-8")
+    assert bench.gameplay_path(tmp_path) == layout / "gameplay_report.json"
+    covered = tmp_path / "data" / "processed" / "scene_covered"
+    covered.mkdir(parents=True)
+    assert bench.gameplay_path(tmp_path) == layout / "gameplay_report.json"
+    (covered / "gameplay_report.json").write_text(json.dumps(COVERED_GAMEPLAY), encoding="utf-8")
+    assert bench.gameplay_path(tmp_path) == covered / "gameplay_report.json"
+    assert bench.gameplay_metrics(tmp_path)["longest_open_sight_m"] == 129.42
