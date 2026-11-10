@@ -8,7 +8,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from shapely import Point, Polygon, box
+from shapely import Point, Polygon, box, unary_union
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Layout, Segment, stable_unit
@@ -22,6 +22,7 @@ from onward_generator.detail.interiors import (
     _lands_on_roof,
     assemble_interior,
     build_interior,
+    flight_landings,
     glass_penetrations,
     interior_visual,
     light_anchors,
@@ -704,3 +705,67 @@ def test_no_stair_well_blocks_the_door() -> None:
     assert isinstance(plan, InteriorPlan) and plan.flights
     zone = _door_zone(segment, door, cfg.interiors)
     assert all(flight.well.disjoint(zone) for flight in plan.flights)
+
+
+# ---- Stair landings and per-floor probes (ADR-034) -------------------------------------------------------------------
+
+
+def _three_floor_plan() -> InteriorPlan:
+    """24 x 18 m, 15 m high in 3 m storeys; seed 3 keeps three furnished floors and a roof climb."""
+    plan = plan_interior("b", Polygon([(0, 0), (24, 0), (24, 18), (0, 18)]), Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0),
+                         Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True), 15.0, 3.0, 5, replace(load_detail_config(), seed=3))
+    assert isinstance(plan, InteriorPlan) and plan.floors == 3 and [f.role for f in plan.flights].count("roof") == 3
+    return plan
+
+
+def test_flight_landings_match_the_rects_seek_flight_checked() -> None:
+    assert MURCIA_CENTER == (-1.12863, 37.98407)
+    plan = _three_floor_plan()
+    landing = load_detail_config().interiors.stair.landing_m
+    shrunk = plan.inner.buffer(-0.02)
+    for flight in plan.flights:
+        g = flight.geometry
+        foot, arrival = flight_landings(flight, landing)
+        inverse = np.linalg.inv(flight.matrix)
+        for zone, (x0, x1) in ((foot, (-landing, 0.0)), (arrival, (g.run_m, g.run_m + landing))):
+            assert shrunk.contains(zone)
+            assert zone.area == pytest.approx(landing * g.width_m)
+            assert zone.intersection(flight.well).area == pytest.approx(0.0, abs=1e-9)
+            assert zone.intersection(flight.well).length == pytest.approx(g.width_m)  # one short side of the well, whole
+            local = [inverse @ np.array([x, y, 0.0, 1.0]) for x, y in list(zone.exterior.coords)[:-1]]
+            assert sorted({round(float(p[0]), 6) for p in local}) == [round(x0, 6), round(x1, 6)]
+            assert sorted({round(float(p[1]), 6) for p in local}) == [0.0, round(g.width_m, 6)]
+
+
+def _two_rooms() -> tuple[InteriorPlan, list[dict[str, object]]]:
+    plan = _room_plan(10.0, 7.0)
+    return replace(plan, flights=()), _rooms(2.8, 5.8)
+
+
+def test_room_furniture_moves_probes_of_its_own_room_only() -> None:
+    plan, rooms = _two_rooms()
+    before = light_anchors(plan, rooms)
+    assert light_anchors(plan, rooms, room_furniture=None) == before
+    assert light_anchors(plan, rooms, room_furniture={}) == before
+    assert light_anchors(plan, rooms, room_furniture={"elsewhere/L0": box(X0, Y0, X0 + 10.0, Y0 + 7.0)}) == before
+    xs, ys = _grid(10.0, 7.0, 3, 2)
+    piece = Point(xs[0], ys[0]).buffer(0.3)
+    after = light_anchors(plan, rooms, room_furniture={"block-light/L1": piece})
+    l0, l1 = after["rooms"]
+    assert l0 == before["rooms"][0]
+    assert (l1["light_m"], l1["range_m"]) == (before["rooms"][1]["light_m"], before["rooms"][1]["range_m"])
+    assert _columns(l1["probes_m"]) == _columns(before["rooms"][1]["probes_m"]) - {(xs[0], ys[0])}
+
+
+def test_furnished_floor_keeps_probes_outside_its_pieces_and_the_union_path_is_unchanged() -> None:
+    plan, rooms = _two_rooms()
+    xs, ys = _grid(10.0, 7.0, 3, 2)
+    pieces = unary_union([Point(xs[1], y).buffer(0.4) for y in ys])
+    after = light_anchors(plan, rooms, room_furniture={"block-light/L0": pieces})
+    kept = _columns(after["rooms"][0]["probes_m"])
+    assert kept == {(x, y) for x in (xs[0], xs[2]) for y in ys}
+    assert not any(pieces.contains(Point(*c)) for c in kept)
+    union = light_anchors(plan, rooms, furniture=pieces)  # ADR-031's union: every room loses those columns
+    assert all(_columns(r["probes_m"]) == kept for r in union["rooms"])
+    both = light_anchors(plan, rooms, furniture=pieces, room_furniture={"block-light/L1": Point(xs[0], ys[0]).buffer(0.3)})
+    assert _columns(both["rooms"][1]["probes_m"]) == kept - {(xs[0], ys[0])}

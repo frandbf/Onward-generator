@@ -1,6 +1,6 @@
-"""Build the shop furniture ``detail`` planned (ADR-031) on the overgrow copy.
+"""Build the interior furniture ``detail`` planned (ADR-031 shop rooms, ADR-034 stair floors) on the overgrow copy.
 
-``detail`` writes a ``furnishing`` block on each furnished shop room of ``scene_detail.json``: the
+``detail`` writes a ``furnishing`` block on each furnished room of ``scene_detail.json``: the
 catalogue row, where it stands, its turn, the triangles it was priced at and its GLB's SHA-256. This
 module reads those blocks, loads the rows through ``read_interior_catalogue`` (only ``placement:
 interior`` rows of the allow-listed CC0 catalogues; street overgrow still refuses them) and emits:
@@ -55,7 +55,7 @@ class FurnishBuild:
 
 
 def planned_pieces(manifest: Mapping[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    """``(building id, piece)`` of every piece in the ``furnishing`` blocks of the shop interiors, in record order."""
+    """``(building id, piece)`` of every piece in the ``furnishing`` blocks of every interior (shop rooms and stair floors), in record order."""
     found: list[tuple[str, dict[str, Any]]] = []
     for item in manifest.get("objects") or []:
         if not isinstance(item, dict) or item.get("type") != "interior":
@@ -75,11 +75,11 @@ def build_furniture(manifest: Mapping[str, Any], library: str | Path | None) -> 
     if not pieces:
         return built
     if library is None:
-        raise FurnishBuildError("scene_detail.json plans shop furniture (ADR-031); overgrow place needs --library")
+        raise FurnishBuildError("scene_detail.json plans interior furniture (ADR-031, ADR-034); overgrow place needs --library")
     catalogues = sorted({str(piece["catalogue"]) for _, piece in pieces})
     unknown = [name for name in catalogues if name not in FURNISH_CATALOGUES]
     if unknown:
-        raise FurnishBuildError(f"shop furniture names catalogues that are not allowed: {', '.join(unknown)}")
+        raise FurnishBuildError(f"interior furniture names catalogues that are not allowed: {', '.join(unknown)}")
     props, rejects = read_interior_catalogue(library, catalogues, {str(p["asset_id"]) for _, p in pieces})  # pragma: no mutate: the ids only spare the GLBs no piece names; the planned rows load the same
     why = {reject.asset_id: reject.reason for reject in rejects}
     seen: set[str] = set()
@@ -87,13 +87,13 @@ def build_furniture(manifest: Mapping[str, Any], library: str | Path | None) -> 
         asset_id = str(piece["asset_id"])
         found = props.get(asset_id)
         if found is None:
-            raise FurnishBuildError(f"shop furniture {asset_id}: not installed under {library} ({why.get(asset_id, 'missing')})")
+            raise FurnishBuildError(f"interior furniture {asset_id}: not installed under {library} ({why.get(asset_id, 'missing')})")
         if found.glb_sha256 != piece["glb_sha256"]:
-            raise FurnishBuildError(f"shop furniture {asset_id}: the GLB is not the one detail planned (sha256 {found.glb_sha256[:12]}, "
+            raise FurnishBuildError(f"interior furniture {asset_id}: the GLB is not the one detail planned (sha256 {found.glb_sha256[:12]}, "
                                     f"plan {str(piece['glb_sha256'])[:12]}); run detail again")
         prop = found.prop
         if prop.triangles != int(piece["triangles"]):
-            raise FurnishBuildError(f"shop furniture {asset_id}: {prop.triangles} triangles, detail priced {piece['triangles']}")
+            raise FurnishBuildError(f"interior furniture {asset_id}: {prop.triangles} triangles, detail priced {piece['triangles']}")
         low, high = prop.mesh.vertices.min(axis=0), prop.mesh.vertices.max(axis=0)
         centre = np.eye(4)
         centre[:2, 3] = -(low[:2] + high[:2]) / 2  # the plan places the middle of the model's box

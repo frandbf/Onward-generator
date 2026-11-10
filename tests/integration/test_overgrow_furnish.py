@@ -115,7 +115,7 @@ def test_with_the_option_off_overgrow_writes_the_same_files(detail_inputs, bases
 
 def test_a_tampered_glb_or_a_missing_catalogue_stops_overgrow(detail_inputs, bases, tmp_path: Path) -> None:
     piece = _pieces(bases["on"])[0]
-    with pytest.raises(OvergrowError, match=f"shop furniture {piece['asset_id']}: not installed"):
+    with pytest.raises(OvergrowError, match=f"interior furniture {piece['asset_id']}: not installed"):
         overgrow(bases["on"], detail_inputs[0], tmp_path / "missing", library=_library(tmp_path / "lib_missing"))
     tampered = tmp_path / "lib_tampered"
     shutil.copytree(bases["library"], tampered, symlinks=False)
@@ -127,7 +127,7 @@ def test_a_tampered_glb_or_a_missing_catalogue_stops_overgrow(detail_inputs, bas
     data[at] = ord("Z") if data[at] != ord("Z") else ord("Y")
     glb.write_bytes(bytes(data))
     assert hashlib.sha256(glb.read_bytes()).hexdigest() != piece["glb_sha256"]
-    with pytest.raises(OvergrowError, match=f"shop furniture {piece['asset_id']}: the GLB is not the one detail planned"):
+    with pytest.raises(OvergrowError, match=f"interior furniture {piece['asset_id']}: the GLB is not the one detail planned"):
         overgrow(bases["on"], detail_inputs[0], tmp_path / "tampered", library=tampered)
     with pytest.raises(OvergrowError, match="needs --library"):
         overgrow(bases["on"], detail_inputs[0], tmp_path / "nolib")
@@ -141,3 +141,44 @@ def test_a_selection_of_another_prop_keeps_the_furniture(detail_inputs, bases, t
     selection.write_text(json.dumps({"ids": [chosen]}), encoding="utf-8")
     report = overgrow(bases["on"], detail_inputs[0], tmp_path / "out", library=library, selection=selection)
     assert report["furnishing"]["pieces"] == len(_pieces(bases["on"]))
+
+
+@pytest.fixture(scope="module")
+def floors(detail_inputs, tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """``detail`` with ``interiors.furnish`` on (ADR-034) and the shop block off, then ``overgrow place``."""
+    tmp = tmp_path_factory.mktemp("floors")
+    scene, heights, base = detail_inputs
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["furnish"]["enabled"] = True
+    config = tmp / "detail_floors.json"
+    config.write_text(json.dumps(doc), encoding="utf-8")
+    out = tmp / "detail"
+    assert detail_main(["--scene", str(scene), "--heights", str(heights), "--base", str(base), "--config", str(config),
+                        "--no-preview", "--out", str(out)]) == 0
+    overgrow(out, scene, tmp / "placed", library=_library(tmp / "library", *FURNISH_CATALOGUES))
+    return out, tmp / "placed"
+
+
+def test_upper_floor_pieces_built_at_their_z_with_one_box_collider_each_solid(floors) -> None:
+    detail, placed = floors
+    manifest = json.loads((detail / "scene_detail.json").read_text(encoding="utf-8"))
+    pieces = {p["id"]: (room["floor_z_m"], p) for o in manifest["objects"] if o.get("type") == "interior" and o["kind"] == "residential"
+              for room in o["rooms"] for p in (room.get("furnishing") or {}).get("pieces", [])}
+    assert pieces and any(z > 0 for z, _ in pieces.values())
+    visual, _ = nodes_from_glb((placed / "scene_visual.glb").read_bytes())
+    collision, _ = nodes_from_glb((placed / "scene_collision.glb").read_bytes())
+    built = {n.name: n for n in visual if n.name.startswith("furnish/")}
+    boxes = {n.name: n for n in collision if n.name.startswith("furnish/collider/")}
+    assert sorted(built) == sorted(pieces)
+    assert sorted(boxes) == sorted(i.replace("furnish/", "furnish/collider/", 1) for i, (_, p) in pieces.items() if p["solid"])
+    assert not any(n.name.startswith("furnish/") for n in collision if not n.name.startswith("furnish/collider/"))
+    for piece_id, (floor_z, piece) in pieces.items():
+        node = built[piece_id]
+        assert node.matrix[2, 3] == pytest.approx(floor_z) and node.extras["slot"] == "wall"
+        low = min(float(v[2]) for p in node.world_primitives() for v in p.mesh.vertices)
+        assert low == pytest.approx(floor_z, abs=1e-4)
+        if piece["solid"]:
+            collider = boxes[piece_id.replace("furnish/", "furnish/collider/", 1)]
+            meshes = [p.mesh for p in collider.world_primitives()]
+            assert sum(m.triangle_count for m in meshes) == 12
+            assert min(float(v[2]) for m in meshes for v in m.vertices) == pytest.approx(floor_z, abs=1e-4)

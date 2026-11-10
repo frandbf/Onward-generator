@@ -47,7 +47,7 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
-from onward_generator.detail.furnish import FurnishError, ShopFurnishing, load_catalogue
+from onward_generator.detail.furnish import FLOOR_SCOPE, FurnishError, ShopFurnishing, load_catalogue
 from onward_generator.detail.grammar import (
     FLAT_SHAPES,
     OVERTURE_FACADE,
@@ -715,6 +715,22 @@ def _furnishing(cfg: DetailConfig) -> ShopFurnishing:
     return ShopFurnishing.of(furnish, catalogue, cfg.seed)
 
 
+def _furnishes_floors(cfg: DetailConfig) -> bool:
+    """Whether the floors of the stair interior get catalogue furniture: interiors and ``interiors.furnish`` on (ADR-034)."""
+    ic = cfg.interiors
+    return ic.enabled and ic.furnish.enabled
+
+
+def _floor_furnishing(cfg: DetailConfig) -> ShopFurnishing:
+    """The map's pass for the floors of the stair interior, with the rows ``interiors.furnish`` names, read from ``assets/``."""
+    furnish = cfg.interiors.furnish
+    try:
+        catalogue = load_catalogue(furnish, REPO_ROOT / "assets", FLOOR_SCOPE)
+    except FurnishError as exc:
+        raise DetailError(str(exc)) from exc
+    return ShopFurnishing.of_floors(furnish, catalogue, cfg.seed)
+
+
 def interior_quota(cfg: DetailConfig) -> int:
     """How many interiors this seed builds, from ``min_buildings`` through ``max_buildings``.
 
@@ -1230,6 +1246,7 @@ def detail_scene(
     budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
     lit: list[tuple[bool, dict[str, Any]]] = []
     furnishing = _furnishing(cfg) if _furnishes_shops(cfg) else None
+    floor_furnishing = _floor_furnishing(cfg) if _furnishes_floors(cfg) else None
     door_fronts: list[Polygon] = []
     every_footprint = union_all(list(footprints.values()))  # what a blade sign must not face (``plan_shops``)
     exposed_m = party_m = 0.0
@@ -1312,6 +1329,7 @@ def detail_scene(
         shop_interiors=shop_interiors,
         budgets=budgets,
         furnishing=furnishing,
+        floor_furnishing=floor_furnishing,
         flat_openings=flat_openings,
         exposed_m=exposed_m,
         party_m=party_m,
@@ -1381,6 +1399,7 @@ def _detail_buildings(
     shop_interiors: list[str],
     budgets: dict[bool, InteriorBudget],
     furnishing: ShopFurnishing | None,
+    floor_furnishing: ShopFurnishing | None,
     flat_openings: int,
     exposed_m: float,
     party_m: float,
@@ -1511,6 +1530,10 @@ def _detail_buildings(
                 # Furniture has its own budget (ADR-031): a room it cannot furnish keeps its shop interior.
                 for message in furnishing.furnish_interior(bid, interior, built, glass_penetrations(layout, segments), cfg.interiors):
                     issues.append(Issue("shop_not_furnished", "info", bid, message))
+            elif not shop and floor_furnishing is not None and interior is not None:
+                # The floors of the stair interior have their own budget too (ADR-034): a floor left bare keeps its interior.
+                for message in floor_furnishing.furnish_floors(bid, interior, built, glass_penetrations(layout, segments), cfg.interiors):
+                    issues.append(Issue("floor_not_furnished", "info", bid, message))
         if shell is None:
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
@@ -1725,6 +1748,7 @@ def _detail_buildings(
         shop_interiors=shop_interiors,
         budgets=budgets,
         furnishing=furnishing,
+        floor_furnishing=floor_furnishing,
         flat_openings=flat_openings,
         exposed_m=exposed_m,
         party_m=party_m,
@@ -1781,6 +1805,7 @@ def _assemble_detail(
     shop_interiors: list[str],
     budgets: dict[bool, InteriorBudget],
     furnishing: ShopFurnishing | None,
+    floor_furnishing: ShopFurnishing | None,
     flat_openings: int,
     exposed_m: float,
     party_m: float,
@@ -1884,6 +1909,8 @@ def _assemble_detail(
     detailed.stats["shop_interior_collision_triangles"] = budgets[True].used["collision_triangles"]
     if furnishing is not None:
         detailed.stats["shop_furnishing"] = furnishing.stats()
+    if floor_furnishing is not None:
+        detailed.stats["floor_furnishing"] = floor_furnishing.stats()
     detailed.stats["interior_lights"] = {
         "max": cfg.interiors.lights_max,
         "placed": sum(len(anchors["rooms"]) for _, anchors in lit) - len(dropped_lights),

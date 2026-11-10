@@ -471,3 +471,298 @@ def test_the_map_pass_takes_the_seed_of_the_configuration() -> None:
     from onward_generator.detail.scene import _furnishing
 
     assert _furnishing(replace(CFG, seed=7)).seed == 7
+
+
+# ---- The floors of the stair interior (ADR-034) -------------------------------------------------------------------
+# A 24 x 18 m block (local metres, origin MURCIA_CENTER), 15 m high in 3 m storeys: with this seed it keeps three
+# furnished floors, a storey flight from L0 and from L1, and a roof climb from L2 in two wells.
+
+from onward_generator.detail.config import load_detail_config  # noqa: E402 - the residential fixtures below read the default block
+from onward_generator.detail.facades import Hole, Segment  # noqa: E402 - as above
+from onward_generator.detail.furnish import FLOOR_SCOPE, ShopFurnishing, floor_rooms  # noqa: E402 - as above
+from onward_generator.detail.interiors import GLASS_VIEW, WELL_CLEARANCE_M, build_interior, flight_landings, plan_interior  # noqa: E402 - as above
+
+DEFAULT = load_detail_config()
+FLOORS = replace(DEFAULT.interiors.furnish, enabled=True)
+RES_SEED = 3  # stable_unit(3, "b", "interior_floors") < 0.5: three furnished floors
+BLOCK = Polygon([(0, 0), (24, 0), (24, 18), (0, 18)])
+SOUTH = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)
+FRONT_DOOR = Hole("interior_door", 0, 11.0, 0.0, 1.2, 2.4, 0.3, None, 0, 0)
+
+
+def _stairs():
+    cfg = replace(DEFAULT, seed=RES_SEED)
+    plan = plan_interior("b", BLOCK, FRONT_DOOR, SOUTH, 15.0, 3.0, 5, cfg)
+    assert not isinstance(plan, str)
+    built = build_interior(plan, 15.0, BLOCK, cfg)
+    return plan, built
+
+
+PLAN, BUILT = _stairs()
+RECORDS = BUILT.spec["rooms"]
+LANDING = DEFAULT.interiors.stair.landing_m
+ENDS = [flight_landings(f, LANDING) for f in PLAN.flights]
+
+
+def _floors(penetrations=()) -> list[FurnishRoom]:
+    return floor_rooms(PLAN, RECORDS, list(penetrations), DEFAULT.interiors, FLOORS)
+
+
+def test_the_fixture_has_three_floors_two_storey_flights_and_a_roof_climb() -> None:
+    assert [(f.role, f.level) for f in PLAN.flights] == [("storey", 0), ("storey", 1), ("roof", 2), ("roof", 3), ("roof", 4)]
+    assert PLAN.flights[3].well.equals(PLAN.flights[1].well)  # the climb reuses the last storey well two levels up
+    assert [r["id"] for r in RECORDS] == ["b/L0", "b/L1", "b/L2"]
+
+
+def test_floor_rooms_one_per_record_with_floor_z_ceiling_and_entry() -> None:
+    rooms = _floors()
+    assert [r.room_id for r in rooms] == ["b/L0", "b/L1", "b/L2"]
+    assert [(r.floor_m, r.ceiling_m) for r in rooms] == [(0.0, 2.8), (3.0, 5.8), (6.0, 9.0)]
+    assert all(r.polygon.equals(PLAN.inner) and r.category == "generic" and r.reach_m == FLOORS.walk_width_m / 2 for r in rooms)
+    assert rooms[0].door_zone.equals(_door_zone(SOUTH, FRONT_DOOR, DEFAULT.interiors))
+    assert rooms[1].door_zone.equals(ENDS[0][1]) and rooms[2].door_zone.equals(ENDS[1][1])  # the arrival from below
+    assert all(r.panes == () and r.display == () and r.door_span is None for r in rooms)
+
+
+def test_floor_rooms_holes_keepouts_and_targets_per_level() -> None:
+    l0, l1, l2 = _floors()
+    wells = [f.well for f in PLAN.flights]
+    assert [h.bounds for h in l0.holes] == [wells[0].bounds]
+    assert [h.bounds for h in l1.holes] == [wells[1].bounds, wells[0].bounds]
+    assert [h.bounds for h in l2.holes] == [wells[2].bounds, wells[1].bounds]  # by level: the roof flight of L3 is not L2's
+    for room in (l0, l1, l2):
+        buffered = [h.buffer(WELL_CLEARANCE_M) for h in room.holes]
+        assert all(k.equals(b) for k, b in zip(room.keepouts, buffered, strict=False))
+    assert [k.bounds for k in l0.keepouts[1:]] == [ENDS[0][0].bounds]
+    assert [k.bounds for k in l1.keepouts[2:]] == [ENDS[1][0].bounds, ENDS[0][1].bounds]
+    assert [k.bounds for k in l2.keepouts[2:]] == [ENDS[2][0].bounds, ENDS[1][1].bounds]
+    assert [t.bounds for t in l0.targets] == [ENDS[0][0].bounds]
+    assert [t.bounds for t in l1.targets] == [ENDS[1][0].bounds]
+    assert [t.bounds for t in l2.targets] == [ENDS[2][0].bounds]  # the foot of the roof climb
+
+
+@pytest.mark.parametrize(("v0", "floors"), [(0.9, ["b/L0"]), (3.0, ["b/L1"]), (3.9, ["b/L1"]), (2.8, []), (6.9, ["b/L2"]), (9.0, [])])
+def test_floor_room_panes_only_from_its_own_storey(v0: float, floors: list[str]) -> None:
+    window = Hole("window", 0, 14.0, v0, 1.2, 1.4, 0.3, GLASS_VIEW, 3, 0)
+    dark = Hole("window", 0, 3.0, v0, 1.2, 1.4, 0.3, "glass_dark", 1, 0)
+    rooms = _floors([(SOUTH, window), (SOUTH, dark)])
+    assert [r.room_id for r in rooms if r.panes] == floors
+    t = DEFAULT.interiors.wall_thickness_m
+    for room in rooms:
+        assert [p.bounds for p in room.panes] == ([pytest.approx((14.0, 0.0, 15.2, t + FLOORS.pane_clear_m))] if room.panes else [])
+
+
+def _planner(room: FurnishRoom, furnish: ShopFurnish = FLOORS) -> _Planner:
+    return _Planner(room, furnish, ASSETS, 48152, "b")
+
+
+def _well_room(*, holes=True, targets=()) -> FurnishRoom:
+    well = box(4.0, 4.0, 7.0, 5.1)
+    return FurnishRoom("b/L1", box(0.0, 0.0, 10.0, 8.0), DOOR_ZONE, 5.8, panes=(), floor_m=3.0,
+                       holes=(well,) if holes else (), keepouts=(well.buffer(WELL_CLEARANCE_M),), targets=targets, reach_m=0.6)
+
+
+@pytest.mark.parametrize(("gap", "reason"), [(0.29, "stair_zone"), (0.31, None)])
+def test_no_piece_in_a_well_plus_clearance(gap: float, reason: str | None) -> None:
+    assert _planner(_well_room()).conflict(box(7.0 + gap, 4.2, 7.8, 4.8)) == reason
+
+
+@pytest.mark.parametrize(("level", "zone"), [(0, ("foot", 0)), (1, ("arrival", 0)), (1, ("foot", 1)), (2, ("foot", 2)), (2, ("arrival", 1))])
+def test_no_piece_in_a_stair_foot_or_arrival_zone(level: int, zone: tuple[str, int]) -> None:
+    room = _floors()[level]
+    kind, flight = zone
+    rect = ENDS[flight][0 if kind == "foot" else 1]
+    inside = rect.buffer(-0.1, join_style="mitre")
+    planner = _planner(room)
+    expected = "door_zone" if room.door_zone.equals(rect) else "stair_zone"  # the arrival from below is that floor's entry
+    assert planner.conflict(inside) == expected
+    assert planner.allowed().intersection(rect).area <= 1e-9  # the wall search never offers it either
+
+
+def test_no_piece_in_the_ground_floor_door_zone_and_none_needed_upstairs() -> None:
+    l0, l1, _ = _floors()
+    door = _door_zone(SOUTH, FRONT_DOOR, DEFAULT.interiors)
+    spot = door.buffer(-0.05, join_style="mitre")
+    assert _planner(l0).conflict(spot) == "door_zone"
+    assert not any(k.intersects(door) for k in l1.keepouts)  # the precondition of the next line
+    assert _planner(l1).conflict(spot) is None
+
+
+def test_no_piece_in_a_pane_band_and_the_piece_stays_inside_the_polygon_less_wall_gap() -> None:
+    window = Hole("window", 0, 14.0, 3.9, 1.2, 1.4, 0.3, GLASS_VIEW, 3, 0)
+    l1 = _floors([(SOUTH, window)])[1]
+    planner = _planner(l1)
+    t = DEFAULT.interiors.wall_thickness_m
+    assert planner.conflict(box(14.2, t + FLOORS.pane_clear_m - 0.01, 15.0, 1.0)) == "pane_band"
+    assert planner.conflict(box(14.2, t + FLOORS.pane_clear_m + 0.01, 15.0, 1.0)) is None
+    assert planner.conflict(box(14.2, t + FLOORS.wall_gap_m - 0.01, 15.0, 1.0).difference(box(0, 0, 24, 0.3 + 0.16))) is None
+    assert planner.conflict(box(8.0, 17.7 - FLOORS.wall_gap_m + 0.01, 9.0, 17.0)) == "outside_room"
+    assert planner.conflict(box(8.0, 17.0, 9.0, 17.7 - FLOORS.wall_gap_m)) is None
+
+
+@pytest.mark.parametrize(("height", "fits"), [(5.8 - 3.0 - 0.1, True), (5.8 - 3.0 - 0.1 + 0.01, False)])
+def test_head_clear_on_an_upper_floor_both_sides_of_the_boundary(height: float, fits: bool) -> None:
+    room = _floors()[1]
+    asset = _asset("tall", (1.0, 0.4, height), role="room_furniture")
+    assert _planner(room).fits_height(asset) is fits
+    assert _planner(replace(room, floor_m=0.0)).fits_height(asset)  # from the ground it would fit: the floor counts
+    result = plan_room(room, _furnish(wall=["tall"], max_pieces_per_room=1), {"tall": asset}, 48152, "b")
+    if fits:
+        assert isinstance(result, RoomFurnishing) and result.pieces[0].z_m == 3.0
+    else:
+        assert result == "no_free_wall"
+
+
+def _furnished_stairs(seed: int = 48152, furnish: ShopFurnish = FLOORS, catalogue=None):
+    plan, built = _stairs()
+    furnishing = ShopFurnishing.of_floors(furnish, catalogue or ASSETS, seed)
+    messages = furnishing.furnish_floors("b", plan, built, [], DEFAULT.interiors)
+    return furnishing, built, messages
+
+
+def test_pieces_on_upper_floors_record_z_equal_floor_z_and_ids_continue_across_floors() -> None:
+    furnishing, built, messages = _furnished_stairs()
+    assert messages == []
+    rooms = built.spec["rooms"]
+    assert all("furnishing" in r for r in rooms)
+    ids = [p["id"] for r in rooms for p in r["furnishing"]["pieces"]]
+    assert ids == [f"furnish/b/{n}" for n in range(len(ids))]
+    for room in rooms:
+        assert room["furnishing"]["pieces"]
+        assert {p["position_m"][2] for p in room["furnishing"]["pieces"]} == {room["floor_z_m"]}
+    assert furnishing.stats()["floor_rooms"] == furnishing.stats()["furnished_rooms"] == 3
+
+
+def test_every_furnished_floor_keeps_its_entry_feet_and_well_clear() -> None:
+    _, built, _ = _furnished_stairs()
+    for room, record in zip(_floors(), built.spec["rooms"], strict=True):
+        pieces = [Polygon(p["footprint_m"]) for p in record["furnishing"]["pieces"]]
+        for footprint in pieces:
+            assert PLAN.inner.buffer(-FLOORS.wall_gap_m + 1e-6, join_style="mitre").contains(footprint)
+            for zone in (room.door_zone, *room.keepouts, *room.holes):
+                assert footprint.intersection(zone).area <= 1e-9
+        walk = PLAN.inner.difference(unary_union([*room.holes, *pieces])).buffer(-FLOORS.walk_width_m / 2)
+        reached = [c for c in polygons_of(walk) if c.distance(room.door_zone) <= 0.6 + 1e-9]
+        assert reached and all(any(c.distance(t) <= 0.6 + 1e-9 for c in reached) for t in room.targets)
+
+
+def _corner_room(**kw) -> FurnishRoom:
+    target = box(8.95, 0.05, 9.95, 1.15)  # a stair foot in the corner, between two walls and a well
+    return FurnishRoom("b/L1", box(0.0, 0.0, 10.0, 6.0), box(0.0, 2.0, 1.5, 3.8), 5.8, floor_m=3.0,
+                       keepouts=(target,), targets=kw.pop("targets", (target,)), reach_m=0.6, **kw)
+
+
+def test_a_piece_that_walls_off_a_stair_foot_cuts_the_path_even_where_nothing_is_cut_off() -> None:
+    fence = [box(7.4, 0.0, 8.9, 2.6), box(8.9, 1.2, 10.0, 2.6)]
+    assert _planner(_corner_room()).path_cut(fence)
+    assert not _planner(_corner_room(targets=())).path_cut(fence)  # the same pieces cut nothing else off
+    assert not _planner(_corner_room()).path_cut([box(7.4, 3.0, 8.9, 4.0)])
+
+
+def test_a_piece_that_would_cut_the_path_to_a_stair_foot_is_refused_blocks_path() -> None:
+    target = box(6.9, 0.05, 7.95, 1.15)  # a stair foot at the far end of the corridor from the door
+    room = FurnishRoom("b/L1", NARROW, WEST_DOOR, 5.8, floor_m=3.0, keepouts=(target,), targets=(target,), reach_m=0.6)
+    deep = _asset("deep", (1.5, 0.72, 2.0))
+    result = plan_room(room, _furnish(wall=["deep"], max_pieces_per_room=12), {"deep": deep}, 48152, "b")
+    assert result == "blocks_path" or "blocks_path" in result.refusals
+    pieces = [] if isinstance(result, str) else [p.footprint for p in result.pieces]
+    walk = room.polygon.difference(unary_union(pieces)).buffer(-0.6)
+    reached = [c for c in polygons_of(walk) if c.distance(room.door_zone) <= 0.6]
+    assert any(c.distance(target) <= 0.6 + 1e-9 for c in reached)
+
+
+@pytest.mark.parametrize(("shift", "blocked"), [(0.0, True), (0.04, False)])
+def test_a_front_zone_over_a_well_blocks(shift: float, blocked: bool) -> None:
+    well = box(4.0, 5.0 - shift, 7.0, 6.0 - shift)  # the front of a 0.8 m deep piece on the north wall ends at y 5.97
+    room = FurnishRoom("b/L1", box(0.0, 0.0, 10.0, 8.0), DOOR_ZONE, 5.8, floor_m=3.0, holes=(well,), reach_m=0.6)
+    planner = _planner(room)
+    footprint, front = box(4.5, 7.17, 6.0, 7.97), box(4.5, 5.97, 6.0, 7.17)
+    assert planner.blocks(footprint, front) is blocked
+
+
+def test_an_empty_floor_with_no_path_from_its_entry_to_a_foot_is_refused_whole() -> None:
+    target = box(6.5, 0.6, 7.5, 1.7)
+    split = FurnishRoom("b/L1", NARROW, WEST_DOOR, 5.8, floor_m=3.0, holes=(box(4.0, 0.05, 5.0, 2.55),), targets=(target,), reach_m=0.6)
+    assert plan_room(split, FLOORS, ASSETS, 48152, "b") == "blocks_path"
+    whole = replace(split, holes=())
+    assert isinstance(plan_room(whole, FLOORS, ASSETS, 48152, "b"), RoomFurnishing)
+    alone = replace(split, targets=())  # without the foot, the floor west of the well is furnished
+    assert isinstance(plan_room(alone, FLOORS, ASSETS, 48152, "b"), RoomFurnishing)
+    none_wanted = replace(FLOORS, max_pieces_per_room=0)  # refused before any piece is tried, not for want of a wall
+    assert plan_room(split, none_wanted, ASSETS, 48152, "b") == "blocks_path"
+    assert plan_room(alone, none_wanted, ASSETS, 48152, "b") == "no_free_wall"
+
+
+def _floor_records(**kw) -> str:
+    _, built, _ = _furnished_stairs(**kw)
+    return json.dumps(built.spec["rooms"], sort_keys=True)
+
+
+def test_floor_furnishing_is_deterministic_and_set_order_free() -> None:
+    first = _floor_records()
+    assert first == _floor_records()
+    generic = FLOORS.sets["generic"]
+    reversed_set = {"generic": FurnishSet((), tuple(reversed(generic.wall)), ())}
+    assert _floor_records(furnish=replace(FLOORS, sets=reversed_set), catalogue=dict(reversed(list(ASSETS.items())))) == first
+    assert _floor_records(seed=7) != first
+
+
+def test_residential_budget_wording_and_boundaries() -> None:
+    budget = FurnishBudget.of(replace(FLOORS, max_triangles=1000, max_collision_triangles=24, max_assets=1), FLOOR_SCOPE)
+    assert budget.scope == "interiors.furnish"
+    assert budget.refuse(_furnished(1000)) is None
+    assert budget.refuse(_furnished(1001)) == "triangle_budget: needs 1001 triangles, 1000 left of interiors.furnish.max_triangles 1000"
+    assert budget.refuse(_furnished(1, solid=2)) is None
+    assert budget.refuse(_furnished(1, solid=3)) == (
+        "collision_budget: needs 36 collision triangles, 24 left of interiors.furnish.max_collision_triangles 24")
+    budget.spend(_furnished(10, asset_id="a"))
+    assert budget.refuse(_furnished(1, asset_id="b")) == "asset_cap: needs 2 distinct assets, 1 allowed by interiors.furnish.max_assets"
+    shop = FurnishBudget.of(FURNISH)
+    assert shop.scope == "shops.furnish" and shop.used == {"triangles": 0, "collision_triangles": 0} and budget.used["triangles"] == 10
+
+
+def test_room_record_method_residential_furnishing_and_provenance() -> None:
+    furnishing, built, _ = _furnished_stairs()
+    for room in built.spec["rooms"]:
+        block = room["furnishing"]
+        assert block["method"] == "residential_furnishing" and block["set"] == "generic" and block["attribute_origin"] == "generated"
+        assert set(block["refusals"]) <= {"blocks_path"}  # residential floors have no counter to miss
+        for piece in block["pieces"]:
+            assert piece["slot"] == "wall" and piece["catalogue"] == "kenney_furniture"
+            assert piece["attribute_origin"] == "generated" and piece["semantics_origin"] == "estimated"
+            assert piece["asset_id"] in {e.id for e in FLOORS.sets["generic"].wall}
+            assert piece["licence"] == "CC0-1.0" and len(piece["glb_sha256"]) == 64 and piece["triangles"] > 0
+            assert isinstance(piece["solid"], bool)
+        assert block["collision_triangles"] == COLLIDER_TRIANGLES * sum(p["solid"] for p in block["pieces"])
+        assert block["visual_triangles"] == sum(p["triangles"] for p in block["pieces"])
+    stats = furnishing.stats()
+    assert "shop_rooms" not in stats and stats["max_triangles"] == FLOORS.max_triangles
+    assert stats["visual_triangles"] == sum(r["furnishing"]["visual_triangles"] for r in built.spec["rooms"])
+
+
+def test_the_light_of_each_floor_stays_and_its_probes_leave_its_own_pieces() -> None:
+    _, built, _ = _furnished_stairs()
+    bare = BUILT.light_anchors["rooms"]
+    for before, after, record in zip(bare, built.light_anchors["rooms"], built.spec["rooms"], strict=True):
+        assert (after["light_m"], after["range_m"]) == (before["light_m"], before["range_m"])
+        pieces = [Polygon(p["footprint_m"]) for p in record["furnishing"]["pieces"]]
+        probes = after["probes_m"]
+        columns = {(probes[k], probes[k + 1]) for k in range(0, len(probes), 3)}
+        assert columns and not any(f.contains(Point(x, y)) for f in pieces for x, y in columns)
+        old = before["probes_m"]
+        assert columns <= {(old[k], old[k + 1]) for k in range(0, len(old), 3)}
+
+
+def test_shop_planner_unchanged_with_default_fields() -> None:
+    """B3 records, pinned from the commit before ADR-034 (the default room fields must not move a shop piece)."""
+    import hashlib
+
+    shop = replace(DEFAULT.interiors.shops.furnish, enabled=True)
+    pins = {"bar": "90fd63787a4ad3367dd14ae570e08da6fd34d9a7f18dacbc1e9152d7f72acc2f",
+            "bakery": "79f5f14bd03e41179467691e21315afb761d514039ee16a3c476fb4658b66b27",
+            "generic": "bfe702212d7076f9bbadeb86c06ed545e143297d57cc3860b7727807de25487d"}
+    for category, pin in pins.items():
+        room = FurnishRoom("b/L0", ROOM, DOOR_ZONE, 3.0, category, (box(0.5, -0.3, 2.0, 0.15),), (WINDOW.exterior,))
+        result = plan_room(room, shop, ASSETS, 48152, "b")
+        assert isinstance(result, RoomFurnishing) and result.method == "shop_furnishing"
+        assert hashlib.sha256(json.dumps(result.record("b", 0), sort_keys=True).encode()).hexdigest() == pin

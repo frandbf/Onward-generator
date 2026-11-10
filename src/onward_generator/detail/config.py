@@ -248,6 +248,8 @@ class Interiors:
     door_clearance_m: float
     lights_max: int
     shops: ShopInteriors
+    furnish: ShopFurnish = ShopFurnish()
+    """Catalogue furniture on the floors of the stair interior (ADR-034). Off by default; an absent block is off."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,7 +392,7 @@ def _furnish_entry(item: str | Mapping[str, Any]) -> FurnishEntry:
 
 
 def _shop_furnish(d: Mapping[str, Any] | None) -> ShopFurnish:
-    """The ``interiors.shops.furnish`` block. Absent, furnishing is off."""
+    """The ``interiors.shops.furnish`` block, or the ``interiors.furnish`` one (same shape). Absent, furnishing is off."""
     if d is None:
         return ShopFurnish()
     sets = {
@@ -413,16 +415,8 @@ def _shop_furnish(d: Mapping[str, Any] | None) -> ShopFurnish:
     )
 
 
-def furnish_problems(furnish: ShopFurnish, categories: Sequence[str], assets: Path) -> list[str]:
-    """Why an enabled furnishing block cannot load: a set key that is no category, or a row that is not a piece of furniture.
-
-    Each row must be in ``catalogues`` (the allow-listed CC0 interior catalogues under ``assets``), have
-    ``placement: interior``, not be a tile, a character or loose clutter (``FURNISH_EXCLUDED_IDS``), and not be
-    deeper than its slot allows after its turn. Decor comes from ``kenney_food`` only. Reads the manifests, never a GLB.
-    """
-    where = "/interiors/shops/furnish"
-    problems = [f"{where}/sets: {name!r} is not a shop category or 'generic'" for name in furnish.sets
-                if name not in categories and name != "generic"]  # the schema requires the generic set
+def _catalogue_rows(furnish: ShopFurnish, assets: Path, where: str, problems: list[str]) -> dict[str, tuple[str, Mapping[str, Any]]]:
+    """Every row of the allow-listed catalogues the block names, by id; a catalogue without a readable manifest is a problem."""
     rows: dict[str, tuple[str, Mapping[str, Any]]] = {}
     for catalogue in furnish.catalogues:
         try:
@@ -433,6 +427,41 @@ def furnish_problems(furnish: ShopFurnish, categories: Sequence[str], assets: Pa
         for row in manifest.get("assets") or []:
             if isinstance(row, Mapping) and row.get("id"):
                 rows[str(row["id"])] = (catalogue, row)
+    return rows
+
+
+def floor_furnish_problems(furnish: ShopFurnish, assets: Path) -> list[str]:
+    """Why an enabled ``interiors.furnish`` block (the floors of the stair interior, ADR-034) cannot load.
+
+    The schema allows the one ``generic`` set. It takes wall pieces only: a non-empty ``counter`` or ``decor`` is
+    refused. Each wall row passes the shop rows' checks (``_entry_problems``): an allowed catalogue, ``placement:
+    interior``, not ``FURNISH_EXCLUDED_IDS``, at most ``MAX_WALL_DEPTH_M`` deep after its turn. Reads the manifests, never a GLB.
+    """
+    where = "/interiors/furnish"
+    problems = [f"{where}/sets: {name!r} is not 'generic'" for name in furnish.sets if name != "generic"]
+    if "generic" not in furnish.sets:
+        problems.append(f"{where}/sets: the 'generic' set is required")
+    rows = _catalogue_rows(furnish, assets, where, problems)
+    for name, chosen in furnish.sets.items():
+        for slot in ("counter", "decor"):
+            if chosen.slot(slot):
+                problems.append(f"{where}/sets/{name}/{slot}: residential floors take wall pieces only")
+        problems.extend(f"{where}/sets/{name}/wall: {entry.id!r} {why}"
+                        for entry in chosen.wall for why in _entry_problems(entry, "wall", rows.get(entry.id)))
+    return problems
+
+
+def furnish_problems(furnish: ShopFurnish, categories: Sequence[str], assets: Path) -> list[str]:
+    """Why an enabled furnishing block cannot load: a set key that is no category, or a row that is not a piece of furniture.
+
+    Each row must be in ``catalogues`` (the allow-listed CC0 interior catalogues under ``assets``), have
+    ``placement: interior``, not be a tile, a character or loose clutter (``FURNISH_EXCLUDED_IDS``), and not be
+    deeper than its slot allows after its turn. Decor comes from ``kenney_food`` only. Reads the manifests, never a GLB.
+    """
+    where = "/interiors/shops/furnish"
+    problems = [f"{where}/sets: {name!r} is not a shop category or 'generic'" for name in furnish.sets
+                if name not in categories and name != "generic"]  # the schema requires the generic set
+    rows = _catalogue_rows(furnish, assets, where, problems)
     for name, chosen in furnish.sets.items():
         for slot in FURNISH_SLOTS:
             for entry in chosen.slot(slot):
@@ -590,6 +619,7 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
             door_clearance_m=float(i["door_clearance_m"]),
             lights_max=int(i["lights_max"]),
             shops=_shop_interiors(i["shops"]),
+            furnish=_shop_furnish(i.get("furnish")),
         ),
         urban_observed=MappingProxyType(
             {kind: MappingProxyType({k: frozenset(v) for k, v in tags.items()}) for kind, tags in sorted(doc["urban"]["observed"].items())}
@@ -613,6 +643,8 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
     furnish = cfg.interiors.shops.furnish
     if furnish.enabled:  # a default load never reads assets/
         problems += furnish_problems(furnish, [c.name for c in cfg.interiors.shops.categories], REPO_ROOT / "assets")
+    if cfg.interiors.furnish.enabled:
+        problems += floor_furnish_problems(cfg.interiors.furnish, REPO_ROOT / "assets")
     if problems:
         raise DetailConfigError(path or "<document>", problems)
     return cfg
