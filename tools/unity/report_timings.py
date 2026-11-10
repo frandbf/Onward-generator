@@ -40,7 +40,7 @@ def _seconds(report: dict[str, Any], prefix: str) -> dict[str, float]:
     seconds = report.get("seconds")
     if not isinstance(seconds, dict):
         return {}
-    return {f"{prefix}.{name}": float(value) for name, value in seconds.items() if isinstance(value, int | float)}
+    return {f"{prefix}.{name}": float(value) for name, value in seconds.items() if isinstance(value, int | float) and not isinstance(value, bool)}
 
 
 def _bake_rows(report: dict[str, Any]) -> dict[str, str]:
@@ -61,14 +61,23 @@ def _bake_rows(report: dict[str, Any]) -> dict[str, str]:
     return rows
 
 
-def column(scene_report: Path) -> tuple[str, dict[str, str]]:
-    """The column title and its cells (row name to text) for one scene report."""
-    report = _read(scene_report)
-    values = _seconds(report, "scene")
+def phase_seconds(scene_report: Path) -> dict[str, float]:
+    """``scene.<phase>`` and, with ``launcher_report.json`` beside it, ``launcher.<phase>`` seconds, in report order.
+
+    A value that is not a number is skipped; a report without a ``seconds`` object gives no rows.
+    ``tools/bench/bench.py`` reads the Unity timings through this function.
+    """
+    values = _seconds(_read(scene_report), "scene")
     launcher = scene_report.with_name("launcher_report.json")
     if launcher.is_file():
         values |= _seconds(_read(launcher), "launcher")
-    cells = {name: f"{value:.1f}" for name, value in values.items()}
+    return values
+
+
+def column(scene_report: Path) -> tuple[str, dict[str, str]]:
+    """The column title and its cells (row name to text) for one scene report."""
+    report = _read(scene_report)
+    cells = {name: f"{value:.1f}" for name, value in phase_seconds(scene_report).items()}
     cells |= _bake_rows(report)
     return str(report.get("package_id") or scene_report.parent.parent.name), cells
 

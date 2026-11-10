@@ -33,6 +33,8 @@ Those numbers are one scene, one route, one player, no bots. A match with player
 
 `MurciaPerfBuilder` is a measurement tool. It is not the export adapter. It does not modify phase-03 or phase-04 outputs.
 
+`task bench` ([01-pipeline.md](01-pipeline.md#benchmark)) records the predicted triangles, draws and lightmap pages and the Python and Unity Editor seconds of four fixed reference maps. Those are generator and Editor figures, not device measurements. The headset figures still come from the protocol below.
+
 ## Headset protocol
 
 - Quest 3 over USB, with debugging on.

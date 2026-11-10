@@ -467,6 +467,42 @@ onward-generator export package \
 
 A library texture plan does not pass `--download`. Add `--download` only for an older Poly Haven plan. `cadastre`, when it is used, sits between `geo` and `generate`.
 
+## Benchmark
+
+`task bench` ([commands.md](commands.md#benchmark), `tools/bench/bench.py`) measures the pipeline on four fixed reference maps from the [workshop-quality plan](plans/2026-11-07-workshop-quality.md), all with seed 48152, daytime, no AI and no Panoramax:
+
+| Id | Centre | Radius | Texels/m | Why |
+| --- | --- | --- | --- | --- |
+| `bench_murcia` | 37.98407, −1.12863 | 150 m | 10 | The base case |
+| `bench_madrid` | Puerta del Sol, 40.4169, −3.7035 | 300 m | 10 | The largest map that exports. `es.catastro` is forced on |
+| `bench_paris` | Île de la Cité, 48.8530, 2.3483 | 50 m | 40 | The worst bake. `fr.lidar_hd` is forced on |
+| `bench_krakow` | Rynek, 50.0614, 19.9366 | 150 m | 10 | Outside Spain, with the `central_european` facade style, which has no atlas |
+
+Everything lives under the gitignored `output/bench/`. The bench never reads or writes `maps/`:
+
+- `inputs/<id>/` holds the frozen inputs: `map.json`, `config/`, `reference/` and `data/raw/` with the `.source.json` sidecars. It never holds `data/processed`.
+- `runs/<UTC stamp>/<id>/` is a fresh copy of those inputs for each run, so every package is a new `pkg_01`. An existing run folder is refused.
+- `runs/<UTC stamp>/` also holds `bench_report.json`, `contact_sheet.png` and `bench_diff.md`.
+
+The first run downloads OSM and the source plugins' data, then copies what it downloaded into `inputs/<id>/data/raw`. A file already cached is never overwritten. Later runs skip every download whose file is cached. `--offline` refuses to start while one is missing. To refresh a map's inputs on purpose, delete `output/bench/inputs/<id>`.
+
+`bench_report.json` (schema `onward-bench`, version 1) is written with sorted keys. Its comparable body holds, for each map:
+
+- the reference parameters;
+- `inputs_sha256`, over the inputs' relative paths and bytes;
+- the generator version;
+- `visual_triangles` and `draws`, total and per tier, from `onward_export.json` `tiers`. A map with no core (`tiers: null`, such as Paris r50) is counted from the package's `scene_visual.glb` with the whole map as core, and `tiers_source` says so;
+- `view_draws` median, p90 and max;
+- `lightmap.pages_at_least` and `texels`.
+
+`created_at`, `package_id` and every path are left out. Everything that cannot be reproduced sits under `timings`:
+
+- the host: `--host-os`, `--host-gpu`, platform facts and `in_container`. No hostname is recorded;
+- per map, each stage's seconds. `setup_s` is map setup and every download; `python_s` is the rest, the figure the "Python on r150 with no network ≤ 30 s" criterion reads. `run` prints source downloads as Python time, so its console line is not compared one for one;
+- `unity`: `{status: missing}` until a bench package has `build/scene_report.json`, then the `scene.<phase>` and `launcher.<phase>` seconds from `tools/unity/report_timings.py`.
+
+The rule is that two runs on the same frozen inputs give the same report apart from `timings`. `task bench -- check A B` verifies that and names any field that differs. For the Unity seconds, run `task unity` on the host with a bench package, then `task bench -- report RUN_DIR`. These are Python and Editor figures, never device measurements.
+
 ## Do not mix
 
 - The Asset Store does not enter `generate` or the geo engine.

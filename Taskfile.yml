@@ -85,6 +85,17 @@ tasks:
       - task: smoke
       - task: test
 
+  bench:
+    desc: Fixed-seed benchmark of the reference maps into output/bench (task bench -- --only bench_murcia; report|compare|check, see tools/bench/bench.py)
+    vars:
+      # Read on the host, not in the image: the bake seconds depend on the host and its GPU.
+      HOST_OS:
+        sh: uname -srm
+      HOST_GPU:
+        sh: "system_profiler SPDisplaysDataType 2>/dev/null | awk -F': ' '/Chipset Model/ {print $2; exit}' || true"
+    cmds:
+      - "{{.RUN}} python tools/bench/bench.py --host-os '{{.HOST_OS}}' --host-gpu '{{.HOST_GPU}}' {{.CLI_ARGS}}"
+
   map:
     desc: Run the Python stages of `onward-generator run` in the image and stop after export (task map -- --name N --lat Y --lon X)
     interactive: true

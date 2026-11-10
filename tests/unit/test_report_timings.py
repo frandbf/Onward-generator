@@ -108,3 +108,29 @@ def test_report_that_is_not_an_object_fails(tmp_path: Path, capsys: pytest.Captu
 def test_no_argument_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:
     assert timings.main([]) == 2
     assert "report_timings.py PATH" in capsys.readouterr().err
+
+
+def test_phase_seconds_reads_scene_and_launcher_as_floats(tmp_path: Path) -> None:
+    report = _package(tmp_path, "pkg", NEW_SCENE, LAUNCHER) / "build" / "scene_report.json"
+    seconds = timings.phase_seconds(report)
+    assert seconds == {"scene.scene": 50.04, "scene.bake": 210.0, "scene.import": 12.25, "scene.gi_bake": 200.0,
+                       "scene.total": 261.0, "launcher.open": 9.0, "launcher.bundle": 30.2, "launcher.total": 41.0}
+    assert all(type(value) is float for value in seconds.values())
+
+
+def test_phase_seconds_skips_values_that_are_not_numbers(tmp_path: Path) -> None:
+    scene = {"seconds": {"bake": 3, "note": "x", "flag": True, "none": None}}
+    report = _package(tmp_path, "pkg", scene, {"seconds": "late"}) / "build" / "scene_report.json"
+    assert timings.phase_seconds(report) == {"scene.bake": 3.0}
+
+
+@pytest.mark.parametrize("scene", [{}, {"seconds": [1]}, {"lightmap_bake": {"lightmapper": "ProgressiveGPU"}}])
+def test_phase_seconds_without_a_seconds_object_is_empty(tmp_path: Path, scene: dict[str, Any]) -> None:
+    assert timings.phase_seconds(_package(tmp_path, "pkg", scene) / "build" / "scene_report.json") == {}
+
+
+def test_phase_seconds_refuses_a_launcher_report_that_is_not_an_object(tmp_path: Path) -> None:
+    report = _package(tmp_path, "pkg", OLD_SCENE) / "build" / "scene_report.json"
+    report.with_name("launcher_report.json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError, match="launcher_report.json is not a JSON object"):
+        timings.phase_seconds(report)

@@ -39,3 +39,14 @@ Every command is `onward-generator <command>`, the same as `python -m onward_gen
 | `ai plan` | Instruction to a validated configuration. `--instruction` or `--instruction-file`. `--provider ollama` (local, `--model`, default `qwen3:14b`), `none` (no model, `--intent FILE`), or `replay` (`--replay FILE`). `--out`, `[--confirm]`, `[--overwrite]`. See `10-ai.md`. | `0` written, `1` rejected, `3` needs confirmation |
 
 `run --source <id>` and `run --no-source <id>` (repeatable) turn a source plugin on or off for the map and store the choice in `map.json` `sources`; `--catastro` and `--no-catastro` are aliases for `es.catastro`. An unknown id, or one given to both, is a usage error. Usage errors return `2`. `run --verbose` prints each stage's full output; `run --preview` also draws the diagnostic PNGs of `generate` and `detail`; `run --no-unity` stops after `export` and prints the `task unity` command for the host.
+
+## Benchmark
+
+`task bench` runs `python tools/bench/bench.py` in the image, with the host's `uname -srm` and, on macOS, its GPU as `--host-os` and `--host-gpu`. It is measurement tooling, not a pipeline stage and not a quality gate. See [01-pipeline.md](01-pipeline.md#benchmark).
+
+| Command | What it does | Exit |
+| --- | --- | --- |
+| `task bench` / `task bench -- run [--only ID...] [--offline] [--against REPORT]` | Generate the four reference maps (`bench_murcia`, `bench_madrid`, `bench_paris`, `bench_krakow`) with seed 48152 in a new `output/bench/runs/<UTC stamp>/` folder, through every Python stage up to `export package`. Write `bench_report.json` and `contact_sheet.png`, then compare with the previous run, or with `--against`, in `bench_diff.md`. The first run uses the network. `--offline` refuses to start while a frozen download is missing. Never runs Unity, never reads or writes `maps/` | `0` / `1`, `2` usage |
+| `task bench -- report RUN_DIR` | Read the packages of a finished run again. Unity seconds appear once `task unity` has built a bench package | `0` / `1` |
+| `task bench -- compare OLD NEW` | Write `bench_diff.md` beside NEW and print it: old, new and delta for each map and metric | `0` / `1` |
+| `task bench -- check A B` | Exit `1` and name the JSON paths when two reports differ outside `timings` | `0` same / `1` |
