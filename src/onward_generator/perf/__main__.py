@@ -7,13 +7,15 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from shapely.geometry import shape
 
 from onward_generator.detail.scene import DetailError, load_base
+from onward_generator.gameplay.report import REPORT_FILE, gameplay_report, headline_text, report_text
 from onward_generator.generation.config import GenerationConfigError, load_generation_config
 from onward_generator.generation.scene import GenerationError
-from onward_generator.io import atomic_write_json, prepare_outputs
+from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs, sha256_file
 from onward_generator.perf.device import drawcall_trace, load_times, summarize_csv
 from onward_generator.perf.layout import TIME_OF_DAY_SETTINGS, LayoutError, gameplay_layout, load_detail_manifest, playable_layout
 from onward_generator.perf.measure import combine_groups, measure_scene_dir
@@ -53,6 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="playable layout only: day or night (ADR-026)",  # pragma: no mutate: help text
     )
     lay.add_argument("--storm", action="store_true", help="playable night layout only: lightning and thunder (ADR-028)")  # pragma: no mutate: help text
+    lay.add_argument(
+        "--gameplay-report", action="store_true",
+        help=f"playable layout only: also write {REPORT_FILE} beside --out (routes, sightlines, cover, balance; ADR-032)",  # pragma: no mutate: help text
+    )
     lay.add_argument("--overwrite", action="store_true")
 
     dev = sub.add_parser("device", help="summarise an OVR Metrics Tool CSV and the logcat of one run")
@@ -73,8 +79,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
         return 0 if exc.code in (0, None) else 2
+    want_report = args.command == "layout" and args.gameplay_report
+    if want_report and not args.playable:
+        print("perf: --gameplay-report needs --playable", file=sys.stderr)
+        return 1
+    report: dict[str, Any] | None = None
     try:
-        (target,) = prepare_outputs(Path(args.out).parent, (Path(args.out).name,), overwrite=args.overwrite)
+        names = (Path(args.out).name, *((REPORT_FILE,) if want_report else ()))
+        target, *report_target = prepare_outputs(Path(args.out).parent, names, overwrite=args.overwrite)
         if args.command == "measure":
             doc = {"schema": MEASURE_SCHEMA, "schema_version": SCHEMA_VERSION,
                    "note": "file contents only; device draw calls depend on culling and batching",
@@ -101,6 +113,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 scene = json.loads(Path(args.scene).expanduser().read_bytes())
                 footprints = {f["id"]: shape(f["geometry"]) for f in scene["features"]}
                 doc = playable_layout(base, manifest, heights, time_of_day=args.time_of_day, storm=args.storm, footprints=footprints)
+                if want_report:
+                    # Computed before either file is written: a refusal leaves both untouched.
+                    report = gameplay_report(base, manifest, doc, Path(args.detail).expanduser() / "scene_collision.glb")
             else:
                 doc = gameplay_layout(base, manifest)
         else:
@@ -113,6 +128,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"perf: {exc}", file=sys.stderr)
         return 1
     atomic_write_json(target, doc)
+    if report is not None:
+        # The report names the layout bytes it was computed from, so a stale report is recognised.
+        report["layout_sha256"] = sha256_file(target)
+        atomic_write_bytes(report_target[0], report_text(report).encode("utf-8"))
     if args.command == "measure":
         for s in doc["scenes"]:
             v, c = s["visual"], s["collision"]
@@ -138,6 +157,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         print(json.dumps({k: v for k, v in doc.items() if k not in ("metrics",)}, ensure_ascii=False)[:600])
     print(f"wrote {target}")
+    if report is not None:
+        print(f"gameplay: {headline_text(report)}  status {report['status']}  (estimated, report only)")
+        print(f"wrote {report_target[0]}")
     if args.command == "layout" and args.playable:
         from onward_generator.next_step import emit, export_command
 

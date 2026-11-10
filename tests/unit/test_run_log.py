@@ -297,6 +297,18 @@ def test_layout(tmp_path: Path) -> None:
     assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1")
 
 
+def test_layout_adds_the_gameplay_headline_of_this_layout_only(tmp_path: Path) -> None:
+    from onward_generator.io import sha256_file
+
+    layout = _write(tmp_path / "layout.json", {"routes": [1, 2]})
+    headline = {"distinct_routes": 3, "longest_open_sight_m": 42.5, "contact_diff_pct": 7.1}
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": sha256_file(layout)})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 2  gameplay: routes 3  sight 42.5 m  balance 7.1 %")
+    # A report left by an earlier run, for other layout bytes, is not shown.
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": "0" * 64})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 2")
+
+
 def test_export_hides_the_standing_unverified_adapter_warning(tmp_path: Path) -> None:
     out = tmp_path / "pkg_01"
     _write(out / "onward_export.json", {

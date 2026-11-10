@@ -115,6 +115,8 @@ Cada línea es un PR propio con su prueba. Lleva ADR cuando cambia una decisión
 
 **Estado de B1 (7 de noviembre de 2026):** hecho en la rama `workshop/b1`, desactivado por defecto. El núcleo sigue siendo un cuadrado alrededor del centro: los spawns y las rutas no existen todavía cuando corre `detail`. El coste sale de una sola ejecución de `detail` con el núcleo máximo, y el cuadrado se resuelve sin búsqueda. Dentro de ±5 % en r150, r300 y r500 (rejillas sintéticas en `tests/integration/test_core_budget.py` y los mapas del bench en [09-perf.md](../09-perf.md#budget-core)). La enmienda a ADR-017 queda `proposed` hasta la sesión de casco (A2).
 
+**Estado de B4 (7 de noviembre de 2026):** hecho en la rama `workshop/b4`, solo como informe y desactivado por defecto (`perf layout --playable --gameplay-report`, `"gameplay_report": true` en `map.json`, `bench.py run --gameplay-report`). `gameplay_report.json` va junto a `layout.json`; `layout.json` y el paquete no cambian, byte a byte, con la opción encendida o apagada. Las métricas de §1 en los cuatro mapas están en [09-perf.md](../09-perf.md#gameplay-metrics): rutas distintas 2, 3, 4 y 6; línea de visión abierta más larga 134 a 291 m (falla los 60 m propuestos en los cuatro); diferencia de contacto 5,2 %, 29,5 %, 0,7 % y 20,5 %; la cobertura N se informa sin umbral. Son estimaciones sobre la navmesh 2D. Una ruta comparte un tramo con otra cuando pasa a menos de 8 m: con solo las aristas compartidas, Murcia daba 6 rutas que eran carriles paralelos de la misma calle. ADR-032 queda `proposed` hasta la partida de prueba de 4.2. C6 y C7 no han empezado.
+
 ### Bloque C: realismo de bajo coste y escala
 
 | # | Incremento | Depende de |

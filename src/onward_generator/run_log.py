@@ -16,6 +16,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from onward_generator.gameplay.headline import REPORT_FILE, headline_text
+from onward_generator.io import sha256_file
+
 WIDTH = 100
 """Breakdown lines wrap at about this many columns."""
 INDENT = " " * 9
@@ -351,6 +354,12 @@ def _layout(out: Path) -> StageReport:
         points = layout.get(team)
         if isinstance(points, dict) and "points_m" in points:
             parts.append(f"{team} {len(points['points_m'])}")
+    report_path = out.with_name(REPORT_FILE)
+    # Only a report computed from this very layout.json: a stale one from an earlier run is not shown.
+    if report_path.is_file():
+        report = _read(report_path)
+        if report.get("layout_sha256") == sha256_file(out):
+            parts.append(f"gameplay: {headline_text(report)}")
     return StageReport("  ".join(parts))
 
 

@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import build_parser, main
-from onward_generator.maps.workspace import create_map, store_sources
+from onward_generator.maps.workspace import create_map, store_gameplay_report, store_sources
 from onward_generator.next_step import (
     STAGE_DIRS,
     cadastre_split_command,
@@ -1698,3 +1698,21 @@ def test_each_stage_marker_is_its_file_in_the_stage_directory(tmp_path: Path) ->
         "bounds": processed / "scene_playable" / "scene_visual.glb",
         "layout": processed / "layout" / "layout.json",
     }
+
+
+def test_the_gameplay_report_key_adds_only_the_flag_to_the_layout(tmp_path: Path) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=400)
+    before = plan_steps(root)
+    assert "--gameplay-report" not in dict(before)["layout"]
+    store_gameplay_report(root, False)
+    assert plan_steps(root) == before
+    store_gameplay_report(root, True)
+    after = plan_steps(root)
+    assert [name for name, _ in after] == [name for name, _ in before]
+    for (name, old), (_, new) in zip(before, after, strict=True):
+        if name != "layout":
+            assert new == old
+    layout = dict(after)["layout"]
+    assert layout[layout.index("--gameplay-report") + 1] == "--out"
+    assert [arg for arg in layout if arg != "--gameplay-report"] == dict(before)["layout"]

@@ -395,6 +395,21 @@ The ambience is `Suburban Day`, profile Urban/Day/`UrbanDay1`, far clip 1000, an
 
 The local card instantiates Free Roam, Hunt, and Uplink. The other modes stay in the layout. See [11-onward-sdk.md](11-onward-sdk.md).
 
+### Gameplay report (off by default)
+
+`perf layout --playable --gameplay-report` also writes `gameplay_report.json` beside `layout.json` (`onward_generator.gameplay_report` 0.1.0, [ADR-032](decisions/ADR-032-gameplay-metrics.md)). `run` passes the flag when `map.json` has `"gameplay_report": true`; a map without the key stays off, and a value that is not true or false is refused. The flag without `--playable` exits 1.
+
+| | |
+| --- | --- |
+| Reads | The playable layout document, the base partition, the playable `scene_detail.json` and `--detail`'s `scene_collision.glb` |
+| Writes | `gameplay_report.json` only. `layout.json` is the same, byte for byte, with the flag on or off, and `export package` never copies the report |
+| Measures | Distinct routes between the spawn blocks on a 2 m grid over the 2D navmesh islands and their overlap per pair, the longest open sightline from route samples without cover within 1.5 m, cover colliders per 25 m stretch, and each team's time to the Uplink at 4 m/s |
+| Provenance | `estimated`: the navmesh the adapter bakes is the real one |
+| Checks | `proposed_checks` says pass or fail against the plan §1 proposals (≥ 3 routes with ≤ 50 % overlap, sightline ≤ 60 m, contact difference ≤ 15 %; cover N is reported only). They never fail the stage or block an export |
+| Failures | A missing block, a spawn off the graph or no path is a `status` with null metrics. An unreadable collision GLB, or a layout that is not 0.3.0, exits 1 and writes neither file. Neither file is overwritten without `--overwrite` |
+
+The report records `layout_sha256`, the hash of the `layout.json` it was computed from. `run`'s layout line then ends with `gameplay: routes N  sight X m  balance Y %`, only when that hash matches the current `layout.json`.
+
 ## 11. Export, Unity, and Quest
 
 `onward-generator export package` and `export verify`. [12-export.md](12-export.md). [ADR-007](decisions/ADR-007-onward-export-adapter.md).

@@ -432,3 +432,78 @@ def test_host_flags_go_before_any_command(tmp_path: Path, capsys: pytest.Capture
     assert bench.main(["--host-os", "X", "compare", str(report), str(report)]) == 0
     assert bench.main(["check", str(report), str(report), "--host-os", "X"]) == 2
     capsys.readouterr()
+
+
+# ---------------------------------------------------------------------------------------------------- gameplay
+
+
+def _gameplay(root: Path, report: Any) -> Path:
+    path = root / "data" / "processed" / "layout" / "gameplay_report.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return root
+
+
+HEADLINE = {"distinct_routes": 2, "max_overlap_pct": 16.9, "longest_open_sight_m": 133.86,
+            "cover_per_100m_min_stretch": 0.0, "contact_diff_pct": 5.23}
+
+
+def test_gameplay_metrics_reads_the_headline(tmp_path: Path) -> None:
+    assert bench.gameplay_metrics(tmp_path) is None
+    root = _gameplay(tmp_path, {"status": "ok", "headline": HEADLINE, "pairs": []})
+    assert bench.gameplay_metrics(root) == {**HEADLINE, "status": "ok"}
+    nulls = dict.fromkeys(HEADLINE)
+    _gameplay(tmp_path, {"status": "no_path", "headline": nulls})
+    assert bench.gameplay_metrics(root) == {**nulls, "status": "no_path"}
+
+
+@pytest.mark.parametrize(("report", "message"), [
+    ({"status": "ok", "headline": {k: v for k, v in HEADLINE.items() if k != "contact_diff_pct"}}, "headline has no contact_diff_pct"),
+    ({"status": "ok", "headline": {**HEADLINE, "distinct_routes": "3"}}, "headline.distinct_routes must be a number or null"),
+    ({"status": "ok", "headline": {**HEADLINE, "max_overlap_pct": True}}, "headline.max_overlap_pct must be a number or null"),
+    ({"status": "ok"}, "headline must be an object"),
+    ({"status": 1, "headline": HEADLINE}, "status must be a string"),
+])
+def test_gameplay_metrics_refuses_a_broken_report(tmp_path: Path, report: Any, message: str) -> None:
+    with pytest.raises(bench.BenchError, match=message):
+        bench.gameplay_metrics(_gameplay(tmp_path, report))
+
+
+def test_map_entry_has_gameplay_only_when_the_report_exists(tmp_path: Path) -> None:
+    package = _package(tmp_path / "pkg")
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "map.json").write_text("{}", encoding="utf-8")
+    ref = bench.REFERENCE_MAPS[0]
+    plain = bench.map_entry(ref, package, inputs)
+    assert "gameplay" not in plain
+    assert bench.map_entry(ref, package, inputs, tmp_path / "run") == plain
+    root = _gameplay(tmp_path / "run", {"status": "ok", "headline": HEADLINE})
+    assert bench.map_entry(ref, package, inputs, root) == {**plain, "gameplay": {**HEADLINE, "status": "ok"}}
+
+
+def test_compare_rows_for_gameplay_read_missing_on_an_old_report() -> None:
+    old = _report()
+    new = _report()
+    new["maps"]["bench_murcia"]["gameplay"] = {**HEADLINE, "status": "ok"}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    assert "| bench_murcia | distinct routes | - | 2 | - |" in lines
+    assert "| bench_murcia | max route overlap % | - | 16.9 | - |" in lines
+    assert "| bench_murcia | longest open sight m | - | 133.9 | - |" in lines
+    assert "| bench_murcia | cover per 100 m (min stretch) | - | 0.0 | - |" in lines
+    assert "| bench_murcia | contact diff % | - | 5.2 | - |" in lines
+    same = bench.compare(new, new, old_name="r2", new_name="r2").splitlines()
+    assert "| bench_murcia | distinct routes | 2 | 2 | 0 |" in same
+    assert "| bench_murcia | contact diff % | 5.2 | 5.2 | 0.0 |" in same
+
+
+def test_report_command_reads_the_gameplay_report_again(tmp_path: Path) -> None:
+    run_dir = tmp_path / "r1"
+    _package(run_dir / "bench_murcia" / "data" / "processed" / "export")
+    report = _report()
+    report["maps"] = {"bench_murcia": report["maps"]["bench_murcia"]}
+    (run_dir / bench.REPORT_FILE).write_text(json.dumps(report), encoding="utf-8")
+    _gameplay(run_dir / "bench_murcia", {"status": "ok", "headline": HEADLINE})
+    assert bench.main(["report", str(run_dir)]) == 0
+    again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert again["maps"]["bench_murcia"]["gameplay"] == {**HEADLINE, "status": "ok"}
