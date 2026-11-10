@@ -31,7 +31,10 @@ FASCIA_GAP_M = 0.05
 FASCIA_CLEAR_M = 0.07
 # Shop furnishing (ADR-031). The catalogues it may read: placement interior, licence recorded CC0 1.0 in
 # docs/legal/data-sources.md. Street overgrow still refuses every interior row (overgrow/library.py).
-FURNISH_CATALOGUES = ("kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop")
+FURNISH_CATALOGUES = (
+    "kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop",
+    "quaternius_home_interior", "quaternius_ultimate_furniture", "quaternius_furniture",
+)
 FURNISH_DECOR_CATALOGUE = "kenney_food"
 FURNISH_SLOTS = ("counter", "wall", "decor")
 # Rows that are not furniture: floor, wall, fence and column tiles, a character, a mannequin, and things a player

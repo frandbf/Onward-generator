@@ -127,7 +127,7 @@
     "door_clearance_m": 1.5,
     "lights_max": 160,
     "furnish": {
-      "enabled": false,
+      "enabled": true,
       "max_triangles": 12000,
       "max_collision_triangles": 1200,
       "max_pieces_per_room": 6,
@@ -137,13 +137,13 @@
       "piece_gap_m": 0.1,
       "pane_clear_m": 0.15,
       "head_clear_m": 0.1,
-      "catalogues": ["kenney_furniture"],
+      "catalogues": ["kenney_furniture", "quaternius_home_interior"],
       "sets": {
         "generic": {
           "counter": [],
-          "wall": ["kenney_furniture_bookcaseOpen", "kenney_furniture_bookcaseClosedDoors", "kenney_furniture_bookcaseOpenLow",
-                   "kenney_furniture_cabinetTelevision", "kenney_furniture_cabinetTelevisionDoors", "kenney_furniture_sideTableDrawers",
-                   "kenney_furniture_desk"],
+          "wall": ["qt_home_Bookshelf", "qt_home_Shelf_2", "qt_home_Drawer_1", "qt_home_NightStand_1", "qt_home_Kitchen_Cabinet1",
+                   "qt_home_Kitchen_Fridge", "qt_home_Kitchen_Oven", "qt_home_Fireplace", "qt_home_Bathroom_WashingMachine",
+                   "qt_home_Houseplant_6", "kenney_furniture_bookcaseOpen", "kenney_furniture_cabinetTelevision"],
           "decor": []
         }
       }
@@ -162,7 +162,7 @@
       ],
       "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" },
       "furnish": {
-        "enabled": false,
+        "enabled": true,
         "max_triangles": 12000,
         "max_collision_triangles": 1200,
         "max_pieces_per_room": 8,
@@ -172,26 +172,26 @@
         "piece_gap_m": 0.1,
         "pane_clear_m": 0.15,
         "head_clear_m": 0.1,
-        "catalogues": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"],
+        "catalogues": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop", "quaternius_home_interior"],
         "sets": {
           "bakery": {
-            "counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_kitchenCabinetDrawer"],
-            "wall": ["Shelf_01", "kenney_furniture_bookcaseOpenLow", "kenney_furniture_bookcaseOpen"],
+            "counter": ["qt_home_Kitchen_3Drawers", "kenney_furniture_kitchenCabinet"],
+            "wall": ["qt_home_Shelf_Large", "qt_home_Kitchen_Fridge", "Shelf_01"],
             "decor": ["kenney_food_loaf", "kenney_food_croissant", "kenney_food_loaf_round", "kenney_food_cake"]
           },
           "pharmacy": {
-            "counter": ["kenney_furniture_kitchenCabinetDrawer", "kenney_furniture_desk"],
-            "wall": ["kenney_furniture_bookcaseClosedDoors", "kenney_furniture_bookcaseClosed", "Shelf_01"],
+            "counter": ["qt_home_Drawer_2", "kenney_furniture_desk"],
+            "wall": ["qt_home_Shelf_Large", "qt_home_Bookshelf", "kenney_furniture_bookcaseClosedDoors"],
             "decor": []
           },
           "bar": {
-            "counter": ["kenney_furniture_kitchenBar", "kenney_furniture_kitchenCabinet"],
-            "wall": ["kenney_furniture_bookcaseOpenLow", "kenney_furniture_sideTable", "kenney_furniture_cabinetTelevision"],
+            "counter": ["qt_home_Drawer_3", "kenney_furniture_kitchenBar"],
+            "wall": ["qt_home_Kitchen_Fridge", "qt_home_Shelf_2", "kenney_furniture_bookcaseOpenLow"],
             "decor": ["kenney_food_cup_coffee", "kenney_food_glass_wine", "kenney_food_wine_red", "kenney_food_soda_bottle"]
           },
           "generic": {
-            "counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_desk"],
-            "wall": ["kenney_furniture_bookcaseOpen", "Shelf_01", "kenney_furniture_bookcaseClosedWide", "kenney_shop_display_small"],
+            "counter": ["qt_home_Drawer_2", "kenney_furniture_kitchenCabinet"],
+            "wall": ["qt_home_Shelf_Large", "qt_home_Shelf_2", "qt_home_Drawer_1", "kenney_shop_display_small", "Shelf_01"],
             "decor": []
           }
         }

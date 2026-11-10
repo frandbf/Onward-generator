@@ -61,7 +61,7 @@ def test_a_transparent_glb_is_refused() -> None:
 
 def test_every_allowed_catalogue_is_cc0_in_its_manifest_and_in_the_licence_record() -> None:
     record = (REPO_ROOT / "docs" / "legal" / "data-sources.md").read_text(encoding="utf-8")
-    shop_rows = [line for line in record.splitlines() if "CC0 1.0" in line and ("assets/kenney_" in line or "assets/polyhaven_shop" in line)]
+    shop_rows = [line for line in record.splitlines() if "CC0 1.0" in line and ("assets/kenney_" in line or "assets/polyhaven_shop" in line or "assets/quaternius_" in line)]
     for name in FURNISH_CATALOGUES:
         manifest = json.loads((ASSETS / name / "manifest.json").read_text(encoding="utf-8"))
         assert interior_licence(manifest["source"]) == "CC0-1.0", name

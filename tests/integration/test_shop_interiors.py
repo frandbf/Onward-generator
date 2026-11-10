@@ -26,6 +26,10 @@ from tests.integration.test_detail_pipeline import _inside
 
 GEN = load_generation_config()
 DOC = selective_interiors(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+# Furnishing is on by default since 10 November 2026; these interior tests measure the rooms without it, and the
+# furnishing tests (test_shop_furnishing.py, test_floor_furnishing.py) switch it on explicitly.
+DOC["interiors"]["shops"]["furnish"]["enabled"] = False
+DOC["interiors"]["furnish"]["enabled"] = False
 CFG = config_from_document(DOC)
 SHOP = "osm-way-312"
 

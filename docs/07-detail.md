@@ -182,9 +182,9 @@ Every building with a `shopfront` ground floor (the evidence above) gets a gener
 
 Before this change a shop building could get the stair interior when it matched the rule (building 312 on the test block did: three floors and a stair behind a shopfront), and every other shop was a closed volume behind dark glass.
 
-#### Furnishing (opt-in, ADR-031)
+#### Furnishing (on by default, ADR-031)
 
-Off by default: `interiors.shops.furnish.enabled` is `false` in `config/detail.default.json`, and a configuration without the `furnish` block is off. With it off nothing is planned, no catalogue is read, and every file is as before (`task bench -- check` against the baseline run). To try it, pass `detail --config` a copy of the default with `enabled: true`. [ADR-031](decisions/ADR-031-shop-furnishing.md) is proposed until the headset checks in `docs/09-perf.md` have run.
+On by default since 10 November 2026: `interiors.shops.furnish.enabled` is `true` in `config/detail.default.json` (the maintainer's decision, before the headset session; ADR-031 amendment). A configuration without the `furnish` block, or with `enabled: false`, plans nothing, reads no catalogue, and writes every file as before furnishing existed. The default sets mix Kenney, Poly Haven and Quaternius Ultimate Home Interior rows (`assets/quaternius_home_interior`), lighter pieces (68–600 triangles) that let more rooms fit `max_triangles`; the set order does not matter, since the planner starts at a seeded row of the id-sorted set. [ADR-031](decisions/ADR-031-shop-furnishing.md) is proposed until the headset checks in `docs/09-perf.md` have run.
 
 `detail` plans catalogue furniture in each reachable shop room after the room is built and charged (`detail/furnish.py`); `overgrow place` builds it (`docs/01-pipeline.md`, 8c). Every piece is `attribute_origin: generated`, and the rows' semantics are `estimated` (no person reviewed a rendered view).
 
@@ -253,9 +253,9 @@ Walls, floors, slab soffits, and stairs use `interior_wall`, `interior_floor`, a
 
 Windows, shopfronts, and balcony doors below the accessible ceiling keep a hole through the exterior wall and the inner wall, and one glass quad in that hole. The quad is `glass_view`: a single piece, no flipped copy, and no renderer collider. The same opening is cut out of the concrete wall collider, through the full wall thickness, and one closed pane is written on a separate collision node `<id>#glass`. The pane is 2 cm thick, centred in the wall, and inset 1 cm from the jambs. The adapter assigns `PP_Sprite_Lit` and the window PNG on `_MainTex`. That shader is already transparent and draws both faces, so the pane is visible from the street and from the room. The dark fill of the window image is about 0.35 alpha; the frame and mullions stay opaque. The image is RGBA and is not a tile of the opaque atlas. `PP_Opaque_Simple_Lit` still covers windows above the accessible ceiling, buildings without an interior, and `glass_boarded`. Those stay solid concrete: they are not openings. The stone frame, the sill, the header, and the pier stay concrete. A window that does not land on the inner wall is omitted (`interior_window_omitted`, info). The counts are `through_windows` and `omitted_windows` on the interior record. A shop's display window is the exception: `shop_glass`, no frame, no pane collider (*Shop interiors*), so `glass_panes` plus `open_shopfronts` matches `through_windows`; a stair interior has no shopfront and its `glass_panes` matches `through_windows`. Transparency on Quest is a known cost and has not been measured.
 
-#### Floor furnishing (opt-in, ADR-034)
+#### Floor furnishing (on by default, ADR-034)
 
-Off by default: `interiors.furnish.enabled` is `false` in `config/detail.default.json`, and a configuration without the block is off. With it off nothing is planned, no catalogue is read, and every file is as before. To try it, pass `detail --config` a copy of the default with `enabled: true`. [ADR-034](decisions/ADR-034-residential-floor-furnishing.md) is proposed until the headset checks in `docs/09-perf.md` have run.
+On by default since 10 November 2026: `interiors.furnish.enabled` is `true` in `config/detail.default.json` (ADR-034 amendment). A configuration without the block, or with `enabled: false`, plans nothing, reads no catalogue, and writes every file as before. The `generic` set has twelve wall pieces, ten of them Quaternius (`kenney_furniture` and `quaternius_home_interior`): no more distinct rows than `max_assets` (12), so variety alone never refuses a room as `asset_cap`. [ADR-034](decisions/ADR-034-residential-floor-furnishing.md) is proposed until the headset checks in `docs/09-perf.md` have run.
 
 The same planner as *Furnishing* above (ADR-031), on each floor record `<building>/L<n>` of a built stair interior (`kind: residential`), after the interior is charged. `overgrow place` builds the pieces at the floor's height. The interior stays `representative_of_real_interior: false`: the furniture is generic, `attribute_origin: generated`, `semantics_origin: estimated`, and says nothing about the real dwelling.
 
@@ -342,7 +342,7 @@ Material names that collide with the generation configuration are refused. Input
 | Shop interior visual triangles (`interiors.shops.max_triangles`) | 6 000 | 64 (test block, one shop) |
 | Interior collision triangles (`interiors.max_collision_triangles`) | 24 000 | 18 388 (Madrid probe, every match) |
 | Shop interior collision triangles (`interiors.shops.max_collision_triangles`) | 72 000 | 58 180 (Madrid, every match) |
-| Shop furniture visual triangles (`interiors.shops.furnish.max_triangles`, off by default) | 12 000 | 11 822 (bench_madrid, option on) |
+| Shop furniture visual triangles (`interiors.shops.furnish.max_triangles`, on by default since 10 November 2026) | 12 000 | 11 822 (bench_madrid, option on) |
 | Shop furniture collision triangles (`interiors.shops.furnish.max_collision_triangles`) | 1 200 | 516 (bench_madrid, option on) |
 | Shop furniture rows a map (`interiors.shops.furnish.max_assets`) | 16 | 13 (each bench map, option on) |
 | Interior lights (`interiors.lights_max`) | 160 | 5 (test block) |

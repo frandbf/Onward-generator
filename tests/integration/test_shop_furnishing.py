@@ -51,7 +51,7 @@ def on(detail_inputs):
     return _detail(detail_inputs, config_from_document(ON))
 
 
-def test_off_by_default_and_without_the_block_nothing_changes(detail_inputs, off) -> None:
+def test_off_and_without_the_block_nothing_changes(detail_inputs, off) -> None:
     absent = copy.deepcopy(DOC)
     del absent["interiors"]["shops"]["furnish"]
     bare = _detail(detail_inputs, config_from_document(absent))

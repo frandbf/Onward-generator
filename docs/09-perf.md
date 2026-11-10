@@ -125,7 +125,7 @@ Pending on the headset (A2), not measured: Unity `scene_report.json` triangles a
 
 ## Shop furnishing
 
-Plan B3, [ADR-031](decisions/ADR-031-shop-furnishing.md), off by default (`interiors.shops.furnish.enabled`). Package figures with the option on, on copies of the bench run `20261107T170959Z` (Docker, Apple M4 Pro): visual triangles 150 339 → 161 793 (bench_murcia), 398 025 → 409 847 (bench_madrid), 72 884 → 78 564 (bench_krakow); draws 213 → 247, 504 → 547, 272 → 293; view draws p90 181 → 211, 374 → 412, 219 → 238; lightmap pages unchanged. Generator figures, not device measurements.
+Plan B3, [ADR-031](decisions/ADR-031-shop-furnishing.md), on by default since 10 November 2026 (`interiors.shops.furnish.enabled`; it was off when these figures were taken). Package figures with the option on, on copies of the bench run `20261107T170959Z` (Docker, Apple M4 Pro): visual triangles 150 339 → 161 793 (bench_murcia), 398 025 → 409 847 (bench_madrid), 72 884 → 78 564 (bench_krakow); draws 213 → 247, 504 → 547, 272 → 293; view draws p90 181 → 211, 374 → 412, 219 → 238; lightmap pages unchanged. Generator figures, not device measurements.
 
 Pending on the headset (not done; the option stays off until they pass):
 
@@ -135,11 +135,11 @@ Pending on the headset (not done; the option stays off until they pass):
 - [ ] OVR Metrics in fixed views A and B looking into a furnished shop row: draws added against the 150 target, a median of at least 72 fps, graphics memory.
 - [ ] From the street, through the `shop_glass`, the furniture reads at scale and faces into the room (Kenney scale and facing are estimated, never reviewed from a rendered view).
 
-Then ADR-031 goes from proposed to accepted or is corrected. Turning furnishing on by default is a separate decision (plan 4.2).
+Then ADR-031 goes from proposed to accepted or is corrected. The maintainer turned furnishing on by default on 10 November 2026, before this session; its checks still decide whether ADR-031 is accepted or corrected.
 
 ## Residential floor furnishing
 
-Plan D7, [ADR-034](decisions/ADR-034-residential-floor-furnishing.md) (proposed), off by default (`interiors.furnish.enabled`). Bench runs on workshop/d7, Docker on an Apple M4 Pro, frozen inputs (`--offline`). Generator figures, not device measurements.
+Plan D7, [ADR-034](decisions/ADR-034-residential-floor-furnishing.md) (proposed), on by default since 10 November 2026 (`interiors.furnish.enabled`; off when these figures were taken). Bench runs on workshop/d7, Docker on an Apple M4 Pro, frozen inputs (`--offline`). Generator figures, not device measurements.
 
 - **Off.** Run `d7_off` against the baseline `d7_base` (workshop/d6): `bench.py check` finds no difference outside timings on all four maps, and every package file is byte-identical apart from `onward_export.json`.
 - **On.** Runs `d7_on` and `d7_on2` with `interiors.furnish.enabled: true` (a working-copy edit of `config/detail.default.json`, reverted after the runs; `run` has no flag for it), on bench_murcia, bench_madrid and bench_krakow; bench_paris has no interiors. `bench.py check` finds the two runs the same apart from timings, and their `scene_detail.json` objects and detail GLBs are byte-identical (only the `inputs` block, which records the run folder paths, differs).

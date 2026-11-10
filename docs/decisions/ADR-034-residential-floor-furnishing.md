@@ -46,6 +46,11 @@ See `docs/09-perf.md`, *Residential floor furnishing*, for the bench runs (optio
 
 Then this ADR goes from proposed to accepted, or is corrected.
 
+## Amendment (10 November 2026): on by default, Quaternius rows
+
+- **On by default.** `interiors.furnish.enabled` is `true` in the default configuration, by the maintainer's decision before the headset session. The status stays proposed until the checks below have run.
+- **Quaternius rows.** The `generic` set is twelve wall pieces, ten of them from `quaternius_home_interior` (bookshelf, shelves, drawers, night stand, kitchen cabinet, fridge, oven, fireplace, washing machine, house plant) and two Kenney. Twelve is `max_assets`, so variety alone never refuses a room as `asset_cap`.
+
 ## Rejected alternatives
 
 - **Charging the furniture to `interiors.max_triangles`.** It would turn down stair interiors to pay for furniture.

@@ -1,0 +1,1074 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://quaternius.com/packs/stylizednaturemegakit.html, CC0 1.0. Opaque models of the free Standard zip only. street_scale 0.5: Grass_Common_Tall 1.87 file units to 0.94 m, Rock_Medium_1 3.2 to 1.6 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_quaternius.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-10",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "qt_nature_DeadTree_1",
+      "file": "DeadTree_1.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dead tree 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Leafless dead tree with a twisted trunk and bare branches, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "damaged",
+      "tags": [
+        "dead",
+        "tree"
+      ],
+      "triangles": 6169,
+      "length_m": 3.074,
+      "depth_m": 2.874,
+      "height_m": 4.748,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_DeadTree_2",
+      "file": "DeadTree_2.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dead tree 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Leafless dead tree with a twisted trunk and bare branches, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "damaged",
+      "tags": [
+        "dead",
+        "tree"
+      ],
+      "triangles": 6557,
+      "length_m": 3.365,
+      "depth_m": 3.189,
+      "height_m": 5.744,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_DeadTree_3",
+      "file": "DeadTree_3.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dead tree 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Leafless dead tree with a twisted trunk and bare branches, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "damaged",
+      "tags": [
+        "dead",
+        "tree"
+      ],
+      "triangles": 5802,
+      "length_m": 3.194,
+      "depth_m": 3.215,
+      "height_m": 6.64,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_DeadTree_4",
+      "file": "DeadTree_4.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dead tree 4. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Leafless dead tree with a twisted trunk and bare branches, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "damaged",
+      "tags": [
+        "dead",
+        "tree"
+      ],
+      "triangles": 5702,
+      "length_m": 3.98,
+      "depth_m": 3.866,
+      "height_m": 6.385,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_DeadTree_5",
+      "file": "DeadTree_5.glb",
+      "category": "vegetation",
+      "role": "tree",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "dead tree 5. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Leafless dead tree with a twisted trunk and bare branches, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "damaged",
+      "tags": [
+        "dead",
+        "tree"
+      ],
+      "triangles": 5648,
+      "length_m": 4.178,
+      "depth_m": 4.207,
+      "height_m": 8.219,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Grass_Common_Short",
+      "file": "Grass_Common_Short.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "grass common short. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Opaque clump of grass common short blades, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "grass",
+        "common",
+        "short"
+      ],
+      "triangles": 155,
+      "length_m": 0.319,
+      "depth_m": 0.369,
+      "height_m": 0.667,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Grass_Common_Tall",
+      "file": "Grass_Common_Tall.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "grass common tall. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Opaque clump of grass common tall blades, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "grass",
+        "common",
+        "tall"
+      ],
+      "triangles": 326,
+      "length_m": 0.448,
+      "depth_m": 0.497,
+      "height_m": 0.936,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Grass_Wispy_Short",
+      "file": "Grass_Wispy_Short.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "grass wispy short. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Opaque clump of grass wispy short blades, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "grass",
+        "wispy",
+        "short"
+      ],
+      "triangles": 494,
+      "length_m": 0.661,
+      "depth_m": 0.605,
+      "height_m": 0.536,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Grass_Wispy_Tall",
+      "file": "Grass_Wispy_Tall.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "grass wispy tall. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Opaque clump of grass wispy tall blades, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "grass",
+        "wispy",
+        "tall"
+      ],
+      "triangles": 622,
+      "length_m": 0.77,
+      "depth_m": 0.797,
+      "height_m": 0.836,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Mushroom_Common",
+      "file": "Mushroom_Common.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mushroom common. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small mushroom common growing from the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "mushroom",
+        "common"
+      ],
+      "triangles": 880,
+      "length_m": 0.282,
+      "depth_m": 0.39,
+      "height_m": 0.232,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Mushroom_Laetiporus",
+      "file": "Mushroom_Laetiporus.glb",
+      "category": "vegetation",
+      "role": "plant",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "mushroom laetiporus. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small mushroom laetiporus growing from the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "mushroom",
+        "laetiporus"
+      ],
+      "triangles": 3216,
+      "length_m": 0.683,
+      "depth_m": 0.552,
+      "height_m": 0.383,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Round_1",
+      "file": "Pebble_Round_1.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble round 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small round pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "round"
+      ],
+      "triangles": 136,
+      "length_m": 0.25,
+      "depth_m": 0.184,
+      "height_m": 0.048,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Round_2",
+      "file": "Pebble_Round_2.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble round 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small round pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "round"
+      ],
+      "triangles": 114,
+      "length_m": 0.225,
+      "depth_m": 0.206,
+      "height_m": 0.047,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Round_3",
+      "file": "Pebble_Round_3.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble round 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small round pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "round"
+      ],
+      "triangles": 128,
+      "length_m": 0.225,
+      "depth_m": 0.242,
+      "height_m": 0.049,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Round_4",
+      "file": "Pebble_Round_4.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble round 4. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small round pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "round"
+      ],
+      "triangles": 126,
+      "length_m": 0.203,
+      "depth_m": 0.226,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Round_5",
+      "file": "Pebble_Round_5.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble round 5. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small round pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "round"
+      ],
+      "triangles": 124,
+      "length_m": 0.209,
+      "depth_m": 0.173,
+      "height_m": 0.05,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_1",
+      "file": "Pebble_Square_1.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 104,
+      "length_m": 0.217,
+      "depth_m": 0.22,
+      "height_m": 0.065,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_2",
+      "file": "Pebble_Square_2.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 78,
+      "length_m": 0.196,
+      "depth_m": 0.14,
+      "height_m": 0.07,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_3",
+      "file": "Pebble_Square_3.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 52,
+      "length_m": 0.187,
+      "depth_m": 0.159,
+      "height_m": 0.079,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_4",
+      "file": "Pebble_Square_4.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 4. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 48,
+      "length_m": 0.17,
+      "depth_m": 0.145,
+      "height_m": 0.084,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_5",
+      "file": "Pebble_Square_5.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 5. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 72,
+      "length_m": 0.176,
+      "depth_m": 0.225,
+      "height_m": 0.076,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Pebble_Square_6",
+      "file": "Pebble_Square_6.glb",
+      "category": "structures",
+      "role": "debris",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "pebble square 6. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Small square pebble lying on the ground, stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "pebble",
+        "square"
+      ],
+      "triangles": 65,
+      "length_m": 0.231,
+      "depth_m": 0.131,
+      "height_m": 0.069,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Round_Small_1",
+      "file": "RockPath_Round_Small_1.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path round small 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Round Small 1), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "round",
+        "small"
+      ],
+      "triangles": 998,
+      "length_m": 0.528,
+      "depth_m": 0.738,
+      "height_m": 0.056,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Round_Small_2",
+      "file": "RockPath_Round_Small_2.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path round small 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Round Small 2), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "round",
+        "small"
+      ],
+      "triangles": 1126,
+      "length_m": 0.57,
+      "depth_m": 0.677,
+      "height_m": 0.052,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Round_Small_3",
+      "file": "RockPath_Round_Small_3.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path round small 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Round Small 3), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "round",
+        "small"
+      ],
+      "triangles": 1002,
+      "length_m": 0.59,
+      "depth_m": 0.645,
+      "height_m": 0.055,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Round_Thin",
+      "file": "RockPath_Round_Thin.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path round thin. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Round Thin), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "round",
+        "thin"
+      ],
+      "triangles": 2254,
+      "length_m": 0.729,
+      "depth_m": 1.045,
+      "height_m": 0.055,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Round_Wide",
+      "file": "RockPath_Round_Wide.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path round wide. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Round Wide), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "round",
+        "wide"
+      ],
+      "triangles": 3500,
+      "length_m": 1.055,
+      "depth_m": 1.065,
+      "height_m": 0.056,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Square_Small_1",
+      "file": "RockPath_Square_Small_1.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path square small 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Square Small 1), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "square",
+        "small"
+      ],
+      "triangles": 783,
+      "length_m": 0.509,
+      "depth_m": 0.487,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Square_Small_2",
+      "file": "RockPath_Square_Small_2.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path square small 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Square Small 2), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "square",
+        "small"
+      ],
+      "triangles": 559,
+      "length_m": 0.496,
+      "depth_m": 0.483,
+      "height_m": 0.075,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Square_Small_3",
+      "file": "RockPath_Square_Small_3.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path square small 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Square Small 3), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "square",
+        "small"
+      ],
+      "triangles": 568,
+      "length_m": 0.418,
+      "depth_m": 0.538,
+      "height_m": 0.087,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Square_Thin",
+      "file": "RockPath_Square_Thin.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path square thin. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Square Thin), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "square",
+        "thin"
+      ],
+      "triangles": 1793,
+      "length_m": 0.78,
+      "depth_m": 0.993,
+      "height_m": 0.088,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_RockPath_Square_Wide",
+      "file": "RockPath_Square_Wide.glb",
+      "category": "structures",
+      "role": "path",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock path square wide. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Flat stepping stone for a garden path (Rock Path Square Wide), stylized low poly.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "path",
+        "square",
+        "wide"
+      ],
+      "triangles": 2256,
+      "length_m": 1.026,
+      "depth_m": 0.993,
+      "height_m": 0.088,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Rock_Medium_1",
+      "file": "Rock_Medium_1.glb",
+      "category": "structures",
+      "role": "rock",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock medium 1. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Medium grey boulder with faceted sides, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "medium"
+      ],
+      "triangles": 342,
+      "length_m": 1.613,
+      "depth_m": 1.495,
+      "height_m": 1.13,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Rock_Medium_2",
+      "file": "Rock_Medium_2.glb",
+      "category": "structures",
+      "role": "rock",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock medium 2. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Medium grey boulder with faceted sides, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "medium"
+      ],
+      "triangles": 244,
+      "length_m": 1.524,
+      "depth_m": 1.24,
+      "height_m": 0.949,
+      "collider": "none"
+    },
+    {
+      "id": "qt_nature_Rock_Medium_3",
+      "file": "Rock_Medium_3.glb",
+      "category": "structures",
+      "role": "rock",
+      "surfaces": [
+        "yard",
+        "empty_lot",
+        "park",
+        "courtyard",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "rock medium 3. Stylized Nature MegaKit [Standard], Quaternius.",
+      "description": "Medium grey boulder with faceted sides, stylized low poly.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "rock",
+        "medium"
+      ],
+      "triangles": 522,
+      "length_m": 1.71,
+      "depth_m": 1.738,
+      "height_m": 1.158,
+      "collider": "none"
+    }
+  ]
+}

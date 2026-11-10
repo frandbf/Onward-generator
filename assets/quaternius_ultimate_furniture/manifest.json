@@ -1,0 +1,454 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://quaternius.com/packs/ultimatefurniture.html, CC0 1.0 (pack page). OBJ + MTL, Y up. street_scale 0.665: Door1 3.08 file units to 2.05 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_quaternius.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-10",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "qt_ufurn_BedDouble",
+      "file": "BedDouble.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed double, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly bed double from Ultimate Furniture, flat colours, about 2.83 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "double"
+      ],
+      "triangles": 4712,
+      "length_m": 1.879,
+      "depth_m": 2.832,
+      "height_m": 1.036,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_BedTwin",
+      "file": "BedTwin.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed twin, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly bed twin from Ultimate Furniture, flat colours, about 2.83 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "twin"
+      ],
+      "triangles": 3684,
+      "length_m": 1.37,
+      "depth_m": 2.832,
+      "height_m": 1.036,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Bookcase",
+      "file": "Bookcase.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly bookcase from Ultimate Furniture, flat colours, about 2.24 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase"
+      ],
+      "triangles": 2928,
+      "length_m": 1.225,
+      "depth_m": 0.442,
+      "height_m": 2.242,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Bookcase_Books",
+      "file": "Bookcase_Books.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bookcase books, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly bookcase books from Ultimate Furniture, flat colours, about 2.24 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bookcase",
+        "books"
+      ],
+      "triangles": 10948,
+      "length_m": 1.225,
+      "depth_m": 0.442,
+      "height_m": 2.242,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Chair",
+      "file": "Chair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly chair from Ultimate Furniture, flat colours, about 0.71 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair"
+      ],
+      "triangles": 736,
+      "length_m": 0.337,
+      "depth_m": 0.42,
+      "height_m": 0.709,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Closet",
+      "file": "Closet.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "closet, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly closet from Ultimate Furniture, flat colours, about 1.98 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "closet"
+      ],
+      "triangles": 2988,
+      "length_m": 1.032,
+      "depth_m": 0.579,
+      "height_m": 1.98,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Desk",
+      "file": "Desk.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "desk, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly desk from Ultimate Furniture, flat colours, about 1.21 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "desk"
+      ],
+      "triangles": 2640,
+      "length_m": 1.212,
+      "depth_m": 0.563,
+      "height_m": 0.613,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_NightStand",
+      "file": "NightStand.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "night stand, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly night stand from Ultimate Furniture, flat colours, about 0.39 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "night",
+        "stand"
+      ],
+      "triangles": 2016,
+      "length_m": 0.391,
+      "depth_m": 0.337,
+      "height_m": 0.34,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_OfficeChair",
+      "file": "OfficeChair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "office chair, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly office chair from Ultimate Furniture, flat colours, about 0.75 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "office",
+        "chair"
+      ],
+      "triangles": 2116,
+      "length_m": 0.48,
+      "depth_m": 0.537,
+      "height_m": 0.75,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_ShortCloset",
+      "file": "ShortCloset.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "short closet, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly short closet from Ultimate Furniture, flat colours, about 1.51 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "short",
+        "closet"
+      ],
+      "triangles": 4040,
+      "length_m": 1.032,
+      "depth_m": 0.603,
+      "height_m": 1.507,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Sofa",
+      "file": "Sofa.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly sofa from Ultimate Furniture, flat colours, about 2.82 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa"
+      ],
+      "triangles": 2392,
+      "length_m": 2.82,
+      "depth_m": 1.186,
+      "height_m": 1.003,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Sofa2",
+      "file": "Sofa2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa 2, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly sofa 2 from Ultimate Furniture, flat colours, about 2.66 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa"
+      ],
+      "triangles": 3688,
+      "length_m": 2.662,
+      "depth_m": 1.025,
+      "height_m": 0.966,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Sofa3",
+      "file": "Sofa3.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa 3, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly sofa 3 from Ultimate Furniture, flat colours, about 2.66 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa"
+      ],
+      "triangles": 3886,
+      "length_m": 2.662,
+      "depth_m": 1.863,
+      "height_m": 0.966,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Sofa_individual",
+      "file": "Sofa_individual.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa individual, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly sofa individual from Ultimate Furniture, flat colours, about 1.09 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa",
+        "individual"
+      ],
+      "triangles": 2596,
+      "length_m": 1.089,
+      "depth_m": 0.956,
+      "height_m": 0.904,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Stool",
+      "file": "Stool.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stool, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly stool from Ultimate Furniture, flat colours, about 0.38 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stool"
+      ],
+      "triangles": 524,
+      "length_m": 0.337,
+      "depth_m": 0.355,
+      "height_m": 0.384,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Table",
+      "file": "Table.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly table from Ultimate Furniture, flat colours, about 1.85 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table"
+      ],
+      "triangles": 1108,
+      "length_m": 0.943,
+      "depth_m": 1.849,
+      "height_m": 0.548,
+      "collider": "none"
+    },
+    {
+      "id": "qt_ufurn_Table2",
+      "file": "Table2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table 2, inside a room. Ultimate Furniture, Quaternius.",
+      "description": "Low-poly table 2 from Ultimate Furniture, flat colours, about 1.85 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table"
+      ],
+      "triangles": 1500,
+      "length_m": 0.943,
+      "depth_m": 1.849,
+      "height_m": 0.548,
+      "collider": "none"
+    }
+  ]
+}

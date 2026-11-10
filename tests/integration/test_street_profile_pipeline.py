@@ -16,6 +16,7 @@ import pytest
 from onward_generator.ai import street_profile as sp
 from onward_generator.ai.providers import ProviderResult
 from onward_generator.cli import main
+from onward_generator.detail.config import DEFAULT_CONFIG_PATH as DETAIL_CONFIG
 from onward_generator.dress.geometry import geometry_fingerprint
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
@@ -77,7 +78,13 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     (work / "inputs").mkdir()
     scene, heights, base = _detail_inputs(work / "inputs", S3DB_BUILDINGS, {}, S3DB_RELATIONS)
     detail = work / "detail"
-    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
+    # Furnishing is on by default; its pieces come from the interior catalogues of the overgrow library, and the
+    # synthetic library below holds only street props, so this street-profile run plans no furniture.
+    config = json.loads(DETAIL_CONFIG.read_text(encoding="utf-8"))
+    config["interiors"]["furnish"]["enabled"] = config["interiors"]["shops"]["furnish"]["enabled"] = False
+    (work / "detail.json").write_text(json.dumps(config), encoding="utf-8")
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(detail), "--no-preview",
+                 "--config", str(work / "detail.json")]) == 0
     library = _library(work / "library")
     root = work / "map"
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=150)

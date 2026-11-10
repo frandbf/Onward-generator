@@ -97,10 +97,12 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     from onward_generator.overgrow.library_catalog import choose_ids, installed_rows, library_directories
 
     directories = library_directories(REPO / "assets")
-    assert {path.name for path in directories} == {"kenney", "kenney_food", "kenney_furniture", "kenney_mini_shop", "normalized", "polyhaven_shop"}
+    assert {path.name for path in directories} == {"kenney", "kenney_food", "kenney_furniture", "kenney_mini_shop", "normalized", "polyhaven_shop",
+                                                  "quaternius_city_props", "quaternius_furniture", "quaternius_home_interior",
+                                                  "quaternius_nature", "quaternius_ultimate_furniture"}
     rows = installed_rows(REPO / "assets")
     ids = [row["id"] for row in rows]
-    assert len(ids) == len(set(ids)) == 603
+    assert len(ids) == len(set(ids)) == 771
     assert "covered_car" in ids
     assert "kenney_suburban_driveway_long" in ids
     assert choose_ids(
@@ -112,7 +114,7 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     kit = {row["id"] for row in rows if row["placement"] == "kit_only"}
     assert len(kit) == 128
     interior = {row["id"] for row in rows if row["placement"] == "interior"}
-    assert len(interior) == 377
+    assert len(interior) == 505
     refused = {row["id"]: row["refused"] for row in rows if "refused" in row}
     assert refused == {"watchtower": "unknown_scale", "warning_signboard": "unknown_scale"}
     expected = [LibraryReject(ident, "kit_only") for ident in kit]

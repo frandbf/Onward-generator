@@ -1,0 +1,612 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://quaternius.com/packs/furniture.html, CC0 1.0 (pack page). OBJ + MTL, Y up. street_scale 1: already metres: Chair 0.99 m, BookCase 1.53 m.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_quaternius.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-10",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "qt_furn_Bed",
+      "file": "Bed.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly bed from Furniture, flat colours, about 1.43 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed"
+      ],
+      "triangles": 528,
+      "length_m": 1.43,
+      "depth_m": 0.89,
+      "height_m": 0.49,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_BedKing",
+      "file": "BedKing.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "bed king, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly bed king from Furniture, flat colours, about 1.43 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "bed",
+        "king"
+      ],
+      "triangles": 700,
+      "length_m": 1.43,
+      "depth_m": 1.354,
+      "height_m": 0.49,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_BookCase",
+      "file": "BookCase.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "book case, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly book case from Furniture, flat colours, about 1.53 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "book",
+        "case"
+      ],
+      "triangles": 280,
+      "length_m": 0.452,
+      "depth_m": 0.758,
+      "height_m": 1.534,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_BookCaseBooks",
+      "file": "BookCaseBooks.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "book case books, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly book case books from Furniture, flat colours, about 1.53 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "book",
+        "case",
+        "books"
+      ],
+      "triangles": 1456,
+      "length_m": 0.452,
+      "depth_m": 0.758,
+      "height_m": 1.534,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_BookCaseLarge",
+      "file": "BookCaseLarge.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "book case large, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly book case large from Furniture, flat colours, about 1.57 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "book",
+        "case",
+        "large"
+      ],
+      "triangles": 280,
+      "length_m": 0.452,
+      "depth_m": 1.571,
+      "height_m": 1.534,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_BookCaseLargeBooks",
+      "file": "BookCaseLargeBooks.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "book case large books, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly book case large books from Furniture, flat colours, about 1.57 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "book",
+        "case",
+        "large",
+        "books"
+      ],
+      "triangles": 3500,
+      "length_m": 0.452,
+      "depth_m": 1.571,
+      "height_m": 1.534,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Chair",
+      "file": "Chair.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly chair from Furniture, flat colours, about 0.99 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair"
+      ],
+      "triangles": 216,
+      "length_m": 0.438,
+      "depth_m": 0.433,
+      "height_m": 0.991,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_ChairCushioned",
+      "file": "ChairCushioned.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair cushioned, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly chair cushioned from Furniture, flat colours, about 1.05 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "cushioned"
+      ],
+      "triangles": 256,
+      "length_m": 0.438,
+      "depth_m": 0.433,
+      "height_m": 1.054,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_ChairHandle",
+      "file": "ChairHandle.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "chair handle, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly chair handle from Furniture, flat colours, about 0.69 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "chair",
+        "handle"
+      ],
+      "triangles": 260,
+      "length_m": 0.438,
+      "depth_m": 0.433,
+      "height_m": 0.694,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Closet",
+      "file": "Closet.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "closet, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly closet from Furniture, flat colours, about 1.48 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "closet"
+      ],
+      "triangles": 208,
+      "length_m": 0.353,
+      "depth_m": 0.66,
+      "height_m": 1.482,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Closet2",
+      "file": "Closet2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "closet 2, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly closet 2 from Furniture, flat colours, about 1.00 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "closet"
+      ],
+      "triangles": 516,
+      "length_m": 0.475,
+      "depth_m": 0.69,
+      "height_m": 0.996,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_CoffeeTable",
+      "file": "CoffeeTable.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coffee table, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly coffee table from Furniture, flat colours, about 1.02 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coffee",
+        "table"
+      ],
+      "triangles": 144,
+      "length_m": 0.589,
+      "depth_m": 1.016,
+      "height_m": 0.28,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_CoffeeTable2",
+      "file": "CoffeeTable2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "coffee table 2, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly coffee table 2 from Furniture, flat colours, about 1.02 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "coffee",
+        "table"
+      ],
+      "triangles": 192,
+      "length_m": 0.589,
+      "depth_m": 1.016,
+      "height_m": 0.335,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Lamp",
+      "file": "Lamp.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly lamp from Furniture, flat colours, about 1.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp"
+      ],
+      "triangles": 108,
+      "length_m": 0.231,
+      "depth_m": 0.245,
+      "height_m": 1.038,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Lamp2",
+      "file": "Lamp2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "lamp 2, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly lamp 2 from Furniture, flat colours, about 1.04 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "lamp"
+      ],
+      "triangles": 108,
+      "length_m": 0.231,
+      "depth_m": 0.245,
+      "height_m": 1.038,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Plant",
+      "file": "Plant.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "plant, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly plant from Furniture, flat colours, about 0.35 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "plant"
+      ],
+      "triangles": 264,
+      "length_m": 0.147,
+      "depth_m": 0.347,
+      "height_m": 0.303,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Sofa",
+      "file": "Sofa.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly sofa from Furniture, flat colours, about 0.83 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa"
+      ],
+      "triangles": 240,
+      "length_m": 0.737,
+      "depth_m": 0.835,
+      "height_m": 0.628,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_SofaDouble",
+      "file": "SofaDouble.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa double, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly sofa double from Furniture, flat colours, about 1.36 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa",
+        "double"
+      ],
+      "triangles": 344,
+      "length_m": 0.737,
+      "depth_m": 1.364,
+      "height_m": 0.628,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_SofaLong",
+      "file": "SofaLong.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "sofa long, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly sofa long from Furniture, flat colours, about 1.36 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "sofa",
+        "long"
+      ],
+      "triangles": 408,
+      "length_m": 1.365,
+      "depth_m": 1.364,
+      "height_m": 0.628,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Stool",
+      "file": "Stool.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "stool, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly stool from Furniture, flat colours, about 0.55 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "stool"
+      ],
+      "triangles": 224,
+      "length_m": 0.366,
+      "depth_m": 0.361,
+      "height_m": 0.546,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Table",
+      "file": "Table.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "table, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly table from Furniture, flat colours, about 1.11 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "table"
+      ],
+      "triangles": 144,
+      "length_m": 1.106,
+      "depth_m": 1.016,
+      "height_m": 0.623,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Vase",
+      "file": "Vase.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "vase, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly vase from Furniture, flat colours, about 0.31 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "vase"
+      ],
+      "triangles": 204,
+      "length_m": 0.229,
+      "depth_m": 0.229,
+      "height_m": 0.314,
+      "collider": "none"
+    },
+    {
+      "id": "qt_furn_Vase2",
+      "file": "Vase2.glb",
+      "category": "furniture",
+      "role": "room_furniture",
+      "surfaces": [
+        "interior"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "vase 2, inside a room. Furniture, Quaternius.",
+      "description": "Low-poly vase 2 from Furniture, flat colours, about 0.31 m on its longest side.",
+      "placement": "interior",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "vase"
+      ],
+      "triangles": 204,
+      "length_m": 0.168,
+      "depth_m": 0.168,
+      "height_m": 0.306,
+      "collider": "none"
+    }
+  ]
+}
