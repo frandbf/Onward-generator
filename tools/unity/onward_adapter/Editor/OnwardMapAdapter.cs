@@ -59,6 +59,14 @@ namespace OnwardGenerator
         // darker than the fog. Same _BaseMap and _BaseColor as the lit graph; URP's unlit pass still mixes in the fog.
         private const string UnlitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Unlit.shadergraph";
         private const string BackdropMaterial = "horizon_backdrop";
+        // Plan D5 spike (ADR-033, proposed): the one facade material named by lit_normal_material is drawn with the SDK's
+        // lit graph and the normal map export package derived from its albedo. Off when the option is empty. No shader
+        // is added and the SDK graphs are not edited; every other material keeps the lines above.
+        private const string LitNormalShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Lit.shadergraph";
+        private const string LitNormalRole = "lit_normal";
+        // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
+        private const float LitNormalSmoothness = 0.1f;
+        private const float LitNormalSpecular = 0.04f;
         // PP_Sprite_Lit is already transparent, Render Face Both, no alpha clip.
         // It has no _BaseColor. Alpha is vertex alpha times _MainTex alpha.
         private const string SpriteShaderPath = SdkRoot + "/Internal/Shaders/PP_Sprite_Lit.shadergraph";
@@ -113,6 +121,10 @@ namespace OnwardGenerator
             // texels and are lit by probes, or by the ambient light when combined, but stay ContributeGI and
             // cast the baked shadows. Absent in older packages, which bake the ring as before.
             public bool scenic_out_of_lightmap = false;
+            // Plan D5 spike (ADR-033, proposed): the facade_trim_* material drawn with PP_Opaque_Lit and the package's
+            // lit_normal.png. Empty (absent in older packages and in every card without the key) keeps PP_Opaque_Simple_Lit.
+            // lit_normal_strength is baked into the PNG by export package; the adapter does not read it.
+            public string lit_normal_material = "";
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -222,6 +234,11 @@ namespace OnwardGenerator
             pkg.Layout = JsonUtility.FromJson<Layout>(File.ReadAllText(pkg.Path("layout")));
             if (pkg.Options.variant != m.package_id)
                 throw new InvalidDataException("adapter_options.json variant does not match package_id");
+            int litNormalFiles = m.files.Count(f => f.role == LitNormalRole);
+            if (!string.IsNullOrEmpty(pkg.Options.lit_normal_material) && litNormalFiles != 1)
+                throw new InvalidDataException($"lit_normal_material {pkg.Options.lit_normal_material} needs exactly one '{LitNormalRole}' file, found {litNormalFiles}");
+            if (string.IsNullOrEmpty(pkg.Options.lit_normal_material) && litNormalFiles != 0)
+                throw new InvalidDataException($"package lists a '{LitNormalRole}' file but adapter_options.json has no lit_normal_material");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -365,6 +382,55 @@ namespace OnwardGenerator
             if (imported == null)
                 throw new InvalidOperationException($"{assetPath}: imported, but no Texture2D to load");
             return imported;
+        }
+
+        // Plan D5: the tangent-space normal map of the package (lit_normal.png, OpenGL green-up), imported as a normal map:
+        // linear, mipmapped, ASTC 6x6 on Android (RGBA32 with albedo_compression none), the albedo's wrap mode and size rule.
+        private static Texture2D LoadNormalPng(string packagePath, string assetBase, bool repeat, string compression)
+        {
+            byte[] png = File.ReadAllBytes(packagePath);
+            int width, height;
+            if (!PngSize(png, out width, out height))
+                throw new InvalidDataException($"{packagePath}: not a PNG");
+            int maxSize = Math.Max(AlbedoMinMaxTextureSize, Mathf.NextPowerOfTwo(Math.Max(width, height)));
+            if (maxSize > UnityMaxTextureSize)
+                throw new InvalidDataException($"{packagePath}: {width} x {height} px is larger than Unity's {UnityMaxTextureSize} px");
+            if (compression != AlbedoAstc6x6 && compression != AlbedoNone)
+                throw new InvalidDataException($"albedo_compression {compression} is neither {AlbedoAstc6x6} nor {AlbedoNone}");
+            string assetPath = assetBase + ".png";
+            File.WriteAllBytes(assetPath, png);
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null)
+                throw new InvalidOperationException($"{assetPath}: no TextureImporter after the import");
+            importer.textureType = TextureImporterType.NormalMap;
+            importer.sRGBTexture = false;
+            importer.convertToNormalmap = false;
+            importer.mipmapEnabled = true;
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.isReadable = false;
+            importer.wrapMode = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+            importer.maxTextureSize = maxSize;
+            TextureImporterPlatformSettings android = importer.GetPlatformTextureSettings("Android");
+            android.overridden = true;
+            android.format = compression == AlbedoNone ? TextureImporterFormat.RGBA32 : TextureImporterFormat.ASTC_6x6;
+            android.maxTextureSize = maxSize;
+            android.compressionQuality = 50;
+            importer.SetPlatformTextureSettings(android);
+            importer.SaveAndReimport();
+            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (imported == null)
+                throw new InvalidOperationException($"{assetPath}: imported, but no Texture2D to load");
+            Debug.Log($"{LogPrefix} Lit normal: {assetPath} {width} x {height} px, NormalMap, linear, Android {android.format}.");
+            return imported;
+        }
+
+        // Plan D5: tangents for normal mapping, from the normals and UV0. BuildMesh sets neither tangents nor colours.
+        private static void AddTangents(Mesh mesh)
+        {
+            if (mesh.normals.Length != mesh.vertexCount || mesh.uv.Length != mesh.vertexCount)
+                throw new InvalidDataException($"{mesh.name}: drawn with {LitNormalShaderPath} but has no normals or UV0 for its tangents");
+            mesh.RecalculateTangents();
         }
 
         // Width and height from the IHDR chunk (big-endian), which always follows the 8-byte signature.
@@ -521,7 +587,7 @@ namespace OnwardGenerator
         // centre on glTF (x, z), as onward_generator.perf.measure.combine_groups. Collision
         // is not touched. Measured on the Quest in phase 05 (ADR-005).
         private static int BuildCombinedVisual(Glb visual, Mesh[] meshes, int[][] meshMaterials, Material[] materials,
-            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt)
+            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt, int litNormal = -1)
         {
             int[] canonical = CanonicalMaterials(visual.Doc.materials, materials, opt);
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
@@ -554,6 +620,7 @@ namespace OnwardGenerator
 
             AssetDatabase.StartAssetEditing();
             var built = new List<(string, Mesh, int)>();
+            int tangentMeshes = 0;
             try
             {
                 foreach (KeyValuePair<(int, int, int), List<CombineInstance>> g in groups)
@@ -570,6 +637,12 @@ namespace OnwardGenerator
                     Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
+                    // Plan D5: only the promoted material's groups get tangents, after the unwrap.
+                    if (litNormal >= 0 && mat == litNormal)
+                    {
+                        AddTangents(combined);
+                        tangentMeshes++;
+                    }
                     AssetDatabase.CreateAsset(combined, $"{root}/Meshes/{name}.asset");
                     built.Add((name, combined, mat));
                 }
@@ -604,6 +677,8 @@ namespace OnwardGenerator
             }
 
             Debug.Log($"{LogPrefix} Combined visual: {built.Count} meshes from {groups.Values.Sum(l => l.Count)} primitives, cell {cellM} m");
+            if (litNormal >= 0)
+                Debug.Log($"{LogPrefix} Lit normal: {tangentMeshes} combined meshes of {visual.Doc.materials[litNormal].name} got tangents.");
             Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
                 + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
@@ -652,13 +727,24 @@ namespace OnwardGenerator
                     images[i] = LoadPng(visual, visual.Doc.images[i], $"{root}/Textures/T{i:D2}", repeatTextures, opt.albedo_compression);
                 if (imageCount > 0)
                     Debug.Log($"{LogPrefix} Albedo: {images.Count(t => t != null)} of {imageCount} images, Android {opt.albedo_compression}.");
+                // Plan D5 spike: -1 and no normal map unless the package names a material.
+                int litNormal = -1;
+                Texture2D litNormalMap = null;
+                if (!string.IsNullOrEmpty(opt.lit_normal_material))
+                {
+                    litNormal = Array.FindIndex(visual.Doc.materials, g => g.name == opt.lit_normal_material);
+                    if (litNormal < 0)
+                        throw new InvalidDataException($"lit_normal_material {opt.lit_normal_material} is not a material of the visual GLB");
+                    EnsureFolder(root + "/Textures");
+                    litNormalMap = LoadNormalPng(pkg.Path(LitNormalRole), $"{root}/Textures/N_{LitNormalRole}", repeatTextures, opt.albedo_compression);
+                }
                 Material[] materials = visual.Doc.materials.Select(g =>
                 {
                     int index = g.pbrMetallicRoughness != null && g.pbrMetallicRoughness.baseColorTexture != null
                         ? g.pbrMetallicRoughness.baseColorTexture.index : -1;
                     Texture2D tex = index >= 0 && index < images.Length ? images[index]
                         : (!repeatTextures && images.Length == 1 ? images[0] : null);
-                    return GetOrCreateMaterial(g, root + "/Materials", tex);
+                    return GetOrCreateMaterial(g, root + "/Materials", tex, litNormalMap, opt.lit_normal_material);
                 }).ToArray();
                 var visualMeshes = new Mesh[visual.Doc.meshes.Length];
                 var visualMaterials = new int[visual.Doc.meshes.Length][];
@@ -673,6 +759,9 @@ namespace OnwardGenerator
                         Unwrapping.GenerateSecondaryUVSet(mesh);
                         if (visualMaterials[i].Any(k => k >= 0 && k < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[k])))
                             SetWhiteVertexColors(mesh);
+                        // Plan D5: only the meshes that draw the promoted material get tangents.
+                        if (litNormal >= 0 && visualMaterials[i].Contains(litNormal))
+                            AddTangents(mesh);
                         AssetDatabase.CreateAsset(mesh, $"{root}/Meshes/V{i:D4}.asset");
                     }
                 }
@@ -685,7 +774,7 @@ namespace OnwardGenerator
                 int visualObjects;
                 if (opt.combine_cell_m > 0)
                 {
-                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt);
+                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt, litNormal);
                 }
                 else
                 {
@@ -2991,7 +3080,7 @@ namespace OnwardGenerator
             return flags;
         }
 
-        private static Material GetOrCreateMaterial(GMaterial g, string folder, Texture2D atlas = null)
+        private static Material GetOrCreateMaterial(GMaterial g, string folder, Texture2D atlas = null, Texture2D normal = null, string litNormal = "")
         {
             string safe = new string(g.name.Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_').ToArray());
             string path = $"{folder}/M_{safe}.mat";
@@ -3042,6 +3131,8 @@ namespace OnwardGenerator
                 AssetDatabase.CreateAsset(view, path);
                 return view;
             }
+            if (!string.IsNullOrEmpty(litNormal) && safe == litNormal)
+                return CreateLitNormalMaterial(g, path, safe, atlas, normal);
             string shaderPath = safe == BackdropMaterial ? UnlitShaderPath : LitShaderPath;
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(shaderPath)
                 ?? throw new InvalidOperationException($"Missing SDK shader at {shaderPath}.");
@@ -3074,6 +3165,36 @@ namespace OnwardGenerator
             }
             material.enableInstancing = false;
             AssetDatabase.CreateAsset(material, path);
+            return material;
+        }
+
+        // Plan D5 spike (ADR-033, proposed): the one promoted facade material on the SDK's PP_Opaque_Lit, with the same
+        // albedo and base colour as on PP_Opaque_Simple_Lit, the derived normal map and a matte low smoothness. A missing
+        // graph or property stops the build: no compatibility is invented.
+        private static Material CreateLitNormalMaterial(GMaterial g, string path, string safe, Texture2D atlas, Texture2D normal)
+        {
+            if (atlas == null) throw new InvalidDataException($"lit_normal_material {safe} has no albedo texture");
+            if (normal == null) throw new InvalidDataException($"lit_normal_material {safe} has no normal map");
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(LitNormalShaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {LitNormalShaderPath}.");
+            var material = new Material(shader) { name = $"M_{safe}" };
+            foreach (string property in new[] { "_BaseColor", "_BaseMap", "_BumpMap", "_Smoothness" })
+            {
+                if (!material.HasProperty(property)) throw new InvalidOperationException($"{shader.name} has no {property} property.");
+            }
+            float[] c = g.pbrMetallicRoughness?.baseColorFactor;
+            // glTF base colours are linear; Unity material colours are authored in sRGB.
+            material.SetColor("_BaseColor", c != null && c.Length >= 3 ? new Color(c[0], c[1], c[2], 1f).gamma : Color.grey);
+            material.SetTexture("_BaseMap", atlas);
+            material.SetTexture("_BumpMap", normal);
+            material.SetFloat("_Smoothness", LitNormalSmoothness);
+            bool specular = material.HasProperty("_SpecColor");
+            if (specular) material.SetColor("_SpecColor", new Color(LitNormalSpecular, LitNormalSpecular, LitNormalSpecular, 1f));
+            material.enableInstancing = false;
+            AssetDatabase.CreateAsset(material, path);
+            Debug.Log($"{LogPrefix} Lit normal: {g.name} -> M_{safe} on {shader.name} ({LitNormalShaderPath}), _BaseMap {atlas.name}, "
+                + $"_BumpMap {normal.name}, _Smoothness {LitNormalSmoothness}" + (specular ? $", _SpecColor {LitNormalSpecular}" : ", no _SpecColor")
+                + $"; keywords [{string.Join(" ", material.shaderKeywords)}].");
             return material;
         }
 

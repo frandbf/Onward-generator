@@ -477,6 +477,23 @@ def test_lightmap_pages_max_run_switches_the_run_copy_only(workdir: Path) -> Non
     assert both["build"] == {**off_card["build"], "scenic_out_of_lightmap": True, "lightmap_pages_max": 6}
 
 
+def test_lit_normal_material_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    assert _run(root, "r1", Stub()) == 0
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    card_rel = json.loads((inputs / "map.json").read_text(encoding="utf-8"))["paths"]["export"]
+    off_card = json.loads((root / "runs" / "r1" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert not any(key.startswith("lit_normal") for key in off_card["build"])
+
+    assert _run(root, "r2", Stub(), "--offline", "--lit-normal-material", "facade_trim_mediterranean") == 0
+    on_card = json.loads((root / "runs" / "r2" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert on_card["build"] == {**off_card["build"], "lit_normal_material": "facade_trim_mediterranean"}
+    assert {k: v for k, v in on_card.items() if k != "build"} == {k: v for k, v in off_card.items() if k != "build"}
+    assert bench.inputs_sha256(inputs) == digest
+    assert "lit_normal_material" not in json.loads((inputs / card_rel).read_text(encoding="utf-8"))["build"]
+
+
 def test_sightline_cover_run_adds_the_stage_reads_the_covered_report_and_keeps_the_inputs(workdir: Path) -> None:
     root = workdir / "bench"
     off = Stub()

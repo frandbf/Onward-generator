@@ -59,6 +59,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                   else f", within build.lightmap_pages_max {lm['lightmap_pages_max']}")
     print(f"  lightmap estimate: {lm['texels']:,} texels at {lm['texels_per_m']:g} texels/m, "
           f"at least {lm['pages_at_least']} pages of {lm['max_size']} px{budget}")
+    lit = m.get("lit_normal")
+    if lit is not None:
+        print(f"  lit normal (plan D5 spike, ADR-033 proposed): {lit['material']} on PP_Opaque_Lit, {lit['path']} "
+              f"{lit['width']} x {lit['height']} px at strength {lit['strength']:g}, about {lit['astc6x6_bytes']:,} bytes in ASTC 6x6")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0
 

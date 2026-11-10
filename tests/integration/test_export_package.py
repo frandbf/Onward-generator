@@ -7,13 +7,17 @@ contract the C# side relies on.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
+from PIL import Image
 
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
@@ -28,6 +32,7 @@ from onward_generator.export.lightmap import (
     pages_at_least,
     surface_class,
 )
+from onward_generator.export.normal_map import DEFAULT_STRENGTH, albedo_png, decode_rgb, normal_map
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
     MANIFEST_FILE,
@@ -38,7 +43,7 @@ from onward_generator.export.package import (
     sha256_file,
     verify_package,
 )
-from onward_generator.generation.gltf import read_glb
+from onward_generator.generation.gltf import pack_glb, read_glb
 from tests.conftest import FIXED_NOW, MURCIA_CENTER
 
 REPO = Path(__file__).resolve().parents[2]
@@ -215,6 +220,24 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(lightmap_pages_max=None), "/build/lightmap_pages_max"),
     (lambda c: c["build"].update(lightmap_pages_max=65), "/build/lightmap_pages_max"),
     (lambda c: c["build"].update(lightmap_page_max=8), "lightmap_page_max"),
+    # Plan D5: one facade_trim_* material, a bounded strength that needs it.
+    (lambda c: c["build"].update(lit_normal_material="roof_plain"), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="party_facade_trim_mediterranean"), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="scenic_trim_mediterranean"), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_"), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_Mediterranean"), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_" + "a" * 53), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material=""), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material=1), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material=None), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material=["facade_trim_a", "facade_trim_b"]), "/build/lit_normal_material"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_a", lit_normal_strength=0), "/build/lit_normal_strength"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_a", lit_normal_strength=-1), "/build/lit_normal_strength"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_a", lit_normal_strength=8.01), "/build/lit_normal_strength"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_a", lit_normal_strength="2"), "/build/lit_normal_strength"),
+    (lambda c: c["build"].update(lit_normal_material="facade_trim_a", lit_normal_strength=None), "/build/lit_normal_strength"),
+    (lambda c: c["build"].update(lit_normal_strength=2), "'lit_normal_material' is a dependency of 'lit_normal_strength'"),
+    (lambda c: c["build"].update(lit_normals_material="facade_trim_a"), "lit_normals_material"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -239,6 +262,154 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
     assert result.manifest["lightmap_estimate"] == estimate(
         visual, texels_per_m=float(build["lightmap_texels_per_m"]), max_size=int(build["lightmap_max_size"]),
         cell_m=float(build["combine_cell_m"]), scales=scales)
+
+
+# Plan D5: the integration fixture card built on workshop/d4 HEAD 02ee02a, before the D5 change.
+GOLDEN_PACKAGE_ID = "murcia_belluga_d1c49ec28b"
+GOLDEN_OPTIONS_SHA256 = "220d833e41f0774e7b7cdc909d43f438d80a60e63f2443072cbd2f48d8fb5cea"
+
+
+def test_lit_normal_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    """Plan D5: without the key, no normal map, no new role, and the options and package_id of before D5."""
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    assert not any(key.startswith("lit_normal") for key in cfg["build"])
+    result = package(inputs, tmp_path / "pkg")
+    assert not (result.directory / "lit_normal.png").exists()
+    assert "lit_normal" not in result.manifest
+    assert all(f["role"] != "lit_normal" for f in result.manifest["files"])
+    assert not any(w.startswith("build.lit_normal_material") for w in result.warnings)
+    options = (result.directory / "adapter_options.json").read_bytes()
+    assert not any(key.startswith("lit_normal") for key in json.loads(options))
+    assert result.manifest["package_id"] == GOLDEN_PACKAGE_ID
+    assert hashlib.sha256(options).hexdigest() == GOLDEN_OPTIONS_SHA256
+
+
+def _albedo(colour_seed: int) -> bytes:
+    """A 24 x 16 deterministic albedo with relief in its luma."""
+    y, x = np.mgrid[0:16, 0:24]
+    rgb = np.stack([(x * 9 + y * colour_seed) % 256, (x * 3 + y * 11) % 256, (x * y) % 256], axis=-1).astype(np.uint8)
+    out = BytesIO()
+    Image.fromarray(rgb).save(out, format="PNG")
+    return out.getvalue()
+
+
+@pytest.fixture(scope="module")
+def trim_inputs(inputs: tuple[Path, Path], tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """The fixture scene with two of its materials renamed to facade_trim_test (an embedded PNG) and facade_trim_bare."""
+    detail = tmp_path_factory.mktemp("trim") / "detail"
+    shutil.copytree(inputs[0], detail)
+    doc, blob = read_glb((detail / "scene_visual.glb").read_bytes())
+    images = doc.setdefault("images", [])
+    png = _albedo(7)
+    data = bytearray(blob)
+    while len(data) % 4:
+        data.append(0)
+    doc["bufferViews"].append({"buffer": 0, "byteOffset": len(data), "byteLength": len(png)})
+    data.extend(png)
+    images.append({"mimeType": "image/png", "bufferView": len(doc["bufferViews"]) - 1})
+    textures = doc.setdefault("textures", [])
+    textures.append({"source": len(images) - 1})
+    plain = [m for m in doc["materials"] if "baseColorTexture" not in (m.get("pbrMetallicRoughness") or {})]
+    plain[0]["name"] = "facade_trim_test"
+    plain[0].setdefault("pbrMetallicRoughness", {})["baseColorTexture"] = {"index": len(textures) - 1, "texCoord": 0}
+    plain[1]["name"] = "facade_trim_bare"
+    doc["buffers"] = [{"byteLength": len(data)}]
+    (detail / "scene_visual.glb").write_bytes(pack_glb(doc, bytes(data)))
+    return detail, inputs[1]
+
+
+def _lit_card(tmp_path: Path, name: str, **build: Any) -> Path:
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    cfg["build"].update(build)
+    path = tmp_path / f"{name}.json"
+    path.write_text(json.dumps(cfg), encoding="utf-8")
+    return path
+
+
+def test_lit_normal_material_writes_the_derived_normal_map(trim_inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    card = _lit_card(tmp_path, "on", lit_normal_material="facade_trim_test")
+    off = package(trim_inputs, tmp_path / "off")
+    on = package(trim_inputs, tmp_path / "on", export_config=card)
+    again = package(trim_inputs, tmp_path / "again", export_config=card)
+    out = on.directory
+    assert verify_package(out) == []
+    entry = next(f for f in on.manifest["files"] if f["role"] == "lit_normal")
+    assert entry == {"role": "lit_normal", "path": "lit_normal.png", "sha256": sha256_file(out / "lit_normal.png"),
+                     "bytes": (out / "lit_normal.png").stat().st_size, "source": "generated"}
+    assert [f["role"] for f in on.manifest["files"]][-1] == "lit_normal"
+    visual = (trim_inputs[0] / "scene_visual.glb").read_bytes()
+    expected = normal_map(decode_rgb(albedo_png(visual, "facade_trim_test")), DEFAULT_STRENGTH)
+    with Image.open(out / "lit_normal.png") as image:
+        assert image.mode == "RGB" and (np.asarray(image) == expected).all()
+    assert on.manifest["lit_normal"] == {"material": "facade_trim_test", "strength": 2.0, "path": "lit_normal.png",
+                                         "width": 24, "height": 16, "astc6x6_bytes": 304, "source": "generated",
+                                         "derived_from": "albedo"}
+    options = load(out / "adapter_options.json")
+    assert options["lit_normal_material"] == "facade_trim_test" and "lit_normal_strength" not in options
+    assert on.manifest["package_id"] != off.manifest["package_id"]
+    assert on.manifest["package_id"] == again.manifest["package_id"]
+    assert (out / "lit_normal.png").read_bytes() == (again.directory / "lit_normal.png").read_bytes()
+    assert "lit_normal" not in off.manifest and not (off.directory / "lit_normal.png").exists()
+
+
+def test_lit_normal_strength_changes_the_map_and_the_package(trim_inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    default = package(trim_inputs, tmp_path / "d", export_config=_lit_card(tmp_path, "d", lit_normal_material="facade_trim_test"))
+    explicit = package(trim_inputs, tmp_path / "e", export_config=_lit_card(
+        tmp_path, "e", lit_normal_material="facade_trim_test", lit_normal_strength=2.0))
+    strong = package(trim_inputs, tmp_path / "s", export_config=_lit_card(
+        tmp_path, "s", lit_normal_material="facade_trim_test", lit_normal_strength=4))
+    assert (strong.directory / "lit_normal.png").read_bytes() != (default.directory / "lit_normal.png").read_bytes()
+    assert (explicit.directory / "lit_normal.png").read_bytes() == (default.directory / "lit_normal.png").read_bytes()
+    assert strong.manifest["package_id"] != default.manifest["package_id"]
+    assert strong.manifest["lit_normal"]["strength"] == 4.0
+    assert load(strong.directory / "adapter_options.json")["lit_normal_strength"] == 4
+
+
+@pytest.mark.parametrize(("material", "match"), [
+    ("facade_trim_nope", r"/build/lit_normal_material: material 'facade_trim_nope' is not in the visual GLB "
+                         r"\(facade trim materials present: facade_trim_bare, facade_trim_test\)"),
+    ("facade_trim_bare", "/build/lit_normal_material: material 'facade_trim_bare' has no base colour texture"),
+])
+def test_lit_normal_material_without_an_albedo_is_refused(trim_inputs: tuple[Path, Path], tmp_path: Path,
+                                                          material: str, match: str) -> None:
+    with pytest.raises(ExportError, match=match):
+        package(trim_inputs, tmp_path / "pkg", export_config=_lit_card(tmp_path, "c", lit_normal_material=material))
+    assert not (tmp_path / "pkg").exists()
+
+
+@pytest.mark.parametrize(("directional", "warned"), [(False, True), (True, False)])
+def test_lit_normal_warns_without_directional_lightmaps(trim_inputs: tuple[Path, Path], tmp_path: Path,
+                                                        directional: bool, warned: bool) -> None:
+    card = _lit_card(tmp_path, "c", lit_normal_material="facade_trim_test", lightmap_directional=directional)
+    result = package(trim_inputs, tmp_path / "pkg", export_config=card)
+    found = [w for w in result.warnings if w.startswith("build.lit_normal_material facade_trim_test: ")]
+    assert bool(found) is warned
+    if warned:
+        assert found == ["build.lit_normal_material facade_trim_test: build.lightmap_directional is not true, so the baked "
+                         "diffuse ignores the normal map and the relief shows only in the specular term; set "
+                         "build.lightmap_directional true for the headset measurement (ADR-033)"]
+    assert result.manifest["warnings"] == list(result.warnings)
+
+
+def test_lit_normal_never_overwrites_a_package(trim_inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    card = _lit_card(tmp_path, "c", lit_normal_material="facade_trim_test")
+    out = package(trim_inputs, tmp_path / "pkg", export_config=card).directory
+    before = sha256_file(out / "lit_normal.png")
+    with pytest.raises(FileExistsError):
+        package(trim_inputs, out, export_config=card)
+    assert sha256_file(out / "lit_normal.png") == before
+
+
+def test_cli_package_names_the_lit_normal_material(trim_inputs: tuple[Path, Path], tmp_path: Path,
+                                                   capsys: pytest.CaptureFixture[str]) -> None:
+    detail, layout = trim_inputs
+    args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
+    card = _lit_card(tmp_path, "c", lit_normal_material="facade_trim_test", lit_normal_strength=1.5)
+    assert main([*args, "--out", str(tmp_path / "on"), "--config", str(card)]) == 0
+    assert ("  lit normal (plan D5 spike, ADR-033 proposed): facade_trim_test on PP_Opaque_Lit, lit_normal.png "
+            "24 x 16 px at strength 1.5, about 304 bytes in ASTC 6x6\n") in capsys.readouterr().out
+    assert main([*args, "--out", str(tmp_path / "off")]) == 0
+    assert "lit normal" not in capsys.readouterr().out
 
 
 ESTIMATE_KEYS = {"texels_per_m", "max_size", "renderers", "renderers_capped", "texels", "texels_by_class", "pages_at_least"}
@@ -584,6 +755,43 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "scenic" not in casts
     assert 'AlbedoNone = "none"' in source and 'AlbedoAstc6x6 = "astc_6x6"' in source
     assert "TextureImporterFormat.ASTC_6x6" in source and "AlbedoMinMaxTextureSize = 4096" in source
+
+
+def test_unity_adapter_promotes_only_the_lit_normal_material() -> None:
+    """Plan D5 spike (ADR-033, proposed): the SDK lit graph, the normal map import and the tangents, all behind the option."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert 'LitNormalShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Lit.shadergraph";' in source
+    assert 'LitShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Simple_Lit.shadergraph";' in source
+    assert 'public string lit_normal_material = "";' in source
+    # The everyday shader line is unchanged and the lit graph is used in the promoted branch only.
+    assert "string shaderPath = safe == BackdropMaterial ? UnlitShaderPath : LitShaderPath;" in source
+    assert source.count("LitNormalShaderPath") == 5
+    material = source[source.index("private static Material CreateLitNormalMaterial"):source.index("private static Material FindSdkGlass")]
+    assert "AssetDatabase.LoadAssetAtPath<Shader>(LitNormalShaderPath)" in material
+    for prop in ("_BaseColor", "_BaseMap", "_BumpMap", "_Smoothness"):
+        assert f'"{prop}"' in material
+    assert 'material.SetTexture("_BumpMap", normal);' in material and 'material.SetTexture("_BaseMap", atlas);' in material
+    assert 'if (specular) material.SetColor("_SpecColor"' in material
+    assert "private const float LitNormalSmoothness = 0.1f;" in source
+    assert "if (!string.IsNullOrEmpty(litNormal) && safe == litNormal)\n                return CreateLitNormalMaterial(" in source
+    # The normal map: NormalMap, linear, ASTC 6x6 on Android, read only from the package's lit_normal file.
+    loader = source[source.index("private static Texture2D LoadNormalPng"):source.index("private static void AddTangents")]
+    assert "importer.textureType = TextureImporterType.NormalMap;" in loader and "importer.sRGBTexture = false;" in loader
+    assert "TextureImporterFormat.ASTC_6x6" in loader and "importer.mipmapEnabled = true;" in loader
+    assert source.count("pkg.Path(LitNormalRole)") == 1
+    scene = source[source.index("if (!string.IsNullOrEmpty(opt.lit_normal_material))"):]
+    assert scene.index("pkg.Path(LitNormalRole)") < scene.index("Material[] materials =")
+    assert 'private const string LitNormalRole = "lit_normal";' in source
+    package_check = source[source.index("private static Package LoadPackage"):source.index("// ---- glTF subset")]
+    assert "m.files.Count(f => f.role == LitNormalRole)" in package_check
+    assert "has no lit_normal_material" in package_check and "needs exactly one" in package_check
+    # Tangents only on the promoted material's meshes, after the lightmap unwrap.
+    combined = source[source.index("private static int BuildCombinedVisual"):source.index("// ---- Entry points")]
+    assert combined.index("Unwrapping.GenerateSecondaryUVSet(combined") < combined.index("AddTangents(combined);")
+    assert "if (litNormal >= 0 && mat == litNormal)" in combined
+    assert "if (litNormal >= 0 && visualMaterials[i].Contains(litNormal))\n                            AddTangents(mesh);" in source
+    assert source.count("RecalculateTangents") == 1 and source.count("AddTangents(") == 3
+    assert "opt.combine_cell_m, flags, opt, litNormal);" in source
 
 
 def test_default_fog_colour_is_the_backdrop_haze() -> None:

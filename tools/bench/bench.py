@@ -50,6 +50,7 @@ from shapely import box
 
 from onward_generator.ai.providers import StaticProvider
 from onward_generator.ai.street_profile import resolve_street_profile
+from onward_generator.export.normal_map import LIT_NORMAL_ROLE
 from onward_generator.export.package import MANIFEST_FILE, THUMBNAIL_FILE
 from onward_generator.export.thumbnail import THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH
 from onward_generator.gameplay.cover_stage import COVER_DIR, COVER_REPORT
@@ -332,6 +333,11 @@ def store_lightmap_pages_max(root: Path, pages_max: int) -> None:
     _set_export_card_key(root, "lightmap_pages_max", pages_max, "--lightmap-pages-max")
 
 
+def store_lit_normal_material(root: Path, material: str) -> None:
+    """Set ``build.lit_normal_material`` in the export card of the run copy ``root`` (plan D5, ADR-033 proposed)."""
+    _set_export_card_key(root, "lit_normal_material", material, "--lit-normal-material")
+
+
 def _positive_int(text: str) -> int:
     """An argparse type: a whole number of at least 1."""
     try:
@@ -366,7 +372,7 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
-              balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False,
+              lit_normal_material: str | None = None, balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False,
               street_profile: bool = False, street_profile_reply: Path | None = None, mid_ring_m: float | None = None) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
@@ -377,6 +383,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``lidar_roofs`` switches the plan C3 roofs from the nDSM spread on in the run copy only.
     ``scenic_out_of_lightmap`` sets the plan C4 export option in the run copy's export card only.
     ``lightmap_pages_max`` sets the plan C5 lightmap page budget in the run copy's export card only.
+    ``lit_normal_material`` sets the plan D5 spike material in the run copy's export card only.
     ``balanced_spawns`` switches the plan C6 spawn and Uplink placement on in the run copy's ``map.json`` only.
     ``sightline_cover`` switches the plan C7 cover stage on in the run copy's ``map.json`` only.
     ``regional_facades`` switches the plan D1 regional atlases on in the run copy's ``map.json`` only.
@@ -403,6 +410,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_scenic_out_of_lightmap(root)
     if lightmap_pages_max is not None:
         store_lightmap_pages_max(root, lightmap_pages_max)
+    if lit_normal_material is not None:
+        store_lit_normal_material(root, lit_normal_material)
     if balanced_spawns:
         store_balanced_spawns(root, True)
     if sightline_cover:
@@ -544,7 +553,7 @@ def map_metrics(package: Path) -> dict[str, Any]:
     else:
         raise BenchError(f"{where}: tiers must be an object or null, got {tiers!r}")
     triangles, draws = _tier_counts(tiers, where)
-    return {
+    metrics: dict[str, Any] = {
         "generator_version": str(manifest.get("generator_version") or MISSING),
         "visual_triangles": triangles,
         "draws": draws,
@@ -552,6 +561,22 @@ def map_metrics(package: Path) -> dict[str, Any]:
         "view_draws": views,
         "lightmap": {"pages_at_least": pages, "texels": texels},
     }
+    if "lit_normal" in manifest:
+        metrics["lit_normal"] = lit_normal_metrics(manifest, where)
+    return metrics
+
+
+def lit_normal_metrics(manifest: Mapping[str, Any], where: str) -> dict[str, Any]:
+    """Plan D5: the promoted material and the normal map's PNG and predicted ASTC 6x6 bytes (the texture-memory delta)."""
+    block = _object(manifest, "lit_normal", where)
+    files = [f for f in manifest.get("files") or [] if isinstance(f, dict) and f.get("role") == LIT_NORMAL_ROLE]
+    if len(files) != 1:
+        raise BenchError(f"{where}: lit_normal needs exactly one '{LIT_NORMAL_ROLE}' file, found {len(files)}")
+    material = block.get("material")
+    if not isinstance(material, str):
+        raise BenchError(f"{where}: lit_normal: material must be a string, got {material!r}")
+    return {"material": material, "png_bytes": _int(files[0], "bytes", f"{where}: files lit_normal"),
+            "astc6x6_bytes": _int(block, "astc6x6_bytes", f"{where}: lit_normal")}
 
 
 def whole_map_tiers(package: Path, view: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -890,6 +915,8 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("view draws p90", "maps", ("view_draws", "p90")),
     ("view draws max", "maps", ("view_draws", "max")),
     ("lightmap pages", "maps", ("lightmap", "pages_at_least")),
+    ("lit normal png bytes", "maps", ("lit_normal", "png_bytes")),
+    ("lit normal astc6x6 bytes", "maps", ("lit_normal", "astc6x6_bytes")),
     ("distinct routes", "maps", ("gameplay", "distinct_routes")),
     ("max route overlap %", "maps", ("gameplay", "max_overlap_pct")),
     ("longest open sight m", "maps", ("gameplay", "longest_open_sight_m")),
@@ -916,7 +943,7 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 # Rows of an opt-in block are left out of the table when neither report has the block.
-_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover", "mid_ring"})
+_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover", "mid_ring", "lit_normal"})
 # Rows of an opt-in tier: the plan D3 mid ring is in the tiers only when a run drew one.
 _OPTIONAL_PATHS = frozenset({("visual_triangles", MID), ("draws", MID)})
 
@@ -1038,6 +1065,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
                         scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
+                        lit_normal_material=args.lit_normal_material,
                         balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover,
                         regional_facades=args.regional_facades, street_profile=args.street_profile,
                         street_profile_reply=args.street_profile_reply, mid_ring_m=args.mid_ring_m)
@@ -1117,6 +1145,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="keep the scenic walls out of the lightmap in each run copy (plan C4, export card build.scenic_out_of_lightmap)")
     run.add_argument("--lightmap-pages-max", type=_positive_int, default=None, metavar="N",
                      help="cap the lightmap estimate at N pages in each run copy (plan C5, export card build.lightmap_pages_max)")
+    run.add_argument("--lit-normal-material", default=None, metavar="NAME",
+                     help="draw the facade_trim_* material NAME with PP_Opaque_Lit and a derived normal map in each run copy "
+                          "(plan D5 spike, export card build.lit_normal_material)")
     run.add_argument("--balanced-spawns", action="store_true",
                      help="place the defenders and the Uplink by the gameplay metrics in each run copy (plan C6, map.json balanced_spawns)")
     run.add_argument("--sightline-cover", action="store_true",
