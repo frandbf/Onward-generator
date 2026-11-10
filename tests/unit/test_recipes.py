@@ -403,6 +403,11 @@ def test_local_catalogues_join_the_pool_and_the_block_catalogues(tmp_path: Path,
     assert shops.sets["generic"] == expected["generic"]
     expected, _ = semantic_sets(cfg.interiors.furnish, recipes.FLOOR_RECIPES, pool, cfg.seed, "floors")
     assert floors.sets["generic"] == expected["generic"]
+    for seed in (2, 5, 13, 21):
+        seeded = replace(cfg, seed=seed)
+        got = with_semantic_sets(seeded, tmp_path).interiors.shops.furnish.sets["generic"]
+        expected, _ = semantic_sets(cfg.interiors.shops.furnish, {"generic": recipes.SHOP_RECIPES["generic"]}, pool, seed, "shops")
+        assert got == expected["generic"], seed
 
 
 def _with(cfg, *, shops: tuple[bool, str], floors: tuple[bool, str]):

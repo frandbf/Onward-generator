@@ -212,3 +212,67 @@ def test_outdoor_rules(row, kind, mount, settings) -> None:
     full = {"id": "zz_q", "file": "q.glb", "length_m": 1, "depth_m": 1, "height_m": 1, "placement": "street"} | row
     block = describe(full, "c")
     assert (block["kind"], block["mount"], block["settings"]) == (kind, mount, settings)
+
+
+def test_a_shared_id_adds_its_words_to_the_file_name_and_a_local_id_does_not() -> None:
+    from onward_generator.overgrow.semantics import _stem
+
+    assert describe({"id": "kenney_furniture_chair", "file": "model.glb", "placement": "interior", "length_m": 0.5, "depth_m": 0.5,
+                     "height_m": 0.9}, "c")["kind"] == "chair"
+    assert describe({"id": "qt_home_Chair", "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 0.9}, "c")["kind"] == "chair"
+    # A local id names its pack (here "sofa"); only its file name counts.
+    local = describe({"id": "as_sofa_pack_Thing", "file": "Thing.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.0,
+                      "height_m": 0.8}, "asset_store_sofa_pack")
+    assert local["kind"] == "other"
+    # The file's own name, whatever its folder and dots.
+    for file in ("deep/dir.v2/Chair.glb", "Chair.lod0.glb"):
+        assert describe({"id": "as_x_Thing", "file": file, "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 0.9},
+                        "c")["kind"] == "chair", file
+    assert describe({"id": "as_x_Thing", "file": "Bed.Chair.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.6,
+                     "height_m": 0.5}, "c")["kind"] == "bed"  # the words before the last dot: "bed" comes first in the rules
+    assert [_stem(i) for i in ("as_pack_name_Chair", "qt_home_Chair", "kenney_furniture_chair", "plain_Id")] == [
+        "Chair", "Chair", "chair", "plain_Id"]
+
+
+@pytest.mark.parametrize(("source", "file_stem", "part"), [
+    ("Kit.fbx#Door", "Cabinet", True),               # the child's name says door
+    ("Kit.fbx#Handle#Cabinet", "Cabinet", False),    # the last segment is the child
+    ("Kit.fbx#Cabinet", "Cabinet_Handle", True),
+    ("Kit.fbx#Cabinet", "Cabinet_Countertop", True),
+    ("Kit.fbx#Cabinet", "Counterbase", True),
+    ("Kit.fbx#Cabinet", "Cabinet", False),
+])
+def test_is_part_reads_the_child_and_the_model_name(source, file_stem, part) -> None:
+    row = _as(file_stem, (0.6, 0.4, 0.8), source_prefab=source)
+    assert is_part(row, words_of(file_stem)) is part
+
+
+def test_annotate_reads_past_a_non_row_and_keeps_a_reviewed_block_of_a_transparent_model(tmp_path: Path) -> None:
+    (tmp_path / "glass.glb").write_bytes(_glb([{"alphaMode": "BLEND"}]))
+    reviewed = {"origin": "reviewed", "kind": "display_case", "mount": "wall", "settings": ["shop"]}
+    document = {"assets": ["not a row", _row("glass", (0.5, 0.5, 0.9)) | {"file": "glass.glb", "semantic": reviewed},
+                           _row("other", (0.5, 0.5, 0.9)) | {"file": "glass.glb"}]}
+    rows = annotate(document, "c", tmp_path)["assets"]
+    assert rows[1]["semantic"] == reviewed and rows[2]["semantic"]["transparent"] is True
+
+
+def test_counts_break_ties_by_kind_name() -> None:
+    rows = [{"semantic": {"kind": "sofa"}}, {"semantic": {"kind": "bed"}}, {"semantic": {"kind": "chair"}}, {"semantic": {"kind": "chair"}}]
+    assert list(counts(rows)) == ["chair", "bed", "sofa"]
+
+
+def test_plural_words_get_their_singular_above_a_length() -> None:
+    assert words_of("boxes") == {"boxes", "boxe", "box"}
+    assert words_of("axes") == {"axes", "axe"}
+    assert words_of("cats") == {"cats", "cat"}
+    assert words_of("bus") == {"bus"}
+
+
+@pytest.mark.parametrize(("row", "settings"), [
+    ({"surfaces": ["carriageway", "park"], "placement": "ground_cover"}, ["street", "park"]),
+    ({"surfaces": ["park"], "placement": "street"}, ["street", "park"]),
+    ({"surfaces": ["park"], "placement": "kerb"}, ["street", "park"]),
+])
+def test_the_street_setting_comes_with_the_others(row, settings) -> None:
+    full = {"id": "zz_q", "file": "q.glb", "role": "x", "length_m": 1, "depth_m": 1, "height_m": 1} | row
+    assert describe(full, "c")["settings"] == settings

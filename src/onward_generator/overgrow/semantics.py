@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 KINDS = (
@@ -148,7 +148,7 @@ _PART_WORDS = frozenset({"base", "handle", "handles", "top", "countertop", "coun
 def is_part(row: Mapping[str, Any], words: set[str]) -> bool:
     """A child of one FBX the exporter split (``source_prefab`` ``<file>#<child>``) named as a part of a whole: a
     cabinet's base, its counter top, a handle. Alone it reads as half a piece of furniture."""
-    source = str(row.get("source_prefab") or "")
+    source = str(row.get("source_prefab"))
     if "#" not in source:
         return False
     child = words_of(source.rsplit("#", 1)[1])
@@ -226,10 +226,11 @@ def describe(row: Mapping[str, Any], catalogue: str) -> dict[str, Any]:
     previous = row.get("semantic")
     if isinstance(previous, Mapping) and previous.get("origin") == "reviewed":
         return dict(previous)
-    file_words = words_of(str(row.get("file") or "").rsplit("/", 1)[-1].rsplit(".", 1)[0])
+    file_words = words_of(PurePosixPath(str(row.get("file"))).stem) if row.get("file") else set()
     # A local Asset Store id carries its package's name (as_<package>_<model>): "kitchen" in every row of a kitchen
     # pack. Its file name is the model's own name; the shared catalogues' ids are that name with a short prefix.
-    words = file_words if str(row.get("id") or "").startswith("as_") else words_of(_stem(str(row.get("id") or ""))) | file_words
+    asset_id = str(row["id"])
+    words = file_words if asset_id.startswith("as_") else words_of(_stem(asset_id)) | file_words
     block = _room(words, row, catalogue) if row.get("placement") == "interior" else _outdoor(words, row)
     return {**block, "origin": "estimated", "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"}
 
@@ -254,7 +255,7 @@ def annotate(document: dict[str, Any], catalogue: str, folder: Path | None = Non
             rows.append(row)
             continue
         block = describe(row, catalogue)
-        file = folder / str(row.get("file") or "") if folder is not None else None
+        file = folder / str(row.get("file")) if folder is not None else None
         if file is not None and file.is_file() and block.get("origin") != "reviewed" and not opaque(file.read_bytes()):
             block = {**block, "mount": "none", "transparent": True}
         rows.append({**row, "semantic": block})
