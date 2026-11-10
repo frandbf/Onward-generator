@@ -394,3 +394,41 @@ def test_detail_cli_passes_places_and_typology_to_the_budget(ring_inputs: tuple[
                  "--no-preview", "--core-radius-m", "60", "--core-target-triangles", "5000"]) == 1
     assert seen["places"] == [] and seen["typology"] is not None
     assert (seen["target_triangles"], seen["max_half_side_m"]) == (5000, 60.0)
+    assert seen["mid_ring_m"] is None
+    # Plan D3: the ring reaches the budget solve too.
+    seen.clear()
+    assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(tmp_path / "d"),
+                 "--no-preview", "--core-radius-m", "60", "--core-target-triangles", "5000", "--mid-ring-m", "20"]) == 1
+    assert seen["mid_ring_m"] == 20.0 and seen["target_triangles"] == 5000
+
+
+@pytest.mark.parametrize("grid", [150], indirect=True, ids=["r150"])
+def test_a_mid_ring_follows_the_solved_core_and_leaves_the_budget_alone(grid: Grid) -> None:
+    """Plan D3: the ring is drawn around the half-side the budget solved; N, the solve and the core are those without it."""
+    from onward_generator.tiers import MID, mid_square, ring_tier
+
+    generated, ref = load_base(grid.base, grid.scene, grid.heights, GEN)
+    ringed = detail_scene_budget(generated, ref, grid.heights, grid.scene, CFG, target_triangles=grid.target,
+                                 max_half_side_m=grid.cap, mid_ring_m=30.0)
+    plain = grid.budget
+    half = plain.core["half_side_m"]
+    assert half < grid.cap  # the solved core is smaller than map.json's largest half-side
+    assert {k: v for k, v in ringed.core.items() if k not in ("mid_ring_m", "buildings")} == {
+        k: v for k, v in plain.core.items() if k != "buildings"}
+    assert ringed.core["mid_ring_m"] == 30.0
+    assert ringed.core["buildings"][CORE] == plain.core["buildings"][CORE]
+    assert ringed.core["buildings"][MID] + ringed.core["buildings"][SCENIC] == plain.core["buildings"][SCENIC]
+    assert ringed.stats["tiers"][CORE] == plain.stats["tiers"][CORE]
+    assert ringed.core["achieved_triangles"] == plain.core["achieved_triangles"]
+    core_ids = sorted(o.id for o in ringed.objects if o.record.get("tier") == CORE)
+    assert core_ids == sorted(o.id for o in plain.objects if o.record.get("tier") == CORE)
+    feature = {f["id"]: shape(f["geometry"]) for f in json.loads(grid.scene.read_text(encoding="utf-8"))["features"]}
+    mid = [o for o in ringed.objects if o.type == "building" and o.record["tier"] == MID]
+    assert mid
+    for o in mid:
+        bid = o.record["source_ids"][0]
+        assert ring_tier(feature[bid], core_square(half), mid_square(half, 30.0)) == MID
+        assert core_reach(feature[bid]) >= half
+        assert o.colliders == [] and o.record["visual"]["triangles"] <= 150
+    # Measured against the solved core, not map.json's: some mid buildings lie inside the largest half-side.
+    assert any(core_reach(feature[o.record["source_ids"][0]]) < grid.cap for o in mid)

@@ -539,3 +539,26 @@ def test_cli_is_reproducible_and_writes_before_after(detail_inputs: tuple[Path, 
     assert "refusing to overwrite" in capsys.readouterr().err
     assert main([*args, "--out", str(base), "--overwrite", "--no-preview"]) == 1  # base files are protected
     assert {p.name: p.read_bytes() for p in base.iterdir()} == before
+
+
+def test_detail_scene_hands_its_prototypes_and_extra_urban_to_the_element_pass(detail_inputs: tuple[Path, Path, Path]) -> None:
+    """``prototypes`` and ``extra_urban`` reach the urban element pass through the building loop's helpers."""
+    from onward_generator.detail.modules import urban_prototypes
+
+    scene, heights, base = detail_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    custom = urban_prototypes(tree_sides=12)
+    calls: list[tuple[object, ...]] = []
+
+    def extra(free, buildings, prototypes, cfg, elements):
+        calls.append((prototypes, cfg, list(elements)))
+        return [], []
+
+    detailed = detail_scene(generated, ref, heights, scene, CFG, prototypes=custom, extra_urban=extra)
+    assert len(calls) == 1
+    received, cfg, elements = calls[0]
+    assert cfg is CFG
+    assert received == custom and all(received[k] is custom[k] for k in custom)
+    placed = [o for o in detailed.objects if o.type == "urban_element"]
+    assert len(elements) == len(placed) > 0
+    assert detailed.prototypes and {id(p) for p in detailed.prototypes.values()} <= {id(p) for p in custom.values()}

@@ -41,3 +41,35 @@ def test_interior_pools_take_the_budgets_of_the_configuration() -> None:
     ]
     assert interior_pools(CFG, {}, {}, extent) == [InteriorPool(CFG.interiors.max_triangles, {}),
                                                    InteriorPool(CFG.interiors.shops.max_triangles, {})]
+
+
+def test_building_costs_leave_the_mid_tier_out() -> None:
+    """Plan D3: N counts only the core, so a mid shell adds nothing to a building's cost."""
+    from onward_generator.tiers import building_costs
+
+    objects = [({"tier": "core", "source_ids": ["a"], "type": "building"}, 100),
+               ({"tier": "mid", "source_ids": ["b"], "type": "building"}, 60),
+               ({"tier": "mid", "source_ids": ["b", "p"], "type": "building_part"}, 12),
+               ({"tier": "scenic", "source_ids": ["c"], "type": "building"}, 10)]
+    assert building_costs(objects) == ({"a": 100}, {})
+
+
+def test_detail_scene_budget_forwards_the_ring_to_both_runs(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from onward_generator.detail import budget as budget_module
+    from onward_generator.detail.scene import DetailedScene
+
+    calls: list[dict[str, object]] = []
+
+    class Stop(Exception):
+        pass
+
+    def fake(*args: object, **kwargs: object) -> DetailedScene:
+        calls.append(kwargs)
+        raise Stop
+
+    monkeypatch.setattr(budget_module, "detail_scene", fake)
+    try:
+        budget_module.detail_scene_budget(None, {}, "h", "s", CFG, target_triangles=5000, max_half_side_m=60.0, mid_ring_m=30.0)  # type: ignore[arg-type]
+    except Stop:
+        pass
+    assert calls == [{"core_half_side_m": 60.0, "mid_ring_m": 30.0}]

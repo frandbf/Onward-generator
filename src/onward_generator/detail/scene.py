@@ -78,11 +78,19 @@ from onward_generator.detail.interiors import (
 )
 from onward_generator.detail.landmarks import attach_towers
 from onward_generator.detail.lidar_roofs import FLAT, PITCHED, REASONS, RoofSpread, SpreadReport, classify, is_roof_tagged
+from onward_generator.detail.mid import MID_MAX_TRIANGLES, MID_REPRESENTATION, build_mid_shell
 from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
-from onward_generator.detail.typology import TypologyConfig, building_typologies, facade_style, load_typology_config, styled_template
+from onward_generator.detail.typology import (
+    FacadeStyle,
+    TypologyConfig,
+    building_typologies,
+    facade_style,
+    load_typology_config,
+    styled_template,
+)
 from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
@@ -98,13 +106,24 @@ from onward_generator.generation.mesh import (
     signed_volume,
     walls,
 )
-from onward_generator.generation.scene import GeneratedScene, Issue, generate_scene, ground_slabs
+from onward_generator.generation.scene import GeneratedScene, Issue, SceneObject, generate_scene, ground_slabs
 from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.io import sha256_file as _sha256
 from onward_generator.sources.es.catastro import PLUGIN_ID as CATASTRO_ID
 from onward_generator.sources.registry import OSM_EVIDENCE, load_source_config
 from onward_generator.sources.world.overture import PLUGIN_ID as OVERTURE_ID
-from onward_generator.tiers import CORE, SCENIC, SCENIC_ROOF, building_tier, core_square, scenic_wall
+from onward_generator.tiers import (
+    CORE,
+    MID,
+    SCENIC,
+    SCENIC_ROOF,
+    CoreError,
+    check_mid_ring,
+    core_square,
+    mid_square,
+    ring_tier,
+    scenic_wall,
+)
 
 MANIFEST_SCHEMA = "onward_generator.scene_detail"
 REPORT_SCHEMA = "onward_generator.detail_report"
@@ -617,7 +636,8 @@ TINT_NOT_USED = ("osm_tag", "landmark", "scenic", "estimated_roof", "no_tint_mat
 
 def _tint_not_used(record: Mapping[str, Any], part: str, lent_source: str) -> str | None:
     """Why a building's ``part`` (``wall`` or ``roof``) did not take the colour lent to it, or ``None`` when it did."""
-    if record.get("tier") == SCENIC:
+    # A mid building (plan D3) has a scenic wall but the roof of its plan, which a lent colour may decide.
+    if record.get("tier") == SCENIC or (record.get("tier") == MID and part == "wall"):
         return "scenic"
     materials = record["facade"]["materials"]
     source = materials[f"{part}_source"]
@@ -1014,15 +1034,86 @@ def _scenic_building(o: Any, geom: BaseGeometry, landmark: bool, use: FacadeUse,
     return DetailObject(o.id, "building", visual, [], record)
 
 
-def _tier_counts(objects: list[DetailObject], dropped_elements: int) -> dict[str, Any]:
-    """Buildings, visual and collision triangles of the objects that carry a tier (ADR-017)."""
-    counts: dict[str, Any] = {t: {"buildings": 0, "visual_triangles": 0, "collision_triangles": 0} for t in (CORE, SCENIC)}
+def _mid_building(o: Any, geom: BaseGeometry, others: BaseGeometry, levels: int | None, landmark: bool, use: FacadeUse,
+                  plan: RoofPlan, roof_materials: Mapping[str, Any], lidar: Mapping[str, object] | None,
+                  cfg: DetailConfig) -> tuple[DetailObject, list[Issue]]:
+    """A mid-tier building (plan D3): the footprint extruded to its height in its scenic wall, painted windows on its
+    exposed walls and the roof form of its ``plan``, at most MID_MAX_TRIANGLES visual triangles, no collider.
+
+    No doors, balconies, parapets, towers, interiors or shops. ``roof_materials`` holds the roof's material
+    origin and source (and the lent colour's evidence), as a core building's; ``lidar`` is the nDSM evidence
+    when the plan's roof form came from it.
+    """
+    bid = o.record["source_ids"][0]
+    height = float(o.record["height"]["height_m"])
+    wall = scenic_wall(cfg.seed, bid)
+    template, roof_material, roof_origin, roof_shape = plan
+    refined, segments = refine_exposure(geom, others, cfg)
+    storeys = storeys_for(height, levels, landmark, cfg)
+    shell = build_mid_shell(refined, segments, storeys, height, template, wall, roof_material, windows=not landmark)
+    visual = [Primitive(mesh, material) for material, mesh in shell.parts.items() if mesh.triangle_count]
+    roof: dict[str, Any] = {**shell.roof, "origin": roof_origin, "roof_shape": roof_shape}
+    if lidar is not None:
+        roof["origin"] = "estimated"
+        roof["lidar"] = dict(lidar)
+    issues = []
+    if "fallback" in roof:
+        issues.append(Issue("roof_shape_fallback", "info", bid, f"mid shell roof drawn flat: {roof['fallback']}"))
+    if shell.defects:
+        issues.append(Issue("facade_mesh_not_watertight", "critical", bid, f"mid shell: {shell.defects} open or non-manifold edges"))
+    record = {
+        **{k: v for k, v in o.record.items() if k != "checks"},
+        "tier": MID,
+        "generation": {"method": "phase03_volume + mid shell", "phase03": o.record.get("generation"),
+                       "template_config_version": cfg.version, "seed": cfg.seed},
+        "facade": {
+            "template": MID_REPRESENTATION,
+            "representation": MID_REPRESENTATION,
+            "representative_of_real_facade": False,
+            "attribute_origin": "generated",
+            "note": FIDELITY_NOTE,
+            "needs_custom_model": landmark,
+            "ground_floor": "none",
+            "storeys": {"count": storeys.count, "height_m": round(storeys.height_m, 3), "origin": storeys.origin},
+            "openings": {},
+            "mid": {"windows": shell.windows, "exposed_faces": shell.exposed_faces, "cap": MID_MAX_TRIANGLES},
+            "shops": [],
+            "materials": {"wall": wall, "wall_origin": "generated", "roof": roof["material"], **roof_materials},
+            "use": use.to_record(),
+            "door": "none",
+            "doors_m": [],
+        },
+        "roof": roof,
+        "interior": False,
+        "materials": [p.material for p in visual],
+        "visual": {"triangles": sum(p.mesh.triangle_count for p in visual)},
+        "collider": {"source": "none_mid", "parts": 0, "triangles": 0, "balconies": 0, "glass_panes": 0},
+        "checks": {"facade_open_edges": shell.defects},
+    }
+    frame = wall_uv_frame(segments, storeys, levels)
+    return DetailObject(o.id, "building", visual, [], record, uv_frame=frame), issues
+
+
+def _tier_counts(objects: list[DetailObject], dropped_elements: int, *, mid: bool) -> dict[str, Any]:
+    """Buildings, visual and collision triangles of the objects that carry a tier (ADR-017).
+
+    With the intermediate ring (``mid``, plan D3) the ``mid`` tier is added, with the visual triangles of each
+    mid building's own shell (``triangles_per_building``: mean to 0.1, min and max; null without a mid building).
+    """
+    counts: dict[str, Any] = {t: {"buildings": 0, "visual_triangles": 0, "collision_triangles": 0} for t in ((CORE, SCENIC, MID) if mid else (CORE, SCENIC))}
     for x in (o for o in objects if "tier" in o.record):
         entry = counts[x.record["tier"]]
         entry["buildings"] += x.type == "building"
         entry["visual_triangles"] += sum(p.mesh.triangle_count for p in x.visual)
         entry["collision_triangles"] += sum(m.triangle_count for m in (*x.colliders, *x.glass_colliders))
     counts[SCENIC]["urban_elements_dropped"] = dropped_elements
+    if mid:
+        shells = [sum(p.mesh.triangle_count for p in x.visual) for x in objects if x.type == "building" and x.record.get("tier") == MID]
+        counts[MID]["triangles_per_building"] = {
+            "mean": round(sum(shells) / len(shells), 1) if shells else None,
+            "min": min(shells, default=None),
+            "max": max(shells, default=None),
+        }
     return counts
 
 
@@ -1046,6 +1137,7 @@ def detail_scene(
     typology: TypologyConfig | None = None,
     tints: Sequence[Mapping[str, Any]] | None = None,
     roof_spread: SpreadReport | None = None,
+    mid_ring_m: float | None = None,
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
@@ -1056,9 +1148,16 @@ def detail_scene(
     ``overture_tints.json`` (plan C2): Overture colours a wall or roof takes when no OSM tag names it. ``None``
     (the default) reads none and adds no count. ``roof_spread`` is a raster plugin's report (plan C3): a building
     without a roof tag takes a flat or pitched roof from its nDSM spread (``lidar_roofs.classify``). ``None`` (the
-    default) reads none, adds no key and draws the roofs as before."""
+    default) reads none, adds no key and draws the roofs as before. ``mid_ring_m`` (plan D3, needs a core) makes a building
+    outside the core that meets a band that wide around it a ``mid`` shell (``tiers.ring_tier``); ``None`` (the default)
+    adds no tier and no key."""
+    if mid_ring_m is not None:
+        if core_half_side_m is None:
+            raise CoreError("mid_ring_m needs a core (core_half_side_m)")
+        check_mid_ring(mid_ring_m)
     tcfg = typology or load_typology_config()
     core = core_square(core_half_side_m) if core_half_side_m is not None else None
+    mid = mid_square(core_half_side_m, mid_ring_m) if core_half_side_m is not None and mid_ring_m is not None else None
     heights = json.loads(Path(heights_path).expanduser().read_text(encoding="utf-8"))
     scene = json.loads(Path(scene_path).expanduser().read_text(encoding="utf-8"))
     height_of = {b["building_id"]: b for b in heights.get("buildings", [])}
@@ -1097,7 +1196,7 @@ def detail_scene(
     # One roof:levels is a storey of the building, a landmark's too: its single facade band is not a storey.
     storey_heights = {bid: storeys_for(heights_m[bid], height_of[bid].get("estimated_levels"), False, cfg).height_m for bid in ids}  # pragma: no mutate: storeys_for reads landmark as a truth value, so None is False
     tags_of = {bid: dict(feature_of[bid].get("tags") or {}) for bid in ids}
-    tier_of = {bid: building_tier(footprints[bid], core) for bid in ids}
+    tier_of = {bid: ring_tier(footprints[bid], core, mid) for bid in ids}
     lidar_classes, lidar_plans, lidar_evidence = _lidar_inputs(
         roof_spread, _lidar_classes(ids, footprints, tree, key_of, tags_of, heights_m, tier_of, roof_spread, cfg),
     ) if roof_spread is not None else ({}, {}, {})
@@ -1146,6 +1245,138 @@ def detail_scene(
     emitted: dict[str, tuple[list[DetailObject], list[Issue]]] = {}
     core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]] = {}
 
+    return _detail_buildings(
+        base=base,
+        base_ref=base_ref,
+        cfg=cfg,
+        tcfg=tcfg,
+        prototypes=prototypes,
+        extra_urban=extra_urban,
+        core_half_side_m=core_half_side_m,
+        mid_ring_m=mid_ring_m,
+        places=places,
+        tints=tints,
+        roof_spread=roof_spread,
+        core=core,
+        heights=heights,
+        height_of=height_of,
+        features=features,
+        feature_of=feature_of,
+        place_of=place_of,
+        footprints=footprints,
+        ids=ids,
+        tree=tree,
+        key_of=key_of,
+        tier_of=tier_of,
+        building_objs=building_objs,
+        order=order,
+        heights_m=heights_m,
+        templates=templates,
+        facade_walls=facade_walls,
+        typologies=typologies,
+        facade_styles=facade_styles,
+        lent_walls=lent_walls,
+        lent_roofs=lent_roofs,
+        roof_plans=roof_plans,
+        lidar_classes=lidar_classes,
+        lidar_evidence=lidar_evidence,
+        evidence=evidence,
+        catastro=catastro,
+        third_party=third_party,
+        whole_in_core=whole_in_core,
+        interior_queue=interior_queue,
+        interiors_left=interiors_left,
+        objects=objects,
+        issues=issues,
+        leading_issues=leading_issues,
+        emitted=emitted,
+        core_shells=core_shells,
+        lit=lit,
+        every_footprint=every_footprint,
+        door_fronts=door_fronts,
+        counts=counts,
+        templates_used=templates_used,
+        roof_types=roof_types,
+        roof_shapes=roof_shapes,
+        door_rules=door_rules,
+        setbacks=setbacks,
+        interiors_built=interiors_built,
+        shop_interiors=shop_interiors,
+        budgets=budgets,
+        furnishing=furnishing,
+        flat_openings=flat_openings,
+        exposed_m=exposed_m,
+        party_m=party_m,
+    )
+
+
+def _detail_buildings(
+    *,
+    base: GeneratedScene,
+    base_ref: Mapping[str, Any],
+    cfg: DetailConfig,
+    tcfg: TypologyConfig,
+    prototypes: Mapping[str, Prototype] | None,
+    extra_urban: ExtraUrban | None,
+    core_half_side_m: float | None,
+    mid_ring_m: float | None,
+    places: Sequence[Mapping[str, Any]],
+    tints: Sequence[Mapping[str, Any]] | None,
+    roof_spread: SpreadReport | None,
+    core: Polygon | None,
+    heights: dict[str, Any],
+    height_of: dict[str, Any],
+    features: list[Any],
+    feature_of: dict[str, Any],
+    place_of: dict[str, Mapping[str, Any]],
+    footprints: dict[str, BaseGeometry],
+    ids: list[str],
+    tree: STRtree,
+    key_of: dict[str, str],
+    tier_of: dict[str, str],
+    building_objs: list[SceneObject],
+    order: list[SceneObject],
+    heights_m: dict[str, float],
+    templates: dict[str, Template],
+    facade_walls: dict[str, tuple[FacadeUse, str, str]],
+    typologies: dict[str, dict[str, Any]],
+    facade_styles: dict[str, FacadeStyle],
+    lent_walls: dict[str, dict[str, Any]],
+    lent_roofs: dict[str, dict[str, Any]],
+    roof_plans: dict[str, RoofPlan],
+    lidar_classes: dict[str, str],
+    lidar_evidence: dict[str, dict[str, object]],
+    evidence: dict[str, list[str]],
+    catastro: dict[str, Any],
+    third_party: set[str],
+    whole_in_core: set[str],
+    interior_queue: list[str],
+    interiors_left: int,
+    objects: list[DetailObject],
+    issues: list[Issue],
+    leading_issues: int,
+    emitted: dict[str, tuple[list[DetailObject], list[Issue]]],
+    core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]],
+    lit: list[tuple[bool, dict[str, Any]]],
+    every_footprint: BaseGeometry,
+    door_fronts: list[Polygon],
+    counts: Counter[str],
+    templates_used: Counter[str],
+    roof_types: Counter[str],
+    roof_shapes: Counter[str],
+    door_rules: Counter[str],
+    setbacks: Counter[str],
+    interiors_built: list[str],
+    shop_interiors: list[str],
+    budgets: dict[bool, InteriorBudget],
+    furnishing: ShopFurnishing | None,
+    flat_openings: int,
+    exposed_m: float,
+    party_m: float,
+) -> DetailedScene:
+    """The building loop of ``detail_scene``: each building in ``order`` drawn as a core, mid or scenic one, then ``_assemble_detail``.
+
+    It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1153,6 +1384,21 @@ def detail_scene(
         h = height_of[bid]
         if tier_of[bid] == SCENIC:
             objects.append(_scenic_building(o, geom, bool(h.get("landmark")), facade_walls[bid][0], cfg))
+            emitted[o.id] = (objects[first_object:], issues[first_issue:])
+            continue
+        if tier_of[bid] == MID:
+            _, roof_material, roof_origin, _ = roof_plans[bid]
+            lent_roof = lent_roofs.get(key_of[bid])
+            roof_source = _source(tagged_roof(dict(feature_of[bid].get("tags") or {}), cfg.materials, lent=_lent_colour(lent_roof)), roof_origin)
+            roof_materials: dict[str, Any] = {"roof_origin": roof_origin, "roof_source": roof_source}
+            if roof_source == OVERTURE_ROOF and lent_roof is not None:
+                roof_materials["roof_evidence"] = _tint_evidence(lent_roof)
+            near = [ids[k] for k in tree.query(geom, predicate="dwithin", distance=cfg.probe_m) if ids[k] != bid]
+            shell_obj, shell_issues = _mid_building(o, geom, union_all([footprints[n] for n in near]), h.get("estimated_levels"),
+                                                    bool(h.get("landmark")), facade_walls[bid][0], roof_plans[bid], roof_materials,
+                                                    lidar_evidence.get(bid), cfg)
+            objects.append(shell_obj)
+            issues.extend(shell_issues)
             emitted[o.id] = (objects[first_object:], issues[first_issue:])
             continue
         height = heights_m[bid]
@@ -1412,6 +1658,112 @@ def detail_scene(
                 x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
+    return _assemble_detail(
+        base=base,
+        base_ref=base_ref,
+        cfg=cfg,
+        tcfg=tcfg,
+        prototypes=prototypes,
+        extra_urban=extra_urban,
+        core_half_side_m=core_half_side_m,
+        mid_ring_m=mid_ring_m,
+        places=places,
+        tints=tints,
+        roof_spread=roof_spread,
+        core=core,
+        heights=heights,
+        height_of=height_of,
+        features=features,
+        footprints=footprints,
+        ids=ids,
+        tree=tree,
+        key_of=key_of,
+        tier_of=tier_of,
+        building_objs=building_objs,
+        facade_walls=facade_walls,
+        typologies=typologies,
+        facade_styles=facade_styles,
+        lent_walls=lent_walls,
+        lent_roofs=lent_roofs,
+        lidar_classes=lidar_classes,
+        third_party=third_party,
+        issues=issues,
+        leading_issues=leading_issues,
+        emitted=emitted,
+        core_shells=core_shells,
+        lit=lit,
+        every_footprint=every_footprint,
+        door_fronts=door_fronts,
+        counts=counts,
+        templates_used=templates_used,
+        roof_types=roof_types,
+        roof_shapes=roof_shapes,
+        door_rules=door_rules,
+        setbacks=setbacks,
+        interiors_built=interiors_built,
+        shop_interiors=shop_interiors,
+        budgets=budgets,
+        furnishing=furnishing,
+        flat_openings=flat_openings,
+        exposed_m=exposed_m,
+        party_m=party_m,
+    )
+
+
+def _assemble_detail(
+    *,
+    base: GeneratedScene,
+    base_ref: Mapping[str, Any],
+    cfg: DetailConfig,
+    tcfg: TypologyConfig,
+    prototypes: Mapping[str, Prototype] | None,
+    extra_urban: ExtraUrban | None,
+    core_half_side_m: float | None,
+    mid_ring_m: float | None,
+    places: Sequence[Mapping[str, Any]],
+    tints: Sequence[Mapping[str, Any]] | None,
+    roof_spread: SpreadReport | None,
+    core: Polygon | None,
+    heights: dict[str, Any],
+    height_of: dict[str, Any],
+    features: list[Any],
+    footprints: dict[str, BaseGeometry],
+    ids: list[str],
+    tree: STRtree,
+    key_of: dict[str, str],
+    tier_of: dict[str, str],
+    building_objs: list[SceneObject],
+    facade_walls: dict[str, tuple[FacadeUse, str, str]],
+    typologies: dict[str, dict[str, Any]],
+    facade_styles: dict[str, FacadeStyle],
+    lent_walls: dict[str, dict[str, Any]],
+    lent_roofs: dict[str, dict[str, Any]],
+    lidar_classes: dict[str, str],
+    third_party: set[str],
+    issues: list[Issue],
+    leading_issues: int,
+    emitted: dict[str, tuple[list[DetailObject], list[Issue]]],
+    core_shells: dict[str, tuple[Shell, list[Segment], DetailObject]],
+    lit: list[tuple[bool, dict[str, Any]]],
+    every_footprint: BaseGeometry,
+    door_fronts: list[Polygon],
+    counts: Counter[str],
+    templates_used: Counter[str],
+    roof_types: Counter[str],
+    roof_shapes: Counter[str],
+    door_rules: Counter[str],
+    setbacks: Counter[str],
+    interiors_built: list[str],
+    shop_interiors: list[str],
+    budgets: dict[bool, InteriorBudget],
+    furnishing: ShopFurnishing | None,
+    flat_openings: int,
+    exposed_m: float,
+    party_m: float,
+) -> DetailedScene:
+    """The rest of ``detail_scene`` once every building is drawn: party walls, building parts, ground, urban elements, checks and the report.
+
+    It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
     wall_areas = _split_party_walls(core_shells, footprints, tree, ids)
     objects = [x for o in building_objs for x in emitted[o.id][0]]
     for x in objects:
@@ -1434,7 +1786,7 @@ def detail_scene(
     if core is not None:
         for piece in part_objects:
             piece.record["tier"] = tier_of[piece.record["source_ids"][0]]
-            if piece.record["tier"] == SCENIC:
+            if piece.record["tier"] != CORE:
                 piece.colliders = []
     objects.extend(part_objects)
 
@@ -1536,7 +1888,10 @@ def detail_scene(
     if core is not None:
         tiers = Counter(tier_of.values())
         detailed.core = {"half_side_m": core_half_side_m, "buildings": {CORE: tiers[CORE], SCENIC: tiers[SCENIC]}}
-        detailed.stats["tiers"] = _tier_counts(objects, placed - len(elements))
+        if mid_ring_m is not None:
+            detailed.core["mid_ring_m"] = float(mid_ring_m)
+            detailed.core["buildings"][MID] = tiers[MID]
+        detailed.stats["tiers"] = _tier_counts(objects, placed - len(elements), mid=mid_ring_m is not None)
     _budget(detailed)
     return detailed
 

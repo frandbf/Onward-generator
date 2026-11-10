@@ -18,7 +18,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator.bounds.envelope import DEFAULT_HEIGHT_M, DEFAULT_THICKNESS_M
-from onward_generator.tiers import SCENIC, core_of
+from onward_generator.tiers import CORE, core_of
 
 LADDERS_MAX = 3
 LIFTS_MAX = 3
@@ -196,7 +196,8 @@ def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, Bas
     climbed = {o["source_ids"][0] for o in objects if o.get("type") == "interior" and o.get("roof_access")}
     found = []
     for building in objects:
-        if building.get("type") != "building" or building.get("tier") == SCENIC:
+        # Outside the core (scenic, or the plan D3 mid ring) no player can reach a roof.
+        if building.get("type") != "building" or building.get("tier", CORE) != CORE:
             continue
         source = building["source_ids"][0]
         if source in climbed or source not in footprints or building["height"].get("landmark"):

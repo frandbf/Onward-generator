@@ -24,7 +24,7 @@ from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_f
 from onward_generator.io import atomic_write_json
 from onward_generator.materials.library_plan import select_texture_plan
 from onward_generator.sources.registry import choices, plugin_by_id
-from onward_generator.tiers import CORE_BUDGET_MODE, MIN_CORE_HALF_SIDE_M, CoreError, check_target
+from onward_generator.tiers import CORE_BUDGET_MODE, MIN_CORE_HALF_SIDE_M, CoreError, check_mid_ring, check_target
 
 MAP_SCHEMA = "onward_generator.map"
 MAP_VERSION = "0.1.0"
@@ -339,6 +339,42 @@ def store_lidar_roofs(directory: str | Path, enabled: bool) -> None:
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
     document["lidar_roofs"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
+def _mid_ring_value(document: Mapping[str, Any], value: object) -> float:
+    """``value`` as ``mid_ring_m`` of the map ``document``: metres in range, on a map with a core (fixed or budget)."""
+    if not document.get("core_radius_m") and document.get("core") is None:
+        raise MapError('map.json "mid_ring_m" needs a playable core ("core_radius_m" or a budget "core")')
+    try:
+        return check_mid_ring(value)
+    except CoreError as exc:
+        raise MapError(f"map.json {exc}") from exc
+
+
+def mid_ring_m(directory: str | Path) -> float | None:
+    """``"mid_ring_m"`` of ``map.json`` (plan D3, ADR-017 amendment, off by default), or None without the key or the map.
+
+    ``detail`` then draws the buildings outside the core within that many metres of it as mid shells. A value
+    that is not a number of metres from 10 to 1000, or the key on a map without a core, is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return None
+    if "mid_ring_m" not in document:
+        return None
+    return _mid_ring_value(document, document["mid_ring_m"])
+
+
+def store_mid_ring(directory: str | Path, metres: float | None) -> None:
+    """Record the intermediate ring width on an existing map, or remove it with None. Does not rewrite scenes."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    if metres is None:
+        document.pop("mid_ring_m", None)
+    else:
+        document["mid_ring_m"] = _mid_ring_value(document, metres)
     atomic_write_json(root / "map.json", document)
 
 

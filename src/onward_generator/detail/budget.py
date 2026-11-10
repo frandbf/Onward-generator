@@ -80,7 +80,8 @@ def detail_scene_budget(
 ) -> DetailedScene:
     """``detail_scene`` with the core half-side solved from ``target_triangles`` (core visual triangles of ``counts.tiers``).
 
-    The probe runs at ``max_half_side_m``. Only the kept run's objects and issues are returned. The
+    The probe runs at ``max_half_side_m``. ``options`` go to both runs, ``mid_ring_m`` (plan D3) too: the intermediate
+    ring follows each run's core, and its buildings are not core, so they never enter the costs. Only the kept run's objects and issues are returned. The
     ``core`` block gains the budget fields; ``core_budget_floor`` / ``core_budget_ceiling`` (info) tell a
     target the core cannot reach, and ``core_budget_missed`` (warning) a core more than
     ``CORE_BUDGET_TOLERANCE`` off the target that no clamp explains.

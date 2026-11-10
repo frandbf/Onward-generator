@@ -16,7 +16,10 @@ from onward_generator.tiers import (
     CORE,
     CORE_BUDGET_MODE,
     CORE_BUDGET_TOLERANCE,
+    MAX_MID_RING_M,
     MAX_TARGET_TRIANGLES,
+    MID,
+    MIN_MID_RING_M,
     MIN_TARGET_TRIANGLES,
     SCENIC,
     SCENIC_WALLS,
@@ -27,12 +30,15 @@ from onward_generator.tiers import (
     bounds_tier,
     building_costs,
     building_tier,
+    check_mid_ring,
     check_target,
     combine_cell,
     core_extent,
     core_of,
     core_reach,
     core_square,
+    mid_square,
+    ring_tier,
     scenic_wall,
     solve_core,
     tier_summary,
@@ -521,3 +527,98 @@ def test_combine_cell_takes_the_bounds_of_every_primitive_and_its_size() -> None
     assert combine_cell(parts, 100.0) == (0, 0)
     assert combine_cell(parts, 50.0) == (1, 0)
     assert combine_cell(parts[:1], 4.0) == (1, -2)
+
+
+# ---------------------------------------------------------------------------------------------------- the mid ring (plan D3)
+
+MID_150 = mid_square(100.0, 50.0)
+
+
+def test_mid_constants_and_square() -> None:
+    assert (MID, MIN_MID_RING_M, MAX_MID_RING_M) == ("mid", 10.0, 1000.0)
+    assert MID_150.bounds == (-150.0, -150.0, 150.0, 150.0)
+    # Past the core's own limit the band is still built: 2000 m of core and 1000 m of ring.
+    assert mid_square(2000.0, 1000.0).bounds == (-3000.0, -3000.0, 3000.0, 3000.0)
+
+
+@pytest.mark.parametrize(("footprint", "tier"), [
+    (box(10, 10, 20, 20), CORE),             # inside the core
+    (box(95, 0, 110, 10), CORE),             # across the core edge: taken whole
+    (box(100, 0, 110, 10), MID),             # touches the core edge, inside the band
+    (box(140, 0, 160, 10), MID),             # across the band's outer edge: taken whole
+    (box(150, 0, 160, 10), SCENIC),          # touches the band's outer edge only
+    (box(170, 0, 180, 10), SCENIC),          # past the band
+    (box(-150.5, -10, -149.5, 10), MID),     # west: half a metre inside the band
+])
+def test_ring_tier(footprint: Polygon, tier: str) -> None:
+    assert ring_tier(footprint, CORE_100, MID_150) == tier
+
+
+def test_ring_tier_takes_a_multipolygon_whole() -> None:
+    from shapely.geometry import MultiPolygon
+
+    split = MultiPolygon([box(120, 0, 130, 10), box(200, 0, 210, 10)])
+    assert ring_tier(split, CORE_100, MID_150) == MID
+    assert ring_tier(MultiPolygon([box(200, 0, 210, 10), box(220, 0, 230, 10)]), CORE_100, MID_150) == SCENIC
+
+
+@pytest.mark.parametrize("footprint", [box(10, 10, 20, 20), box(95, 0, 110, 10), box(100, 0, 110, 10), box(170, 0, 180, 10)])
+def test_ring_tier_without_a_ring_is_building_tier(footprint: Polygon) -> None:
+    assert ring_tier(footprint, CORE_100, None) == building_tier(footprint, CORE_100)
+    assert ring_tier(footprint, None, None) == CORE == ring_tier(footprint, None, MID_150)
+
+
+def test_ring_tier_keeps_the_core_of_building_tier() -> None:
+    """sha256-seeded boxes around MURCIA_CENTER (local 0, 0): the ring never moves a building in or out of the core."""
+    import hashlib
+
+    for k in range(300):
+        d = hashlib.sha256(f"d3:{k}".encode()).digest()
+        x, y = d[0] - 128 + d[1] / 256, d[2] - 128 + d[3] / 256
+        w, h = 1 + d[4] / 16, 1 + d[5] / 16
+        footprint = box(x, y, x + w, y + h)
+        core = building_tier(footprint, CORE_100) == CORE
+        assert (ring_tier(footprint, CORE_100, MID_150) == CORE) == core
+        assert ring_tier(footprint, CORE_100, MID_150) in ((CORE,) if core else (MID, SCENIC))
+
+
+@pytest.mark.parametrize("value", [10, 10.0, 100, 1000, 1000.0])
+def test_check_mid_ring_accepts_the_range(value: float) -> None:
+    assert check_mid_ring(value) == float(value)
+    assert type(check_mid_ring(value)) is float
+
+
+@pytest.mark.parametrize("value", [9.999, 1000.001, 0, -5, float("nan"), float("inf"), True, False, "100", None])
+def test_check_mid_ring_refuses(value: object) -> None:
+    with pytest.raises(CoreError, match=r"^mid_ring_m must be a number of metres from 10 to 1000, got "):
+        check_mid_ring(value)
+    with pytest.raises(CoreError) as raised:
+        check_mid_ring(value)
+    assert str(raised.value).endswith(f"got {value!r}")
+
+
+def test_tier_summary_without_mid_records_keeps_its_keys() -> None:
+    visual = _glb(("building/a", "plaster", _floor(10, 10, 20, 20)), ("building/b", "scenic_wall_light", _floor(160, 10, 170, 20)))
+    summary = tier_summary(visual, [{"id": "building/a", "tier": CORE}, {"id": "building/b", "tier": SCENIC}], CORE_100, cell_m=100.0)
+    assert list(summary) == ["cell_m", "draws", CORE, SCENIC, SHARED]
+
+
+def test_tier_summary_adds_the_mid_tier_when_a_record_has_it() -> None:
+    visual = _glb(
+        ("building/a", "plaster", _floor(10, 10, 20, 20)),
+        ("building/m", "scenic_trim_mediterranean", _floor(110, 10, 120, 20)),  # mid
+        ("building/s", "scenic_trim_mediterranean", _floor(160, 10, 170, 20)),  # scenic, same cell and material
+        ("building/n", "roof_tile", _floor(115, 30, 118, 40)),                  # mid, its own material
+    )
+    objects = [{"id": "building/a", "tier": CORE}, {"id": "building/m", "tier": MID},
+               {"id": "building/s", "tier": SCENIC}, {"id": "building/n", "tier": MID}]
+    summary = tier_summary(visual, objects, CORE_100, cell_m=100.0)
+    assert summary == {
+        "cell_m": 100.0,
+        "draws": 3,  # the scenic and mid walls of one cell share one group, counted once in the total
+        CORE: {"visual_triangles": 2, "draws": 1},
+        SCENIC: {"visual_triangles": 2, "draws": 1},
+        SHARED: {"visual_triangles": 0, "draws": 0},
+        MID: {"visual_triangles": 4, "draws": 2},
+    }
+    assert list(summary)[-1] == MID

@@ -597,3 +597,23 @@ def test_a_street_profile_reply_needs_the_switch(workdir: Path, capsys: pytest.C
     reply = REPO / "tests" / "fixtures" / "street_profile" / "neutral.json"
     assert _run(workdir / "bench", "r1", Stub(), "--street-profile-reply", str(reply)) != 0
     assert "--street-profile-reply needs --street-profile" in capsys.readouterr().err
+
+
+def test_mid_ring_run_switches_the_run_copy_only(workdir: Path) -> None:
+    """Plan D3: ``--mid-ring-m`` writes the width into the run copy's map.json; detail gets the flag after the core."""
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    assert all("--mid-ring-m" not in argv for argv in off.calls)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--mid-ring-m", "100") == 0
+    copy = root / "runs" / "r2" / "bench_murcia"
+    assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["mid_ring_m"] == 100.0
+    assert bench.inputs_sha256(inputs) == digest
+    assert "mid_ring_m" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    detail = next(argv for argv in on.calls if argv[0] == "detail")
+    assert detail[detail.index("--mid-ring-m") + 1] == "100"
+    assert detail.index("--mid-ring-m") > detail.index("--core-radius-m")

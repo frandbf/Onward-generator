@@ -272,6 +272,15 @@ Windows, shopfronts, and balcony doors below the accessible ceiling keep a hole 
 
 Measured on Madrid (40.40657, −3.719187) with Catastro: see [09-perf.md](09-perf.md#playable-core).
 
+#### Intermediate ring
+
+`--mid-ring-m W` (with `--core-radius-m`; `map.json` `mid_ring_m`, see [02-configuration.md](02-configuration.md#one-folder-per-map)) adds a third tier between the core and the scenic ring ([ADR-017 amendment of 9 November 2026](decisions/ADR-017-playable-core.md#amendment-9-november-2026-an-intermediate-hlod-ring-plan-d3)). It is off by default until a headset session validates it; without it nothing changes, byte for byte.
+
+- **Tier.** `tiers.ring_tier`: the core is decided as above; a building that is not core and shares area with the square of half-side `core.half_side_m + W` is `mid`, one that only touches its outer edge is `scenic`. Whole buildings only; `building:part` volumes follow their building and lose their collider. With a budget core the band follows the solved half-side, and N counts only the core.
+- **Mid shell.** The footprint extruded to its height in its scenic wall material, the roof form its roof plan gives (an OSM `roof:shape`, the estimated or template hip, the nDSM gable with `lidar_roofs`, else a flat cap; no parapet) and painted windows: ADR-025 flat openings (a hole and a `glass_dark` quad, 1.2 × 1.4 m, 0.9 m sill, one per 3 m bay) on exposed walls, a whole wall-storey row at a time, longest wall first, at most 150 visual triangles per building. A roof that would go over is drawn flat (`roof.fallback: mid_triangle_cap`); a footprint whose plain shell is already over 150 gets no window. No doors, balconies, parapets, towers, interiors, shops or collider (`collider.source: none_mid`); a landmark gets no window.
+- **Record.** `tier: mid`, `facade.template` and `representation` `mid_shell`, `facade.storeys`, `facade.mid {windows, exposed_faces, cap}`, `facade.materials` with the roof's origin and source (an Overture roof colour can apply to a mid roof, not to its wall), `checks.facade_open_edges`; `roof.origin` is the roof plan's. `materials apply` maps the walls and windows of a mid node onto `scenic_trim_<style>`.
+- **Report.** `scene_detail.json` `core` gains `mid_ring_m` and `buildings.mid`; `counts.tiers.mid` gives `buildings`, `visual_triangles`, `collision_triangles` (0) and `triangles_per_building {mean, min, max}` of the shells. `run` prints the mid tier on the `detail` line. `counts.lidar_roofs.core_buildings` counts the mid buildings too, since their roofs are classified.
+
 #### Budget core
 
 `--core-target-triangles N` (with `--core-radius-m M` as the largest half-side; `map.json` `core`, see [02-configuration.md](02-configuration.md#one-folder-per-map)) picks the half-side from a triangle target instead ([ADR-017 amendment of 7 November 2026](decisions/ADR-017-playable-core.md#amendment-7-november-2026-budget-mode)). It is off by default until a headset session validates it.

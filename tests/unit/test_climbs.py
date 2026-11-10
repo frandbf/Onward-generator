@@ -140,6 +140,7 @@ def test_the_rules_choose_ladders_up_to_3_storeys_and_lifts_from_3_to_6() -> Non
         _building("b", 2, interior=True),
         _building("b", 2, landmark=True),
         {**_building("b", 2), "tier": "scenic"},
+        {**_building("b", 2), "tier": "mid"},  # plan D3: the intermediate ring is past the wall too
     ],
 )
 def test_a_building_a_ladder_cannot_use_is_skipped(building: dict) -> None:
@@ -376,3 +377,9 @@ def test_a_wall_slides_from_its_middle_outward_and_keeps_the_strip_on_it() -> No
     east = (20.0, 5.0, 1.0, 0.0, 10.0)  # the east wall of a box, running north: along it is +y
     assert [w[:2] for w in _slid(east, 9.2)] == [(20.0, 5.0)] and [w[:2] for w in _slid(east, 9.0)] == [(20.0, 5.0), (20.0, 5.5), (20.0, 4.5)]
     assert SLIDE_STEP_M == 0.5
+
+
+def test_a_core_tier_or_no_tier_keeps_a_building() -> None:
+    footprints = {"b": box(0, 100, 20, 110)}
+    assert len(_place([{**_building("b", 2), "tier": "core"}], footprints)["ladders"]) == 1
+    assert len(_place([_building("b", 2)], footprints)["ladders"]) == 1

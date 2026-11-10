@@ -254,10 +254,10 @@ def _detail(out: Path) -> StageReport:
 
 
 def _tiers(tiers: Mapping[str, Any]) -> tuple[str, ...]:
-    """``core 120 bldg 180 000 tris``, then the scenic ring (ADR-017). Empty without a core."""
+    """``core 120 bldg 180 000 tris``, then the scenic ring (ADR-017) and the mid ring when on (plan D3). Empty without a core."""
     return tuple(
         f"{name} {group(tiers[name]['buildings'])} bldg {group(tiers[name]['visual_triangles'])} tris"
-        for name in ("core", "scenic") if name in tiers
+        for name in ("core", "mid", "scenic") if name in tiers
     )
 
 

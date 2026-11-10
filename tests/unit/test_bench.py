@@ -779,3 +779,120 @@ def test_the_bench_profile_provider_never_calls_a_model(tmp_path: Path) -> None:
     reply.write_text('{"cover": "off"}', encoding="utf-8")
     replay = bench.profile_provider(reply)
     assert (replay.name, replay.text, replay.source) == ("replay", '{"cover": "off"}', str(reply))
+
+
+# ---------------------------------------------------------------------------------------------------- the mid ring (plan D3)
+
+
+def test_tier_counts_read_the_mid_tier_only_when_the_manifest_has_it() -> None:
+    tiers = _manifest()["tiers"]
+    assert bench._tier_counts(tiers, "m") == (
+        {"core": tiers["core"]["visual_triangles"], "scenic": tiers["scenic"]["visual_triangles"],
+         "shared": tiers["shared"]["visual_triangles"],
+         "total": sum(tiers[t]["visual_triangles"] for t in ("core", "scenic", "shared"))},
+        {"total": tiers["draws"], "core": tiers["core"]["draws"], "scenic": tiers["scenic"]["draws"], "shared": tiers["shared"]["draws"]},
+    )
+    triangles, draws = bench._tier_counts({**tiers, "mid": {"visual_triangles": 700, "draws": 9}}, "m")
+    assert triangles["mid"] == 700 and draws["mid"] == 9
+    assert triangles["total"] == sum(tiers[t]["visual_triangles"] for t in ("core", "scenic", "shared")) + 700
+    assert list(triangles) == ["core", "scenic", "shared", "mid", "total"]
+    with pytest.raises(bench.BenchError, match=r"tiers\.mid: draws must be an integer"):
+        bench._tier_counts({**tiers, "mid": {"visual_triangles": 700}}, "m")
+
+
+MID_TIER = {"buildings": 12, "visual_triangles": 960, "collision_triangles": 0,
+            "triangles_per_building": {"mean": 80.0, "min": 34, "max": 150}}
+
+
+def test_mid_ring_metrics_read_the_detail_report(tmp_path: Path) -> None:
+    assert bench.mid_ring_metrics(tmp_path) is None
+    root = _detail_report(tmp_path, {"counts": {"tiers": {"core": {}, "scenic": {}}}})
+    assert bench.mid_ring_metrics(root) is None
+    _detail_report(tmp_path, {"counts": {}})
+    assert bench.mid_ring_metrics(root) is None
+    _detail_report(tmp_path, {"counts": {"tiers": {"mid": MID_TIER}}})
+    assert bench.mid_ring_metrics(root) == {"buildings": 12, "visual_triangles": 960, "triangles_per_building_mean": 80.0,
+                                            "triangles_per_building_min": 34, "triangles_per_building_max": 150}
+    empty = MID_TIER | {"buildings": 0, "visual_triangles": 0, "triangles_per_building": {"mean": None, "min": None, "max": None}}
+    _detail_report(tmp_path, {"counts": {"tiers": {"mid": empty}}})
+    assert bench.mid_ring_metrics(root)["triangles_per_building_mean"] is None
+
+
+@pytest.mark.parametrize(("block", "message"), [
+    ([], "counts.tiers: mid must be an object"),
+    (MID_TIER | {"buildings": "12"}, "counts.tiers.mid: buildings must be an integer"),
+    (MID_TIER | {"visual_triangles": None}, "counts.tiers.mid: visual_triangles must be an integer"),
+    (MID_TIER | {"triangles_per_building": None}, "triangles_per_building must be an object"),
+    (MID_TIER | {"triangles_per_building": {"mean": "80", "min": 1, "max": 2}}, "needs numbers or null"),
+    (MID_TIER | {"triangles_per_building": {"mean": 80.0, "min": True, "max": 2}}, "needs numbers or null"),
+])
+def test_mid_ring_metrics_refuse_a_broken_block(tmp_path: Path, block: Any, message: str) -> None:
+    with pytest.raises(bench.BenchError, match=message):
+        bench.mid_ring_metrics(_detail_report(tmp_path, {"counts": {"tiers": {"mid": block}}}))
+
+
+def test_map_entry_and_report_have_the_mid_ring_only_when_the_tier_exists(tmp_path: Path) -> None:
+    package = _package(tmp_path / "pkg")
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "map.json").write_text("{}", encoding="utf-8")
+    ref = bench.REFERENCE_MAPS[0]
+    root = _detail_report(tmp_path / "run", {"counts": {"tiers": {}}})
+    assert "mid_ring" not in bench.map_entry(ref, package, inputs, root)
+    _detail_report(root, {"counts": {"tiers": {"mid": MID_TIER}}})
+    assert bench.map_entry(ref, package, inputs, root)["mid_ring"]["buildings"] == 12
+    run_dir = tmp_path / "r1"
+    _package(run_dir / "bench_murcia" / "data" / "processed" / "export")
+    report = _report()
+    (run_dir / bench.REPORT_FILE).write_text(json.dumps(report), encoding="utf-8")
+    assert bench.main(["report", str(run_dir)]) == 0
+    assert "mid_ring" not in json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))["maps"]["bench_murcia"]
+    _detail_report(run_dir / "bench_murcia", {"counts": {"tiers": {"mid": MID_TIER}}})
+    assert bench.main(["report", str(run_dir)]) == 0
+    again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert again["maps"]["bench_murcia"]["mid_ring"]["triangles_per_building_max"] == 150
+
+
+def test_compare_shows_mid_rows_only_when_a_report_has_them() -> None:
+    old, new = _report(), _report()
+    assert " mid" not in bench.compare(old, new, old_name="r1", new_name="r2")
+    new["maps"]["bench_murcia"]["visual_triangles"]["mid"] = 960
+    new["maps"]["bench_murcia"]["draws"]["mid"] = 9
+    new["maps"]["bench_murcia"]["mid_ring"] = {"buildings": 12, "visual_triangles": 960, "triangles_per_building_mean": 80.0,
+                                              "triangles_per_building_min": 34, "triangles_per_building_max": 150}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    for row in ("| bench_murcia | triangles mid | - | 960 | - |", "| bench_murcia | draws mid | - | 9 | - |",
+                "| bench_murcia | mid ring buildings | - | 12 | - |", "| bench_murcia | mid tris per building mean | - | 80.0 | - |",
+                "| bench_murcia | mid tris per building min | - | 34 | - |", "| bench_murcia | mid tris per building max | - | 150 | - |"):
+        assert row in lines
+    rows = [line.split(" | ")[1] for line in lines if line.startswith("| bench_murcia")]
+    assert rows.index("triangles mid") == rows.index("triangles scenic") + 1
+    assert rows.index("draws mid") == rows.index("draws scenic") + 1
+
+
+def test_the_run_parser_takes_the_mid_ring(capsys: pytest.CaptureFixture[str]) -> None:
+    assert bench.build_parser().parse_args(["run", "--mid-ring-m", "100"]).mid_ring_m == 100.0
+    assert bench.build_parser().parse_args(["run"]).mid_ring_m is None
+    for bad in ("5", "abc", "nan"):
+        with pytest.raises(SystemExit):
+            bench.build_parser().parse_args(["run", "--mid-ring-m", bad])
+    assert "from 10 to 1000" in capsys.readouterr().err
+
+
+def test_mid_ring_option_messages() -> None:
+    assert bench._mid_ring("10") == 10.0 and bench._mid_ring("1000") == 1000.0
+    with pytest.raises(argparse.ArgumentTypeError, match=r"^mid_ring_m must be a number of metres from 10 to 1000, got 5\.0$"):
+        bench._mid_ring("5")
+    with pytest.raises(argparse.ArgumentTypeError, match="could not convert"):
+        bench._mid_ring("abc")
+
+
+@pytest.mark.parametrize(("document", "core"), [
+    ({"core_radius_m": 100.0}, True),
+    ({"core": {"mode": "budget"}}, True),
+    ({"core_radius_m": 0}, False),
+    ({"core_radius_m": None, "core": None}, False),
+    ({}, False),
+])
+def test_has_core(document: dict[str, Any], core: bool) -> None:
+    assert bench.has_core(document) is core

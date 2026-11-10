@@ -344,6 +344,20 @@ def test_detail_prints_the_tiers_of_a_map_with_a_core(tmp_path: Path) -> None:
     assert report.details[2] == ("tiers", ("core 108 bldg 127 033 tris", "scenic 446 bldg 19 641 tris"))
 
 
+def test_detail_prints_the_mid_ring_between_the_core_and_the_scenic_ring(tmp_path: Path) -> None:
+    out = tmp_path / "scene_detail"
+    _write(out / "detail_report.json", {
+        "counts": {
+            "visual_triangles": 166694, "materials": 30, "visual_nodes": 678, "openings": {}, "urban_elements": {},
+            "tiers": {"core": {"buildings": 108, "visual_triangles": 127033},
+                      "scenic": {"buildings": 300, "visual_triangles": 13000, "urban_elements_dropped": 3},
+                      "mid": {"buildings": 146, "visual_triangles": 14600}},
+        },
+    } | _severity(0, 0))
+    report = summarize("detail", ["--out", str(out)])
+    assert report.details[2] == ("tiers", ("core 108 bldg 127 033 tris", "mid 146 bldg 14 600 tris", "scenic 300 bldg 13 000 tris"))
+
+
 def test_detail_prints_the_typologies_and_eras_of_the_core(tmp_path: Path) -> None:
     out = tmp_path / "scene_detail"
     _write(out / "detail_report.json", {

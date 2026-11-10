@@ -5,6 +5,10 @@ local metres. A building whose footprint meets the open square is ``core``:
 it keeps today's detail. Every other building is ``scenic``: a plain shell
 with no openings, interior, sign or collider. Stages after ``detail`` read
 the core from the ``core`` block of ``scene_detail.json``.
+
+With the opt-in intermediate ring (plan D3, ADR-017 amendment), a building
+outside the core that meets a band ``mid_ring_m`` wide around it is ``mid``:
+a box with painted windows and its roof form, still without a collider.
 """
 
 from __future__ import annotations
@@ -28,6 +32,10 @@ CORE = "core"
 SCENIC = "scenic"
 SHARED = "shared"
 TIERS = (CORE, SCENIC, SHARED)
+# The intermediate HLOD ring (plan D3), opt-in: it never appears in TIERS, so a run without it reports as before.
+MID = "mid"
+MIN_MID_RING_M = 10.0
+MAX_MID_RING_M = 1000.0
 MIN_CORE_HALF_SIDE_M = 50.0
 MAX_CORE_HALF_SIDE_M = 2000.0
 # Shared wall materials of the scenic shells. Three tones, so the ring is not one colour,
@@ -70,6 +78,36 @@ def building_tier(footprint: BaseGeometry, core: BaseGeometry | None) -> str:
     """``core`` when the footprint shares area with the core (or there is no core), else ``scenic``."""
     if core is None or (footprint.intersects(core) and not footprint.touches(core)):
         return CORE
+    return SCENIC
+
+
+def check_mid_ring(value: object) -> float:
+    """``value`` as the width of the intermediate ring: a number of metres from MIN_MID_RING_M to MAX_MID_RING_M."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not MIN_MID_RING_M <= value <= MAX_MID_RING_M:
+        raise CoreError(f"mid_ring_m must be a number of metres from {MIN_MID_RING_M:g} to {MAX_MID_RING_M:g}, got {value!r}")
+    return float(value)
+
+
+def mid_square(half_side_m: float, mid_ring_m: float) -> Polygon:
+    """The outer edge of the intermediate ring: the core square grown by ``mid_ring_m`` on every side.
+
+    It is built directly, so a core plus ring wider than MAX_CORE_HALF_SIDE_M is still a band.
+    """
+    outer = half_side_m + mid_ring_m
+    return box(-outer, -outer, outer, outer)
+
+
+def ring_tier(footprint: BaseGeometry, core: BaseGeometry | None, mid: BaseGeometry | None) -> str:
+    """``building_tier``, except that a non-core footprint sharing area with ``mid`` is ``mid`` (plan D3).
+
+    The core is decided first and by the same rule, so the intermediate ring never changes it. Buildings are
+    taken whole: one that crosses into the band is ``mid``, one that only touches its outer edge stays ``scenic``.
+    """
+    tier = building_tier(footprint, core)
+    if tier == CORE or mid is None:
+        return tier
+    if footprint.intersects(mid) and not footprint.touches(mid):
+        return MID
     return SCENIC
 
 
@@ -298,12 +336,15 @@ def tier_summary(visual: bytes, objects: Iterable[Mapping[str, Any]], core: Base
     (ground, curbs, markings, props, the backdrop) takes the tier of its bounds.
     A draw is one (cell, material) group; a group that holds two tiers counts
     once in each, so the tier draws can add up to more than ``draws``.
+    The ``mid`` tier (plan D3) is reported only when a record has it.
     """
     if not cell_m > 0:
         raise CoreError(f"cell_m must be positive, got {cell_m}")
-    tier_of = {str(o["id"]): str(o["tier"]) for o in objects if o.get("tier") in TIERS}
+    objects = list(objects)
+    tiers = (*TIERS, MID) if any(o.get("tier") == MID for o in objects) else TIERS
+    tier_of = {str(o["id"]): str(o["tier"]) for o in objects if o.get("tier") in tiers}
     triangles: Counter[str] = Counter()
-    groups: dict[str, set[tuple[int, int, str]]] = {tier: set() for tier in TIERS}
+    groups: dict[str, set[tuple[int, int, str]]] = {tier: set() for tier in tiers}
     for name, bounds, cell, primitives in _combined_nodes(visual, cell_m):
         tier = tier_of.get(name) or bounds_tier(bounds, core)
         for p in primitives:
@@ -312,7 +353,7 @@ def tier_summary(visual: bytes, objects: Iterable[Mapping[str, Any]], core: Base
     return {
         "cell_m": cell_m,
         "draws": len(set().union(*groups.values())),
-        **{tier: {"visual_triangles": triangles[tier], "draws": len(groups[tier])} for tier in TIERS},
+        **{tier: {"visual_triangles": triangles[tier], "draws": len(groups[tier])} for tier in tiers},
     }
 
 

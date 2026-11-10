@@ -63,6 +63,7 @@ from onward_generator.maps.workspace import (
     store_balanced_spawns,
     store_gameplay_report,
     store_lidar_roofs,
+    store_mid_ring,
     store_overture_tints,
     store_regional_facades,
     store_repetition,
@@ -76,7 +77,7 @@ from onward_generator.pipeline_run import PipelineError, plan_steps, run_steps, 
 from onward_generator.run_log import SETUP_STEPS, RunLog
 from onward_generator.sources.plugin import SourceError
 from onward_generator.sources.registry import choices
-from onward_generator.tiers import CORE, SCENIC, SHARED, tier_summary
+from onward_generator.tiers import CORE, MID, SCENIC, SHARED, CoreError, check_mid_ring, tier_summary
 
 SCHEMA = "onward-bench"
 SCHEMA_VERSION = 1
@@ -366,7 +367,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
               scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
               balanced_spawns: bool = False, sightline_cover: bool = False, regional_facades: bool = False,
-              street_profile: bool = False, street_profile_reply: Path | None = None) -> MapRun:
+              street_profile: bool = False, street_profile_reply: Path | None = None, mid_ring_m: float | None = None) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -382,6 +383,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``street_profile`` switches the plan D2 street profile on in the run copy's ``map.json`` only and resolves it
     without a model: the reply is ``street_profile_reply`` (provider ``replay``), or nothing (provider ``none``,
     which gives the neutral rules profile).
+    ``mid_ring_m`` sets the plan D3 intermediate ring in the run copy's ``map.json`` only, on a map with a core;
+    a map without one (bench_paris) has no ring to draw and runs as without it.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -409,6 +412,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     if street_profile:
         store_street_profile(root, True)
         resolve_street_profile(root, provider=profile_provider(street_profile_reply))
+    if mid_ring_m is not None and has_core(load_map(root)):
+        store_mid_ring(root, mid_ring_m)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -426,6 +431,19 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         raise BenchError(f"{ref.id}: the plan has no export stage")
     _run(ref, root, prepared.inputs, steps, execute, log, targets)
     return MapRun(ref, root, package, list(log.times), frozenset(targets))
+
+
+def has_core(document: Mapping[str, Any]) -> bool:
+    """Whether a ``map.json`` has a playable core, fixed (``core_radius_m``) or budget (``core``)."""
+    return bool(document.get("core_radius_m")) or document.get("core") is not None
+
+
+def _mid_ring(text: str) -> float:
+    """``--mid-ring-m``: metres from 10 to 1000 (plan D3)."""
+    try:
+        return check_mid_ring(float(text))
+    except (ValueError, CoreError) as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def profile_provider(reply: Path | None) -> StaticProvider:
@@ -485,7 +503,8 @@ def _object(block: Mapping[str, Any], key: str, where: str) -> dict[str, Any]:
 def _tier_counts(tiers: Mapping[str, Any], where: str) -> tuple[dict[str, int], dict[str, int]]:
     triangles: dict[str, int] = {}
     draws: dict[str, int] = {"total": _int(tiers, "draws", where)}
-    for tier in (CORE, SCENIC, SHARED):
+    # The plan D3 mid tier is in the manifest only when the run drew one.
+    for tier in (CORE, SCENIC, SHARED, *((MID,) if MID in tiers else ())):
         block = _object(tiers, tier, f"{where}: tiers")
         triangles[tier] = _int(block, "visual_triangles", f"{where}: tiers.{tier}")
         draws[tier] = _int(block, "draws", f"{where}: tiers.{tier}")
@@ -727,6 +746,29 @@ def lidar_roofs_metrics(root: Path) -> dict[str, Any] | None:
     }
 
 
+def mid_ring_metrics(root: Path) -> dict[str, Any] | None:
+    """The plan D3 summary of the map's ``detail_report.json``, or None when ``counts.tiers`` has no ``mid`` block.
+
+    ``buildings`` and ``visual_triangles`` of the mid tier in ``detail``, and the mean, min and max visual triangles
+    of one mid building's shell. A malformed block is an error.
+    """
+    path = detail_report_path(root)
+    if not path.is_file():
+        return None
+    tiers = _object(_read_object(path), "counts", str(path)).get("tiers")
+    if not isinstance(tiers, dict) or MID not in tiers:
+        return None
+    where = f"{path}: counts.tiers.mid"
+    block = _object(tiers, MID, f"{path}: counts.tiers")
+    spread = _object(block, "triangles_per_building", where)
+    shape = {key: spread.get(key) for key in ("mean", "min", "max")}
+    if not all(v is None or (isinstance(v, int | float) and not isinstance(v, bool)) for v in shape.values()):
+        raise BenchError(f"{where}: triangles_per_building needs numbers or null for mean, min and max")
+    return {"buildings": _int(block, "buildings", where), "visual_triangles": _int(block, "visual_triangles", where),
+            "triangles_per_building_mean": shape["mean"], "triangles_per_building_min": shape["min"],
+            "triangles_per_building_max": shape["max"]}
+
+
 def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None = None) -> dict[str, Any]:
     """The comparable figures of one map; ``gameplay``, ``repetition`` and ``lidar_roofs`` only when ``root`` holds their reports."""
     entry = {"reference": ref.parameters(), "inputs_sha256": inputs_sha256(inputs), **map_metrics(package)}
@@ -739,6 +781,9 @@ def map_entry(ref: ReferenceMap, package: Path, inputs: Path, root: Path | None 
     lidar_roofs = lidar_roofs_metrics(root) if root is not None else None
     if lidar_roofs is not None:
         entry["lidar_roofs"] = lidar_roofs
+    mid_ring = mid_ring_metrics(root) if root is not None else None
+    if mid_ring is not None:
+        entry["mid_ring"] = mid_ring
     cover = cover_metrics(root) if root is not None else None
     if cover is not None:
         entry["cover"] = cover
@@ -836,9 +881,11 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("triangles total", "maps", ("visual_triangles", "total")),
     ("triangles core", "maps", ("visual_triangles", CORE)),
     ("triangles scenic", "maps", ("visual_triangles", SCENIC)),
+    ("triangles mid", "maps", ("visual_triangles", MID)),
     ("draws total", "maps", ("draws", "total")),
     ("draws core", "maps", ("draws", CORE)),
     ("draws scenic", "maps", ("draws", SCENIC)),
+    ("draws mid", "maps", ("draws", MID)),
     ("view draws median", "maps", ("view_draws", "median")),
     ("view draws p90", "maps", ("view_draws", "p90")),
     ("view draws max", "maps", ("view_draws", "max")),
@@ -854,6 +901,10 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("lidar roofs flat", "maps", ("lidar_roofs", "flat")),
     ("lidar roofs pitched", "maps", ("lidar_roofs", "pitched")),
     ("lidar roofs classified %", "maps", ("lidar_roofs", "classified_pct")),
+    ("mid ring buildings", "maps", ("mid_ring", "buildings")),
+    ("mid tris per building mean", "maps", ("mid_ring", "triangles_per_building_mean")),
+    ("mid tris per building min", "maps", ("mid_ring", "triangles_per_building_min")),
+    ("mid tris per building max", "maps", ("mid_ring", "triangles_per_building_max")),
     ("cover props", "maps", ("cover", "props")),
     ("cover triangles", "maps", ("cover", "triangles")),
     ("uncovered stretches after cover", "maps", ("cover", "after", "uncovered_stretches")),
@@ -865,7 +916,9 @@ _ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 # Rows of an opt-in block are left out of the table when neither report has the block.
-_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover"})
+_OPTIONAL_BLOCKS = frozenset({"repetition", "lidar_roofs", "cover", "mid_ring"})
+# Rows of an opt-in tier: the plan D3 mid ring is in the tiers only when a run drew one.
+_OPTIONAL_PATHS = frozenset({("visual_triangles", MID), ("draws", MID)})
 
 
 def _value(report: Mapping[str, Any] | None, map_id: str, where: str, keys: tuple[str, ...]) -> Any:
@@ -913,7 +966,7 @@ def compare(old: Mapping[str, Any], new: Mapping[str, Any], *, old_name: str, ne
         for label, where, path in _ROWS:
             before = _value(old if map_id in old_maps else None, map_id, where, path)
             after = _value(new if map_id in new_maps else None, map_id, where, path)
-            if path[0] in _OPTIONAL_BLOCKS and before is None and after is None:
+            if (path[0] in _OPTIONAL_BLOCKS or path in _OPTIONAL_PATHS) and before is None and after is None:
                 continue
             lines.append(f"| {map_id} | {label} | {_cell(before)} | {_cell(after)} | {_delta(before, after)} |")
     return "\n".join(lines) + "\n"
@@ -987,7 +1040,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
                         scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
                         balanced_spawns=args.balanced_spawns, sightline_cover=args.sightline_cover,
                         regional_facades=args.regional_facades, street_profile=args.street_profile,
-                        street_profile_reply=args.street_profile_reply)
+                        street_profile_reply=args.street_profile_reply, mid_ring_m=args.mid_ring_m)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -1014,6 +1067,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         lidar_roofs = lidar_roofs_metrics(run_dir / map_id)
         if lidar_roofs is not None:
             entry["lidar_roofs"] = lidar_roofs
+        mid_ring = mid_ring_metrics(run_dir / map_id)
+        if mid_ring is not None:
+            entry["mid_ring"] = mid_ring
         cover = cover_metrics(run_dir / map_id)
         if cover is not None:
             entry["cover"] = cover
@@ -1071,6 +1127,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="switch the plan D2 street profile on in each run copy (map.json street_profile); never calls a live model")
     run.add_argument("--street-profile-reply", type=Path, default=None, metavar="FILE",
                      help="with --street-profile: the profile reply to replay in each run copy (default: none, the neutral rules profile)")
+    run.add_argument("--mid-ring-m", type=_mid_ring, default=None, metavar="M",
+                     help="draw the plan D3 intermediate ring M metres wide in each run copy with a core (map.json mid_ring_m)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

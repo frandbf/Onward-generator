@@ -31,6 +31,7 @@ from onward_generator.maps.workspace import (
     map_directory,
     map_storm,
     map_time_of_day,
+    mid_ring_m,
     panoramax_enabled,
     sightline_cover_enabled,
     store_brief,
@@ -541,7 +542,26 @@ def output_ready(name: str, root: Path) -> bool:
     if marker is None:
         return False
     # With "lidar_roofs" detail also reads the LiDAR report (plan C3), so a newer report makes it stale.
-    return _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) if name == "detail" else []))
+    fresh = _fresh(marker, _input_markers(root, name) + (_roof_spread_input(root) if name == "detail" else []))
+    return fresh and (name != "detail" or _mid_ring_current(root))
+
+
+def _mid_ring_current(root: Path) -> bool:
+    """True when the detail scene was drawn with the ``mid_ring_m`` of ``map.json`` (plan D3), none included.
+
+    The width is a map.json key and not a file, so a changed, added or removed width makes detail stale. A scene
+    that cannot be read records no width; a map.json width that is refused makes detail stale, so ``run`` reports it.
+    """
+    manifest = root / "data" / "processed" / STAGE_DIRS["detail"] / "scene_detail.json"
+    try:
+        wanted = mid_ring_m(root)
+    except MapError:
+        return False
+    try:
+        recorded = (json.loads(manifest.read_bytes()).get("core") or {}).get("mid_ring_m")
+    except (OSError, ValueError):
+        recorded = None
+    return recorded == wanted
 
 
 # The file in a stage's directory whose age decides whether the stage is fresh. Scene stages use scene_visual.glb.
