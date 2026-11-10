@@ -44,6 +44,7 @@ from onward_generator.overgrow.constants import (
 )
 from onward_generator.overgrow.dressing import block_reason, collider_mesh, dress, keep, load_spawns
 from onward_generator.overgrow.fit import _footprint, object_reason
+from onward_generator.overgrow.furnish import FurnishBuildError, build_furniture
 from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.growth import (
     canopy_png,
@@ -134,6 +135,11 @@ def overgrow(
     area = _resolve_zone(zone, zone_radius_m, zone_polygon)
     area = within_core(area, core_of(manifest))
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
+    try:
+        # The shop furniture detail planned (ADR-031). No plan: nothing is read and nothing is added.
+        furniture = build_furniture(manifest, library)
+    except FurnishBuildError as exc:
+        raise OvergrowError(str(exc)) from exc
     props, library_rejects = read_library(library)
     chosen: list[str] | None = None
     if selection is not None:
@@ -335,6 +341,10 @@ def overgrow(
     materials.setdefault("tree_canopy", Material((1, 1, 1, 1), 0.8))
     for name in planted.images:
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
+    extra_nodes.extend(furniture.nodes)
+    images.update(furniture.images)
+    for name in furniture.images:
+        materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
 
     targets = prepare_outputs(
         out, OUTPUT_FILES, overwrite=overwrite,
@@ -357,10 +367,10 @@ def overgrow(
         )
         for index, node in enumerate(trees)
     ]
-    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders]
+    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders]
     collision = base / "scene_collision.glb"
     atomic_write_bytes(targets[1], _collision_bytes(collision.read_bytes() if collision.is_file() else b"", colliders))
-    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")):
+    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces:
         raise OvergrowError("a solid prop was placed without a collision box")
     objects = [dict(o) for o in (manifest.get("objects") or []) if isinstance(o, dict)]
     objects.extend(
@@ -436,6 +446,8 @@ def overgrow(
         "geometry": compare,
         "input_visual_sha256": file_sha256(base / "scene_visual.glb"),
     }
+    if furniture.nodes:
+        summary["furnishing"] = furniture.report()
     atomic_write_json(targets[4], summary)
     if composed is not None:
         atomic_write_json(out / "ambient_plan.json", composed.record)

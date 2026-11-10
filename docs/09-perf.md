@@ -121,6 +121,20 @@ ADR-017 amendment of 7 November 2026 (plan B1). `detail --core-radius-m M --core
 
 Pending on the headset (A2), not measured: Unity `scene_report.json` triangles against N, draws in the fixed views A and B (at most 150), median fps on the route (at least 72), and how the ring reads through the fog, which still starts at `core_radius_m`, not at the solved wall.
 
+## Shop furnishing
+
+Plan B3, [ADR-031](decisions/ADR-031-shop-furnishing.md), off by default (`interiors.shops.furnish.enabled`). Package figures with the option on, on copies of the bench run `20261107T170959Z` (Docker, Apple M4 Pro): visual triangles 150 339 → 161 793 (bench_murcia), 398 025 → 409 847 (bench_madrid), 72 884 → 78 564 (bench_krakow); draws 213 → 247, 504 → 547, 272 → 293; view draws p90 181 → 211, 374 → 412, 219 → 238; lightmap pages unchanged. Generator figures, not device measurements.
+
+Pending on the headset (not done; the option stays off until they pass):
+
+- [ ] A `bench_murcia` package built with furnishing on: the furniture inside the shop rooms is lit by the room light and probes (or the combined cell's ambient light), not black (`prop_` materials take no lightmap; `docs/12-export.md`).
+- [ ] Walk in through each kind of shop door: the 1.2 m clear path holds, and no piece blocks the door or traps the player.
+- [ ] Cover-sized furniture stops bullets and the player; decor does not; nothing is an invisible wall.
+- [ ] OVR Metrics in fixed views A and B looking into a furnished shop row: draws added against the 150 target, a median of at least 72 fps, graphics memory.
+- [ ] From the street, through the `shop_glass`, the furniture reads at scale and faces into the room (Kenney scale and facing are estimated, never reviewed from a rendered view).
+
+Then ADR-031 goes from proposed to accepted or is corrected. Turning furnishing on by default is a separate decision (plan 4.2).
+
 ## Hunt with bots on a small map
 
 Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.

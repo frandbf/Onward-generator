@@ -22,7 +22,7 @@ from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator import __version__
-from onward_generator.detail.config import DetailConfig, Template
+from onward_generator.detail.config import REPO_ROOT, DetailConfig, Template
 from onward_generator.detail.facades import (
     DOOR_KINDS,
     HIDDEN_GAP_M,
@@ -47,6 +47,7 @@ from onward_generator.detail.facades import (
     storeys_for,
     wall_uv_frame,
 )
+from onward_generator.detail.furnish import FurnishError, ShopFurnishing, load_catalogue
 from onward_generator.detail.grammar import (
     FLAT_SHAPES,
     FacadeUse,
@@ -515,6 +516,22 @@ def _shops_of(poi_ids: list[str], feature_of: Mapping[str, Mapping[str, Any]], b
     return [(pid, feature_of[pid].get("tags") or {}, (points[pid].x, points[pid].y)) for pid in poi_ids]
 
 
+def _furnishes_shops(cfg: DetailConfig) -> bool:
+    """Whether shop rooms get catalogue furniture: interiors, shop interiors and ``shops.furnish`` all on."""
+    ic = cfg.interiors
+    return ic.enabled and ic.shops.enabled and ic.shops.furnish.enabled
+
+
+def _furnishing(cfg: DetailConfig) -> ShopFurnishing:
+    """The map's furnishing pass, with the catalogue rows its sets name, read from ``assets/``."""
+    furnish = cfg.interiors.shops.furnish
+    try:
+        catalogue = load_catalogue(furnish, REPO_ROOT / "assets")
+    except FurnishError as exc:
+        raise DetailError(str(exc)) from exc
+    return ShopFurnishing.of(furnish, catalogue, cfg.seed)
+
+
 def interior_quota(cfg: DetailConfig) -> int:
     """How many interiors this seed builds, from ``min_buildings`` through ``max_buildings``.
 
@@ -935,6 +952,7 @@ def detail_scene(
     shop_interiors: list[str] = []
     budgets = {False: InteriorBudget.of_stairs(cfg), True: InteriorBudget.of_shops(cfg)}
     lit: list[tuple[bool, dict[str, Any]]] = []
+    furnishing = _furnishing(cfg) if _furnishes_shops(cfg) else None
     door_fronts: list[Polygon] = []
     every_footprint = union_all(list(footprints.values()))  # what a blade sign must not face (``plan_shops``)
     exposed_m = party_m = 0.0
@@ -1058,6 +1076,10 @@ def detail_scene(
             door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         if built is not None:
             budget.spend(built)
+            if shop and furnishing is not None and interior is not None:
+                # Furniture has its own budget (ADR-031): a room it cannot furnish keeps its shop interior.
+                for message in furnishing.furnish_interior(bid, interior, built, glass_penetrations(layout, segments), cfg.interiors):
+                    issues.append(Issue("shop_not_furnished", "info", bid, message))
         if shell is None:
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
@@ -1292,6 +1314,8 @@ def detail_scene(
     detailed.stats["shopfront_evidence"] = dict(sorted(Counter(g["source"] for g in grounds if g).items()))
     detailed.stats["shop_interior_visual_triangles"] = budgets[True].used["triangles"]
     detailed.stats["shop_interior_collision_triangles"] = budgets[True].used["collision_triangles"]
+    if furnishing is not None:
+        detailed.stats["shop_furnishing"] = furnishing.stats()
     detailed.stats["interior_lights"] = {
         "max": cfg.interiors.lights_max,
         "placed": sum(len(anchors["rooms"]) for _, anchors in lit) - len(dropped_lights),

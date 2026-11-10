@@ -448,7 +448,7 @@ def _probe_columns(inner: Polygon, wells: BaseGeometry) -> list[tuple[float, flo
     return columns
 
 
-def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furniture: BaseGeometry | None = None) -> dict[str, Any]:
     """Where the adapter may put one baked light and a few light probes in each furnished room (ADR-013).
 
     Coordinates are local metres (x east, y north, z up), like ``uv_frame``. The light sits
@@ -456,9 +456,11 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]]) -> dict[s
     stair wells when the centroid falls in one. ``range_m`` reaches the corners of the
     room's rotated rectangle, clamped. ``probes_m`` is a flat list of x, y, z triples:
     one layer above the floor and one under the ceiling. A shop's rooms are ``plan.rooms``, in order;
-    a courtyard is not part of the room, so a centroid in it moves too.
+    a courtyard is not part of the room, so a centroid in it moves too. ``furniture`` is the plan of the
+    furnishing pieces (ADR-031): no probe column stands in it. ``None`` leaves the grid as it was.
     """
     wells = unary_union([flight.well.buffer(WELL_CLEARANCE_M) for flight in plan.flights])
+    probe_wells = unary_union([wells, furniture])  # shapely skips a None part
     areas = [room.polygon for room in plan.rooms] or [plan.inner] * len(rooms)
     anchors = []
     for index, room in enumerate(rooms):
@@ -469,7 +471,7 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]]) -> dict[s
             centre = clear.representative_point()
         corners = list(area.minimum_rotated_rectangle.exterior.coords)
         reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
-        columns = _probe_columns(area, wells)
+        columns = _probe_columns(area, probe_wells)
         floor, ceiling = float(room["floor_z_m"]), float(room["ceiling_z_m"])
         probes: list[float] = []
         for z in (floor + PROBE_LOW_M, ceiling - PROBE_HIGH_BELOW_CEILING_M):
