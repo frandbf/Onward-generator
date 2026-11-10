@@ -84,7 +84,7 @@ def test_on_the_bakery_room_gets_bakery_furniture_inside_its_walls(detail_inputs
     assert stats["visual_triangles"] == block["visual_triangles"] == sum(p["triangles"] for p in block["pieces"])
     assert stats["collision_triangles"] == 12 * sum(p["solid"] for p in block["pieces"])
     assert stats["refusals_by_reason"] == {}
-    assert stats["max_triangles"] == 12000 and stats["assets"] == len(stats["pieces_by_asset"])
+    assert stats["max_triangles"] == 16000 and stats["assets"] == len(stats["pieces_by_asset"])
 
 
 def test_two_runs_with_one_seed_give_the_same_scene(detail_inputs, on) -> None:

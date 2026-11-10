@@ -17,7 +17,7 @@ from onward_generator.assetstore.packages import LICENCE_NAME, LOCAL_PREFIX
 
 ENV = "ONWARD_LOCAL_CATALOGUES"
 LICENCE_SPDX = "LicenseRef-Unity-Asset-Store-EULA"
-ROWS_PER_SLOT = 2
+ROWS_PER_SLOT = 4
 """At most this many local rows join one set slot, lightest first: every distinct row counts against ``max_assets``."""
 
 

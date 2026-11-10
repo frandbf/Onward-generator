@@ -325,6 +325,9 @@ def level_of_detail(prop: Prop) -> Prop:
     box moved more than ``LOD_BOX_TOLERANCE_M`` at street size is refused and the
     target doubles, while it still saves a quarter of the file's triangles.
     """
+    if prop.spec.category == "vehicles":
+        # Clustering tore holes in the cars' bodies (headset, 10 November 2026); a vehicle is cover, kept whole.
+        return prop
     _street, scale = apply_fit_scale(prop.mesh, prop.spec.role)
     if _span(prop.mesh, 2) * scale < FLAT_PROP_M and prop.triangles > IMPOSTOR_MIN_TRIS:
         # A prop lying on the ground is its top face to a standing player: one textured polygon (impostor.py).

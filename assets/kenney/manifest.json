@@ -615,7 +615,8 @@
       "length_m": 0.984,
       "depth_m": 0.984,
       "height_m": 0.436,
-      "collider": "none"
+      "collider": "none",
+      "refused": "low_detail"
     },
     {
       "id": "kenney_modular_detail_ac_b",
@@ -641,7 +642,8 @@
       "length_m": 1.271,
       "depth_m": 0.513,
       "height_m": 0.922,
-      "collider": "none"
+      "collider": "none",
+      "refused": "low_detail"
     },
     {
       "id": "kenney_modular_door_brown_glass",

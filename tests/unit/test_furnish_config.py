@@ -63,7 +63,7 @@ def test_a_document_without_the_block_loads_with_furnishing_off() -> None:
 
 def test_the_enabled_default_sets_load() -> None:
     furnish = config_from_document(_doc()).interiors.shops.furnish
-    assert furnish.enabled and furnish.walk_width_m == 1.2 and furnish.max_triangles == 12000
+    assert furnish.enabled and furnish.walk_width_m == 1.2 and furnish.max_triangles == 16000
     assert furnish.set_for("butcher") is furnish.sets["generic"]
 
 
@@ -133,7 +133,7 @@ def test_a_counter_may_be_one_metre_deep_and_no_more() -> None:
 
 @pytest.mark.parametrize(("key", "value", "ok"), [
     ("walk_width_m", 1.19, False), ("walk_width_m", 1.2, True), ("max_triangles", -1, False),
-    ("max_pieces_per_room", 25, False), ("max_assets", 33, False), ("max_collision_triangles", 20001, False),
+    ("max_pieces_per_room", 25, False), ("max_assets", 65, False), ("max_collision_triangles", 20001, False),
 ])
 def test_the_schema_ranges(key: str, value: float, ok: bool) -> None:
     doc = _doc()
@@ -234,7 +234,7 @@ def test_the_floor_block_is_on_by_default_and_checks_its_rows(monkeypatch: pytes
     monkeypatch.setattr(config_module, "floor_furnish_problems", record)
     furnish = load_detail_config().interiors.furnish
     assert furnish.enabled is True and len(checked) == 1 and sorted(furnish.sets) == ["generic"]
-    assert furnish.max_triangles == 12000 and furnish.max_collision_triangles == 1200 and furnish.max_assets == 12
+    assert furnish.max_triangles == 12000 and furnish.max_collision_triangles == 1200 and furnish.max_assets == 30
     assert furnish.max_pieces_per_room == 6
     assert furnish.catalogues == ("kenney_furniture", "quaternius_home_interior")
     assert len({e.id for e in furnish.sets["generic"].wall}) <= furnish.max_assets  # no map can hit asset_cap on variety alone

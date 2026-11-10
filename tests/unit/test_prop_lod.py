@@ -33,7 +33,8 @@ from tests.unit.test_overgrow_plan import _scene as _plan_scene
 PNG_A = b"\x89PNG\r\n\x1a\nA"
 PNG_B = b"\x89PNG\r\n\x1a\nB"
 BARREL = AssetSpec("synth_barrel", "waste", "barrel", ("sidewalk",), "ground", "test")
-WRECK = AssetSpec("synth_wreck", "vehicles", "wreck", ("curb",), "ground", "test")
+WRECK = AssetSpec("synth_wreck", "waste", "wreck", ("curb",), "ground", "test")  # the wreck fit scale, not a vehicle: vehicles keep their mesh
+CAR = AssetSpec("synth_car", "vehicles", "wreck", ("curb",), "ground", "test")
 
 
 def _sphere(radius: float, rings: int, segments: int, centre_z: float | None = None) -> Mesh:
@@ -264,3 +265,12 @@ def test_a_planned_prop_carries_its_lod_in_the_node_extras() -> None:
     plain = realize(plan, digest, _props(), _site(features))
     assert plain.nodes and not any("lod" in node.extras for node in plain.nodes)
     assert ASSETS_BY_ID["security_camera_02"].role == "camera"
+
+
+def test_a_vehicle_keeps_its_whole_mesh() -> None:
+    """Clustering tore holes in the cars' bodies on the headset (10 November 2026): a vehicle is never reduced."""
+    car = Mesh(box(0, 4.5, 0, 1.8, 0, 1.5).vertices, np.tile(np.array([[0, 1, 2]]), (5000, 1)))
+    prop = _prop(car, CAR)
+    assert level_of_detail(prop) is prop
+    assert level_of_detail(_prop(car, WRECK)) is not prop
+

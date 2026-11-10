@@ -29,7 +29,7 @@
         "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
         "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 20000 },
         "max_pieces_per_room": { "type": "integer", "minimum": 0, "maximum": 24 },
-        "max_assets": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "max_assets": { "type": "integer", "minimum": 0, "maximum": 64 },
         "walk_width_m": { "type": "number", "minimum": 1.2, "maximum": 3.0 },
         "wall_gap_m": { "type": "number", "minimum": 0, "maximum": 0.2 },
         "piece_gap_m": { "type": "number", "minimum": 0, "maximum": 1.0 },

@@ -13,6 +13,7 @@ import pytest
 from onward_generator.detail.__main__ import main as detail_main
 from onward_generator.detail.config import FURNISH_CATALOGUES, REPO_ROOT
 from onward_generator.generation.gltf import nodes_from_glb, read_glb
+from onward_generator.overgrow.atlas import ATLAS_PREFIX, PROP_ATLAS_EXTRA
 from onward_generator.overgrow.fit import check_scene
 from onward_generator.overgrow.place import OvergrowError, overgrow
 from tests.integration.test_shop_interiors import DOC, SHOP
@@ -69,7 +70,8 @@ def test_overgrow_builds_every_planned_piece_with_an_albedo_prop_material(bases,
         node = built[piece["id"]]
         assert node.extras["type"] == "furnishing" and node.extras["attribute_origin"] == "generated"
         assert node.extras["asset_id"] == piece["asset_id"] and node.extras["licence"] == "CC0-1.0"
-        assert node.primitives and all(p.material.startswith(f"prop_{piece['asset_id']}") for p in node.primitives)
+        # Its own prop_<id> material, or the shared prop atlas that holds it (overgrow/atlas.py).
+        assert node.primitives and all(p.material.startswith((f"prop_{piece['asset_id']}", ATLAS_PREFIX)) for p in node.primitives)
         low = min(float(v[2]) for p in node.world_primitives() for v in p.mesh.vertices)
         assert low == pytest.approx(piece["position_m"][2], abs=1e-4)
     doc, _ = read_glb((out / "scene_visual.glb").read_bytes())
@@ -80,8 +82,12 @@ def test_overgrow_builds_every_planned_piece_with_an_albedo_prop_material(bases,
         assert "baseColorTexture" in pbr and pbr["baseColorFactor"] == [1, 1, 1, 1] and pbr["roughnessFactor"] == 0.9
     meshes = [doc["meshes"][n["mesh"]] for n in doc["nodes"] if n.get("name", "").startswith("furnish/")]
     assert all("TEXCOORD_0" in prim["attributes"] for mesh in meshes for prim in mesh["primitives"])
+    cells = doc.get("extras", {}).get(PROP_ATLAS_EXTRA, {})
+    own = sorted(report["furnishing"]["materials"])
+    assert all(name in cells or name in furniture for name in own)  # each model's material: kept, or in the atlas
+    assert {cells[name][0] for name in own if name in cells} | {name for name in own if name not in cells} == furniture
     assert report["furnishing"] == {"pieces": len(pieces), "triangles": sum(p["triangles"] for p in pieces),
-                                    "colliders": sum(p["solid"] for p in pieces), "materials": sorted(furniture)}
+                                    "colliders": sum(p["solid"] for p in pieces), "materials": own}
 
 
 def test_only_solid_pieces_get_a_collider_and_only_in_the_collision_glb(bases, placed) -> None:

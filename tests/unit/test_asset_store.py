@@ -238,7 +238,7 @@ def test_local_rows_per_slot_are_capped_lightest_first(tmp_path: Path, monkeypat
     (folder / "manifest.json").write_text(json.dumps({"source": f"{local.LICENCE_NAME} local", "assets": rows}), encoding="utf-8")
     merged = with_local_furnishing(base, tmp_path)
     ids = [e.id for e in merged.interiors.shops.furnish.sets["generic"].wall if e.id.startswith("as_")]
-    assert ids == ["as_many_shelf_6", "as_many_shelf_5", "as_many_shelf_4", "as_many_shelf_3"][:local.ROWS_PER_SLOT] and local.ROWS_PER_SLOT == 2
+    assert ids == ["as_many_shelf_6", "as_many_shelf_5", "as_many_shelf_4", "as_many_shelf_3"][:local.ROWS_PER_SLOT] and local.ROWS_PER_SLOT == 4
     assert merged.interiors.furnish == base.interiors.furnish  # floors: False
 
 

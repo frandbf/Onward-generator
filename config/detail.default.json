@@ -131,7 +131,7 @@
       "max_triangles": 12000,
       "max_collision_triangles": 1200,
       "max_pieces_per_room": 6,
-      "max_assets": 12,
+      "max_assets": 30,
       "walk_width_m": 1.2,
       "wall_gap_m": 0.03,
       "piece_gap_m": 0.1,
@@ -143,7 +143,10 @@
           "counter": [],
           "wall": ["qt_home_Bookshelf", "qt_home_Shelf_2", "qt_home_Drawer_1", "qt_home_NightStand_1", "qt_home_Kitchen_Cabinet1",
                    "qt_home_Kitchen_Fridge", "qt_home_Kitchen_Oven", "qt_home_Fireplace", "qt_home_Bathroom_WashingMachine",
-                   "qt_home_Houseplant_6", "kenney_furniture_bookcaseOpen", "kenney_furniture_cabinetTelevision"],
+                   "qt_home_Houseplant_6", "kenney_furniture_bookcaseOpen", "kenney_furniture_cabinetTelevision",
+                   "qt_home_Kitchen_2Drawers", "qt_home_Kitchen_Sink", "qt_home_NightStand_2", "qt_home_NightStand_3",
+                   "qt_home_Drawer_5", "qt_home_Shelf_1", "qt_home_Houseplant_8", "qt_home_Light_Stand2", "qt_home_Light_Floor1",
+                   "qt_home_Trashcan_Large", "qt_home_Kitchen_Oven_Large", "qt_home_Drawer_4"],
           "decor": []
         }
       }
@@ -163,10 +166,10 @@
       "generic": { "wall": "interior_shop_generic", "floor": "interior_shop_wood" },
       "furnish": {
         "enabled": true,
-        "max_triangles": 12000,
+        "max_triangles": 16000,
         "max_collision_triangles": 1200,
         "max_pieces_per_room": 4,
-        "max_assets": 16,
+        "max_assets": 40,
         "walk_width_m": 1.2,
         "wall_gap_m": 0.03,
         "piece_gap_m": 0.1,
