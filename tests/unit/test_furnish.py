@@ -728,7 +728,7 @@ def test_room_record_method_residential_furnishing_and_provenance() -> None:
         assert block["method"] == "residential_furnishing" and block["set"] == "generic" and block["attribute_origin"] == "generated"
         assert set(block["refusals"]) <= {"blocks_path"}  # residential floors have no counter to miss
         for piece in block["pieces"]:
-            assert piece["slot"] == "wall" and piece["catalogue"] == "kenney_furniture"
+            assert piece["slot"] == "wall" and piece["catalogue"] in FLOORS.catalogues
             assert piece["attribute_origin"] == "generated" and piece["semantics_origin"] == "estimated"
             assert piece["asset_id"] in {e.id for e in FLOORS.sets["generic"].wall}
             assert piece["licence"] == "CC0-1.0" and len(piece["glb_sha256"]) == 64 and piece["triangles"] > 0
@@ -753,11 +753,31 @@ def test_the_light_of_each_floor_stays_and_its_probes_leave_its_own_pieces() -> 
         assert columns <= {(old[k], old[k + 1]) for k in range(0, len(old), 3)}
 
 
+B3_SHOP_CATALOGUES = ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"]
+B3_SHOP_SETS = {
+    "bakery": {"counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_kitchenCabinetDrawer"],
+               "wall": ["Shelf_01", "kenney_furniture_bookcaseOpenLow", "kenney_furniture_bookcaseOpen"],
+               "decor": ["kenney_food_loaf", "kenney_food_croissant", "kenney_food_loaf_round", "kenney_food_cake"]},
+    "pharmacy": {"counter": ["kenney_furniture_kitchenCabinetDrawer", "kenney_furniture_desk"],
+                 "wall": ["kenney_furniture_bookcaseClosedDoors", "kenney_furniture_bookcaseClosed", "Shelf_01"], "decor": []},
+    "bar": {"counter": ["kenney_furniture_kitchenBar", "kenney_furniture_kitchenCabinet"],
+            "wall": ["kenney_furniture_bookcaseOpenLow", "kenney_furniture_sideTable", "kenney_furniture_cabinetTelevision"],
+            "decor": ["kenney_food_cup_coffee", "kenney_food_glass_wine", "kenney_food_wine_red", "kenney_food_soda_bottle"]},
+    "generic": {"counter": ["kenney_furniture_kitchenCabinet", "kenney_furniture_desk"],
+                "wall": ["kenney_furniture_bookcaseOpen", "Shelf_01", "kenney_furniture_bookcaseClosedWide", "kenney_shop_display_small"],
+                "decor": []},
+}
+
+
 def test_shop_planner_unchanged_with_default_fields() -> None:
     """B3 records, pinned from the commit before ADR-034 (the default room fields must not move a shop piece)."""
     import hashlib
 
-    shop = replace(DEFAULT.interiors.shops.furnish, enabled=True)
+    # The pins were taken with the B3 sets (Kenney and Poly Haven only); the Quaternius rows added to the default
+    # sets on 10 November 2026 change which piece comes first, not the planner, so the B3 sets are rebuilt here.
+    b3 = json.loads(json.dumps(DOC))
+    b3["interiors"]["shops"]["furnish"].update(enabled=True, catalogues=B3_SHOP_CATALOGUES, sets=B3_SHOP_SETS)
+    shop = config_from_document(b3).interiors.shops.furnish
     pins = {"bar": "90fd63787a4ad3367dd14ae570e08da6fd34d9a7f18dacbc1e9152d7f72acc2f",
             "bakery": "79f5f14bd03e41179467691e21315afb761d514039ee16a3c476fb4658b66b27",
             "generic": "bfe702212d7076f9bbadeb86c06ed545e143297d57cc3860b7727807de25487d"}

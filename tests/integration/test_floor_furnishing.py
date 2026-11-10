@@ -64,7 +64,7 @@ def _rooms(d, bid: str) -> list[dict]:
     return _obj(d, f"interior/{bid}").record["rooms"]
 
 
-def test_off_by_default_and_without_the_block_scene_detail_is_identical(detail_inputs, off) -> None:
+def test_off_and_without_the_block_scene_detail_is_identical(detail_inputs, off) -> None:
     assert MURCIA_CENTER == (-1.12863, 37.98407)
     absent = copy.deepcopy(DOC)
     del absent["interiors"]["furnish"]

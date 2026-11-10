@@ -1,4 +1,4 @@
-"""``interiors.shops.furnish`` configuration (ADR-031): off by default, validated rows and ranges."""
+"""``interiors.shops.furnish`` configuration (ADR-031): on by default since 10 November 2026, validated rows and ranges."""
 
 from __future__ import annotations
 
@@ -38,14 +38,20 @@ def _problems(doc: dict) -> list[str]:
     return caught.value.problems
 
 
-def test_the_default_config_has_furnishing_off_and_reads_no_asset(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(*_args, **_kwargs):
-        raise AssertionError("a default load must not read assets/")
+def test_the_default_config_has_furnishing_on_and_checks_its_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    checked: list[object] = []
+    real = config_module.furnish_problems
 
-    monkeypatch.setattr(config_module, "furnish_problems", refuse)
+    def record(*args, **kwargs):
+        checked.append(args[0])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(config_module, "furnish_problems", record)
     furnish = load_detail_config().interiors.shops.furnish
-    assert furnish.enabled is False
+    assert furnish.enabled is True and len(checked) == 1
     assert sorted(furnish.sets) == ["bakery", "bar", "generic", "pharmacy"]
+    assert furnish.catalogues == ("kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop", "quaternius_home_interior")
+    assert furnish.sets["generic"].counter[0] == FurnishEntry("qt_home_Drawer_2")
 
 
 def test_a_document_without_the_block_loads_with_furnishing_off() -> None:
@@ -217,15 +223,21 @@ def _floors_doc(enabled: bool = True) -> dict:
     return doc
 
 
-def test_the_floor_block_is_off_by_default_and_reads_no_asset(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(*_args, **_kwargs):
-        raise AssertionError("a default load must not read assets/")
+def test_the_floor_block_is_on_by_default_and_checks_its_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    checked: list[object] = []
+    real = config_module.floor_furnish_problems
 
-    monkeypatch.setattr(config_module, "floor_furnish_problems", refuse)
+    def record(*args, **kwargs):
+        checked.append(args[0])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(config_module, "floor_furnish_problems", record)
     furnish = load_detail_config().interiors.furnish
-    assert furnish.enabled is False and sorted(furnish.sets) == ["generic"]
+    assert furnish.enabled is True and len(checked) == 1 and sorted(furnish.sets) == ["generic"]
     assert furnish.max_triangles == 12000 and furnish.max_collision_triangles == 1200 and furnish.max_assets == 12
-    assert furnish.max_pieces_per_room == 6 and furnish.catalogues == ("kenney_furniture",)
+    assert furnish.max_pieces_per_room == 6
+    assert furnish.catalogues == ("kenney_furniture", "quaternius_home_interior")
+    assert len({e.id for e in furnish.sets["generic"].wall}) <= furnish.max_assets  # no map can hit asset_cap on variety alone
     generic = furnish.sets["generic"]
     assert generic.counter == () and generic.decor == () and generic.wall
 
@@ -238,9 +250,11 @@ def test_a_document_without_the_floor_block_loads_with_it_off() -> None:
 
 
 def test_the_enabled_default_floor_block_loads_and_leaves_the_shop_block_alone() -> None:
-    cfg = config_from_document(_floors_doc())
+    doc = _floors_doc()
+    doc["interiors"]["shops"]["furnish"]["enabled"] = False
+    cfg = config_from_document(doc)
     assert cfg.interiors.furnish.enabled and cfg.interiors.shops.furnish.enabled is False
-    assert cfg.interiors.furnish.sets["generic"].wall[0] == FurnishEntry("kenney_furniture_bookcaseOpen")
+    assert cfg.interiors.furnish.sets["generic"].wall[0] == FurnishEntry("qt_home_Bookshelf")
 
 
 def test_the_schema_takes_only_the_generic_set_and_no_extra_key() -> None:
@@ -306,7 +320,8 @@ def test_an_excluded_id_and_a_street_row_are_refused_even_in_a_listed_catalogue(
 
 def test_a_floor_catalogue_without_a_manifest_is_named(tmp_path) -> None:
     sets = {"generic": FurnishSet((), (FurnishEntry("kenney_furniture_bookcaseOpen"),), ())}
-    assert config_module.floor_furnish_problems(replace(config_from_document(_floors_doc(False)).interiors.furnish, sets=sets), tmp_path) == [
+    base = config_from_document(_floors_doc(False)).interiors.furnish
+    assert config_module.floor_furnish_problems(replace(base, catalogues=("kenney_furniture",), sets=sets), tmp_path) == [
         f"/interiors/furnish/catalogues: 'kenney_furniture' has no readable manifest under {tmp_path}",
         "/interiors/furnish/sets/generic/wall: 'kenney_furniture_bookcaseOpen' is not a row of an allowed catalogue"]
 

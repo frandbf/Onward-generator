@@ -60,6 +60,13 @@ Option on: copies of `bench_murcia`, `bench_madrid` and `bench_krakow` from that
 
 Then this ADR goes from proposed to accepted, or is corrected.
 
+## Amendment (10 November 2026): on by default, Quaternius rows
+
+- **On by default.** The maintainer chose to turn shop furnishing on by default (`interiors.shops.furnish.enabled: true`) before the headset session, to see furnished shops on every new map. The status stays proposed: the headset checks below still decide whether it is accepted or corrected. `enabled: false` in a detail configuration restores the earlier output byte for byte.
+- **Quaternius rows.** `FURNISH_CATALOGUES` adds `quaternius_home_interior`, `quaternius_ultimate_furniture` and `quaternius_furniture` (CC0 1.0, `tools/import_quaternius.py`, `docs/legal/data-sources.md`). The default sets swap some Kenney pieces for Quaternius ones (shelves, kitchen drawers, fridge, cabinets) instead of adding them: the distinct rows per map stay about as many as before, so the `max_assets` cap and the draws do not grow, and the lighter rows (68–600 triangles against about 1 000 for Kenney) let more rooms fit `max_triangles`. On Madrid r200 the cap, not the asset cap, refused 32 of 42 shop rooms before this change.
+- **A short wall piece in `generic`.** `qt_home_Drawer_1` (0.66 m) keeps a low-ceiling shop furnishable: the 2.17 m shelves do not fit under a 2.0 m ceiling less the head clearance.
+- **Facing.** The Quaternius OBJ files face +Z, the glTF front the planner assumes. The Furniture pack (`quaternius_furniture`) has its long side on Y; it is in the catalogue list but in no default set.
+
 ## Rejected alternatives
 
 - **Charging furniture to `shops.max_triangles`.** Madrid would lose shop rooms (5 992 of 6 000 used, 54 shops already turned down).

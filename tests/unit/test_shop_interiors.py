@@ -75,11 +75,11 @@ def test_shop_interior_config_is_read_as_given() -> None:
          "/interiors/shops/generic: material 'brick_red' must be defined in /materials and start with 'interior_'"),
         ({"interiors__shops__generic__floor": "interior_nope"},
          "/interiors/shops/generic: material 'interior_nope' must be defined in /materials and start with 'interior_'"),
-        ({"interiors__shops__categories": [{"name": "bar", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "plaster_white"}]},
+        ({"interiors__shops__furnish__enabled": False, "interiors__shops__categories": [{"name": "bar", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "plaster_white"}]},
          "/interiors/shops/bar: material 'plaster_white' must be defined in /materials and start with 'interior_'"),
-        ({"interiors__shops__categories": [{"name": "generic", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "interior_floor"}]},
+        ({"interiors__shops__furnish__enabled": False, "interiors__shops__categories": [{"name": "generic", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "interior_floor"}]},
          "/interiors/shops/categories: names must be unique and not 'generic'"),
-        ({"interiors__shops__categories": [{"name": "bar", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "interior_floor"}] * 2},
+        ({"interiors__shops__furnish__enabled": False, "interiors__shops__categories": [{"name": "bar", "tags": {"amenity": ["bar"]}, "wall": "interior_wall", "floor": "interior_floor"}] * 2},
          "/interiors/shops/categories: names must be unique and not 'generic'"),
     ],
 )
@@ -110,7 +110,9 @@ def test_invalid_shop_interior_config_is_rejected(changes: dict, fragment: str) 
 
 
 def test_shop_interior_config_is_required_and_its_limits_are_inclusive() -> None:
-    config_from_document(_doc(interiors__lights_max=0, interiors__shops__max_triangles=0, interiors__shops__categories=[]))
+    # Furnishing (on by default) needs the shop categories its sets name; this checks the shop block alone.
+    config_from_document(_doc(interiors__lights_max=0, interiors__shops__max_triangles=0, interiors__shops__categories=[],
+                              interiors__shops__furnish__enabled=False))
     config_from_document(_doc(interiors__lights_max=256))
     config_from_document(_doc(interiors__shops__band_depth_m=3, interiors__shops__min_room_area_m2=4))
     config_from_document(_doc(interiors__shops__band_depth_m=50, interiors__shops__min_room_area_m2=100))

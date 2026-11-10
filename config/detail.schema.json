@@ -37,7 +37,7 @@
         "head_clear_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
         "catalogues": {
           "type": "array", "uniqueItems": true, "minItems": 1,
-          "items": { "enum": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"] }
+          "items": { "enum": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop", "quaternius_home_interior", "quaternius_ultimate_furniture", "quaternius_furniture"] }
         },
         "sets": {
           "type": "object", "required": ["generic"],

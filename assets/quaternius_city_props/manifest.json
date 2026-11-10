@@ -1,0 +1,161 @@
+{
+  "schema": "onward_generator.abandoned_prefabs",
+  "schema_version": "0.2.0",
+  "unit": "m",
+  "collider": "none",
+  "shader": "PP_Opaque_Simple_Lit albedo only",
+  "source": "https://quaternius.com/packs/downtowncitymegakit.html, CC0 1.0. Only the Prop_* models of the free Standard zip.",
+  "semantics": {
+    "origin": "estimated",
+    "basis": "written by tools/import_quaternius.py from each file name and bounding box; no person reviewed a rendered view",
+    "reviewed_on": "2026-11-10",
+    "fields": [
+      "description",
+      "placement",
+      "grouping",
+      "condition",
+      "tags"
+    ]
+  },
+  "assets": [
+    {
+      "id": "qt_city_Prop_ManholeCover",
+      "file": "Prop_ManholeCover.glb",
+      "category": "barriers",
+      "role": "manhole",
+      "surfaces": [
+        "sidewalk",
+        "carriageway",
+        "plaza"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "prop manhole cover. Downtown City MegaKit [Standard], Quaternius.",
+      "description": "Round cast-iron manhole cover with an ornamental pattern, flush with the ground.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "worn",
+      "tags": [
+        "prop",
+        "manhole",
+        "cover"
+      ],
+      "triangles": 118,
+      "length_m": 0.925,
+      "depth_m": 0.925,
+      "height_m": 0.033,
+      "collider": "none"
+    },
+    {
+      "id": "qt_city_Prop_Drain",
+      "file": "Prop_Drain.glb",
+      "category": "barriers",
+      "role": "manhole",
+      "surfaces": [
+        "curb",
+        "carriageway"
+      ],
+      "anchor": "flat",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "prop drain. Downtown City MegaKit [Standard], Quaternius.",
+      "description": "Rectangular cast-iron storm drain grate set in the ground at the kerb.",
+      "placement": "ground_cover",
+      "grouping": "cluster",
+      "condition": "worn",
+      "tags": [
+        "prop",
+        "drain"
+      ],
+      "triangles": 10,
+      "length_m": 0.585,
+      "depth_m": 0.585,
+      "height_m": 0.04,
+      "collider": "none"
+    },
+    {
+      "id": "qt_city_Prop_Planter_Single",
+      "file": "Prop_Planter_Single.glb",
+      "category": "furniture",
+      "role": "planter",
+      "surfaces": [
+        "sidewalk",
+        "plaza",
+        "courtyard"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "prop planter single. Downtown City MegaKit [Standard], Quaternius.",
+      "description": "Square concrete street planter with a metal rim, filled with soil.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "worn",
+      "tags": [
+        "prop",
+        "planter",
+        "single"
+      ],
+      "triangles": 118,
+      "length_m": 2.0,
+      "depth_m": 2.0,
+      "height_m": 0.6,
+      "collider": "none"
+    },
+    {
+      "id": "qt_city_Prop_Bollard",
+      "file": "Prop_Bollard.glb",
+      "category": "barriers",
+      "role": "barrier",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "plaza"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "prop bollard. Downtown City MegaKit [Standard], Quaternius.",
+      "description": "Short dark metal bollard on a concrete foot, at the kerb.",
+      "placement": "kerb",
+      "grouping": "single",
+      "condition": "worn",
+      "tags": [
+        "prop",
+        "bollard"
+      ],
+      "triangles": 190,
+      "length_m": 0.216,
+      "depth_m": 0.227,
+      "height_m": 0.892,
+      "collider": "none"
+    },
+    {
+      "id": "qt_city_Prop_ACUnit",
+      "file": "Prop_ACUnit.glb",
+      "category": "facade",
+      "role": "aircon",
+      "surfaces": [
+        "facade"
+      ],
+      "anchor": "facade",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "prop acunit. Downtown City MegaKit [Standard], Quaternius.",
+      "description": "Boxy air-conditioning unit with a fan grille, hung on a facade.",
+      "placement": "wall_mounted",
+      "grouping": "single",
+      "condition": "worn",
+      "tags": [
+        "prop",
+        "acunit"
+      ],
+      "triangles": 136,
+      "length_m": 0.893,
+      "depth_m": 0.347,
+      "height_m": 0.6,
+      "collider": "none"
+    }
+  ]
+}
