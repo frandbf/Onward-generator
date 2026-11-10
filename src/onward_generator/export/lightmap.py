@@ -5,7 +5,9 @@ Unity bakes every static renderer at ``lightmap_texels_per_m`` times its
 scale is chosen per material: roofs, ground, interiors and blank party walls
 (``party_*``, docs/07-detail.md) take fewer texels than the facades a player walks past. Renderers kept out of the lightmap (trees,
 urban metal, railings, overgrow props, the horizon backdrop) mirror
-``ContributesGi`` in ``tools/unity/onward_adapter/Editor/OnwardMapAdapter.cs``.
+``ContributesGi`` in ``tools/unity/onward_adapter/Editor/OnwardMapAdapter.cs``. With the export option
+``build.scenic_out_of_lightmap`` (plan C4, ADR-017 amendment, off when absent) the scenic shell walls
+(``scenic_*``) leave the lightmap too; they stay in the bake as shadow casters, as props and trees do.
 
 The estimate is not a Unity measurement. It sums, per combined renderer, its
 surface area times the squared texel density, capped at one atlas page as Unity
@@ -56,27 +58,35 @@ def surface_class(material: str) -> str:
     return "facade"
 
 
-def contributes_gi(material: str) -> bool:
-    """False for the renderers the adapter keeps out of the lightmap (``scaleInLightmap = 0``)."""
+def contributes_gi(material: str, *, scenic_out_of_lightmap: bool = False) -> bool:
+    """False for the renderers the adapter keeps out of the lightmap (``scaleInLightmap = 0``).
+
+    ``scenic_out_of_lightmap`` also leaves out the scenic shell walls (``scenic_*``); the scenic roofs share
+    ``roof_flat_grey`` with the core and stay baked.
+    """
     name = material.lower()
+    if scenic_out_of_lightmap and name.startswith(SCENIC_PREFIX):
+        return False
     return not (name.startswith(NO_GI_PREFIX) or any(part in name for part in NO_GI_PARTS))
 
 
-def material_scales(materials: Iterable[str], class_scales: Mapping[str, float]) -> list[dict[str, Any]]:
+def material_scales(materials: Iterable[str], class_scales: Mapping[str, float], *,
+                    scenic_out_of_lightmap: bool = False) -> list[dict[str, Any]]:
     """``{"material", "scale"}`` for each lit material whose class scale is not 1, sorted by name."""
     rows = []
     for name in sorted(set(materials)):
         scale = float(class_scales.get(surface_class(name), 1.0))
-        if contributes_gi(name) and scale != 1.0:
+        if contributes_gi(name, scenic_out_of_lightmap=scenic_out_of_lightmap) and scale != 1.0:
             rows.append({"material": name, "scale": scale})
     return rows
 
 
 def estimate(visual: bytes, *, texels_per_m: float, max_size: int, cell_m: float,
-             scales: Iterable[Mapping[str, Any]] = ()) -> dict[str, Any]:
+             scales: Iterable[Mapping[str, Any]] = (), scenic_out_of_lightmap: bool = False) -> dict[str, Any]:
     """Texels the bake needs for the visual GLB, grouped as the adapter combines it.
 
     ``cell_m`` 0 means one renderer per node, as the adapter does without combining.
+    ``scenic_out_of_lightmap`` leaves the ``scenic_*`` walls out, as ``contributes_gi`` does.
     """
     by_material = {str(row["material"]): float(row["scale"]) for row in scales}
     nodes, _materials = nodes_from_glb(visual)
@@ -84,7 +94,7 @@ def estimate(visual: bytes, *, texels_per_m: float, max_size: int, cell_m: float
     for index, node in enumerate(nodes):
         for primitive in node.world_primitives():
             # build_glb never writes a primitive without triangles.
-            if not contributes_gi(primitive.material):
+            if not contributes_gi(primitive.material, scenic_out_of_lightmap=scenic_out_of_lightmap):
                 continue
             vertices = primitive.mesh.vertices
             centre = (vertices.min(axis=0) + vertices.max(axis=0)) * 0.5

@@ -277,6 +277,36 @@ def test_export_reports_the_tiers(ring_inputs: tuple[Path, Path, Path], ring_det
     assert tiers["draws"] <= sum(tiers[t]["draws"] for t in ("core", "scenic", "shared"))
 
 
+def test_scenic_out_of_lightmap_reaches_the_adapter_and_the_estimate(
+    ring_inputs: tuple[Path, Path, Path], ring_detail: Path, tmp_path: Path,
+) -> None:
+    """Plan C4: with the option the scenic walls take no texels; the draws and triangles do not change."""
+    scene, heights, base = ring_inputs
+    layout = tmp_path / "layout.json"
+    assert main(["perf", "layout", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+                 "--detail", str(ring_detail), "--out", str(layout)]) == 0
+    off = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "off", now=FIXED_NOW)
+    card = json.loads(EXPORT_CONFIG_DEFAULT.read_text(encoding="utf-8"))
+    card["build"]["scenic_out_of_lightmap"] = True
+    (tmp_path / "card.json").write_text(json.dumps(card), encoding="utf-8")
+    on = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "on", now=FIXED_NOW, export_config=tmp_path / "card.json")
+    off_options = json.loads((off.directory / "adapter_options.json").read_text(encoding="utf-8"))
+    on_options = json.loads((on.directory / "adapter_options.json").read_text(encoding="utf-8"))
+    assert "scenic_out_of_lightmap" not in off_options and on_options["scenic_out_of_lightmap"] is True
+    scenic_rows = [r for r in off_options["lightmap_scales"] if r["material"].startswith("scenic_")]
+    assert scenic_rows and all(r["scale"] == 0.25 for r in scenic_rows)
+    assert on_options["lightmap_scales"] == [r for r in off_options["lightmap_scales"] if r not in scenic_rows]
+    assert {"material": SCENIC_ROOF, "scale": 0.25} in on_options["lightmap_scales"]
+    before, after = off.manifest["lightmap_estimate"], on.manifest["lightmap_estimate"]
+    assert before["texels_by_class"]["scenic"] > 0 and "scenic" not in after["texels_by_class"]
+    # The total and each class are rounded on their own, so they may differ by one texel.
+    assert abs(after["texels"] - (before["texels"] - before["texels_by_class"]["scenic"])) <= 1
+    assert after["texels_by_class"] == {k: v for k, v in before["texels_by_class"].items() if k != "scenic"}
+    assert after["renderers"] < before["renderers"] and after["pages_at_least"] <= before["pages_at_least"]
+    assert on.manifest["tiers"] == off.manifest["tiers"] and on.manifest["view_draws"] == off.manifest["view_draws"]
+    assert on.manifest["package_id"] != off.manifest["package_id"]
+
+
 @pytest.mark.parametrize(("cell_m", "predicted"), [(50.0, 50.0), (0.0, 100.0)])
 def test_export_predicts_draws_at_the_cards_cell(ring_inputs: tuple[Path, Path, Path], ring_detail: Path, tmp_path: Path,
                                                 cell_m: float, predicted: float) -> None:

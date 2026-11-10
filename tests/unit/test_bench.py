@@ -665,3 +665,44 @@ def test_the_run_parser_takes_the_lidar_roofs_switch() -> None:
     args = bench.build_parser().parse_args(["run", "--lidar-roofs"])
     assert args.lidar_roofs is True
     assert bench.build_parser().parse_args(["run"]).lidar_roofs is False
+
+
+def test_the_run_parser_takes_the_scenic_out_of_lightmap_switch() -> None:
+    assert bench.build_parser().parse_args(["run", "--scenic-out-of-lightmap"]).scenic_out_of_lightmap is True
+    assert bench.build_parser().parse_args(["run"]).scenic_out_of_lightmap is False
+
+
+def _scenic_map(root: Path, card: Any, export: str | None = "config/export.json") -> Path:
+    root.mkdir(parents=True)
+    (root / "map.json").write_text(json.dumps({"schema": "onward_generator.map", "id": "m", "paths": {"export": export} if export else {}}), encoding="utf-8")
+    if card is not None:
+        path = root / (export or "config/export.json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(card if isinstance(card, str) else json.dumps(card), encoding="utf-8")
+    return root
+
+
+@pytest.mark.parametrize("export", ["config/export.json", "config/other.json", None])
+def test_store_scenic_out_of_lightmap_sets_the_card_key(tmp_path: Path, export: str | None) -> None:
+    root = _scenic_map(tmp_path / "m", {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0}}, export)
+    bench.store_scenic_out_of_lightmap(root)
+    card = json.loads((root / (export or "config/export.json")).read_text(encoding="utf-8"))
+    assert card == {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0, "scenic_out_of_lightmap": True}}
+
+
+@pytest.mark.parametrize(("card", "match"), [
+    (None, "has no export card for --scenic-out-of-lightmap"),
+    ("{not json", "not valid JSON"),
+    ({"build": []}, r"build must be an object, got \[\]"),
+    ({"map": {}}, "build must be an object, got None"),
+    ([1], "build must be an object, got None"),
+])
+def test_store_scenic_out_of_lightmap_refuses_a_bad_card(tmp_path: Path, card: Any, match: str) -> None:
+    root = _scenic_map(tmp_path / "m", card)
+    with pytest.raises(bench.BenchError, match=match):
+        bench.store_scenic_out_of_lightmap(root)
+
+
+def test_store_scenic_out_of_lightmap_needs_a_map(tmp_path: Path) -> None:
+    with pytest.raises(bench.BenchError, match="no map.json to find the export card"):
+        bench.store_scenic_out_of_lightmap(tmp_path)

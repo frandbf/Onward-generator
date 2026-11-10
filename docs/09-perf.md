@@ -98,7 +98,7 @@ ADR-017. Madrid, 40.40657, −3.719187, with Catastro, on fork/main of 30 Octobe
 - 446 scenic buildings at r300 cost 19 641 triangles, 44 each: four walls and a roof, against about 1 180 for a detailed building.
 - A ring cell is about four draws (three scenic walls and one roof). The ring adds 140 uncullled draws at r300, the core about 260. Before the street plates were kept to the core the ring cost 230: each plate was then a material of its own. Since 3 November 2026 they share `street_sign_atlas_<page>`.
 - With a 150 m core the map is about 209 000 triangles before the SDK prefabs and the players, against the guide's 250 000 for all of it (ADR-005). A 120 m core leaves about 82 000. Which margin a match needs is a headset question.
-- The scenic shells bake at scale 0.25: 3.4 M texels of the 34.7 M at r300.
+- The scenic shells bake at scale 0.25: 3.4 M texels of the 34.7 M at r300. Plan C4 can take the walls out of the lightmap ([below](#scenic-walls-out-of-the-lightmap)).
 
 ## Budget core
 
@@ -291,3 +291,28 @@ Pending (not done; the switch stays off until they pass):
 
 Then the ADR-023 amendment goes from proposed to accepted, or the thresholds are corrected.
 
+
+## Scenic walls out of the lightmap
+
+Plan C4 is covered by the ADR-017 amendment of 8 November 2026 (proposed) and is off by default. It is turned on by the export card's `build.scenic_out_of_lightmap: true` or `bench.py run --scenic-out-of-lightmap`, which sets it in each run copy's card. The rules are in [12-export.md](12-export.md#lighting). The runs used Docker on an Apple M4 Pro, the frozen bench inputs and `--offline`, on 8 November 2026.
+
+- **Off.** `bench.py check` finds no difference outside timings between run `c4_off` and the baseline `c4_baseline` (HEAD of plan C3).
+- **On.** Run `c4_on` against `c4_off`. Paris has no core and no scenic walls, and is the control.
+
+| Map | Lightmap texels (estimate) | Scenic texels taken off | Pages at least | Triangles, draws, view draws |
+| --- | --- | --- | --- | --- |
+| bench_murcia r150 | 13 796 669 → 11 916 415 | 1 880 254 (13.6 %) | 4 → 3 | 150 339; 213; 85 / 181 / 213: 0 |
+| bench_madrid r300 | 42 183 417 → 30 723 971 | 11 459 446 (27.2 %) | 11 → 8 | 398 025; 504; 175 / 374 / 448: 0 |
+| bench_paris r50 | 11 516 466, 0 | 0 | 3, 0 | 47 585; 91; 34 / 77 / 91: 0 |
+| bench_krakow r150 | 6 995 380 → 6 218 679 | 776 701 (11.1 %) | 2, 0 | 72 884; 272; 95 / 219 / 268: 0 |
+
+Madrid's drop is one texel over its `scenic` class because the total and each class are rounded on their own. The scenic roofs (`roof_flat_grey`) stay baked and are counted under `roof`. The figures are the export estimate (a lower bound on pages), not a bake: the Unity seconds are not measured (`unity.status` is `missing` on every bench map).
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Unity 2021.3.23f1: the adapter compiles, and the scene log's `scaleInLightmap (scale x renderers)` line shows the scenic renderers at 0 with the option on and at 0.25 with it off.
+- [ ] Bake time: bench_murcia (and bench_madrid if time allows) with the option off and on, `task unity -- --bake draft` and `--bake final`; compare `seconds.gi_bake`, `seconds.bake`, `lightmaps` and `lightmap_texels` with `python tools/unity/report_timings.py <pkgA> <pkgB>`. The final bake must stay at or under 5 min and the draft at or under 1.5 min at r150 / 10 texels/m.
+- [ ] Editor views A, B and one across the core edge: the ring does not read black or slate-dark (ADR-014 saw about 48 % of the albedo under the ambient light alone), and the core-edge buildings still cast and receive plausible shadows.
+- [ ] Headset (Quest 3), option on and off: the ring's brightness and colour sit with the fog, no seam at the core wall, median at least 72 fps, views A and B at or under 150 draws, graphics memory at or under 1 GB.
+
+Then the ADR-017 amendment goes from proposed to accepted, or the option is dropped.

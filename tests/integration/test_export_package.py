@@ -18,7 +18,7 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
-from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, surface_class
+from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales, surface_class
 from onward_generator.export.package import (
     EXPORT_CONFIG_DEFAULT,
     MANIFEST_FILE,
@@ -194,6 +194,10 @@ def test_invalid_layout_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mu
     (lambda c: c["build"].update(lightmap_class_scales={"roof": 0}), "/build/lightmap_class_scales/roof"),
     (lambda c: c["build"].update(lightmap_class_scales={"roof": 1.5}), "/build/lightmap_class_scales/roof"),
     (lambda c: c["build"].update(lightmap_class_scales={"props": 0.5}), "/build/lightmap_class_scales"),
+    (lambda c: c["build"].update(scenic_out_of_lightmap="yes"), "/build/scenic_out_of_lightmap"),
+    (lambda c: c["build"].update(scenic_out_of_lightmap=1), "/build/scenic_out_of_lightmap"),
+    (lambda c: c["build"].update(scenic_out_of_lightmap=None), "/build/scenic_out_of_lightmap"),
+    (lambda c: c["build"].update(scenic_out_of_lightmaps=True), "scenic_out_of_lightmaps"),
 ])
 def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: Path, mutate: Any, match: str) -> None:
     cfg = load(EXPORT_CONFIG_DEFAULT)
@@ -201,6 +205,23 @@ def test_invalid_export_config_is_refused(inputs: tuple[Path, Path], tmp_path: P
     (tmp_path / "cfg.json").write_text(json.dumps(cfg), encoding="utf-8")
     with pytest.raises(ExportError, match=match):
         package(inputs, tmp_path / "pkg", export_config=tmp_path / "cfg.json")
+
+
+def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    """Plan C4: the default card has no key, so the options, scales and estimate are those of before."""
+    cfg = load(EXPORT_CONFIG_DEFAULT)
+    assert "scenic_out_of_lightmap" not in cfg["build"]
+    result = package(inputs, tmp_path / "pkg")
+    options = load(result.directory / "adapter_options.json")
+    assert "scenic_out_of_lightmap" not in options
+    build = {k: v for k, v in cfg["build"].items() if k != "lightmap_class_scales"}
+    visual = (inputs[0] / "scene_visual.glb").read_bytes()
+    names = [str(m.get("name")) for m in read_glb(visual)[0].get("materials") or []]
+    scales = material_scales(names, {**DEFAULT_CLASS_SCALES, **cfg["build"].get("lightmap_class_scales", {})})
+    assert options == {"variant": result.manifest["package_id"], **build, "lightmap_scales": scales}
+    assert result.manifest["lightmap_estimate"] == estimate(
+        visual, texels_per_m=float(build["lightmap_texels_per_m"]), max_size=int(build["lightmap_max_size"]),
+        cell_m=float(build["combine_cell_m"]), scales=scales)
 
 
 def test_albedo_compression_reaches_the_adapter_options(inputs: tuple[Path, Path], tmp_path: Path) -> None:
@@ -437,6 +458,20 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert '\\"lightmap_texels\\":{LightmapTexels()}' in source
     # Albedo: ASTC 6x6 through a TextureImporter by default, RGBA32 assets with "none", 4096 px atlas not downscaled.
     assert 'public string albedo_compression = "astc_6x6";' in source
+    # Plan C4: the scenic walls leave the lightmap only with the option, at every ContributesGi call site.
+    assert "public bool scenic_out_of_lightmap = false;" in source
+    assert 'm.name.ToLowerInvariant().StartsWith("m_scenic_", StringComparison.Ordinal)' in source
+    assert "ContributesGi(material) && !(opt != null && opt.scenic_out_of_lightmap && IsScenic(material))" in source
+    assert 'ContributesGi(materials[i], opt) ? "gi" : "nogi"' in source
+    assert "renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ?" in source
+    assert "if (!ContributesGi(renderer.sharedMaterial, opt))" in source
+    assert source.count("!ContributesGi(m, opt)") == 2
+    # The one-argument rule is called only from the overload.
+    assert re.findall(r"ContributesGi\((?:materials\[i\]|renderer\.sharedMaterial|m)\)", source) == []
+    assert source.count("ContributesGi(material)") == 1
+    # The scenic walls keep ContributeGI: they still cast the baked sun's shadows on the core.
+    casts = source[source.index("private static bool CastsBakedShadow"):source.index("private static StaticEditorFlags LightmapFlags")]
+    assert "scenic" not in casts
     assert 'AlbedoNone = "none"' in source and 'AlbedoAstc6x6 = "astc_6x6"' in source
     assert "TextureImporterFormat.ASTC_6x6" in source and "AlbedoMinMaxTextureSize = 4096" in source
 

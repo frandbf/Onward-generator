@@ -404,3 +404,20 @@ def test_lidar_roofs_run_switches_the_run_copy_only(workdir: Path) -> None:
     assert [argv[2] for argv in on.calls if argv[:2] == ["source", "normalize"]] == ["es.pnoa_ndsm"]
     report = copy / "data" / "processed" / "es.pnoa_ndsm" / "es.pnoa_ndsm_report.json"
     assert Path(detail[detail.index("--lidar-roofs") + 1]).resolve() == report.resolve()
+
+
+def test_scenic_out_of_lightmap_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    assert _run(root, "r1", Stub()) == 0
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    card_rel = json.loads((inputs / "map.json").read_text(encoding="utf-8"))["paths"]["export"]
+    off_card = json.loads((root / "runs" / "r1" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert "scenic_out_of_lightmap" not in off_card["build"]
+
+    assert _run(root, "r2", Stub(), "--offline", "--scenic-out-of-lightmap") == 0
+    on_card = json.loads((root / "runs" / "r2" / "bench_murcia" / card_rel).read_text(encoding="utf-8"))
+    assert on_card["build"] == {**off_card["build"], "scenic_out_of_lightmap": True}
+    assert {k: v for k, v in on_card.items() if k != "build"} == {k: v for k, v in off_card.items() if k != "build"}
+    assert bench.inputs_sha256(inputs) == digest
+    assert "scenic_out_of_lightmap" not in json.loads((inputs / card_rel).read_text(encoding="utf-8"))["build"]

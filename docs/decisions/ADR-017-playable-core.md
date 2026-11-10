@@ -71,3 +71,20 @@ The guide in the workshop plan is at most 220 000 triangles in Unity. With the f
 9. **Fog.** `export.json` `fog_start_m` is written by `map create` from `core_radius_m`, before the core is solved, so with a budget core the fog may start before or past the wall. Not changed here (export scope); the headset session checks it.
 
 Measured with synthetic grids (r150, r300, r500) in `tests/integration/test_core_budget.py` and on the bench inputs in `docs/09-perf.md#budget-core`. To check on the headset before the status is accepted: Unity `scene_report.json` triangles against N, draws in the fixed views A and B (at most 150), the median fps on the route (at least 72), and the ring through the fog at the moved wall.
+
+## Amendment, 8 November 2026: scenic walls out of the lightmap (decision 9)
+
+Status: proposed until a Unity bake and a headset session check it (plan C4, `docs/plans/2026-11-07-workshop-quality.md`). Off by default; decision 9 stays the default.
+
+Decision 9 rejected a probe-lit ring because the adapter's `ContributesGi` would have to change. The change is now made, behind an option:
+
+1. **Opt-in.** The export card's `build.scenic_out_of_lightmap` (boolean, absent means off) reaches `adapter_options.json` only when the card sets it. A card without the key gives the same package, `package_id` included, and an older package bakes the ring as before (the adapter's `Options` default is `false`).
+2. **Walls only.** With the option on, a material whose name starts `scenic_` (`M_scenic_*` in Unity: the three scenic walls and `scenic_trim_<style>`) takes no lightmap texels (`scaleInLightmap = 0`) and `receiveGI = LightProbes`; combined, it takes the ambient light (`lightProbeUsage = Off`), as trees and props do (`docs/12-export.md`, *Out of the lightmap*). The scenic roofs share `roof_flat_grey` with the core's flat roofs and stay baked at 0.25. Covering them needs a scenic roof material of its own or tier-aware grouping, both of which change the draws; that is a later increment.
+3. **Still a shadow caster.** The walls keep `ContributeGI`, so the baked sun still casts their shadows on the core, the reason props stopped leaving GI on 4 November 2026.
+4. **Mirror.** `export.lightmap.contributes_gi`, `material_scales` and `estimate` take `scenic_out_of_lightmap`; `lightmap_estimate` then has no `scenic` class. A test pins the C# prefix `m_scenic_` to `"m_" + tiers.SCENIC_PREFIX`.
+
+On the bench (`docs/09-perf.md#scenic-walls-out-of-the-lightmap`) the estimate falls by the scenic class: Madrid r300 −11.46 M texels (27 %, 11 → 8 pages), Murcia r150 −1.88 M (14 %, 4 → 3), Kraków −0.78 M (11 %, 2 pages), Paris 0 (no core). Triangles and draws do not change. These are estimates, not a bake.
+
+Risks, all for the bake and the headset: ADR-014 measured a renderer lit by the ambient light alone at about 48 % of its albedo (its backdrop then moved to the unlit graph), so the ring may read slate-dark against the fog; a brightness step may show where a lightmapped core facade meets an ambient-lit scenic wall in a shared cell; the lit roofs over ambient walls may disagree from above; without combining (`combine_cell_m` 0) each scenic renderer samples probes from outside the core's probe hull. The bake seconds may not fall in step with the texels: the walls still cast shadows in the bake and are still unwrapped.
+
+To check before the status is accepted: the C# compiles in Unity 2021.3.23f1; the scene log's `scaleInLightmap (scale x renderers)` line shows the scenic renderers at 0 with the option and at 0.25 without; `task unity -- --bake draft` and `--bake final` with the option off and on, compared with `tools/unity/report_timings.py`; and on Quest 3 the ring's brightness against the fog, the seam at the core wall, at least 72 fps median and at most 150 draws in views A and B.

@@ -287,12 +287,12 @@ def interior_lights(visual: bytes) -> int:
     )
 
 
-def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes) -> None:
+def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes, *, scenic_out_of_lightmap: bool) -> None:
     """Replace ``lightmap_class_scales`` in the adapter options by one scale per visual material."""
     class_scales = {**DEFAULT_CLASS_SCALES, **options.pop("lightmap_class_scales", {})}
     doc, _blob = read_glb(visual)
     names = [str(m.get("name")) for m in doc.get("materials") or []]
-    options["lightmap_scales"] = material_scales(names, class_scales)
+    options["lightmap_scales"] = material_scales(names, class_scales, scenic_out_of_lightmap=scenic_out_of_lightmap)
 
 
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
@@ -349,7 +349,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     thumbnail_sha = hashlib.sha256(thumbnail).hexdigest()
     options = {"variant": "", **cfg["build"]}
     visual_bytes = sources["visual"].read_bytes()
-    _resolve_lightmap_scales(options, visual_bytes)
+    # Plan C4: read, never written or normalised, so a card without the key keeps its package_id.
+    scenic_out = options.get("scenic_out_of_lightmap") is True
+    _resolve_lightmap_scales(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
@@ -403,7 +405,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             "lightmap_estimate": estimate(
                 visual_bytes, texels_per_m=float(options["lightmap_texels_per_m"]),
                 max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
-                scales=options["lightmap_scales"],
+                scales=options["lightmap_scales"], scenic_out_of_lightmap=scenic_out,
             ),
             "tiers": _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"])),
             "view_draws": _view_draws(visual_bytes, detail_manifest, layout_doc, float(options["combine_cell_m"])),

@@ -65,6 +65,10 @@
           "description": "Android format of the albedo textures the adapter imports: astc_6x6 (default), or none for uncompressed RGBA32 as before",
           "enum": ["astc_6x6", "none"]
         },
+        "scenic_out_of_lightmap": {
+          "description": "Plan C4, ADR-017 amendment (proposed): the scenic_* shell walls take no lightmap texels (scaleInLightmap 0, receiveGI LightProbes, ambient light when combined) but stay ContributeGI and cast the baked shadows; the scenic roofs stay baked. Off when absent",
+          "type": "boolean"
+        },
         "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
         "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
         "fog_enabled": { "type": "boolean" },

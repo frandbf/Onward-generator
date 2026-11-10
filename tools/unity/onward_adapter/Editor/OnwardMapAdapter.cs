@@ -109,6 +109,10 @@ namespace OnwardGenerator
             // interiors and blank party walls (party_<wall>) below 1. A material not listed keeps 1.
             // Absent in older packages.
             public LightmapScale[] lightmap_scales = new LightmapScale[0];
+            // Plan C4, ADR-017 amendment (proposed): the scenic shell walls (M_scenic_*) take no lightmap
+            // texels and are lit by probes, or by the ambient light when combined, but stay ContributeGI and
+            // cast the baked shadows. Absent in older packages, which bake the ring as before.
+            public bool scenic_out_of_lightmap = false;
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -482,7 +486,7 @@ namespace OnwardGenerator
                 float[] c = g.pbrMetallicRoughness?.baseColorFactor;
                 string colour = c == null ? "none" : string.Join(",", c.Select(v => v.ToString("F4", CultureInfo.InvariantCulture)));
                 string key = string.Join("|", texture.ToString(CultureInfo.InvariantCulture), colour,
-                    materials[i].shader != null ? materials[i].shader.name : "", ContributesGi(materials[i]) ? "gi" : "nogi",
+                    materials[i].shader != null ? materials[i].shader.name : "", ContributesGi(materials[i], opt) ? "gi" : "nogi",
                     ScaleInLightmap(opt, docs, i).ToString("F4", CultureInfo.InvariantCulture));
                 if (first.TryGetValue(key, out int seen)) canonical[i] = seen;
                 else first[key] = i;
@@ -562,6 +566,7 @@ namespace OnwardGenerator
                     var combined = new Mesh { name = name, indexFormat = verts > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16 };
                     combined.CombineMeshes(g.Value.ToArray(), true, true, false);
                     combined.RecalculateBounds();
+                    // Renderers out of the lightmap (props, trees, the scenic walls under plan C4) are still unwrapped.
                     Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
@@ -585,8 +590,8 @@ namespace OnwardGenerator
                 renderer.shadowCastingMode = mat >= 0 && mat < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[mat])
                     ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
-                if (!ContributesGi(renderer.sharedMaterial))
+                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                if (!ContributesGi(renderer.sharedMaterial, opt))
                 {
                     renderer.receiveGI = ReceiveGI.LightProbes;
                     // Unity samples the probes once per renderer, at its bounds centre. For the trees and props
@@ -696,9 +701,9 @@ namespace OnwardGenerator
                         renderer.shadowCastingMode = visualMaterials[node.mesh].All(k => k >= 0 && k < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[k]))
                             ? ShadowCastingMode.Off : ShadowCastingMode.On;
                         GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                        renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m)) ? 0f
+                        renderer.scaleInLightmap = renderer.sharedMaterials.Any(m => !ContributesGi(m, opt)) ? 0f
                             : visualMaterials[node.mesh].Select(k => ScaleInLightmap(opt, visual.Doc.materials, k)).DefaultIfEmpty(1f).Max();
-                        if (renderer.sharedMaterials.Any(m => !ContributesGi(m))) renderer.receiveGI = ReceiveGI.LightProbes;
+                        if (renderer.sharedMaterials.Any(m => !ContributesGi(m, opt))) renderer.receiveGI = ReceiveGI.LightProbes;
                         visualObjects++;
                     }
                 }
@@ -2958,6 +2963,16 @@ namespace OnwardGenerator
                 || n.StartsWith("m_prop_") || n.Contains("abandoned_grass") || n.Contains("abandoned_vine")
                 || IsSeeThroughOrRim(n) || n.Contains("horizon_backdrop"));
         }
+
+        // Plan C4 (ADR-017 amendment, proposed): with scenic_out_of_lightmap the scenic shell walls
+        // (scenic_wall_*, scenic_trim_*) leave the lightmap as well. They keep ContributeGI through
+        // LightmapFlags, so they still cast the baked sun's shadows on the core. The scenic roofs share
+        // roof_flat_grey with the core roofs and stay baked.
+        private static bool ContributesGi(Material material, Options opt) =>
+            ContributesGi(material) && !(opt != null && opt.scenic_out_of_lightmap && IsScenic(material));
+
+        private static bool IsScenic(Material m) =>
+            m != null && m.name.ToLowerInvariant().StartsWith("m_scenic_", StringComparison.Ordinal);
 
         // The see-through glass is drawn unlit, so its texels lit nothing; the 3 cm rims of the shop and
         // street signs held 17 of 18 overlapping-UV charts. Neither needs the lightmap (Barcelona Sarria).

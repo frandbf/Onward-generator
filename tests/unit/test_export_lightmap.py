@@ -5,6 +5,8 @@ Local coordinates are metres from MURCIA_CENTER (x east, y north, z up).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from onward_generator.export.lightmap import (
@@ -17,6 +19,9 @@ from onward_generator.export.lightmap import (
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb
 from onward_generator.generation.mesh import Mesh, quad
+from onward_generator.tiers import SCENIC_PREFIX
+
+ADAPTER_CS = Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs"
 
 
 def _floor(x0: float, x1: float, y0: float, y1: float) -> Mesh:
@@ -174,3 +179,73 @@ def test_scenic_shells_bake_at_the_roof_scale() -> None:
     assert material_scales(["scenic_wall_warm", "plaster_cream"], DEFAULT_CLASS_SCALES) == [
         {"material": "scenic_wall_warm", "scale": 0.25},
     ]
+
+
+@pytest.mark.parametrize(("material", "option", "lit"), [
+    ("scenic_wall_light", False, True),
+    ("scenic_wall_light", True, False),
+    ("scenic_trim_brick", True, False),
+    ("Scenic_Wall_Ochre", True, False),
+    ("wall_scenic_x", True, True),
+    ("roof_flat_grey", True, True),
+    ("plaster_cream", True, True),
+    ("prop_x", True, False),
+    ("prop_x", False, False),
+    ("tree_canopy", True, False),
+    ("tree_canopy", False, False),
+])
+def test_contributes_gi_scenic_follows_the_option(material: str, option: bool, lit: bool) -> None:
+    """Plan C4: the scenic shell walls leave the lightmap only with the option; the scenic roofs stay baked."""
+    assert contributes_gi(material, scenic_out_of_lightmap=option) is lit
+    if not option:
+        assert contributes_gi(material) is lit
+
+
+def test_material_scales_drops_scenic_when_out_of_lightmap() -> None:
+    names = ["scenic_wall_light", "scenic_trim_x", "roof_flat_grey", "plaster_cream", "party_x"]
+    baked = [
+        {"material": "party_x", "scale": 0.5},
+        {"material": "roof_flat_grey", "scale": 0.25},
+        {"material": "scenic_trim_x", "scale": 0.25},
+        {"material": "scenic_wall_light", "scale": 0.25},
+    ]
+    assert material_scales(names, DEFAULT_CLASS_SCALES) == baked
+    assert material_scales(names, DEFAULT_CLASS_SCALES, scenic_out_of_lightmap=False) == baked
+    assert material_scales(names, DEFAULT_CLASS_SCALES, scenic_out_of_lightmap=True) == [
+        {"material": "party_x", "scale": 0.5},
+        {"material": "roof_flat_grey", "scale": 0.25},
+    ]
+
+
+def test_estimate_scenic_out_of_lightmap() -> None:
+    glb = _glb(("scenic_wall_light", _floor(0, 10, 0, 10)), ("plaster_cream", _floor(0, 2, 0, 5)))
+    scales = material_scales(["scenic_wall_light", "plaster_cream"], DEFAULT_CLASS_SCALES)
+    off = estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=100.0, scales=scales)
+    # Scenic: 100 m² at 10 × 0.25 texels/m = 625 texels; the facade: 10 m² at 10 texels/m = 1 000.
+    assert off["texels_by_class"] == {"facade": 1_000, "scenic": 625}
+    assert (off["renderers"], off["texels"]) == (2, 1_625)
+    assert estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=100.0, scales=scales,
+                    scenic_out_of_lightmap=False) == off
+    on = estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=100.0, scales=scales, scenic_out_of_lightmap=True)
+    assert on["texels_by_class"] == {"facade": 1_000}
+    assert (on["renderers"], on["texels"]) == (1, off["texels"] - off["texels_by_class"]["scenic"])
+    assert on["pages_at_least"] <= off["pages_at_least"]
+
+
+def test_estimate_of_a_scenic_only_scene_out_of_lightmap_is_empty() -> None:
+    glb = _glb(("scenic_wall_warm", _floor(0, 10, 0, 10)), ("scenic_trim_brick", _floor(0, 3, 0, 3)))
+    assert estimate(glb, texels_per_m=10.0, max_size=2048, cell_m=100.0, scenic_out_of_lightmap=True) == {
+        "texels_per_m": 10.0,
+        "max_size": 2048,
+        "renderers": 0,
+        "renderers_capped": 0,
+        "texels": 0,
+        "texels_by_class": {},
+        "pages_at_least": 0,
+    }
+
+
+def test_scenic_rule_matches_the_adapter_source() -> None:
+    """The adapter names a material M_<glTF name>; its scenic test and the Python prefix must not drift."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert f'StartsWith("m_{SCENIC_PREFIX}", StringComparison.Ordinal)' in source
