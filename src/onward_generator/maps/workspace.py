@@ -211,6 +211,33 @@ def store_gameplay_report(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def repetition_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"repetition": true`` (plan C1, ADR-009 amendment, off by default).
+
+    ``materials apply`` then measures roof and paving tiles and phases the ground UVs per
+    combine cell. A map without ``map.json`` or without the key stays off. A value that is not
+    a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("repetition", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "repetition" must be true or false, got {value!r}')
+    return value
+
+
+def store_repetition(directory: str | Path, enabled: bool) -> None:
+    """Record the repetition switch on an existing map. Does not rewrite scenes or the texture plan."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"repetition" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["repetition"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 DEFAULT_COMBINE_CELL_M = 100.0
 
 
@@ -342,9 +369,13 @@ def _square_ring(frame: LocalFrame, radius_m: float) -> list[list[float]]:
 
 
 def refresh_texture_plan(directory: str | Path, *, texture_provider: Provider | None = None) -> Path:
-    """Replace only ``config/texture_plan.json`` on a map that already exists."""
+    """Replace only ``config/texture_plan.json`` on a map that already exists.
+
+    With the ``"repetition"`` switch on, roofs and paving come from their calm pools too.
+    """
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
+    extended = repetition_enabled(root)
     center = document["center"]
     seed = int(document.get("seed") or 0)
     path = _write_texture_plan(
@@ -356,6 +387,7 @@ def refresh_texture_plan(directory: str | Path, *, texture_provider: Provider | 
         brief=str(document.get("brief") or "") or None,
         seed=seed,
         provider=texture_provider,
+        extended=extended,
     )
     return path
 
@@ -370,6 +402,7 @@ def _write_texture_plan(
     brief: str | None,
     seed: int,
     provider: Provider | None,
+    extended: bool = False,
 ) -> Path:
     document = select_texture_plan(
         name=name,
@@ -379,6 +412,7 @@ def _write_texture_plan(
         brief=brief,
         seed=seed,
         provider=provider,
+        extended=extended,
     )
     path = root / "config" / "texture_plan.json"
     atomic_write_json(path, document)

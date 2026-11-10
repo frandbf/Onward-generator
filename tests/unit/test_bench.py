@@ -507,3 +507,80 @@ def test_report_command_reads_the_gameplay_report_again(tmp_path: Path) -> None:
     assert bench.main(["report", str(run_dir)]) == 0
     again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
     assert again["maps"]["bench_murcia"]["gameplay"] == {**HEADLINE, "status": "ok"}
+
+
+# ---------------------------------------------------------------------------------------------------- repetition (plan C1)
+
+
+def _repetition(root: Path, report: Any) -> Path:
+    path = root / "data" / "processed" / "scene_materials" / "materials_report.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return root
+
+
+SLOTS = [
+    {"slot": "roofs", "status": "measured", "coarse_contrast": 0.0211, "limit": 0.019, "over_limit": True},
+    {"slot": "sidewalks", "status": "measured", "coarse_contrast": 0.006, "limit": 0.012, "over_limit": False},
+    {"slot": "doors", "status": "not_applicable", "coarse_contrast": None, "limit": None, "over_limit": False},
+    {"slot": "trunks", "status": "unmeasured", "coarse_contrast": None, "limit": None, "over_limit": False},
+]
+
+
+def test_repetition_metrics_summarise_the_measured_slots(tmp_path: Path) -> None:
+    assert bench.repetition_metrics(tmp_path) is None
+    root = _repetition(tmp_path, {"applied": []})
+    assert bench.repetition_metrics(root) is None
+    _repetition(tmp_path, {"repetition": {"slots": SLOTS}})
+    assert bench.repetition_metrics(root) == {"slots_measured": 2, "max_ratio": round(0.0211 / 0.019, 4), "over_limit_count": 1}
+    _repetition(tmp_path, {"repetition": {"slots": SLOTS[2:]}})
+    assert bench.repetition_metrics(root) == {"slots_measured": 0, "max_ratio": None, "over_limit_count": 0}
+
+
+@pytest.mark.parametrize(("block", "message"), [
+    ([], "repetition must be an object"),
+    ({"slots": "x"}, "slots must be a list of objects"),
+    ({"slots": [1]}, "slots must be a list of objects"),
+    ({"slots": [{"slot": "roofs", "status": "measured", "coarse_contrast": None, "limit": 0.019}]}, "slot 'roofs' needs a number"),
+    ({"slots": [{"slot": "roofs", "status": "measured", "coarse_contrast": 0.01, "limit": True}]}, "slot 'roofs' needs a number"),
+    ({"slots": [{"slot": "roofs", "status": "measured", "coarse_contrast": 0.01, "limit": 0}]}, "slot 'roofs' needs a number"),
+])
+def test_repetition_metrics_refuse_a_broken_block(tmp_path: Path, block: Any, message: str) -> None:
+    with pytest.raises(bench.BenchError, match=message):
+        bench.repetition_metrics(_repetition(tmp_path, {"repetition": block}))
+
+
+def test_map_entry_has_repetition_only_when_the_block_exists(tmp_path: Path) -> None:
+    package = _package(tmp_path / "pkg")
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "map.json").write_text("{}", encoding="utf-8")
+    ref = bench.REFERENCE_MAPS[0]
+    plain = bench.map_entry(ref, package, inputs)
+    root = _repetition(tmp_path / "run", {"applied": []})
+    assert bench.map_entry(ref, package, inputs, root) == plain
+    _repetition(root, {"repetition": {"slots": SLOTS}})
+    assert bench.map_entry(ref, package, inputs, root)["repetition"]["over_limit_count"] == 1
+
+
+def test_compare_shows_repetition_rows_only_when_a_report_has_them() -> None:
+    old, new = _report(), _report()
+    assert "repetition" not in bench.compare(old, new, old_name="r1", new_name="r2")
+    new["maps"]["bench_murcia"]["repetition"] = {"slots_measured": 2, "max_ratio": 1.1105, "over_limit_count": 1}
+    lines = bench.compare(old, new, old_name="r1", new_name="r2").splitlines()
+    assert "| bench_murcia | repetition slots measured | - | 2 | - |" in lines
+    assert "| bench_murcia | repetition max contrast/limit | - | 1.1 | - |" in lines
+    assert "| bench_murcia | repetition tiles over limit | - | 1 | - |" in lines
+    assert not any("repetition" in line for line in lines if "bench_madrid" in line)
+
+
+def test_report_command_reads_the_repetition_block_again(tmp_path: Path) -> None:
+    run_dir = tmp_path / "r1"
+    _package(run_dir / "bench_murcia" / "data" / "processed" / "export")
+    report = _report()
+    report["maps"] = {"bench_murcia": report["maps"]["bench_murcia"]}
+    (run_dir / bench.REPORT_FILE).write_text(json.dumps(report), encoding="utf-8")
+    _repetition(run_dir / "bench_murcia", {"repetition": {"slots": SLOTS}})
+    assert bench.main(["report", str(run_dir)]) == 0
+    again = json.loads((run_dir / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert again["maps"]["bench_murcia"]["repetition"]["slots_measured"] == 2

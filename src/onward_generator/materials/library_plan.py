@@ -162,6 +162,24 @@ CONTRAST_LIMITS: dict[str | None, float] = {
     "brick": WALL_CONTRAST_LIMIT,
     "rock": WALL_CONTRAST_LIMIT,
 }
+# Roofs and paving are measured only with the map.json "repetition" switch (plan C1, ADR-009
+# amendment "Repetition per cell"), so the default pools and picks stay as they were.
+# Paving carries joints and stone grain at a coarser scale than asphalt. Kept pavingstones151
+# 0.0073, pavingstones007 0.0126, pavingstones008 0.0152; dropped pavingstones050 0.0165 (a
+# fan of coloured setts whose arcs make a grid), pavingstones141 0.0188 (large mottled pebbles).
+PAVING_CONTRAST_LIMIT = 0.016
+# Roof tiles carry rows and weathering. Kept roofingtiles014a 0.0109, roofingtiles014b 0.0156,
+# roofingtiles011b 0.0168, roofingtiles011c 0.0183; dropped roofingtiles012c 0.0211 (dark
+# stains and moss patches that repeat).
+ROOF_CONTRAST_LIMIT = 0.019
+EXTENDED_CONTRAST_LIMITS: dict[str | None, float] = {
+    **CONTRAST_LIMITS,
+    "paving": PAVING_CONTRAST_LIMIT,
+    "roof": ROOF_CONTRAST_LIMIT,
+}
+# A door image is mapped 0-1 on each opening (UNIT_UV_MATERIALS), so it never tiles: the
+# coarse contrast says nothing about repetition there.
+NOT_APPLICABLE_FAMILIES = frozenset({"door"})
 _MEASURE_PX = 128
 
 
@@ -174,12 +192,17 @@ def coarse_contrast(path: Path) -> float:
     return float(np.asarray(blurred, dtype=np.float64).std() / 255.0)
 
 
-def is_calm(row: Mapping[str, Any], limit: float | None = None) -> bool:
+def contrast_limit(family: str | None, *, extended: bool = False) -> float | None:
+    """The family's coarse-contrast limit; ``extended`` adds roofs and paving (the "repetition" switch)."""
+    return (EXTENDED_CONTRAST_LIMITS if extended else CONTRAST_LIMITS).get(family)
+
+
+def is_calm(row: Mapping[str, Any], limit: float | None = None, *, extended: bool = False) -> bool:
     """A row outside the measured families is always calm. A missing file is left to texture_record to report.
 
-    ``limit`` replaces the family limit in ``CONTRAST_LIMITS``.
+    ``limit`` replaces the family limit. ``extended`` measures roofs and paving as well.
     """
-    family_limit = CONTRAST_LIMITS.get(texture_family(row))
+    family_limit = contrast_limit(texture_family(row), extended=extended)
     if family_limit is None:
         return True
     path = REPO_ROOT / str(row["path"])
@@ -188,11 +211,11 @@ def is_calm(row: Mapping[str, Any], limit: float | None = None) -> bool:
     return coarse_contrast(path) <= (family_limit if limit is None else limit)
 
 
-def _pools(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool) -> dict[str, list[dict[str, Any]]]:
     pools: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         family = texture_family(row)
-        if family is None or not is_calm(row):
+        if family is None or not is_calm(row, extended=extended):
             continue
         pools.setdefault(family, []).append(dict(row))
     for family in pools:
@@ -200,9 +223,9 @@ def _pools(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]
     return pools
 
 
-def unfilled_slots(rows: Sequence[Mapping[str, Any]]) -> list[str]:
+def unfilled_slots(rows: Sequence[Mapping[str, Any]], *, extended: bool = False) -> list[str]:
     """Slots whose texture family has no row in the library, e.g. trunks without bark."""
-    pools = _pools(rows)
+    pools = _pools(rows, extended=extended)
     return [slot for slot, family in SLOT_FAMILY.items() if not pools.get(family)]
 
 
@@ -217,8 +240,8 @@ def _entry(slot: str, row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def deterministic_choices(rows: Sequence[Mapping[str, Any]], seed: int) -> dict[str, str]:
-    pools = _pools(rows)
+def deterministic_choices(rows: Sequence[Mapping[str, Any]], seed: int, *, extended: bool = False) -> dict[str, str]:
+    pools = _pools(rows, extended=extended)
     used: set[str] = set()
     chosen: dict[str, str] = {}
     for slot, family in SLOT_FAMILY.items():
@@ -231,13 +254,14 @@ def deterministic_choices(rows: Sequence[Mapping[str, Any]], seed: int) -> dict[
     return chosen
 
 
-def _document(name: str, choices: Mapping[str, str], rows: Sequence[Mapping[str, Any]], *, selector: str, brief: str | None) -> dict[str, Any]:
+def _document(name: str, choices: Mapping[str, str], rows: Sequence[Mapping[str, Any]], *, selector: str, brief: str | None,
+              extended: bool) -> dict[str, Any]:
     by_id = {str(row["id"]): row for row in rows}
     entries = [_entry(slot, by_id[library_id]) for slot, library_id in choices.items()]
     entries.sort(key=lambda row: row["id"])
     atmosphere = "abandoned" if brief and "abandon" in brief.lower() else "inhabited"
     description = f"Textures for {name}, chosen from the imported library ({selector})."
-    gaps = unfilled_slots(rows)
+    gaps = unfilled_slots(rows, extended=extended)
     if gaps:
         families = ", ".join(f"{slot} ({SLOT_FAMILY[slot]})" for slot in gaps)
         description += f" The library has no texture for {families}; those slots keep the procedural tile."
@@ -255,7 +279,7 @@ def _document(name: str, choices: Mapping[str, str], rows: Sequence[Mapping[str,
     }
 
 
-def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]], *, extended: bool = False) -> dict[str, str]:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -263,7 +287,7 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, st
     raw = payload.get("choices") if isinstance(payload, dict) else None
     if not isinstance(raw, list):
         raise PlanError("texture reply needs a choices list")
-    pools = _pools(rows)
+    pools = _pools(rows, extended=extended)
     by_id = {str(row["id"]): texture_family(row) for row in rows}
     chosen: dict[str, str] = {}
     for item in raw:
@@ -286,8 +310,9 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, st
     return chosen
 
 
-def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], seed: int, complaint: str | None) -> dict[str, str]:
-    pools = _pools(rows)
+def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], complaint: str | None,
+         extended: bool) -> dict[str, str]:
+    pools = _pools(rows, extended=extended)
     listed = {
         family: [row["id"] for row in pool]
         for family, pool in pools.items()
@@ -305,7 +330,7 @@ def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitu
         "Reply with JSON only."
     )
     result = provider.complete(system, json.dumps(instruction, ensure_ascii=False), _CHOICE_SCHEMA)
-    return _parse_choices(result.text, rows)
+    return _parse_choices(result.text, rows, extended=extended)
 
 
 def select_texture_plan(
@@ -318,31 +343,35 @@ def select_texture_plan(
     seed: int,
     provider: Provider | None = None,
     library: Sequence[Mapping[str, Any]] | None = None,
+    extended: bool = False,
 ) -> dict[str, Any]:
+    """``extended`` chooses roofs and paving from their calm pools too (the map.json "repetition" switch)."""
     rows = list(library) if library is not None else library_rows()
     if provider is None:
-        choices = deterministic_choices(rows, seed)
-        return _document(name, choices, rows, selector="library", brief=brief)
+        choices = deterministic_choices(rows, seed, extended=extended)
+        return _document(name, choices, rows, selector="library", brief=brief, extended=extended)
     complaint: str | None = None
     for _attempt in range(2):
         try:
             choices = _ask(
                 provider, name=name, map_id=map_id, latitude=latitude, longitude=longitude,
-                brief=brief, rows=rows, seed=seed, complaint=complaint,
+                brief=brief, rows=rows, complaint=complaint, extended=extended,
             )
-            return _document(name, choices, rows, selector="ollama", brief=brief)
+            return _document(name, choices, rows, selector="ollama", brief=brief, extended=extended)
         except ProviderError as exc:
             complaint = str(exc)
             break
         except PlanError as exc:
             complaint = str(exc)
-    choices = deterministic_choices(rows, seed)
-    document = _document(name, choices, rows, selector="library", brief=brief)
+    choices = deterministic_choices(rows, seed, extended=extended)
+    document = _document(name, choices, rows, selector="library", brief=brief, extended=extended)
     document["description"] += f" The model reply was rejected: {complaint}"
     return document
 
 
-def assert_library_entries(document: Mapping[str, Any], rows: Sequence[Mapping[str, Any]] | None = None) -> None:
+def assert_library_entries(
+    document: Mapping[str, Any], rows: Sequence[Mapping[str, Any]] | None = None, *, extended: bool = False,
+) -> None:
     catalog = list(rows) if rows is not None else library_rows()
     by_id = {str(row["id"]): row for row in catalog}
     seen: set[str] = set()
@@ -354,7 +383,7 @@ def assert_library_entries(document: Mapping[str, Any], rows: Sequence[Mapping[s
         row = by_id.get(library_id)
         if row is None or texture_family(row) != SLOT_FAMILY.get(slot):
             raise PlanError(f"{slot} cannot use {library_id}")
-        if not is_calm(row):
+        if not is_calm(row, extended=extended):
             raise PlanError(
                 f"{slot} cannot use {library_id}: its tile repeats visibly. "
                 "Run `map create --name <map> --textures` to choose this map's textures again"
@@ -362,3 +391,39 @@ def assert_library_entries(document: Mapping[str, Any], rows: Sequence[Mapping[s
         if library_id in seen:
             raise PlanError(f"{library_id} is used more than once")
         seen.add(library_id)
+
+
+def repetition_rows(applied: Sequence[Mapping[str, Any]], paths: Mapping[str, Path]) -> list[dict[str, Any]]:
+    """One row per applied library slot: its coarse contrast against the extended family limit.
+
+    ``paths`` maps an applied asset id to the image file that was applied. A door
+    is ``not_applicable`` (mapped 0-1 per opening, never measured); a family with no limit,
+    such as bark, is ``unmeasured``.
+    """
+    rows: list[dict[str, Any]] = []
+    for row in applied:
+        asset_id = str(row["asset_id"])
+        family = SLOT_FAMILY.get(str(row["id"]))
+        limit = contrast_limit(family, extended=True)
+        contrast: float | None = None
+        over = False
+        if family in NOT_APPLICABLE_FAMILIES:
+            status, limit = "not_applicable", None
+        elif limit is None:
+            status = "unmeasured"
+        else:
+            status = "measured"
+            measured = coarse_contrast(paths[asset_id])
+            # The verdict is is_calm's, on the unrounded value; the report shows 4 places.
+            contrast, over = round(measured, 4), measured > limit
+        rows.append({
+            "slot": row["id"],
+            "color_id": row["color_id"],
+            "asset_id": asset_id,
+            "family": family,
+            "coarse_contrast": contrast,
+            "limit": limit,
+            "over_limit": over,
+            "status": status,
+        })
+    return rows

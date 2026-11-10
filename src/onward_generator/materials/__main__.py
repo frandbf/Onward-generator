@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -13,6 +14,17 @@ from onward_generator.materials.plan import PlanError
 from onward_generator.materials.polyhaven import DEFAULT_CACHE, DownloadError
 from onward_generator.materials.trim_style import AUTO, FACADE_MODES
 from onward_generator.next_step import after_materials, emit
+
+
+def cell_metres(text: str) -> float:
+    """``--cell-m``: a finite number of metres above 0."""
+    try:
+        value = float(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of metres") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError(f"the combine cell must be a finite number of metres above 0, got {text!r}")
+    return value
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--facade-style", default=AUTO,
         help="a style of config/facade_styles.json, or auto (from the map centre)",  # pragma: no mutate: help text only
     )
+    apply_p.add_argument(
+        "--repetition", action="store_true",
+        help="measure roof and paving tiles and phase the ground UVs per combine cell (plan C1)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
+        "--cell-m", type=cell_metres, default=100.0,
+        help="combine cell in metres for --repetition (ADR-005)",  # pragma: no mutate: help text only
+    )
     return parser
 
 
@@ -57,6 +77,8 @@ def _run_apply(args: argparse.Namespace) -> int:
         tile_cache=not args.no_tile_cache,
         facades=args.facades,
         facade_style=args.facade_style,
+        repetition=args.repetition,
+        cell_m=args.cell_m,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -72,6 +94,10 @@ def _run_apply(args: argparse.Namespace) -> int:
     if facades:
         detail = f"materials={','.join(facades['materials'])}" if facades["mode"] == "trim" else f"reason={facades['reason']}"
         print(f"facades: {facades['mode']} style={facades['style']} ({facades['style_origin']}) {detail}")
+    repetition = report.get("repetition")
+    if repetition:
+        over = ", ".join(repetition["over_limit"]) or "none"
+        print(f"repetition: cell {repetition['cell_m']:g} m, slots={len(repetition['slots'])} over limit: {over}")
     print(f"wrote {Path(args.out).expanduser()}")
     emit(after_materials(Path(args.out)))
     return 0

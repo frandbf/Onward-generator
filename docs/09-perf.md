@@ -182,6 +182,30 @@ Pending (not done; the option stays a report until they pass):
 
 Then ADR-032 goes from proposed to accepted or is corrected. Making a metric a blocking check, or acting on it (C6, C7), comes after that.
 
+## Repetition per cell
+
+Plan C1, the ADR-009 amendment *Repetition per cell* (proposed), off by default (`map.json` `"repetition": true`, `materials apply --repetition --cell-m M`, `bench.py run --repetition`; rules in [08-dress.md](08-dress.md#roofs-and-paving-the-repetition-switch-plan-c1)). Docker on an Apple M4 Pro, frozen bench inputs, `--offline --gameplay-report`:
+
+- **Off.** Run `c1_off` against the baseline `20261107T233423Z`: `bench.py check` finds no difference outside timings. Every `scene_materials` and export GLB is the same bytes once the run folder name is normalised in the GLB JSON; the JSON files differ only in run folder paths, `created_at` and the hashes of files that hold those paths, as between two runs at HEAD.
+- **On.** Runs `c1_on` and `c1_on2` are the same apart from timings (`bench.py check`), and every GLB is byte-identical between them. Against `c1_off`, triangles (total, core, scenic), draws (total, core, scenic), view draws (median, p90, max) and lightmap pages are identical on all four maps. In `scene_materials` and `scene_playable` the vertices, triangles, materials and image counts are the same; only `TEXCOORD_0` of `carriageway`, `sidewalk`, `pedestrian` and `cobblestone_paving` changes. The roof and paving images can change, because the run copy's plan is chosen again from the extended pools.
+
+| Map | Slots measured | Max contrast / limit | Over limit |
+| --- | --- | --- | --- |
+| bench_murcia r150 | 8 | 0.875 | 0 |
+| bench_madrid r300 | 9 | 0.875 | 0 |
+| bench_paris r50 | 8 | 0.7875 | 0 |
+| bench_krakow r150 | 13 | 0.875 | 0 |
+
+Ground islands that take a phase (scene_materials, baseline run): carriageway 1 / 13 / 4 / 2, sidewalk 71 / 137 / 23 / 5, pedestrian 35 / 43 / 23 / 46, cobble 20 / 49 / 11 / 10 for Murcia / Madrid / Paris / Krakow. The Murcia carriageway is one island, so it takes a single phase. Generator figures, not device measurements.
+
+Pending (not done; the switch stays off until they pass):
+
+- [ ] Headset, on a map with the switch on: walk a long straight street and a plaza. Sidewalk, carriageway and cobble show no visible grid at the 2 m and 10 m repeats, and no visible seam or jump at the 100 m combine-cell boundaries.
+- [ ] Headset: roofs seen from the elevated spawns and ladders show no repeated blotch with the extended roof and paving pools (`acg_roofingtiles011c`, 0.0183, is the closest to its limit).
+- [ ] Headset, OVR Metrics in fixed views A and B: draws and frame rate unchanged against the switch off.
+
+Then the ADR-009 amendment goes from proposed to accepted, or the limits are corrected.
+
 ## Hunt with bots on a small map
 
 Paris, Rue Mouffetard (48.84045, 2.34981), r50, no core, 40 texels per metre, `final` bake: 24 lightmap pages, `view_draws` median 76 and p90 177 (the export estimate, no culling). Quest 3, 5 November 2026, default listing mode, one player in a Hunt match with bots. OVR Metrics CSV, `logcat`, `ovrgpuprofiler -r="2,4,26,33"` and `dumpsys meminfo`, read with `perf device`; the window is the 440 samples in the map, from 47 s after the capture started to the end.

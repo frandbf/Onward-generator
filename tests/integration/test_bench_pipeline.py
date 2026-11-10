@@ -93,6 +93,8 @@ class Stub:
         else:
             out.mkdir(parents=True, exist_ok=True)
             (out / "stub.json").write_text("{}")
+            if head == ("materials", "apply") and "--repetition" in argv:
+                (out / "materials_report.json").write_text(json.dumps({"repetition": REPETITION}), encoding="utf-8")
         return 0
 
 
@@ -315,3 +317,48 @@ def test_gameplay_report_run_adds_the_headline_and_an_off_run_does_not(workdir: 
     third = Stub()
     assert _run(root, "r3", third, "--offline") == 0
     assert bench.main(["check", str(root / "runs" / "r1"), str(root / "runs" / "r3")]) == 0
+
+
+REPETITION = {"enabled": True, "cell_m": 100.0, "over_limit": [], "slots": [
+    {"slot": "roofs", "status": "measured", "coarse_contrast": 0.0168, "limit": 0.019, "over_limit": False},
+    {"slot": "doors", "status": "not_applicable", "coarse_contrast": None, "limit": None, "over_limit": False},
+]}
+
+
+def test_repetition_run_switches_the_run_copy_and_adds_the_summary(workdir: Path) -> None:
+    from onward_generator.materials.library_plan import deterministic_choices, library_rows
+
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    materials = next(argv for argv in off.calls if argv[:2] == ["materials", "apply"])
+    assert "--repetition" not in materials
+    first = json.loads((root / "runs" / "r1" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert "repetition" not in first["maps"]["bench_murcia"]
+    diff = (root / "runs" / "r1" / bench.DIFF_FILE).read_text(encoding="utf-8") if (root / "runs" / "r1" / bench.DIFF_FILE).is_file() else ""
+    assert "repetition" not in diff
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+    plan_before = (inputs / "config" / "texture_plan.json").read_text(encoding="utf-8")
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--repetition") == 0
+    materials = next(argv for argv in on.calls if argv[:2] == ["materials", "apply"])
+    assert materials[materials.index("--repetition"):materials.index("--repetition") + 3] == ["--repetition", "--cell-m", "100.0"]
+    second = json.loads((root / "runs" / "r2" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert second["maps"]["bench_murcia"]["repetition"] == {"slots_measured": 1, "max_ratio": round(0.0168 / 0.019, 4),
+                                                            "over_limit_count": 0}
+    copy = root / "runs" / "r2" / "bench_murcia"
+    assert json.loads((copy / "map.json").read_text(encoding="utf-8"))["repetition"] is True
+    seed = int(json.loads((copy / "map.json").read_text(encoding="utf-8")).get("seed") or 0)
+    plan = json.loads((copy / "config" / "texture_plan.json").read_text(encoding="utf-8"))
+    assert {row["id"]: row["library_id"] for row in plan["entries"]} == deterministic_choices(library_rows(), seed, extended=True)
+    # The switch and the new plan live in the run copy only.
+    assert bench.inputs_sha256(inputs) == digest
+    assert "repetition" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert (inputs / "config" / "texture_plan.json").read_text(encoding="utf-8") == plan_before
+    assert bench.strip_timings(first)["maps"]["bench_murcia"] == {
+        key: value for key, value in bench.strip_timings(second)["maps"]["bench_murcia"].items() if key != "repetition"
+    }
+    diff = (root / "runs" / "r2" / bench.DIFF_FILE).read_text(encoding="utf-8")
+    assert "| bench_murcia | repetition tiles over limit | - | 0 | - |" in diff

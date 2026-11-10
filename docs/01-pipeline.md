@@ -274,6 +274,8 @@ Cobble is only `surface/pedestrian_cobble`. Historic plaster uses the photograph
 
 With the flag off, `next:` from `materials apply` is `signs place`. With the flag on, `next:` is `panoramax apply`.
 
+**Repetition (opt-in, plan C1).** `map.json` `"repetition": true` makes `run` and `next:` add `--repetition --cell-m <build.combine_cell_m>` (100 m when the export card leaves it at 0). Absent or `false`, the argv and every output are unchanged byte for byte; any other value stops with `map.json "repetition" must be true or false`. With the flag, `materials apply` refuses a library plan that binds a roof or paving image over its coarse-contrast limit before writing anything (`map create --name <map> --textures` chooses again, from the extended pools when the switch is on), writes a `repetition` block in `materials_report.json`, and shifts the ground UVs per combine cell. `--cell-m` must be a finite number above 0. The rules are in [08-dress.md](08-dress.md#roofs-and-paving-the-repetition-switch-plan-c1); the ADR-009 amendment *Repetition per cell* is proposed until the headset session.
+
 ## 8a. Street photos
 
 `onward-generator panoramax apply` is under development. It runs only when `map.json` has `"panoramax": true`. With the flag off the command prints `panoramax off`, writes nothing, and exits 0.
@@ -529,7 +531,9 @@ The first run downloads OSM and the source plugins' data, then copies what it do
 - the generator version;
 - `visual_triangles` and `draws`, total and per tier, from `onward_export.json` `tiers`. A map with no core (`tiers: null`, such as Paris r50) is counted from the package's `scene_visual.glb` with the whole map as core, and `tiers_source` says so;
 - `view_draws` median, p90 and max;
-- `lightmap.pages_at_least` and `texels`.
+- `lightmap.pages_at_least` and `texels`;
+- with `run --gameplay-report`, `gameplay`: the headline of each map's `gameplay_report.json`;
+- with `run --repetition` (plan C1), `repetition`: `slots_measured`, `max_ratio` (largest coarse contrast over its limit) and `over_limit_count` from the `repetition` block of `scene_materials/materials_report.json`. The flag sets `"repetition": true` in the run copy's `map.json` and rewrites the run copy's texture plan from the extended pools; the frozen inputs do not change. A report without the flag has no `repetition` key, and `bench_diff.md` shows the rows only when a report has them.
 
 `created_at`, `package_id` and every path are left out. Everything that cannot be reproduced sits under `timings`:
 

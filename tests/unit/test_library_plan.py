@@ -257,3 +257,303 @@ def test_every_seed_fills_the_wall_slots_from_the_calm_pools(seed: int) -> None:
     assert plaster == CALM_PLASTER
     assert choices["brick"] in CALM_BRICK
     assert choices["stone_monuments"] in CALM_ROCK
+
+
+# Plan C1: roofs and paving are measured only with the map.json "repetition" switch (extended=True).
+CALM_PAVING = {"acg_pavingstones151", "acg_pavingstones007", "acg_pavingstones008"}
+BUSY_PAVING = {"acg_pavingstones050", "acg_pavingstones141"}
+CALM_ROOF = {"acg_roofingtiles014a", "acg_roofingtiles014b", "acg_roofingtiles011b", "acg_roofingtiles011c"}
+BUSY_ROOF = {"acg_roofingtiles012c"}
+# deterministic_choices(library_rows(), seed) before plan C1, for seeds 0..20 and 48152 (roofs, streets_plazas).
+DEFAULT_ROOF_PAVING = {
+    0: ("acg_roofingtiles012c", "acg_pavingstones050"), 1: ("acg_roofingtiles011b", "acg_pavingstones007"),
+    2: ("acg_roofingtiles011b", "acg_pavingstones151"), 3: ("acg_roofingtiles011c", "acg_pavingstones007"),
+    4: ("acg_roofingtiles014a", "acg_pavingstones007"), 5: ("acg_roofingtiles011b", "acg_pavingstones151"),
+    6: ("acg_roofingtiles011b", "acg_pavingstones141"), 7: ("acg_roofingtiles014b", "acg_pavingstones008"),
+    8: ("acg_roofingtiles011c", "acg_pavingstones050"), 9: ("acg_roofingtiles011c", "acg_pavingstones007"),
+    10: ("acg_roofingtiles011c", "acg_pavingstones050"), 11: ("acg_roofingtiles012c", "acg_pavingstones050"),
+    12: ("acg_roofingtiles014a", "acg_pavingstones008"), 13: ("acg_roofingtiles012c", "acg_pavingstones151"),
+    14: ("acg_roofingtiles014a", "acg_pavingstones050"), 15: ("acg_roofingtiles014b", "acg_pavingstones008"),
+    16: ("acg_roofingtiles011b", "acg_pavingstones007"), 17: ("acg_roofingtiles011b", "acg_pavingstones050"),
+    18: ("acg_roofingtiles011c", "acg_pavingstones008"), 19: ("acg_roofingtiles014b", "acg_pavingstones050"),
+    20: ("acg_roofingtiles012c", "acg_pavingstones008"), 48152: ("acg_roofingtiles011b", "acg_pavingstones141"),
+}
+# The sha256 of every default pick for those seeds, taken before plan C1.
+DEFAULT_PICKS_SHA256 = "e9c372941b1fa06ecb57cc6db4d4e4e4b44aaef8cbb3ab5fcdb2fa966a093d1c"
+
+
+def test_roof_and_paving_contrast_matches_the_measured_library() -> None:
+    measured = {
+        "acg_pavingstones007": 0.0126, "acg_pavingstones008": 0.0152, "acg_pavingstones050": 0.0165,
+        "acg_pavingstones141": 0.0188, "acg_pavingstones151": 0.0073,
+        "acg_roofingtiles011b": 0.0168, "acg_roofingtiles011c": 0.0183, "acg_roofingtiles012c": 0.0211,
+        "acg_roofingtiles014a": 0.0109, "acg_roofingtiles014b": 0.0156,
+    }
+    for library_id, expected in measured.items():
+        path = REPO_ROOT / "assets" / "textures" / "ambientcg" / f"{library_id}.jpg"
+        assert coarse_contrast(path) == pytest.approx(expected, abs=2e-4), library_id
+
+
+def test_the_roof_and_paving_limits_and_the_extended_table() -> None:
+    from onward_generator.materials.library_plan import (
+        CONTRAST_LIMITS,
+        EXTENDED_CONTRAST_LIMITS,
+        NOT_APPLICABLE_FAMILIES,
+        PAVING_CONTRAST_LIMIT,
+        ROOF_CONTRAST_LIMIT,
+        contrast_limit,
+    )
+
+    assert PAVING_CONTRAST_LIMIT == 0.016
+    assert ROOF_CONTRAST_LIMIT == 0.019
+    assert set(CONTRAST_LIMITS) == {"asphalt", "concrete", "plaster", "brick", "rock"}
+    assert EXTENDED_CONTRAST_LIMITS == {**CONTRAST_LIMITS, "paving": 0.016, "roof": 0.019}
+    assert NOT_APPLICABLE_FAMILIES == frozenset({"door"})
+    assert contrast_limit("roof") is None
+    assert contrast_limit("roof", extended=True) == 0.019
+    assert contrast_limit("paving", extended=True) == 0.016
+    assert contrast_limit("asphalt") == contrast_limit("asphalt", extended=True) == COARSE_CONTRAST_LIMIT
+    assert contrast_limit("door", extended=True) is None
+    assert contrast_limit("bark", extended=True) is None
+
+
+def test_extended_pools_keep_only_calm_roofs_and_paving() -> None:
+    rows = {str(row["id"]): row for row in library_rows()}
+    for family, calm, busy in (("paving", CALM_PAVING, BUSY_PAVING), ("roof", CALM_ROOF, BUSY_ROOF)):
+        members = {library_id for library_id, row in rows.items() if texture_family(row) == family}
+        assert members == calm | busy, family
+        assert {library_id for library_id in members if is_calm(rows[library_id], extended=True)} == calm, family
+        assert {library_id for library_id in members if is_calm(rows[library_id])} == members, family
+
+
+def test_the_extended_limit_is_inclusive() -> None:
+    rows = {str(row["id"]): row for row in library_rows()}
+    for library_id in ("acg_roofingtiles012c", "acg_pavingstones141"):
+        row = rows[library_id]
+        value = coarse_contrast(REPO_ROOT / str(row["path"]))
+        assert is_calm(row, limit=value, extended=True)
+        assert not is_calm(row, limit=value - 1e-6, extended=True)
+
+
+def test_the_default_picks_are_the_ones_before_plan_c1() -> None:
+    import hashlib
+
+    rows = library_rows()
+    seeds = [*range(21), 48152]
+    picks = {seed: deterministic_choices(rows, seed) for seed in seeds}
+    assert {seed: (picks[seed]["roofs"], picks[seed]["streets_plazas"]) for seed in seeds} == DEFAULT_ROOF_PAVING
+    digest = hashlib.sha256(json.dumps({str(k): v for k, v in picks.items()}, sort_keys=True).encode()).hexdigest()
+    assert digest == DEFAULT_PICKS_SHA256
+
+
+@pytest.mark.parametrize("seed", [*range(21), 48152])
+def test_extended_picks_change_only_roofs_and_paving_and_stay_calm(seed: int) -> None:
+    rows = library_rows()
+    default, extended = deterministic_choices(rows, seed), deterministic_choices(rows, seed, extended=True)
+    assert {slot for slot in default if default[slot] != extended[slot]} <= {"roofs", "streets_plazas"}
+    assert set(default) == set(extended)
+    assert extended["roofs"] in CALM_ROOF
+    assert extended["streets_plazas"] in CALM_PAVING
+
+
+def test_extended_pools_are_never_empty() -> None:
+    rows = library_rows()
+    assert unfilled_slots(rows, extended=True) == unfilled_slots(rows)
+
+
+@pytest.mark.parametrize(("slot", "library_id"), [("roofs", "acg_roofingtiles012c"), ("streets_plazas", "acg_pavingstones141"),
+                                                  ("streets_plazas", "acg_pavingstones050")])
+def test_an_over_limit_roof_or_paving_is_refused_only_when_extended(slot: str, library_id: str) -> None:
+    from onward_generator.materials.library_plan import assert_library_entries
+
+    document = {"entries": [{"id": slot, "library_id": library_id}]}
+    assert_library_entries(document)
+    with pytest.raises(PlanError) as caught:
+        assert_library_entries(document, extended=True)
+    assert str(caught.value) == (
+        f"{slot} cannot use {library_id}: its tile repeats visibly. "
+        "Run `map create --name <map> --textures` to choose this map's textures again"
+    )
+
+
+def _reply_with(rows: list[dict], slot: str, library_id: str) -> str:
+    choices = deterministic_choices(rows, 0, extended=True)
+    choices[slot] = library_id
+    return json.dumps({"choices": [{"slot": key, "library_id": value} for key, value in choices.items()]})
+
+
+@pytest.mark.parametrize(("slot", "library_id"), [("roofs", "acg_roofingtiles012c"), ("streets_plazas", "acg_pavingstones141")])
+def test_a_model_reply_with_a_busy_roof_or_paving_is_rejected_only_when_extended(slot: str, library_id: str) -> None:
+    from onward_generator.materials.library_plan import _parse_choices
+
+    rows = library_rows()
+    reply = _reply_with(rows, slot, library_id)
+    assert _parse_choices(reply, rows)[slot] == library_id
+    family = "roof" if slot == "roofs" else "paving"
+    with pytest.raises(PlanError, match=rf"^{library_id} is not in the {family} pool$"):
+        _parse_choices(reply, rows, extended=True)
+    common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
+              "brief": None, "seed": 5}
+    accepted = select_texture_plan(**common, provider=StaticProvider("replay", reply, "test"))
+    assert accepted["selector"] == "ollama"
+    assert next(row for row in accepted["entries"] if row["id"] == slot)["library_id"] == library_id
+    rejected = select_texture_plan(**common, provider=StaticProvider("replay", reply, "test"), extended=True)
+    assert rejected["selector"] == "library"
+    assert f"{library_id} is not in the {family} pool" in rejected["description"]
+    picks = deterministic_choices(rows, 5, extended=True)
+    assert {row["id"]: row["library_id"] for row in rejected["entries"]} == picks
+
+
+def test_an_extended_model_reply_with_calm_tiles_is_accepted() -> None:
+    rows = library_rows()
+    choices = deterministic_choices(rows, 2, extended=True)
+    reply = json.dumps({"choices": [{"slot": key, "library_id": value} for key, value in choices.items()]})
+    plan = select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                               brief=None, seed=2, provider=StaticProvider("replay", reply, "test"), extended=True)
+    assert plan["selector"] == "ollama"
+
+
+def test_the_extended_plan_description_names_only_the_extended_gaps() -> None:
+    rows = [_fixture_row("fx_roof_busy", "RoofingTiles012C")]
+    rows[0]["path"] = "assets/textures/ambientcg/acg_roofingtiles012c.jpg"
+    plan = select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                               brief=None, seed=2, library=rows, extended=True)
+    assert "roofs (roof)" in plan["description"]
+    plain = select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                                brief=None, seed=2, library=rows)
+    assert "roofs (roof)" not in plain["description"]
+
+
+def _applied(slot: str, asset_id: str, color_id: str = "c") -> dict[str, str]:
+    return {"id": slot, "asset_id": asset_id, "color_id": color_id}
+
+
+def test_repetition_rows_measure_roofs_and_paving_and_skip_doors(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import library_plan
+
+    rows = {str(row["id"]): row for row in library_rows()}
+    paths = {library_id: REPO_ROOT / str(row["path"]) for library_id, row in rows.items()}
+    measured: list[Path] = []
+    real = library_plan.coarse_contrast
+
+    def spy(path: Path) -> float:
+        measured.append(path)
+        return real(path)
+
+    monkeypatch.setattr(library_plan, "coarse_contrast", spy)
+    out = library_plan.repetition_rows([
+        _applied("roofs", "acg_roofingtiles012c", "roof_tile"),
+        _applied("streets_plazas", "acg_pavingstones151", "cobblestone_paving"),
+        _applied("doors", "kenney_fantasy_door_wood", "door_wood"),
+        _applied("trunks", "kenney_fantasy_door_wood", "tree_trunk"),
+        _applied("plain_facades", "ph_plastered_wall", "plaster_white"),
+    ], paths)
+    assert out[0] == {"slot": "roofs", "color_id": "roof_tile", "asset_id": "acg_roofingtiles012c", "family": "roof",
+                      "coarse_contrast": round(real(paths["acg_roofingtiles012c"]), 4), "limit": 0.019,
+                      "over_limit": True, "status": "measured"}
+    assert out[0]["coarse_contrast"] == pytest.approx(0.0211, abs=2e-4)
+    assert out[1]["over_limit"] is False and out[1]["limit"] == 0.016 and out[1]["status"] == "measured"
+    assert out[2] == {"slot": "doors", "color_id": "door_wood", "asset_id": "kenney_fantasy_door_wood", "family": "door",
+                      "coarse_contrast": None, "limit": None, "over_limit": False, "status": "not_applicable"}
+    assert out[3]["status"] == "unmeasured" and out[3]["limit"] is None and out[3]["coarse_contrast"] is None
+    assert out[3]["family"] == "bark" and out[3]["over_limit"] is False
+    assert out[4]["status"] == "measured" and out[4]["limit"] == 0.025
+    assert paths["kenney_fantasy_door_wood"] not in measured
+    assert measured == [paths["acg_roofingtiles012c"], paths["acg_pavingstones151"], paths["ph_plastered_wall"]]
+
+
+def test_repetition_rows_flag_a_busy_tile_and_round_to_four_places(tmp_path: Path) -> None:
+    from onward_generator.materials.library_plan import repetition_rows
+
+    rng = np.random.default_rng(7)
+    grain = 120 + rng.integers(-20, 21, size=(256, 256))
+    cover = grain.copy()
+    cover[112:144, 112:144] = 200
+    paths = {"busy": _grey(tmp_path, "cover", cover), "calm": _grey(tmp_path, "grain", grain)}
+    busy, calm = repetition_rows([_applied("streets_plazas", "busy"), _applied("streets_plazas", "calm")], paths)
+    assert busy["over_limit"] is True and calm["over_limit"] is False
+    assert busy["coarse_contrast"] == round(coarse_contrast(paths["busy"]), 4)
+    assert calm["coarse_contrast"] == round(coarse_contrast(paths["calm"]), 4)
+
+
+def test_the_over_limit_verdict_is_on_the_unrounded_value(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import library_plan
+
+    path = tmp_path / "x.png"
+    monkeypatch.setattr(library_plan, "coarse_contrast", lambda _path: 0.01600004)
+    (row,) = library_plan.repetition_rows([_applied("streets_plazas", "x")], {"x": path})
+    assert row["coarse_contrast"] == 0.016
+    assert row["over_limit"] is True
+    monkeypatch.setattr(library_plan, "coarse_contrast", lambda _path: 0.016)
+    (row,) = library_plan.repetition_rows([_applied("streets_plazas", "x")], {"x": path})
+    assert row["over_limit"] is False
+
+
+class _Recording:
+    """A provider that replays ``replies`` in turn and keeps every instruction it was given."""
+
+    def __init__(self, *replies: str) -> None:
+        self.replies = list(replies)
+        self.instructions: list[dict] = []
+
+    def complete(self, system: str, instruction: str, schema: dict) -> object:
+        from onward_generator.ai.providers import ProviderResult
+
+        self.instructions.append(json.loads(instruction))
+        return ProviderResult(self.replies.pop(0), {"provider": "test", "source": "test", "model": None})
+
+
+def _busy_roof_only() -> list[dict[str, str]]:
+    row = _fixture_row("fx_roof_busy", "RoofingTiles012C")
+    row["path"] = "assets/textures/ambientcg/acg_roofingtiles012c.jpg"
+    return [row]
+
+
+def test_unfilled_slots_measure_roofs_only_when_extended() -> None:
+    rows = _busy_roof_only()
+    assert "roofs" not in unfilled_slots(rows)
+    assert "roofs" in unfilled_slots(rows, extended=True)
+
+
+def test_the_model_is_shown_the_extended_pools_and_the_brief() -> None:
+    rows = library_rows()
+    choices = deterministic_choices(rows, 2, extended=True)
+    good = json.dumps({"choices": [{"slot": key, "library_id": value} for key, value in choices.items()]})
+    provider = _Recording('{"choices": []}', good)
+    plan = select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                               brief="abandoned old town", seed=2, provider=provider, library=rows, extended=True)
+    assert plan["selector"] == "ollama"
+    first, second = provider.instructions
+    assert "acg_roofingtiles012c" not in first["ids_by_family"]["roof"]
+    assert set(first["ids_by_family"]["roof"]) == CALM_ROOF
+    assert set(first["ids_by_family"]["paving"]) == CALM_PAVING
+    assert first["map"]["brief"] == "abandoned old town"
+    assert first["complaint"] == ""
+    assert second["complaint"].startswith("texture reply missed")
+    assert plan["atmosphere"] == "abandoned"
+    assert plan["description"].startswith("Textures for Murcia, chosen from the imported library (ollama).")
+
+
+def test_an_accepted_extended_reply_names_the_extended_gaps() -> None:
+    rows = _busy_roof_only()
+    common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
+              "brief": "abandoned", "seed": 2, "library": rows}
+    extended = select_texture_plan(**common, provider=_Recording('{"choices": []}'), extended=True)
+    assert extended["selector"] == "ollama" and extended["atmosphere"] == "abandoned"
+    assert extended["description"].startswith("Textures for Murcia, chosen from the imported library (ollama).")
+    assert "roofs (roof)" in extended["description"]
+
+
+@pytest.mark.parametrize("extended", [False, True])
+def test_a_fallback_plan_keeps_the_name_the_brief_and_the_extended_gaps(extended: bool) -> None:
+    rows = _busy_roof_only()
+    common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
+              "brief": "abandoned", "seed": 2, "library": rows}
+    plan = select_texture_plan(**common, provider=_Recording("not json", "not json"), extended=extended)
+    assert plan["selector"] == "library" and plan["atmosphere"] == "abandoned"
+    assert plan["description"].startswith("Textures for Murcia, chosen from the imported library (library).")
+    assert ("roofs (roof)" in plan["description"]) is extended
+    direct = select_texture_plan(**common, extended=extended)
+    assert direct["atmosphere"] == "abandoned"
+    assert direct["description"].startswith("Textures for Murcia, chosen from the imported library (library).")
+    assert ("roofs (roof)" in direct["description"]) is extended
