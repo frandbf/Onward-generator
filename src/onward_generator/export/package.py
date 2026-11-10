@@ -26,7 +26,15 @@ from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, rea
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
 from onward_generator.export.info3 import fit_listing_description
-from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, estimate, material_scales
+from onward_generator.export.lightmap import (
+    DEFAULT_CLASS_SCALES,
+    LightmapBudgetError,
+    estimate,
+    lightmap_areas,
+    material_scales,
+    page_budget_density,
+    summarise,
+)
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
@@ -295,6 +303,28 @@ def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes, *, scenic_o
     options["lightmap_scales"] = material_scales(names, class_scales, scenic_out_of_lightmap=scenic_out_of_lightmap)
 
 
+def _apply_page_budget(options: dict[str, Any], visual: bytes, *, scenic_out_of_lightmap: bool) -> dict[str, Any]:
+    """Plan C5: lower ``lightmap_texels_per_m`` in the options until the estimate fits ``lightmap_pages_max``.
+
+    Uses the resolved ``lightmap_scales`` and the scenic rule of the manifest estimate, so C4 composes. Within
+    budget the options are left as they are. Returns the manifest's ``lightmap_estimate`` at the applied
+    density, with the requested density and the budget; ``ExportError`` when the budget cannot be met.
+    """
+    requested = float(options["lightmap_texels_per_m"])
+    pages_max = int(options["lightmap_pages_max"])
+    max_size = int(options["lightmap_max_size"])
+    areas = lightmap_areas(visual, cell_m=float(options["combine_cell_m"]), scenic_out_of_lightmap=scenic_out_of_lightmap)
+    try:
+        applied = page_budget_density(areas, requested=requested, pages_max=pages_max, max_size=max_size,
+                                      scales=options["lightmap_scales"])
+    except LightmapBudgetError as exc:
+        raise ExportError([f"export config: /build/lightmap_pages_max: {exc}"]) from exc
+    if applied != requested:
+        options["lightmap_texels_per_m"] = applied
+    found = summarise(areas, texels_per_m=applied, max_size=max_size, scales=options["lightmap_scales"])
+    return {**found, "texels_per_m_requested": requested, "lightmap_pages_max": pages_max}
+
+
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
     return fit_listing_description(f"{config['map']['description']} Data: {credits}.")
@@ -352,6 +382,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     # Plan C4: read, never written or normalised, so a card without the key keeps its package_id.
     scenic_out = options.get("scenic_out_of_lightmap") is True
     _resolve_lightmap_scales(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
+    # Plan C5: only a card with the key runs the page budget, so a card without it keeps its package_id.
+    budget_estimate = (_apply_page_budget(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
+                       if "lightmap_pages_max" in options else None)
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
@@ -402,7 +435,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                                   "phase_04_checks": detail_report.get("phase_04_checks")},
                 "layout_purpose": layout_doc.get("purpose"),
             },
-            "lightmap_estimate": estimate(
+            "lightmap_estimate": budget_estimate if budget_estimate is not None else estimate(
                 visual_bytes, texels_per_m=float(options["lightmap_texels_per_m"]),
                 max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
                 scales=options["lightmap_scales"], scenic_out_of_lightmap=scenic_out,

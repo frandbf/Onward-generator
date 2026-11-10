@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import copy
 import importlib.util
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -706,3 +708,48 @@ def test_store_scenic_out_of_lightmap_refuses_a_bad_card(tmp_path: Path, card: A
 def test_store_scenic_out_of_lightmap_needs_a_map(tmp_path: Path) -> None:
     with pytest.raises(bench.BenchError, match="no map.json to find the export card"):
         bench.store_scenic_out_of_lightmap(tmp_path)
+
+
+def test_the_run_parser_takes_lightmap_pages_max() -> None:
+    assert bench.build_parser().parse_args(["run", "--lightmap-pages-max", "8"]).lightmap_pages_max == 8
+    assert bench.build_parser().parse_args(["run", "--lightmap-pages-max", "1"]).lightmap_pages_max == 1
+    assert bench.build_parser().parse_args(["run"]).lightmap_pages_max is None
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "2.5", "x", ""])
+def test_the_run_parser_refuses_a_bad_lightmap_pages_max(value: str, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        bench.build_parser().parse_args(["run", "--lightmap-pages-max", value])
+    assert "--lightmap-pages-max" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(("value", "message"), [("0", "0 is below 1"), ("-3", "-3 is below 1"), ("2.5", "'2.5' is not a whole number")])
+def test_positive_int_messages(value: str, message: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError, match=f"^{re.escape(message)}$"):
+        bench._positive_int(value)
+    assert bench._positive_int("12") == 12
+
+
+@pytest.mark.parametrize("export", ["config/export.json", "config/other.json", None])
+def test_store_lightmap_pages_max_sets_the_card_key(tmp_path: Path, export: str | None) -> None:
+    root = _scenic_map(tmp_path / "m", {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0}}, export)
+    bench.store_lightmap_pages_max(root, 8)
+    card = json.loads((root / (export or "config/export.json")).read_text(encoding="utf-8"))
+    assert card == {"map": {"id": "m"}, "build": {"combine_cell_m": 100.0, "lightmap_pages_max": 8}}
+
+
+@pytest.mark.parametrize(("card", "match"), [
+    (None, "has no export card for --lightmap-pages-max"),
+    ("{not json", "not valid JSON"),
+    ({"build": []}, r"build must be an object, got \[\]"),
+    ({"map": {}}, "build must be an object, got None"),
+])
+def test_store_lightmap_pages_max_refuses_a_bad_card(tmp_path: Path, card: Any, match: str) -> None:
+    root = _scenic_map(tmp_path / "m", card)
+    with pytest.raises(bench.BenchError, match=match):
+        bench.store_lightmap_pages_max(root, 8)
+
+
+def test_store_lightmap_pages_max_needs_a_map(tmp_path: Path) -> None:
+    with pytest.raises(bench.BenchError, match="no map.json to find the export card"):
+        bench.store_lightmap_pages_max(tmp_path, 8)

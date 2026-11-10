@@ -18,9 +18,10 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.detail import detail_scene, load_base, load_detail_config
 from onward_generator.detail.scene import FIDELITY_NOTE
+from onward_generator.export.lightmap import DEFAULT_CLASS_SCALES, lightmap_areas, material_scales, pages_at_least
 from onward_generator.export.package import EXPORT_CONFIG_DEFAULT, build_package
 from onward_generator.generation import load_generation_config
-from onward_generator.generation.gltf import nodes_from_glb
+from onward_generator.generation.gltf import nodes_from_glb, read_glb
 from onward_generator.tiers import SCENIC_ROOF, SCENIC_WALLS, core_square, scenic_wall, tier_summary
 from tests.conftest import FIXED_NOW, _detail_inputs
 from tests.detail_fixture import BUILDINGS, POIS
@@ -305,6 +306,48 @@ def test_scenic_out_of_lightmap_reaches_the_adapter_and_the_estimate(
     assert after["renderers"] < before["renderers"] and after["pages_at_least"] <= before["pages_at_least"]
     assert on.manifest["tiers"] == off.manifest["tiers"] and on.manifest["view_draws"] == off.manifest["view_draws"]
     assert on.manifest["package_id"] != off.manifest["package_id"]
+
+
+def test_lightmap_pages_max_with_scenic_out_of_lightmap(
+    ring_inputs: tuple[Path, Path, Path], ring_detail: Path, tmp_path: Path,
+) -> None:
+    """Plans C4 and C5 together: the budget counts only the baked surfaces, so the scenic walls lower no density."""
+    scene, heights, base = ring_inputs
+    layout = tmp_path / "layout.json"
+    assert main(["perf", "layout", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+                 "--detail", str(ring_detail), "--out", str(layout)]) == 0
+    visual = (ring_detail / "scene_visual.glb").read_bytes()
+    names = [str(m.get("name")) for m in read_glb(visual)[0].get("materials") or []]
+
+    def pages(density: float, max_size: int, scenic_out: bool) -> int:
+        scales = material_scales(names, DEFAULT_CLASS_SCALES, scenic_out_of_lightmap=scenic_out)
+        areas = lightmap_areas(visual, cell_m=100.0, scenic_out_of_lightmap=scenic_out)
+        return pages_at_least(areas, density, max_size=max_size, scales=scales)
+
+    # The first page size and density on the card's range where the scenic walls add a page.
+    max_size, density = next((size, d) for size in (4096, 2048, 1024, 512) for d in (40.0, 30.0, 20.0, 10.0)
+                             if pages(d, size, False) > pages(d, size, True))
+    budget = pages(density, max_size, True)
+
+    def built(name: str, **build: Any) -> Any:
+        card = json.loads(EXPORT_CONFIG_DEFAULT.read_text(encoding="utf-8"))
+        card["build"].update({"lightmap_texels_per_m": density, "lightmap_max_size": max_size,
+                              "lightmap_pages_max": budget, **build})
+        (tmp_path / f"{name}.json").write_text(json.dumps(card), encoding="utf-8")
+        return build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / name, now=FIXED_NOW,
+                             export_config=tmp_path / f"{name}.json")
+
+    # The same budget: met as asked with the scenic walls out, met by lowering the density with them in.
+    both, walls_in = built("both", scenic_out_of_lightmap=True), built("walls_in")
+    lm_both, lm_in = both.manifest["lightmap_estimate"], walls_in.manifest["lightmap_estimate"]
+    assert "scenic" not in lm_both["texels_by_class"] and lm_in["texels_by_class"]["scenic"] > 0
+    assert lm_both["texels_per_m"] == lm_both["texels_per_m_requested"] == density
+    assert lm_in["texels_per_m"] < density == lm_in["texels_per_m_requested"]
+    assert lm_both["pages_at_least"] == budget and lm_in["pages_at_least"] <= budget
+    options = json.loads((walls_in.directory / "adapter_options.json").read_text(encoding="utf-8"))
+    assert options["lightmap_texels_per_m"] == lm_in["texels_per_m"]
+    options = json.loads((both.directory / "adapter_options.json").read_text(encoding="utf-8"))
+    assert options["lightmap_texels_per_m"] == density and options["scenic_out_of_lightmap"] is True
 
 
 @pytest.mark.parametrize(("cell_m", "predicted"), [(50.0, 50.0), (0.0, 100.0)])

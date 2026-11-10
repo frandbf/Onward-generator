@@ -293,15 +293,15 @@ def copy_inputs(inputs: Path, root: Path) -> None:
         (root / "data" / folder).mkdir(parents=True, exist_ok=True)
 
 
-def store_scenic_out_of_lightmap(root: Path) -> None:
-    """Set ``build.scenic_out_of_lightmap`` true in the export card of the run copy ``root`` (plan C4)."""
+def _set_export_card_key(root: Path, key: str, value: Any, flag: str) -> None:
+    """Set ``build.<key>`` to ``value`` in the export card of the run copy ``root``; ``flag`` names the bench option."""
     try:
         document = load_map(root)
     except MapError as exc:
         raise BenchError(f"{root}: no map.json to find the export card ({exc})") from exc
     card_path = root / str((document.get("paths") or {}).get("export") or "config/export.json")
     if not card_path.is_file():
-        raise BenchError(f"{card_path}: the run copy has no export card for --scenic-out-of-lightmap")
+        raise BenchError(f"{card_path}: the run copy has no export card for {flag}")
     try:
         card = json.loads(card_path.read_bytes())
     except ValueError as exc:  # JSONDecodeError and UnicodeDecodeError
@@ -309,8 +309,29 @@ def store_scenic_out_of_lightmap(root: Path) -> None:
     build = card.get("build") if isinstance(card, dict) else None
     if not isinstance(build, dict):
         raise BenchError(f"{card_path}: build must be an object, got {build!r}")
-    build["scenic_out_of_lightmap"] = True
+    build[key] = value
     atomic_write_json(card_path, card)
+
+
+def store_scenic_out_of_lightmap(root: Path) -> None:
+    """Set ``build.scenic_out_of_lightmap`` true in the export card of the run copy ``root`` (plan C4)."""
+    _set_export_card_key(root, "scenic_out_of_lightmap", True, "--scenic-out-of-lightmap")
+
+
+def store_lightmap_pages_max(root: Path, pages_max: int) -> None:
+    """Set ``build.lightmap_pages_max`` in the export card of the run copy ``root`` (plan C5)."""
+    _set_export_card_key(root, "lightmap_pages_max", pages_max, "--lightmap-pages-max")
+
+
+def _positive_int(text: str) -> int:
+    """An argparse type: a whole number of at least 1."""
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from exc
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{value} is below 1")
+    return value
 
 
 def freeze_downloads(root: Path, inputs: Path) -> list[str]:
@@ -335,7 +356,7 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
-              scenic_out_of_lightmap: bool = False) -> MapRun:
+              scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -344,6 +365,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``overture_tints`` switches the plan C2 Overture colours on in the run copy only.
     ``lidar_roofs`` switches the plan C3 roofs from the nDSM spread on in the run copy only.
     ``scenic_out_of_lightmap`` sets the plan C4 export option in the run copy's export card only.
+    ``lightmap_pages_max`` sets the plan C5 lightmap page budget in the run copy's export card only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -360,6 +382,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_lidar_roofs(root, True)
     if scenic_out_of_lightmap:
         store_scenic_out_of_lightmap(root)
+    if lightmap_pages_max is not None:
+        store_lightmap_pages_max(root, lightmap_pages_max)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -883,7 +907,7 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
         print(f"bench: {item.ref.id}", flush=True)
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
-                        scenic_out_of_lightmap=args.scenic_out_of_lightmap)
+                        scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -952,6 +976,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="switch the plan C3 flat or pitched roofs from the nDSM spread on in each run copy (map.json lidar_roofs)")
     run.add_argument("--scenic-out-of-lightmap", action="store_true",
                      help="keep the scenic walls out of the lightmap in each run copy (plan C4, export card build.scenic_out_of_lightmap)")
+    run.add_argument("--lightmap-pages-max", type=_positive_int, default=None, metavar="N",
+                     help="cap the lightmap estimate at N pages in each run copy (plan C5, export card build.lightmap_pages_max)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

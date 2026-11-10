@@ -11,9 +11,16 @@ import pytest
 
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
+    LIGHTMAP_DENSITY_STEP,
+    LIGHTMAP_TEXELS_FLOOR,
+    LightmapBudgetError,
     contributes_gi,
     estimate,
+    lightmap_areas,
     material_scales,
+    page_budget_density,
+    pages_at_least,
+    summarise,
     surface_class,
 )
 from onward_generator.generation.config import Material
@@ -249,3 +256,170 @@ def test_scenic_rule_matches_the_adapter_source() -> None:
     """The adapter names a material M_<glTF name>; its scenic test and the Python prefix must not drift."""
     source = ADAPTER_CS.read_text(encoding="utf-8")
     assert f'StartsWith("m_{SCENIC_PREFIX}", StringComparison.Ordinal)' in source
+
+
+# ---------------------------------------------------------------------------------------- plan C5: page budget
+
+
+def _quads(material: str, count: int = 4, side: float = 100.0) -> bytes:
+    """``count`` square floors of ``side`` metres, each in its own 100 m cell along x."""
+    return _glb(*((material, _floor(i * 100.0, i * 100.0 + side, 0.0, side)) for i in range(count)))
+
+
+def _areas(glb: bytes, *, scenic_out_of_lightmap: bool = False) -> dict[tuple[tuple[int, ...], str], float]:
+    return lightmap_areas(glb, cell_m=100.0, scenic_out_of_lightmap=scenic_out_of_lightmap)
+
+
+@pytest.mark.parametrize("scenic_out", [False, True])
+@pytest.mark.parametrize(("texels_per_m", "max_size", "cell_m"), [(10.0, 2048, 100.0), (10.0, 100, 8.0), (7.5, 30, 0.0)])
+def test_estimate_is_summarise_of_areas(scenic_out: bool, texels_per_m: float, max_size: int, cell_m: float) -> None:
+    """The C5 split of ``estimate`` keeps its output, capped renderers and the scenic rule included."""
+    glb = _glb(("ground", _floor(0, 10, 0, 1)), ("ground", _floor(0, 4, 0, 1)), ("roof_tile", _floor(0, 20, 0, 20)),
+               ("scenic_wall_light", _floor(0, 10, 0, 10)), ("prop_x", _floor(0, 5, 0, 5)))
+    scales = material_scales(["ground", "roof_tile", "scenic_wall_light"], DEFAULT_CLASS_SCALES,
+                             scenic_out_of_lightmap=scenic_out)
+    areas = lightmap_areas(glb, cell_m=cell_m, scenic_out_of_lightmap=scenic_out)
+    found = estimate(glb, texels_per_m=texels_per_m, max_size=max_size, cell_m=cell_m, scales=scales,
+                     scenic_out_of_lightmap=scenic_out)
+    assert found == summarise(areas, texels_per_m=texels_per_m, max_size=max_size, scales=scales)
+    assert pages_at_least(areas, texels_per_m, max_size=max_size, scales=scales) == found["pages_at_least"]
+    assert ("scenic" in found["texels_by_class"]) is not scenic_out
+
+
+def test_lightmap_areas_by_cell_and_material() -> None:
+    glb = _glb(("ground", _floor(0, 10, 0, 10)), ("ground", _floor(20, 22, 0, 1)), ("roof_tile", _floor(0, 4, 0, 5)),
+               ("prop_x", _floor(0, 5, 0, 5)))
+    assert dict(lightmap_areas(glb, cell_m=100.0)) == {((0, 0), "ground"): 102.0, ((0, 0), "roof_tile"): 20.0}
+    assert dict(lightmap_areas(glb, cell_m=0.0)) == {((0,), "ground"): 100.0, ((1,), "ground"): 2.0, ((2,), "roof_tile"): 20.0}
+    # The scenic walls stay in by default, as in ``estimate``.
+    scenic = _glb(("scenic_wall_light", _floor(0, 3, 0, 1)))
+    assert dict(lightmap_areas(scenic, cell_m=100.0)) == {((0, 0), "scenic_wall_light"): 3.0}
+    assert dict(lightmap_areas(scenic, cell_m=100.0, scenic_out_of_lightmap=True)) == {}
+
+
+def test_page_budget_constants() -> None:
+    # ADR-005 saw lightmap UV overlaps at 2 texels/m; the floor is twice that. The step is exact in binary.
+    assert (LIGHTMAP_TEXELS_FLOOR, LIGHTMAP_DENSITY_STEP) == (4.0, 0.25)
+    assert issubclass(LightmapBudgetError, ValueError)
+
+
+def test_page_budget_density_over_budget_exact() -> None:
+    # Four 10 000 m² facades at 10 texels/m: 1 000 000 texels each, under the 1 048 576 page, so 4 pages.
+    # Two pages hold 2 097 152 texels: 7.25 texels/m gives 4 × 525 625 = 2 102 500, 7.0 gives 1 960 000.
+    areas = _areas(_quads("plaster_cream"))
+    assert pages_at_least(areas, 10.0, max_size=1024) == 4
+    assert page_budget_density(areas, requested=10.0, pages_max=2, max_size=1024) == 7.0
+    assert pages_at_least(areas, 7.25, max_size=1024) == 3
+    assert page_budget_density(areas, requested=10.0, pages_max=3, max_size=1024) == 8.75
+    assert pages_at_least(areas, 8.75, max_size=1024) == 3 and pages_at_least(areas, 9.0, max_size=1024) == 4
+
+
+def test_page_budget_density_equal_to_budget_is_unchanged() -> None:
+    areas = _areas(_quads("plaster_cream"))
+    assert page_budget_density(areas, requested=10.0, pages_max=4, max_size=1024) == 10.0
+    assert page_budget_density(areas, requested=10.0, pages_max=5, max_size=1024) == 10.0
+
+
+def test_page_budget_density_under_budget_is_unchanged_and_not_quantised() -> None:
+    areas = _areas(_quads("plaster_cream"))
+    assert page_budget_density(areas, requested=10.3, pages_max=5, max_size=1024) == 10.3
+    # Over budget the result is on the grid, at or under the requested density.
+    assert page_budget_density(areas, requested=7.3, pages_max=2, max_size=1024) == 7.0
+
+
+def test_page_budget_density_is_deterministic_and_maximal() -> None:
+    glb = _glb(*(("plaster_cream", _floor(i * 100.0, i * 100.0 + 30.0 + 7.0 * i, 0.0, 40.0 + 3.0 * i)) for i in range(6)))
+    areas = _areas(glb)
+    reverse = dict(reversed(list(areas.items())))
+    applied = page_budget_density(areas, requested=40.0, pages_max=3, max_size=1024)
+    assert applied < 40.0
+    assert {page_budget_density(areas, requested=40.0, pages_max=3, max_size=1024) for _ in range(3)} == {applied}
+    assert page_budget_density(reverse, requested=40.0, pages_max=3, max_size=1024) == applied
+    assert applied % LIGHTMAP_DENSITY_STEP == 0
+    assert pages_at_least(areas, applied, max_size=1024) <= 3 < pages_at_least(areas, applied + LIGHTMAP_DENSITY_STEP, max_size=1024)
+
+
+def test_page_budget_density_respects_class_scales() -> None:
+    # The same quads as roofs bake at a quarter of the density: 62 500 texels each, one page in all.
+    roofs = _areas(_quads("roof_tile"))
+    scales = material_scales(["roof_tile"], DEFAULT_CLASS_SCALES)
+    assert page_budget_density(roofs, requested=10.0, pages_max=1, max_size=1024, scales=scales) == 10.0
+    assert page_budget_density(_areas(_quads("plaster_cream")), requested=10.0, pages_max=1, max_size=1024) < 10.0
+    # Without the scales the roofs count as facades and the density is lowered.
+    assert page_budget_density(roofs, requested=10.0, pages_max=1, max_size=1024) < 10.0
+
+
+def test_page_budget_density_with_scenic_out_of_lightmap() -> None:
+    """Plan C4 and C5 together: the scenic walls count towards the budget only when they are baked."""
+    glb = _glb(("plaster_cream", _floor(0, 100, 0, 100)),
+               *(("scenic_wall_light", _floor(i * 100.0, i * 100.0 + 100.0, 0.0, 100.0)) for i in range(1, 5)))
+    scales = material_scales(["plaster_cream", "scenic_wall_light"], DEFAULT_CLASS_SCALES)
+    # The facade: 1 000 000 texels; each scenic wall at 2.5 texels/m: 62 500. 1 250 000 texels in 2 pages.
+    baked = _areas(glb)
+    assert pages_at_least(baked, 10.0, max_size=1024, scales=scales) == 2
+    assert page_budget_density(baked, requested=10.0, pages_max=1, max_size=1024, scales=scales) == 9.0
+    out_scales = material_scales(["plaster_cream", "scenic_wall_light"], DEFAULT_CLASS_SCALES, scenic_out_of_lightmap=True)
+    out = _areas(glb, scenic_out_of_lightmap=True)
+    assert pages_at_least(out, 10.0, max_size=1024, scales=out_scales) == 1
+    assert page_budget_density(out, requested=10.0, pages_max=1, max_size=1024, scales=out_scales) == 10.0
+
+
+def test_page_budget_density_capped_renderer() -> None:
+    # A 40 000 m² facade wants 4 000 000 texels at 10 texels/m and is capped at one page; a second renderer of
+    # 100 m² adds 10 000. Two pages at 10 texels/m; one page needs the big one under the cap and room for both.
+    glb = _glb(("plaster_cream", _floor(0, 200, 0, 200)), ("plaster_cream", _floor(300, 310, 0, 10)))
+    areas = _areas(glb)
+    assert estimate(glb, texels_per_m=10.0, max_size=1024, cell_m=100.0)["renderers_capped"] == 1
+    assert pages_at_least(areas, 10.0, max_size=1024) == 2
+    # 40 100 m² × d² <= 1 048 576: d <= 5.1137, so 5.0 on the grid.
+    assert page_budget_density(areas, requested=10.0, pages_max=1, max_size=1024) == 5.0
+
+
+def test_page_budget_density_capped_renderers_make_budget_impossible() -> None:
+    # Three renderers each over a page even at 4 texels/m (90 000 m² × 16 = 1 440 000): three pages at least.
+    areas = _areas(_quads("plaster_cream", count=3, side=300.0))
+    with pytest.raises(LightmapBudgetError, match="needs at least 3 pages at 4 texels/m"):
+        page_budget_density(areas, requested=10.0, pages_max=2, max_size=1024)
+
+
+def test_page_budget_density_floor_exact() -> None:
+    # Four 16 384 m² facades at 4 texels/m: 262 144 texels each, a quarter page, so one page exactly at the floor.
+    side = 128.0
+    areas = _areas(_quads("plaster_cream", side=side))
+    assert pages_at_least(areas, 4.0, max_size=1024) == 1 < pages_at_least(areas, 4.25, max_size=1024)
+    assert page_budget_density(areas, requested=10.0, pages_max=1, max_size=1024) == 4.0
+    assert page_budget_density(areas, requested=4.1, pages_max=1, max_size=1024) == 4.0
+
+
+def test_page_budget_density_refuses_below_floor() -> None:
+    # 129 m sides: 16 641 m² × 16 = 266 256 texels each, 1 065 024 in all: just over one page at the floor.
+    areas = _areas(_quads("plaster_cream", side=129.0))
+    with pytest.raises(LightmapBudgetError) as caught:
+        page_budget_density(areas, requested=10.0, pages_max=1, max_size=1024)
+    assert str(caught.value) == (
+        "build.lightmap_pages_max 1 cannot be met: the lightmap needs at least 2 pages at 4 texels/m, "
+        "and the density never goes below the 4 texels/m floor (ADR-005)"
+    )
+    assert isinstance(caught.value, ValueError)
+
+
+def test_page_budget_density_requested_below_floor() -> None:
+    # At 3 texels/m four 10 000 m² facades need 360 000 texels: one page of 512² (262 144) is not enough.
+    areas = _areas(_quads("plaster_cream"))
+    assert pages_at_least(areas, 3.0, max_size=512) == 2
+    with pytest.raises(LightmapBudgetError, match="needs at least 2 pages at 3 texels/m, and the density never"):
+        page_budget_density(areas, requested=3.0, pages_max=1, max_size=512)
+    assert page_budget_density(areas, requested=3.0, pages_max=2, max_size=512) == 3.0
+    # Just above the floor and over budget: nothing on the grid between 4.0 and 4.1 fits.
+    with pytest.raises(LightmapBudgetError, match="at 4 texels/m"):
+        page_budget_density(areas, requested=4.1, pages_max=1, max_size=512)
+
+
+def test_page_budget_refusal_counts_pages_with_the_class_scales() -> None:
+    # Three 1 600 m² roofs, 64 px pages (4 096 texels). At the floor with the roof scale (1 texel/m): 4 800 texels,
+    # 2 pages; without the scale each would be capped at a page, 3 pages. The message counts with the scale.
+    areas = _areas(_quads("roof_tile", count=3, side=40.0))
+    scales = material_scales(["roof_tile"], DEFAULT_CLASS_SCALES)
+    assert pages_at_least(areas, 4.0, max_size=64) == 3
+    with pytest.raises(LightmapBudgetError, match="needs at least 2 pages at 4 texels/m"):
+        page_budget_density(areas, requested=10.0, pages_max=1, max_size=64, scales=scales)

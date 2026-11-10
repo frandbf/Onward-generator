@@ -69,6 +69,12 @@
           "description": "Plan C4, ADR-017 amendment (proposed): the scenic_* shell walls take no lightmap texels (scaleInLightmap 0, receiveGI LightProbes, ambient light when combined) but stay ContributeGI and cast the baked shadows; the scenic roofs stay baked. Off when absent",
           "type": "boolean"
         },
+        "lightmap_pages_max": {
+          "description": "Plan C5, ADR-005 amendment (proposed): lightmap page budget. export package lowers lightmap_texels_per_m, in 0.25 steps and never below 4 texels/m, until the offline estimate (pages_at_least, a lower bound) fits; it refuses the package when the floor does not fit. Off when absent",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
         "interior_lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
         "interior_light_intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 4 },
         "fog_enabled": { "type": "boolean" },
