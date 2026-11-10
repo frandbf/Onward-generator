@@ -12,7 +12,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from onward_generator.config.loader import ConfigLoadError, read_json_document
+from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.io import sha256_file as _sha256
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -136,8 +136,10 @@ def _semantic_problems(doc: Mapping[str, Any]) -> list[str]:
 
 
 def _load_overrides(path: Path, bounds: tuple[float, float]) -> tuple[dict[str, Override], FileRef]:
+    # An overrides file is pipeline output (one entry per building from the source plugins),
+    # not hand-written configuration: Catastro on Madrid r300 writes about 1.2 MB of it.
     try:
-        doc, resolved = read_json_document(path)
+        doc, resolved = read_json_document(path, max_bytes=MAX_SCENE_BYTES)
     except ConfigLoadError as exc:
         raise HeightConfigError(path, [exc.diagnostic.message]) from exc
     problems = _schema_problems(doc, OVERRIDES_SCHEMA_PATH)

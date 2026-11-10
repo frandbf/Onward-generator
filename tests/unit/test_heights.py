@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from shapely.geometry import box, mapping
 
+from onward_generator.config.loader import MAX_CONFIG_BYTES
 from onward_generator.heights import (
     BuildingInput,
     HeightClass,
@@ -239,6 +240,14 @@ def test_override_wins_and_is_measured(tmp_path: Path) -> None:
 def test_invalid_overrides_are_rejected(tmp_path: Path, entries: list[dict[str, Any]]) -> None:
     with pytest.raises(HeightConfigError):
         write_overrides(tmp_path, entries)
+
+
+def test_an_overrides_file_over_the_config_limit_loads(tmp_path: Path) -> None:
+    # Source plugins write one entry per building; a large Catastro map passes 1 MiB (Madrid r300: 1.2 MB).
+    entries = [{**OVERRIDE, "id": f"osm-way-{i}", "source": "Synthetic survey " + "x" * 40} for i in range(1, 12001)]
+    config = write_overrides(tmp_path, entries)
+    assert (tmp_path / "overrides.json").stat().st_size > MAX_CONFIG_BYTES
+    assert config.overrides_file is not None and len(config.overrides) == 12000
 
 
 # --- Global guarantees. ---
