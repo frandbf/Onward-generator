@@ -126,6 +126,28 @@
     "stair": { "width_m": 1.1, "max_riser_m": 0.185, "tread_m": 0.28, "landing_m": 1.0 },
     "door_clearance_m": 1.5,
     "lights_max": 160,
+    "furnish": {
+      "enabled": false,
+      "max_triangles": 12000,
+      "max_collision_triangles": 1200,
+      "max_pieces_per_room": 6,
+      "max_assets": 12,
+      "walk_width_m": 1.2,
+      "wall_gap_m": 0.03,
+      "piece_gap_m": 0.1,
+      "pane_clear_m": 0.15,
+      "head_clear_m": 0.1,
+      "catalogues": ["kenney_furniture"],
+      "sets": {
+        "generic": {
+          "counter": [],
+          "wall": ["kenney_furniture_bookcaseOpen", "kenney_furniture_bookcaseClosedDoors", "kenney_furniture_bookcaseOpenLow",
+                   "kenney_furniture_cabinetTelevision", "kenney_furniture_cabinetTelevisionDoors", "kenney_furniture_sideTableDrawers",
+                   "kenney_furniture_desk"],
+          "decor": []
+        }
+      }
+    },
     "shops": {
       "enabled": true,
       "max_triangles": 6000,

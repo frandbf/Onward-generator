@@ -206,3 +206,116 @@ def test_furnishing_problems_add_to_the_other_problems() -> None:
     _furnish(doc)["sets"]["generic"]["wall"].append("no_such_row")
     assert _problems(doc) == ["/interiors: min_buildings must be at most max_buildings",
                               "/interiors/shops/furnish/sets/generic/wall: 'no_such_row' is not a row of an allowed catalogue"]
+
+
+# ---- interiors.furnish: the floors of the stair interior (ADR-034) ----------------------------------------------------
+
+
+def _floors_doc(enabled: bool = True) -> dict:
+    doc = copy.deepcopy(DOC)
+    doc["interiors"]["furnish"]["enabled"] = enabled
+    return doc
+
+
+def test_the_floor_block_is_off_by_default_and_reads_no_asset(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("a default load must not read assets/")
+
+    monkeypatch.setattr(config_module, "floor_furnish_problems", refuse)
+    furnish = load_detail_config().interiors.furnish
+    assert furnish.enabled is False and sorted(furnish.sets) == ["generic"]
+    assert furnish.max_triangles == 12000 and furnish.max_collision_triangles == 1200 and furnish.max_assets == 12
+    assert furnish.max_pieces_per_room == 6 and furnish.catalogues == ("kenney_furniture",)
+    generic = furnish.sets["generic"]
+    assert generic.counter == () and generic.decor == () and generic.wall
+
+
+def test_a_document_without_the_floor_block_loads_with_it_off() -> None:
+    doc = copy.deepcopy(DOC)
+    del doc["interiors"]["furnish"]
+    furnish = config_from_document(doc).interiors.furnish
+    assert furnish.enabled is False and dict(furnish.sets) == {}
+
+
+def test_the_enabled_default_floor_block_loads_and_leaves_the_shop_block_alone() -> None:
+    cfg = config_from_document(_floors_doc())
+    assert cfg.interiors.furnish.enabled and cfg.interiors.shops.furnish.enabled is False
+    assert cfg.interiors.furnish.sets["generic"].wall[0] == FurnishEntry("kenney_furniture_bookcaseOpen")
+
+
+def test_the_schema_takes_only_the_generic_set_and_no_extra_key() -> None:
+    doc = _floors_doc()
+    doc["interiors"]["furnish"]["sets"]["bedroom"] = {"counter": [], "wall": [], "decor": []}
+    assert any("/interiors/furnish/sets" in p and "bedroom" in p for p in _problems(doc))
+    doc = _floors_doc()
+    del doc["interiors"]["furnish"]["sets"]["generic"]
+    assert any("/interiors/furnish/sets" in p and "generic" in p for p in _problems(doc))
+    doc = _floors_doc()
+    doc["interiors"]["furnish"]["colour"] = "red"
+    assert any("/interiors/furnish" in p and "colour" in p for p in _problems(doc))
+    doc = _floors_doc()
+    doc["interiors"]["furnish"]["walk_width_m"] = 1.19
+    assert any("/interiors/furnish/walk_width_m" in p for p in _problems(doc))
+
+
+def _floor_problems(tmp_path, sets: dict[str, FurnishSet], rows: list[dict] | None = None, catalogues=("kenney_furniture",)) -> list[str]:
+    base = config_from_document(_floors_doc(False)).interiors.furnish
+    root = config_module.REPO_ROOT / "assets"
+    if rows is not None:
+        (tmp_path / "kenney_furniture").mkdir()
+        (tmp_path / "kenney_furniture" / "manifest.json").write_text(json.dumps({"assets": rows}), encoding="utf-8")
+        root = tmp_path
+    return config_module.floor_furnish_problems(replace(base, catalogues=catalogues, sets=sets), root)
+
+
+def test_floor_set_keys_other_than_generic_and_a_missing_generic_set_are_named(tmp_path) -> None:
+    wall = (FurnishEntry("kenney_furniture_bookcaseOpen"),)
+    assert _floor_problems(tmp_path, {"bedroom": FurnishSet((), wall, ())}) == [
+        "/interiors/furnish/sets: 'bedroom' is not 'generic'", "/interiors/furnish/sets: the 'generic' set is required"]
+    assert _floor_problems(tmp_path, {"generic": FurnishSet((), wall, ())}) == []
+
+
+def test_floors_take_wall_pieces_only(tmp_path) -> None:
+    piece = (FurnishEntry("kenney_furniture_bookcaseOpenLow"),)
+    assert _floor_problems(tmp_path, {"generic": FurnishSet(piece, piece, piece)}) == [
+        "/interiors/furnish/sets/generic/counter: residential floors take wall pieces only",
+        "/interiors/furnish/sets/generic/decor: residential floors take wall pieces only"]
+
+
+@pytest.mark.parametrize(("asset_id", "why"), [
+    ("kenney_furniture_bedSingle", "is 2.284 m deep, more than 0.8 m for a wall piece"),
+    ("kenney_furniture_loungeSofa", "is 0.832 m deep, more than 0.8 m for a wall piece"),
+    ("kenney_furniture_floorFull", "is 2.03 m deep, more than 0.8 m for a wall piece"),
+    ("kenney_shop_floor", "is not a row of an allowed catalogue"),  # its catalogue is not listed in this block
+    ("kenney_bench", "is not a row of an allowed catalogue"),
+])
+def test_a_floor_row_that_is_not_allowed_is_refused_by_name(tmp_path, asset_id: str, why: str) -> None:
+    sets = {"generic": FurnishSet((), (FurnishEntry(asset_id),), ())}
+    assert _floor_problems(tmp_path, sets) == [f"/interiors/furnish/sets/generic/wall: {asset_id!r} {why}"]
+
+
+def test_an_excluded_id_and_a_street_row_are_refused_even_in_a_listed_catalogue(tmp_path) -> None:
+    rows = [{"id": "kenney_shop_mannequin", "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 1.8},
+            {"id": "street_bin", "placement": "street", "length_m": 0.5, "depth_m": 0.5, "height_m": 1.0},
+            {"id": "shelf", "placement": "interior", "length_m": 1.0, "depth_m": MAX_WALL_DEPTH_M, "height_m": 1.0}]
+    sets = {"generic": FurnishSet((), tuple(FurnishEntry(r["id"]) for r in rows), ())}
+    assert _floor_problems(tmp_path, sets, rows) == [
+        "/interiors/furnish/sets/generic/wall: 'kenney_shop_mannequin' is a tile, a character or loose clutter, not furniture",
+        "/interiors/furnish/sets/generic/wall: 'street_bin' has placement 'street', not 'interior'"]
+
+
+def test_a_floor_catalogue_without_a_manifest_is_named(tmp_path) -> None:
+    sets = {"generic": FurnishSet((), (FurnishEntry("kenney_furniture_bookcaseOpen"),), ())}
+    assert config_module.floor_furnish_problems(replace(config_from_document(_floors_doc(False)).interiors.furnish, sets=sets), tmp_path) == [
+        f"/interiors/furnish/catalogues: 'kenney_furniture' has no readable manifest under {tmp_path}",
+        "/interiors/furnish/sets/generic/wall: 'kenney_furniture_bookcaseOpen' is not a row of an allowed catalogue"]
+
+
+def test_floor_problems_stop_the_load_beside_the_others() -> None:
+    doc = _floors_doc()
+    doc["interiors"]["min_buildings"], doc["interiors"]["max_buildings"] = 9, 8
+    doc["interiors"]["furnish"]["sets"]["generic"]["wall"].append("kenney_furniture_bedDouble")
+    doc["interiors"]["furnish"]["sets"]["generic"]["decor"].append("kenney_food_loaf")
+    assert _problems(doc) == ["/interiors: min_buildings must be at most max_buildings",
+                              "/interiors/furnish/sets/generic/decor: residential floors take wall pieces only",
+                              "/interiors/furnish/sets/generic/wall: 'kenney_furniture_bedDouble' is 2.284 m deep, more than 0.8 m for a wall piece"]

@@ -99,11 +99,11 @@ def test_no_plan_reads_nothing() -> None:
 def test_the_plan_needs_a_library_of_allowed_catalogues() -> None:
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(PLAN, None)
-    assert str(caught.value) == "scene_detail.json plans shop furniture (ADR-031); overgrow place needs --library"
+    assert str(caught.value) == "scene_detail.json plans interior furniture (ADR-031, ADR-034); overgrow place needs --library"
     odd = _manifest({**P0, "catalogue": "kenney"}, {**P1, "catalogue": "normalized"})
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(odd, ASSETS)
-    assert str(caught.value) == "shop furniture names catalogues that are not allowed: kenney, normalized"
+    assert str(caught.value) == "interior furniture names catalogues that are not allowed: kenney, normalized"
 
 
 def _library(tmp_path: Path, placement: str = "interior") -> Path:
@@ -120,19 +120,19 @@ def _library(tmp_path: Path, placement: str = "interior") -> Path:
 def test_a_row_missing_or_refused_stops_the_build_with_its_reason(tmp_path: Path) -> None:
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(_manifest(P0), tmp_path)
-    assert str(caught.value) == f"shop furniture Shelf_01: not installed under {tmp_path} (missing)"
+    assert str(caught.value) == f"interior furniture Shelf_01: not installed under {tmp_path} (missing)"
     library = _library(tmp_path, placement="kit_only")
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(_manifest(P0), library)
-    assert str(caught.value) == f"shop furniture Shelf_01: not installed under {library} (not_interior)"
+    assert str(caught.value) == f"interior furniture Shelf_01: not installed under {library} (not_interior)"
 
 
 def test_a_glb_or_a_count_other_than_the_plan_stops_the_build() -> None:
     sha = PROPS["Shelf_01"].glb_sha256
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(_manifest({**P0, "glb_sha256": "0123456789abcdef" * 4}), ASSETS)
-    assert str(caught.value) == (f"shop furniture Shelf_01: the GLB is not the one detail planned (sha256 {sha[:12]}, "
+    assert str(caught.value) == (f"interior furniture Shelf_01: the GLB is not the one detail planned (sha256 {sha[:12]}, "
                                  "plan 0123456789ab); run detail again")
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(_manifest({**P0, "triangles": 7}), ASSETS)
-    assert str(caught.value) == f"shop furniture Shelf_01: {PROPS['Shelf_01'].prop.triangles} triangles, detail priced 7"
+    assert str(caught.value) == f"interior furniture Shelf_01: {PROPS['Shelf_01'].prop.triangles} triangles, detail priced 7"

@@ -21,6 +21,30 @@
       "type": "object", "additionalProperties": false, "required": ["counter", "wall", "decor"],
       "properties": { "counter": { "$ref": "#/$defs/furnishSlot" }, "wall": { "$ref": "#/$defs/furnishSlot" }, "decor": { "$ref": "#/$defs/furnishSlot" } }
     },
+    "furnishBlock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "max_triangles", "max_collision_triangles", "max_pieces_per_room", "max_assets", "walk_width_m", "wall_gap_m", "piece_gap_m", "pane_clear_m", "head_clear_m", "catalogues", "sets"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
+        "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 20000 },
+        "max_pieces_per_room": { "type": "integer", "minimum": 0, "maximum": 24 },
+        "max_assets": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "walk_width_m": { "type": "number", "minimum": 1.2, "maximum": 3.0 },
+        "wall_gap_m": { "type": "number", "minimum": 0, "maximum": 0.2 },
+        "piece_gap_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
+        "pane_clear_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
+        "head_clear_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
+        "catalogues": {
+          "type": "array", "uniqueItems": true, "minItems": 1,
+          "items": { "enum": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"] }
+        },
+        "sets": {
+          "type": "object", "required": ["generic"],
+          "additionalProperties": { "$ref": "#/$defs/furnishSet" }
+        }
+      }
+    },
     "len": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
     "len0": { "type": "number", "minimum": 0, "maximum": 50 },
     "opening": {
@@ -215,6 +239,17 @@
         },
         "door_clearance_m": { "$ref": "#/$defs/len" },
         "lights_max": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "furnish": {
+          "description": "Catalogue furniture on the floors of the stair interior (ADR-034). Optional; absent means off. Off by default until the headset session. One 'generic' set of wall pieces.",
+          "allOf": [
+            { "$ref": "#/$defs/furnishBlock" },
+            {
+              "properties": {
+                "sets": { "type": "object", "required": ["generic"], "properties": { "generic": { "$ref": "#/$defs/furnishSet" } }, "additionalProperties": false }
+              }
+            }
+          ]
+        },
         "shops": {
           "type": "object", "additionalProperties": false, "required": ["enabled", "max_triangles", "max_collision_triangles", "max_area_m2", "band_depth_m", "min_room_area_m2", "categories", "generic"],
           "properties": {
@@ -242,28 +277,7 @@
             },
             "furnish": {
               "description": "Catalogue furniture in the shop rooms (ADR-031). Optional; absent means off. Off by default until the headset session.",
-              "type": "object", "additionalProperties": false,
-              "required": ["enabled", "max_triangles", "max_collision_triangles", "max_pieces_per_room", "max_assets", "walk_width_m", "wall_gap_m", "piece_gap_m", "pane_clear_m", "head_clear_m", "catalogues", "sets"],
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
-                "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 20000 },
-                "max_pieces_per_room": { "type": "integer", "minimum": 0, "maximum": 24 },
-                "max_assets": { "type": "integer", "minimum": 0, "maximum": 32 },
-                "walk_width_m": { "type": "number", "minimum": 1.2, "maximum": 3.0 },
-                "wall_gap_m": { "type": "number", "minimum": 0, "maximum": 0.2 },
-                "piece_gap_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
-                "pane_clear_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
-                "head_clear_m": { "type": "number", "minimum": 0, "maximum": 1.0 },
-                "catalogues": {
-                  "type": "array", "uniqueItems": true, "minItems": 1,
-                  "items": { "enum": ["kenney_food", "kenney_furniture", "kenney_mini_shop", "polyhaven_shop"] }
-                },
-                "sets": {
-                  "type": "object", "required": ["generic"],
-                  "additionalProperties": { "$ref": "#/$defs/furnishSet" }
-                }
-              }
+              "$ref": "#/$defs/furnishBlock"
             }
           }
         }

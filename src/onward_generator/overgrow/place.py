@@ -137,7 +137,7 @@ def overgrow(
     area = within_core(area, core_of(manifest))
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
     try:
-        # The shop furniture detail planned (ADR-031). No plan: nothing is read and nothing is added.
+        # The interior furniture detail planned (ADR-031 shop rooms, ADR-034 stair floors). No plan: nothing is read and nothing is added.
         furniture = build_furniture(manifest, library)
     except FurnishBuildError as exc:
         raise OvergrowError(str(exc)) from exc

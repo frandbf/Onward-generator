@@ -448,7 +448,17 @@ def _probe_columns(inner: Polygon, wells: BaseGeometry) -> list[tuple[float, flo
     return columns
 
 
-def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furniture: BaseGeometry | None = None) -> dict[str, Any]:
+def flight_landings(flight: Flight, landing_m: float) -> tuple[Polygon, Polygon]:
+    """The floor ``_seek_flight`` kept clear at each end of ``flight``: its foot, on the floor of ``flight.level``, and its
+    arrival, on the floor above. Each is ``landing_m`` long and as wide as the stair, against one short side of the well."""
+    run, width = flight.geometry.run_m, flight.geometry.width_m
+    origin, x_axis, y_axis = flight.matrix[:3, 3], flight.matrix[:3, 0], flight.matrix[:3, 1]  # frame_matrix's columns
+    return (_rect(origin, x_axis, y_axis, -landing_m, 0.0, 0.0, width),
+            _rect(origin, x_axis, y_axis, run, run + landing_m, 0.0, width))
+
+
+def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furniture: BaseGeometry | None = None,
+                  room_furniture: Mapping[str, BaseGeometry] | None = None) -> dict[str, Any]:
     """Where the adapter may put one baked light and a few light probes in each furnished room (ADR-013).
 
     Coordinates are local metres (x east, y north, z up), like ``uv_frame``. The light sits
@@ -458,6 +468,8 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furnit
     one layer above the floor and one under the ceiling. A shop's rooms are ``plan.rooms``, in order;
     a courtyard is not part of the room, so a centroid in it moves too. ``furniture`` is the plan of the
     furnishing pieces (ADR-031): no probe column stands in it. ``None`` leaves the grid as it was.
+    ``room_furniture`` maps a room id to the plan of that room's pieces only (the floors of a stair interior share
+    one polygon, ADR-034): the probe columns of that room keep out of it, and the other rooms keep theirs.
     """
     wells = unary_union([flight.well.buffer(WELL_CLEARANCE_M) for flight in plan.flights])
     probe_wells = unary_union([wells, furniture])  # shapely skips a None part
@@ -471,7 +483,8 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furnit
             centre = clear.representative_point()
         corners = list(area.minimum_rotated_rectangle.exterior.coords)
         reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
-        columns = _probe_columns(area, probe_wells)
+        own = (room_furniture or {}).get(room["id"])
+        columns = _probe_columns(area, probe_wells if own is None else unary_union([probe_wells, own]))  # pragma: no mutate: unary_union skips a None part, so taking the union branch without furniture gives the same grid
         floor, ceiling = float(room["floor_z_m"]), float(room["ceiling_z_m"])
         probes: list[float] = []
         for z in (floor + PROBE_LOW_M, ceiling - PROBE_HIGH_BELOW_CEILING_M):

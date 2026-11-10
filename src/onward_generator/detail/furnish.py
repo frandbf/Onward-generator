@@ -1,4 +1,5 @@
-"""Catalogue furniture in the generic shop rooms (ADR-031). Off by default (``interiors.shops.furnish``).
+"""Catalogue furniture in the generic shop rooms (ADR-031) and on the floors of the stair interior (ADR-034).
+Each is off by default (``interiors.shops.furnish``, ``interiors.furnish``).
 
 This module only plans: which catalogue row stands where in each shop room, at what turn, and what it
 costs. ``overgrow place`` reads the plan from ``scene_detail.json`` and builds the meshes and colliders
@@ -24,6 +25,14 @@ Rules, in local metres:
 - **Choice.** ``stable_unit(seed, building, room, slot, ring, edge, k)`` picks the first row to try, in a
   set sorted by id, so the order of a set or a catalogue does not change the plan.
 
+A floor of the stair interior (``floor_rooms``, ADR-034) is one room ``<building>/L<n>`` on the interior's one
+polygon, at its own ``floor_m``. Its entry is the door zone on the ground floor and the arrival landing of the flight
+from below on the floors above. Its stair wells are holes in the walk region, and each well plus
+``interiors.WELL_CLEARANCE_M``, the foot of every flight that starts on it and the arrival of the flight that ends on
+it are keep-outs (``stair_zone``). The walk region must keep every stair foot joined to the entry. A landing lies
+between the well and the walls, so the walk region of a ``walk_width_m`` body only reaches its open side: the entry
+and the feet count as reached within ``reach_m`` (half of ``walk_width_m``).
+
 The model's front is assumed to be its local -Y (glTF +Z): ``yaw_deg`` turns it to face into the room, and a
 set entry's ``turn_deg`` turns it first. That facing is an assumption for the headset check.
 """
@@ -33,7 +42,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +53,17 @@ from shapely.geometry.polygon import orient
 
 from onward_generator.detail.config import FURNISH_SLOTS, FurnishEntry, FurnishSet, Interiors, ShopFurnish
 from onward_generator.detail.facades import Hole, Segment, stable_unit
-from onward_generator.detail.interiors import SHOP_GLASS, Interior, InteriorPlan, _door_zone, _rim_on, light_anchors
+from onward_generator.detail.interiors import (
+    SEE_THROUGH,
+    SHOP_GLASS,
+    WELL_CLEARANCE_M,
+    Interior,
+    InteriorPlan,
+    _door_zone,
+    _rim_on,
+    flight_landings,
+    light_anchors,
+)
 from onward_generator.generation.mesh import polygons_of
 
 # A solid piece's collider is one box: 12 triangles, in the collision GLB only.
@@ -77,10 +96,15 @@ class FurnishAsset:
 
 @dataclass(frozen=True, slots=True)
 class FurnishRoom:
-    """One shop room to furnish. ``door_zone`` is ``None`` for a room with no walkable door (seen through its windows only).
+    """One room to furnish. ``door_zone`` is ``None`` for a room with no walkable door (seen through its windows only).
 
     ``panes`` are the keep-out bands behind see-through openings; ``display`` the inner spans of its ``shop_glass``
     openings; ``door_span`` the inner span of its door.
+
+    A floor of the stair interior (ADR-034) also has: ``floor_m``, the z its pieces stand at; ``holes``, the stair
+    wells, which the walk region leaves out; ``keepouts``, the stair zones no piece enters; ``targets``, the stair feet
+    the walk region must keep joined to the entry (``door_zone``); and ``reach_m``, how far short of the entry and the
+    targets the walk region may stop. The defaults are a shop room's: ground floor, no stair.
     """
 
     room_id: str
@@ -91,6 +115,11 @@ class FurnishRoom:
     panes: tuple[Polygon, ...] = ()
     display: tuple[LineString, ...] = ()
     door_span: LineString | None = None
+    floor_m: float = 0.0
+    holes: tuple[Polygon, ...] = ()
+    keepouts: tuple[Polygon, ...] = ()
+    targets: tuple[Polygon, ...] = ()
+    reach_m: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +153,7 @@ class RoomFurnishing:
     pieces: tuple[Piece, ...]
     refusals: tuple[str, ...] = ()
     """Pieces the room did not get, once per reason: ``no_counter_spot``, ``blocks_path``."""
+    method: str = "shop_furnishing"
 
     @property
     def visual_triangles(self) -> int:
@@ -145,7 +175,7 @@ class RoomFurnishing:
     def record(self, building_id: str, first: int) -> dict[str, Any]:
         """The ``furnishing`` block of the room record; piece ids ``furnish/<building>/<n>`` from ``first``."""
         return {
-            "method": "shop_furnishing", "attribute_origin": "generated", "set": self.category,
+            "method": self.method, "attribute_origin": "generated", "set": self.category,
             "pieces": [p.record(f"furnish/{building_id}/{first + i}") for i, p in enumerate(self.pieces)],
             "visual_triangles": self.visual_triangles, "collision_triangles": self.collision_triangles,
             "refusals": list(self.refusals),
@@ -154,9 +184,10 @@ class RoomFurnishing:
 
 @dataclass(slots=True)
 class FurnishBudget:
-    """What the map's furniture has used of ``shops.furnish``: drawn and collision triangles, and distinct assets.
+    """What the map's furniture has used of its block (``scope``): drawn and collision triangles, and distinct assets.
 
-    Separate from ``shops.max_triangles``: furniture never takes a shop room's budget (ADR-031).
+    Separate from ``shops.max_triangles`` and ``interiors.max_triangles``: furniture never takes a room's budget
+    (ADR-031, ADR-034). The shop rooms and the floors of the stair interior each have their own.
     """
 
     max_triangles: int
@@ -164,10 +195,11 @@ class FurnishBudget:
     max_assets: int
     used: dict[str, int] = field(default_factory=lambda: {"triangles": 0, "collision_triangles": 0})
     assets: set[str] = field(default_factory=set)
+    scope: str = "shops.furnish"
 
     @classmethod
-    def of(cls, furnish: ShopFurnish) -> FurnishBudget:
-        return cls(furnish.max_triangles, furnish.max_collision_triangles, furnish.max_assets)
+    def of(cls, furnish: ShopFurnish, scope: str = "shops.furnish") -> FurnishBudget:
+        return cls(furnish.max_triangles, furnish.max_collision_triangles, furnish.max_assets, scope=scope)
 
     def refuse(self, room: RoomFurnishing) -> str | None:
         """``None`` when the whole room fits, else the reason. A room is furnished whole or not at all."""
@@ -177,10 +209,10 @@ class FurnishBudget:
         ):
             left = limit - self.used[kind]
             if cost > left:
-                return f"{label}: needs {cost} {kind.replace('_', ' ')}, {left} left of shops.furnish.max_{kind} {limit}"
+                return f"{label}: needs {cost} {kind.replace('_', ' ')}, {left} left of {self.scope}.max_{kind} {limit}"
         wanted = len(self.assets | room.assets)
         if wanted > self.max_assets:
-            return f"asset_cap: needs {wanted} distinct assets, {self.max_assets} allowed by shops.furnish.max_assets"
+            return f"asset_cap: needs {wanted} distinct assets, {self.max_assets} allowed by {self.scope}.max_assets"
         return None
 
     def spend(self, room: RoomFurnishing) -> None:
@@ -277,11 +309,15 @@ class _Planner:
         self.free = self.polygon.buffer(-furnish.wall_gap_m, join_style="mitre")
         assert room.door_zone is not None
         self.door_zone = room.door_zone
-        self.keepout = unary_union([room.door_zone, *room.panes])
+        self.keepout = unary_union([room.door_zone, *room.panes, *room.keepouts])
         self.half_walk = furnish.walk_width_m / 2
-        empty = self.polygon.buffer(-self.half_walk)
-        self.reached_empty = [c for c in polygons_of(empty) if c.intersects(self.door_zone)]
-        self.islands = unary_union([c for c in polygons_of(empty) if not c.intersects(self.door_zone)])
+        # The floor a body walks on: the room less its stair wells. A shop room has none, and keeps its own polygon.
+        self.walk_floor = self.polygon.difference(unary_union(room.holes)) if room.holes else self.polygon
+        self.entry = room.door_zone.buffer(room.reach_m) if room.reach_m else room.door_zone
+        self.targets = [t.buffer(room.reach_m) if room.reach_m else t for t in room.targets]
+        empty = self.walk_floor.buffer(-self.half_walk)
+        self.reached_empty = [c for c in polygons_of(empty) if c.intersects(self.entry)]
+        self.islands = unary_union([c for c in polygons_of(empty) if not c.intersects(self.entry)])
         self.edges = room_edges(room.polygon)
         self.pieces: list[Piece] = []
         self.fronts: list[Polygon] = []
@@ -310,6 +346,8 @@ class _Planner:
             return "outside_room"
         if footprint.intersection(self.door_zone).area > SLIVER_M2:
             return "door_zone"
+        if any(footprint.intersection(zone).area > SLIVER_M2 for zone in self.room.keepouts):
+            return "stair_zone"
         if any(footprint.intersection(pane).area > SLIVER_M2 for pane in self.room.panes):
             return "pane_band"
         if any(footprint.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot != "decor"):
@@ -320,6 +358,8 @@ class _Planner:
         """Whether a floor piece on ``footprint`` with its ``front`` zone would cut the clear path (``blocks_path``)."""
         if not self.polygon.buffer(1e-7, join_style="mitre").contains(front):
             return True
+        if any(front.intersection(hole).area > SLIVER_M2 for hole in self.room.holes):
+            return True
         if any(front.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot != "decor"):
             return True
         if any(footprint.intersection(zone).area > SLIVER_M2 for zone in self.fronts):
@@ -327,18 +367,27 @@ class _Planner:
         return self.path_cut([footprint], [front])
 
     def path_cut(self, extra: Sequence[Polygon] = (), fronts: Sequence[Polygon] = ()) -> bool:
-        """Whether the pieces and ``extra`` cut a place the empty room reached off the door, or leave a front zone unreached."""
+        """Whether the pieces and ``extra`` cut a place the empty room reached off the door, leave a stair foot
+        (``targets``) cut off from the entry, or leave a front zone unreached."""
         floor = [p.footprint for p in self.pieces if p.slot != "decor"] + list(extra)
-        walk = self.polygon.difference(unary_union(floor)).buffer(-self.half_walk)
-        reached = unary_union([c for c in polygons_of(walk) if c.intersects(self.door_zone)])
+        walk = self.walk_floor.difference(unary_union(floor)).buffer(-self.half_walk)
+        reached = unary_union([c for c in polygons_of(walk) if c.intersects(self.entry)])
         if reached.is_empty:
             return True
         if walk.difference(reached).difference(self.islands).area > ISLAND_M2:
             return True
+        if self.cut_off(reached):
+            return True
         return any(not front.intersects(reached) for front in (*self.fronts, *fronts))
 
-    def fits_height(self, asset: FurnishAsset, z: float = 0.0) -> bool:
-        return z + asset.size_m[2] <= self.room.ceiling_m - self.cfg.head_clear_m + 1e-9
+    def cut_off(self, reached: BaseGeometry) -> bool:
+        """Whether a stair foot is out of ``reached``, the walk region joined to the entry."""
+        return any(not target.intersects(reached) for target in self.targets)
+
+    def fits_height(self, asset: FurnishAsset, z: float | None = None) -> bool:
+        """Whether the piece, standing at ``z`` (the room's floor when ``None``), keeps ``head_clear_m`` under the ceiling."""
+        base = self.room.floor_m if z is None else z
+        return base + asset.size_m[2] <= self.room.ceiling_m - self.cfg.head_clear_m + 1e-9
 
     def make(self, entry: FurnishEntry, slot: str, edge: _Edge, s: float) -> tuple[Piece, Polygon]:
         """The piece of ``entry`` with its back on ``edge`` from ``s``, and its front zone, ``walk_width_m`` deep."""
@@ -348,7 +397,8 @@ class _Planner:
         footprint = edge.rect(s, s + along, g, g + depth)
         centre = edge.a + edge.u * (s + along / 2) + edge.n * (g + depth / 2)
         yaw = (edge.yaw_deg + entry.turn_deg) % 360.0
-        piece = Piece(asset, slot, footprint, (float(centre[0]), float(centre[1])), 0.0, yaw, entry.turn_deg, piece_solid(asset, slot))
+        piece = Piece(asset, slot, footprint, (float(centre[0]), float(centre[1])), self.room.floor_m, yaw, entry.turn_deg,
+                      piece_solid(asset, slot))
         front = edge.rect(s, s + along, g + depth, g + depth + self.cfg.walk_width_m)
         return piece, front
 
@@ -468,15 +518,16 @@ class _Planner:
 
 
 def plan_room(room: FurnishRoom, furnish: ShopFurnish, catalogue: Mapping[str, FurnishAsset], seed: int, building_id: str) -> RoomFurnishing | str:
-    """The furniture of one shop room, or why it gets none: ``unreachable`` (no door), ``blocks_path`` (the empty room
-    has no clear path from its door, or every piece that fitted would cut it), ``no_free_wall`` (nothing fitted).
+    """The furniture of one room, or why it gets none: ``unreachable`` (no door), ``blocks_path`` (the empty room
+    has no clear path from its door, or none to a stair foot, or every piece that fitted would cut it), ``no_free_wall``
+    (nothing fitted).
 
     The counter comes first, then its decor, then the wall pieces. Budgets are the caller's (``FurnishBudget``).
     """
     if room.door_zone is None:
         return "unreachable"
     planner = _Planner(room, furnish, catalogue, seed, building_id)
-    if not planner.reached_empty:
+    if not planner.reached_empty or planner.cut_off(unary_union(planner.reached_empty)):
         return "blocks_path"
     counter = planner.place_counter()
     if counter is not None:
@@ -492,7 +543,7 @@ class FurnishError(ValueError):
     """The furnishing sets name a row the catalogues cannot give."""
 
 
-def load_catalogue(furnish: ShopFurnish, root: Path) -> dict[str, FurnishAsset]:
+def load_catalogue(furnish: ShopFurnish, root: Path, scope: str = "shops.furnish") -> dict[str, FurnishAsset]:
     """Every row the sets name, read from the allow-listed catalogues under ``root`` as overgrow will read it.
 
     The triangles are those after the load-time level of detail, so detail prices what overgrow builds. A row
@@ -508,7 +559,7 @@ def load_catalogue(furnish: ShopFurnish, root: Path) -> dict[str, FurnishAsset]:
     why = {reject.asset_id: reject.reason for reject in rejects}
     missing = [f"{i} ({why.get(i, 'not installed')})" for i in ids if i not in props]
     if missing:
-        raise FurnishError(f"shops.furnish: rows the catalogues under {root} do not give: " + ", ".join(missing))
+        raise FurnishError(f"{scope}: rows the catalogues under {root} do not give: " + ", ".join(missing))
     assets = {
         i: FurnishAsset(i, p.catalogue, p.licence, p.prop.spec.role, p.prop.spec.category,
                         (round(p.prop.size_m[0], 6), round(p.prop.size_m[1], 6), round(p.prop.size_m[2], 6)), p.prop.triangles, p.glb_sha256, p.parts)
@@ -545,9 +596,51 @@ def furnish_rooms(plan: InteriorPlan, records: Sequence[Mapping[str, Any]], pene
     return rooms
 
 
+def floor_rooms(plan: InteriorPlan, records: Sequence[Mapping[str, Any]], penetrations: Sequence[tuple[Segment, Hole]],
+                ic: Interiors, furnish: ShopFurnish) -> list[FurnishRoom]:
+    """The floors of a stair interior as furnishing sees them (ADR-034): one room per record ``<building>/L<n>``.
+
+    Every floor is ``plan.inner`` at the record's ``floor_z_m`` under its ``ceiling_z_m``. The entry is the door zone
+    on the ground floor and the arrival landing of the flight from below above it. The holes are the wells of the
+    flights of that level (standing on it) and of the level below (opening through it), roof climb included, by level.
+    The keep-outs are each hole plus ``WELL_CLEARANCE_M``, the foot of each flight of that level and the arrival of
+    the flight from below; the targets are those feet. A ``pane_clear_m`` band stands behind each see-through window
+    whose sill is on that storey (``floor_z_m <= v0 < ceiling_z_m``).
+    """
+    t, landing = ic.wall_thickness_m, ic.stair.landing_m
+    ends = [flight_landings(flight, landing) for flight in plan.flights]
+    door_zone = _door_zone(plan.door_segment, plan.door, ic)
+    rooms: list[FurnishRoom] = []
+    for record in records:
+        level, floor, ceiling = int(record["level"]), float(record["floor_z_m"]), float(record["ceiling_z_m"])
+        rising = [k for k, flight in enumerate(plan.flights) if flight.level == level]
+        arriving = [k for k, flight in enumerate(plan.flights) if flight.level == level - 1]
+        holes = tuple(plan.flights[k].well for k in (*rising, *arriving))
+        entry = door_zone if level == 0 else ends[arriving[0]][1]
+        panes = tuple(seg.plan_rect(hole.s0, hole.s0 + hole.width, -(t + furnish.pane_clear_m), 0.0)
+                      for seg, hole in penetrations if hole.back in SEE_THROUGH and floor <= hole.v0 < ceiling)
+        rooms.append(FurnishRoom(
+            str(record["id"]), plan.inner, entry, ceiling, "generic", panes,
+            floor_m=floor,
+            holes=holes,
+            keepouts=(*(hole.buffer(WELL_CLEARANCE_M) for hole in holes), *(ends[k][0] for k in rising), *(ends[k][1] for k in arriving)),
+            targets=tuple(ends[k][0] for k in rising),
+            reach_m=furnish.walk_width_m / 2,
+        ))
+    return rooms
+
+
+FLOOR_SCOPE = "interiors.furnish"
+
+
 @dataclass(slots=True)
 class ShopFurnishing:
-    """The map's furnishing pass: one call per built shop interior, in the order they were built."""
+    """The map's furnishing pass: one call per built interior, in the order they were built.
+
+    ``scope`` names the block it reads (``shops.furnish`` for the shop rooms, ``interiors.furnish`` for the floors of
+    the stair interior); each pass has its own budget. ``method`` is written on each room's block and ``room_key``
+    names the room count in ``stats``.
+    """
 
     furnish: ShopFurnish
     catalogue: Mapping[str, FurnishAsset]
@@ -559,23 +652,25 @@ class ShopFurnishing:
     pieces: Counter[str] = field(default_factory=Counter)
     refused: Counter[str] = field(default_factory=Counter)
     piece_refusals: Counter[str] = field(default_factory=Counter)
+    method: str = "shop_furnishing"
+    room_key: str = "shop_rooms"
 
     @classmethod
     def of(cls, furnish: ShopFurnish, catalogue: Mapping[str, FurnishAsset], seed: int) -> ShopFurnishing:
         return cls(furnish, catalogue, seed, FurnishBudget.of(furnish))
 
-    def furnish_interior(self, building_id: str, plan: InteriorPlan, built: Interior, penetrations: Sequence[tuple[Segment, Hole]],
-                         ic: Interiors) -> list[str]:
-        """Furnish every room of a built shop interior that fits; return one message per room left bare.
+    @classmethod
+    def of_floors(cls, furnish: ShopFurnish, catalogue: Mapping[str, FurnishAsset], seed: int) -> ShopFurnishing:
+        """The pass of the floors of the stair interior (ADR-034), with the budget of ``interiors.furnish``."""
+        return cls(furnish, catalogue, seed, FurnishBudget.of(furnish, FLOOR_SCOPE), method="residential_furnishing", room_key="floor_rooms")
 
-        A furnished room record gains ``furnishing``. When any room is furnished, the light probes are
-        placed again so no probe column stands in a piece. A room left bare keeps its shop interior.
-        """
-        records = built.spec["rooms"]
+    def _furnish(self, building_id: str, rooms: Sequence[FurnishRoom], records: Sequence[dict[str, Any]]) -> tuple[list[str], dict[str, BaseGeometry]]:
+        """Furnish each of ``rooms`` that fits, whole or not at all; return one message per room left bare, and the
+        plan of the floor pieces of each furnished room. Piece ids run on across the building's rooms."""
         messages: list[str] = []
-        floors: list[BaseGeometry] = []
+        floors: dict[str, BaseGeometry] = {}
         first = 0
-        for room in furnish_rooms(plan, records, penetrations, ic):
+        for room in rooms:
             self.rooms += 1
             self.reachable += room.door_zone is not None
             result = plan_room(room, self.furnish, self.catalogue, self.seed, building_id)
@@ -589,17 +684,42 @@ class ShopFurnishing:
             self.furnished += 1
             self.pieces.update(p.asset.asset_id for p in result.pieces)
             self.piece_refusals.update(result.refusals)
-            next(r for r in records if r["id"] == room.room_id)["furnishing"] = result.record(building_id, first)
+            block = replace(result, method=self.method).record(building_id, first)
+            next(r for r in records if r["id"] == room.room_id)["furnishing"] = block
             first += len(result.pieces)
-            floors.append(result.floor_footprints)
+            floors[room.room_id] = result.floor_footprints
+        return messages, floors
+
+    def furnish_interior(self, building_id: str, plan: InteriorPlan, built: Interior, penetrations: Sequence[tuple[Segment, Hole]],
+                         ic: Interiors) -> list[str]:
+        """Furnish every room of a built shop interior that fits; return one message per room left bare.
+
+        A furnished room record gains ``furnishing``. When any room is furnished, the light probes are
+        placed again so no probe column stands in a piece. A room left bare keeps its shop interior.
+        """
+        records = built.spec["rooms"]
+        messages, floors = self._furnish(building_id, furnish_rooms(plan, records, penetrations, ic), records)
         if floors:
-            built.light_anchors = light_anchors(plan, records, furniture=unary_union(floors))
+            built.light_anchors = light_anchors(plan, records, furniture=unary_union(list(floors.values())))
+        return messages
+
+    def furnish_floors(self, building_id: str, plan: InteriorPlan, built: Interior, penetrations: Sequence[tuple[Segment, Hole]],
+                       ic: Interiors) -> list[str]:
+        """Furnish every floor of a built stair interior that fits (ADR-034); return one message per floor left bare.
+
+        A furnished floor record gains ``furnishing``. The light of each floor stays where it was; when any floor is
+        furnished, the probes are placed again so no probe column of a floor stands in that floor's pieces.
+        """
+        records = built.spec["rooms"]
+        messages, floors = self._furnish(building_id, floor_rooms(plan, records, penetrations, ic, self.furnish), records)
+        if floors:
+            built.light_anchors = light_anchors(plan, records, room_furniture=floors)
         return messages
 
     def stats(self) -> dict[str, Any]:
-        """``counts.shop_furnishing`` in ``detail_report.json``."""
+        """``counts.shop_furnishing`` (or ``counts.floor_furnishing``) in ``detail_report.json``."""
         return {
-            "shop_rooms": self.rooms, "reachable_rooms": self.reachable, "furnished_rooms": self.furnished,
+            self.room_key: self.rooms, "reachable_rooms": self.reachable, "furnished_rooms": self.furnished,
             "pieces": sum(self.pieces.values()), "pieces_by_asset": dict(sorted(self.pieces.items())),
             "refusals_by_reason": dict(sorted(self.refused.items())),
             "piece_refusals_by_reason": dict(sorted(self.piece_refusals.items())),
