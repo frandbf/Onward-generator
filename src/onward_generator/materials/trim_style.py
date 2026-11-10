@@ -21,9 +21,15 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 
+from onward_generator.detail.typology import LATE_PERIOD, PERIODS
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STYLE_TABLE_PATH = REPO_ROOT / "config" / "facade_styles.json"
 STYLE_SCHEMA_PATH = REPO_ROOT / "config" / "facade_styles.schema.json"
+# Opt-in recipes for the styles whose atlas is null in the main table (plan D1).
+REGIONAL_TABLE_PATH = REPO_ROOT / "config" / "facade_styles.regional.json"
+# The era periods of detail (ADR-024), which key the era bands of an atlas.
+ERA_PERIODS = (*(name for name, _ in PERIODS), LATE_PERIOD)
 FACADE_MODES = ("trim", "legacy")
 AUTO = "auto"
 # The cells of the fit row, left to right. A window family has two shutter positions.
@@ -76,6 +82,53 @@ def load_style_table(path: str | Path | None = None) -> StyleTable:
     return StyleTable(source, hashlib.sha256(raw).hexdigest(), str(doc["default_style"]), rules, styles)
 
 
+@dataclass(frozen=True, slots=True)
+class RegionalTable:
+    """The opt-in atlas recipes of ``config/facade_styles.regional.json``, by style name."""
+
+    path: Path
+    sha256: str
+    atlases: Mapping[str, Mapping[str, Any]]
+
+
+def load_regional_table(table: StyleTable, path: str | Path | None = None) -> RegionalTable:
+    """Read and validate the regional recipes against ``table``.
+
+    Each recipe must name a style of ``table`` whose atlas is null there: a regional
+    recipe never replaces an atlas the main table already has (the mediterranean one).
+    """
+    source = Path(path) if path is not None else REGIONAL_TABLE_PATH
+    raw = source.read_bytes()
+    try:
+        doc = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise StyleError(f"{source}: not JSON: {exc}") from exc
+    schema = json.loads(STYLE_SCHEMA_PATH.read_bytes())
+    regional = {"$defs": schema["$defs"], "$ref": "#/$defs/regional_table"}
+    first = best_match(Draft202012Validator(regional).iter_errors(doc))
+    if first is not None:
+        where = "/".join(str(p) for p in first.absolute_path) or "(root)"
+        raise StyleError(f"{source}: {where}: {first.message}")
+    atlases: dict[str, Mapping[str, Any]] = doc["atlases"]
+    for name, atlas in atlases.items():
+        if name not in table.styles:
+            raise StyleError(f"{source}: style {name!r} is not in the style table")
+        if table.styles[name].atlas is not None:
+            raise StyleError(f"{source}: style {name} already has an atlas in the style table")
+        _check_atlas(name, atlas)
+    return RegionalTable(source, hashlib.sha256(raw).hexdigest(), atlases)
+
+
+def style_atlas(table: StyleTable, name: str, regional: RegionalTable | None) -> tuple[Mapping[str, Any] | None, str | None]:
+    """The atlas of a style and where it comes from: ``table``, ``regional`` or none."""
+    atlas = table.styles[name].atlas
+    if atlas is not None:
+        return atlas, "table"
+    if regional is not None and name in regional.atlases:
+        return regional.atlases[name], "regional"
+    return None, None
+
+
 def _box(raw: Sequence[float]) -> tuple[float, float, float, float]:
     lat0, lat1, lon0, lon1 = (float(v) for v in raw)
     return lat0, lat1, lon0, lon1
@@ -91,6 +144,13 @@ def _check_atlas(name: str, atlas: Mapping[str, Any]) -> None:
     if wall_strip_px(atlas) < 4 * int(atlas["gutter_px"]):
         strips = len(atlas["walls"]) * len(atlas["tones"])
         raise StyleError(f"style {name}: {strips} wall strips do not fit the atlas height")
+    for period, band in (atlas.get("eras") or {}).items():
+        for tone in band["tones"]:
+            if tone >= len(atlas["tones"]):
+                raise StyleError(f"style {name}: era {period} tone {tone} has no strip")
+        for family in band["window_families"]:
+            if family >= len(atlas["window_families"]):
+                raise StyleError(f"style {name}: era {period} window family {family} does not exist")
 
 
 def select_style(table: StyleTable, latitude: float, longitude: float) -> str:

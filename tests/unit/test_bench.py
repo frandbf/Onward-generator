@@ -758,3 +758,8 @@ def test_store_lightmap_pages_max_needs_a_map(tmp_path: Path) -> None:
 def test_the_run_parser_takes_the_balanced_spawns_switch() -> None:
     assert bench.build_parser().parse_args(["run", "--balanced-spawns"]).balanced_spawns is True
     assert bench.build_parser().parse_args(["run"]).balanced_spawns is False
+
+
+def test_the_run_parser_takes_the_regional_facades_switch() -> None:
+    assert bench.build_parser().parse_args(["run", "--regional-facades"]).regional_facades is True
+    assert bench.build_parser().parse_args(["run"]).regional_facades is False

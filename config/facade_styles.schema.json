@@ -53,6 +53,23 @@
     }
   },
   "$defs": {
+    "regional_table": {
+      "description": "Opt-in atlas recipes for styles whose atlas is null in facade_styles.json (plan D1, ADR-020 amendment). Read only with map.json regional_facades: true or materials apply --regional-facades.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "schema_version", "atlases"],
+      "properties": {
+        "schema": { "const": "onward_generator.facade_styles_regional" },
+        "schema_version": { "const": "0.1.0" },
+        "description": { "type": "string" },
+        "atlases": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[a-z_]+$" },
+          "additionalProperties": { "$ref": "#/$defs/atlas" }
+        }
+      }
+    },
     "rgb": {
       "type": "array",
       "items": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -127,6 +144,11 @@
             "additionalProperties": false,
             "required": ["frame", "shutter", "closed"],
             "properties": {
+              "kind": {
+                "description": "How the cell is painted: shutter (a roller shutter under its box, the default), casement (two leaves under a transom), sash (two sashes with glazing bars) or grille (iron bars over the glass, timber leaves behind). closed is the share of the glass the shutter, an inner blind (casement, sash) or the leaves (grille) hide; shutter is that blind's or those leaves' colour.",
+                "enum": ["shutter", "casement", "sash", "grille"]
+              },
+              "iron": { "$ref": "#/$defs/rgb" },
               "frame": { "$ref": "#/$defs/rgb" },
               "shutter": { "$ref": "#/$defs/rgb" },
               "closed": {
@@ -134,6 +156,32 @@
                 "items": { "type": "number", "minimum": 0, "maximum": 0.9 },
                 "minItems": 1,
                 "maxItems": 3
+              }
+            },
+            "if": { "required": ["kind"], "properties": { "kind": { "const": "grille" } } },
+            "then": { "required": ["iron"] }
+          }
+        },
+        "eras": {
+          "description": "Era bands (plan D1, ADR-027 amendment): for a building whose record has an observed facade.typology.era, the tones and window families it may take and the dress shares that change. The era is observed; the band is an estimate. A building with no observed era, or an era with no band, keeps the style's own look.",
+          "type": "object",
+          "propertyNames": { "enum": ["pre_1900", "1900_1939", "1940_1959", "1960_1979", "1980_1999", "2000_plus"] },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tones", "window_families"],
+            "properties": {
+              "tones": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1, "maxItems": 3, "uniqueItems": true },
+              "window_families": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1, "maxItems": 4, "uniqueItems": true },
+              "dress": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "zocalo_share": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "cornice_share": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "course_share": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
               }
             }
           }

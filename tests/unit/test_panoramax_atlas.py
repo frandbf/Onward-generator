@@ -14,7 +14,7 @@ from PIL import Image
 
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh, quad
-from onward_generator.materials.trim_style import TrimLayout, load_style_table, trim_layout
+from onward_generator.materials.trim_style import TrimLayout, load_regional_table, load_style_table, trim_layout
 from onward_generator.panoramax.apply import (
     _CELL_SIDE,
     TINT_SKIP_REASONS,
@@ -668,3 +668,25 @@ def test_rows_keeps_the_dict_rows_and_refuses_another_type() -> None:
     assert _rows([{"a": 1}, "x", {"b": 2}]) == [{"a": 1}, {"b": 2}]
     with pytest.raises(TypeError, match="^match_facades gave str, not a list$"):
         _rows("x")
+
+
+def test_tint_atlas_for_reads_a_scene_baked_from_the_regional_table() -> None:
+    table = load_style_table()
+    regional = load_regional_table(table)
+    anglo = regional.atlases["anglo"]
+    png = _png(anglo["size_px"], anglo["height_px"])
+    images = {"facade_trim_anglo": png}
+    facades = {"mode": "trim", "style": "anglo", "style_table_sha256": table.sha256, "regional_table_sha256": regional.sha256}
+    atlas = tint_atlas_for(facades, images)
+    assert isinstance(atlas, TintAtlas) and atlas.style == "anglo"
+    assert atlas.layout == trim_layout(anglo)
+    # Anglo draws its cream walls as buff brick: the tint moves them among the bricks.
+    assert atlas.families["plaster_cream"] == "brick" and atlas.families["plaster_white"] == "plaster"
+    assert "facade_trim_anglo" in atlas.materials
+    with pytest.raises(PanoramaxError, match="^the materials scene was built with another regional facade table; rerun materials$"):
+        tint_atlas_for({**facades, "regional_table_sha256": "0" * 64}, images)
+    # Without the key, a regional style has no atlas, as before plan D1.
+    legacy = {key: value for key, value in facades.items() if key != "regional_table_sha256"}
+    assert tint_atlas_for(legacy, images) == "no_trim_atlas"
+    assert tint_atlas_for({**facades, "style": "generic"}, {"facade_trim_generic": png}) == "no_trim_atlas"
+    assert tint_atlas_for({**facades, "style": "nordic"}, {"facade_trim_nordic": png}) == "no_trim_atlas"

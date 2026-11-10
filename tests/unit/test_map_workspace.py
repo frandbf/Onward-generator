@@ -745,3 +745,37 @@ def test_store_sightline_cover_needs_a_map(tmp_path: Path) -> None:
 
     with pytest.raises(MapError, match="not found"):
         store_sightline_cover(tmp_path / "nowhere", True)
+
+
+def test_regional_facades_are_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import regional_facades_enabled, store_regional_facades
+
+    assert regional_facades_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "regional_facades" not in load_map(root)
+    assert regional_facades_enabled(root) is False
+    before = load_map(root)
+    store_regional_facades(root, True)
+    assert load_map(root) == before | {"regional_facades": True} and regional_facades_enabled(root) is True
+    store_regional_facades(root, False)
+    assert load_map(root)["regional_facades"] is False and regional_facades_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_regional_facades_refuse_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import regional_facades_enabled, store_regional_facades
+
+    root = _atlas_map(tmp_path, regional_facades=value)
+    with pytest.raises(MapError) as caught:
+        regional_facades_enabled(root)
+    assert str(caught.value) == f'map.json "regional_facades" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_regional_facades(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"regional_facades" must be true or false, got {value!r}'
+
+
+def test_store_regional_facades_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_regional_facades
+
+    with pytest.raises(MapError, match="not found"):
+        store_regional_facades(tmp_path / "nowhere", True)

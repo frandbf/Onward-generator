@@ -259,6 +259,88 @@ def window_pixels(width: int, height: int, family: Mapping[str, Any], closed: fl
     return np.where(between(y, -INF, 0.02)[..., None], rgb * 0.6, rgb)
 
 
+def _sill_shadow(y: np.ndarray, rgb: np.ndarray) -> np.ndarray:
+    """The two lowest rows of a cell, in the shadow of the sill."""
+    return np.where(between(y, -INF, 0.02)[..., None], rgb * 0.6, rgb)
+
+
+def _blind(x: np.ndarray, y: np.ndarray, rgb: np.ndarray, color: Sequence[float], closed: float, top: float) -> np.ndarray:
+    """An inner blind lowered from ``top`` over ``closed`` of the glass, seen through it: folds, no slats.
+
+    It spans the cell's width: the caller paints the frame over its sides afterwards.
+    """
+    bottom = top - closed * (top - 0.05)
+    folds = 0.8 + 0.06 * np.cos(x * 2 * np.pi * 9)
+    drawn = between(y, bottom, top)
+    return np.where(drawn[..., None], np.asarray(color) * folds[..., None], rgb)
+
+
+def casement_pixels(width: int, height: int, family: Mapping[str, Any], closed: float) -> np.ndarray:
+    """Two casement leaves under a fanlight and its transom, no shutter box; an inner blind over ``closed`` of the glass."""
+    x, y = _cell_grid(width, height)
+    rgb = _blind(x, y, _glass(x, y, 0.06), family["shutter"], closed, 0.95)
+    outer = ~between(x, 0.06, 0.94) | ~between(y, 0.05, 0.95)
+    transom = between(np.abs(y - 0.74), -INF, 0.018)
+    stiles = between(np.abs(x - 0.5), -INF, 0.035) & between(y, -INF, 0.74)
+    frame = outer | transom | stiles
+    rgb = np.where(frame[..., None], np.asarray(family["frame"]), rgb)
+    # The meeting stiles of the two leaves: a dark line between them.
+    rgb = np.where((between(np.abs(x - 0.5), -INF, 0.004) & between(y, 0.05, 0.74))[..., None], np.asarray(family["frame"]) * 0.5, rgb)
+    return _sill_shadow(y, rgb)
+
+
+SASH_BARS_X = (1 / 3, 2 / 3)
+SASH_BARS_Y = (0.275, 0.725)
+
+
+def sash_pixels(width: int, height: int, family: Mapping[str, Any], closed: float) -> np.ndarray:
+    """A sliding sash window, six panes over six: a meeting rail at mid height, thin glazing bars, an inner blind."""
+    x, y = _cell_grid(width, height)
+    rgb = _blind(x, y, _glass(x, y, 0.06), family["shutter"], closed, 0.95)
+    bars = np.zeros(np.broadcast_shapes(x.shape, y.shape), dtype=bool)
+    for bar in SASH_BARS_X:
+        bars |= between(np.abs(x - bar), -INF, 0.008)
+    for bar in SASH_BARS_Y:
+        bars |= between(np.abs(y - bar), -INF, 0.008)
+    rail = between(np.abs(y - 0.5), -INF, 0.025)
+    frame = ~between(x, 0.06, 0.94) | ~between(y, 0.05, 0.95) | rail | bars
+    rgb = np.where(frame[..., None], np.asarray(family["frame"]), rgb)
+    # The upper sash sits in front: its meeting rail casts a line on the lower one.
+    rgb = np.where((between(y, 0.47, 0.475) & between(x, 0.06, 0.94))[..., None], rgb * 0.6, rgb)
+    return _sill_shadow(y, rgb)
+
+
+GRILLE_BARS = 7
+
+
+def grille_pixels(width: int, height: int, family: Mapping[str, Any], closed: float) -> np.ndarray:
+    """Iron bars over two glazed leaves; timber leaves behind close in from both sides over ``closed`` of the glass."""
+    x, y = _cell_grid(width, height)
+    rgb = _glass(x, y, 0.05)
+    reach = closed * 0.44
+    # Full height, from each side: the frame painted next covers what lies outside the glass.
+    leaves = between(x, -INF, 0.06 + reach) | between(x, 0.94 - reach, INF)
+    panel = 0.85 + 0.1 * between((y * 4.0) % 1.0, 0.1, 0.9)
+    rgb = np.where(leaves[..., None], np.asarray(family["shutter"]) * panel[..., None], rgb)
+    frame = ~between(x, 0.06, 0.94) | ~between(y, 0.05, 0.95) | between(np.abs(x - 0.5), -INF, 0.012)
+    rgb = np.where(frame[..., None], np.asarray(family["frame"]), rgb)
+    pitch = 0.88 / GRILLE_BARS
+    bars = between(np.abs((x - 0.06) - np.round((x - 0.06) / pitch) * pitch), -INF, 0.008) & between(x, 0.07, 0.93)
+    rails = between(np.abs(y - 0.12), -INF, 0.01) | between(np.abs(y - 0.88), -INF, 0.01)
+    iron = (bars | rails) & between(y, 0.03, 0.97)
+    rgb = np.where(iron[..., None], np.asarray(family["iron"]), rgb)
+    return _sill_shadow(y, rgb)
+
+
+def paint_window(width: int, height: int, family: Mapping[str, Any], closed: float) -> np.ndarray:
+    """The cell of one window family and position, by the family's ``kind``; without one, the roller shutter."""
+    kind = family.get("kind")
+    if kind is None or kind == "shutter":
+        return window_pixels(width, height, family, closed)
+    painters = {"casement": casement_pixels, "sash": sash_pixels, "grille": grille_pixels}
+    return painters[str(kind)](width, height, family, closed)
+
+
 def door_pixels(width: int, height: int, color: Sequence[float], rng: np.random.Generator) -> np.ndarray:
     """A panelled two-leaf door: wood grain, two raised panels per leaf, a dark frame."""
     x, y = _cell_grid(width, height)
@@ -338,7 +420,7 @@ def bake_trim_atlas(
     names = iter(window_cells(atlas))
     for family in atlas["window_families"]:
         for closed in family["closed"]:
-            _paint_cell(image, layout.cells[next(names)], gutter, window_pixels(w, h, family, float(closed)))
+            _paint_cell(image, layout.cells[next(names)], gutter, paint_window(w, h, family, float(closed)))
     colors = atlas["door_colors"]
     for index, door in enumerate(DOOR_CELLS):
         _paint_cell(image, layout.cells[door], gutter, door_pixels(w, h, colors[index % len(colors)], rng))

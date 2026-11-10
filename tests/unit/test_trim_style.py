@@ -10,12 +10,16 @@ from typing import Any
 import pytest
 
 from onward_generator.materials.trim_style import (
+    ERA_PERIODS,
+    REGIONAL_TABLE_PATH,
     STYLE_TABLE_PATH,
     StyleError,
     fit_cells,
+    load_regional_table,
     load_style_table,
     resolve_style,
     select_style,
+    style_atlas,
     trim_layout,
     wall_strip_px,
     window_cells,
@@ -183,3 +187,99 @@ def test_layout_rows_and_uvs() -> None:
     last = layout.cells["boarded"]
     assert (last.col0, last.col1) == (7 * 192, 8 * 192)
     assert last.u1 == pytest.approx((8 * 192 - 8) / 2048)
+
+
+# The shipped main table, unchanged by plan D1: materials reports and the Panoramax tint read its hash.
+MAIN_TABLE_SHA256 = "a1282b14f763b38ebdc66ad7d1b807f8ad5ee962a139a4cb6f7f302ef1068237"
+REGIONAL = ("central_european", "anglo", "latin_american")
+
+
+def _regional_doc() -> dict[str, Any]:
+    return json.loads(REGIONAL_TABLE_PATH.read_text(encoding="utf-8"))
+
+
+def _write_regional(tmp_path: Path, doc: Any) -> Path:
+    path = tmp_path / "regional.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    return path
+
+
+def test_the_main_table_is_unchanged() -> None:
+    assert load_style_table().sha256 == MAIN_TABLE_SHA256
+
+
+def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
+    table = load_style_table()
+    regional = load_regional_table(table)
+    assert regional.path == REGIONAL_TABLE_PATH and len(regional.sha256) == 64
+    assert set(regional.atlases) == set(REGIONAL)
+    kinds = {"central_european": {"casement"}, "anglo": {"sash", "casement"}, "latin_american": {"grille", "casement"}}
+    for name, atlas in regional.atlases.items():
+        # The Panoramax tint moves inside a wall family: every family is still there.
+        assert set(atlas["walls"]) == set(table.styles["mediterranean"].atlas["walls"])  # type: ignore[index]
+        assert set(atlas["walls"].values()) == {"plaster", "ashlar", "brick"}
+        assert len(fit_cells(atlas)) * atlas["fit_cell_px"] <= atlas["size_px"]
+        assert wall_strip_px(atlas) == 184
+        assert {f["kind"] for f in atlas["window_families"]} == kinds[name]
+        assert set(atlas["eras"]) == set(ERA_PERIODS)
+        assert atlas["sources"]["plaster"] != "acg_paintedplaster010"
+
+
+def test_era_periods_follow_detail() -> None:
+    assert ERA_PERIODS == ("pre_1900", "1900_1939", "1940_1959", "1960_1979", "1980_1999", "2000_plus")
+    schema = json.loads((STYLE_TABLE_PATH.parent / "facade_styles.schema.json").read_text(encoding="utf-8"))
+    assert schema["$defs"]["atlas"]["properties"]["eras"]["propertyNames"]["enum"] == list(ERA_PERIODS)
+
+
+def test_style_atlas_takes_the_table_first_then_the_regional_recipe() -> None:
+    table = load_style_table()
+    regional = load_regional_table(table)
+    medi = table.styles["mediterranean"].atlas
+    assert style_atlas(table, "mediterranean", None) == (medi, "table")
+    assert style_atlas(table, "mediterranean", regional) == (medi, "table")
+    assert style_atlas(table, "central_european", None) == (None, None)
+    assert style_atlas(table, "central_european", regional) == (regional.atlases["central_european"], "regional")
+    assert style_atlas(table, "generic", None) == (None, None)
+    assert style_atlas(table, "generic", regional) == (None, None)
+
+
+def test_regional_table_refusals(tmp_path: Path) -> None:
+    table = load_style_table()
+    path = tmp_path / "regional.json"
+    path.write_text("{", encoding="utf-8")
+    with pytest.raises(StyleError, match="regional.json: not JSON"):
+        load_regional_table(table, path)
+
+    def refused(change: Any, message: str) -> None:
+        doc = _regional_doc()
+        change(doc)
+        with pytest.raises(StyleError, match=message):
+            load_regional_table(table, _write_regional(tmp_path, doc))
+
+    refused(lambda d: d.update(extra=1), r"regional.json: \(root\): Additional properties")
+    refused(lambda d: d.update(schema="onward_generator.facade_styles"), r"schema: 'onward_generator.facade_styles_regional' was expected")
+    refused(lambda d: d["atlases"].update(nordic=d["atlases"]["anglo"]), "style 'nordic' is not in the style table")
+    refused(lambda d: d["atlases"].update(mediterranean=d["atlases"]["anglo"]), "style mediterranean already has an atlas in the style table")
+    refused(lambda d: d["atlases"]["anglo"]["eras"].update(victorian={"tones": [0], "window_families": [0]}), "atlases/anglo/eras")
+    refused(lambda d: d["atlases"]["anglo"]["eras"]["pre_1900"].update(tones=[3]), "style anglo: era pre_1900 tone 3 has no strip")
+    refused(lambda d: d["atlases"]["anglo"]["eras"]["pre_1900"].update(window_families=[3]),
+            "style anglo: era pre_1900 window family 3 does not exist")
+    refused(lambda d: d["atlases"]["anglo"]["eras"]["pre_1900"].update(tones=[]), "should be non-empty")
+    refused(lambda d: d["atlases"]["anglo"]["eras"]["pre_1900"].pop("tones"), "'tones' is a required property")
+    refused(lambda d: d["atlases"]["latin_american"]["window_families"][0].pop("iron"), "'iron' is a required property")
+    refused(lambda d: d["atlases"]["anglo"]["window_families"][0].update(kind="louvre"), "'louvre' is not one of")
+    refused(lambda d: d["atlases"]["anglo"]["window_families"].append(d["atlases"]["anglo"]["window_families"][0]),
+            "style anglo: 12 cells of 192 px do not fit the atlas width")
+    refused(lambda d: d["atlases"]["anglo"]["scenic_walls"].update(scenic_wall_light="plaster_grey"),
+            "style anglo: scenic wall scenic_wall_light maps to plaster_grey, which has no strip")
+    # The last valid indices pass.
+    doc = _regional_doc()
+    doc["atlases"]["anglo"]["eras"]["pre_1900"].update(tones=[2], window_families=[2])
+    assert load_regional_table(table, _write_regional(tmp_path, doc)).atlases["anglo"]["eras"]["pre_1900"]["tones"] == [2]
+
+
+def test_a_main_table_keeps_its_own_eras_checks(tmp_path: Path) -> None:
+    doc = _doc()
+    doc["styles"]["mediterranean"]["atlas"]["eras"] = {"1960_1979": {"tones": [3], "window_families": [0]}}
+    with pytest.raises(StyleError, match="style mediterranean: era 1960_1979 tone 3 has no strip"):
+        load_style_table(_write(tmp_path, doc))

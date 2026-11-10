@@ -39,7 +39,7 @@ from onward_generator.geo.projection import LocalFrame
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.maps.workspace import DEFAULT_COMBINE_CELL_M, MapError, load_map
 from onward_generator.materials.trim import scenic_trim_material, trim_material
-from onward_generator.materials.trim_style import Strip, TrimLayout, load_style_table, trim_layout
+from onward_generator.materials.trim_style import Strip, TrimLayout, load_regional_table, load_style_table, style_atlas, trim_layout
 from onward_generator.next_step import map_root
 from onward_generator.panoramax.cache import PanoramaxError, cache_directory
 from onward_generator.panoramax.match import (
@@ -816,9 +816,16 @@ def tint_atlas_for(facades: Mapping[str, Any] | None, images: Mapping[str, bytes
     style = str(facades.get("style"))
     entry = table.styles.get(style)
     png = images.get(trim_material(style))
-    if entry is None or entry.atlas is None or png is None:
+    regional = None
+    if "regional_table_sha256" in facades:
+        # Baked from the opt-in regional recipes (plan D1): they must still be the ones the scene used.
+        regional = load_regional_table(table)
+        if facades["regional_table_sha256"] != regional.sha256:
+            raise PanoramaxError("the materials scene was built with another regional facade table; rerun materials")
+    atlas = None if entry is None else style_atlas(table, style, regional)[0]
+    if atlas is None or png is None:
         return "no_trim_atlas"
-    layout = trim_layout(entry.atlas)
+    layout = trim_layout(atlas)
     with Image.open(io.BytesIO(png)) as image:
         if image.size != (layout.size, layout.height):
             return "layout_mismatch"
@@ -827,7 +834,7 @@ def tint_atlas_for(facades: Mapping[str, Any] | None, images: Mapping[str, bytes
     return TintAtlas(
         style,
         layout,
-        {str(wall): str(family) for wall, family in entry.atlas["walls"].items()},
+        {str(wall): str(family) for wall, family in atlas["walls"].items()},
         strip_colours(rgb, layout),
         frozenset([*trims, *(party_material(name) for name in trims)]),
     )

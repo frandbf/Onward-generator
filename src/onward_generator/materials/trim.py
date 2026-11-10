@@ -44,8 +44,10 @@ from onward_generator.materials.trim_style import (
     Strip,
     StyleError,
     TrimLayout,
+    load_regional_table,
     load_style_table,
     resolve_style,
+    style_atlas,
     trim_layout,
 )
 
@@ -199,11 +201,42 @@ def stable_unit(*parts: object) -> float:
     return int.from_bytes(digest[:8]) / 2.0**64
 
 
-def building_look(key: str, atlas: Mapping[str, Any]) -> Look:
-    """The tone and the dress of one building, by ``sha256`` of its look key and the shares of the style."""
-    dress = atlas["dress"]
+def observed_period(record: Mapping[str, Any] | None) -> str | None:
+    """The era period of a building record (``facade.typology.era``), only when it is observed; else None.
+
+    Unknown stays unknown (ADR-024): no era, an estimated one or a malformed record gives None.
+    """
+    facade = (record or {}).get("facade")
+    typology = facade.get("typology") if isinstance(facade, Mapping) else None
+    era = typology.get("era") if isinstance(typology, Mapping) else None
+    if not isinstance(era, Mapping) or era.get("origin") != "observed":
+        return None
+    period = era.get("period")
+    return period if isinstance(period, str) else None
+
+
+def era_band(atlas: Mapping[str, Any], period: str | None) -> Mapping[str, Any] | None:
+    """The era band of ``atlas`` for ``period``, or None (no period, or none drawn for it)."""
+    if period is None:
+        return None
+    band: Mapping[str, Any] | None = (atlas.get("eras") or {}).get(period)
+    return band
+
+
+def building_look(key: str, atlas: Mapping[str, Any], band: Mapping[str, Any] | None = None) -> Look:
+    """The tone and the dress of one building, by ``sha256`` of its look key and the shares of the style.
+
+    An era ``band`` narrows the tones to its own and overrides the dress shares it names.
+    """
+    if band is None:
+        dress = atlas["dress"]
+        tone = stable_index(len(atlas["tones"]), key, "tone")
+    else:
+        dress = {**atlas["dress"], **(band.get("dress") or {})}
+        tones = band["tones"]
+        tone = int(tones[stable_index(len(tones), key, "tone")])
     return Look(
-        stable_index(len(atlas["tones"]), key, "tone"),
+        tone,
         stable_unit(key, "zocalo") < float(dress["zocalo_share"]),
         stable_unit(key, "cornice") < float(dress["cornice_share"]),
         stable_unit(key, "courses") < float(dress["course_share"]),
@@ -330,6 +363,8 @@ class TrimStats:
     kept_materials: dict[str, int] = field(default_factory=dict)
     cells: dict[str, int] = field(default_factory=dict)
     looks: dict[str, int] = field(default_factory=dict)
+    # Buildings by era band, only for an atlas that has eras: the period, ``no_band`` or ``unknown``.
+    eras: dict[str, int] = field(default_factory=dict)
 
     def count_look(self, look: Look) -> None:
         names = [f"tone_{look.tone}"] + [name for name, on in (("zocalo", look.zocalo), ("cornice", look.cornice),
@@ -346,6 +381,7 @@ class TrimStats:
             "kept_materials": dict(sorted(self.kept_materials.items())),
             "openings_by_cell": dict(sorted(self.cells.items())),
             "looks": dict(sorted(self.looks.items())),
+            **({"eras": dict(sorted(self.eras.items()))} if self.eras else {}),
         }
 
 
@@ -359,7 +395,11 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
     # The first value of the building's ``uv_phase`` (materials apply), or none.
     phase_u = float(sum((extras.get("uv_phase") or [])[:1]))
     key = look_key(node.name)
-    look = building_look(key, atlas)
+    period = observed_period(record)
+    band = era_band(atlas, period)
+    look = building_look(key, atlas, band)
+    if band is not None:
+        windows = [windows[i] for i in band["window_families"]]
     merged: dict[str, tuple[list[Mesh], list[np.ndarray]]] = {}
     kept: list[Primitive] = []
     for prim in node.primitives:
@@ -396,6 +436,9 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
         return node
     stats.buildings += 1
     stats.count_look(look)
+    if "eras" in atlas:
+        era = "unknown" if period is None else period if band is not None else "no_band"
+        stats.eras[era] = stats.eras.get(era, 0) + 1
     trims = [Primitive(merge(meshes), name, np.vstack(uv_list).astype(np.float32)) for name, (meshes, uv_list) in sorted(merged.items())]
     return replace(node, primitives=(*trims, *kept))
 
@@ -456,11 +499,15 @@ def apply_trim(
     style: str = AUTO,
     table_path: str | Path | None = None,
     cache: TileCache | None = None,
+    regional: bool = False,
+    regional_table_path: str | Path | None = None,
 ) -> TrimResult:
     """Choose the style, bake (or read from ``cache``) its atlas and remap the building nodes.
 
     ``colors`` are the linear wall colours of the scene by material id. A mode of
-    ``legacy``, or a style without an atlas, returns the nodes unchanged.
+    ``legacy``, or a style without an atlas, returns the nodes unchanged. With
+    ``regional`` (plan D1, off by default) a style whose atlas is null in the table
+    takes its recipe from the regional table, when that has one.
     """
     if mode not in FACADE_MODES:
         raise StyleError(f"unknown facade mode {mode!r}; known: {', '.join(FACADE_MODES)}")
@@ -468,7 +515,9 @@ def apply_trim(
     origin = (manifest.get("frame") or {}).get("origin_wgs84")
     name, chosen = resolve_style(table, style, origin)
     head = {"mode": mode, "style": name, "style_origin": chosen, "style_table_sha256": table.sha256}
-    atlas = table.styles[name].atlas
+    wants_regional = regional and mode == "trim" and table.styles[name].atlas is None
+    regional_table = load_regional_table(table, regional_table_path) if wants_regional else None
+    atlas, atlas_origin = style_atlas(table, name, regional_table)
     if mode == "legacy" or atlas is None:
         reason = "config" if mode == "legacy" else "style_has_no_atlas"
         return TrimResult("legacy", name, list(nodes), report={**head, "mode": "legacy", "reason": reason})
@@ -492,8 +541,14 @@ def apply_trim(
     out, stats = trim_nodes(nodes, records_by_id, name, atlas, layout)
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
+    extra: dict[str, Any] = {}
+    if regional_table is not None:
+        extra = {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
+        if "eras" in atlas:
+            extra["era_bands"] = {"era_origin": "observed", "band_origin": "estimated", "buildings": dict(sorted(stats.eras.items()))}
     report = {
         **head,
+        **extra,
         "materials": used,
         "atlas": {
             "size": [layout.size, layout.height], "sha256": hashlib.sha256(png).hexdigest(), "cache_key": key,

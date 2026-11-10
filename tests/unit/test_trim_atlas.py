@@ -16,12 +16,16 @@ from onward_generator.materials.trim_atlas import (
     bake_trim_atlas,
     between,
     boarded_pixels,
+    casement_pixels,
     cornice_pixels,
     door_pixels,
     grain,
+    grille_pixels,
     linear_to_srgb8,
     luma_rgb,
+    paint_window,
     sample_periodic,
+    sash_pixels,
     shop_glass_pixels,
     srgb_to_linear,
     stone_pixels,
@@ -30,7 +34,7 @@ from onward_generator.materials.trim_atlas import (
     window_pixels,
     zocalo_pixels,
 )
-from onward_generator.materials.trim_style import load_style_table, trim_layout
+from onward_generator.materials.trim_style import load_regional_table, load_style_table, trim_layout
 
 TINTS = {
     "brick_red": (0.62, 0.28, 0.22), "plaster_cream": (0.96, 0.86, 0.62), "plaster_ochre": (0.93, 0.66, 0.28),
@@ -218,3 +222,141 @@ def test_bake_is_deterministic_opaque_and_padded() -> None:
 
 
 GOLDEN = "e9af2f31b06d43236b1031c12fb6a1da86468d54536e32d8fe106e964ce0bee5"
+
+
+# window_pixels of both mediterranean families at closed 0, 0.25, 0.4 and 0.7 (176 x 368), rounded to 9
+# decimals, before plan D1 added the window kinds: the shutter cell must not change.
+SHUTTER_WINDOWS = "0e2bceb43e3c90d50a4d0274ce6b66f9ff355c72bce37999217a3eacbaff2870"
+
+
+def _windows_digest(paint: Any, families: list[dict[str, Any]]) -> str:
+    digest = hashlib.sha256()
+    for family in families:
+        for closed in (0.0, 0.25, 0.4, 0.7):
+            digest.update(np.round(paint(176, 368, family, closed), 9).tobytes())
+    return digest.hexdigest()
+
+
+def test_the_shutter_window_keeps_its_bytes() -> None:
+    families = list((load_style_table().styles["mediterranean"].atlas or {})["window_families"])
+    assert all("kind" not in family for family in families)
+    assert _windows_digest(window_pixels, families) == SHUTTER_WINDOWS
+    assert _windows_digest(paint_window, families) == SHUTTER_WINDOWS
+    assert _windows_digest(paint_window, [{**f, "kind": "shutter"} for f in families]) == SHUTTER_WINDOWS
+
+
+FRAME = [0.9, 0.9, 0.9]
+BLIND = [0.2, 0.6, 0.2]
+IRON = [0.05, 0.05, 0.06]
+
+
+def _at(pixels: np.ndarray, x: float, y: float) -> np.ndarray:
+    """The pixel at cell coordinates x (0-1 left to right), y (0-1 bottom to top)."""
+    h, w = pixels.shape[:2]
+    return pixels[int((1.0 - y) * h), int(x * w)]
+
+
+def test_a_casement_has_a_transom_and_no_shutter_box() -> None:
+    family = {"kind": "casement", "frame": FRAME, "shutter": BLIND, "closed": [0.0]}
+    open_ = casement_pixels(200, 400, family, 0.0)
+    assert open_.shape == (400, 200, 3)
+    # No shutter box at the top: glass (blue-ish) under the top frame, not the shutter colour.
+    assert _at(open_, 0.25, 0.92).argmax() == 2
+    assert _at(open_, 0.25, 0.74).tolist() == FRAME  # the transom
+    assert _at(open_, 0.47, 0.4).tolist() == FRAME  # a meeting stile
+    assert _at(open_, 0.47, 0.85).argmax() == 2  # the fanlight has no stile
+    assert _at(open_, 0.5, 0.4).tolist() == pytest.approx([0.45, 0.45, 0.45])  # the line between the leaves
+    assert _at(open_, 0.03, 0.5).tolist() == FRAME
+    # The blind drops from the top over ``closed`` of the glass.
+    half = casement_pixels(200, 400, family, 0.5)
+    assert _at(half, 0.25, 0.6).argmax() == 1 and _at(half, 0.25, 0.3).argmax() == 2
+    assert np.array_equal(casement_pixels(200, 400, family, 0.5), half)
+
+
+def test_a_sash_has_a_meeting_rail_and_glazing_bars() -> None:
+    family = {"kind": "sash", "frame": FRAME, "shutter": BLIND, "closed": [0.0]}
+    sash = sash_pixels(300, 400, family, 0.0)
+    assert _at(sash, 0.2, 0.5).tolist() == FRAME  # the meeting rail
+    assert _at(sash, 1 / 3, 0.2).tolist() == FRAME and _at(sash, 2 / 3, 0.8).tolist() == FRAME
+    assert _at(sash, 0.2, 0.725).tolist() == FRAME and _at(sash, 0.2, 0.275).tolist() == FRAME
+    assert _at(sash, 0.2, 0.62).argmax() == 2 and _at(sash, 0.5, 0.62).argmax() == 2
+    # The shadow of the upper sash's rail on the lower one, inside the frame only.
+    assert _at(sash, 0.2, 0.4725)[2] < _at(sash, 0.2, 0.44)[2]
+    assert _at(sash, 0.03, 0.4725).tolist() == FRAME
+    blind = sash_pixels(300, 400, family, 0.5)
+    assert _at(blind, 0.2, 0.62).argmax() == 1 and _at(blind, 0.2, 0.2).argmax() == 2
+
+
+def test_a_grille_has_iron_bars_over_glass_and_leaves_behind() -> None:
+    family = {"kind": "grille", "frame": [0.3, 0.2, 0.1], "shutter": BLIND, "iron": IRON, "closed": [0.0]}
+    grille = grille_pixels(352, 400, family, 0.0)
+    pitch = 0.88 / 7
+    for k in range(1, 7):
+        assert _at(grille, 0.06 + k * pitch, 0.5).tolist() == IRON
+    # Glass between two bars, and the rails at 0.12 and 0.88.
+    assert _at(grille, 0.06 + 1.5 * pitch, 0.5).argmax() == 2
+    assert _at(grille, 0.06 + 1.5 * pitch, 0.12).tolist() == IRON
+    assert _at(grille, 0.06 + 1.5 * pitch, 0.88).tolist() == IRON
+    assert _at(grille, 0.03, 0.5).tolist() == [0.3, 0.2, 0.1]
+    closed = grille_pixels(352, 400, family, 0.7)
+    assert _at(closed, 0.06 + 1.5 * pitch, 0.5).argmax() == 1  # a timber leaf
+    assert _at(closed, 0.06 + 1.5 * pitch, 0.5).tolist() != _at(grille, 0.06 + 1.5 * pitch, 0.5).tolist()
+    assert _at(closed, 0.06 + 6 * pitch, 0.5).tolist() == IRON  # the bars stay in front
+
+
+def test_paint_window_dispatches_on_the_kind() -> None:
+    base = {"frame": FRAME, "shutter": BLIND, "iron": IRON, "closed": [0.0]}
+    painted = {kind: paint_window(96, 192, {**base, "kind": kind}, 0.3) for kind in ("shutter", "casement", "sash", "grille")}
+    assert np.array_equal(painted["shutter"], window_pixels(96, 192, base, 0.3))
+    assert np.array_equal(painted["casement"], casement_pixels(96, 192, base, 0.3))
+    assert np.array_equal(painted["sash"], sash_pixels(96, 192, base, 0.3))
+    assert np.array_equal(painted["grille"], grille_pixels(96, 192, base, 0.3))
+    kinds = list(painted)
+    for i, a in enumerate(kinds):
+        for b in kinds[i + 1 :]:
+            assert not np.array_equal(painted[a], painted[b]), (a, b)
+
+
+def small_regional(name: str) -> dict[str, Any]:
+    """A regional recipe on a 1024 px atlas."""
+    atlas = copy.deepcopy(dict(load_regional_table(load_style_table()).atlases[name]))
+    atlas.update(size_px=1024, height_px=2048, fit_row_px=192, fit_cell_px=96, cornice_px=64, zocalo_px=64, stone_px=32)
+    atlas["grime"] = dict(atlas["grime"], streaks_per_strip=12)
+    return atlas
+
+
+def test_regional_bakes_are_deterministic_and_differ_by_style() -> None:
+    images = {}
+    for name in ("central_european", "anglo", "latin_american"):
+        atlas = small_regional(name)
+        layout = trim_layout(atlas)
+        image = bake_trim_atlas(name, atlas, layout, TINTS, sources())
+        assert np.array_equal(image, bake_trim_atlas(name, atlas, layout, TINTS, sources()))
+        assert (image[..., 3] == 255).all()
+        images[name] = image
+    assert not np.array_equal(images["central_european"], images["anglo"])
+    assert not np.array_equal(images["anglo"], images["latin_american"])
+    # The latin_american grille cell holds the iron colour; the casement cells of central_european do not.
+    atlas = small_regional("latin_american")
+    cell = trim_layout(atlas).cells["window_0_0"]
+    iron = linear_to_srgb8(np.asarray(atlas["window_families"][0]["iron"]))
+    block = images["latin_american"][cell.row0 : cell.row1, cell.col0 : cell.col1, :3]
+    assert (block == iron).all(axis=-1).any()
+
+
+# The new window kinds (plan D1) at closed 0, 0.3 and 0.7 (176 x 368), rounded to 9 decimals. New bytes in
+# a regional atlas change its cache key only through the recipe, so a painter change must be deliberate.
+WINDOW_KINDS_GOLDEN = {
+    "casement": "1024e87fd015d4f0e5f2be555d32fd949b76a5e7c9758ec4633e9e274c3ec240",
+    "sash": "69c2c7cdbef24d5596dce4c60b81ac953cfd7f7e4e3aff348696d6ec2279f7bb",
+    "grille": "2f3d4732468f009cfaadb0caa8608bbd18e4bcba7ebcd9aaffdd0ff848748b89",
+}
+
+
+@pytest.mark.parametrize(("kind", "paint"), [("casement", casement_pixels), ("sash", sash_pixels), ("grille", grille_pixels)])
+def test_each_window_kind_keeps_its_bytes(kind: str, paint: Any) -> None:
+    family = {"frame": [0.9, 0.88, 0.84], "shutter": [0.3, 0.6, 0.2], "iron": [0.05, 0.05, 0.06]}
+    digest = hashlib.sha256()
+    for closed in (0.0, 0.3, 0.7):
+        digest.update(np.round(paint(176, 368, family, closed), 9).tobytes())
+    assert digest.hexdigest() == WINDOW_KINDS_GOLDEN[kind]

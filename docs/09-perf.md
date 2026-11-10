@@ -235,6 +235,30 @@ Pending (not done; the option stays off until they pass):
 
 Then the ADR-032 C7 amendment moves to accepted or is corrected. The option is not turned on by default before then.
 
+## Regional atlases
+
+Plan D1, the ADR-020 and ADR-027 amendments of 8 November 2026 (proposed), off by default (`map.json` `"regional_facades": true`, `materials apply --regional-facades`, `bench.py run --regional-facades`; [08-dress.md](08-dress.md#trim-sheet-facades)). `central_european`, `anglo` and `latin_american` take a trim atlas from `config/facade_styles.regional.json`, with their own windows and era bands. Docker on an Apple M4 Pro, frozen bench inputs, `--offline`:
+
+- **Off.** Run `d1_off` against the workshop/c7 run `20261108T232105Z`: `bench.py check` finds no difference outside timings; triangles, draws, view draws and lightmap pages have delta 0 on all four maps; every package file but `onward_export.json` (creation time, run folder paths and the hashes of files that hold them, as between any two runs) is byte-identical, and the `facades` block of every `materials_report.json` is equal.
+- **On.** Runs `d1_on` and `d1_on2` are the same apart from timings, and the Kraków atlas is byte-identical (`facade_trim.png` sha256 `3e114867875c6f94…`). Murcia and Madrid (mediterranean) and Paris (`generic`, no regional recipe) give every package file but `onward_export.json` byte-identical to the off run. Only Kraków changes.
+
+| Map | Path | Materials | Predicted draws (core, scenic) | View draws median / p90 / max | Triangles | Images | Texture memory RGBA32 / ASTC 6×6 | Lightmap pages |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bench_krakow r150 | per material (off; `central_european`, `style_has_no_atlas`) | 118 | 272 (215, 51) | 95 / 219 / 268 | 72 884 | 64 | 129.7 / 14.5 MiB | 2 |
+| bench_krakow r150 | trim, regional `central_european` (on) | 103 | 214 (179, 29) | 73 / 180 / 214 | 77 688 | 61 | 156.1 / 17.5 MiB | 2 |
+
+Texture memory is every distinct image of the package's `scene_visual.glb` with mips (4/3), in RGBA32 and as ASTC 6×6 blocks: an estimate, not a Unity or device reading. The option takes 58 predicted draws (−21 %) and 15 materials off Kraków for 6.6 % more triangles (the band cuts) and one 2048 × 4096 atlas (+3.0 MiB as ASTC 6×6). This matches ADR-020's measure with a forced mediterranean atlas (−29 % draws on an older Kraków build). 155 buildings take the atlas; 41 tinted walls (`building:colour`) keep their own material, as on Murcia and Madrid. Only one trimmed building has an observed era (`pre_1900`); the other 154 keep the look they would have had without era bands (`era_bands.buildings`: `pre_1900` 1, `unknown` 154). `anglo` and `latin_american` have no bench map. They are covered by unit and integration tests on synthetic centres and the Murcia block.
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Headset, option on and off, on a `central_european` map (bench_krakow r150), and if possible synthetic `anglo` and `latin_american` maps: the casement, sash and grille cells up close and at a distance under ASTC 6×6; the atlas seams at a distance and the string course up close; neighbouring blocks read apart through tone and era; the stretched plain-wall body reads as weathering, not a smear.
+- [ ] Headset: ≥ 72 fps median and ≤ 150 draws at views A and B with the option off and on (OVR Metrics, the protocol above); graphics memory with the 4096 px atlas.
+- [ ] Plan §1 rubric (1 to 5 for facade and repetition) on the contact sheet and the fixed spawn captures, option off and on.
+- [ ] Era bands on a map with observed eras (Catastro year or OSM `start_date`) in a regional style.
+- [ ] Optional, Unity 2021.3.23f1 (A3): real draws and texture memory for Kraków with the option on.
+
+Then the ADR-020 and ADR-027 amendments move to accepted or are corrected. The option is not turned on by default before then.
+
 ## Repetition per cell
 
 Plan C1, the ADR-009 amendment *Repetition per cell* (proposed), off by default (`map.json` `"repetition": true`, `materials apply --repetition --cell-m M`, `bench.py run --repetition`; rules in [08-dress.md](08-dress.md#roofs-and-paving-the-repetition-switch-plan-c1)). Docker on an Apple M4 Pro, frozen bench inputs, `--offline --gameplay-report`:
