@@ -137,6 +137,38 @@ Pending on the headset (not done; the option stays off until they pass):
 
 Then ADR-031 goes from proposed to accepted or is corrected. Turning furnishing on by default is a separate decision (plan 4.2).
 
+## Residential floor furnishing
+
+Plan D7, [ADR-034](decisions/ADR-034-residential-floor-furnishing.md) (proposed), off by default (`interiors.furnish.enabled`). Bench runs on workshop/d7, Docker on an Apple M4 Pro, frozen inputs (`--offline`). Generator figures, not device measurements.
+
+- **Off.** Run `d7_off` against the baseline `d7_base` (workshop/d6): `bench.py check` finds no difference outside timings on all four maps, and every package file is byte-identical apart from `onward_export.json`.
+- **On.** Runs `d7_on` and `d7_on2` with `interiors.furnish.enabled: true` (a working-copy edit of `config/detail.default.json`, reverted after the runs; `run` has no flag for it), on bench_murcia, bench_madrid and bench_krakow; bench_paris has no interiors. `bench.py check` finds the two runs the same apart from timings, and their `scene_detail.json` objects and detail GLBs are byte-identical (only the `inputs` block, which records the run folder paths, differs).
+
+| Map | Floors furnished / total | Pieces | Furniture triangles (cap 12 000) | Colliders | Materials added | Floors refused |
+| --- | --- | --- | --- | --- | --- | --- |
+| bench_murcia | 8 / 10 | 48 | 11 508 | 48 | 12 | 2 `blocks_path`; pieces: 8 `blocks_path` |
+| bench_madrid | 8 / 20 | 48 | 11 014 | 48 | 12 | 9 `triangle_budget`, 3 `blocks_path`; pieces: 4 `blocks_path` |
+| bench_krakow | 6 / 6 | 36 | 8 438 | 36 | 12 | pieces: 3 `blocks_path` |
+
+| Map | Visual triangles off → on | Draws off → on | View draws p90 off → on | Lightmap pages | Room lights placed, dropped |
+| --- | --- | --- | --- | --- | --- |
+| bench_murcia | 150 339 → 161 847 (+11 508) | 213 → 235 (+22) | 181 → 200 | 4 → 4 | 40, 0 (unchanged) |
+| bench_madrid | 398 025 → 409 039 (+11 014) | 504 → 544 (+40) | 374 → 408 | 11 → 11 | 90, 0 (unchanged) |
+| bench_krakow | 72 884 → 81 322 (+8 438) | 272 → 292 (+20) | 219 → 234 | 2 → 2 | 10, 0 (unchanged) |
+
+The added triangles are all core furniture; `interiors.max_triangles` use (3 464, 7 960, 1 768) and the stair interiors themselves do not change. Every piece the set holds is cover-sized, so each gets a 12-triangle box collider. The draws are the cost: each of the 7 rows (12 `prop_` materials, albedo only on `PP_Opaque_Simple_Lit`) is one draw in each combine cell it appears in.
+
+Pending on the headset (A2) and in Unity (A3), not done; ADR-034 stays proposed until they pass:
+
+- [ ] A `bench_murcia` or `bench_krakow` package built with the option on: the furniture on every furnished floor is lit by that floor's baked light and probes, not black (`prop_` materials take no lightmap; `docs/12-export.md`).
+- [ ] Walk in through the residential door and climb every stair: no piece blocks the door, a stair foot, a stair arrival or the roof climb, the 1.2 m path holds on each floor, and the player is never trapped.
+- [ ] Cover-sized furniture stops bullets and the player, and nothing is an invisible wall.
+- [ ] From the street, through the `glass_view` windows, the furniture reads at scale and faces into the room (Kenney facing and scale are estimated, never reviewed from a rendered view).
+- [ ] OVR Metrics in fixed views A and B with the option on and off: draws against the 150 target, a median of at least 72 fps, graphics memory.
+- [ ] Unity 2021.3.23f1: the bake accepts the per-floor point lights and the LightProbeGroup; record `seconds.bake` draft and final with `report_timings.py`.
+
+Then ADR-034 goes from proposed to accepted or is corrected. Turning it on by default is a separate decision (plan 4.2).
+
 ## Panoramax with the trim atlas
 
 Plan B2, ADR-020 amendment of 7 November 2026, off by default (`map.json` `"panoramax_atlas": true`, with `"panoramax": true`). With the switch off, `task bench -- --offline` (run `20261107T201937Z`, no Panoramax) is the same as run `20261107T195936Z` apart from timings (`bench.py check`), and the Panoramax stage of the synthetic Murcia block writes the same five files, by SHA-256, as before the change.
