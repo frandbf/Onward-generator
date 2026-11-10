@@ -766,3 +766,12 @@ def test_shop_planner_unchanged_with_default_fields() -> None:
         result = plan_room(room, shop, ASSETS, 48152, "b")
         assert isinstance(result, RoomFurnishing) and result.method == "shop_furnishing"
         assert hashlib.sha256(json.dumps(result.record("b", 0), sort_keys=True).encode()).hexdigest() == pin
+
+
+def test_the_floor_pass_takes_the_seed_and_the_block_of_the_configuration() -> None:
+    from onward_generator.detail.scene import _floor_furnishing
+
+    cfg = replace(DEFAULT, seed=7, interiors=replace(DEFAULT.interiors, furnish=FLOORS))
+    furnishing = _floor_furnishing(cfg)
+    assert furnishing.seed == 7 and furnishing.furnish is FLOORS
+    assert furnishing.budget.scope == FLOOR_SCOPE and furnishing.method == "residential_furnishing"

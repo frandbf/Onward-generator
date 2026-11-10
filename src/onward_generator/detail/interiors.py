@@ -484,7 +484,7 @@ def light_anchors(plan: InteriorPlan, rooms: Sequence[dict[str, Any]], *, furnit
         corners = list(area.minimum_rotated_rectangle.exterior.coords)
         reach = min(LIGHT_RANGE_MAX_M, max(LIGHT_RANGE_MIN_M, math.dist(corners[0], corners[2]) / 2 + 1.0))
         own = (room_furniture or {}).get(room["id"])
-        columns = _probe_columns(area, probe_wells if own is None else unary_union([probe_wells, own]))
+        columns = _probe_columns(area, probe_wells if own is None else unary_union([probe_wells, own]))  # pragma: no mutate: unary_union skips a None part, so taking the union branch without furniture gives the same grid
         floor, ceiling = float(room["floor_z_m"]), float(room["ceiling_z_m"])
         probes: list[float] = []
         for z in (floor + PROBE_LOW_M, ceiling - PROBE_HIGH_BELOW_CEILING_M):
