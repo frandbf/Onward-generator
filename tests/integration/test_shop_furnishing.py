@@ -80,7 +80,7 @@ def test_on_the_bakery_room_gets_bakery_furniture_inside_its_walls(detail_inputs
         assert footprint.distance(door) > 0.3 + 0.0  # the door zone starts behind the wall and takes 1.5 m
     stats = on.stats["shop_furnishing"]
     assert stats["shop_rooms"] == stats["reachable_rooms"] == stats["furnished_rooms"] == 1
-    assert stats["pieces"] == len(block["pieces"]) == 8
+    assert stats["pieces"] == len(block["pieces"]) == ON["interiors"]["shops"]["furnish"]["max_pieces_per_room"] == 4
     assert stats["visual_triangles"] == block["visual_triangles"] == sum(p["triangles"] for p in block["pieces"])
     assert stats["collision_triangles"] == 12 * sum(p["solid"] for p in block["pieces"])
     assert stats["refusals_by_reason"] == {}

@@ -165,7 +165,7 @@
         "enabled": true,
         "max_triangles": 12000,
         "max_collision_triangles": 1200,
-        "max_pieces_per_room": 8,
+        "max_pieces_per_room": 4,
         "max_assets": 16,
         "walk_width_m": 1.2,
         "wall_gap_m": 0.03,

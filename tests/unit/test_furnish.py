@@ -126,8 +126,9 @@ def _wall_of(piece: Piece, polygon: Polygon) -> tuple[float, float]:
 def test_wall_pieces_stand_back_to_the_wall_a_wall_gap_off_it(turn: float) -> None:
     polygon = rotate(ROOM, turn, origin=(0, 0))
     zone = rotate(DOOR_ZONE, turn, origin=(0, 0))
-    result = _plan_default(_room(polygon, zone))
-    assert len(result.pieces) == FURNISH.max_pieces_per_room
+    furnish = replace(FURNISH, max_pieces_per_room=8)  # enough pieces to pack a wall: the packing is what this checks
+    result = _plan_default(_room(polygon, zone), furnish=furnish)
+    assert len(result.pieces) == furnish.max_pieces_per_room
     for piece in _floor(result):
         distance, cosine = _wall_of(piece, polygon)
         assert distance == pytest.approx(GAP, abs=1e-6)
@@ -776,7 +777,7 @@ def test_shop_planner_unchanged_with_default_fields() -> None:
     # The pins were taken with the B3 sets (Kenney and Poly Haven only); the Quaternius rows added to the default
     # sets on 10 November 2026 change which piece comes first, not the planner, so the B3 sets are rebuilt here.
     b3 = json.loads(json.dumps(DOC))
-    b3["interiors"]["shops"]["furnish"].update(enabled=True, catalogues=B3_SHOP_CATALOGUES, sets=B3_SHOP_SETS)
+    b3["interiors"]["shops"]["furnish"].update(enabled=True, catalogues=B3_SHOP_CATALOGUES, sets=B3_SHOP_SETS, max_pieces_per_room=8)
     shop = config_from_document(b3).interiors.shops.furnish
     pins = {"bar": "90fd63787a4ad3367dd14ae570e08da6fd34d9a7f18dacbc1e9152d7f72acc2f",
             "bakery": "79f5f14bd03e41179467691e21315afb761d514039ee16a3c476fb4658b66b27",

@@ -40,6 +40,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from onward_generator.assetstore import local
 from onward_generator.generation.gltf import Primitive, images_by_material, read_glb, scene_primitives
 from onward_generator.generation.mesh import Mesh, merge
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
@@ -221,7 +222,7 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
     return props, rejects
 
 
-INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0"}
+INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0", local.LICENCE_NAME: local.LICENCE_SPDX}
 """Licences an interior catalogue's manifest ``source`` may name, and the SPDX id furnishing records (ADR-031)."""
 
 
@@ -269,6 +270,8 @@ def read_interior_catalogue(
             continue
         check_manifest(document, str(manifest))
         licence = interior_licence(document.get("source"))
+        if licence == local.LICENCE_SPDX and not (local.is_local(directory.name) and local.enabled()):
+            licence = None  # the Asset Store EULA only in a local, gitignored asset_store_* catalogue (ADR-035)
         for row in document.get("assets") or []:
             if not isinstance(row, dict) or not row.get("id") or not row.get("file") or (ids is not None and row["id"] not in ids):
                 continue

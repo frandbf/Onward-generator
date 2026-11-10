@@ -167,10 +167,12 @@ def test_over_budget_floor_keeps_its_bare_interior(detail_inputs, on, off) -> No
     assert all("furnishing" not in r for bid in HOMES for r in _rooms(tight, bid))
     assert tight.stats["floor_furnishing"]["refusals_by_reason"] == {"triangle_budget": 4}
     assert _glb(tight.visual_nodes()) == _glb(off.visual_nodes())  # no piece and no probe moved
-    first = _rooms(on, HOMES[0])[0]["furnishing"]["visual_triangles"]
+    # The budget goes to the interior nearest the map centre first (ADR-031 amendment of 10 November 2026).
+    nearest = min(HOMES, key=lambda bid: (_footprint(detail_inputs, bid).distance(Point(0.0, 0.0)), bid))
+    first = _rooms(on, nearest)[0]["furnishing"]["visual_triangles"]
     one = _detail(detail_inputs, config_from_document(_doc(ON, max_triangles=first)))
     stats = one.stats["floor_furnishing"]
-    assert "furnishing" in _rooms(one, HOMES[0])[0]
+    assert "furnishing" in _rooms(one, nearest)[0]
     assert stats["furnished_rooms"] >= 1 and stats["refusals_by_reason"].get("triangle_budget", 0) >= 1
     assert stats["furnished_rooms"] + stats["refusals_by_reason"]["triangle_budget"] == 4
     assert stats["visual_triangles"] <= first
