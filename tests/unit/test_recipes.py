@@ -321,9 +321,10 @@ def test_decor_takes_its_own_triangle_cap_and_a_row_at_the_cap_is_kept() -> None
 def test_small_slots_rank_by_the_biggest_side_whichever_it_is(slot) -> None:
     sizes = {"long": (0.40, 0.05, 0.05), "deep": (0.05, 0.41, 0.05), "tall": (0.05, 0.05, 0.42), "tiny": (0.06, 0.06, 0.06),
              "small": (0.07, 0.07, 0.07)}
-    pool = [_c(name, "decor_misc", size=size, settings=("shop",)) for name, size in sizes.items()]
+    # Named so that the id order would keep "a_tiny": only the size ranking leaves it out.
+    pool = [_c(f"a_{name}" if name == "tiny" else name, "decor_misc", size=size, settings=("shop",)) for name, size in sizes.items()]
     picked = [e.id for e in choose(slot, ("decor_misc",), ("shop",), pool, SEED, "k")]
-    assert set(picked) == {"tall", "deep", "long", "small"}  # POOL keeps the four biggest; "tiny" is left out
+    assert set(picked) == {"tall", "deep", "long", "small"}  # POOL keeps the four biggest
 
 
 def test_the_furniture_slots_rank_by_triangles_not_size() -> None:
@@ -344,7 +345,7 @@ def test_library_skips_a_non_row_an_excluded_id_and_keeps_reading_after_a_skip(t
     _manifest(tmp_path / "cat", ["not a row", _lib_row(excluded, "shelf_tall"), _lib_row("café", "shelf_tall"),
                                  {"id": "bare", "placement": "interior", "semantic": {"kind": "rug", "mount": "floor_flat"}}])
     found = library(tmp_path, ["cat"])
-    assert [c.asset_id for c in found] == ["café", "bare"]
+    assert [c.asset_id for c in found] == ["café", "bare"] and found[0].triangles == 100
     assert found[1] == Candidate("bare", "cat", "rug", frozenset(), 0.0, 0.0, 0.0, 0)
 
 
@@ -387,13 +388,16 @@ def _local(tmp_path: Path, rows: list[dict]) -> None:
 def test_local_catalogues_join_the_pool_and_the_block_catalogues(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "1")
     monkeypatch.delenv(recipes.ENV, raising=False)  # on unless switched off
-    _local(tmp_path, [_lib_row("as_test_shelf", "shelf_tall"), _lib_row("as_test_sofa", "sofa", size=(2.0, 0.9, 0.8), settings=("living",))])
+    rows = [_lib_row("as_test_shelf", "shelf_tall"), _lib_row("as_test_sofa", "sofa", size=(2.0, 0.9, 0.8), settings=("living",))]
+    # Four of each kind in reach, so the seed and the scope pick which comes first.
+    rows += [_lib_row(f"as_test_shelf{i}", "shelf_tall", settings=("shop", "living")) for i in range(4)]
+    rows += [_lib_row(f"as_test_sofa{i}", "sofa", size=(2.0, 0.9, 0.8), settings=("living",)) for i in range(4)]
+    _local(tmp_path, rows)
     assert recipes.allowed_catalogues(tmp_path) == ["asset_store_test"]
     cfg = load_detail_config()
     out = with_semantic_sets(cfg, tmp_path)
     shops, floors = out.interiors.shops.furnish, out.interiors.furnish
-    assert [e.id for e in shops.sets["generic"].wall] == ["as_test_shelf"] and "asset_store_test" in shops.catalogues
-    assert [e.id for e in floors.sets["generic"].wall_deep] == ["as_test_sofa"] and "asset_store_test" in floors.catalogues
+    assert "asset_store_test" in shops.catalogues and "asset_store_test" in floors.catalogues
     pool = library(tmp_path, ["asset_store_test"])
     expected, _ = semantic_sets(cfg.interiors.shops.furnish, {"generic": recipes.SHOP_RECIPES["generic"]}, pool, cfg.seed, "shops")
     assert shops.sets["generic"] == expected["generic"]
@@ -472,3 +476,11 @@ def test_the_walls_take_their_share_and_the_tables_the_rest() -> None:
     # A cap of two still leaves the walls one piece and the tables the other.
     small = [p.slot for p in _plan(_zoned(wall=("shelf",), table=("table",), seat=("chair",)), cap=2).pieces]
     assert small[:2] == ["wall", "table"] and small.count("wall") == 1
+
+
+def test_a_recipe_falls_back_to_its_own_written_set_before_generic() -> None:
+    shops = load_detail_config().interiors.shops.furnish
+    bar = replace(shops.sets["generic"], wall=(FurnishEntry("bar_only_shelf"),))
+    sets, _ = semantic_sets(replace(shops, sets={"generic": shops.sets["generic"], "bar": bar}), {"bar": recipes.SHOP_RECIPES["bar"]}, [],
+                            SEED, "shops")
+    assert sets["bar"].wall == (FurnishEntry("bar_only_shelf"),)

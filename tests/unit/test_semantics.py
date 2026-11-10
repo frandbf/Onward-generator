@@ -138,3 +138,77 @@ def test_every_tracked_manifest_row_has_a_valid_semantic_block() -> None:
             assert block["kind"] in KINDS and block["mount"] in MOUNTS, (manifest.parent.name, row["id"])
             assert set(block["settings"]) <= set(SETTINGS), (manifest.parent.name, row["id"])
             assert block["origin"] in ("estimated", "reviewed")
+
+
+# ---- each rule on its own (mutation coverage, ADR-036) -----------------------------------------------------------
+
+
+def _as(file_stem: str, size: tuple[float, float, float], **extra: object) -> dict[str, object]:
+    """A local row: its words are its file name's only."""
+    return _row(f"as_pack_{file_stem}", size, **extra) | {"file": f"{file_stem}.glb"}
+
+
+@pytest.mark.parametrize(("stem", "settings"), [
+    ("bedroomChair", ["bedroom"]), ("kidsChair", ["bedroom"]), ("nurseryChair", ["bedroom"]), ("diningChair", ["dining"]),
+    ("livingChair", ["living"]), ("officeChair", ["office"]), ("bathroomChair", ["bathroom"]), ("kitchenChair", ["kitchen"]),
+])
+def test_the_room_a_name_names_wins(stem, settings) -> None:
+    assert describe(_as(stem, (0.5, 0.5, 0.9)), "c")["settings"] == settings
+
+
+@pytest.mark.parametrize(("stem", "size", "kind", "mount"), [
+    ("Table", (0.45, 0.3, 0.3), "other", "none"),        # at SMALL_M a large kind is a part
+    ("Table", (0.46, 0.3, 0.75), "table", "center"),
+    ("Chair", (0.4, 0.4, 0.4), "chair", "seat"),         # a small chair stays a chair
+    ("Bookshelf", (1.0, 0.4, 1.2), "shelf_tall", "wall"),  # 1.2 m is tall
+    ("Table", (1.0, 0.6, 0.55), "table", "center"),      # 0.55 m is a table, under it a coffee table
+    ("Lamp", (0.3, 0.3, 1.0), "lamp_small", "table_top"),
+    ("LampFloor", (0.3, 0.3, 1.0), "lamp_floor", "corner"),  # "floor" and at least 1 m: a floor lamp
+    ("LampFloor", (0.3, 0.3, 0.99), "lamp_small", "table_top"),
+    ("Floorlamp", (0.3, 0.3, 0.5), "lamp_floor", "corner"),  # named one whatever its size
+    ("Tablelamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),
+    ("Desklamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),
+    ("deskLamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),  # a desk lamp is not a desk
+    ("Houseplant", (0.5, 0.5, 2.0), "plant_pot", "corner"),
+    ("Chair", (0.4, 0.4, 0.0), "chair", "seat"),
+])
+def test_size_rules(stem, size, kind, mount) -> None:
+    block = describe(_as(stem, size), "c")
+    assert (block["kind"], block["mount"]) == (kind, mount)
+
+
+def test_a_missing_size_reads_as_zero() -> None:
+    no_height = {k: v for k, v in _as("Bookshelf", (1.0, 0.4, 1.0)).items() if k != "height_m"}
+    assert describe(no_height, "c")["kind"] == "shelf_tall"  # no height: never made low
+    for missing in ("length_m", "depth_m"):
+        row = {k: v for k, v in _as("Table", (0.3, 0.3, 0.3)).items() if k != missing}
+        assert describe(row, "c").get("part") is True, missing  # what is left is small
+
+
+def test_a_part_block_is_whole() -> None:
+    row = _as("Cabinet", (0.6, 0.4, 0.8), source_prefab="Kit.fbx#Cabinet")
+    assert describe(row, "asset_store_kitchen_set")["mount"] == "wall"  # a whole cabinet child is no part
+    part = _as("Cabinet_Base", (0.6, 0.4, 0.8), source_prefab="Kit.fbx#Cabinet")  # the name says base
+    assert {k: v for k, v in describe(part, "asset_store_kitchen_set").items() if k not in ("origin", "basis")} == {
+        "kind": "other", "mount": "none", "settings": ["kitchen"], "part": True}
+
+
+@pytest.mark.parametrize(("row", "kind", "mount", "settings"), [
+    ({"role": "nothing"}, "other", "ground", ["street"]),
+    ({"role": "x", "anchor": "facade"}, "other", "facade", ["street"]),
+    ({"role": "x", "placement": "wall_mounted"}, "other", "facade", ["street"]),
+    ({"role": "x", "placement": "kit_only"}, "kit_piece", "none", ["street"]),
+    ({"role": "x", "surfaces": ["carriageway"], "placement": "ground_cover"}, "other", "ground", ["street"]),
+    ({"role": "x", "placement": "street"}, "other", "ground", ["street"]),
+    ({"role": "x", "placement": "kerb"}, "other", "ground", ["street"]),
+    ({"role": "x", "surfaces": ["empty_lot"], "placement": "ground_cover"}, "other", "ground", ["yard"]),
+    ({"role": "x", "surfaces": ["park"], "placement": "ground_cover"}, "other", "ground", ["park"]),
+    ({"role": "crate", "category": "waste", "placement": "ground_cover"}, "crate", "ground", ["industrial"]),
+    ({"role": "pallet", "category": "structures", "placement": "ground_cover"}, "pallet", "ground", ["industrial"]),
+    ({"role": "dumpster", "category": "waste", "placement": "ground_cover"}, "dumpster", "ground", ["industrial"]),
+    ({"role": "x", "category": "vegetation", "placement": "ground_cover"}, "other", "ground", ["park"]),
+])
+def test_outdoor_rules(row, kind, mount, settings) -> None:
+    full = {"id": "zz_q", "file": "q.glb", "length_m": 1, "depth_m": 1, "height_m": 1, "placement": "street"} | row
+    block = describe(full, "c")
+    assert (block["kind"], block["mount"], block["settings"]) == (kind, mount, settings)

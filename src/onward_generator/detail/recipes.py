@@ -95,7 +95,7 @@ def _fits(slot: str, c: Candidate) -> tuple[bool, int]:
         "decor": biggest <= 0.45,
         "top": biggest <= 0.45,
     }
-    return bool(limits.get(slot, False)), turn
+    return bool(limits.get(slot)), turn
 
 
 def library(root: Path, catalogues: Sequence[str]) -> list[Candidate]:
@@ -103,7 +103,7 @@ def library(root: Path, catalogues: Sequence[str]) -> list[Candidate]:
     found: list[Candidate] = []
     for name in sorted(catalogues):
         try:
-            document = json.loads((root / name / "manifest.json").read_text(encoding="utf-8"))
+            document = json.loads((root / name / "manifest.json").read_bytes())
         except (OSError, json.JSONDecodeError):
             continue
         for row in document.get("assets") or []:
@@ -179,7 +179,7 @@ def allowed_catalogues(root: Path) -> list[str]:
 def with_semantic_sets(cfg: DetailConfig, root: Path) -> DetailConfig:
     """``cfg`` with the sets of every enabled ``selection: semantic`` block chosen from the library (ADR-036)."""
     shops, floors = cfg.interiors.shops.furnish, cfg.interiors.furnish
-    if os.environ.get(ENV, "1") == "0":
+    if os.environ.get(ENV) == "0":
         return cfg
     if not ((shops.enabled and shops.selection == "semantic") or (floors.enabled and floors.selection == "semantic")):
         return cfg

@@ -155,6 +155,11 @@ def is_part(row: Mapping[str, Any], words: set[str]) -> bool:
     return bool(child & _PART_WORDS) or bool(words & {"base", "handle", "countertop", "counterbase"})
 
 
+# A table lamp is a lamp, not a table, and a desk lamp not a desk: the lamp rules are read first.
+_LAMPS_FIRST = (tuple(r for r in _ROOM_RULES if r[0] in ("lamp_floor", "lamp_small"))
+                + tuple(r for r in _ROOM_RULES if r[0] not in ("lamp_floor", "lamp_small")))
+
+
 def _named_room(words: set[str]) -> list[str]:
     """The room a model's own name names (bathroomCabinet, kitchenFridge, kidsBed), which then wins over its kind's rooms."""
     named = [room for word, room in (("bathroom", "bathroom"), ("kitchen", "kitchen"), ("bedroom", "bedroom"), ("kids", "bedroom"),
@@ -172,11 +177,7 @@ def _room(words: set[str], row: Mapping[str, Any], catalogue: str) -> dict[str, 
     if words & _HUNG:
         kind = next((k for k, vocabulary, _m, _s in _ROOM_RULES if words & vocabulary), "decor_misc")
         return {"kind": kind, "mount": "none", "settings": list(pack), "hung": True}
-    rules = _ROOM_RULES
-    if words & {"lamp", "lampstand", "floorlamp", "desklamp", "tablelamp"}:
-        # A table lamp is a lamp, not a table: lamp rules first.
-        rules = tuple(r for r in _ROOM_RULES if r[0] in ("lamp_floor", "lamp_small")) + _ROOM_RULES
-    for kind, vocabulary, mount, settings in rules:
+    for kind, vocabulary, mount, settings in _LAMPS_FIRST:
         if words & vocabulary:
             if kind == "lamp_small" and (words & {"floor", "stand"}) and height >= 1.0:
                 kind, mount, settings = "lamp_floor", "corner", ("living", "bedroom")
@@ -186,8 +187,6 @@ def _room(words: set[str], row: Mapping[str, Any], catalogue: str) -> dict[str, 
                 kind = "shelf_low"
             if kind == "table" and height and height < 0.55:
                 kind, mount, settings = "coffee_table", "center", ("living",)
-            if kind == "plant_pot" and height > 1.8:
-                mount = "corner"
             return {"kind": kind, "mount": mount, "settings": _named_room(words) or list(dict.fromkeys((*settings, *pack)))}
     if words & _FOOD or catalogue == "kenney_food":
         return {"kind": "decor_food", "mount": "counter_top", "settings": ["bakery", "bar", "grocery", "kitchen", "dining"]}
@@ -199,10 +198,8 @@ def _room(words: set[str], row: Mapping[str, Any], catalogue: str) -> dict[str, 
 
 
 def _outdoor(words: set[str], row: Mapping[str, Any]) -> dict[str, Any]:
-    role = str(row.get("role") or "")
-    placement = str(row.get("placement") or "")
-    category = str(row.get("category") or "")
-    kind = _OUTDOOR_BY_ROLE.get(role)
+    placement, category = row.get("placement"), row.get("category")
+    kind = _OUTDOOR_BY_ROLE.get(str(row.get("role")))
     if kind is None:
         kind = next((k for word, k in _OUTDOOR_BY_ROLE.items() if word in words), "other")
     if placement == "kit_only":

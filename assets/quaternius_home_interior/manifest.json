@@ -2117,10 +2117,13 @@
       "height_m": 0.28,
       "collider": "none",
       "semantic": {
-        "kind": "other",
-        "mount": "none",
-        "settings": [],
-        "part": true,
+        "kind": "lamp_small",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office"
+        ],
         "origin": "estimated",
         "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
       }
