@@ -414,6 +414,19 @@ The local card instantiates Free Roam, Hunt, and Uplink. The other modes stay in
 
 The report records `layout_sha256`, the hash of the `layout.json` it was computed from. `run`'s layout line then ends with `gameplay: routes N  sight X m  balance Y %`, only when that hash matches the current `layout.json`.
 
+### Balanced spawns (off by default)
+
+`perf layout --playable --balanced-spawns` places the defenders' block and the Uplink by the gameplay metrics (plan C6, [ADR-032](decisions/ADR-032-gameplay-metrics.md) C6 amendment). `run` passes the flag when `map.json` has `"balanced_spawns": true`; a map without the key stays off, and a value that is not true or false is refused before any stage runs. The flag without `--playable` exits 1.
+
+| | |
+| --- | --- |
+| Reads | The same inputs as the playable layout |
+| Writes | `layout.json`, `gameplay_layout` 0.3.0 with the same keys. Only the values of the spawn blocks, the Uplink and what follows from them move. Off, it is the same, byte for byte, as without the flag |
+| Chooses | Up to 8 candidates: 4 defenders' positions, each with the midpoint Uplink and the even-contact Uplink. The lowest (contact difference, −distinct routes, max overlap, index) among those no worse than today's placement; today's is kept unless one is strictly better |
+| Prints | `placement: balanced, candidate K of N, contact diff A -> B %, routes R -> S, overlap X -> Y % (estimated from the 2D navmesh)`, or `placement: kept the current placement: <reason> (...)`. Not written to a file |
+| Provenance | Estimated on the 2D navmesh grid, not the baked navmesh |
+| Failures | Never fails where the option-off layout succeeds: an invalid candidate or a placement that cannot be built keeps today's placement |
+
 ## 11. Export, Unity, and Quest
 
 `onward-generator export package` and `export verify`. [12-export.md](12-export.md). [ADR-007](decisions/ADR-007-onward-export-adapter.md).

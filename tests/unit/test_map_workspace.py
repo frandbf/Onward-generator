@@ -679,3 +679,36 @@ def test_store_lidar_roofs_needs_a_map(tmp_path: Path) -> None:
 
     with pytest.raises(MapError, match="not found"):
         store_lidar_roofs(tmp_path / "nowhere", True)
+
+
+def test_balanced_spawns_are_off_without_the_key_and_stored_on_request(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import balanced_spawns_enabled, store_balanced_spawns
+
+    assert balanced_spawns_enabled(tmp_path / "nowhere") is False
+    root = _atlas_map(tmp_path)
+    assert "balanced_spawns" not in load_map(root)
+    assert balanced_spawns_enabled(root) is False
+    store_balanced_spawns(root, True)
+    assert load_map(root)["balanced_spawns"] is True and balanced_spawns_enabled(root) is True
+    store_balanced_spawns(root, False)
+    assert load_map(root)["balanced_spawns"] is False and balanced_spawns_enabled(root) is False
+
+
+@pytest.mark.parametrize("value", [1, "yes", None, 0, "true", []])
+def test_balanced_spawns_refuse_a_value_that_is_not_a_bool(tmp_path: Path, value: object) -> None:
+    from onward_generator.maps.workspace import balanced_spawns_enabled, store_balanced_spawns
+
+    root = _atlas_map(tmp_path, balanced_spawns=value)
+    with pytest.raises(MapError) as caught:
+        balanced_spawns_enabled(root)
+    assert str(caught.value) == f'map.json "balanced_spawns" must be true or false, got {value!r}'
+    with pytest.raises(MapError) as stored:
+        store_balanced_spawns(root, value)  # type: ignore[arg-type]
+    assert str(stored.value) == f'"balanced_spawns" must be true or false, got {value!r}'
+
+
+def test_store_balanced_spawns_needs_a_map(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import store_balanced_spawns
+
+    with pytest.raises(MapError, match="not found"):
+        store_balanced_spawns(tmp_path / "nowhere", True)

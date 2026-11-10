@@ -1,7 +1,7 @@
 """Fixed-seed benchmark of the reference maps: ``bench_report.json``, a contact sheet and a comparison table.
 
     python tools/bench/bench.py [--host-os S] [--host-gpu S] [run] [--only ID ...] [--offline] [--against REPORT] [--gameplay-report] [--repetition] [--overture-tints] [--lidar-roofs]
-        [--scenic-out-of-lightmap]
+        [--scenic-out-of-lightmap] [--lightmap-pages-max N] [--balanced-spawns]
     python tools/bench/bench.py report RUN_DIR
     python tools/bench/bench.py compare OLD NEW
     python tools/bench/bench.py check A B
@@ -56,6 +56,7 @@ from onward_generator.maps.workspace import (
     create_map,
     load_map,
     refresh_texture_plan,
+    store_balanced_spawns,
     store_gameplay_report,
     store_lidar_roofs,
     store_overture_tints,
@@ -356,7 +357,8 @@ def freeze_downloads(root: Path, inputs: Path) -> list[str]:
 
 def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_report: bool = False,
               repetition: bool = False, overture_tints: bool = False, lidar_roofs: bool = False,
-              scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None) -> MapRun:
+              scenic_out_of_lightmap: bool = False, lightmap_pages_max: int | None = None,
+              balanced_spawns: bool = False) -> MapRun:
     """Run every Python stage of one reference map in ``run_dir/<id>``; skip the downloads already cached.
 
     ``gameplay_report`` switches ``gameplay_report.json`` on in the run copy's ``map.json`` only (ADR-032).
@@ -366,6 +368,7 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
     ``lidar_roofs`` switches the plan C3 roofs from the nDSM spread on in the run copy only.
     ``scenic_out_of_lightmap`` sets the plan C4 export option in the run copy's export card only.
     ``lightmap_pages_max`` sets the plan C5 lightmap page budget in the run copy's export card only.
+    ``balanced_spawns`` switches the plan C6 spawn and Uplink placement on in the run copy's ``map.json`` only.
     The frozen inputs and their digest do not change.
     """
     ref = prepared.ref
@@ -384,6 +387,8 @@ def bench_map(prepared: Prepared, run_dir: Path, execute: Execute, *, gameplay_r
         store_scenic_out_of_lightmap(root)
     if lightmap_pages_max is not None:
         store_lightmap_pages_max(root, lightmap_pages_max)
+    if balanced_spawns:
+        store_balanced_spawns(root, True)
     log = RunLog()
     if prepared.created_s is not None:
         log.times.append(("map", prepared.created_s))
@@ -907,7 +912,8 @@ def cmd_run(args: argparse.Namespace, execute: Execute) -> int:
         print(f"bench: {item.ref.id}", flush=True)
         ran = bench_map(item, run_dir, execute, gameplay_report=args.gameplay_report, repetition=args.repetition,
                         overture_tints=args.overture_tints, lidar_roofs=args.lidar_roofs,
-                        scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max)
+                        scenic_out_of_lightmap=args.scenic_out_of_lightmap, lightmap_pages_max=args.lightmap_pages_max,
+                        balanced_spawns=args.balanced_spawns)
         entries[item.ref.id] = map_entry(item.ref, ran.package, item.inputs, ran.root)
         map_timings[item.ref.id] = {**split_times(ran.times, ran.downloads), "unity": unity_timings(ran.package)}
     _sheet(run_dir, list(entries))
@@ -978,6 +984,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="keep the scenic walls out of the lightmap in each run copy (plan C4, export card build.scenic_out_of_lightmap)")
     run.add_argument("--lightmap-pages-max", type=_positive_int, default=None, metavar="N",
                      help="cap the lightmap estimate at N pages in each run copy (plan C5, export card build.lightmap_pages_max)")
+    run.add_argument("--balanced-spawns", action="store_true",
+                     help="place the defenders and the Uplink by the gameplay metrics in each run copy (plan C6, map.json balanced_spawns)")
     report = sub.add_parser("report", help="read a run's packages again, for the Unity timings")
     report.add_argument("run_dir", type=Path)
     comparison = sub.add_parser("compare", help="write bench_diff.md beside NEW and print it")

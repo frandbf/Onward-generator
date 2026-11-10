@@ -211,6 +211,32 @@ def store_gameplay_report(directory: str | Path, enabled: bool) -> None:
     atomic_write_json(root / "map.json", document)
 
 
+def balanced_spawns_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"balanced_spawns": true`` (plan C6, ADR-032 amendment, off by default).
+
+    ``run`` then asks ``perf layout`` for ``--balanced-spawns``. A map without ``map.json``
+    or without the key stays off. A value that is not a bool is refused.
+    """
+    try:
+        document = load_map(directory)
+    except MapError:
+        return False
+    value = document.get("balanced_spawns", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "balanced_spawns" must be true or false, got {value!r}')
+    return value
+
+
+def store_balanced_spawns(directory: str | Path, enabled: bool) -> None:
+    """Record the balanced spawns switch on an existing map (plan C6)."""
+    if not isinstance(enabled, bool):
+        raise MapError(f'"balanced_spawns" must be true or false, got {enabled!r}')
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    document["balanced_spawns"] = enabled
+    atomic_write_json(root / "map.json", document)
+
+
 def repetition_enabled(directory: str | Path) -> bool:
     """True only when ``map.json`` has ``"repetition": true`` (plan C1, ADR-009 amendment, off by default).
 

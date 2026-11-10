@@ -319,6 +319,27 @@ def test_gameplay_report_run_adds_the_headline_and_an_off_run_does_not(workdir: 
     assert bench.main(["check", str(root / "runs" / "r1"), str(root / "runs" / "r3")]) == 0
 
 
+def test_balanced_spawns_run_switches_the_run_copy_only(workdir: Path) -> None:
+    root = workdir / "bench"
+    off = Stub()
+    assert _run(root, "r1", off) == 0
+    assert "--balanced-spawns" not in next(argv for argv in off.calls if argv[:2] == ["perf", "layout"])
+    inputs = root / "inputs" / "bench_murcia"
+    digest = bench.inputs_sha256(inputs)
+
+    on = Stub()
+    assert _run(root, "r2", on, "--offline", "--balanced-spawns") == 0
+    layout = next(argv for argv in on.calls if argv[:2] == ["perf", "layout"])
+    assert layout[layout.index("--balanced-spawns") + 1] == "--out"
+    assert [arg.replace("/r2/", "/r1/") for arg in layout if arg != "--balanced-spawns"] == next(argv for argv in off.calls if argv[:2] == ["perf", "layout"])
+    assert bench.inputs_sha256(inputs) == digest
+    assert "balanced_spawns" not in json.loads((inputs / "map.json").read_text(encoding="utf-8"))
+    assert json.loads((root / "runs" / "r2" / "bench_murcia" / "map.json").read_text(encoding="utf-8"))["balanced_spawns"] is True
+    first = json.loads((root / "runs" / "r1" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    second = json.loads((root / "runs" / "r2" / bench.REPORT_FILE).read_text(encoding="utf-8"))
+    assert second["maps"]["bench_murcia"]["inputs_sha256"] == first["maps"]["bench_murcia"]["inputs_sha256"]
+
+
 REPETITION = {"enabled": True, "cell_m": 100.0, "over_limit": [], "slots": [
     {"slot": "roofs", "status": "measured", "coarse_contrast": 0.0168, "limit": 0.019, "over_limit": False},
     {"slot": "doors", "status": "not_applicable", "coarse_contrast": None, "limit": None, "over_limit": False},

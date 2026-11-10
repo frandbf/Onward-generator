@@ -753,3 +753,8 @@ def test_store_lightmap_pages_max_refuses_a_bad_card(tmp_path: Path, card: Any, 
 def test_store_lightmap_pages_max_needs_a_map(tmp_path: Path) -> None:
     with pytest.raises(bench.BenchError, match="no map.json to find the export card"):
         bench.store_lightmap_pages_max(tmp_path, 8)
+
+
+def test_the_run_parser_takes_the_balanced_spawns_switch() -> None:
+    assert bench.build_parser().parse_args(["run", "--balanced-spawns"]).balanced_spawns is True
+    assert bench.build_parser().parse_args(["run"]).balanced_spawns is False
