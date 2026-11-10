@@ -25,6 +25,11 @@ LOD_MIN_TRIS = 128
 FLAT_PROP_M = 0.1
 # A reduced copy whose bounding box moved more than this (street metres) lost a part; the target doubles.
 LOD_BOX_TOLERANCE_M = 0.02
+# A prop lower than FLAT_PROP_M with more triangles than this is drawn as a flat impostor (overgrow/impostor.py).
+IMPOSTOR_MIN_TRIS = 64
+# Decorative vegetation (not a tree): at most DECOR_MAX_TRIS, and its box may move by DECOR_BOX_FRACTION of its size.
+DECOR_MAX_TRIS = 300
+DECOR_BOX_FRACTION = 0.1
 ALBEDO_PX = 512
 # A flat-anchored vegetation mesh taller than this is a slope tile, not ground cover.
 FLAT_VEGETATION_MAX_M = 0.05

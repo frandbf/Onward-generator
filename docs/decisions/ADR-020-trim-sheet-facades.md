@@ -62,6 +62,10 @@ The trim path takes 20 % of the predicted draws off Madrid (−44) and 29 % off 
 - **A tone per construction rather than per parcel.** More variety in a block, but it undoes the one look per parcel of ADR-016.
 - **Darkened corners in the strips.** A strip repeats along the run, so its dark edge would come back every repeat, not at the corner.
 
+## Amendment (10 November 2026): one band for the background rings
+
+The scenic and mid buildings (ADR-017) stand behind the fog, past the play area. They now take one band per wall: no zocalo, no cornice, no string course, no storey cuts. Before, every scenic face was cut into three bands, and a mid face into one band per storey, for lines no player can make out at 100–200 m. On Madrid r200 the mid ring drops from 40 004 to 27 584 triangles and the scenic ring from 29 716 to 19 888, with the same materials and so the same draws. The core buildings are unchanged.
+
 ## Consequences
 
 - Facade draws per cell drop from up to fifteen to at most three, with one texture for all of them: −20 % predicted draws on Madrid, −29 % on Kraków. Triangles grow by the band cuts (two per storey and face with openings, four per plain face): +5.0 % on Madrid, +8.4 % on Kraków. Texture memory grows by 21 MiB.
