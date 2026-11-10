@@ -38,6 +38,10 @@ FURNISH_CATALOGUES = (
 )
 FURNISH_DECOR_CATALOGUE = "kenney_food"
 FURNISH_SLOTS = ("counter", "wall", "decor")
+# Slots the semantic recipes also fill (ADR-036): beds and sofas against a wall, free-standing islands, tables with their
+# seats, corner pieces, a rug, and small things on the tables. A configuration's hand-written sets may name them too.
+ZONE_SLOTS = ("wall_deep", "center", "table", "seat", "corner", "rug", "top")
+ALL_SLOTS = (*FURNISH_SLOTS, *ZONE_SLOTS)
 # Rows that are not furniture: floor, wall, fence and column tiles, a character, a mannequin, and things a player
 # would read as loose clutter on the floor. Refused in any furnishing set.
 FURNISH_EXCLUDED_IDS = frozenset({
@@ -186,14 +190,25 @@ class FurnishEntry:
 
 @dataclass(frozen=True, slots=True)
 class FurnishSet:
-    """The rows of one shop category: one counter, wall pieces, and small decor on the counter top."""
+    """The rows of one room type: a counter, wall pieces and small decor on the counter top; and, with the semantic
+    recipes (ADR-036), deep wall pieces, free-standing islands, tables with seats, corners, a rug and table-top decor."""
 
     counter: tuple[FurnishEntry, ...]
     wall: tuple[FurnishEntry, ...]
     decor: tuple[FurnishEntry, ...]
+    wall_deep: tuple[FurnishEntry, ...] = ()
+    center: tuple[FurnishEntry, ...] = ()
+    table: tuple[FurnishEntry, ...] = ()
+    seat: tuple[FurnishEntry, ...] = ()
+    corner: tuple[FurnishEntry, ...] = ()
+    rug: tuple[FurnishEntry, ...] = ()
+    top: tuple[FurnishEntry, ...] = ()
 
     def slot(self, name: str) -> tuple[FurnishEntry, ...]:
-        return {"counter": self.counter, "wall": self.wall, "decor": self.decor}[name]
+        if name not in ALL_SLOTS:
+            raise KeyError(name)
+        found: tuple[FurnishEntry, ...] = getattr(self, name)
+        return found
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +227,9 @@ class ShopFurnish:
     head_clear_m: float = 0.1
     catalogues: tuple[str, ...] = FURNISH_CATALOGUES
     sets: Mapping[str, FurnishSet] = MappingProxyType({})
+    selection: str = "sets"
+    """``sets``: the configuration's hand-written sets. ``semantic``: sets chosen from the described library by room
+    type (``detail/recipes.py``, ADR-036) when the configuration is loaded for a run; the written sets stay a fallback."""
 
     def set_for(self, category: str) -> FurnishSet:
         """The set of ``category``, else the ``generic`` one."""
@@ -400,7 +418,7 @@ def _shop_furnish(d: Mapping[str, Any] | None) -> ShopFurnish:
     if d is None:
         return ShopFurnish()
     sets = {
-        name: FurnishSet(*(tuple(_furnish_entry(item) for item in block[slot]) for slot in FURNISH_SLOTS))
+        name: FurnishSet(**{slot: tuple(_furnish_entry(item) for item in block.get(slot, ())) for slot in ALL_SLOTS})
         for name, block in sorted(d["sets"].items())
     }
     return ShopFurnish(
@@ -416,6 +434,7 @@ def _shop_furnish(d: Mapping[str, Any] | None) -> ShopFurnish:
         head_clear_m=float(d["head_clear_m"]),
         catalogues=tuple(sorted(d["catalogues"])),
         sets=MappingProxyType(sets),
+        selection=str(d.get("selection", "sets")),
     )
 
 
@@ -673,7 +692,10 @@ def load_detail_config(path: str | Path | None = None) -> DetailConfig:
     except ConfigLoadError as exc:
         raise DetailConfigError(path or DEFAULT_CONFIG_PATH, [exc.diagnostic.message]) from exc
     cfg = config_from_document(doc, path=str(resolved), sha256=hashlib.sha256(resolved.read_bytes()).hexdigest())
-    return with_local_furnishing(cfg, REPO_ROOT / "assets")
+    cfg = with_local_furnishing(cfg, REPO_ROOT / "assets")
+    from onward_generator.detail.recipes import with_semantic_sets  # recipes import this module
+
+    return with_semantic_sets(cfg, REPO_ROOT / "assets")
 
 
 def with_local_furnishing(cfg: DetailConfig, assets: Path) -> DetailConfig:

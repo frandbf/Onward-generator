@@ -42,7 +42,19 @@
       "length_m": 1.125,
       "depth_m": 1.203,
       "height_m": 2.731,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_tableware",
+        "mount": "table_top",
+        "settings": [
+          "bar",
+          "kitchen",
+          "dining",
+          "bakery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_cash_register_self",
@@ -69,7 +81,20 @@
       "length_m": 2.25,
       "depth_m": 1.375,
       "height_m": 1.732,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "register",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_cash_register",
@@ -95,7 +120,20 @@
       "length_m": 2.25,
       "depth_m": 2.125,
       "height_m": 1.477,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "register",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_character_employee",
@@ -121,7 +159,16 @@
       "length_m": 1.918,
       "depth_m": 1.046,
       "height_m": 1.808,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_clothing_rack",
@@ -147,7 +194,21 @@
       "length_m": 2.0,
       "depth_m": 1.255,
       "height_m": 2.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_clothing_table",
@@ -173,7 +234,20 @@
       "length_m": 2.2,
       "depth_m": 1.45,
       "height_m": 1.488,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_column",
@@ -198,7 +272,16 @@
       "length_m": 1.814,
       "depth_m": 1.814,
       "height_m": 2.5,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_display_bread",
@@ -224,7 +307,19 @@
       "length_m": 1.75,
       "depth_m": 1.5,
       "height_m": 1.25,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "display_case",
+        "mount": "wall",
+        "settings": [
+          "bakery",
+          "shop",
+          "pharmacy",
+          "grocery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_display_cans",
@@ -250,7 +345,19 @@
       "length_m": 2.0,
       "depth_m": 2.0,
       "height_m": 2.25,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "display_case",
+        "mount": "wall",
+        "settings": [
+          "bakery",
+          "shop",
+          "pharmacy",
+          "grocery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_display_flowers",
@@ -276,7 +383,19 @@
       "length_m": 2.0,
       "depth_m": 2.001,
       "height_m": 1.58,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "display_case",
+        "mount": "wall",
+        "settings": [
+          "bakery",
+          "shop",
+          "pharmacy",
+          "grocery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_display_fruit",
@@ -302,7 +421,19 @@
       "length_m": 1.5,
       "depth_m": 1.5,
       "height_m": 1.29,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "display_case",
+        "mount": "wall",
+        "settings": [
+          "bakery",
+          "shop",
+          "pharmacy",
+          "grocery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_display_small",
@@ -328,7 +459,19 @@
       "length_m": 0.978,
       "depth_m": 0.708,
       "height_m": 2.081,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "display_case",
+        "mount": "wall",
+        "settings": [
+          "bakery",
+          "shop",
+          "pharmacy",
+          "grocery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_fence_door_rotate",
@@ -355,7 +498,16 @@
       "length_m": 2.5,
       "depth_m": 0.468,
       "height_m": 0.948,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_fence",
@@ -380,7 +532,16 @@
       "length_m": 1.484,
       "depth_m": 0.468,
       "height_m": 0.86,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_floor_wood",
@@ -406,7 +567,16 @@
       "length_m": 2.5,
       "depth_m": 2.5,
       "height_m": 0.033,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_floor",
@@ -431,7 +601,16 @@
       "length_m": 2.5,
       "depth_m": 2.5,
       "height_m": 0.031,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_freezer",
@@ -456,7 +635,20 @@
       "length_m": 2.0,
       "depth_m": 1.5,
       "height_m": 0.844,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "wall",
+        "settings": [
+          "bar",
+          "grocery",
+          "bakery",
+          "kitchen",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_freezers_standing",
@@ -482,7 +674,20 @@
       "length_m": 2.5,
       "depth_m": 1.2,
       "height_m": 2.25,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "wall",
+        "settings": [
+          "bar",
+          "grocery",
+          "bakery",
+          "kitchen",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_gacha_machine",
@@ -508,7 +713,17 @@
       "length_m": 1.084,
       "depth_m": 1.119,
       "height_m": 2.443,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_shop_hand_truck",
@@ -534,7 +749,16 @@
       "length_m": 0.933,
       "depth_m": 0.92,
       "height_m": 1.366,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_mannequin",
@@ -559,7 +783,16 @@
       "length_m": 1.446,
       "depth_m": 0.883,
       "height_m": 1.797,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "mannequin",
+        "mount": "center",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_shelf_bags",
@@ -585,7 +818,21 @@
       "length_m": 2.0,
       "depth_m": 1.75,
       "height_m": 2.158,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_shelf_boxes",
@@ -611,7 +858,21 @@
       "length_m": 2.0,
       "depth_m": 1.75,
       "height_m": 2.125,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_shelf_end",
@@ -637,7 +898,21 @@
       "length_m": 2.0,
       "depth_m": 1.0,
       "height_m": 2.625,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_shopping_basket",
@@ -663,7 +938,18 @@
       "length_m": 0.875,
       "depth_m": 0.875,
       "height_m": 0.625,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_shopping_cart",
@@ -689,7 +975,16 @@
       "length_m": 0.875,
       "depth_m": 1.332,
       "height_m": 0.965,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_wall_corner",
@@ -715,7 +1010,16 @@
       "length_m": 2.0,
       "depth_m": 2.0,
       "height_m": 2.5,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_wall_door_rotate",
@@ -742,7 +1046,16 @@
       "length_m": 2.5,
       "depth_m": 1.5,
       "height_m": 2.5,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_shop_wall_window",
@@ -768,7 +1081,17 @@
       "length_m": 2.5,
       "depth_m": 1.5,
       "height_m": 2.5,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_shop_wall",
@@ -793,7 +1116,16 @@
       "length_m": 2.5,
       "depth_m": 1.5,
       "height_m": 2.5,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

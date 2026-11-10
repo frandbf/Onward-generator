@@ -52,7 +52,17 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "MP",
       "source_url": "https://polyhaven.com/a/covered_car",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "rusted_wheel_rim_02",
@@ -91,7 +101,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "John Hutcheson",
       "source_url": "https://polyhaven.com/a/rusted_wheel_rim_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "old_tyre",
@@ -130,7 +151,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "MP",
       "source_url": "https://polyhaven.com/a/old_tyre",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "large_iron_gate",
@@ -163,7 +195,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Josh Dean",
       "source_url": "https://polyhaven.com/a/large_iron_gate",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "modular_fire_escape",
@@ -194,7 +235,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Juniix",
       "source_url": "https://polyhaven.com/a/modular_fire_escape",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "structure",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "metal_trash_can",
@@ -232,7 +282,17 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "GurJas Studios",
       "source_url": "https://polyhaven.com/a/metal_trash_can",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "bin",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "Barrel_01",
@@ -270,7 +330,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Jorge Camacho",
       "source_url": "https://polyhaven.com/a/Barrel_01",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "barrel_stove",
@@ -308,7 +379,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "MP",
       "source_url": "https://polyhaven.com/a/barrel_stove",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "Barrel_02",
@@ -346,7 +428,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Jorge Camacho",
       "source_url": "https://polyhaven.com/a/Barrel_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "can_rusted",
@@ -384,7 +477,17 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Rahul Chaudhary",
       "source_url": "https://polyhaven.com/a/can_rusted",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "bin",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "small_lpg_tank",
@@ -422,7 +525,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Ulan Cabanilla",
       "source_url": "https://polyhaven.com/a/small_lpg_tank",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "propane_tank",
@@ -460,7 +574,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Slinc",
       "source_url": "https://polyhaven.com/a/propane_tank",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "industrial_storage_cart",
@@ -499,7 +624,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Jule Bielitz",
       "source_url": "https://polyhaven.com/a/industrial_storage_cart",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "crate",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "old_bed_frame",
@@ -537,7 +673,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Luca B",
       "source_url": "https://polyhaven.com/a/old_bed_frame",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "wooden_picnic_table",
@@ -575,7 +722,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Ulan Cabanilla",
       "source_url": "https://polyhaven.com/a/wooden_picnic_table",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "bench",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "exterior_aircon_unit",
@@ -606,7 +764,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Monsta3D",
       "source_url": "https://polyhaven.com/a/exterior_aircon_unit",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "aircon",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "security_camera_02",
@@ -637,7 +804,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Garrison Gager, Yann Kervran",
       "source_url": "https://polyhaven.com/a/security_camera_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "camera",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "security_camera_01",
@@ -668,7 +844,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Alexander Otterbeck, Yann Kervran",
       "source_url": "https://polyhaven.com/a/security_camera_01",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "camera",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "concrete_road_barrier",
@@ -702,7 +887,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Amal Kumar",
       "source_url": "https://polyhaven.com/a/concrete_road_barrier",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "concrete_road_barrier_02",
@@ -736,7 +930,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Amal Kumar",
       "source_url": "https://polyhaven.com/a/concrete_road_barrier_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "water_manhole_cover",
@@ -769,7 +972,16 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Raunox",
       "source_url": "https://polyhaven.com/a/water_manhole_cover",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "manhole",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "fern_02",
@@ -803,7 +1015,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Rob Tuytel, Rico Cilliers",
       "source_url": "https://polyhaven.com/a/fern_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "flower_empodium",
@@ -837,7 +1060,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Jenelle van Heerden, Rico Cilliers",
       "source_url": "https://polyhaven.com/a/flower_empodium",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "weed_plant_02",
@@ -870,7 +1104,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Rob Tuytel, Rico Cilliers",
       "source_url": "https://polyhaven.com/a/weed_plant_02",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "shrub_03",
@@ -903,7 +1148,18 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "author": "Rico Cilliers",
       "source_url": "https://polyhaven.com/a/shrub_03",
-      "source": "polyhaven"
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "mustang_boss_429",
@@ -940,7 +1196,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "mohamedhussien",
       "source_url": "https://sketchfab.com/models/97e3bdfe47ea40f49351debaa11cd1e2",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "rusty_abandoned_truck",
@@ -977,7 +1243,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "rashad-brahimli",
       "source_url": "https://sketchfab.com/models/68f715c39c07464db59e099bb8dc2d4e",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "abandoned_auto",
@@ -1014,7 +1290,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "pixeledbun",
       "source_url": "https://sketchfab.com/models/d5307c411b2246d69d9b29c5880223ec",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "destroyed_car_03",
@@ -1051,7 +1337,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "kryik1023",
       "source_url": "https://sketchfab.com/models/efc4dfe2c7284a64bc9281eb4f61d402",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "burned_police_cars",
@@ -1088,7 +1384,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "kryik1023",
       "source_url": "https://sketchfab.com/models/ad16f7085cb047b494997cf9efed5059",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "abandoned_sedan_2",
@@ -1125,7 +1431,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "rashad-brahimli",
       "source_url": "https://sketchfab.com/models/db2df46c49f9441286c84c66208ef7ac",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "crashed_abandoned_car",
@@ -1162,7 +1478,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "rashad-brahimli",
       "source_url": "https://sketchfab.com/models/66ef51a84c9843dda53bf0b4b9020011",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "abandoned_sedan_1",
@@ -1199,7 +1525,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "rashad-brahimli",
       "source_url": "https://sketchfab.com/models/6a2169dafc254f399387a679305bb1bf",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "building_container_metal",
@@ -1236,7 +1572,19 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "yadrogames",
       "source_url": "https://sketchfab.com/models/36380c606bae46848237e9bbe073fa3b",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "structure",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "crashed_helicopter",
@@ -1274,7 +1622,18 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "jigar6102021",
       "source_url": "https://sketchfab.com/models/1ad46b04f23d43dbb2730c9435c1a7cc",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "forest_hut",
@@ -1311,7 +1670,19 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "Gerhald",
       "source_url": "https://sketchfab.com/models/642f7e533f3242bb9f43addea71efbc4",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "structure",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "gas_tanker",
@@ -1346,7 +1717,18 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "ahmagh2e",
       "source_url": "https://sketchfab.com/models/240baad0fd7b4924a5705950be7adee6",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "barrel",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "fire_escape_sf",
@@ -1378,7 +1760,16 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "local.yany",
       "source_url": "https://sketchfab.com/models/a624f8c74f2b4774b4436aaf093c1e01",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "structure",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "abandoned_garage",
@@ -1415,7 +1806,19 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "olegolegperepelica",
       "source_url": "https://sketchfab.com/models/a1959927a98e4752bdb01b6e1f7f7d26",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "structure",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "watchtower",
@@ -1453,7 +1856,19 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "ahmagh2e",
       "source_url": "https://sketchfab.com/models/bda39e79dbfa4976b1791b6b1f58259c",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "structure",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "road_closed_barrier",
@@ -1488,7 +1903,16 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "rashad-brahimli",
       "source_url": "https://sketchfab.com/models/af50e8d36c7e481c8ddc375ce751c1d6",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "barrier_low",
@@ -1522,7 +1946,16 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "tridentcorp",
       "source_url": "https://sketchfab.com/models/f61862267fdf489386aeadae20754229",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "fence_door_metal",
@@ -1555,7 +1988,16 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "ahmagh2e",
       "source_url": "https://sketchfab.com/models/82227d60e9484b958feb856a2c8f4d33",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "warning_signboard",
@@ -1590,7 +2032,16 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "chenkl",
       "source_url": "https://sketchfab.com/models/5805213c2b54454fb22d8176c8741210",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "jungle_ground_roots",
@@ -1623,7 +2074,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "iGauravRajput",
       "source_url": "https://sketchfab.com/models/68c9e77971874643bcef67dc1987a2b7",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "jungle_ground_water",
@@ -1656,7 +2117,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "iGauravRajput",
       "source_url": "https://sketchfab.com/models/3781a00ddb6146ceb51144d00349a240",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "jungle_ground_tile",
@@ -1689,7 +2160,17 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "iGauravRajput",
       "source_url": "https://sketchfab.com/models/1ce5fa26a4ce49d6b170988dd4bc5ee2",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "tree_low_poly",
@@ -1725,7 +2206,18 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "00amza",
       "source_url": "https://sketchfab.com/models/73201f05280d48dcb10ed4ca362d69f8",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "scanned_plants_grass",
@@ -1759,7 +2251,18 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "author": "klessgyzen",
       "source_url": "https://sketchfab.com/models/d0fbc8fecfbb40bf9029bc97b6e9e122",
-      "source": "sketchfab"
+      "source": "sketchfab",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

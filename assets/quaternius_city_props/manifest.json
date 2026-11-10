@@ -45,7 +45,16 @@
       "length_m": 0.925,
       "depth_m": 0.925,
       "height_m": 0.033,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "manhole",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_city_Prop_Drain",
@@ -72,7 +81,16 @@
       "length_m": 0.585,
       "depth_m": 0.585,
       "height_m": 0.04,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "manhole",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_city_Prop_Planter_Single",
@@ -101,7 +119,17 @@
       "length_m": 2.0,
       "depth_m": 2.0,
       "height_m": 0.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "planter",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_city_Prop_Bollard",
@@ -129,7 +157,16 @@
       "length_m": 0.216,
       "depth_m": 0.227,
       "height_m": 0.892,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_city_Prop_ACUnit",
@@ -155,7 +192,16 @@
       "length_m": 0.893,
       "depth_m": 0.347,
       "height_m": 0.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "aircon",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

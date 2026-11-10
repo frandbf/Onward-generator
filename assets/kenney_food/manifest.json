@@ -42,7 +42,20 @@
       "length_m": 0.031,
       "depth_m": 0.052,
       "height_m": 0.064,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_apple_half",
@@ -68,7 +81,20 @@
       "length_m": 0.029,
       "depth_m": 0.059,
       "height_m": 0.057,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_apple",
@@ -93,7 +119,20 @@
       "length_m": 0.059,
       "depth_m": 0.059,
       "height_m": 0.057,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_avocado",
@@ -118,7 +157,20 @@
       "length_m": 0.045,
       "depth_m": 0.052,
       "height_m": 0.064,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bacon_raw",
@@ -144,7 +196,20 @@
       "length_m": 0.039,
       "depth_m": 0.156,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bacon",
@@ -169,7 +234,20 @@
       "length_m": 0.039,
       "depth_m": 0.156,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bag_flat",
@@ -195,7 +273,18 @@
       "length_m": 0.195,
       "depth_m": 0.14,
       "height_m": 0.057,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bag",
@@ -220,7 +309,18 @@
       "length_m": 0.066,
       "depth_m": 0.124,
       "height_m": 0.18,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_banana",
@@ -245,7 +345,20 @@
       "length_m": 0.041,
       "depth_m": 0.189,
       "height_m": 0.059,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_barrel",
@@ -270,7 +383,18 @@
       "length_m": 0.228,
       "depth_m": 0.204,
       "height_m": 0.204,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_beet",
@@ -295,7 +419,20 @@
       "length_m": 0.029,
       "depth_m": 0.029,
       "height_m": 0.08,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bottle_ketchup",
@@ -321,7 +458,20 @@
       "length_m": 0.043,
       "depth_m": 0.05,
       "height_m": 0.118,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bottle_musterd",
@@ -347,7 +497,20 @@
       "length_m": 0.043,
       "depth_m": 0.05,
       "height_m": 0.118,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bottle_oil",
@@ -373,7 +536,20 @@
       "length_m": 0.042,
       "depth_m": 0.042,
       "height_m": 0.187,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bowl_broth",
@@ -399,7 +575,20 @@
       "length_m": 0.158,
       "depth_m": 0.174,
       "height_m": 0.087,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bowl_cereal",
@@ -425,7 +614,20 @@
       "length_m": 0.151,
       "depth_m": 0.19,
       "height_m": 0.126,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bowl_soup",
@@ -451,7 +653,20 @@
       "length_m": 0.151,
       "depth_m": 0.174,
       "height_m": 0.064,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bowl",
@@ -476,7 +691,20 @@
       "length_m": 0.151,
       "depth_m": 0.174,
       "height_m": 0.064,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_bread",
@@ -501,7 +729,20 @@
       "length_m": 0.133,
       "depth_m": 0.11,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_broccoli",
@@ -526,7 +767,20 @@
       "length_m": 0.113,
       "depth_m": 0.113,
       "height_m": 0.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_burger_cheese_double",
@@ -553,7 +807,20 @@
       "length_m": 0.113,
       "depth_m": 0.113,
       "height_m": 0.096,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_burger_cheese",
@@ -579,7 +846,20 @@
       "length_m": 0.113,
       "depth_m": 0.113,
       "height_m": 0.066,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_burger_double",
@@ -605,7 +885,20 @@
       "length_m": 0.121,
       "depth_m": 0.121,
       "height_m": 0.108,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_burger",
@@ -630,7 +923,20 @@
       "length_m": 0.121,
       "depth_m": 0.121,
       "height_m": 0.087,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cabbage",
@@ -655,7 +961,20 @@
       "length_m": 0.114,
       "depth_m": 0.121,
       "height_m": 0.092,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cake_birthday",
@@ -681,7 +1000,20 @@
       "length_m": 0.192,
       "depth_m": 0.192,
       "height_m": 0.109,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cake_slicer",
@@ -707,7 +1039,20 @@
       "length_m": 0.217,
       "depth_m": 0.057,
       "height_m": 0.021,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cake",
@@ -732,7 +1077,20 @@
       "length_m": 0.192,
       "depth_m": 0.192,
       "height_m": 0.082,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_can_open",
@@ -758,7 +1116,20 @@
       "length_m": 0.09,
       "depth_m": 0.09,
       "height_m": 0.122,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_can_small",
@@ -784,7 +1155,20 @@
       "length_m": 0.09,
       "depth_m": 0.09,
       "height_m": 0.048,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_can",
@@ -809,7 +1193,20 @@
       "length_m": 0.09,
       "depth_m": 0.09,
       "height_m": 0.096,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_candy_bar_wrapper",
@@ -836,7 +1233,20 @@
       "length_m": 0.088,
       "depth_m": 0.035,
       "height_m": 0.024,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_candy_bar",
@@ -862,7 +1272,20 @@
       "length_m": 0.088,
       "depth_m": 0.022,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_carrot",
@@ -887,7 +1310,20 @@
       "length_m": 0.103,
       "depth_m": 0.103,
       "height_m": 0.215,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_carton_small",
@@ -913,7 +1349,18 @@
       "length_m": 0.069,
       "depth_m": 0.069,
       "height_m": 0.117,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_carton",
@@ -938,7 +1385,18 @@
       "length_m": 0.069,
       "depth_m": 0.069,
       "height_m": 0.177,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cauliflower",
@@ -963,7 +1421,20 @@
       "length_m": 0.114,
       "depth_m": 0.121,
       "height_m": 0.092,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_celery_stick",
@@ -989,7 +1460,20 @@
       "length_m": 0.014,
       "depth_m": 0.026,
       "height_m": 0.162,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cheese_cut",
@@ -1015,7 +1499,20 @@
       "length_m": 0.115,
       "depth_m": 0.079,
       "height_m": 0.006,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cheese_slicer",
@@ -1041,7 +1538,20 @@
       "length_m": 0.186,
       "depth_m": 0.058,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cheese",
@@ -1066,7 +1576,20 @@
       "length_m": 0.204,
       "depth_m": 0.204,
       "height_m": 0.066,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cherries",
@@ -1091,7 +1614,20 @@
       "length_m": 0.026,
       "depth_m": 0.049,
       "height_m": 0.051,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_chinese",
@@ -1116,7 +1652,20 @@
       "length_m": 0.136,
       "depth_m": 0.167,
       "height_m": 0.17,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_chocolate_wrapper",
@@ -1142,7 +1691,20 @@
       "length_m": 0.088,
       "depth_m": 0.061,
       "height_m": 0.019,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_chocolate",
@@ -1167,7 +1729,20 @@
       "length_m": 0.088,
       "depth_m": 0.044,
       "height_m": 0.01,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_chopstic_decorative",
@@ -1193,7 +1768,20 @@
       "length_m": 0.006,
       "depth_m": 0.135,
       "height_m": 0.006,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_chopstick",
@@ -1218,7 +1806,20 @@
       "length_m": 0.006,
       "depth_m": 0.135,
       "height_m": 0.006,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cocktail",
@@ -1243,7 +1844,20 @@
       "length_m": 0.078,
       "depth_m": 0.108,
       "height_m": 0.152,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_coconut_half",
@@ -1269,7 +1883,20 @@
       "length_m": 0.075,
       "depth_m": 0.075,
       "height_m": 0.037,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_coconut",
@@ -1294,7 +1921,20 @@
       "length_m": 0.075,
       "depth_m": 0.075,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cookie_chocolate",
@@ -1320,7 +1960,20 @@
       "length_m": 0.036,
       "depth_m": 0.042,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cookie",
@@ -1345,7 +1998,20 @@
       "length_m": 0.066,
       "depth_m": 0.057,
       "height_m": 0.015,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cooking_fork",
@@ -1371,7 +2037,20 @@
       "length_m": 0.205,
       "depth_m": 0.022,
       "height_m": 0.022,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cooking_knife_chopping",
@@ -1398,7 +2077,20 @@
       "length_m": 0.18,
       "depth_m": 0.067,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cooking_knife",
@@ -1424,7 +2116,20 @@
       "length_m": 0.215,
       "depth_m": 0.04,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cooking_spatula",
@@ -1450,7 +2155,20 @@
       "length_m": 0.205,
       "depth_m": 0.057,
       "height_m": 0.022,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cooking_spoon",
@@ -1476,7 +2194,20 @@
       "length_m": 0.2,
       "depth_m": 0.052,
       "height_m": 0.007,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_corn_dog",
@@ -1502,7 +2233,20 @@
       "length_m": 0.181,
       "depth_m": 0.033,
       "height_m": 0.028,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_corn",
@@ -1527,7 +2271,20 @@
       "length_m": 0.103,
       "depth_m": 0.09,
       "height_m": 0.095,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_croissant",
@@ -1552,7 +2309,20 @@
       "length_m": 0.104,
       "depth_m": 0.143,
       "height_m": 0.058,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cup_coffee",
@@ -1578,7 +2348,20 @@
       "length_m": 0.065,
       "depth_m": 0.086,
       "height_m": 0.042,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cup_saucer",
@@ -1604,7 +2387,20 @@
       "length_m": 0.107,
       "depth_m": 0.107,
       "height_m": 0.011,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cup_tea",
@@ -1630,7 +2426,20 @@
       "length_m": 0.071,
       "depth_m": 0.088,
       "height_m": 0.06,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cup",
@@ -1655,7 +2464,20 @@
       "length_m": 0.069,
       "depth_m": 0.088,
       "height_m": 0.06,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cupcake",
@@ -1680,7 +2502,20 @@
       "length_m": 0.107,
       "depth_m": 0.092,
       "height_m": 0.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cutting_board_japanese",
@@ -1707,7 +2542,20 @@
       "length_m": 0.147,
       "depth_m": 0.252,
       "height_m": 0.024,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cutting_board_round",
@@ -1734,7 +2582,20 @@
       "length_m": 0.24,
       "depth_m": 0.24,
       "height_m": 0.018,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_cutting_board",
@@ -1760,7 +2621,20 @@
       "length_m": 0.174,
       "depth_m": 0.246,
       "height_m": 0.018,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_dim_sum",
@@ -1786,7 +2660,20 @@
       "length_m": 0.048,
       "depth_m": 0.056,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_donut_chocolate",
@@ -1812,7 +2699,20 @@
       "length_m": 0.074,
       "depth_m": 0.085,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_donut_sprinkles",
@@ -1838,7 +2738,20 @@
       "length_m": 0.074,
       "depth_m": 0.085,
       "height_m": 0.028,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_donut",
@@ -1863,7 +2776,20 @@
       "length_m": 0.074,
       "depth_m": 0.085,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_egg_cooked",
@@ -1889,7 +2815,20 @@
       "length_m": 0.124,
       "depth_m": 0.115,
       "height_m": 0.008,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_egg_cup",
@@ -1915,7 +2854,20 @@
       "length_m": 0.047,
       "depth_m": 0.055,
       "height_m": 0.045,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_egg_half",
@@ -1941,7 +2893,20 @@
       "length_m": 0.035,
       "depth_m": 0.04,
       "height_m": 0.032,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_egg",
@@ -1966,7 +2931,20 @@
       "length_m": 0.035,
       "depth_m": 0.04,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_eggplant",
@@ -1991,7 +2969,20 @@
       "length_m": 0.061,
       "depth_m": 0.065,
       "height_m": 0.122,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_fish_bones",
@@ -2017,7 +3008,20 @@
       "length_m": 0.093,
       "depth_m": 0.191,
       "height_m": 0.022,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_fish",
@@ -2042,7 +3046,20 @@
       "length_m": 0.059,
       "depth_m": 0.186,
       "height_m": 0.097,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_frappe",
@@ -2067,7 +3084,20 @@
       "length_m": 0.076,
       "depth_m": 0.076,
       "height_m": 0.15,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_fries_empty",
@@ -2093,7 +3123,20 @@
       "length_m": 0.049,
       "depth_m": 0.08,
       "height_m": 0.071,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_fries",
@@ -2118,7 +3161,20 @@
       "length_m": 0.055,
       "depth_m": 0.08,
       "height_m": 0.119,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_frikandel_speciaal",
@@ -2144,7 +3200,20 @@
       "length_m": 0.191,
       "depth_m": 0.05,
       "height_m": 0.033,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_frying_pan_lid",
@@ -2171,7 +3240,21 @@
       "length_m": 0.173,
       "depth_m": 0.182,
       "height_m": 0.033,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "none",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_food_frying_pan",
@@ -2197,7 +3280,20 @@
       "length_m": 0.197,
       "depth_m": 0.307,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ginger_bread_cutter",
@@ -2224,7 +3320,20 @@
       "length_m": 0.088,
       "depth_m": 0.081,
       "height_m": 0.013,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ginger_bread",
@@ -2250,7 +3359,20 @@
       "length_m": 0.078,
       "depth_m": 0.071,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_glass_wine",
@@ -2276,7 +3398,20 @@
       "length_m": 0.068,
       "depth_m": 0.059,
       "height_m": 0.15,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_glass",
@@ -2301,7 +3436,20 @@
       "length_m": 0.048,
       "depth_m": 0.055,
       "height_m": 0.086,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_grapes",
@@ -2326,7 +3474,20 @@
       "length_m": 0.084,
       "depth_m": 0.072,
       "height_m": 0.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_honey",
@@ -2351,7 +3512,20 @@
       "length_m": 0.098,
       "depth_m": 0.098,
       "height_m": 0.095,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_hot_dog_raw",
@@ -2378,7 +3552,20 @@
       "length_m": 0.176,
       "depth_m": 0.033,
       "height_m": 0.029,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_hot_dog",
@@ -2404,7 +3591,20 @@
       "length_m": 0.176,
       "depth_m": 0.061,
       "height_m": 0.046,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ice_cream_cne",
@@ -2431,7 +3631,20 @@
       "length_m": 0.055,
       "depth_m": 0.064,
       "height_m": 0.089,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ice_cream_cup",
@@ -2458,7 +3671,20 @@
       "length_m": 0.06,
       "depth_m": 0.07,
       "height_m": 0.054,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ice_cream_scoop_chocolate",
@@ -2486,7 +3712,20 @@
       "length_m": 0.071,
       "depth_m": 0.081,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ice_cream_scoop_mint",
@@ -2514,7 +3753,20 @@
       "length_m": 0.071,
       "depth_m": 0.081,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_ice_cream",
@@ -2540,7 +3792,20 @@
       "length_m": 0.071,
       "depth_m": 0.081,
       "height_m": 0.139,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_knife_block",
@@ -2566,7 +3831,20 @@
       "length_m": 0.191,
       "depth_m": 0.067,
       "height_m": 0.199,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_leek",
@@ -2591,7 +3869,20 @@
       "length_m": 0.082,
       "depth_m": 0.082,
       "height_m": 0.254,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_lemon_half",
@@ -2617,7 +3908,20 @@
       "length_m": 0.052,
       "depth_m": 0.06,
       "height_m": 0.034,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_lemon",
@@ -2642,7 +3946,20 @@
       "length_m": 0.052,
       "depth_m": 0.06,
       "height_m": 0.067,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_loaf_baguette",
@@ -2668,7 +3985,20 @@
       "length_m": 0.249,
       "depth_m": 0.075,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_loaf_round",
@@ -2694,7 +4024,20 @@
       "length_m": 0.232,
       "depth_m": 0.154,
       "height_m": 0.088,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_loaf",
@@ -2719,7 +4062,20 @@
       "length_m": 0.174,
       "depth_m": 0.11,
       "height_m": 0.133,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_lollypop",
@@ -2744,7 +4100,20 @@
       "length_m": 0.012,
       "depth_m": 0.056,
       "height_m": 0.114,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_maki_roe",
@@ -2770,7 +4139,20 @@
       "length_m": 0.036,
       "depth_m": 0.031,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_maki_salmon",
@@ -2796,7 +4178,20 @@
       "length_m": 0.036,
       "depth_m": 0.031,
       "height_m": 0.021,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_maki_vegetable",
@@ -2822,7 +4217,20 @@
       "length_m": 0.036,
       "depth_m": 0.031,
       "height_m": 0.021,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_cooked",
@@ -2848,7 +4256,20 @@
       "length_m": 0.144,
       "depth_m": 0.173,
       "height_m": 0.019,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_patty",
@@ -2874,7 +4295,20 @@
       "length_m": 0.09,
       "depth_m": 0.103,
       "height_m": 0.019,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_raw",
@@ -2900,7 +4334,20 @@
       "length_m": 0.144,
       "depth_m": 0.173,
       "height_m": 0.019,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_ribs",
@@ -2926,7 +4373,20 @@
       "length_m": 0.161,
       "depth_m": 0.115,
       "height_m": 0.018,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_sausage",
@@ -2952,7 +4412,20 @@
       "length_m": 0.045,
       "depth_m": 0.117,
       "height_m": 0.022,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_meat_tenderizer",
@@ -2978,7 +4451,20 @@
       "length_m": 0.162,
       "depth_m": 0.083,
       "height_m": 0.035,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mincemeat_pie",
@@ -3004,7 +4490,20 @@
       "length_m": 0.159,
       "depth_m": 0.184,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mortar_pestle",
@@ -3030,7 +4529,20 @@
       "length_m": 0.034,
       "depth_m": 0.04,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mortar",
@@ -3055,7 +4567,20 @@
       "length_m": 0.119,
       "depth_m": 0.137,
       "height_m": 0.063,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_muffin",
@@ -3080,7 +4605,20 @@
       "length_m": 0.091,
       "depth_m": 0.079,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mug",
@@ -3105,7 +4643,20 @@
       "length_m": 0.103,
       "depth_m": 0.086,
       "height_m": 0.082,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mushroom_half",
@@ -3131,7 +4682,20 @@
       "length_m": 0.019,
       "depth_m": 0.043,
       "height_m": 0.042,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mushroom",
@@ -3156,7 +4720,20 @@
       "length_m": 0.037,
       "depth_m": 0.043,
       "height_m": 0.042,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mussel_open",
@@ -3182,7 +4759,20 @@
       "length_m": 0.029,
       "depth_m": 0.047,
       "height_m": 0.024,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_mussel",
@@ -3207,7 +4797,20 @@
       "length_m": 0.028,
       "depth_m": 0.047,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_onion_half",
@@ -3233,7 +4836,20 @@
       "length_m": 0.032,
       "depth_m": 0.074,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_onion",
@@ -3258,7 +4874,20 @@
       "length_m": 0.064,
       "depth_m": 0.074,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_orange",
@@ -3283,7 +4912,20 @@
       "length_m": 0.051,
       "depth_m": 0.051,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pan_stew",
@@ -3309,7 +4951,20 @@
       "length_m": 0.197,
       "depth_m": 0.229,
       "height_m": 0.053,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pan",
@@ -3334,7 +4989,20 @@
       "length_m": 0.197,
       "depth_m": 0.229,
       "height_m": 0.053,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pancakes",
@@ -3359,7 +5027,20 @@
       "length_m": 0.131,
       "depth_m": 0.151,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_paprika_slice",
@@ -3385,7 +5066,20 @@
       "length_m": 0.048,
       "depth_m": 0.048,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_paprika",
@@ -3410,7 +5104,20 @@
       "length_m": 0.05,
       "depth_m": 0.05,
       "height_m": 0.06,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_peanut_butter",
@@ -3436,7 +5143,20 @@
       "length_m": 0.071,
       "depth_m": 0.071,
       "height_m": 0.089,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pear_half",
@@ -3462,7 +5182,20 @@
       "length_m": 0.029,
       "depth_m": 0.059,
       "height_m": 0.081,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pear",
@@ -3487,7 +5220,20 @@
       "length_m": 0.059,
       "depth_m": 0.059,
       "height_m": 0.081,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pepper_mill",
@@ -3513,7 +5259,20 @@
       "length_m": 0.047,
       "depth_m": 0.047,
       "height_m": 0.164,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pepper",
@@ -3538,7 +5297,20 @@
       "length_m": 0.031,
       "depth_m": 0.096,
       "height_m": 0.023,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pie",
@@ -3563,7 +5335,20 @@
       "length_m": 0.285,
       "depth_m": 0.285,
       "height_m": 0.045,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pineapple",
@@ -3588,7 +5373,20 @@
       "length_m": 0.072,
       "depth_m": 0.073,
       "height_m": 0.141,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pizza_box",
@@ -3614,7 +5412,18 @@
       "length_m": 0.283,
       "depth_m": 0.286,
       "height_m": 0.264,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pizza_cutter",
@@ -3640,7 +5449,20 @@
       "length_m": 0.161,
       "depth_m": 0.076,
       "height_m": 0.017,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pizza",
@@ -3665,7 +5487,20 @@
       "length_m": 0.253,
       "depth_m": 0.253,
       "height_m": 0.013,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate_broken",
@@ -3691,7 +5526,20 @@
       "length_m": 0.268,
       "depth_m": 0.268,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate_deep",
@@ -3717,7 +5565,20 @@
       "length_m": 0.268,
       "depth_m": 0.268,
       "height_m": 0.043,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate_dinner",
@@ -3743,7 +5604,20 @@
       "length_m": 0.268,
       "depth_m": 0.268,
       "height_m": 0.066,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate_rectangle",
@@ -3769,7 +5643,20 @@
       "length_m": 0.258,
       "depth_m": 0.216,
       "height_m": 0.039,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate_sauerkraut",
@@ -3795,7 +5682,20 @@
       "length_m": 0.268,
       "depth_m": 0.268,
       "height_m": 0.053,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_plate",
@@ -3820,7 +5720,20 @@
       "length_m": 0.268,
       "depth_m": 0.268,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_popsicle_chocolate",
@@ -3846,7 +5759,20 @@
       "length_m": 0.028,
       "depth_m": 0.06,
       "height_m": 0.147,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_popsicle_stick",
@@ -3872,7 +5798,20 @@
       "length_m": 0.006,
       "depth_m": 0.012,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_popsicle",
@@ -3897,7 +5836,20 @@
       "length_m": 0.023,
       "depth_m": 0.054,
       "height_m": 0.147,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pot_lid",
@@ -3923,7 +5875,20 @@
       "length_m": 0.197,
       "depth_m": 0.188,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pot_stew_lid",
@@ -3950,7 +5915,21 @@
       "length_m": 0.197,
       "depth_m": 0.188,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "none",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_food_pot_stew",
@@ -3976,7 +5955,20 @@
       "length_m": 0.197,
       "depth_m": 0.247,
       "height_m": 0.108,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pot",
@@ -4001,7 +5993,20 @@
       "length_m": 0.197,
       "depth_m": 0.247,
       "height_m": 0.108,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pudding",
@@ -4026,7 +6031,20 @@
       "length_m": 0.075,
       "depth_m": 0.087,
       "height_m": 0.06,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pumpkin_basic",
@@ -4052,7 +6070,20 @@
       "length_m": 0.126,
       "depth_m": 0.109,
       "height_m": 0.09,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_pumpkin",
@@ -4077,7 +6108,20 @@
       "length_m": 0.126,
       "depth_m": 0.126,
       "height_m": 0.069,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_radish",
@@ -4102,7 +6146,20 @@
       "length_m": 0.103,
       "depth_m": 0.103,
       "height_m": 0.173,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_rice_ball",
@@ -4128,7 +6185,20 @@
       "length_m": 0.024,
       "depth_m": 0.035,
       "height_m": 0.039,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_rollingPin",
@@ -4154,7 +6224,20 @@
       "length_m": 0.244,
       "depth_m": 0.049,
       "height_m": 0.042,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_salad",
@@ -4179,7 +6262,20 @@
       "length_m": 0.151,
       "depth_m": 0.174,
       "height_m": 0.082,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sandwich",
@@ -4204,7 +6300,20 @@
       "length_m": 0.13,
       "depth_m": 0.13,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sausage_half",
@@ -4230,7 +6339,20 @@
       "length_m": 0.056,
       "depth_m": 0.041,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sausage",
@@ -4255,7 +6377,20 @@
       "length_m": 0.111,
       "depth_m": 0.041,
       "height_m": 0.036,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_shaker_pepper",
@@ -4281,7 +6416,20 @@
       "length_m": 0.028,
       "depth_m": 0.028,
       "height_m": 0.059,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_shaker_salt",
@@ -4307,7 +6455,20 @@
       "length_m": 0.028,
       "depth_m": 0.028,
       "height_m": 0.059,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_skewer_vegetables",
@@ -4333,7 +6494,20 @@
       "length_m": 0.179,
       "depth_m": 0.033,
       "height_m": 0.032,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_skewer",
@@ -4358,7 +6532,20 @@
       "length_m": 0.179,
       "depth_m": 0.033,
       "height_m": 0.028,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soda_bottle",
@@ -4384,7 +6571,20 @@
       "length_m": 0.054,
       "depth_m": 0.047,
       "height_m": 0.174,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soda_can_crushed",
@@ -4411,7 +6611,20 @@
       "length_m": 0.074,
       "depth_m": 0.074,
       "height_m": 0.054,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soda_can",
@@ -4437,7 +6650,20 @@
       "length_m": 0.067,
       "depth_m": 0.067,
       "height_m": 0.105,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soda_glass",
@@ -4463,7 +6689,20 @@
       "length_m": 0.079,
       "depth_m": 0.089,
       "height_m": 0.124,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soda",
@@ -4488,7 +6727,20 @@
       "length_m": 0.076,
       "depth_m": 0.076,
       "height_m": 0.13,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_soy",
@@ -4513,7 +6765,20 @@
       "length_m": 0.05,
       "depth_m": 0.057,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_steamer",
@@ -4538,7 +6803,20 @@
       "length_m": 0.192,
       "depth_m": 0.192,
       "height_m": 0.18,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_strawberry",
@@ -4563,7 +6841,20 @@
       "length_m": 0.036,
       "depth_m": 0.036,
       "height_m": 0.055,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_styrofoam_dinner",
@@ -4589,7 +6880,20 @@
       "length_m": 0.378,
       "depth_m": 0.228,
       "height_m": 0.247,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_styrofoam",
@@ -4614,7 +6918,20 @@
       "length_m": 0.378,
       "depth_m": 0.228,
       "height_m": 0.247,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sub",
@@ -4639,7 +6956,20 @@
       "length_m": 0.085,
       "depth_m": 0.203,
       "height_m": 0.067,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sundae",
@@ -4664,7 +6994,20 @@
       "length_m": 0.067,
       "depth_m": 0.077,
       "height_m": 0.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sushi_egg",
@@ -4690,7 +7033,20 @@
       "length_m": 0.035,
       "depth_m": 0.052,
       "height_m": 0.024,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_sushi_salmon",
@@ -4716,7 +7072,20 @@
       "length_m": 0.032,
       "depth_m": 0.06,
       "height_m": 0.027,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_taco",
@@ -4741,7 +7110,20 @@
       "length_m": 0.128,
       "depth_m": 0.034,
       "height_m": 0.079,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_tajine_lid",
@@ -4767,7 +7149,20 @@
       "length_m": 0.227,
       "depth_m": 0.238,
       "height_m": 0.133,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_tajine",
@@ -4792,7 +7187,20 @@
       "length_m": 0.246,
       "depth_m": 0.258,
       "height_m": 0.041,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_tomato_slice",
@@ -4818,7 +7226,20 @@
       "length_m": 0.054,
       "depth_m": 0.054,
       "height_m": 0.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_tomato",
@@ -4843,7 +7264,20 @@
       "length_m": 0.051,
       "depth_m": 0.051,
       "height_m": 0.043,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_turkey",
@@ -4868,7 +7302,20 @@
       "length_m": 0.28,
       "depth_m": 0.204,
       "height_m": 0.113,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_utensil_fork",
@@ -4894,7 +7341,20 @@
       "length_m": 0.151,
       "depth_m": 0.025,
       "height_m": 0.005,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_utensil_knife",
@@ -4920,7 +7380,20 @@
       "length_m": 0.18,
       "depth_m": 0.023,
       "height_m": 0.005,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_utensil_spoon",
@@ -4946,7 +7419,20 @@
       "length_m": 0.144,
       "depth_m": 0.036,
       "height_m": 0.008,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_waffle",
@@ -4971,7 +7457,20 @@
       "length_m": 0.096,
       "depth_m": 0.096,
       "height_m": 0.012,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_watermelon",
@@ -4996,7 +7495,20 @@
       "length_m": 0.137,
       "depth_m": 0.137,
       "height_m": 0.143,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_whipped_cream",
@@ -5022,7 +7534,20 @@
       "length_m": 0.041,
       "depth_m": 0.047,
       "height_m": 0.029,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_whisk",
@@ -5047,7 +7572,20 @@
       "length_m": 0.217,
       "depth_m": 0.047,
       "height_m": 0.047,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_whole_ham",
@@ -5073,7 +7611,20 @@
       "length_m": 0.114,
       "depth_m": 0.192,
       "height_m": 0.132,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_wholer_ham",
@@ -5099,7 +7650,20 @@
       "length_m": 0.102,
       "depth_m": 0.249,
       "height_m": 0.118,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_wine_red",
@@ -5125,7 +7689,20 @@
       "length_m": 0.057,
       "depth_m": 0.05,
       "height_m": 0.21,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_food_wine_white",
@@ -5151,7 +7728,20 @@
       "length_m": 0.061,
       "depth_m": 0.053,
       "height_m": 0.197,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_food",
+        "mount": "counter_top",
+        "settings": [
+          "bakery",
+          "bar",
+          "grocery",
+          "kitchen",
+          "dining"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

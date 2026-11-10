@@ -9,6 +9,8 @@ import pytest
 # A developer's own Asset Store catalogues (assets/asset_store_*, gitignored, ADR-035) must not change any test:
 # set before any test module loads a configuration or a library at import time.
 os.environ["ONWARD_LOCAL_CATALOGUES"] = "0"
+# The semantic recipes (ADR-036) follow the described library; tests pin the hand-written sets. test_recipes turns them on.
+os.environ["ONWARD_SEMANTIC_SETS"] = "0"
 
 from onward_generator.domain.models import AreaOfInterest, SourceDataset
 from onward_generator.geo.aoi import load_aoi_geojson

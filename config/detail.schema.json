@@ -19,13 +19,19 @@
     "furnishSlot": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/furnishEntry" } },
     "furnishSet": {
       "type": "object", "additionalProperties": false, "required": ["counter", "wall", "decor"],
-      "properties": { "counter": { "$ref": "#/$defs/furnishSlot" }, "wall": { "$ref": "#/$defs/furnishSlot" }, "decor": { "$ref": "#/$defs/furnishSlot" } }
+      "properties": {
+        "counter": { "$ref": "#/$defs/furnishSlot" }, "wall": { "$ref": "#/$defs/furnishSlot" }, "decor": { "$ref": "#/$defs/furnishSlot" },
+        "wall_deep": { "$ref": "#/$defs/furnishSlot" }, "center": { "$ref": "#/$defs/furnishSlot" }, "table": { "$ref": "#/$defs/furnishSlot" },
+        "seat": { "$ref": "#/$defs/furnishSlot" }, "corner": { "$ref": "#/$defs/furnishSlot" }, "rug": { "$ref": "#/$defs/furnishSlot" },
+        "top": { "$ref": "#/$defs/furnishSlot" }
+      }
     },
     "furnishBlock": {
       "type": "object", "additionalProperties": false,
       "required": ["enabled", "max_triangles", "max_collision_triangles", "max_pieces_per_room", "max_assets", "walk_width_m", "wall_gap_m", "piece_gap_m", "pane_clear_m", "head_clear_m", "catalogues", "sets"],
       "properties": {
         "enabled": { "type": "boolean" },
+        "selection": { "enum": ["sets", "semantic"] },
         "max_triangles": { "type": "integer", "minimum": 0, "maximum": 100000 },
         "max_collision_triangles": { "type": "integer", "minimum": 0, "maximum": 20000 },
         "max_pieces_per_room": { "type": "integer", "minimum": 0, "maximum": 24 },

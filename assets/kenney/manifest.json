@@ -45,7 +45,18 @@
       "length_m": 2.52,
       "depth_m": 2.8,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_driveway_short",
@@ -75,7 +86,18 @@
       "length_m": 2.52,
       "depth_m": 1.4,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_1x2",
@@ -105,7 +127,17 @@
       "length_m": 6.125,
       "depth_m": 3.062,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_1x3",
@@ -135,7 +167,17 @@
       "length_m": 8.925,
       "depth_m": 3.062,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_1x4",
@@ -165,7 +207,17 @@
       "length_m": 11.725,
       "depth_m": 3.062,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_2x2",
@@ -195,7 +247,17 @@
       "length_m": 6.125,
       "depth_m": 5.862,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_2x3",
@@ -225,7 +287,17 @@
       "length_m": 8.925,
       "depth_m": 5.862,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_3x2",
@@ -255,7 +327,17 @@
       "length_m": 6.125,
       "depth_m": 8.663,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_3x3",
@@ -285,7 +367,17 @@
       "length_m": 8.925,
       "depth_m": 8.663,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence_low",
@@ -315,7 +407,17 @@
       "length_m": 8.925,
       "depth_m": 5.862,
       "height_m": 1.19,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_fence",
@@ -345,7 +447,17 @@
       "length_m": 3.325,
       "depth_m": 0.525,
       "height_m": 1.89,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_path_long",
@@ -375,7 +487,18 @@
       "length_m": 1.4,
       "depth_m": 2.8,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_path_short",
@@ -405,7 +528,18 @@
       "length_m": 1.4,
       "depth_m": 1.4,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_path_stones_long",
@@ -435,7 +569,18 @@
       "length_m": 0.98,
       "depth_m": 2.8,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_path_stones_messy",
@@ -465,7 +610,18 @@
       "length_m": 1.089,
       "depth_m": 2.529,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_path_stones_short",
@@ -495,7 +651,18 @@
       "length_m": 0.98,
       "depth_m": 1.4,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_planter",
@@ -527,7 +694,18 @@
       "length_m": 2.8,
       "depth_m": 2.1,
       "height_m": 1.24,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "planter",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_tree_large",
@@ -558,7 +736,18 @@
       "length_m": 1.473,
       "depth_m": 1.701,
       "height_m": 5.369,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_suburban_tree_small",
@@ -589,7 +778,18 @@
       "length_m": 1.473,
       "depth_m": 1.701,
       "height_m": 3.969,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_detail_ac_a",
@@ -616,7 +816,16 @@
       "depth_m": 0.984,
       "height_m": 0.436,
       "collider": "none",
-      "refused": "low_detail"
+      "refused": "low_detail",
+      "semantic": {
+        "kind": "aircon",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_detail_ac_b",
@@ -643,7 +852,16 @@
       "depth_m": 0.513,
       "height_m": 0.922,
       "collider": "none",
-      "refused": "low_detail"
+      "refused": "low_detail",
+      "semantic": {
+        "kind": "aircon",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_brown_glass",
@@ -669,7 +887,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_brown_window",
@@ -695,7 +922,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_brown",
@@ -721,7 +957,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_white_glass",
@@ -747,7 +992,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_white_window",
@@ -773,7 +1027,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_door_white",
@@ -799,7 +1062,16 @@
       "length_m": 1.025,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_awning_a",
@@ -825,7 +1097,16 @@
       "length_m": 4.1,
       "depth_m": 4.551,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_awning_b",
@@ -851,7 +1132,16 @@
       "length_m": 4.1,
       "depth_m": 5.023,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_awning_c",
@@ -877,7 +1167,16 @@
       "length_m": 4.1,
       "depth_m": 5.023,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_center_corner",
@@ -903,7 +1202,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_center",
@@ -929,7 +1237,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_corner_slanted_passage",
@@ -955,7 +1272,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_corner_slanted",
@@ -981,7 +1307,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_corner",
@@ -1007,7 +1342,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_end",
@@ -1033,7 +1377,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_side",
@@ -1059,7 +1412,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_border_straight",
@@ -1085,7 +1447,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_center",
@@ -1111,7 +1482,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.436,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_corner_high",
@@ -1137,7 +1517,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_corner",
@@ -1163,7 +1552,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.436,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_detail_a",
@@ -1189,7 +1587,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_detail_b",
@@ -1215,7 +1622,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_detail_c",
@@ -1241,7 +1657,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_detail_d",
@@ -1267,7 +1692,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_flat_top",
@@ -1293,7 +1727,16 @@
       "length_m": 4.51,
       "depth_m": 4.51,
       "height_m": 0.871,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_gable_corner",
@@ -1319,7 +1762,16 @@
       "length_m": 4.287,
       "depth_m": 4.287,
       "height_m": 2.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_gable_end",
@@ -1345,7 +1797,16 @@
       "length_m": 4.474,
       "depth_m": 4.1,
       "height_m": 2.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_gable",
@@ -1371,7 +1832,16 @@
       "length_m": 4.474,
       "depth_m": 4.1,
       "height_m": 2.127,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_corner_a",
@@ -1397,7 +1867,16 @@
       "length_m": 4.671,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_corner_b",
@@ -1423,7 +1902,16 @@
       "length_m": 4.671,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_corner_c",
@@ -1449,7 +1937,16 @@
       "length_m": 4.671,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_corner_inner",
@@ -1475,7 +1972,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 2.972,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_detail",
@@ -1501,7 +2007,16 @@
       "length_m": 4.1,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_flat",
@@ -1527,7 +2042,16 @@
       "length_m": 4.1,
       "depth_m": 4.1,
       "height_m": 0.436,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted_window",
@@ -1553,7 +2077,16 @@
       "length_m": 4.1,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_roof_slanted",
@@ -1579,7 +2112,16 @@
       "length_m": 4.1,
       "depth_m": 4.671,
       "height_m": 3.206,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_detailed",
@@ -1605,7 +2147,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_large",
@@ -1631,7 +2182,16 @@
       "length_m": 1.537,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_narrow",
@@ -1657,7 +2217,16 @@
       "length_m": 0.769,
       "depth_m": 0.205,
       "height_m": 1.73,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_round_low",
@@ -1683,7 +2252,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.42,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_round_middle",
@@ -1709,7 +2287,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 2.562,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_round_narrow",
@@ -1735,7 +2322,16 @@
       "length_m": 0.769,
       "depth_m": 0.205,
       "height_m": 1.73,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_round_top",
@@ -1761,7 +2357,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.912,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_round_wide",
@@ -1787,7 +2392,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.912,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_tall",
@@ -1813,7 +2427,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown_wide",
@@ -1839,7 +2462,16 @@
       "length_m": 3.075,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_brown",
@@ -1865,7 +2497,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_detailed",
@@ -1891,7 +2532,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_large",
@@ -1917,7 +2567,16 @@
       "length_m": 1.537,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_narrow",
@@ -1943,7 +2602,16 @@
       "length_m": 0.769,
       "depth_m": 0.205,
       "height_m": 1.73,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_round_low",
@@ -1969,7 +2637,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.42,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_round_middle",
@@ -1995,7 +2672,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 2.562,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_round_narrow",
@@ -2021,7 +2707,16 @@
       "length_m": 0.769,
       "depth_m": 0.205,
       "height_m": 1.73,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_round_top",
@@ -2047,7 +2742,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.912,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_round_wide",
@@ -2073,7 +2777,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.912,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_tall",
@@ -2099,7 +2812,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 2.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white_wide",
@@ -2125,7 +2847,16 @@
       "length_m": 3.075,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_modular_window_white",
@@ -2151,7 +2882,16 @@
       "length_m": 1.281,
       "depth_m": 0.205,
       "height_m": 1.558,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_awning_small",
@@ -2178,7 +2918,16 @@
       "length_m": 1.913,
       "depth_m": 0.96,
       "height_m": 0.899,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "structure",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_awning_wide",
@@ -2205,7 +2954,16 @@
       "length_m": 3.2,
       "depth_m": 0.96,
       "height_m": 0.899,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "structure",
+        "mount": "facade",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_barrier_strong_damaged",
@@ -2235,7 +2993,16 @@
       "length_m": 2.125,
       "depth_m": 0.797,
       "height_m": 1.062,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_barrier_strong_type_a",
@@ -2265,7 +3032,16 @@
       "length_m": 2.125,
       "depth_m": 0.797,
       "height_m": 1.062,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "barrier",
+        "mount": "ground",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_beam",
@@ -2293,7 +3069,17 @@
       "length_m": 0.8,
       "depth_m": 3.2,
       "height_m": 0.8,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "structure",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_bench",
@@ -2325,7 +3111,18 @@
       "length_m": 1.932,
       "depth_m": 1.031,
       "height_m": 1.309,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bench",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_block",
@@ -2358,7 +3155,17 @@
       "length_m": 1.3,
       "depth_m": 1.3,
       "height_m": 1.3,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_bricks_type_a",
@@ -2391,7 +3198,17 @@
       "length_m": 1.483,
       "depth_m": 1.389,
       "height_m": 0.52,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_bricks_type_b",
@@ -2424,7 +3241,17 @@
       "length_m": 1.676,
       "depth_m": 1.107,
       "height_m": 0.52,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_dumpster_closed",
@@ -2457,7 +3284,17 @@
       "length_m": 1.92,
       "depth_m": 1.452,
       "height_m": 1.743,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bin",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_dumpster_open",
@@ -2490,7 +3327,17 @@
       "length_m": 1.92,
       "depth_m": 1.551,
       "height_m": 1.759,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bin",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_light_double",
@@ -2522,7 +3369,18 @@
       "length_m": 0.276,
       "depth_m": 1.415,
       "height_m": 3.072,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_post",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_light_single",
@@ -2554,7 +3412,18 @@
       "length_m": 0.276,
       "depth_m": 0.845,
       "height_m": 3.072,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_post",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_detail_light_traffic",
@@ -2586,7 +3455,18 @@
       "length_m": 0.5,
       "depth_m": 1.869,
       "height_m": 3.328,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_post",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_door_type_a",
@@ -2612,7 +3492,16 @@
       "length_m": 1.273,
       "depth_m": 0.16,
       "height_m": 2.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_door_type_b",
@@ -2638,7 +3527,16 @@
       "length_m": 1.273,
       "depth_m": 0.16,
       "height_m": 2.009,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_pallet_small",
@@ -2671,7 +3569,17 @@
       "length_m": 1.3,
       "depth_m": 1.495,
       "height_m": 0.39,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_pallet",
@@ -2704,7 +3612,17 @@
       "length_m": 1.25,
       "depth_m": 1.25,
       "height_m": 0.188,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_planks",
@@ -2737,7 +3655,17 @@
       "length_m": 1.412,
       "depth_m": 0.713,
       "height_m": 0.125,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_center",
@@ -2763,7 +3691,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.0,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_corner_inner",
@@ -2789,7 +3726,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_corner_outer",
@@ -2815,7 +3761,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_corner",
@@ -2841,7 +3796,16 @@
       "length_m": 6.4,
       "depth_m": 6.4,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_damaged",
@@ -2867,7 +3831,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_pavement",
@@ -2893,7 +3866,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.0,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_side",
@@ -2919,7 +3901,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_asphalt_straight",
@@ -2945,7 +3936,16 @@
       "length_m": 3.2,
       "depth_m": 6.4,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_center",
@@ -2971,7 +3971,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.0,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_corner_inner",
@@ -2997,7 +4006,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_corner_outer",
@@ -3023,7 +4041,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_corner",
@@ -3049,7 +4076,16 @@
       "length_m": 6.4,
       "depth_m": 6.4,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_damaged",
@@ -3075,7 +4111,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_pavement",
@@ -3101,7 +4146,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.0,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_side",
@@ -3127,7 +4181,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_straight",
@@ -3153,7 +4216,16 @@
       "length_m": 3.2,
       "depth_m": 6.4,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_road_dirt_tile",
@@ -3179,7 +4251,16 @@
       "length_m": 1.6,
       "depth_m": 1.6,
       "height_m": 0.16,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_roof_metal_poles",
@@ -3205,7 +4286,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 2.24,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_roof_metal_type_a",
@@ -3231,7 +4321,16 @@
       "length_m": 3.639,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_roof_metal_type_b",
@@ -3257,7 +4356,16 @@
       "length_m": 3.639,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_scaffolding_poles",
@@ -3284,7 +4392,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_truck_flat",
@@ -3316,7 +4433,17 @@
       "length_m": 2.656,
       "depth_m": 5.259,
       "height_m": 3.219,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_truck_green_cargo",
@@ -3349,7 +4476,17 @@
       "length_m": 2.656,
       "depth_m": 3.738,
       "height_m": 2.363,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_truck_green",
@@ -3381,7 +4518,17 @@
       "length_m": 2.656,
       "depth_m": 5.259,
       "height_m": 3.219,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_truck_grey_cargo",
@@ -3414,7 +4561,17 @@
       "length_m": 2.656,
       "depth_m": 3.738,
       "height_m": 2.363,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_truck_grey",
@@ -3446,7 +4603,17 @@
       "length_m": 2.656,
       "depth_m": 5.259,
       "height_m": 3.219,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "vehicle",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_column_painted",
@@ -3473,7 +4640,16 @@
       "length_m": 0.8,
       "depth_m": 0.8,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_column",
@@ -3500,7 +4676,16 @@
       "length_m": 0.8,
       "depth_m": 0.8,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_corner_painted",
@@ -3527,7 +4712,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_corner",
@@ -3554,7 +4748,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_detail_painted",
@@ -3581,7 +4784,16 @@
       "length_m": 1.92,
       "depth_m": 0.64,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_detail",
@@ -3608,7 +4820,16 @@
       "length_m": 1.92,
       "depth_m": 0.64,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_diagonal",
@@ -3635,7 +4856,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_door",
@@ -3662,7 +4892,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_flat_garage",
@@ -3689,7 +4928,16 @@
       "length_m": 3.2,
       "depth_m": 0.32,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_flat_painted",
@@ -3716,7 +4964,16 @@
       "length_m": 3.2,
       "depth_m": 0.0,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_flat_window",
@@ -3743,7 +5000,16 @@
       "length_m": 3.2,
       "depth_m": 0.32,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_flat",
@@ -3770,7 +5036,16 @@
       "length_m": 3.2,
       "depth_m": 0.0,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_garage",
@@ -3797,7 +5072,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_low_painted",
@@ -3824,7 +5108,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_low",
@@ -3851,7 +5144,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_open",
@@ -3878,7 +5180,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_painted_diagonal",
@@ -3905,7 +5216,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_painted",
@@ -3932,7 +5252,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_roof_detailed",
@@ -3959,7 +5288,16 @@
       "length_m": 3.639,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_roof_slant_detailed",
@@ -3986,7 +5324,16 @@
       "length_m": 3.2,
       "depth_m": 3.639,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_roof_slant",
@@ -4013,7 +5360,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_roof",
@@ -4040,7 +5396,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a_window",
@@ -4067,7 +5432,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_a",
@@ -4094,7 +5468,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_column",
@@ -4121,7 +5504,16 @@
       "length_m": 0.8,
       "depth_m": 0.8,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_corner",
@@ -4148,7 +5540,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_detail_painted",
@@ -4175,7 +5576,16 @@
       "length_m": 1.92,
       "depth_m": 0.64,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_diagonal",
@@ -4202,7 +5612,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_door",
@@ -4229,7 +5648,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_flat_garage",
@@ -4256,7 +5684,16 @@
       "length_m": 3.2,
       "depth_m": 0.32,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_flat_window",
@@ -4283,7 +5720,16 @@
       "length_m": 3.2,
       "depth_m": 0.32,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_flat",
@@ -4310,7 +5756,16 @@
       "length_m": 3.2,
       "depth_m": 0.0,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_garage",
@@ -4337,7 +5792,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_low",
@@ -4364,7 +5828,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_open",
@@ -4391,7 +5864,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_roof_detailed",
@@ -4418,7 +5900,16 @@
       "length_m": 3.639,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_roof_slant_detailed",
@@ -4445,7 +5936,16 @@
       "length_m": 3.2,
       "depth_m": 3.639,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_roof_slant",
@@ -4472,7 +5972,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_roof",
@@ -4499,7 +6008,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b_window",
@@ -4526,7 +6044,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_b",
@@ -4553,7 +6080,16 @@
       "length_m": 3.2,
       "depth_m": 3.2,
       "height_m": 3.2,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_broken_type_a",
@@ -4581,7 +6117,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.28,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_broken_type_b",
@@ -4609,7 +6154,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_steps_type_a",
@@ -4636,7 +6190,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.28,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_steps_type_b",
@@ -4663,7 +6226,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_type_a",
@@ -4690,7 +6262,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.28,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_wall_type_b",
@@ -4717,7 +6298,16 @@
       "length_m": 3.2,
       "depth_m": 0.224,
       "height_m": 1.6,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fence",
+        "mount": "ground",
+        "settings": [
+          "yard"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_small_type_a",
@@ -4743,7 +6333,16 @@
       "length_m": 1.113,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_small_type_b",
@@ -4769,7 +6368,16 @@
       "length_m": 1.113,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_wide_type_a",
@@ -4795,7 +6403,16 @@
       "length_m": 1.913,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_wide_type_b",
@@ -4821,7 +6438,16 @@
       "length_m": 1.913,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_wide_type_c",
@@ -4847,7 +6473,16 @@
       "length_m": 1.913,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_urban_window_wide_type_d",
@@ -4873,7 +6508,16 @@
       "length_m": 1.913,
       "depth_m": 0.16,
       "height_m": 1.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kit_piece",
+        "mount": "none",
+        "settings": [
+          "street"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

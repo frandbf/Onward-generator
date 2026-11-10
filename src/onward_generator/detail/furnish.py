@@ -51,7 +51,7 @@ from shapely import LineString, Point, Polygon, unary_union
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
-from onward_generator.detail.config import FURNISH_SLOTS, FurnishEntry, FurnishSet, Interiors, ShopFurnish
+from onward_generator.detail.config import ALL_SLOTS, ZONE_SLOTS, FurnishEntry, FurnishSet, Interiors, ShopFurnish
 from onward_generator.detail.facades import Hole, Segment, stable_unit
 from onward_generator.detail.interiors import (
     SEE_THROUGH,
@@ -76,6 +76,19 @@ SLIVER_M2 = 1e-8
 # A part of the walk region this small, cut off from the door, is noise; anything larger is a pocket nobody can reach.
 ISLAND_M2 = 1e-6
 ROOM_REFUSALS = ("unreachable", "blocks_path", "no_free_wall", "triangle_budget", "collision_budget", "asset_cap")
+# Pieces that stand on another piece or lie flat on the floor: they take no floor, cut no path and get no collider.
+ON_TOP = frozenset({"decor", "top", "rug"})
+# A room gets one piece per this many square metres, at least MIN_PIECES, at most max_pieces_per_room (ADR-036).
+AREA_PER_PIECE_M2 = 8.0
+MIN_PIECES = 4
+# Share of a room's pieces the walls may take, so the floor keeps room for islands, tables and corners.
+WALL_SHARE = 0.4
+CORNER_PIECES = 2
+TOP_PER_TABLE = 1
+# Clear space round a table group, so a body can pull a chair and walk between groups.
+GROUP_CLEAR_M = 0.5
+# Pieces a zoned room's cap leaves out: what stands on a piece or lies flat, and the seats that go with a table.
+CAP_FREE = ON_TOP | {"seat"}
 PIECE_REFUSALS = ("no_counter_spot", "blocks_path")
 
 
@@ -169,8 +182,8 @@ class RoomFurnishing:
 
     @property
     def floor_footprints(self) -> BaseGeometry:
-        """The plan of the pieces on the floor; decor stands on a counter."""
-        return unary_union([p.footprint for p in self.pieces if p.slot != "decor"])
+        """The plan of the pieces on the floor; decor stands on a counter or a table, a rug lies flat."""
+        return unary_union([p.footprint for p in self.pieces if p.slot not in ON_TOP])
 
     def record(self, building_id: str, first: int) -> dict[str, Any]:
         """The ``furnishing`` block of the room record; piece ids ``furnish/<building>/<n>`` from ``first``."""
@@ -250,7 +263,7 @@ def piece_solid(asset: FurnishAsset, slot: str) -> bool:
     """Whether a piece gets a box collider: the overgrow cover rule (``is_solid``) at its placed size; decor never."""
     from onward_generator.overgrow.ambient import is_solid  # overgrow imports detail; load it on use
 
-    return slot != "decor" and is_solid(asset.role, asset.category, asset.size_m)
+    return slot not in ON_TOP and is_solid(asset.role, asset.category, asset.size_m)
 
 
 def footprint_size(asset: FurnishAsset, turn_deg: int) -> tuple[float, float]:
@@ -323,20 +336,32 @@ class _Planner:
         self.fronts: list[Polygon] = []
         self.refusals: set[str] = set()
         self._allowed: BaseGeometry | None = None
+        self.edge_choice: dict[tuple[int, int], FurnishEntry] = {}
+        # A set with zone slots (the semantic recipes, ADR-036) is planned by zones and scaled by the room's area; a
+        # hand-written set of counter, wall and decor only keeps the plan of ADR-031 exactly.
+        self.zoned = any(self.room_set().slot(name) for name in ZONE_SLOTS)
+        by_area = max(MIN_PIECES, round(float(room.polygon.area) / AREA_PER_PIECE_M2))
+        self.cap = min(furnish.max_pieces_per_room, by_area) if self.zoned else furnish.max_pieces_per_room
 
     def add(self, piece: Piece) -> None:
         self.pieces.append(piece)
         self._allowed = None
 
     @property
+    def floor_count(self) -> int:
+        """Pieces against the cap: in a zoned room all but decor, table tops, rugs and seats (a table brings its own),
+        else all."""
+        return sum(1 for p in self.pieces if p.slot not in CAP_FREE) if self.zoned else len(self.pieces)
+
+    @property
     def full(self) -> bool:
-        return len(self.pieces) >= self.cfg.max_pieces_per_room
+        return self.floor_count >= self.cap
 
     def allowed(self) -> BaseGeometry:
         """The floor a further piece may cover: the free floor less the keep-outs, the front zones, and the pieces with
         ``piece_gap_m`` round each."""
         if self._allowed is None:
-            placed = [p.footprint.buffer(self.cfg.piece_gap_m, join_style="mitre") for p in self.pieces if p.slot != "decor"]
+            placed = [p.footprint.buffer(self.cfg.piece_gap_m, join_style="mitre") for p in self.pieces if p.slot not in ON_TOP]
             self._allowed = self.free.difference(unary_union([self.keepout, *placed, *self.fronts]))
         return self._allowed
 
@@ -350,7 +375,7 @@ class _Planner:
             return "stair_zone"
         if any(footprint.intersection(pane).area > SLIVER_M2 for pane in self.room.panes):
             return "pane_band"
-        if any(footprint.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot != "decor"):
+        if any(footprint.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot not in ON_TOP):
             return "overlap"
         return None
 
@@ -360,7 +385,7 @@ class _Planner:
             return True
         if any(front.intersection(hole).area > SLIVER_M2 for hole in self.room.holes):
             return True
-        if any(front.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot != "decor"):
+        if any(front.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot not in ON_TOP):
             return True
         if any(footprint.intersection(zone).area > SLIVER_M2 for zone in self.fronts):
             return True
@@ -369,7 +394,7 @@ class _Planner:
     def path_cut(self, extra: Sequence[Polygon] = (), fronts: Sequence[Polygon] = ()) -> bool:
         """Whether the pieces and ``extra`` cut a place the empty room reached off the door, leave a stair foot
         (``targets``) cut off from the entry, or leave a front zone unreached."""
-        floor = [p.footprint for p in self.pieces if p.slot != "decor"] + list(extra)
+        floor = [p.footprint for p in self.pieces if p.slot not in ON_TOP] + list(extra)
         walk = self.walk_floor.difference(unary_union(floor)).buffer(-self.half_walk)
         reached = unary_union([c for c in polygons_of(walk) if c.intersects(self.entry)])
         if reached.is_empty:
@@ -459,7 +484,13 @@ class _Planner:
         return None
 
     def place_decor(self, counter: Piece) -> None:
-        entries = _ordered(self.room_set().decor, self.seed, self.building_id, self.room.room_id, "decor")
+        self.place_on(counter, self.room_set().decor, "decor", DECOR_PER_COUNTER)
+
+    def place_on(self, counter: Piece, slot_entries: Sequence[FurnishEntry], slot: str, count: int) -> None:
+        """Up to ``count`` small pieces of ``slot_entries`` on the top of ``counter`` (a counter or a table), visual only."""
+        # The counter's decor keeps the key of ADR-031; each table of a zoned room shuffles its own.
+        key = (slot,) if slot == "decor" else (slot, round(counter.centre[0], 3), round(counter.centre[1], 3))
+        entries = _ordered(slot_entries, self.seed, self.building_id, self.room.room_id, *key)
         if not entries:
             return
         top = counter.z_m + counter.asset.size_m[2]
@@ -467,34 +498,44 @@ class _Planner:
         theta = math.radians(counter.yaw_deg - counter.turn_deg)
         along_axis = np.array([-math.cos(theta), -math.sin(theta)])  # the wall direction ``u`` the counter was set on
         centre = np.array(counter.centre)
-        for k in range(DECOR_PER_COUNTER):
-            if self.full:
+        for k in range(count):
+            if not self.zoned and self.full:
                 return
-            offset = (k + 1) / (DECOR_PER_COUNTER + 1) - 0.5
+            offset = (k + 1) / (count + 1) - 0.5
             for entry in entries[k:] + entries[:k]:
                 asset = self.catalogue[entry.id]
                 along, depth = footprint_size(asset, entry.turn_deg)
-                if along > c_along / DECOR_PER_COUNTER or depth > c_depth or not self.fits_height(asset, top):
+                if along > c_along / count or depth > c_depth or not self.fits_height(asset, top):
                     continue
                 at = centre + along_axis * offset * c_along
                 half_u, half_n = along_axis * along / 2, np.array([-along_axis[1], along_axis[0]]) * depth / 2
                 corners = [at - half_u - half_n, at + half_u - half_n, at + half_u + half_n, at - half_u + half_n]
                 footprint = Polygon([(float(p[0]), float(p[1])) for p in corners])
-                self.add(Piece(asset, "decor", footprint, (float(at[0]), float(at[1])), top,
+                self.add(Piece(asset, slot, footprint, (float(at[0]), float(at[1])), top,
                                          (counter.yaw_deg - counter.turn_deg + entry.turn_deg) % 360.0, entry.turn_deg, False))
                 break
 
-    def place_walls(self) -> None:
-        """Round after round, one wall piece on each edge that still has room, longest edge first, until the room is full."""
+    def place_walls(self, quota: int | None = None, slot: str = "wall") -> None:
+        """Round after round, one wall piece on each edge that still has room, longest edge first, until the room is
+        full or ``quota`` pieces of ``slot`` stand. An edge keeps the model that first fitted it, so a wall reads as a
+        run of the same piece (ADR-036)."""
         open_edges = sorted(self.edges, key=lambda e: (-round(e.length, 6), e.ring, e.index))
         k = 0
-        while open_edges and not self.full:
-            open_edges = [edge for edge in open_edges if not self.full and self.place_wall(edge, k)]
+        start = len(self.pieces)
+        while open_edges and not self.full and (quota is None or len(self.pieces) - start < quota):
+            open_edges = [edge for edge in open_edges
+                          if not self.full and (quota is None or len(self.pieces) - start < quota) and self.place_wall(edge, k, slot)]
             k += 1
 
-    def place_wall(self, edge: _Edge, k: int) -> bool:
-        """Put the ``k``-th wall piece of ``edge`` at the first free stretch it fits; ``False`` when none fits."""
-        for entry in _ordered(self.room_set().wall, self.seed, self.building_id, self.room.room_id, "wall", edge.ring, edge.index, k):
+    def place_wall(self, edge: _Edge, k: int, slot: str = "wall") -> bool:
+        """Put the ``k``-th piece of ``slot`` on ``edge`` at the first free stretch it fits; ``False`` when none fits."""
+        # A zoned room orders an edge's models once, so the edge keeps one; ADR-031 reshuffled them for every k.
+        round_key = () if self.zoned else (k,)
+        ordered = _ordered(self.room_set().slot(slot), self.seed, self.building_id, self.room.room_id, slot, edge.ring, edge.index, *round_key)
+        kept = self.edge_choice.get((edge.ring, edge.index)) if self.zoned else None
+        if kept is not None and kept in ordered:
+            ordered = [kept, *(e for e in ordered if e != kept)]
+        for entry in ordered:
             asset = self.catalogue[entry.id]
             if not self.fits_height(asset):
                 continue
@@ -502,7 +543,7 @@ class _Planner:
             fitting = [lo for lo, hi in free_intervals(edge, depth, self.allowed(), self.cfg.wall_gap_m) if hi - lo >= along - 1e-9]
             if not fitting:
                 continue
-            piece, front = self.make(entry, "wall", edge, fitting[0])
+            piece, front = self.make(entry, slot, edge, fitting[0])
             if self.conflict(piece.footprint) is not None:
                 continue
             if self.blocks(piece.footprint, front):
@@ -510,8 +551,154 @@ class _Planner:
                 continue
             self.fronts.append(front)
             self.add(piece)
+            if slot == "wall":
+                self.edge_choice[(edge.ring, edge.index)] = entry
             return True
         return False
+
+    # ---- zones (ADR-036) ------------------------------------------------------------------------------------------
+
+    def frame(self) -> tuple[_Edge, float, float, float, float]:
+        """The room's longest outer edge as a frame, and the free floor's extent along it (s) and into the room (d)."""
+        main = max((e for e in self.edges if e.ring == 0), key=lambda e: (round(e.length, 6), -e.index))
+        coords = np.asarray(self.free.exterior.coords) if isinstance(self.free, Polygon) else np.asarray(self.polygon.exterior.coords)
+        rel = coords - main.a
+        s_vals, d_vals = rel @ main.u, rel @ main.n
+        return main, float(s_vals.min()), float(s_vals.max()), float(d_vals.min()), float(d_vals.max())
+
+    def _rect_piece(self, frame: _Edge, entry: FurnishEntry, slot: str, s: float, d: float, facing: np.ndarray) -> Piece:
+        asset = self.catalogue[entry.id]
+        along, depth = footprint_size(asset, entry.turn_deg)
+        footprint = frame.rect(s, s + along, d, d + depth)
+        centre = frame.a + frame.u * (s + along / 2) + frame.n * (d + depth / 2)
+        yaw = (math.degrees(math.atan2(float(facing[0]), -float(facing[1]))) + entry.turn_deg) % 360.0
+        return Piece(asset, slot, footprint, (float(centre[0]), float(centre[1])), self.room.floor_m, yaw, entry.turn_deg,
+                     piece_solid(asset, slot))
+
+    def place_rug(self) -> None:
+        """One rug of the set, centred on the free floor along its longest wall; it lies flat, so nothing else minds it."""
+        entries = _ordered(self.room_set().rug, self.seed, self.building_id, self.room.room_id, "rug")
+        if not entries:
+            return
+        frame, s0, s1, d0, d1 = self.frame()
+        for entry in entries:
+            asset = self.catalogue[entry.id]
+            along, depth = footprint_size(asset, entry.turn_deg)
+            s, d = (s0 + s1 - along) / 2, (d0 + d1 - depth) / 2
+            piece = self._rect_piece(frame, entry, "rug", s, d, frame.n)
+            if self.free.contains(piece.footprint) and piece.footprint.intersection(self.keepout).area <= SLIVER_M2:
+                self.add(piece)
+                return
+
+    def place_center(self, quota: int) -> int:
+        """Rows of free-standing islands (shelving, display cases) parallel to the longest wall, an aisle
+        ``walk_width_m`` wide in front of each; one model for the whole room, so the rows line up."""
+        return self._grid(self.room_set().center, "center", quota, group=False)
+
+    def place_tables(self, quota: int) -> int:
+        """Tables in a grid, each with its seats on its two long sides facing it, ``GROUP_CLEAR_M`` round each group."""
+        return self._grid(self.room_set().table, "table", quota, group=True)
+
+    def _grid(self, slot_entries: Sequence[FurnishEntry], slot: str, quota: int, *, group: bool) -> int:
+        entries = _ordered(slot_entries, self.seed, self.building_id, self.room.room_id, slot)
+        if not entries or quota <= 0 or self.full:
+            return 0
+        frame, s0, s1, d0, d1 = self.frame()
+        walk = self.cfg.walk_width_m
+        for entry in entries:
+            asset = self.catalogue[entry.id]
+            if not self.fits_height(asset):
+                continue
+            along, depth = footprint_size(asset, entry.turn_deg)
+            seat = self._seat(along) if group else None
+            seat_depth = footprint_size(self.catalogue[seat.id], seat.turn_deg)[1] if seat is not None else 0.0
+            margin = (seat_depth + GROUP_CLEAR_M) if group else 0.0
+            placed = 0
+            d = d0 + walk + margin
+            while d + depth + margin <= d1 - (walk if not group else 0.0) and placed < quota and not self.full:
+                s = s0 + walk / 2 + margin
+                while s + along + margin <= s1 - walk / 2 and placed < quota and not self.full:
+                    if self._try_unit(frame, entry, slot, s, d, seat, group):
+                        placed += 1
+                        s += along + (2 * margin if group else self.cfg.piece_gap_m)
+                    else:
+                        s += max(0.25, along / 2)
+                d += depth + (2 * margin if group else walk)
+            if placed:
+                return placed
+        return 0
+
+    def _seat(self, table_along: float) -> FurnishEntry | None:
+        for entry in _ordered(self.room_set().seat, self.seed, self.building_id, self.room.room_id, "seat"):
+            along, _depth = footprint_size(self.catalogue[entry.id], entry.turn_deg)
+            if along <= table_along + 0.1 and self.fits_height(self.catalogue[entry.id]):
+                return entry
+        return None
+
+    def _try_unit(self, frame: _Edge, entry: FurnishEntry, slot: str, s: float, d: float, seat: FurnishEntry | None, group: bool) -> bool:
+        """Place one island, or one table and its seats, at (s, d) of ``frame`` if it keeps every rule."""
+        asset = self.catalogue[entry.id]
+        along, depth = footprint_size(asset, entry.turn_deg)
+        main = self._rect_piece(frame, entry, slot, s, d, -frame.n)
+        unit = [main]
+        if group and seat is not None:
+            s_along, s_depth = footprint_size(self.catalogue[seat.id], seat.turn_deg)
+            count = 2 if along >= 2 * s_along + 0.2 else 1
+            for facing, dd in ((-frame.n, d + depth + 0.05), (frame.n, d - 0.05 - s_depth)):
+                for k in range(count):
+                    # Seats spread evenly along the table side, an equal gap before, between and after them.
+                    start_s = s + (along - count * s_along) * (k + 1) / (count + 1) + k * s_along
+                    unit.append(self._rect_piece(frame, seat, "seat", start_s, dd, facing))
+        if self.full:
+            return False
+        footprints = [p.footprint for p in unit]
+        for footprint in footprints:
+            if self.conflict(footprint) is not None or any(footprint.intersection(z).area > SLIVER_M2 for z in self.fronts):
+                return False
+        if any(f.intersection(g).area > SLIVER_M2 for i, f in enumerate(footprints) for g in footprints[i + 1:]):
+            return False
+        whole = unary_union(footprints)
+        clear = whole.buffer(GROUP_CLEAR_M if group else self.cfg.piece_gap_m, join_style="mitre")
+        if any(clear.intersection(p.footprint).area > SLIVER_M2 for p in self.pieces if p.slot not in ON_TOP):
+            return False
+        front = None if group else frame.rect(s, s + along, d - self.cfg.walk_width_m, d)
+        if self.path_cut(footprints, [front] if front is not None else []):
+            self.refusals.add("blocks_path")
+            return False
+        if front is not None:
+            self.fronts.append(front)
+        for piece in unit:
+            self.add(piece)
+        return True
+
+    def place_corners(self, quota: int) -> None:
+        """Up to ``quota`` corner pieces (plants, a floor lamp, an armchair), each in a free corner of the outer wall."""
+        entries = _ordered(self.room_set().corner, self.seed, self.building_id, self.room.room_id, "corner")
+        if not entries:
+            return
+        placed = 0
+        for edge in sorted((e for e in self.edges if e.ring == 0), key=lambda e: (-round(e.length, 6), e.index)):
+            for at_end in (False, True):
+                if placed >= quota or self.full:
+                    return
+                for entry in entries[placed:] + entries[:placed]:
+                    asset = self.catalogue[entry.id]
+                    along, depth = footprint_size(asset, entry.turn_deg)
+                    if not self.fits_height(asset) or along > edge.length:
+                        continue
+                    piece, front = self.make(entry, "corner", edge, edge.length - along - self.cfg.wall_gap_m if at_end else self.cfg.wall_gap_m)
+                    if self.conflict(piece.footprint) is not None or any(piece.footprint.intersection(z).area > SLIVER_M2 for z in self.fronts):
+                        continue
+                    if self.path_cut([piece.footprint]):
+                        continue
+                    self.add(piece)
+                    placed += 1
+                    break
+
+    def place_tops(self) -> None:
+        """Small things on every table: cups and plates in a bar, cakes in a bakery, books and lamps at home."""
+        for table in [p for p in self.pieces if p.slot == "table"]:
+            self.place_on(table, self.room_set().top, "top", TOP_PER_TABLE)
 
     def room_set(self) -> FurnishSet:
         return self.cfg.set_for(self.room.category)
@@ -529,11 +716,27 @@ def plan_room(room: FurnishRoom, furnish: ShopFurnish, catalogue: Mapping[str, F
     planner = _Planner(room, furnish, catalogue, seed, building_id)
     if not planner.reached_empty or planner.cut_off(unary_union(planner.reached_empty)):
         return "blocks_path"
+    if not planner.zoned:
+        counter = planner.place_counter()
+        if counter is not None:
+            planner.place_decor(counter)
+        planner.place_walls()
+        if not planner.pieces:
+            return "blocks_path" if "blocks_path" in planner.refusals else "no_free_wall"
+        refusals = tuple(r for r in PIECE_REFUSALS if r in planner.refusals)
+        return RoomFurnishing(room.room_id, room.category if room.category in furnish.sets else "generic", tuple(planner.pieces), refusals)
+    planner.place_rug()
     counter = planner.place_counter()
     if counter is not None:
         planner.place_decor(counter)
-    planner.place_walls()
-    if not planner.pieces:
+    planner.place_walls(quota=2, slot="wall_deep")
+    planner.place_corners(CORNER_PIECES)  # before the wall runs, which start in the corners
+    planner.place_walls(quota=max(1, math.ceil(WALL_SHARE * planner.cap)))
+    planner.place_tables(planner.cap - planner.floor_count)
+    planner.place_center(planner.cap - planner.floor_count)
+    planner.place_tops()
+    planner.place_walls()  # whatever the floor left, back to the walls
+    if not [p for p in planner.pieces if p.slot not in ON_TOP]:
         return "blocks_path" if "blocks_path" in planner.refusals else "no_free_wall"
     refusals = tuple(r for r in PIECE_REFUSALS if r in planner.refusals)
     return RoomFurnishing(room.room_id, room.category if room.category in furnish.sets else "generic", tuple(planner.pieces), refusals)
@@ -551,7 +754,7 @@ def load_catalogue(furnish: ShopFurnish, root: Path, scope: str = "shops.furnish
     """
     from onward_generator.overgrow.library import read_interior_catalogue  # overgrow imports detail; load it on use
 
-    ids = sorted({entry.id for chosen in furnish.sets.values() for slot in FURNISH_SLOTS for entry in chosen.slot(slot)})
+    ids = sorted({entry.id for chosen in furnish.sets.values() for slot in ALL_SLOTS for entry in chosen.slot(slot)})
     key = (str(root), furnish.catalogues, tuple(ids))
     if key in _CATALOGUES:  # the budget core runs detail several times in one process
         return _CATALOGUES[key]

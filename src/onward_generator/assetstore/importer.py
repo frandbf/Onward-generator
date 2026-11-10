@@ -29,6 +29,7 @@ from onward_generator.generation.gltf import read_glb, scene_primitives
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.overgrow.library_catalog import LibraryError
 from onward_generator.overgrow.manifest import check_manifest
+from onward_generator.overgrow.semantics import annotate
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPORTER = REPO_ROOT / "tools" / "unity" / "asset_store_export" / "Editor" / "AssetStoreExport.cs"
@@ -190,6 +191,7 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
         "semantics": {**SEMANTICS, "reviewed_on": datetime.date.today().isoformat()}, "package": {"publisher": package.publisher, "category": package.category, "name": package.name},
         "skipped": dict(sorted(result.skipped.items())), "unit_factor": factor, "assets": rows,
     }
+    document = annotate(document, package.catalogue, target)  # the semantic block of every row (ADR-036)
     check_manifest(document, package.catalogue)
     atomic_write_json(target / "manifest.json", document)
     (target / "License.txt").write_text(
