@@ -316,3 +316,37 @@ def test_the_triangle_cap_and_a_nested_output_reach_the_plan(stage: dict[str, Pa
     assert set(report["rejects"]) >= {"cap_triangles", "no_valid_spot"}
     with pytest.raises(CoverError, match="refusing to overwrite existing output"):
         apply_cover(base, stage["scene"], stage["playable"], stage["layout"], out, library=stage["library"])
+
+
+def test_max_props_from_a_street_profile_caps_the_cover_and_records_its_block(stage: dict[str, Path], tmp_path: Path) -> None:
+    from onward_generator.ai import street_profile as sp
+    from onward_generator.ai.providers import ProviderResult
+    from onward_generator.maps.workspace import create_map, store_sightline_cover, store_street_profile
+
+    class Light:
+        name = "stub"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            return ProviderResult(json.dumps({"profile_version": "0.1.0", "dominant_typology": "map_default", "palette": "map_default",
+                                              "props_profile": "map_default", "abandonment": "map_default", "cover": "off"}))
+
+    root = tmp_path / "map"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER[1], longitude=MURCIA_CENTER[0], radius_m=150)
+    store_street_profile(root, True)
+    store_sightline_cover(root, True)
+    sp.resolve_street_profile(root, provider=Light(), library=None)
+    flags = sp.profile_flags(root)["cover"]
+    assert flags[:2] == ["--max-props", "0"]
+    zero = tmp_path / "zero"
+    args = _args(stage, zero)
+    assert main([*args[:-2], *flags, *args[-2:]]) == 0
+    report = json.loads((zero / COVER_REPORT).read_text(encoding="utf-8"))
+    assert report["caps"]["props"] == 0 and report["nothing_placed"] == "max props is 0" and report["placed"] == []
+    assert report["street_profile"]["ids"]["cover"] == "off" and report["street_profile"]["provenance"] == "ai_generated"
+    assert _sha(zero / "scene_visual.glb") == _sha(stage["playable"] / "scene_visual.glb")
+    two = tmp_path / "two"
+    assert main([*_args(stage, two)[:-2], "--max-props", "8", *_args(stage, two)[-2:]]) == 0
+    capped = json.loads((two / COVER_REPORT).read_text(encoding="utf-8"))
+    assert capped["caps"] == {**report["caps"], "props": 8} and report["caps"]["triangles"] == 12_000
+    assert len(capped["placed"]) <= 8 and "street_profile" not in capped
+    assert main([*_args(stage, tmp_path / "bad")[:-2], "--max-props", "9", *_args(stage, tmp_path / "bad")[-2:]]) == 2

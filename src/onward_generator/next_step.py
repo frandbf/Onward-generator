@@ -201,6 +201,8 @@ def materials_command(base: Path) -> StageCommand:
 
     repetition = ["--repetition", "--cell-m", str(combine_cell_m(root))] if root is not None and repetition_enabled(root) else []
     regional = ["--regional-facades"] if root is not None and regional_facades_enabled(root) else []
+    from onward_generator.ai.street_profile import profile_flags
+
     return invoke(
         "materials", "apply",
         "--base", show(base),
@@ -209,6 +211,7 @@ def materials_command(base: Path) -> StageCommand:
         *(facade_options(root) if root is not None else []),
         *regional,
         *repetition,
+        *profile_flags(root).get("materials", []),
         "--out", show(stage_path(base, STAGE_DIRS["materials"])),
     )
 
@@ -306,6 +309,15 @@ def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
         selection = root / "config" / "prop_selection.json"
         if selection.is_file():
             parts.extend(["--selection", show(selection)])
+    from onward_generator.ai.street_profile import profile_flags
+
+    extra = profile_flags(root).get("overgrow", [])
+    if "--profile" in extra:
+        # The abandonment id replaces the default years in place; the other flags follow.
+        at = extra.index("--profile")
+        parts[parts.index("--profile") + 1] = extra[at + 1]
+        extra = extra[:at] + extra[at + 2:]
+    parts.extend(extra)
     out_name = "scene_phase3" if compact else STAGE_DIRS["overgrow"]
     parts.extend(["--out", show(stage_path(base, out_name))])
     return invoke(*parts)

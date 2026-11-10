@@ -763,3 +763,19 @@ def test_the_run_parser_takes_the_balanced_spawns_switch() -> None:
 def test_the_run_parser_takes_the_regional_facades_switch() -> None:
     assert bench.build_parser().parse_args(["run", "--regional-facades"]).regional_facades is True
     assert bench.build_parser().parse_args(["run"]).regional_facades is False
+
+
+def test_the_run_parser_takes_the_street_profile_switch_and_reply() -> None:
+    assert bench.build_parser().parse_args(["run", "--street-profile"]).street_profile is True
+    parsed = bench.build_parser().parse_args(["run"])
+    assert parsed.street_profile is False and parsed.street_profile_reply is None
+    assert bench.build_parser().parse_args(["run", "--street-profile-reply", "r.json"]).street_profile_reply == Path("r.json")
+
+
+def test_the_bench_profile_provider_never_calls_a_model(tmp_path: Path) -> None:
+    none = bench.profile_provider(None)
+    assert (none.name, none.text, none.source) == ("none", "", "none")
+    reply = tmp_path / "reply.json"
+    reply.write_text('{"cover": "off"}', encoding="utf-8")
+    replay = bench.profile_provider(reply)
+    assert (replay.name, replay.text, replay.source) == ("replay", '{"cover": "off"}', str(reply))

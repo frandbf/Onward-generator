@@ -259,6 +259,32 @@ Pending (not done; the option stays off until they pass):
 
 Then the ADR-020 and ADR-027 amendments move to accepted or are corrected. The option is not turned on by default before then.
 
+## Street profile
+
+Plan D2, the ADR-006 and ADR-010 amendments of 8 November 2026 (proposed), off by default (`map.json` `"street_profile": true`, `run --street-profile`, `bench.py run --street-profile [--street-profile-reply FILE]`; [10-ai.md](10-ai.md#street-profile-plan-d2)). The bench never calls a model: with a reply file it is replayed (provider `replay`), without one the reply is empty and the neutral rules profile changes nothing. Docker on an Apple M4 Pro, frozen bench inputs, `--offline`, `--gameplay-report`:
+
+- **Off.** Run `d2_off` against the workshop/d1 run `20261109T013210Z`: `bench.py check` finds no difference outside timings; triangles, draws, view draws, lightmap pages and the gameplay headline have delta 0 on all four maps.
+- **On.** Runs `d2_on` and `d2_on2` with `tests/fixtures/street_profile/applied.json` (`mediterranean`, `extended_pools`, `wrecked`, `years_30`, `light`). On every map `palette` is skipped (`texture_plan_not_calm`: the saved texture plans bind a roof or paving tile over the calm limit) and `cover` is inactive (no `sightline_cover`); the facade style, the wrecked props selection (18 library ids) and the 30-year profile apply.
+
+| Map | Triangles off → on | Predicted draws off → on | View draws median / p90 / max, on | Lightmap pages | Longest open sight m |
+| --- | --- | --- | --- | --- | --- |
+| bench_murcia r150 | 150 339 → 147 826 | 213 → 175 | 80 / 145 / 175 | 4 → 4 | 133.9 → 116.8 |
+| bench_madrid r300 | 398 025 → 381 972 | 504 → 456 | 173 / 326 / 400 | 11 → 11 | 291.2 → 291.2 |
+| bench_paris r50 | 47 585 → 29 512 | 91 → 44 | 23 / 39 / 44 | 3 → 3 | 195.2 → 190.4 |
+| bench_krakow r150 | 72 884 → 62 735 | 272 → 168 | 68 / 136 / 168 | 2 → 2 | 209.0 → 216.0 |
+
+Murcia and Madrid are mediterranean already, so their drop comes from overgrow: fewer props (the wrecked group) and the 30-year profile. Paris (`generic`) and Kraków (`central_european`) also take the mediterranean trim atlas, which the profile names explicitly: that is the largest share of their drop, and it is a look the brief asked for, not a regional fact. Estimates from the package, not Unity or device readings.
+
+Pending (not done; the option stays off until they pass):
+
+- [ ] Optional, with local Ollama (`qwen3:14b`, loopback): one map with `"street_profile": true`; read the record (raw reply, hashes, ids), rerun and confirm the replay makes no call and the outputs are byte-identical.
+- [ ] Headset, the same map with the option off and on: ≥ 72 fps median and ≤ 150 draws at views A and B, draws and triangles inside the plan §1 budget.
+- [ ] Headset: the abandonment and props profile read as the brief asked (density, condition); walkways keep 1.2 m of passage and spawns stay clear.
+- [ ] Headset: the chosen facade style shows no atlas seams, and observed OSM colours and eras still show.
+- [ ] Headset and a playtest (plan 4.2): a cover id that changes the C7 count does not seal a route.
+
+Then the ADR-006 and ADR-010 amendments move to accepted or are corrected. The option is not turned on by default before then.
+
 ## Repetition per cell
 
 Plan C1, the ADR-009 amendment *Repetition per cell* (proposed), off by default (`map.json` `"repetition": true`, `materials apply --repetition --cell-m M`, `bench.py run --repetition`; rules in [08-dress.md](08-dress.md#roofs-and-paving-the-repetition-switch-plan-c1)). Docker on an Apple M4 Pro, frozen bench inputs, `--offline --gameplay-report`:

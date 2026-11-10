@@ -43,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--library", default=None, help="one catalogue directory, or a parent of catalogues; missing means procedural only")
     place.add_argument("--selection", default=None, help="prop_selection.json; only those installed ids are placed")
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
+    place.add_argument(
+        "--street-profile",
+        help="config/street_profile.json; adds its block to overgrow_report.json (plan D2)",  # pragma: no mutate: help text
+    )
     place.add_argument("--overwrite", action="store_true")
     fit = sub.add_parser("fit", help="reject props whose size or footprint does not fit the street")
     fit.add_argument("--base", required=True, help="overgrow output directory")
@@ -115,11 +119,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _library(args)
         if args.command == "fit":
             return _fit(args)
+        from onward_generator.ai.street_profile import report_block
+
+        block = report_block(args.street_profile) if args.street_profile is not None else None
         report = overgrow(
             args.base, args.scene, args.out,
             overwrite=args.overwrite, profile=args.profile, seed=args.seed,
             zone_radius_m=args.zone_radius, zone_polygon=args.zone_polygon,
             library=args.library, layout=args.layout, selection=args.selection,
+            street_profile=block,
         )
     except (OvergrowError, FitError, FetchError, SketchfabError, ZoneError, LibraryError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:
         print(f"overgrow: {exc}", file=sys.stderr)

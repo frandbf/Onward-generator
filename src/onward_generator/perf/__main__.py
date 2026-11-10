@@ -12,6 +12,7 @@ from typing import Any
 from shapely.geometry import shape
 
 from onward_generator.detail.scene import DetailError, load_base
+from onward_generator.gameplay.cover import MAX_PROPS_CHOICES
 from onward_generator.gameplay.report import REPORT_FILE, gameplay_report, headline_text, report_text
 from onward_generator.generation.config import GenerationConfigError, load_generation_config
 from onward_generator.generation.scene import GenerationError
@@ -80,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     cov.add_argument("--layout", required=True, help="the playable layout.json (perf layout --playable)")  # pragma: no mutate: help text
     cov.add_argument("--library", default="assets", help="catalogue folder (default assets)")  # pragma: no mutate: help text
     cov.add_argument("--generation-config", default=None)  # pragma: no mutate: argparse's default is None
+    cov.add_argument(
+        "--max-props", type=int, choices=MAX_PROPS_CHOICES, default=None,
+        help="at most this many cover props (a street profile's cover id, plan D2); default 24",  # pragma: no mutate: help text
+    )
+    cov.add_argument("--street-profile", default=None, help="config/street_profile.json; adds its block to cover_report.json (plan D2)")  # pragma: no mutate: help text
     cov.add_argument("--out", required=True, help="new output directory (scene_covered)")  # pragma: no mutate: help text
     cov.add_argument("--overwrite", action="store_true")
 
@@ -205,11 +211,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _cover(args: argparse.Namespace) -> int:
     """``perf cover``: exit 0 when the directory is written, with or without props; 1 on a refusal, which writes nothing."""
+    from onward_generator.ai.street_profile import report_block
     from onward_generator.gameplay.cover_stage import apply_cover, cover_note
 
     try:
         base, _ = load_base(args.base, args.scene, args.heights, load_generation_config(args.generation_config))
-        result = apply_cover(base, args.scene, args.detail, args.layout, args.out, library=args.library, overwrite=args.overwrite)
+        block = report_block(args.street_profile) if args.street_profile is not None else None
+        result = apply_cover(base, args.scene, args.detail, args.layout, args.out, library=args.library, overwrite=args.overwrite,
+                             max_props=args.max_props, street_profile=block)
     except (DetailError, GenerationError, GenerationConfigError, FileNotFoundError, ValueError) as exc:
         print(f"perf: {exc}", file=sys.stderr)
         return 1
