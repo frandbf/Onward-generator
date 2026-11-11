@@ -1141,6 +1141,12 @@ ExtraUrban = Callable[
 ]
 
 
+def rejection_severity(rejected: Rejected) -> str:
+    """``info`` for a generated attempt (its id holds ``#``) and for a lamp kept off its neighbour: neither loses
+    observed data (plan Q5). ``warning`` for an observed element that finds no place."""
+    return "info" if "#" in rejected.id or rejected.reason == "too_close_to_another_lamp" else "warning"
+
+
 def detail_scene(
     base: GeneratedScene,
     base_ref: Mapping[str, Any],
@@ -1904,8 +1910,7 @@ def _assemble_detail(
     if core is not None:
         elements = [e for e in elements if core.covers(Point(float(e.matrix[0, 3]), float(e.matrix[1, 3])))]
     for r in rejected:
-        severity = "info" if "#lamp" in r.id else "warning"
-        issues.append(Issue("urban_element_not_placed", severity, r.id, f"{r.kind}: {r.reason}"))
+        issues.append(Issue("urban_element_not_placed", rejection_severity(r), r.id, f"{r.kind}: {r.reason}"))
     used_protos: dict[str, Prototype] = {}
     for e in elements:
         proto = prototypes[e.kind]

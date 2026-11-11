@@ -212,3 +212,96 @@ def test_generated_furniture_and_lamps_keep_off_the_ground_in_front_of_a_door_an
     assert [(r.id, r.reason) for r in rejected] == [("way/1#lamp0", "in_front_of_a_door"), ("way/3#bench0", "in_front_of_a_door")]
     alone, none = place_elements([], [walk, road], FREE, FAR_BUILDING, PROTOS, cfg)
     assert none == [] and len(alone) == 3
+
+
+# ------------------------------------------------------------------------------------------------ street lamps (plan Q6)
+
+
+def test_an_observed_lamp_on_a_facade_hangs_on_it_facing_out() -> None:
+    """A lamp within 0.5 m of a facade becomes a wall lamp on the nearest facade point, local +x out of the wall."""
+    building = box(0.0, 0.0, 20.0, 20.0)
+    features = [_poi("node/1", 10.0, 20.3, highway="street_lamp"),   # 0.3 m north of the north wall
+                _poi("node/2", 20.0, 10.0, highway="street_lamp"),   # exactly on the east wall
+                _poi("node/3", 10.0, -0.49, highway="street_lamp")]  # 0.49 m south of the south wall
+    placed, rejected = place_elements(features, [], FREE, building, PROTOS, _cfg())
+    assert rejected == []
+    assert [(e.id, e.kind, e.origin, e.rule) for e in placed] == [
+        (f"urban/wall_lamp/node/{i}", "wall_lamp", "observed", "osm_poi_on_the_nearest_facade") for i in (1, 2, 3)]
+    assert [_xy(e) for e in placed] == [pytest.approx((10.0, 20.0)), pytest.approx((20.0, 10.0)), pytest.approx((10.0, 0.0))]
+    assert [tuple(e.matrix[:2, 0]) for e in placed] == [pytest.approx((0.0, 1.0)), pytest.approx((1.0, 0.0)), pytest.approx((0.0, -1.0))]
+
+
+@pytest.mark.parametrize(("distance", "kind"), [(0.49, "wall_lamp"), (0.5, "street_lamp")])
+def test_a_lamp_half_a_metre_from_a_facade_stands_on_its_own(distance: float, kind: str) -> None:
+    building = box(0.0, -50.0, 10.0, 50.0)
+    placed, _ = place_elements([_poi("node/1", 10.0 + distance, 0.0, highway="street_lamp")], [], FREE, building, PROTOS, _cfg())
+    assert [e.kind for e in placed] == [kind]
+
+
+@pytest.mark.parametrize("tags", [{"lamp_mount": "wall"}, {"support": "wall_mounted"}, {"support": "wall"}])
+def test_a_lamp_tagged_on_a_wall_hangs_on_the_nearest_facade(tags: dict[str, str]) -> None:
+    building = box(0.0, -50.0, 10.0, 50.0)
+    placed, _ = place_elements([_poi("node/1", 14.0, 0.0, highway="street_lamp", **tags)], [], FREE, building, PROTOS, _cfg())
+    assert [(e.kind, _xy(e)) for e in placed] == [("wall_lamp", pytest.approx((10.0, 0.0)))]
+    other, _ = place_elements([_poi("node/1", 14.0, 0.0, highway="street_lamp", lamp_mount="straight_mast")], [], FREE, building, PROTOS, _cfg())
+    assert [e.kind for e in other] == ["street_lamp"]
+
+
+def test_without_a_wall_lamp_prototype_or_a_building_a_facade_lamp_is_a_pole() -> None:
+    without = {k: v for k, v in PROTOS.items() if k != "wall_lamp"}
+    building = box(0.0, -50.0, 10.0, 50.0)
+    tagged = [_poi("node/1", 14.0, 0.0, highway="street_lamp", lamp_mount="wall")]
+    assert [e.kind for e in place_elements(tagged, [], FREE, building, without, _cfg())[0]] == ["street_lamp"]
+    from shapely.geometry import Polygon
+    assert [e.kind for e in place_elements(tagged, [], FREE, Polygon(), PROTOS, _cfg())[0]] == ["street_lamp"]
+
+
+def test_observed_lamps_keep_8_m_from_each_other_in_id_order() -> None:
+    building = box(0.0, -50.0, 10.0, 50.0)
+    features = [_poi("node/1", 30.0, 0.0, highway="street_lamp"), _poi("node/2", 37.99, 0.0, highway="street_lamp"),
+                _poi("node/3", 38.0, 0.0, highway="street_lamp"), _poi("node/4", 10.2, 0.0, highway="street_lamp"),
+                _poi("node/5", 10.2, 7.9, highway="street_lamp"), _poi("node/6", 10.2, 8.1, highway="street_lamp")]
+    placed, rejected = place_elements(features, [], FREE, building, PROTOS, _cfg())
+    assert [e.id for e in placed] == ["urban/street_lamp/node/1", "urban/street_lamp/node/3", "urban/wall_lamp/node/4", "urban/wall_lamp/node/6"]
+    assert [(r.id, r.kind, r.reason) for r in rejected] == [
+        ("node/2", "street_lamp", "too_close_to_another_lamp"), ("node/5", "wall_lamp", "too_close_to_another_lamp")]
+
+
+def test_a_free_standing_observed_lamp_reaches_away_from_the_nearest_facade() -> None:
+    building = box(0.0, -50.0, 10.0, 50.0)
+    placed, _ = place_elements([_poi("node/1", 13.0, 0.0, highway="street_lamp"), _poi("node/2", -4.0, 20.0, highway="street_lamp")],
+                               [], FREE, building, PROTOS, _cfg())
+    assert [tuple(e.matrix[:2, 0]) for e in placed] == [pytest.approx((1.0, 0.0)), pytest.approx((-1.0, 0.0))]
+    alone, _ = place_elements([_poi("node/1", 13.0, 0.0, highway="street_lamp")], [], FREE, box(0, 0, 0, 0).buffer(0), PROTOS, _cfg())
+    assert np.allclose(alone[0].matrix[:3, :3], np.eye(3))  # no facade: yaw 0
+
+
+def test_generated_lamps_keep_off_wall_lamps_too() -> None:
+    road = LinearWay("way/1", "vehicular", LineString([(0.0, 0.0), (50.0, 0.0)]), 6.0, "observed")
+    building = box(30.0, -20.0, 45.0, -10.0)
+    observed = [_poi("node/7", 37.5, -10.2, highway="street_lamp")]  # on the facade, 6.7 m from lamp 1 at (37.5, -3.5)
+    placed, rejected = place_elements(observed, [road], FREE, building, PROTOS, _cfg(lamps=True))
+    assert ("way/1#lamp1", "too_close_to_another_lamp") in [(r.id, r.reason) for r in rejected]
+    assert [e.kind for e in placed if e.origin == "observed"] == ["wall_lamp"]
+
+
+def test_the_wall_lamp_prototype_hangs_above_head_height_without_a_collider() -> None:
+    lamp = PROTOS["wall_lamp"]
+    vertices = np.vstack([mesh.vertices for _, mesh in lamp.parts])
+    assert lamp.collider is None and lamp.key == "urban:wall_lamp"
+    assert vertices[:, 2].min() == pytest.approx(3.1) and vertices[:, 0].min() == pytest.approx(0.0)
+    assert vertices[:, 0].max() == pytest.approx(0.72) and lamp.triangle_count <= 40
+
+
+@pytest.mark.parametrize(("rid", "reason", "severity"), [
+    ("way/1#lamp0", "too_close_to_building", "info"),
+    ("way/2#bench3", "not_on_free_walkable_ground", "info"),
+    ("node/5", "too_close_to_another_lamp", "info"),
+    ("node/6", "not_on_free_walkable_ground", "warning"),
+    ("node/7", "overlaps_another_element", "warning"),
+])
+def test_only_an_observed_element_that_finds_no_place_is_a_warning(rid: str, reason: str, severity: str) -> None:
+    from onward_generator.detail.scene import rejection_severity
+    from onward_generator.detail.urban import Rejected
+
+    assert rejection_severity(Rejected(rid, "street_lamp", reason)) == severity

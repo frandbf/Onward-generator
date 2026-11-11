@@ -51,7 +51,8 @@ def generated_accessories(
     """Deterministic benches and bins on free walkable ground. Never on carriageway."""
     extra: list[Element] = []
     rejected: list[Rejected] = []
-    taken = [_footprint(prototypes[e.kind], e.matrix, cfg.urban_clearance_m) for e in placed if e.kind in prototypes]
+    # A wall lamp has no collider: it hangs above the players' heads.
+    taken = [_footprint(prototypes[e.kind], e.matrix, cfg.urban_clearance_m) for e in placed if e.kind in prototypes and prototypes[e.kind].collider is not None]
     existing = [Point(float(e.matrix[0, 3]), float(e.matrix[1, 3])) for e in placed]
 
     def try_place(element: Element) -> str | None:
