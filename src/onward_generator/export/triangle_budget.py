@@ -58,7 +58,9 @@ def suggested_core(half_side_m: float, core_triangles: int, estimated: int, limi
     Rounded down to ``CORE_STEP_M``. None when even the smallest core would not fit, or the core has no triangles.
     """
     room = limit - (estimated - core_triangles)
-    if core_triangles <= 0 or room <= 0:
+    if core_triangles <= 0:
+        return None
+    if room <= 0:  # pragma: no mutate: room 0 gives a half-side of 0, under MIN_CORE_M, so < and <= both return None
         return None
     half = math.floor(half_side_m * math.sqrt(room / core_triangles) / CORE_STEP_M) * CORE_STEP_M
     return float(half) if half >= MIN_CORE_M else None

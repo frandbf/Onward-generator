@@ -82,6 +82,10 @@ def test_the_suggested_core_scales_with_the_area_and_rounds_down() -> None:
     assert suggested_core(100.0, 223_307, 252_179) == 95.0
     assert suggested_core(100.0, 100_000, 350_000) is None  # the rest alone is over the limit
     assert suggested_core(100.0, 0, 260_000) is None
+    assert suggested_core(100.0, 0, 240_000) is None  # room, but no core triangles to scale
+    assert suggested_core(100.0, 1, 250_001, 250_000) is None  # exactly no room left
+    assert suggested_core(100.0, 4, 250_001, 250_000) == 85.0  # 3 of 4 fit: sqrt(0.75) of 100 m
+    assert suggested_core(100.0, 1, 250_000, 250_000) == 100.0  # one core triangle, and room for it
     assert suggested_core(100.0, 200_000, 260_000, 250_000) == 95.0  # sqrt(190/200) = 0.975
     assert suggested_core(60.0, 200_000, 340_000, 250_000) is None  # 60 * sqrt(110/200) = 44.5, under 50
     assert suggested_core(60.0, 200_000, 300_000, 250_000) == 50.0  # 60 * sqrt(150/200) = 51.96

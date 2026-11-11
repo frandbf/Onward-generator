@@ -278,6 +278,29 @@ def test_export_reports_the_tiers(ring_inputs: tuple[Path, Path, Path], ring_det
     assert tiers["draws"] <= sum(tiers[t]["draws"] for t in ("core", "scenic", "shared"))
 
 
+def test_export_over_the_triangle_limit_suggests_a_smaller_core(
+    ring_inputs: tuple[Path, Path, Path], ring_detail: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Plan Q2: the package hands the core and its triangles to the estimate. The fixture's core is the 50 m minimum,
+    so the floor is lowered here to see the suggestion."""
+    from onward_generator.export import triangle_budget as budget
+
+    scene, heights, base = ring_inputs
+    layout = tmp_path / "layout.json"
+    assert main(["perf", "layout", "--scene", str(scene), "--heights", str(heights), "--base", str(base),
+                 "--detail", str(ring_detail), "--out", str(layout)]) == 0
+    within = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "within", now=FIXED_NOW).manifest
+    estimated = within["triangle_budget"]["estimated_unity_triangles"]
+    assert "suggested_core_radius_m" not in within["triangle_budget"]
+    monkeypatch.setattr(budget, "MIN_CORE_M", 5.0)
+    monkeypatch.setattr(budget, "UNITY_TRIANGLE_LIMIT", estimated - 1)
+    over = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "over", now=FIXED_NOW).manifest
+    core = over["tiers"]["core"]["visual_triangles"]
+    assert over["triangle_budget"]["suggested_core_radius_m"] == budget.suggested_core(CORE_M, core, estimated, estimated - 1) == 45.0
+    assert any(w.endswith(f"over the {estimated - 1} limit; a core of 45 m should fit (map.json core_radius_m, then run --from detail) "
+                          "[unity_triangle_budget]") for w in over["warnings"])
+
+
 def test_scenic_out_of_lightmap_reaches_the_adapter_and_the_estimate(
     ring_inputs: tuple[Path, Path, Path], ring_detail: Path, tmp_path: Path,
 ) -> None:
