@@ -21,6 +21,9 @@ from tests.integration.test_shop_interiors import DOC, SHOP, _detail, _footprint
 
 ON = copy.deepcopy(DOC)
 ON["interiors"]["shops"]["furnish"]["enabled"] = True
+# The hand-written sets fill every room to the cap (ADR-031); the default cap of 12 is for the semantic recipes'
+# area-scaled rooms (ADR-036), which test_recipes covers. Five keeps this one room filled to the cap.
+ON["interiors"]["shops"]["furnish"]["max_pieces_per_room"] = 5
 BAKERY = load_detail_config().interiors.shops.furnish.sets["bakery"]
 
 
@@ -80,11 +83,11 @@ def test_on_the_bakery_room_gets_bakery_furniture_inside_its_walls(detail_inputs
         assert footprint.distance(door) > 0.3 + 0.0  # the door zone starts behind the wall and takes 1.5 m
     stats = on.stats["shop_furnishing"]
     assert stats["shop_rooms"] == stats["reachable_rooms"] == stats["furnished_rooms"] == 1
-    assert stats["pieces"] == len(block["pieces"]) == 8
+    assert stats["pieces"] == len(block["pieces"]) == ON["interiors"]["shops"]["furnish"]["max_pieces_per_room"] == 5
     assert stats["visual_triangles"] == block["visual_triangles"] == sum(p["triangles"] for p in block["pieces"])
     assert stats["collision_triangles"] == 12 * sum(p["solid"] for p in block["pieces"])
     assert stats["refusals_by_reason"] == {}
-    assert stats["max_triangles"] == 12000 and stats["assets"] == len(stats["pieces_by_asset"])
+    assert stats["max_triangles"] == 70000 and stats["assets"] == len(stats["pieces_by_asset"])
 
 
 def test_two_runs_with_one_seed_give_the_same_scene(detail_inputs, on) -> None:

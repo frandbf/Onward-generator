@@ -264,9 +264,11 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
         cell_m=float(build["combine_cell_m"]), scales=scales)
 
 
-# Plan D5: the integration fixture card built on workshop/d4 HEAD 02ee02a, before the D5 change.
-GOLDEN_PACKAGE_ID = "murcia_belluga_d1c49ec28b"
-GOLDEN_OPTIONS_SHA256 = "220d833e41f0774e7b7cdc909d43f438d80a60e63f2443072cbd2f48d8fb5cea"
+# Plan D5: the integration fixture card built on workshop/d4 HEAD 02ee02a, before the D5 change. The package id
+# hashes the scene, so it was re-pinned on 10 November 2026 when the shop windows gained their #glass panes and more
+# props became solid. The adapter options were re-pinned with it: their only change is "variant", the package id.
+GOLDEN_PACKAGE_ID = "murcia_belluga_6477379f29"
+GOLDEN_OPTIONS_SHA256 = "697198d4040c5906334355b09186590366381c21c9846ef5285ab4e75f7d24f9"
 
 
 def test_lit_normal_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:
@@ -711,7 +713,10 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     # They stay in the bake to cast its shadows; only the horizon backdrop leaves GI.
     assert "renderer.receiveGI = ReceiveGI.LightProbes;" in source
     # A combined probe-lit renderer would sample one probe for a whole 100 m cell: it takes the ambient light.
-    assert "renderer.lightProbeUsage = LightProbeUsage.Off;" in source
+    # Furniture is combined per building and storey instead, inside its rooms, and blends their probes (ADR-031).
+    assert "renderer.lightProbeUsage = furnitureMeshes.Contains(name) ? LightProbeUsage.BlendProbes : LightProbeUsage.Off;" in source
+    assert 'nodeName.StartsWith("furnish/", StringComparison.Ordinal) && nodeName.Split(\'/\').Length == 3' in source
+    assert "cx = FurnitureCellBase - index;" in source and "private const float FurnitureStoreyM = 2.5f;" in source
     assert "if (mats.Any(m => !CastsBakedShadow(m))) flags &= ~StaticEditorFlags.ContributeGI;" in source
     # ADR-013: the adapter reads the light anchors from the visual node extras, all baked.
     assert "public GLightAnchors light_anchors;" in source

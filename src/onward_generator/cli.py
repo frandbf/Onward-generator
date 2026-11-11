@@ -208,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("geo", help="run the geographic pipeline (see: geo --help)", add_help=False)
     sub.add_parser("cadastre", help="Catastro INSPIRE floors: download | match | split (see: cadastre --help)", add_help=False)  # pragma: no mutate: main dispatches cadastre before this stub is parsed, so add_help is never read
+    sub.add_parser("asset-store", help="local catalogues from your downloaded Unity Asset Store packs: scan | import (see: asset-store --help)", add_help=False)  # pragma: no mutate: main dispatches asset-store before this stub is parsed, so add_help is never read
     sub.add_parser("source", help="optional data-source plugins: list | merge (see: source --help)", add_help=False)  # pragma: no mutate: main dispatches source before this stub is parsed, so add_help is never read
     sub.add_parser("generate", help="phase 03 geometry: ground, streets, buildings (see: generate --help)", add_help=False)
     sub.add_parser("detail", help="phase 04: facades, roofs, urban elements, interiors (see: detail --help)", add_help=False)
@@ -289,6 +290,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from onward_generator.cadastre.__main__ import main as cadastre_main
 
         return cadastre_main(argv[1:])
+    if argv[:1] == ["asset-store"]:
+        from onward_generator.assetstore.__main__ import main as asset_store_main
+
+        return asset_store_main(argv[1:])
     if argv[:1] == ["source"]:
         from onward_generator.sources.__main__ import main as source_main
 

@@ -49,3 +49,22 @@ On the bench (`docs/09-perf.md#lightmap-page-budget`) a budget of 8 changes only
 Risks, for the bake and the headset: `pages_at_least` is a lower bound with no packing or padding (Unity packed 24 pages where the estimate said 3 on Paris at 40 texels/m), so a bake can exceed the budget until A3 calibrates it; a lower density gives softer shadows and may bring seams or overlaps near the floor, which is itself unmeasured; Unity may round a fractional `lightmapResolution` such as 8.75.
 
 To check before the status is accepted: a Unity draft and final bake of bench_madrid with and without the budget, compared with `tools/unity/report_timings.py` (`lightmaps` at most the budget, or the estimate's error recorded); the scene log's density line and overlapping-UV count; Editor views of a close facade; and on Quest 3 the shadow quality, at least 72 fps median, at most 150 draws in views A and B, at most 1 GB of graphics memory.
+
+## Amendment (10 November 2026): one atlas for props and furniture
+
+A draw audit of Madrid Sol Quest r200 found 479 draw groups. 260 were props and furniture, which carried 21 % of the triangles: every library model had its own `prop_<id>` material, so each distinct model cost one draw per 100 m cell (or per building and storey for furniture).
+
+`overgrow place` now packs the albedo of every prop whose UVs stay in the unit square into a shared 2048 px atlas (`prop_atlas_<n>`, `overgrow/atlas.py`):
+- a flat colour takes an 8 px cell, a texture at most 256 px, each with 4 px of its edge repeated;
+- the UVs are scaled into the cell;
+- the visual GLB's `extras.prop_atlas` records each material's cell, so `perf cover` puts its props in the same atlas;
+- a prop whose texture repeats keeps its own material.
+
+The name keeps the `prop_` prefix, so the adapter's lighting rules are unchanged.
+
+On the same map the draws drop from 423 to 279. Per view, the median goes from 144 to 113 and the p90 from 321 to 204. A new model no longer costs a draw, so the furnishing `max_assets` caps rise from 16 to 40 (shops) and from 12 to 30 (floors); the schema maximum is 64.
+
+## Amendment (10 November 2026): the triangle target is the official maximum
+
+The maintainer set the triangle target to the guide's figure: at most 250 000 triangles in Unity (`scene_report.json` `triangles`), no longer 220 000. That count holds the scene and the SDK prefabs. It does not hold the players' avatars or weapons, which the guide's figure includes, so a map near 250 000 leaves no margin for them. The headset session decides whether that holds at 72 fps. Madrid Sol Quest r200 is at 226 750.
+

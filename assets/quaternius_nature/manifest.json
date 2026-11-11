@@ -44,7 +44,17 @@
       "length_m": 3.074,
       "depth_m": 2.874,
       "height_m": 4.748,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_DeadTree_2",
@@ -72,7 +82,17 @@
       "length_m": 3.365,
       "depth_m": 3.189,
       "height_m": 5.744,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_DeadTree_3",
@@ -100,7 +120,17 @@
       "length_m": 3.194,
       "depth_m": 3.215,
       "height_m": 6.64,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_DeadTree_4",
@@ -128,7 +158,17 @@
       "length_m": 3.98,
       "depth_m": 3.866,
       "height_m": 6.385,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_DeadTree_5",
@@ -156,7 +196,17 @@
       "length_m": 4.178,
       "depth_m": 4.207,
       "height_m": 8.219,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tree",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Grass_Common_Short",
@@ -185,7 +235,17 @@
       "length_m": 0.319,
       "depth_m": 0.369,
       "height_m": 0.667,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Grass_Common_Tall",
@@ -214,7 +274,17 @@
       "length_m": 0.448,
       "depth_m": 0.497,
       "height_m": 0.936,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Grass_Wispy_Short",
@@ -243,7 +313,17 @@
       "length_m": 0.661,
       "depth_m": 0.605,
       "height_m": 0.536,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Grass_Wispy_Tall",
@@ -272,7 +352,17 @@
       "length_m": 0.77,
       "depth_m": 0.797,
       "height_m": 0.836,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Mushroom_Common",
@@ -300,7 +390,17 @@
       "length_m": 0.282,
       "depth_m": 0.39,
       "height_m": 0.232,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Mushroom_Laetiporus",
@@ -328,7 +428,17 @@
       "length_m": 0.683,
       "depth_m": 0.552,
       "height_m": 0.383,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant",
+        "mount": "ground",
+        "settings": [
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Round_1",
@@ -358,7 +468,18 @@
       "length_m": 0.25,
       "depth_m": 0.184,
       "height_m": 0.048,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Round_2",
@@ -388,7 +509,18 @@
       "length_m": 0.225,
       "depth_m": 0.206,
       "height_m": 0.047,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Round_3",
@@ -418,7 +550,18 @@
       "length_m": 0.225,
       "depth_m": 0.242,
       "height_m": 0.049,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Round_4",
@@ -448,7 +591,18 @@
       "length_m": 0.203,
       "depth_m": 0.226,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Round_5",
@@ -478,7 +632,18 @@
       "length_m": 0.209,
       "depth_m": 0.173,
       "height_m": 0.05,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_1",
@@ -508,7 +673,18 @@
       "length_m": 0.217,
       "depth_m": 0.22,
       "height_m": 0.065,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_2",
@@ -538,7 +714,18 @@
       "length_m": 0.196,
       "depth_m": 0.14,
       "height_m": 0.07,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_3",
@@ -568,7 +755,18 @@
       "length_m": 0.187,
       "depth_m": 0.159,
       "height_m": 0.079,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_4",
@@ -598,7 +796,18 @@
       "length_m": 0.17,
       "depth_m": 0.145,
       "height_m": 0.084,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_5",
@@ -628,7 +837,18 @@
       "length_m": 0.176,
       "depth_m": 0.225,
       "height_m": 0.076,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Pebble_Square_6",
@@ -658,7 +878,18 @@
       "length_m": 0.231,
       "depth_m": 0.131,
       "height_m": 0.069,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "debris",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Round_Small_1",
@@ -690,7 +921,18 @@
       "length_m": 0.528,
       "depth_m": 0.738,
       "height_m": 0.056,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Round_Small_2",
@@ -722,7 +964,18 @@
       "length_m": 0.57,
       "depth_m": 0.677,
       "height_m": 0.052,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Round_Small_3",
@@ -754,7 +1007,18 @@
       "length_m": 0.59,
       "depth_m": 0.645,
       "height_m": 0.055,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Round_Thin",
@@ -786,7 +1050,18 @@
       "length_m": 0.729,
       "depth_m": 1.045,
       "height_m": 0.055,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Round_Wide",
@@ -818,7 +1093,18 @@
       "length_m": 1.055,
       "depth_m": 1.065,
       "height_m": 0.056,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Square_Small_1",
@@ -850,7 +1136,18 @@
       "length_m": 0.509,
       "depth_m": 0.487,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Square_Small_2",
@@ -882,7 +1179,18 @@
       "length_m": 0.496,
       "depth_m": 0.483,
       "height_m": 0.075,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Square_Small_3",
@@ -914,7 +1222,18 @@
       "length_m": 0.418,
       "depth_m": 0.538,
       "height_m": 0.087,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Square_Thin",
@@ -946,7 +1265,18 @@
       "length_m": 0.78,
       "depth_m": 0.993,
       "height_m": 0.088,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_RockPath_Square_Wide",
@@ -978,7 +1308,18 @@
       "length_m": 1.026,
       "depth_m": 0.993,
       "height_m": 0.088,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "path",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Rock_Medium_1",
@@ -1008,7 +1349,18 @@
       "length_m": 1.613,
       "depth_m": 1.495,
       "height_m": 1.13,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rock",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Rock_Medium_2",
@@ -1038,7 +1390,18 @@
       "length_m": 1.524,
       "depth_m": 1.24,
       "height_m": 0.949,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rock",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_nature_Rock_Medium_3",
@@ -1068,7 +1431,18 @@
       "length_m": 1.71,
       "depth_m": 1.738,
       "height_m": 1.158,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rock",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

@@ -42,7 +42,16 @@
       "length_m": 0.467,
       "depth_m": 0.264,
       "height_m": 0.792,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "cabinet_low",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bathroomCabinetDrawer",
@@ -69,7 +78,16 @@
       "length_m": 0.873,
       "depth_m": 0.65,
       "height_m": 0.958,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "cabinet_low",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bathroomMirror",
@@ -95,7 +113,16 @@
       "length_m": 0.612,
       "depth_m": 0.293,
       "height_m": 0.882,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_bathroomSink",
@@ -121,7 +148,16 @@
       "length_m": 0.69,
       "depth_m": 0.589,
       "height_m": 1.137,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bathroomSinkSquare",
@@ -148,7 +184,16 @@
       "length_m": 0.873,
       "depth_m": 0.609,
       "height_m": 1.177,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bathtub",
@@ -173,7 +218,16 @@
       "length_m": 2.416,
       "depth_m": 1.137,
       "height_m": 0.853,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bath",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bear",
@@ -198,7 +252,14 @@
       "length_m": 0.791,
       "depth_m": 0.502,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bedBunk",
@@ -224,7 +285,16 @@
       "length_m": 1.159,
       "depth_m": 2.223,
       "height_m": 1.725,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bedDouble",
@@ -250,7 +320,16 @@
       "length_m": 1.941,
       "depth_m": 2.284,
       "height_m": 0.761,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bedSingle",
@@ -276,7 +355,16 @@
       "length_m": 1.159,
       "depth_m": 2.284,
       "height_m": 0.761,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bench",
@@ -301,7 +389,14 @@
       "length_m": 0.812,
       "depth_m": 0.406,
       "height_m": 0.954,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_benchCushion",
@@ -327,7 +422,19 @@
       "length_m": 0.812,
       "depth_m": 0.406,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_benchCushionLow",
@@ -354,7 +461,19 @@
       "length_m": 0.853,
       "depth_m": 0.447,
       "height_m": 0.406,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bookcaseClosed",
@@ -380,7 +499,21 @@
       "length_m": 0.812,
       "depth_m": 0.507,
       "height_m": 1.725,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bookcaseClosedDoors",
@@ -407,7 +540,21 @@
       "length_m": 0.812,
       "depth_m": 0.507,
       "height_m": 1.725,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bookcaseClosedWide",
@@ -434,7 +581,21 @@
       "length_m": 1.624,
       "depth_m": 0.507,
       "height_m": 1.604,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bookcaseOpen",
@@ -460,7 +621,21 @@
       "length_m": 0.812,
       "depth_m": 0.507,
       "height_m": 1.786,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_bookcaseOpenLow",
@@ -487,7 +662,21 @@
       "length_m": 0.812,
       "depth_m": 0.507,
       "height_m": 0.812,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_low",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_books",
@@ -512,7 +701,19 @@
       "length_m": 0.305,
       "depth_m": 0.192,
       "height_m": 0.211,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cabinetBed",
@@ -538,7 +739,16 @@
       "length_m": 0.54,
       "depth_m": 0.436,
       "height_m": 0.473,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cabinetBedDrawer",
@@ -565,7 +775,16 @@
       "length_m": 0.54,
       "depth_m": 0.441,
       "height_m": 0.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cabinetBedDrawerTable",
@@ -593,7 +812,16 @@
       "length_m": 0.54,
       "depth_m": 0.441,
       "height_m": 0.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cabinetTelevision",
@@ -619,7 +847,17 @@
       "length_m": 1.624,
       "depth_m": 0.507,
       "height_m": 0.629,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tv",
+        "mount": "wall",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cabinetTelevisionDoors",
@@ -646,7 +884,17 @@
       "length_m": 1.624,
       "depth_m": 0.528,
       "height_m": 0.629,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tv",
+        "mount": "wall",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cardboardBoxClosed",
@@ -673,7 +921,18 @@
       "length_m": 0.431,
       "depth_m": 0.431,
       "height_m": 0.57,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_cardboardBoxOpen",
@@ -700,7 +959,18 @@
       "length_m": 0.755,
       "depth_m": 0.431,
       "height_m": 0.57,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "storage",
+        "mount": "corner",
+        "settings": [
+          "grocery",
+          "shop",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_ceilingFan",
@@ -726,7 +996,15 @@
       "length_m": 0.923,
       "depth_m": 1.066,
       "height_m": 0.271,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chair",
@@ -751,7 +1029,20 @@
       "length_m": 0.406,
       "depth_m": 0.406,
       "height_m": 0.954,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chairCushion",
@@ -777,7 +1068,20 @@
       "length_m": 0.406,
       "depth_m": 0.406,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chairDesk",
@@ -803,7 +1107,17 @@
       "length_m": 0.68,
       "depth_m": 0.638,
       "height_m": 1.233,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "desk",
+        "mount": "wall",
+        "settings": [
+          "office",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chairModernCushion",
@@ -830,7 +1144,20 @@
       "length_m": 0.406,
       "depth_m": 0.406,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chairModernFrameCushion",
@@ -858,7 +1185,20 @@
       "length_m": 0.406,
       "depth_m": 0.406,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_chairRounded",
@@ -884,7 +1224,20 @@
       "length_m": 0.406,
       "depth_m": 0.406,
       "height_m": 0.924,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_coatRack",
@@ -910,7 +1263,21 @@
       "length_m": 0.909,
       "depth_m": 0.273,
       "height_m": 0.568,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_low",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_coatRackStanding",
@@ -937,7 +1304,21 @@
       "length_m": 0.554,
       "depth_m": 0.554,
       "height_m": 1.563,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_computerKeyboard",
@@ -963,7 +1344,19 @@
       "length_m": 0.573,
       "depth_m": 0.24,
       "height_m": 0.056,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_computerMouse",
@@ -989,7 +1382,19 @@
       "length_m": 0.101,
       "depth_m": 0.173,
       "height_m": 0.048,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_computerScreen",
@@ -1015,7 +1420,19 @@
       "length_m": 0.797,
       "depth_m": 0.211,
       "height_m": 0.597,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_desk",
@@ -1040,7 +1457,17 @@
       "length_m": 1.491,
       "depth_m": 0.796,
       "height_m": 0.78,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "desk",
+        "mount": "wall",
+        "settings": [
+          "office",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_deskCorner",
@@ -1066,7 +1493,17 @@
       "length_m": 1.978,
       "depth_m": 1.978,
       "height_m": 0.78,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "desk",
+        "mount": "wall",
+        "settings": [
+          "office",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_doorway",
@@ -1091,7 +1528,14 @@
       "length_m": 0.987,
       "depth_m": 0.23,
       "height_m": 2.049,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_doorwayFront",
@@ -1117,7 +1561,15 @@
       "length_m": 0.987,
       "depth_m": 0.23,
       "height_m": 2.049,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_doorwayOpen",
@@ -1143,7 +1595,14 @@
       "length_m": 0.987,
       "depth_m": 0.181,
       "height_m": 2.049,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_dryer",
@@ -1168,7 +1627,17 @@
       "length_m": 0.792,
       "depth_m": 0.771,
       "height_m": 0.954,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "washer",
+        "mount": "wall",
+        "settings": [
+          "bathroom",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_floorCorner",
@@ -1194,7 +1663,14 @@
       "length_m": 1.117,
       "depth_m": 1.117,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_floorCornerRound",
@@ -1221,7 +1697,14 @@
       "length_m": 1.117,
       "depth_m": 1.117,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_floorFull",
@@ -1247,7 +1730,14 @@
       "length_m": 2.03,
       "depth_m": 2.03,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_floorHalf",
@@ -1273,7 +1763,14 @@
       "length_m": 1.015,
       "depth_m": 2.03,
       "height_m": 0.102,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_hoodLarge",
@@ -1299,7 +1796,15 @@
       "length_m": 0.873,
       "depth_m": 0.578,
       "height_m": 0.75,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_hoodModern",
@@ -1325,7 +1830,15 @@
       "length_m": 0.873,
       "depth_m": 0.578,
       "height_m": 0.811,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenBar",
@@ -1351,7 +1864,16 @@
       "length_m": 0.873,
       "depth_m": 0.426,
       "height_m": 0.853,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "counter",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenBarEnd",
@@ -1378,7 +1900,16 @@
       "length_m": 0.206,
       "depth_m": 0.426,
       "height_m": 0.853,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "counter",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenBlender",
@@ -1404,7 +1935,17 @@
       "length_m": 0.276,
       "depth_m": 0.222,
       "height_m": 0.462,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinet",
@@ -1430,7 +1971,16 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetCornerInner",
@@ -1458,7 +2008,16 @@
       "length_m": 0.934,
       "depth_m": 0.934,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetCornerRound",
@@ -1486,7 +2045,16 @@
       "length_m": 0.913,
       "depth_m": 0.913,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetDrawer",
@@ -1513,7 +2081,16 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetUpper",
@@ -1540,7 +2117,15 @@
       "length_m": 0.873,
       "depth_m": 0.447,
       "height_m": 0.792,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetUpperCorner",
@@ -1568,7 +2153,15 @@
       "length_m": 0.436,
       "depth_m": 0.426,
       "height_m": 0.792,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetUpperDouble",
@@ -1596,7 +2189,15 @@
       "length_m": 0.873,
       "depth_m": 0.447,
       "height_m": 0.792,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCabinetUpperLow",
@@ -1624,7 +2225,15 @@
       "length_m": 0.873,
       "depth_m": 0.447,
       "height_m": 0.396,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenCoffeeMachine",
@@ -1651,7 +2260,16 @@
       "length_m": 0.385,
       "depth_m": 0.488,
       "height_m": 0.36,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenFridge",
@@ -1677,7 +2295,17 @@
       "length_m": 0.873,
       "depth_m": 0.593,
       "height_m": 1.868,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenFridgeBuiltIn",
@@ -1705,7 +2333,17 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 1.764,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenFridgeLarge",
@@ -1732,7 +2370,16 @@
       "length_m": 1.056,
       "depth_m": 0.823,
       "height_m": 1.868,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenFridgeSmall",
@@ -1759,7 +2406,17 @@
       "length_m": 0.873,
       "depth_m": 0.593,
       "height_m": 1.219,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "fridge",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenMicrowave",
@@ -1785,7 +2442,17 @@
       "length_m": 0.589,
       "depth_m": 0.467,
       "height_m": 0.365,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenSink",
@@ -1811,7 +2478,16 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 0.995,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "wall",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_kitchenStove",
@@ -1837,7 +2513,17 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_kitchenStoveElectric",
@@ -1864,7 +2550,17 @@
       "length_m": 0.873,
       "depth_m": 0.913,
       "height_m": 0.913,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "kitchen_unit",
+        "mount": "none",
+        "settings": [
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_lampRoundFloor",
@@ -1891,7 +2587,17 @@
       "length_m": 0.309,
       "depth_m": 0.356,
       "height_m": 1.746,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_floor",
+        "mount": "corner",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_lampRoundTable",
@@ -1918,7 +2624,18 @@
       "length_m": 0.309,
       "depth_m": 0.356,
       "height_m": 0.638,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_lampSquareCeiling",
@@ -1945,7 +2662,15 @@
       "length_m": 0.244,
       "depth_m": 0.244,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_lampSquareFloor",
@@ -1972,7 +2697,17 @@
       "length_m": 0.244,
       "depth_m": 0.244,
       "height_m": 1.746,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_floor",
+        "mount": "corner",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_lampSquareTable",
@@ -1999,7 +2734,18 @@
       "length_m": 0.244,
       "depth_m": 0.244,
       "height_m": 0.589,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_lampWall",
@@ -2025,7 +2771,15 @@
       "length_m": 0.46,
       "depth_m": 0.305,
       "height_m": 0.188,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "none",
+        "settings": [],
+        "hung": true,
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_laptop",
@@ -2050,7 +2804,19 @@
       "length_m": 0.536,
       "depth_m": 0.487,
       "height_m": 0.328,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeChair",
@@ -2076,7 +2842,16 @@
       "length_m": 0.995,
       "depth_m": 0.832,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeChairRelax",
@@ -2103,7 +2878,16 @@
       "length_m": 0.995,
       "depth_m": 1.37,
       "height_m": 1.279,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeDesignChair",
@@ -2130,7 +2914,16 @@
       "length_m": 1.481,
       "depth_m": 0.832,
       "height_m": 0.812,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeDesignSofa",
@@ -2157,7 +2950,16 @@
       "length_m": 2.274,
       "depth_m": 0.832,
       "height_m": 0.812,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeDesignSofaCorner",
@@ -2185,7 +2987,16 @@
       "length_m": 2.74,
       "depth_m": 2.74,
       "height_m": 0.812,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeSofa",
@@ -2211,7 +3022,16 @@
       "length_m": 1.989,
       "depth_m": 0.832,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeSofaCorner",
@@ -2238,7 +3058,16 @@
       "length_m": 1.989,
       "depth_m": 1.989,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeSofaLong",
@@ -2265,7 +3094,16 @@
       "length_m": 1.989,
       "depth_m": 1.665,
       "height_m": 0.934,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_loungeSofaOttoman",
@@ -2292,7 +3130,16 @@
       "length_m": 0.893,
       "depth_m": 0.914,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_paneling",
@@ -2317,7 +3164,14 @@
       "length_m": 1.015,
       "depth_m": 0.061,
       "height_m": 1.207,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_pillow",
@@ -2342,7 +3196,19 @@
       "length_m": 0.467,
       "depth_m": 0.18,
       "height_m": 0.451,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_pillowBlue",
@@ -2368,7 +3234,19 @@
       "length_m": 0.467,
       "depth_m": 0.129,
       "height_m": 0.261,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_pillowBlueLong",
@@ -2395,7 +3273,19 @@
       "length_m": 1.049,
       "depth_m": 0.18,
       "height_m": 0.451,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_pillowLong",
@@ -2421,7 +3311,19 @@
       "length_m": 0.785,
       "depth_m": 0.18,
       "height_m": 0.451,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_plantSmall1",
@@ -2447,7 +3349,26 @@
       "length_m": 0.192,
       "depth_m": 0.192,
       "height_m": 0.284,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant_pot",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_plantSmall2",
@@ -2473,7 +3394,26 @@
       "length_m": 0.192,
       "depth_m": 0.192,
       "height_m": 0.284,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant_pot",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_plantSmall3",
@@ -2499,7 +3439,26 @@
       "length_m": 0.199,
       "depth_m": 0.172,
       "height_m": 0.294,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant_pot",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_pottedPlant",
@@ -2525,7 +3484,26 @@
       "length_m": 0.43,
       "depth_m": 0.49,
       "height_m": 1.328,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant_pot",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_radio",
@@ -2550,7 +3528,19 @@
       "length_m": 0.639,
       "depth_m": 0.198,
       "height_m": 0.463,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_rugDoormat",
@@ -2576,7 +3566,19 @@
       "length_m": 0.871,
       "depth_m": 0.481,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rug",
+        "mount": "floor_flat",
+        "settings": [
+          "living",
+          "bedroom",
+          "dining",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_rugRectangle",
@@ -2602,7 +3604,19 @@
       "length_m": 3.187,
       "depth_m": 1.868,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rug",
+        "mount": "floor_flat",
+        "settings": [
+          "living",
+          "bedroom",
+          "dining",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_rugRound",
@@ -2628,7 +3642,19 @@
       "length_m": 1.868,
       "depth_m": 1.868,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rug",
+        "mount": "floor_flat",
+        "settings": [
+          "living",
+          "bedroom",
+          "dining",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_rugRounded",
@@ -2654,7 +3680,19 @@
       "length_m": 3.187,
       "depth_m": 1.868,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rug",
+        "mount": "floor_flat",
+        "settings": [
+          "living",
+          "bedroom",
+          "dining",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_rugSquare",
@@ -2680,7 +3718,19 @@
       "length_m": 1.836,
       "depth_m": 1.868,
       "height_m": 0.02,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "rug",
+        "mount": "floor_flat",
+        "settings": [
+          "living",
+          "bedroom",
+          "dining",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_shower",
@@ -2705,7 +3755,17 @@
       "length_m": 1.14,
       "depth_m": 1.181,
       "height_m": 2.221,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bath",
+        "mount": "none",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_showerRound",
@@ -2731,7 +3791,17 @@
       "length_m": 1.14,
       "depth_m": 1.14,
       "height_m": 2.221,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bath",
+        "mount": "none",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_sideTable",
@@ -2757,7 +3827,16 @@
       "length_m": 1.085,
       "depth_m": 0.447,
       "height_m": 0.78,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_sideTableDrawers",
@@ -2784,7 +3863,16 @@
       "length_m": 1.085,
       "depth_m": 0.451,
       "height_m": 0.78,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_speaker",
@@ -2809,7 +3897,19 @@
       "length_m": 0.3,
       "depth_m": 0.3,
       "height_m": 1.292,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_speakerSmall",
@@ -2835,7 +3935,19 @@
       "length_m": 0.3,
       "depth_m": 0.27,
       "height_m": 0.605,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stairs",
@@ -2860,7 +3972,14 @@
       "length_m": 3.702,
       "depth_m": 1.604,
       "height_m": 2.719,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stairsCorner",
@@ -2886,7 +4005,14 @@
       "length_m": 3.601,
       "depth_m": 2.894,
       "height_m": 2.719,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stairsOpen",
@@ -2912,7 +4038,14 @@
       "length_m": 3.702,
       "depth_m": 1.604,
       "height_m": 2.719,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stairsOpenSingle",
@@ -2939,7 +4072,14 @@
       "length_m": 3.702,
       "depth_m": 1.604,
       "height_m": 2.719,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stoolBar",
@@ -2965,7 +4105,18 @@
       "length_m": 0.539,
       "depth_m": 0.467,
       "height_m": 0.883,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "stool",
+        "mount": "seat",
+        "settings": [
+          "bar",
+          "kitchen",
+          "bakery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_stoolBarSquare",
@@ -2992,7 +4143,18 @@
       "length_m": 0.312,
       "depth_m": 0.3,
       "height_m": 0.822,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "stool",
+        "mount": "seat",
+        "settings": [
+          "bar",
+          "kitchen",
+          "bakery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_table",
@@ -3017,7 +4179,19 @@
       "length_m": 1.708,
       "depth_m": 0.908,
       "height_m": 0.663,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableCloth",
@@ -3043,7 +4217,19 @@
       "length_m": 1.708,
       "depth_m": 0.908,
       "height_m": 0.663,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableCoffee",
@@ -3069,7 +4255,16 @@
       "length_m": 1.342,
       "depth_m": 0.812,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableCoffeeGlass",
@@ -3096,7 +4291,17 @@
       "length_m": 1.342,
       "depth_m": 0.812,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "none",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_tableCoffeeGlassSquare",
@@ -3124,7 +4329,17 @@
       "length_m": 0.812,
       "depth_m": 0.812,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "none",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_tableCoffeeSquare",
@@ -3151,7 +4366,16 @@
       "length_m": 0.812,
       "depth_m": 0.812,
       "height_m": 0.467,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableCross",
@@ -3177,7 +4401,19 @@
       "length_m": 1.73,
       "depth_m": 0.908,
       "height_m": 0.705,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableCrossCloth",
@@ -3204,7 +4440,19 @@
       "length_m": 1.73,
       "depth_m": 0.908,
       "height_m": 0.705,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_tableGlass",
@@ -3230,7 +4478,20 @@
       "length_m": 1.708,
       "depth_m": 0.908,
       "height_m": 0.663,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "none",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_tableRound",
@@ -3256,7 +4517,19 @@
       "length_m": 1.406,
       "depth_m": 1.624,
       "height_m": 0.744,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_televisionAntenna",
@@ -3282,7 +4555,17 @@
       "length_m": 0.537,
       "depth_m": 0.162,
       "height_m": 0.209,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tv",
+        "mount": "wall",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_televisionModern",
@@ -3308,7 +4591,17 @@
       "length_m": 1.39,
       "depth_m": 0.261,
       "height_m": 0.923,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tv",
+        "mount": "wall",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_televisionVintage",
@@ -3334,7 +4627,17 @@
       "length_m": 0.832,
       "depth_m": 0.548,
       "height_m": 0.548,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "tv",
+        "mount": "wall",
+        "settings": [
+          "living",
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_toaster",
@@ -3359,7 +4662,19 @@
       "length_m": 0.382,
       "depth_m": 0.203,
       "height_m": 0.264,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "appliance",
+        "mount": "counter_top",
+        "settings": [
+          "kitchen",
+          "bar",
+          "bakery",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_toilet",
@@ -3384,7 +4699,16 @@
       "length_m": 0.634,
       "depth_m": 0.969,
       "height_m": 0.915,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "toilet",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_toiletSquare",
@@ -3410,7 +4734,16 @@
       "length_m": 0.616,
       "depth_m": 0.786,
       "height_m": 0.915,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "toilet",
+        "mount": "wall",
+        "settings": [
+          "bathroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_trashcan",
@@ -3435,7 +4768,26 @@
       "length_m": 0.422,
       "depth_m": 0.475,
       "height_m": 0.869,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "trash_small",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wall",
@@ -3460,7 +4812,14 @@
       "length_m": 2.03,
       "depth_m": 0.102,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallCorner",
@@ -3486,7 +4845,14 @@
       "length_m": 1.117,
       "depth_m": 1.117,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallCornerRond",
@@ -3513,7 +4879,14 @@
       "length_m": 1.117,
       "depth_m": 1.117,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallDoorway",
@@ -3539,7 +4912,14 @@
       "length_m": 2.03,
       "depth_m": 0.181,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallDoorwayWide",
@@ -3566,7 +4946,14 @@
       "length_m": 2.03,
       "depth_m": 0.181,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallHalf",
@@ -3592,7 +4979,14 @@
       "length_m": 1.015,
       "depth_m": 0.102,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "kenney_furniture_wallWindow",
@@ -3618,7 +5012,15 @@
       "length_m": 2.03,
       "depth_m": 0.181,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_wallWindowSlide",
@@ -3645,7 +5047,15 @@
       "length_m": 2.03,
       "depth_m": 0.181,
       "height_m": 2.618,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "other",
+        "mount": "none",
+        "settings": [],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_washer",
@@ -3670,7 +5080,18 @@
       "length_m": 0.792,
       "depth_m": 0.792,
       "height_m": 0.954,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "washer",
+        "mount": "none",
+        "settings": [
+          "bathroom",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     },
     {
       "id": "kenney_furniture_washerDryerStacked",
@@ -3697,7 +5118,18 @@
       "length_m": 0.792,
       "depth_m": 0.792,
       "height_m": 1.908,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "washer",
+        "mount": "none",
+        "settings": [
+          "bathroom",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)",
+        "transparent": true
+      }
     }
   ]
 }

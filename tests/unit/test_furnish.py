@@ -126,8 +126,9 @@ def _wall_of(piece: Piece, polygon: Polygon) -> tuple[float, float]:
 def test_wall_pieces_stand_back_to_the_wall_a_wall_gap_off_it(turn: float) -> None:
     polygon = rotate(ROOM, turn, origin=(0, 0))
     zone = rotate(DOOR_ZONE, turn, origin=(0, 0))
-    result = _plan_default(_room(polygon, zone))
-    assert len(result.pieces) == FURNISH.max_pieces_per_room
+    furnish = replace(FURNISH, max_pieces_per_room=8)  # enough pieces to pack a wall: the packing is what this checks
+    result = _plan_default(_room(polygon, zone), furnish=furnish)
+    assert len(result.pieces) == furnish.max_pieces_per_room
     for piece in _floor(result):
         distance, cosine = _wall_of(piece, polygon)
         assert distance == pytest.approx(GAP, abs=1e-6)
@@ -297,7 +298,7 @@ def test_the_asset_cap_refuses_a_seventeenth_distinct_asset() -> None:
 
 
 @pytest.mark.parametrize(("size", "solid"), [
-    ((1.0, 0.4, 0.5), True), ((1.0, 0.39, 0.5), False), ((1.0, 0.4, 0.49), False), ((0.4, 2.0, 0.5), True),
+    ((1.0, 0.4, 0.5), True), ((1.0, 0.2, 0.5), True), ((1.0, 0.19, 0.5), False), ((1.0, 0.4, 0.49), False), ((0.4, 2.0, 0.5), True), ((1.2, 0.1, 2.0), True), ((1.2, 0.09, 2.0), False),
 ])
 def test_a_piece_gets_a_collider_only_when_it_is_cover_sized(size: tuple[float, float, float], solid: bool) -> None:
     asset = _asset("p", size, role="room_furniture")
@@ -776,11 +777,12 @@ def test_shop_planner_unchanged_with_default_fields() -> None:
     # The pins were taken with the B3 sets (Kenney and Poly Haven only); the Quaternius rows added to the default
     # sets on 10 November 2026 change which piece comes first, not the planner, so the B3 sets are rebuilt here.
     b3 = json.loads(json.dumps(DOC))
-    b3["interiors"]["shops"]["furnish"].update(enabled=True, catalogues=B3_SHOP_CATALOGUES, sets=B3_SHOP_SETS)
+    b3["interiors"]["shops"]["furnish"].update(enabled=True, catalogues=B3_SHOP_CATALOGUES, sets=B3_SHOP_SETS, max_pieces_per_room=8)
     shop = config_from_document(b3).interiors.shops.furnish
     pins = {"bar": "90fd63787a4ad3367dd14ae570e08da6fd34d9a7f18dacbc1e9152d7f72acc2f",
-            "bakery": "79f5f14bd03e41179467691e21315afb761d514039ee16a3c476fb4658b66b27",
-            "generic": "bfe702212d7076f9bbadeb86c06ed545e143297d57cc3860b7727807de25487d"}
+            # Re-pinned 10 November 2026: the same pieces in the same places; more of them are solid (SOLID_DEPTH_M 0.2).
+            "bakery": "2a7d6461b1ee376bcbe82b914e276ddeee911a7d466e56cf86a1030af12ad39c",
+            "generic": "0ba89183c0ab73af63b67caac7ba4f037bea8c71faec8b088e17b7683cb8ef05"}
     for category, pin in pins.items():
         room = FurnishRoom("b/L0", ROOM, DOOR_ZONE, 3.0, category, (box(0.5, -0.3, 2.0, 0.15),), (WINDOW.exterior,))
         result = plan_room(room, shop, ASSETS, 48152, "b")

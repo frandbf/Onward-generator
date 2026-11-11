@@ -41,7 +41,9 @@ REPO = Path(__file__).resolve().parents[2]
 EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 # perf layout --playable --gameplay-report on this fixture at workshop/c5 (c3c90b4), before C6 changed any code.
 HEAD_LAYOUT_SHA256 = "cd51c366f376154aedc9faba4951fca3da63f72a53f482b53a31cdbd1d128a61"
-HEAD_REPORT_SHA256 = "ecf7c36fdd68cf50157cc79b16d175775d86f9c5569131b9a9459c288c014a8d"
+# The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
+# so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
+HEAD_REPORT_SHA256 = "2c6bda06dd8295099679e214c21e7f498307fd7f9c34e0be4758772dee6eb59a"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 

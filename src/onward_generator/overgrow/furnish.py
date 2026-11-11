@@ -25,6 +25,7 @@ from typing import Any
 
 import numpy as np
 
+from onward_generator.assetstore import local
 from onward_generator.detail.config import FURNISH_CATALOGUES
 from onward_generator.detail.modules import yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
@@ -77,7 +78,7 @@ def build_furniture(manifest: Mapping[str, Any], library: str | Path | None) -> 
     if library is None:
         raise FurnishBuildError("scene_detail.json plans interior furniture (ADR-031, ADR-034); overgrow place needs --library")
     catalogues = sorted({str(piece["catalogue"]) for _, piece in pieces})
-    unknown = [name for name in catalogues if name not in FURNISH_CATALOGUES]
+    unknown = [name for name in catalogues if name not in FURNISH_CATALOGUES and not (local.is_local(name) and local.enabled())]
     if unknown:
         raise FurnishBuildError(f"interior furniture names catalogues that are not allowed: {', '.join(unknown)}")
     props, rejects = read_interior_catalogue(library, catalogues, {str(p["asset_id"]) for _, p in pieces})  # pragma: no mutate: the ids only spare the GLBs no piece names; the planned rows load the same

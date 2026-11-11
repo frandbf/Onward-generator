@@ -30,7 +30,13 @@ _OPEN_ROLES = frozenset({
 })
 COVER_HEIGHT_M = 0.5
 COVER_DEPTH_M = 0.4
-"""A prop at least this tall and this deep on its short side looks like cover, so it stops players and bullets."""
+"""A prop at least this tall and this deep on its short side is cover: it shelters a player (gameplay metrics, perf cover)."""
+SOLID_DEPTH_M = 0.2
+"""A prop at least COVER_HEIGHT_M tall and this deep on its short side stops a body and a shot. It was COVER_DEPTH_M
+until 10 November 2026, when a 2.2 m bookshelf 0.37 m deep, a fire hydrant and a bollard were walked through."""
+TALL_SOLID_M = 1.0
+TALL_DEPTH_M = 0.1
+"""Any prop at least this tall and this deep on its short side is solid too: a body cannot walk through a tall shelf."""
 _CROSS_ROLES = frozenset({"wreck", "gate", "barrier"})
 _SCHEMA = {
     "type": "object",
@@ -82,7 +88,8 @@ def is_solid(role: str, category: str, size_m: tuple[float, float, float] | None
     if size_m is None:
         return False
     length_m, width_m, height_m = size_m
-    return height_m >= COVER_HEIGHT_M and min(length_m, width_m) >= COVER_DEPTH_M
+    short = min(length_m, width_m)
+    return (height_m >= COVER_HEIGHT_M and short >= SOLID_DEPTH_M) or (height_m >= TALL_SOLID_M and short >= TALL_DEPTH_M)
 
 
 def blocks_street(role: str, *, street_blocking: bool) -> bool:

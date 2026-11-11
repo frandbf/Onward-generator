@@ -96,13 +96,13 @@ def test_shop_display_windows_are_see_through_and_carry_their_vinyls(detail_inpu
     room = _obj(shops, f"interior/{SHOP}").record
     building = _obj(shops, f"building/{SHOP}")
     ceiling = room["rooms"][0]["ceiling_z_m"]
-    # Every display window is frameless shop glass with no pane collider; any other window keeps glass_view and its pane.
+    # Every display window is frameless shop glass; any other window is glass_view. Each keeps a #glass pane collider.
     fronts = building.record["facade"]["openings"]["shopfront"]
     [shop_glass] = [p for p in building.visual if p.material == "shop_glass"]
     view = [p.mesh.triangle_count for p in building.visual if p.material == "glass_view"]
     assert shop_glass.mesh.triangle_count == 2 * room["open_shopfronts"] == 2 * fronts > 0
-    assert sum(view) == 2 * room["glass_panes"] == 2 * len(building.glass_colliders)
-    assert room["through_windows"] == room["open_shopfronts"] + room["glass_panes"]
+    assert sum(view) == 2 * (room["glass_panes"] - room["open_shopfronts"])
+    assert room["through_windows"] == room["glass_panes"] == len(building.glass_colliders)
     for prim in building.visual:
         if prim.material == "glass_dark":
             assert prim.mesh.vertices[:, 2].min() >= ceiling - 1e-3  # only the upper floors keep the opaque glass
@@ -269,7 +269,7 @@ def test_a_one_storey_shop_has_its_room_under_a_closed_roof(one_storey_inputs: t
     # See-through shop windows, and a light under the roof slab.
     assert interior["through_windows"] > 0
     assert [p.mesh.triangle_count for p in building.visual if p.material == "shop_glass"] == [2 * interior["through_windows"]]
-    assert interior["open_shopfronts"] == interior["through_windows"] and not building.glass_colliders
+    assert interior["open_shopfronts"] == interior["through_windows"] == len(building.glass_colliders)
     assert anchor["light_m"][2] == pytest.approx(room["ceiling_z_m"] - LIGHT_BELOW_CEILING_M)
 
 
@@ -351,7 +351,7 @@ def test_a_courtyard_shop_room_goes_round_the_courtyard(complex_inputs: tuple[Pa
     [panes] = [p.mesh.vertices for p in _obj(open_yard, f"building/{bid}").visual if p.material == "shop_glass"]
     yard_panes = (np.abs(panes[:, 0] + 28.0) <= 4.0 + t + 0.01) & (np.abs(panes[:, 1] - 18.0) <= 4.0 + t + 0.01)
     assert yard_panes.sum() == 4 * (yard["through_windows"] - interior.record["through_windows"])
-    assert yard["open_shopfronts"] == yard["through_windows"] and yard["glass_panes"] == 0
+    assert yard["open_shopfronts"] == yard["through_windows"] == yard["glass_panes"]
 
 
 def test_a_shop_of_two_parts_has_a_room_in_each_and_one_door(complex_shops) -> None:

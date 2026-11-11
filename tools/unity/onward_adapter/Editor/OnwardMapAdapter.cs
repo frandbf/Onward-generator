@@ -562,6 +562,13 @@ namespace OnwardGenerator
             return canonical;
         }
 
+        private const int FurnitureCellBase = -1000000;
+        private const float FurnitureStoreyM = 2.5f;
+
+        // Furniture nodes written by overgrow from detail's furnishing blocks: furnish/<building>/<n> (not the colliders).
+        private static bool IsFurniture(string nodeName) =>
+            nodeName != null && nodeName.StartsWith("furnish/", StringComparison.Ordinal) && nodeName.Split('/').Length == 3;
+
         private static bool IsShopOverlay(GMaterial material) =>
             material != null && (material.name == ShopGlassMaterial || material.name.StartsWith(ShopDecalPrefix, StringComparison.Ordinal));
 
@@ -591,6 +598,11 @@ namespace OnwardGenerator
         {
             int[] canonical = CanonicalMaterials(visual.Doc.materials, materials, opt);
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
+            // Interior furniture (furnish/<building>/<n>, ADR-031/034) is combined per building and storey, not per
+            // ground cell, and lit by the light probes of its rooms: combined per cell it took the sky's ambient
+            // light and read pale blue in a dark room (headset, Madrid Sol Quest, 10 November 2026).
+            var furnitureKeys = new Dictionary<string, int>(StringComparer.Ordinal);
+            var furnitureGroups = new HashSet<(int, int, int)>();
             var probe = new GameObject("probe");
             try
             {
@@ -604,10 +616,19 @@ namespace OnwardGenerator
                     Mesh mesh = meshes[node.mesh];
                     Vector3 c = m.MultiplyPoint3x4(mesh.bounds.center);
                     int cx = Mathf.FloorToInt(c.x / cellM), cz = Mathf.FloorToInt(-c.z / cellM);
+                    bool furniture = IsFurniture(node.name);
+                    if (furniture)
+                    {
+                        string building = node.name.Split('/')[1];
+                        if (!furnitureKeys.TryGetValue(building, out int index)) furnitureKeys[building] = index = furnitureKeys.Count;
+                        cx = FurnitureCellBase - index;                        // a cell no ground node can reach
+                        cz = Mathf.FloorToInt(c.y / FurnitureStoreyM);              // its storey, from the bounds centre height
+                    }
                     for (int s = 0; s < mesh.subMeshCount; s++)
                     {
                         int k = meshMaterials[node.mesh][s];
                         var key = (cx, cz, k >= 0 && k < canonical.Length ? canonical[k] : k);
+                        if (furniture) furnitureGroups.Add(key);
                         if (!groups.TryGetValue(key, out List<CombineInstance> list)) groups[key] = list = new List<CombineInstance>();
                         list.Add(new CombineInstance { mesh = mesh, subMeshIndex = s, transform = m });
                     }
@@ -620,6 +641,7 @@ namespace OnwardGenerator
 
             AssetDatabase.StartAssetEditing();
             var built = new List<(string, Mesh, int)>();
+            var furnitureMeshes = new HashSet<string>(StringComparer.Ordinal);
             int tangentMeshes = 0;
             try
             {
@@ -645,6 +667,7 @@ namespace OnwardGenerator
                     }
                     AssetDatabase.CreateAsset(combined, $"{root}/Meshes/{name}.asset");
                     built.Add((name, combined, mat));
+                    if (furnitureGroups.Contains(g.Key)) furnitureMeshes.Add(name);
                 }
             }
             finally
@@ -671,7 +694,9 @@ namespace OnwardGenerator
                     // of a 100 m cell that point fell inside a building on 3 of 4 cells of MurciaEjemplo2 and the
                     // whole cell went dark; sampling at one of its pieces instead put another cell in shadow.
                     // A combined renderer therefore takes the scene's ambient light, the same everywhere.
-                    renderer.lightProbeUsage = LightProbeUsage.Off;
+                    // Furniture is combined per building and storey, so its bounds centre is inside its rooms,
+                    // among their probes (ADR-013): it blends them and takes the room's light.
+                    renderer.lightProbeUsage = furnitureMeshes.Contains(name) ? LightProbeUsage.BlendProbes : LightProbeUsage.Off;
                 }
                 byScale[renderer.scaleInLightmap] = byScale.TryGetValue(renderer.scaleInLightmap, out int seen) ? seen + 1 : 1;
             }

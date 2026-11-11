@@ -256,6 +256,8 @@ GitHub publishes no digest for that release. The archive's SHA-512 matches the o
 
 `config/props/catalog.json` records Unity Asset Store packs that were reviewed and not baked into the GLB. `props place` can write instances that have OSM evidence. The Unity adapter does not instantiate that list. Visible furniture in the exported scene is the generated furniture from `dress style`, plus the normalized library from `overgrow`.
 
+Since 10 November 2026 each user can convert **their own** downloaded Asset Store packs into local catalogues (`asset-store import`, [ADR-035](../decisions/ADR-035-local-asset-store-catalogues.md)). The Standard Unity Asset Store EULA forbids redistributing the files. The converted GLBs therefore stay in `assets/asset_store_*/` on that machine. Git ignores those folders, and a test checks that no tracked file names the EULA. A built map may embed them, as the EULA allows for a Licensed Product. The export package and those GLBs must not be shared or published.
+
 Approved to import, and still not instantiated: **327313**, **71042** (furniture only), and **251403**. A pack whose licence or shader does not fit `PP_Opaque_Simple_Lit` stays out. Store shaders do not replace that shader.
 
 ## Quest measurement and export

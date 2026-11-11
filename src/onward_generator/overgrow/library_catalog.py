@@ -11,6 +11,8 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from onward_generator.assetstore import local
+
 REVIEW_FILE = Path(__file__).resolve().parents[3] / "assets" / "normalized_review.json"
 SELECTION_SCHEMA = "onward_generator.prop_selection"
 SELECTION_VERSION = "0.1.0"
@@ -32,9 +34,10 @@ def library_directories(library: str | Path) -> list[Path]:
         return [root]
     if not root.is_dir():
         return []
+    show_local = local.enabled()
     return [
         child for child in sorted(root.iterdir(), key=lambda path: path.name)
-        if child.is_dir() and (child / "manifest.json").is_file()
+        if child.is_dir() and (child / "manifest.json").is_file() and (show_local or not local.is_local(child.name))
     ]
 
 

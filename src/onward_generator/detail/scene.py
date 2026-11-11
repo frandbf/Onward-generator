@@ -64,6 +64,7 @@ from onward_generator.detail.grammar import (
 from onward_generator.detail.interiors import (
     MIN_ROOM_M2,
     Interior,
+    InteriorPlan,
     assemble_interior,
     cap_lights,
     glass_penetrations,
@@ -1336,6 +1337,42 @@ def detail_scene(
     )
 
 
+@dataclass(slots=True)
+class _PendingFurnish:
+    """A built interior waiting for its furniture: the budget goes to the interiors nearest the core centre first."""
+
+    shop: bool
+    bid: str
+    interior: InteriorPlan
+    built: Interior
+    penetrations: list[tuple[Segment, Hole]]
+    key: str
+    distance_m: float
+    obj: DetailObject | None = None
+    lit_index: int = -1
+
+
+def _furnish_by_priority(pending: Sequence[_PendingFurnish], furnishing: ShopFurnishing | None, floor_furnishing: ShopFurnishing | None,
+                         cfg: DetailConfig, lit: list[tuple[bool, dict[str, Any]]],
+                         emitted: dict[str, tuple[list[DetailObject], list[Issue]]]) -> None:
+    """Furnish the waiting interiors nearest the map centre first (ADR-031 amendment of 10 November 2026).
+
+    The map centre is the centre of the playable core, where ``perf layout`` later puts the spawns, the routes and the
+    Uplink; the routes themselves do not exist yet when ``detail`` runs. Each pass keeps its own budget, whole rooms
+    or none. A furnished interior gets its new light anchors on its object and in ``lit``, before ``cap_lights``.
+    """
+    for entry in sorted(pending, key=lambda e: (e.distance_m, e.bid)):
+        passer = furnishing if entry.shop else floor_furnishing
+        assert passer is not None
+        furnish = passer.furnish_interior if entry.shop else passer.furnish_floors
+        code = "shop_not_furnished" if entry.shop else "floor_not_furnished"
+        messages = furnish(entry.bid, entry.interior, entry.built, entry.penetrations, cfg.interiors)
+        if entry.obj is not None and entry.built.light_anchors is not None:  # pragma: no mutate: entry.obj is always set before furnishing; the check is for mypy
+            entry.obj.light_anchors = entry.built.light_anchors
+            lit[entry.lit_index] = (entry.shop, entry.built.light_anchors)
+        emitted[entry.key][1].extend(Issue(code, "info", entry.bid, message) for message in messages)
+
+
 def _detail_buildings(
     *,
     base: GeneratedScene,
@@ -1408,6 +1445,7 @@ def _detail_buildings(
 
     It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
     lod2_swap: set[str] = set()
+    pending_furnish: list[_PendingFurnish] = []
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1526,14 +1564,10 @@ def _detail_buildings(
             door_rule = ensure_door(layout, doors_on, storeys, plain_door[0], door_spec, template, refined, cfg)
         if built is not None:
             budget.spend(built)
-            if shop and furnishing is not None and interior is not None:
-                # Furniture has its own budget (ADR-031): a room it cannot furnish keeps its shop interior.
-                for message in furnishing.furnish_interior(bid, interior, built, glass_penetrations(layout, segments), cfg.interiors):
-                    issues.append(Issue("shop_not_furnished", "info", bid, message))
-            elif not shop and floor_furnishing is not None and interior is not None:
-                # The floors of the stair interior have their own budget too (ADR-034): a floor left bare keeps its interior.
-                for message in floor_furnishing.furnish_floors(bid, interior, built, glass_penetrations(layout, segments), cfg.interiors):
-                    issues.append(Issue("floor_not_furnished", "info", bid, message))
+            if interior is not None and (furnishing if shop else floor_furnishing) is not None:
+                # Furnished after the loop, nearest the core centre first, so the budget goes where play is (ADR-031).
+                pending_furnish.append(_PendingFurnish(shop, bid, interior, built, glass_penetrations(layout, segments), o.id,
+                                                       float(geom.distance(Point(0.0, 0.0)))))
         if shell is None:
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
@@ -1583,6 +1617,8 @@ def _detail_buildings(
             ))
             assert built.light_anchors is not None
             lit.append((shop, built.light_anchors))
+            if pending_furnish and pending_furnish[-1].bid == bid and pending_furnish[-1].obj is None:
+                pending_furnish[-1].obj, pending_furnish[-1].lit_index = objects[-1], len(lit) - 1
             if shop:
                 shop_interiors.append(bid)
             else:
@@ -1699,6 +1735,7 @@ def _detail_buildings(
                 x.record["tier"] = CORE
         emitted[o.id] = (objects[first_object:], issues[first_issue:])
 
+    _furnish_by_priority(pending_furnish, furnishing, floor_furnishing, cfg, lit, emitted)
     return _assemble_detail(
         base=base,
         base_ref=base_ref,

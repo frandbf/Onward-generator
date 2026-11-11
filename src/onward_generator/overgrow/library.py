@@ -40,18 +40,23 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from onward_generator.assetstore import local
 from onward_generator.generation.gltf import Primitive, images_by_material, read_glb, scene_primitives
 from onward_generator.generation.mesh import Mesh, merge
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
 from onward_generator.overgrow.constants import (
+    DECOR_BOX_FRACTION,
+    DECOR_MAX_TRIS,
     FLAT_PROP_M,
     FLAT_VEGETATION_MAX_M,
+    IMPOSTOR_MIN_TRIS,
     LOD_BOX_TOLERANCE_M,
     LOD_MIN_TRIS,
     LOD_TRIS_PER_M2,
     TARGET_ASSET_TRIS,
 )
 from onward_generator.overgrow.fit import apply_fit_scale
+from onward_generator.overgrow.impostor import flat_impostor
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
 from onward_generator.overgrow.manifest import INTERIOR, KIT_ONLY, check_manifest
 from onward_generator.overgrow.normalize import cluster_decimate, rest_on_ground
@@ -221,7 +226,7 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
     return props, rejects
 
 
-INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0"}
+INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0", local.LICENCE_NAME: local.LICENCE_SPDX}
 """Licences an interior catalogue's manifest ``source`` may name, and the SPDX id furnishing records (ADR-031)."""
 
 
@@ -269,6 +274,8 @@ def read_interior_catalogue(
             continue
         check_manifest(document, str(manifest))
         licence = interior_licence(document.get("source"))
+        if licence == local.LICENCE_SPDX and not (local.is_local(directory.name) and local.enabled()):
+            licence = None  # the Asset Store EULA only in a local, gitignored asset_store_* catalogue (ADR-035)
         for row in document.get("assets") or []:
             if not isinstance(row, dict) or not row.get("id") or not row.get("file") or (ids is not None and row["id"] not in ids):
                 continue
@@ -318,15 +325,31 @@ def level_of_detail(prop: Prop) -> Prop:
     box moved more than ``LOD_BOX_TOLERANCE_M`` at street size is refused and the
     target doubles, while it still saves a quarter of the file's triangles.
     """
+    if prop.spec.category == "vehicles":
+        # Clustering tore holes in the cars' bodies (headset, 10 November 2026); a vehicle is cover, kept whole.
+        return prop
     _street, scale = apply_fit_scale(prop.mesh, prop.spec.role)
+    if _span(prop.mesh, 2) * scale < FLAT_PROP_M and prop.triangles > IMPOSTOR_MIN_TRIS:
+        # A prop lying on the ground is its top face to a standing player: one textured polygon (impostor.py).
+        return flat_impostor(prop)
     target = lod_target(prop.mesh, scale)
+    tolerance = LOD_BOX_TOLERANCE_M
+    if is_decorative(prop.spec):
+        # Ground plants are not cover: fewer triangles, and a looser hold on their outline (a fern frond may go).
+        target = min(target, DECOR_MAX_TRIS)
+        tolerance = max(tolerance, DECOR_BOX_FRACTION * max(_span(prop.mesh, axis) for axis in range(3)) * scale)
     # A copy that saves less than a quarter of the triangles is not worth the lost detail.
     while 4 * target <= 3 * prop.triangles:
         reduced = _decimated(prop, target)
-        if box_shift(prop.mesh, reduced.mesh) * scale <= LOD_BOX_TOLERANCE_M:
+        if box_shift(prop.mesh, reduced.mesh) * scale <= tolerance:
             return reduced
         target *= 2
     return prop
+
+
+def is_decorative(spec: AssetSpec) -> bool:
+    """Vegetation that is not a tree: ground plants, flowers, roots and grass, which no player hides behind."""
+    return spec.category == "vegetation" and spec.role != "tree"
 
 
 def box_shift(a: Mesh, b: Mesh) -> float:

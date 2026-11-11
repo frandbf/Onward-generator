@@ -33,6 +33,7 @@ from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_o
 from onward_generator.maps.workspace import MapError, load_map
 from onward_generator.next_step import map_root
 from onward_generator.overgrow.ambient import cross_yaw, plan_from_brief
+from onward_generator.overgrow.atlas import PROP_ATLAS_EXTRA, apply_atlas
 from onward_generator.overgrow.constants import (
     LANE_M,
     MAX_ADDED_TRIS,
@@ -347,13 +348,20 @@ def overgrow(
     for name in furniture.images:
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
 
+    # One shared atlas for the props and furniture: one draw per cell (or building storey) instead of one per model.
+    extra_nodes, images, cells = apply_atlas(extra_nodes, images)
+    materials = {name: m for name, m in materials.items() if name not in cells}
+    for name in {cell.atlas for cell in cells.values()}:
+        materials[name] = Material((1, 1, 1, 1), 0.9)
+
     targets = prepare_outputs(
         out, OUTPUT_FILES, overwrite=overwrite,
         protected=(base / "scene_visual.glb", base / "scene_collision.glb", base / "scene_detail.json"),
     )
     visual = build_glb(
         [*nodes, *extra_nodes], materials,
-        extras={"manifest": "scene_detail.json", "overgrow": len(records)},
+        extras={"manifest": "scene_detail.json", "overgrow": len(records),
+                **({PROP_ATLAS_EXTRA: {name: cell.to_list() for name, cell in sorted(cells.items())}} if cells else {})},
         repeat_images=images, preserve_uvs=True,
         unit_uv_materials={"glass_dark", "glass_boarded", "glass_view", "door_wood"},
     )

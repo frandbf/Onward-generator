@@ -41,7 +41,16 @@
       "length_m": 1.43,
       "depth_m": 0.89,
       "height_m": 0.49,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_BedKing",
@@ -67,7 +76,16 @@
       "length_m": 1.43,
       "depth_m": 1.354,
       "height_m": 0.49,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "bed",
+        "mount": "wall",
+        "settings": [
+          "bedroom"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_BookCase",
@@ -93,7 +111,21 @@
       "length_m": 0.452,
       "depth_m": 0.758,
       "height_m": 1.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_BookCaseBooks",
@@ -120,7 +152,21 @@
       "length_m": 0.452,
       "depth_m": 0.758,
       "height_m": 1.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_BookCaseLarge",
@@ -147,7 +193,21 @@
       "length_m": 0.452,
       "depth_m": 1.571,
       "height_m": 1.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_BookCaseLargeBooks",
@@ -175,7 +235,21 @@
       "length_m": 0.452,
       "depth_m": 1.571,
       "height_m": 1.534,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "shelf_tall",
+        "mount": "wall",
+        "settings": [
+          "shop",
+          "grocery",
+          "pharmacy",
+          "bakery",
+          "living",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Chair",
@@ -200,7 +274,20 @@
       "length_m": 0.438,
       "depth_m": 0.433,
       "height_m": 0.991,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_ChairCushioned",
@@ -226,7 +313,20 @@
       "length_m": 0.438,
       "depth_m": 0.433,
       "height_m": 1.054,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_ChairHandle",
@@ -252,7 +352,20 @@
       "length_m": 0.438,
       "depth_m": 0.433,
       "height_m": 0.694,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "chair",
+        "mount": "seat",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "office",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Closet",
@@ -277,7 +390,18 @@
       "length_m": 0.353,
       "depth_m": 0.66,
       "height_m": 1.482,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "wardrobe",
+        "mount": "wall",
+        "settings": [
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Closet2",
@@ -302,7 +426,18 @@
       "length_m": 0.475,
       "depth_m": 0.69,
       "height_m": 0.996,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "wardrobe",
+        "mount": "wall",
+        "settings": [
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_CoffeeTable",
@@ -328,7 +463,16 @@
       "length_m": 0.589,
       "depth_m": 1.016,
       "height_m": 0.28,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_CoffeeTable2",
@@ -354,7 +498,16 @@
       "length_m": 0.589,
       "depth_m": 1.016,
       "height_m": 0.335,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "coffee_table",
+        "mount": "center",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Lamp",
@@ -379,7 +532,18 @@
       "length_m": 0.231,
       "depth_m": 0.245,
       "height_m": 1.038,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Lamp2",
@@ -404,7 +568,18 @@
       "length_m": 0.231,
       "depth_m": 0.245,
       "height_m": 1.038,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "lamp_small",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Plant",
@@ -429,7 +604,26 @@
       "length_m": 0.147,
       "depth_m": 0.347,
       "height_m": 0.303,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "plant_pot",
+        "mount": "corner",
+        "settings": [
+          "kitchen",
+          "living",
+          "dining",
+          "bedroom",
+          "bathroom",
+          "bakery",
+          "bar",
+          "grocery",
+          "pharmacy",
+          "shop",
+          "office"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Sofa",
@@ -454,7 +648,16 @@
       "length_m": 0.737,
       "depth_m": 0.835,
       "height_m": 0.628,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_SofaDouble",
@@ -480,7 +683,16 @@
       "length_m": 0.737,
       "depth_m": 1.364,
       "height_m": 0.628,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_SofaLong",
@@ -506,7 +718,16 @@
       "length_m": 1.365,
       "depth_m": 1.364,
       "height_m": 0.628,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "sofa",
+        "mount": "wall",
+        "settings": [
+          "living"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Stool",
@@ -531,7 +752,18 @@
       "length_m": 0.366,
       "depth_m": 0.361,
       "height_m": 0.546,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "stool",
+        "mount": "seat",
+        "settings": [
+          "bar",
+          "kitchen",
+          "bakery"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Table",
@@ -556,7 +788,19 @@
       "length_m": 1.106,
       "depth_m": 1.016,
       "height_m": 0.623,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "table",
+        "mount": "center",
+        "settings": [
+          "dining",
+          "bar",
+          "bakery",
+          "kitchen"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Vase",
@@ -581,7 +825,19 @@
       "length_m": 0.229,
       "depth_m": 0.229,
       "height_m": 0.314,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     },
     {
       "id": "qt_furn_Vase2",
@@ -606,7 +862,19 @@
       "length_m": 0.168,
       "depth_m": 0.168,
       "height_m": 0.306,
-      "collider": "none"
+      "collider": "none",
+      "semantic": {
+        "kind": "decor_misc",
+        "mount": "table_top",
+        "settings": [
+          "living",
+          "bedroom",
+          "office",
+          "shop"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }

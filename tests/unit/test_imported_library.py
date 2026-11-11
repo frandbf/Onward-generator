@@ -116,7 +116,8 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
     interior = {row["id"] for row in rows if row["placement"] == "interior"}
     assert len(interior) == 505
     refused = {row["id"]: row["refused"] for row in rows if "refused" in row}
-    assert refused == {"watchtower": "unknown_scale", "warning_signboard": "unknown_scale"}
+    assert refused == {"watchtower": "unknown_scale", "warning_signboard": "unknown_scale",
+                       "kenney_modular_detail_ac_a": "low_detail", "kenney_modular_detail_ac_b": "low_detail"}
     expected = [LibraryReject(ident, "kit_only") for ident in kit]
     expected += [LibraryReject(ident, "interior") for ident in interior]
     expected += [LibraryReject(ident, reason) for ident, reason in refused.items()]

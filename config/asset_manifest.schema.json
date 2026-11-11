@@ -66,8 +66,8 @@
             "enum": [0, 90, 180, 270]
           },
           "refused": {
-            "description": "Optional. The library never loads this row and reports the value as the reject reason. unknown_scale: the file has no reliable size in metres.",
-            "enum": ["unknown_scale"]
+            "description": "Optional. The library never loads this row and reports the value as the reject reason. unknown_scale: the file has no reliable size in metres. low_detail: a flat-colour model that reads as untextured beside the textured library (headset, 10 November 2026).",
+            "enum": ["unknown_scale", "low_detail"]
           },
           "tags": {
             "type": "array",

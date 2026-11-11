@@ -450,7 +450,7 @@ Plan D3, [ADR-017 amendment of 9 November 2026](decisions/ADR-017-playable-core.
 
 Pending on the headset (A2) and in Unity (A3), not done; the option stays off until they pass:
 - Unity 2021.3.23f1: bench_madrid r300 with the ring off and on, `task unity -- --bake draft` and `--bake final`; `scene_report.json` triangles and bake seconds with `tools/unity/report_timings.py`; lightmap pages within the estimate.
-- Quest 3, the same map off and on: at least 72 fps median on the route, at most 150 draws in views A and B (OVR Metrics), triangles within 220 000.
+- Quest 3, the same map off and on: at least 72 fps median on the route, at most 150 draws in views A and B (OVR Metrics), triangles within 250 000 (the official maximum, the target since 10 November 2026; 220 000 before).
 - How the ring reads from the core wall and through the fog (which still starts at `core_radius_m`): atlas seams or a smeared window treatment on the mid walls, roof forms against the sky.
 - The seams core / mid / scenic: brightness steps between baked core walls and mid walls, with `build.scenic_out_of_lightmap` on and off; popping or z-fighting where tiers share a cell.
 - No player or bot reaches a mid building: the perimeter wall stays on the core edge, no ladder, lift or spawn outside the core.

@@ -56,6 +56,7 @@ from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb, read_glb
 from onward_generator.generation.scene import GeneratedScene
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
+from onward_generator.overgrow.atlas import ATLAS_PREFIX, PROP_ATLAS_EXTRA, Cell, remap_nodes
 from onward_generator.overgrow.constants import MAX_ADDED_TRIS
 from onward_generator.overgrow.dressing import load_spawns
 from onward_generator.overgrow.fit import check_scene, collider_mesh, grounds_from_scene
@@ -212,8 +213,10 @@ def _overgrow_triangles(nodes: Sequence[Node]) -> int:
     return sum(prim.mesh.triangle_count for node in nodes if node.name.startswith("overgrow/") for prim in node.primitives)
 
 
-def _scene_assets(materials: Mapping[str, Material]) -> frozenset[str]:
-    return frozenset(name.removeprefix("prop_").split("__")[0] for name in materials if name.startswith("prop_"))
+def _scene_assets(materials: Mapping[str, Material], cells: Mapping[str, Any] | None = None) -> frozenset[str]:
+    """Assets already in the scene: their own ``prop_<id>`` material, or their cell in the shared prop atlas."""
+    names = [*(name for name in materials if not name.startswith(ATLAS_PREFIX)), *(cells or {})]
+    return frozenset(name.removeprefix("prop_").split("__")[0] for name in names if name.startswith("prop_"))
 
 
 def _check_inputs(detail: Path, manifest: Mapping[str, Any], layout: Mapping[str, Any], out: Path, overwrite: bool) -> None:
@@ -339,7 +342,8 @@ def apply_cover(
     before_report = build_report(islands, base.partition.buildings, colliders, layout)
     targets = open_sight_points(islands, base.partition.buildings, colliders, layout)
     props, _library_rejects = read_library(library)
-    candidates, refused = cover_props(fitted_props(props), catalogue_licences(library), _scene_assets(materials))
+    candidates, refused = cover_props(fitted_props(props), catalogue_licences(library),
+                                      _scene_assets(materials, read_glb(visual_bytes)[0].get("extras", {}).get(PROP_ATLAS_EXTRA)))
     overgrown = _overgrow_triangles(nodes)
     caps = Caps(props=MAX_COVER_PROPS if max_props is None else max_props, triangles=triangle_cap(overgrown))
     site = build_site(base, manifest, layout, layout_file, scene_file, collision_path)
@@ -418,12 +422,16 @@ def _write(
             shutil.copyfile(detail / name, work / name)
         return []
     visual_nodes, collider_nodes, images = _nodes(plan.placements)
+    extras = read_glb(visual_bytes)[0].get("extras")
+    # A cover prop already in the shared atlas (overgrow) joins it: no new material, no new draw per cell.
+    cells = {name: Cell.from_list(values) for name, values in ((extras or {}).get(PROP_ATLAS_EXTRA) or {}).items()}
+    visual_nodes = remap_nodes(visual_nodes, cells)
+    images = {name: data for name, data in images.items() if name not in cells}
     all_images = images_by_material(visual_bytes)
     all_images.update(images)
     merged = dict(materials)
     for name in images:
         merged.setdefault(name, PROP_MATERIAL)
-    extras = read_glb(visual_bytes)[0].get("extras")
     atomic_write_bytes(work / "scene_visual.glb", build_glb(
         [*nodes, *visual_nodes], merged, extras=extras, repeat_images=all_images, preserve_uvs=True,
     ))

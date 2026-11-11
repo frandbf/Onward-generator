@@ -98,10 +98,10 @@ def test_see_through_window_opens_the_wall_and_keeps_a_pane() -> None:
         room_window_cuts(layout, [segment]), glass_penetrations(layout, [segment]),
     )
     assert built.defects == 0
-    # The window keeps its pane; the shopfront is shop glass, open with no pane.
+    # The window and the shopfront (shop glass) each keep a #glass pane: a shot crosses it, a body does not.
     assert [h.back for h in layout.holes] == [GLASS_VIEW, SHOP_GLASS, "glass_dark"]
-    assert (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (1, 1)
-    assert len(built.glass_colliders) == 1
+    assert (built.spec["glass_panes"], built.spec["open_shopfronts"]) == (2, 1)
+    assert len(built.glass_colliders) == 2
     concrete = [mesh for _name, mesh in built.colliders]
 
     def at(s: float, z: float, depth: float) -> np.ndarray:
@@ -125,7 +125,9 @@ def test_see_through_window_opens_the_wall_and_keeps_a_pane() -> None:
     assert any(_inside(mesh, sill) for mesh in concrete) and not any(_inside(mesh, sill) for mesh in built.glass_colliders)
     assert any(_inside(mesh, pier) for mesh in concrete) and not any(_inside(mesh, pier) for mesh in built.glass_colliders)
     shop_point = at(19.2, 1.2, thickness / 2)
-    assert not any(_inside(mesh, shop_point) for mesh in [*concrete, *built.glass_colliders])
+    # The shopfront has no concrete (a shot crosses) and one #glass pane (a body does not).
+    assert not any(_inside(mesh, shop_point) for mesh in concrete)
+    assert sum(_inside(mesh, shop_point) for mesh in built.glass_colliders) == 1
     door_point = at(11.6, 1.0, thickness / 2)
     assert not any(_inside(mesh, door_point) for mesh in [*concrete, *built.glass_colliders])
     blocked = at(7.6, 16.7, thickness / 2)

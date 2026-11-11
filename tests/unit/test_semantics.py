@@ -1,0 +1,282 @@
+"""The semantic block of every library row (overgrow/semantics.py, ADR-036)."""
+
+from __future__ import annotations
+
+import json
+import struct
+from pathlib import Path
+
+import pytest
+
+from onward_generator.overgrow.semantics import HOME, KINDS, MOUNTS, SETTINGS, SHOPS, annotate, counts, describe, is_part, opaque, words_of
+
+ESTIMATED = "name, catalogue, role, placement and size (overgrow/semantics.py)"
+
+
+def _row(asset_id: str, size: tuple[float, float, float], placement: str = "interior", **extra: object) -> dict[str, object]:
+    length, depth, height = size
+    return {"id": asset_id, "file": f"{asset_id}.glb", "placement": placement, "role": "shelf", "category": "furniture",
+            "length_m": length, "depth_m": depth, "height_m": height, **extra}
+
+
+def _glb(materials: list[dict[str, object]]) -> bytes:
+    body = json.dumps({"asset": {"version": "2.0"}, "materials": materials}).encode()
+    body += b" " * (-len(body) % 4)
+    blob = b"\0" * 4
+    return (struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(body) + 8 + len(blob)) + struct.pack("<I4s", len(body), b"JSON") + body
+            + struct.pack("<I4s", len(blob), b"BIN\0") + blob)
+
+
+@pytest.mark.parametrize(("asset_id", "size", "kind", "mount", "settings"), [
+    ("kenney_furniture_chair", (0.5, 0.5, 0.9), "chair", "seat", ["dining", "bar", "bakery", "office", "kitchen"]),
+    # The model's own name names its room, which wins over the kind's rooms.
+    ("kenney_furniture_bathroomCabinet", (0.6, 0.4, 0.8), "cabinet_low", "wall", ["bathroom"]),
+    # A table lamp is a lamp, not a table; a tall floor lamp goes in a corner.
+    ("kenney_furniture_lampSquareTable", (0.3, 0.3, 0.5), "lamp_small", "table_top", ["living", "bedroom", "office"]),
+    ("kenney_furniture_lampSquareFloor", (0.4, 0.4, 1.6), "lamp_floor", "corner", ["living", "bedroom"]),
+    ("kenney_food_croissant", (0.2, 0.1, 0.08), "decor_food", "counter_top", ["bakery", "bar", "grocery", "kitchen", "dining"]),
+])
+def test_a_row_is_described_from_its_name_and_size(asset_id, size, kind, mount, settings) -> None:
+    block = describe(_row(asset_id, size), "kenney_furniture")
+    assert block == {"kind": kind, "mount": mount, "settings": settings, "origin": "estimated", "basis": ESTIMATED}
+    assert block["kind"] in KINDS and block["mount"] in MOUNTS and set(block["settings"]) <= set(SETTINGS)
+
+
+def test_a_low_shelf_and_a_low_table_change_kind_by_height() -> None:
+    assert describe(_row("qt_home_Bookshelf", (1.0, 0.4, 1.0)), "c")["kind"] == "shelf_low"
+    assert describe(_row("qt_home_Bookshelf", (1.0, 0.4, 2.0)), "c")["kind"] == "shelf_tall"
+    low = describe(_row("qt_home_Table", (1.0, 0.6, 0.45)), "c")
+    assert (low["kind"], low["mount"], low["settings"]) == ("coffee_table", "center", ["living"])
+
+
+def test_a_large_kind_too_small_to_be_one_is_a_part_and_never_placed() -> None:
+    block = describe(_row("qt_home_Table", (0.3, 0.3, 0.3)), "c")
+    assert block["mount"] == "none" and block.get("part") is True
+
+
+def test_a_split_child_named_as_a_part_is_a_part() -> None:
+    row = _row("as_kitchen_Cabinet_handle", (0.1, 0.02, 0.02), source_prefab="Kitchen.fbx#Cabinet_Handle")
+    assert is_part(row, words_of("Cabinet_Handle"))
+    assert describe(row, "asset_store_kitchen")["mount"] == "none"
+    assert not is_part(_row("x", (1, 1, 1), source_prefab="Sofa.fbx"), words_of("handle"))  # no split, no part
+
+
+def test_a_hung_model_is_never_placed_on_the_floor() -> None:
+    block = describe(_row("qt_home_WallShelf", (0.8, 0.2, 0.3)), "c")
+    assert block["mount"] == "none" and block["hung"] is True
+
+
+def test_an_outdoor_row_gets_a_street_setting() -> None:
+    block = describe(_row("qt_city_Bench", (1.5, 0.5, 0.8), placement="street"), "quaternius_city_props")
+    assert block["kind"] == "bench" and block["mount"] == "ground" and block["settings"] == ["street"]
+
+
+def test_a_reviewed_block_is_kept_as_it_is() -> None:
+    reviewed = {"origin": "reviewed", "kind": "bed", "mount": "wall", "settings": ["bedroom"]}
+    assert describe({"id": "qt_home_Table", "semantic": reviewed}, "c") == reviewed
+
+
+def test_an_as_id_is_read_from_its_file_name_only() -> None:
+    # Every row of a kitchen pack carries "kitchen" in its id; the model's own name is its file name.
+    row = _row("as_kitchen_pack_Chair", (0.5, 0.5, 0.9)) | {"file": "Chair.glb"}
+    assert describe(row, "asset_store_kitchen_pack")["kind"] == "chair"
+
+
+def test_words_of_splits_camel_case_digits_and_separators() -> None:
+    assert words_of("kitchenFridgeSmall_02") == {"kitchen", "fridge", "small", "kitchenfridge", "fridgesmall"}
+    assert words_of("Shelves") == {"shelves", "shelv", "shelve"}
+
+
+def test_opaque_reads_every_material_alpha_mode() -> None:
+    assert opaque(_glb([{"name": "a"}, {"name": "b", "alphaMode": "OPAQUE"}]))
+    assert not opaque(_glb([{"name": "a"}, {"name": "b", "alphaMode": "BLEND"}]))
+    assert opaque(_glb([]))
+
+
+def test_annotate_marks_a_transparent_model_unplaceable_and_keeps_other_rows(tmp_path: Path) -> None:
+    (tmp_path / "glass.glb").write_bytes(_glb([{"alphaMode": "BLEND"}]))
+    (tmp_path / "chair.glb").write_bytes(_glb([{}]))
+    document = {"catalogue": "c", "assets": [_row("glass", (0.5, 0.5, 0.9)) | {"file": "glass.glb"},
+                                            _row("kenney_furniture_chair", (0.5, 0.5, 0.9)) | {"file": "chair.glb"},
+                                            "not a row"]}
+    rows = annotate(document, "kenney_furniture", tmp_path)["assets"]
+    assert rows[0]["semantic"]["mount"] == "none" and rows[0]["semantic"]["transparent"] is True
+    assert rows[1]["semantic"]["kind"] == "chair" and "transparent" not in rows[1]["semantic"]
+    assert rows[2] == "not a row"
+    # Without a folder no GLB is opened.
+    assert "transparent" not in annotate(document, "kenney_furniture")["assets"][0]["semantic"]
+
+
+def test_counts_tally_kinds() -> None:
+    rows = [{"semantic": {"kind": "chair"}}, {"semantic": {"kind": "chair"}}, {"semantic": {"kind": "bed"}}]
+    assert list(counts([*rows, {}]).items()) == [("chair", 2), ("bed", 1), ("none", 1)]
+
+
+def test_the_shop_and_home_settings_are_settings() -> None:
+    assert set(SHOPS) <= set(SETTINGS) and set(HOME) <= set(SETTINGS)
+
+
+def _tracked_manifests() -> list[Path]:
+    from onward_generator.detail.config import REPO_ROOT
+
+    # The local Asset Store catalogues are gitignored, one machine's own (ADR-035).
+    return [m for m in sorted((REPO_ROOT / "assets").glob("*/manifest.json")) if not m.parent.name.startswith("asset_store_")]
+
+
+def test_every_tracked_manifest_is_what_annotate_writes() -> None:
+    """The committed blocks are the rules' output, row for row: ``tools/describe_library.py --check`` as a test. A rule
+    change that moves a block must come with the rewritten manifests."""
+    for manifest in _tracked_manifests():
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        assert annotate(document, manifest.parent.name, manifest.parent) == document, manifest.parent.name
+
+
+def test_every_tracked_manifest_row_has_a_valid_semantic_block() -> None:
+    for manifest in _tracked_manifests():
+        for row in json.loads(manifest.read_text(encoding="utf-8")).get("assets") or []:
+            block = row["semantic"]
+            assert block["kind"] in KINDS and block["mount"] in MOUNTS, (manifest.parent.name, row["id"])
+            assert set(block["settings"]) <= set(SETTINGS), (manifest.parent.name, row["id"])
+            assert block["origin"] in ("estimated", "reviewed")
+
+
+# ---- each rule on its own (mutation coverage, ADR-036) -----------------------------------------------------------
+
+
+def _as(file_stem: str, size: tuple[float, float, float], **extra: object) -> dict[str, object]:
+    """A local row: its words are its file name's only."""
+    return _row(f"as_pack_{file_stem}", size, **extra) | {"file": f"{file_stem}.glb"}
+
+
+@pytest.mark.parametrize(("stem", "settings"), [
+    ("bedroomChair", ["bedroom"]), ("kidsChair", ["bedroom"]), ("nurseryChair", ["bedroom"]), ("diningChair", ["dining"]),
+    ("livingChair", ["living"]), ("officeChair", ["office"]), ("bathroomChair", ["bathroom"]), ("kitchenChair", ["kitchen"]),
+])
+def test_the_room_a_name_names_wins(stem, settings) -> None:
+    assert describe(_as(stem, (0.5, 0.5, 0.9)), "c")["settings"] == settings
+
+
+@pytest.mark.parametrize(("stem", "size", "kind", "mount"), [
+    ("Table", (0.45, 0.3, 0.3), "other", "none"),        # at SMALL_M a large kind is a part
+    ("Table", (0.46, 0.3, 0.75), "table", "center"),
+    ("Chair", (0.4, 0.4, 0.4), "chair", "seat"),         # a small chair stays a chair
+    ("Bookshelf", (1.0, 0.4, 1.2), "shelf_tall", "wall"),  # 1.2 m is tall
+    ("Table", (1.0, 0.6, 0.55), "table", "center"),      # 0.55 m is a table, under it a coffee table
+    ("Lamp", (0.3, 0.3, 1.0), "lamp_small", "table_top"),
+    ("LampFloor", (0.3, 0.3, 1.0), "lamp_floor", "corner"),  # "floor" and at least 1 m: a floor lamp
+    ("LampFloor", (0.3, 0.3, 0.99), "lamp_small", "table_top"),
+    ("Floorlamp", (0.3, 0.3, 0.5), "lamp_floor", "corner"),  # named one whatever its size
+    ("Tablelamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),
+    ("Desklamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),
+    ("deskLamp", (0.3, 0.3, 0.5), "lamp_small", "table_top"),  # a desk lamp is not a desk
+    ("Houseplant", (0.5, 0.5, 2.0), "plant_pot", "corner"),
+    ("Chair", (0.4, 0.4, 0.0), "chair", "seat"),
+])
+def test_size_rules(stem, size, kind, mount) -> None:
+    block = describe(_as(stem, size), "c")
+    assert (block["kind"], block["mount"]) == (kind, mount)
+
+
+def test_a_missing_size_reads_as_zero() -> None:
+    no_height = {k: v for k, v in _as("Bookshelf", (1.0, 0.4, 1.0)).items() if k != "height_m"}
+    assert describe(no_height, "c")["kind"] == "shelf_tall"  # no height: never made low
+    for missing in ("length_m", "depth_m"):
+        row = {k: v for k, v in _as("Table", (0.3, 0.3, 0.3)).items() if k != missing}
+        assert describe(row, "c").get("part") is True, missing  # what is left is small
+
+
+def test_a_part_block_is_whole() -> None:
+    row = _as("Cabinet", (0.6, 0.4, 0.8), source_prefab="Kit.fbx#Cabinet")
+    assert describe(row, "asset_store_kitchen_set")["mount"] == "wall"  # a whole cabinet child is no part
+    part = _as("Cabinet_Base", (0.6, 0.4, 0.8), source_prefab="Kit.fbx#Cabinet")  # the name says base
+    assert {k: v for k, v in describe(part, "asset_store_kitchen_set").items() if k not in ("origin", "basis")} == {
+        "kind": "other", "mount": "none", "settings": ["kitchen"], "part": True}
+
+
+@pytest.mark.parametrize(("row", "kind", "mount", "settings"), [
+    ({"role": "nothing"}, "other", "ground", ["street"]),
+    ({"role": "x", "anchor": "facade"}, "other", "facade", ["street"]),
+    ({"role": "x", "placement": "wall_mounted"}, "other", "facade", ["street"]),
+    ({"role": "x", "placement": "kit_only"}, "kit_piece", "none", ["street"]),
+    ({"role": "x", "surfaces": ["carriageway"], "placement": "ground_cover"}, "other", "ground", ["street"]),
+    ({"role": "x", "placement": "street"}, "other", "ground", ["street"]),
+    ({"role": "x", "placement": "kerb"}, "other", "ground", ["street"]),
+    ({"role": "x", "surfaces": ["empty_lot"], "placement": "ground_cover"}, "other", "ground", ["yard"]),
+    ({"role": "x", "surfaces": ["park"], "placement": "ground_cover"}, "other", "ground", ["park"]),
+    ({"role": "crate", "category": "waste", "placement": "ground_cover"}, "crate", "ground", ["industrial"]),
+    ({"role": "pallet", "category": "structures", "placement": "ground_cover"}, "pallet", "ground", ["industrial"]),
+    ({"role": "dumpster", "category": "waste", "placement": "ground_cover"}, "dumpster", "ground", ["industrial"]),
+    ({"role": "x", "category": "vegetation", "placement": "ground_cover"}, "other", "ground", ["park"]),
+])
+def test_outdoor_rules(row, kind, mount, settings) -> None:
+    full = {"id": "zz_q", "file": "q.glb", "length_m": 1, "depth_m": 1, "height_m": 1, "placement": "street"} | row
+    block = describe(full, "c")
+    assert (block["kind"], block["mount"], block["settings"]) == (kind, mount, settings)
+
+
+def test_a_shared_id_adds_its_words_to_the_file_name_and_a_local_id_does_not() -> None:
+    from onward_generator.overgrow.semantics import _stem
+
+    assert describe({"id": "kenney_furniture_chair", "file": "model.glb", "placement": "interior", "length_m": 0.5, "depth_m": 0.5,
+                     "height_m": 0.9}, "c")["kind"] == "chair"
+    assert describe({"id": "qt_home_Chair", "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 0.9}, "c")["kind"] == "chair"
+    # A local id names its pack (here "sofa"); only its file name counts.
+    local = describe({"id": "as_sofa_pack_Thing", "file": "Thing.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.0,
+                      "height_m": 0.8}, "asset_store_sofa_pack")
+    assert local["kind"] == "other"
+    # A lowercase model name defeats the prefix strip: the "as_" rule alone keeps the pack's word out.
+    lower = describe({"id": "as_sofa_pack_thing", "file": "thing.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.0,
+                      "height_m": 0.8}, "asset_store_sofa_pack")
+    assert lower["kind"] == "other"
+    # The file's own name, whatever its folder and dots.
+    for file in ("deep/dir.v2/Chair.glb", "Chair.lod0.glb"):
+        assert describe({"id": "as_x_Thing", "file": file, "placement": "interior", "length_m": 0.5, "depth_m": 0.5, "height_m": 0.9},
+                        "c")["kind"] == "chair", file
+    assert describe({"id": "as_x_Thing", "file": "Bed.Chair.glb", "placement": "interior", "length_m": 2.0, "depth_m": 1.6,
+                     "height_m": 0.5}, "c")["kind"] == "bed"  # the words before the last dot: "bed" comes first in the rules
+    assert [_stem(i) for i in ("as_pack_name_Chair", "qt_home_Chair", "kenney_furniture_chair", "plain_Id")] == [
+        "Chair", "Chair", "chair", "plain_Id"]
+
+
+@pytest.mark.parametrize(("source", "file_stem", "part"), [
+    ("Kit.fbx#Door", "Cabinet", True),               # the child's name says door
+    ("Kit.fbx#Handle#Cabinet", "Cabinet", False),    # the last segment is the child
+    ("Kit.fbx#Cabinet", "Cabinet_Handle", True),
+    ("Kit.fbx#Cabinet", "Cabinet_Countertop", True),
+    ("Kit.fbx#Cabinet", "Counterbase", True),
+    ("Kit.fbx#Cabinet", "Cabinet", False),
+])
+def test_is_part_reads_the_child_and_the_model_name(source, file_stem, part) -> None:
+    row = _as(file_stem, (0.6, 0.4, 0.8), source_prefab=source)
+    assert is_part(row, words_of(file_stem)) is part
+
+
+def test_annotate_reads_past_a_non_row_and_keeps_a_reviewed_block_of_a_transparent_model(tmp_path: Path) -> None:
+    (tmp_path / "glass.glb").write_bytes(_glb([{"alphaMode": "BLEND"}]))
+    reviewed = {"origin": "reviewed", "kind": "display_case", "mount": "wall", "settings": ["shop"]}
+    document = {"assets": ["not a row", _row("glass", (0.5, 0.5, 0.9)) | {"file": "glass.glb", "semantic": reviewed},
+                           _row("other", (0.5, 0.5, 0.9)) | {"file": "glass.glb"}]}
+    rows = annotate(document, "c", tmp_path)["assets"]
+    assert rows[1]["semantic"] == reviewed and rows[2]["semantic"]["transparent"] is True
+
+
+def test_counts_break_ties_by_kind_name() -> None:
+    rows = [{"semantic": {"kind": "sofa"}}, {"semantic": {"kind": "bed"}}, {"semantic": {"kind": "chair"}}, {"semantic": {"kind": "chair"}}]
+    assert list(counts(rows)) == ["chair", "bed", "sofa"]
+
+
+def test_plural_words_get_their_singular_above_a_length() -> None:
+    assert words_of("boxes") == {"boxes", "boxe", "box"}
+    assert words_of("axes") == {"axes", "axe"}
+    assert words_of("cats") == {"cats", "cat"}
+    assert words_of("bus") == {"bus"}
+
+
+@pytest.mark.parametrize(("row", "settings"), [
+    ({"surfaces": ["carriageway", "park"], "placement": "ground_cover"}, ["street", "park"]),
+    ({"surfaces": ["park"], "placement": "street"}, ["street", "park"]),
+    ({"surfaces": ["park"], "placement": "kerb"}, ["street", "park"]),
+])
+def test_the_street_setting_comes_with_the_others(row, settings) -> None:
+    full = {"id": "zz_q", "file": "q.glb", "role": "x", "length_m": 1, "depth_m": 1, "height_m": 1} | row
+    assert describe(full, "c")["settings"] == settings
