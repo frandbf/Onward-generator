@@ -104,7 +104,9 @@ def test_storing_a_time_of_day_says_whether_it_changed(tmp_path: Path) -> None:
 def test_the_adapter_reads_the_time_of_day_and_lights_the_lamps() -> None:
     """No Unity here: this pins the wiring. Whether it compiles and looks right is the headset checklist of ADR-026."""
     source = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
-    assert "LevelDescriptor.ETimeOfDay.Day,\n" not in source and "TimeOfDayOf(pkg.Layout)," in source
+    assert "LevelDescriptor.ETimeOfDay.Day,\n" not in source and "TimeOfDayFor(pkg)," in source
+    # The launcher's time of day is the layout's, unless a headset test package overrides it (plan E2, ADR-037).
+    assert ": TimeOfDayOf(pkg.Layout);" in source
     assert "ApplyNight(light, pkg.Layout);" in source and "AddStreetLights(pkg.Layout);" in source
     assert "public float[] street_lights_m;" in source
     assert "public float[] audio_roof_wind_m;" in source and "layout.audio_roof_wind_m" in source
