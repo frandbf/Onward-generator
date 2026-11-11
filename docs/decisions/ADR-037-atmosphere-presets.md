@@ -16,7 +16,8 @@ Status: proposed · 10 November 2026. Plan E0 of [the atmosphere plan](../plans/
 3. **Day only.** The map, `run` and `export package` refuse a preset other than `neutral` on a night map, and refuse turning a map with a preset to night, as a storm is refused by day (ADR-028).
 4. **Numbers in a versioned file.** `config/atmosphere.default.json`, validated by `config/atmosphere.schema.json`, holds `golden_hour` and `overcast`. `neutral` is not a preset of the file. The adapter will read numbers in a `lighting` block of `adapter_options.json` and never a preset name.
 5. **Byte for byte.** Without a preset the package is the one of before, `package_id` included. With one, `export package` writes `atmosphere` in `adapter_options.json` (it enters `package_id`) and an `atmosphere` block in the manifest: `preset`, `origin: generated` and `applied`, the parts of the preset the package carries. In E0 `applied` is empty.
-6. **Starting values from the references, not from the proposal.** The sun starts at 30° for `golden_hour`: a 12° to 18° sun casts shadows three to five times the height of a building and hides an enemy in the shade.
+6. **Fixed views to compare bakes (plan E1).** `run_export.sh PACKAGE views` renders four eye-level PNGs of the baked scene from cameras that depend only on the layout, so the packages of one map can be compared without the headset. It writes under `build/views/` and never into the package.
+7. **Starting values from the references, not from the proposal.** The sun starts at 30° for `golden_hour`: a 12° to 18° sun casts shadows three to five times the height of a building and hides an enemy in the shade.
 
 ## Rejected alternatives
 

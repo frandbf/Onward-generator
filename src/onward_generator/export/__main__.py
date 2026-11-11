@@ -7,6 +7,7 @@ import sys
 from collections.abc import Sequence
 
 from onward_generator.export.package import ExportError, build_package, verify_package
+from onward_generator.export.views import ViewError, write_views
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037, proposed)")  # pragma: no mutate: help text
     v = sub.add_parser("verify", help="re-hash every file of a package")
     v.add_argument("package")
+    w = sub.add_parser("views", help="write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1)")
+    w.add_argument("package")
     return parser
 
 
@@ -29,6 +32,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
         return 0 if exc.code in (0, None) else 2
+    if args.command == "views":
+        try:
+            path = write_views(args.package)
+        except ViewError as exc:
+            print(f"export views: {exc}", file=sys.stderr)
+            return 1
+        print(f"views written to {path}")
+        print(f"next: tools/unity/onward_adapter/run_export.sh {path.parents[2]} views")
+        return 0
     if args.command == "verify":
         problems = verify_package(args.package)
         for p in problems:

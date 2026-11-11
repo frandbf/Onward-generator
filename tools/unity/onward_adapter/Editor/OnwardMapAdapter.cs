@@ -933,6 +933,92 @@ namespace OnwardGenerator
             });
         }
 
+        // Plan E1 (ADR-037): fixed eye-level views of the baked scene, from build/views/views.json, which
+        // `onward-generator export views` writes. The scene is opened, not saved; the package is not touched.
+        [Serializable]
+        private class CaptureView
+        {
+            public string name;
+            public float[] position_m;
+            public float heading_deg;
+            public float pitch_deg;
+        }
+
+        [Serializable]
+        private class CaptureViewList
+        {
+            public string schema;
+            public int width;
+            public int height;
+            public float fov_deg;
+            public CaptureView[] views;
+        }
+
+        [MenuItem("ONWARD Murcia Export/3. Capture fixed views of the baked scene")]
+        public static void CaptureViews() => CaptureViewsFromPaths(RequireArg("-exportPackage"));
+
+        public static void CaptureViewsFromPaths(string packageDir)
+        {
+            RunGuarded(() =>
+            {
+                Package pkg = LoadPackage(packageDir);
+                string dir = Path.Combine(packageDir, "build", "views");
+                string listPath = Path.Combine(dir, "views.json");
+                if (!File.Exists(listPath))
+                    throw new FileNotFoundException($"{listPath} not found; run onward-generator export views first.");
+                var list = JsonUtility.FromJson<CaptureViewList>(File.ReadAllText(listPath));
+                if (list == null || list.schema != "onward_generator.capture_views" || list.views == null || list.views.Length == 0)
+                    throw new InvalidDataException($"{listPath} is not a capture_views document with views");
+                if (list.width <= 0 || list.height <= 0 || list.fov_deg <= 0f || list.fov_deg >= 180f)
+                    throw new InvalidDataException($"{listPath}: width, height and fov_deg are out of range");
+                string scenePath = ScenePath(pkg);
+                if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+                    throw new FileNotFoundException($"Scene {scenePath} not found; run the scene step first.");
+                ApplyQuestGraphics();
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                EnsureLightmapsAssigned();
+                var cameraObject = new GameObject("OnwardCaptureCamera");
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.fieldOfView = list.fov_deg;
+                camera.nearClipPlane = 0.1f;
+                camera.farClipPlane = pkg.Layout.far_clip_m > 0f ? pkg.Layout.far_clip_m : 1000f;
+                camera.clearFlags = CameraClearFlags.Skybox;
+                var target = new RenderTexture(list.width, list.height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
+                var image = new Texture2D(list.width, list.height, TextureFormat.RGB24, false);
+                camera.targetTexture = target;
+                try
+                {
+                    foreach (CaptureView view in list.views)
+                    {
+                        if (string.IsNullOrEmpty(view.name) || view.name.Any(c => !(char.IsLower(c) || char.IsDigit(c) || c == '_')))
+                            throw new InvalidDataException($"{listPath}: view name '{view.name}' must be lower case letters, digits and _");
+                        if (view.position_m == null || view.position_m.Length != 3)
+                            throw new InvalidDataException($"{listPath}: view {view.name} needs position_m [x, y, z]");
+                        string png = Path.Combine(dir, view.name + ".png");
+                        if (File.Exists(png))
+                            throw new IOException($"{png} exists; captures are never overwritten");
+                        // Local (x east, y north, z up) to Unity (x, z, y); heading is clockwise from north, Unity's yaw.
+                        cameraObject.transform.position = new Vector3(view.position_m[0], view.position_m[2], view.position_m[1]);
+                        cameraObject.transform.rotation = Quaternion.Euler(-view.pitch_deg, view.heading_deg, 0f);
+                        camera.Render();
+                        RenderTexture.active = target;
+                        image.ReadPixels(new Rect(0, 0, list.width, list.height), 0, 0);
+                        image.Apply();
+                        File.WriteAllBytes(png, image.EncodeToPNG());
+                        Debug.Log($"{LogPrefix} View {view.name}: {png}");
+                    }
+                }
+                finally
+                {
+                    RenderTexture.active = null;
+                    camera.targetTexture = null;
+                    UnityEngine.Object.DestroyImmediate(cameraObject);
+                    target.Release();
+                }
+                Debug.Log($"{LogPrefix} Captured {list.views.Length} views in {dir}.");
+            });
+        }
+
         [MenuItem("ONWARD Murcia Export/2. Build for Quest via Onward Launcher")]
         public static void BuildQuestViaLauncher() =>
             BuildLauncherFromPaths(RequireArg("-exportPackage"), RequireArg("-exportOut"), OptionalArg("-exportReport"));
