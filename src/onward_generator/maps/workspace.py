@@ -41,6 +41,12 @@ _TEXELS_DEFAULT = 10.0
 # on Barcelona Sarria (r 150) the whole map was played, at 381 k triangles and up to 376 draws a view.
 CORE_RADIUS_DEFAULT_M = 150.0
 CORE_RING_DEFAULT_M = 50.0
+# The area of a new map (plan Q2b): a 150 m half-side keeps the default core at 100 m. The former 400 m, with its
+# 150 m core, gave 421 689 visual triangles on Rue Mouffetard and 430 774 in Unity on Madrid Sol workshop (r 300),
+# against the official 250 000. With 150 m Madrid Sol arena and Barcelona Sarria bake within it (244 834, 232 488);
+# Rue Mouffetard, denser, was still 252 179 with its 100 m core and fitted at 95 m (plan Q2a's estimate says so).
+RADIUS_DEFAULT_M = 150.0
+MARGIN_DEFAULT_M = 30.0
 _TEXELS_MAX = 40.0
 # Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
 _FOG_BAND_M = 600.0
@@ -63,8 +69,8 @@ def create_map(
     name: str,
     latitude: float,
     longitude: float,
-    radius_m: float = 400.0,
-    margin_m: float = 30.0,
+    radius_m: float = RADIUS_DEFAULT_M,
+    margin_m: float = MARGIN_DEFAULT_M,
     seed: int | None = None,
     description: str | None = None,
     brief: str | None = None,

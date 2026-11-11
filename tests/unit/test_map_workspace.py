@@ -160,11 +160,19 @@ def test_cli_create_and_show(tmp_path: Path, capsys: pytest.CaptureFixture[str],
     assert main(["map", "create", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", "--radius-m", "300",
                  "--core-radius-m", "120"]) == 0
     assert json.loads((tmp_path / "maps" / "lorca" / "map.json").read_text(encoding="utf-8"))["core_radius_m"] == 120.0
+    # Plan Q2b: without --radius-m a map is 150 m with a 30 m margin, so its core is 100 m.
+    assert main(["map", "create", "--name", "Totana", "--lat", "37.768", "--lon", "-1.501"]) == 0
+    totana = json.loads((tmp_path / "maps" / "totana" / "map.json").read_text(encoding="utf-8"))
+    assert (totana["radius_m"], totana["margin_m"], totana["core_radius_m"]) == (150.0, 30.0, 100.0)
+    assert main(["map", "create", "--name", "Mula", "--lat", "38.042", "--lon", "-1.490", "--margin-m", "12.5"]) == 0
+    assert json.loads((tmp_path / "maps" / "mula" / "map.json").read_text(encoding="utf-8"))["margin_m"] == 12.5
     capsys.readouterr()
     with pytest.raises(SystemExit):
         main(["map", "create", "--help"])
     assert ("--core-radius-m CORE_RADIUS_M half-side of the playable core square, metres (default: 50 m inside the "
-            "radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)") in " ".join(capsys.readouterr().out.split())
+            "radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)") in (shown := " ".join(capsys.readouterr().out.split()))
+    assert "--radius-m RADIUS_M half-side of the square area, metres (50–1500, default 150)" in shown
+    assert "--margin-m MARGIN_M inclusion margin around the square, metres" in shown
 
 
 def _polygon(ring: tuple[tuple[float, float], ...]):

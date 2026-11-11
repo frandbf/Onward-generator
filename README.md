@@ -90,7 +90,7 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 
 | Option | What it does |
 | --- | --- |
-| `--radius-m 50…1500` | Half the side of the square, in metres (default 400). |
+| `--radius-m 50…1500` | Half the side of the square, in metres (default 150, which leaves a 100 m playable core). On an existing map `run` uses the radius in `map.json`. |
 | `--core-radius-m` | The playable core. Past it, buildings are plain shells, so large maps stay inside the Quest budget ([ADR-017](docs/decisions/ADR-017-playable-core.md)). |
 | `--lightmap-texels-per-m` | Lighting detail, at most 40 (default 10). Higher looks sharper and bakes much longer. |
 | `--brief "…"` | How the streets should feel. Ask for an abandoned city and cars and barrels block the road. |

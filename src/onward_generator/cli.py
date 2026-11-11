@@ -231,8 +231,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--name", required=True, help="Quest card title, 1–80 characters; the id and maps/<id> folder are the slug of this name")
     run.add_argument("--lat", required=True, type=float, help="centre latitude, WGS84 degrees")
     run.add_argument("--lon", required=True, type=float, help="centre longitude, WGS84 degrees")
-    run.add_argument("--radius-m", type=float, default=400.0, help="half-side of the square area, metres (50–1500)")
-    run.add_argument("--margin-m", type=float, default=30.0, help="inclusion margin around the square, metres")
+    run.add_argument("--radius-m", type=float, default=None, help="half-side of the square area, metres (50–1500; default: what map.json has, else 150)")  # pragma: no mutate: help text; argparse's default for an option is already None
+    run.add_argument("--margin-m", type=float, default=None, help="inclusion margin around the square, metres (default: what map.json has, else 30)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--seed", type=int, default=None)
     run.add_argument("--description", default=None)
     run.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
