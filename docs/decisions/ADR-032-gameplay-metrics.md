@@ -76,6 +76,30 @@ Every map meets the 15 % contact proposal with the option on. Murcia still has 2
 
 **Pending (not done):** the playtest (plan 4.2) with the option on and off; on the headset, a `bench_murcia` package with the option on: the four spawn blocks and the Uplink load, Assault, Uplink and Hunt validate in the SDK (Unity 2021.3.23f1 build without validator errors), bots patrol from their starts, no spawn stands in or against a prop, the spawns are on the baked navmesh, ≥ 72 fps and ≤ 150 draws at views A and B with the option off and on, and no long open sightline joins the two teams' spawns; in Unity (A3), the Uplink is within 0.25 m of the baked mesh and the `Navmesh islands` log line still shows the origin island holding most of the area.
 
+## C6 amendment, 11 November 2026 (proposed) — both teams move, and routes come first within 15 %
+
+Plan Q1 ([2026-11-11-generation-quality](../plans/2026-11-11-generation-quality.md)). On Rue Mouffetard the report gave one distinct route. All eight candidates of the rule above put the defenders at the far end of the attackers' own street, because the attackers never moved and `_defender_candidates` takes the farthest grid points first, 10 m apart. The choice also put the contact difference before the routes, so a candidate with more routes lost to one a little better balanced.
+
+**Candidates.** After those of the rule above, every pair of `_spread_sites` at least 30 m apart, attackers at the first of the pair, each with the same two Uplinks. `_spread_sites` starts at today's attackers and adds, up to `K_SITES` = 6 in all, the grid point whose block fits farthest from the sites already kept (ties to the north, then east), while that distance is at least `SITE_GAP_M` = 20 m. That gives at most 15 more pairs, 38 candidates in all. A placement may now move the attackers: `_check_placement` asks that both blocks fit the spawn area and stand 30 m apart, and `gameplay_layout` takes the attackers, and the map quad with them, from the placement.
+
+**Choice.** Admissibility does not change: valid, at least candidate 0's routes, at most its contact difference, an overlap at most max(candidate 0's, 50 %). Among admissible candidates within `CONTACT_TOLERANCE_PCT` = 15 % (this ADR's proposed balance threshold) the most distinct routes win, then the lower difference, overlap and index. Past 15 % the order of the rule above stands: the difference first. Stage 2 now scores every candidate no less balanced than candidate 0, because within the tolerance a less balanced one with more routes can win.
+
+**A warning.** When the report of the layout exists and its headline has exactly 1 distinct route, `run` warns after the layout stage: `1 distinct route between the spawns: the map plays as a corridor (ADR-032)`. 0 is the report's own `no path` status, not this warning.
+
+**Measured** (Docker on an Apple M4 Pro, `choose_placement` on the maps' current inputs; estimated on the 2D navmesh, not a playtest). Candidate 0 against the chosen candidate:
+
+| Map | Candidates | Contact difference | Distinct routes | Max overlap | `choose_placement` |
+| --- | --- | --- | --- | --- | --- |
+| Rue Mouffetard r150, core 95 | 36 | 8.11 → 0.17 % | 1 → 1 | 0 → 0 % | 1.4 s |
+| Madrid Sol arena r150, core 100 | 32 | 19.18 → 1.85 % | 3 → 5 | 45.74 → 41.78 % | 3.3 s |
+| Madrid Sol workshop r300, core 150 | 34 | 13.98 → 0.15 % | 2 → 6 | 34.70 → 43.64 % | 7.1 s |
+| B1 Madrid r500 | 28 | 5.74 → 0.45 % | 3 → 5 | 41.41 → 45.48 % | 7.6 s |
+| Barcelona Sarria night r150 | 34 | 41.37 → 0.28 % | 2 → 2 | 40.42 → 26.92 % | 2.0 s |
+
+With the rule above, Madrid Sol arena's layout reported 3 routes at 2.46 %. Rue Mouffetard keeps one route whatever the placement: of 33 pairs of spread sites none gave two. The ADR-015 navmesh walks the sidewalks and the crossings, not the carriageway, and the market street is the only walkable link from north to south in its core. Its unreachable ground is mostly closed courtyards, not a broken street network. `choose_placement` takes up to 7.6 s on the larger maps, inside this ADR's 10 s per map for the layout stage on its own, though the stage with the report may pass it on a 500 m map.
+
+**Pending:** the same as the rule above, the playtest and a headset session, now also with moved attackers. The option stays off by default.
+
 ## C7 amendment (proposed) — cover on the long open sightlines
 
 Status: proposed · 8 November 2026 (plan increment C7). It stays proposed with the rest of this ADR until the playtest of plan 4.2 and the headset session below. The playtest does not block the code, so C7 ships behind an option that is off by default. Cites [ADR-010](ADR-010-overgrow-ai-plan.md) (code, not a model, reserves the passage; AI stays optional: C7 is rules only), [ADR-017](ADR-017-playable-core.md) (cover stands inside the playable core, never on the wall), [ADR-031](ADR-031-shop-furnishing.md) (1.2 m walk width and the connectivity test by erosion, reused here on the street) and [ADR-005](ADR-005-quest-performance.md) (the triangle and draw budget). It amends none of them.

@@ -858,8 +858,13 @@ def test_a_placement_sets_the_defenders_and_the_uplink() -> None:
     assert {k: v for k, v in moved.items() if k not in ("defenders", "uplink_m")} == {k: v for k, v in today.items() if k not in ("defenders", "uplink_m")}
     # Exactly 30 m apart is enough.
     assert gameplay_layout(base, manifest, placement=Placement(a, (30.0, 0.0), (15.0, 0.0), a, a))["defenders"]["centre_m"] == [30.0, 0.0]  # type: ignore[arg-type]
+    # Since the C6 amendment of 11 November 2026 the attackers may move too, and the map quad follows them.
+    shifted = gameplay_layout(base, manifest, placement=Placement((-40.0, 40.0), (40.0, -40.0), (10.0, -10.0), a, a))  # type: ignore[arg-type]
+    assert shifted["attackers"]["centre_m"] == [-40.0, 40.0] and shifted["attackers"]["points_m"][0] == {"x": -41.8, "y": 39.4}
+    assert shifted["map_quad_m"] == [-40.0, 37.6]
     for placement, message in (
-        (Placement((1.0, 0.0), (40.0, -40.0), (10.0, -10.0), a, a), r"^the placement moves the attackers to \(1.0, 0.0\); they stay at \(0.0, 0.0\)$"),
+        (Placement((57.0, 0.0), (-40.0, 0.0), (10.0, 0.0), a, a), r"^the placed attackers' block does not fit the free area$"),
+        (Placement((-29.9, 0.0), (0.0, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
         (Placement(a, (29.9, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
         (Placement(a, (57.0, 0.0), (10.0, 0.0), a, a), r"^the placed defenders' block does not fit the free area$"),
         (Placement(a, (40.0, -40.0), (58.6, 0.0), a, a), r"^the placed Uplink is not on the free area$"),
@@ -908,7 +913,11 @@ def test_the_balanced_uplink_stays_on_the_spawn_area_and_the_island_of_today(sit
     assert choice.chosen.diff_pct is not None and choice.baseline.diff_pct is not None
     assert choice.chosen.diff_pct < choice.baseline.diff_pct
     today = gameplay_layout(base, manifest, farthest=True)  # type: ignore[arg-type]
-    assert list(placement.attack) == today["attackers"]["centre_m"]
+    # The attackers may move (C6 amendment of 11 November 2026), but their block stays on the spawn area.
+    from onward_generator.perf.layout import _block, _fits, _spawn_site
+
+    area, _ = _spawn_site(base, manifest)  # type: ignore[arg-type]
+    assert _fits(area, _block(*placement.attack)) and _fits(area, _block(*placement.defend))
     inside = playable_area(manifest)
     free = free_ground(base, [])  # type: ignore[arg-type]
     if inside is not None:
@@ -940,6 +949,7 @@ def test_candidates_whose_second_blocks_do_not_fit_are_invalid(monkeypatch: pyte
         return real(parts, a, d, uplink)
 
     monkeypatch.setattr(layout, "_second_blocks", first_only)
+    monkeypatch.setattr(layout, "K_SITES", 1)  # the candidates of the first C6 rule only: no pair of spread sites
     placement, choice = layout.choose_placement(base, manifest)  # type: ignore[arg-type]
     assert placement is None and choice.index == 0
     assert choice.reason == "kept the current placement: no candidate beats the current placement"
@@ -1071,11 +1081,55 @@ def test_choose_placement_scores_on_the_navmesh_of_the_core(monkeypatch: pytest.
 def test_an_even_uplink_on_the_midpoint_is_not_a_second_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
     import onward_generator.perf.layout as layout
 
+    monkeypatch.setattr(layout, "K_SITES", 1)  # the candidates of the first C6 rule only
     monkeypatch.setattr(layout, "_even_uplink", lambda graph, area, node, placement: placement.uplink)
     placement, choice = layout.choose_placement(_plaza_base(), {"objects": []})  # type: ignore[arg-type]
     assert placement is None and choice.count == 4
     monkeypatch.setattr(layout, "_even_uplink", lambda graph, area, node, placement: None)
     assert layout.choose_placement(_plaza_base(), {"objects": []})[1].count == 4  # type: ignore[arg-type]
+
+
+def test_spread_sites_start_at_the_attackers_and_take_the_farthest_fitting_point() -> None:
+    from onward_generator.perf.layout import K_SITES, SITE_GAP_M, _block, _fits, _spawn_site, _spread_sites
+
+    assert (K_SITES, SITE_GAP_M) == (6, 20.0)
+    area, a = _spawn_site(_plaza_base(), {"objects": []})  # type: ignore[arg-type]
+    sites = _spread_sites(area, a, 6)
+    assert sites[0] == a and len(sites) == 6
+    assert all(_fits(area, _block(*p)) for p in sites)
+    assert all(math.dist(p, q) >= SITE_GAP_M for i, p in enumerate(sites) for q in sites[i + 1:])
+    # The plaza is the square from -60 to 60 less 1.5 m: the second site is a far corner, ties to the north, then east.
+    assert sites[1] == (56.0, 56.0)
+    assert _spread_sites(area, a, 1) == [a] and _spread_sites(area, a, 2) == sites[:2]
+    # A narrow strip has room for few sites 20 m apart.
+    strip, s0 = _spawn_site(_plaza_base(box(-60, -60, 60, -48)), {"objects": []})  # type: ignore[arg-type]
+    few = _spread_sites(strip, s0, 6)
+    assert 2 <= len(few) < 6 and all(math.dist(p, q) >= SITE_GAP_M for i, p in enumerate(few) for q in few[i + 1:])
+
+
+def test_candidates_pair_the_spread_sites_and_move_the_attackers(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.perf.layout as layout
+    from onward_generator.gameplay import placement as P
+
+    seen: list[list] = []
+    real = P.score_all
+
+    def spy(graph: object, candidates: list, **kw: object) -> list:
+        seen.append(list(candidates))
+        return real(graph, candidates, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(P, "score_all", spy)
+    base = _plaza_base()
+    area, a = layout._spawn_site(base, {"objects": []})  # type: ignore[arg-type]
+    layout.choose_placement(base, {"objects": []})  # type: ignore[arg-type]
+    placed = [c for c in seen[0] if not isinstance(c, str)]
+    sites = layout._spread_sites(area, a, layout.K_SITES)
+    moved = {(c.attack, c.defend) for c in placed if c.attack != a}
+    expected = {(s, t) for i, s in enumerate(sites) for t in sites[i + 1:] if s != a and math.dist(s, t) >= TEAM_SEPARATION_M}
+    assert moved == expected and moved
+    # The first candidates are the first rule's: the attackers where gameplay_layout puts them.
+    assert seen[0][0].attack == a
+    assert all(math.dist(c.attack, c.defend) >= TEAM_SEPARATION_M for c in placed)
 
 
 def _fake_base(*pieces: BaseGeometry) -> object:

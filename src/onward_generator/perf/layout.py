@@ -232,7 +232,7 @@ def gameplay_layout(
         uplink = _midpoint_on(area, a, b)
     else:
         _check_placement(area, a, placement)
-        b, uplink = placement.defend, placement.uplink
+        a, b, uplink = placement.attack, placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
     quad = (a[0], a[1] - SPAWN_SPACING_M * 2)
@@ -303,12 +303,12 @@ def _defender_candidates(area: BaseGeometry, a: tuple[float, float], limit: int)
 
 
 def _check_placement(area: BaseGeometry, a: tuple[float, float], placement: Placement) -> None:
-    """The rules of ``gameplay_layout`` for a placement chosen elsewhere: same attackers, defenders' block inside and 30 m away, Uplink on the area."""
-    if placement.attack != a:
-        raise LayoutError(f"the placement moves the attackers to {placement.attack}; they stay at {a}")
-    if not _fits(area, _block(*placement.defend)):
-        raise LayoutError("the placed defenders' block does not fit the free area")
-    gap = math.dist(a, placement.defend)
+    """The rules of ``gameplay_layout`` for a placement chosen elsewhere: both blocks inside the area and 30 m apart,
+    the Uplink on the area. The attackers may leave ``a`` since the C6 amendment of 11 November 2026."""
+    for team, centre in (("attackers", placement.attack), ("defenders", placement.defend)):
+        if not _fits(area, _block(*centre)):
+            raise LayoutError(f"the placed {team}' block does not fit the free area")
+    gap = math.dist(placement.attack, placement.defend)
     if gap < TEAM_SEPARATION_M:
         raise LayoutError(f"the placement holds the teams only {gap:.1f} m apart; {TEAM_SEPARATION_M:.0f} m are required")
     if not area.covers(Point(placement.uplink)):
@@ -317,6 +317,11 @@ def _check_placement(area: BaseGeometry, a: tuple[float, float], placement: Plac
 
 K_DEFENDERS = 4
 """Defenders' positions tried by ``choose_placement``; each gets two Uplinks, so at most 8 candidates (plan C6)."""
+K_SITES = 6
+"""Spawn sites spread over the spawn area (``_spread_sites``); every pair 30 m apart is a candidate with both teams
+moved (C6 amendment of 11 November 2026). Six sites give at most 15 pairs, 30 candidates."""
+SITE_GAP_M = 20.0
+"""The least distance between two spread sites: closer ones would give near-duplicate candidates."""
 
 
 def _objective_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tuple[BaseGeometry, list[BaseGeometry]]:
@@ -343,7 +348,9 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     Candidates, in this order: for each of up to ``K_DEFENDERS`` defenders' positions (``_defender_candidates``),
     the Uplink at the teams' midpoint (today's rule), then the Uplink at the node of the shortest
     attackers-to-defenders path where both teams' distances differ least, kept inside the spawn area.
-    The attackers stay where ``gameplay_layout`` puts them, and the second blocks come from
+    Then, since the C6 amendment of 11 November 2026, every pair of ``_spread_sites`` at least
+    ``TEAM_SEPARATION_M`` apart, attackers at the first of the pair, with the same two Uplinks. The first
+    candidates keep the attackers where ``gameplay_layout`` puts them; the second blocks always come from
     ``extra_spawn_block`` as in ``playable_layout``. Candidate 0 is today's placement. A candidate whose
     second blocks do not fit is invalid. The placement is None when candidate 0 is kept, with the reason
     in the choice. Raises LayoutError only where ``gameplay_layout`` does. Estimated from the 2D navmesh,
@@ -357,20 +364,46 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     graph = nav_graph(nav_islands(base, playable_area(detail_manifest)))
     attack_node = snap(graph, a)
     candidates: list[Placement | str] = []
-    for d in _defender_candidates(area, a, K_DEFENDERS):
-        midpoint = _placed(parts, a, d, _midpoint_on(area, a, d))
+    defenders = _defender_candidates(area, a, K_DEFENDERS)
+    sites = _spread_sites(area, a, K_SITES)
+    pairs = [(a, d) for d in defenders]
+    pairs += [(s, t) for i, s in enumerate(sites) for t in sites[i + 1:]
+              if math.dist(s, t) >= TEAM_SEPARATION_M and (s, t) not in pairs]
+    for attack, d in pairs:
+        midpoint = _placed(parts, attack, d, _midpoint_on(area, attack, d))
         candidates.append(midpoint)
         if isinstance(midpoint, str):
             continue
-        even = _even_uplink(graph, area, attack_node, midpoint)
+        even = _even_uplink(graph, area, attack_node if attack == a else snap(graph, attack), midpoint)
         if even is not None and even != midpoint.uplink:
-            candidates.append(_placed(parts, a, d, even))
+            candidates.append(_placed(parts, attack, d, even))
     choice = select(score_all(graph, candidates))
     if choice.reason is not None:
         return None, choice
     chosen = candidates[choice.index]
     assert isinstance(chosen, Placement)  # pragma: no mutate: an admissible candidate is a placement
     return chosen, choice
+
+
+def _spread_sites(area: BaseGeometry, a: tuple[float, float], limit: int) -> list[tuple[float, float]]:
+    """``a`` and then, up to ``limit`` in all, the grid point whose block fits farthest from the sites already kept
+    (farthest-point sampling, ties to the north, then east), while that distance is at least ``SITE_GAP_M``.
+
+    On Rue Mouffetard every defenders' candidate of ``_defender_candidates`` lay at the far end of the attackers'
+    street; sites spread over the whole spawn area let both teams move."""
+    minx, miny, maxx, maxy = area.bounds
+    x0, y0 = math.floor(minx / GRID_M) * GRID_M, math.floor(miny / GRID_M) * GRID_M
+    columns = int((maxx - minx) / GRID_M) + 2  # pragma: no mutate: more columns only add points past the bounds, where no block fits
+    rows = int((maxy - miny) / GRID_M) + 2  # pragma: no mutate: more rows only add points past the bounds, where no block fits
+    points = [(x0 + GRID_M * i, y0 + GRID_M * j) for j in range(rows) for i in range(columns)]
+    fitting = [p for p in points if _fits(area, _block(*p))]
+    sites = [a]
+    while len(sites) < limit and fitting:
+        gap, site = max(((min(math.dist(p, s) for s in sites), p) for p in fitting), key=lambda t: (t[0], t[1][1], t[1][0]))
+        if gap < SITE_GAP_M:
+            break
+        sites.append(site)
+    return sites
 
 
 def _placed(parts: Sequence[BaseGeometry], a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> Placement | str:

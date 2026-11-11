@@ -42,9 +42,10 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 ### Q1. Rutas del Hunt y forma del mapa
 
 - El informe de juego (ADR-032) da `routes 1`: el mapa se juega como un solo pasillo. En el horneado, Unity descartó `Route_27` y otra ruta («no navmesh path from the previous point»).
-- Al diagnosticar los accesos medimos que el suelo alcanzable desde el Uplink es 9 377 m² de los 16 503 m² del núcleo: un 43 % del suelo del núcleo no se alcanza a pie.
+- ~~Al diagnosticar los accesos medimos que un 43 % del suelo del núcleo no se alcanza a pie.~~ Corregido el 11 de noviembre: esa cifra restaba también la calzada. Lo que no se alcanza son sobre todo patios interiores de manzanas cerradas, y la red de calles está conectada.
 - **Hacer:** averiguar qué parte cierra el paso (pasos más estrechos que un jugador, cruces que faltan, manzanas que tocan el muro) y si `routes 1` es real o un efecto de la rejilla de 2 m del informe. Que `run` avise cuando el suelo alcanzable caiga por debajo de un umbral.
 - **Aceptación:** al menos 2 rutas distintas en Mouffetard, y ninguna ruta de bot descartada en Unity.
+- **Hecho (Q1a, enmienda C6 de ADR-032 del 11 de noviembre):** `balanced_spawns` también mueve a los atacantes, y con diferencia de contacto ≤ 15 % gana el candidato con más rutas. Madrid Sol arena pasa de 3 a 5 rutas y Madrid Sol workshop de 2 a 6. `run` avisa cuando un mapa queda con 1 ruta. Mouffetard sigue con 1: es un pasillo real, porque la calle del mercado es la única conexión norte–sur que pisan los bots, y eso lo cambia la elección del centro y del núcleo, no la colocación. Las rutas de bots que Unity descarta quedan pendientes.
 
 ### Q2. Presupuesto de triángulos y radio por defecto
 
