@@ -297,6 +297,24 @@ def test_layout(tmp_path: Path) -> None:
     assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1")
 
 
+def test_layout_counts_the_climbs_and_warns_when_there_is_none(tmp_path: Path) -> None:
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [{}, {}], "lifts": [{}]})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 2  lifts 1")
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [], "lifts": [{}]})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 0  lifts 1")
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [{}], "lifts": []})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 1  lifts 0")
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [], "lifts": []})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport(
+        "routes 1  ladders 0  lifts 0", alerts=(Alert("warning", "no ladder or lift reaches a roof (ADR-029)", 1),),
+    )
+    # A layout from before ADR-029 has neither key, and one key alone is not counted.
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": []})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1")
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "lifts": []})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1")
+
+
 def test_layout_adds_the_gameplay_headline_of_this_layout_only(tmp_path: Path) -> None:
     from onward_generator.io import sha256_file
 

@@ -36,6 +36,7 @@ from onward_generator.perf.layout import (
     _routes,
     _sample_route,
     ammo_points,
+    climb_ground,
     climb_keep_out,
     component_holding,
     extra_spawn_block,
@@ -783,6 +784,19 @@ def test_reachable_ground_stays_inside_the_core() -> None:
     partition = build_partition(box(-200, -200, 200, 200), [], [street], [], config)
     ground = reachable_ground(_base(street, partition=partition), {"core": {"half_side_m": 60.0}}, (0.0, -20.0))  # type: ignore[arg-type]
     assert ground.covers(Point(59.5, 0)) and not ground.covers(Point(59.7, 0))  # the core less its 0.4 m wall
+
+
+def test_climb_ground_keeps_the_carriageway_and_leaves_out_the_urban_elements() -> None:
+    """ADR-029: a ladder's foot or a cabin may stand on the carriageway a player walks across, not on a bench."""
+    config = load_generation_config()
+    street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 6.0, "config_default")
+    partition = build_partition(box(-50, -50, 50, 50), [], [street], [], config)
+    base = _base(street, partition=partition)
+    bench = {"type": "urban_element", "position_m": [20.0, 10.0]}
+    ground = climb_ground(base, {"objects": [bench]}, (0.0, -20.0))  # type: ignore[arg-type]
+    assert ground.covers(Point(0, 0)) and ground.covers(Point(0, 2.9))  # the carriageway
+    assert not ground.intersects(Point(20, 10).buffer(0.95)) and ground.covers(Point(21.1, 10))  # the bench's 1 m circle
+    assert climb_ground(base, {}, (0.0, -20.0)).covers(Point(20, 10))  # type: ignore[arg-type]
 
 
 # ------------------------------------------------------------------------------------------------ balanced spawns (plan C6)

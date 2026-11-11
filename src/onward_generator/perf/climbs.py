@@ -23,10 +23,15 @@ from onward_generator.tiers import CORE, core_of
 LADDERS_MAX = 3
 LIFTS_MAX = 3
 """The request caps ladders so as not to saturate a map. A lift pair is two choke points, so it gets the same cap."""
-LADDER_MAX_STOREYS = 3
+LADDER_MAX_STOREYS = 4
+"""Raised from 3 with the interiors allowed (ADR-029 amendment of 11 November 2026): on Rue Mouffetard every candidate
+roof had 3 to 6 storeys and an interior, so no map of a dense centre got a ladder."""
 LIFT_MIN_STOREYS = 3
-LIFT_MAX_STOREYS = 6
-"""A higher roof overlooks every street of the map, and a lift would carry a squad there in seconds."""
+LIFT_MAX_STOREYS = 7
+"""A higher roof overlooks every street of the map, and a lift would carry a squad there in seconds.
+
+Raised from 6 (ADR-029 amendment of 11 November 2026): 67 of the 192 core buildings of Madrid Sol have 7 storeys, so
+a 7-storey roof stands among its neighbours rather than over them, and with 6 the map had no lift at all."""
 STOREY_M = 3.0
 """To read a measured height as storeys."""
 FLAT_ROOFS = ("flat", "flat_parapet")
@@ -229,10 +234,18 @@ def place_climbs(
     attackers: Sequence[tuple[float, float]],
     defenders: Sequence[tuple[float, float]],
 ) -> dict[str, list[dict[str, float]]]:
-    """``ladders`` on buildings of at most 3 storeys with no interior, ``lifts`` on buildings of 3 to 6.
+    """``ladders`` on buildings of at most 4 storeys, ``lifts`` on buildings of 3 to 7.
 
-    A building gets one access. Ladders choose first because their rule is the narrower one.
+    A building gets one access. Lifts choose first: a cabin and its apron need far more street than a ladder's foot,
+    so on Rue Mouffetard the ladders took the one roof a lift fitted and the map had no lift. An interior does not
+    keep a ladder away; one whose stair reaches the roof keeps both away (``_candidates``).
+
+    ``free`` is widened by ``COVER_TOLERANCE_M`` before a foot or a street cabin is checked against it: the layout
+    hands over an intersection of two grounds, whose edge along a facade lands a few micrometres off the wall, and
+    ``covers`` is exact. On Rue Mouffetard every foot missed the ground by less than 0.000001 m2, and neither it nor
+    Madrid Sol got a ladder or a lift.
     """
+    free = free.buffer(COVER_TOLERANCE_M)
     spawns = [*attackers, *defenders]
     ranked = sorted(
         (row for row in _candidates(detail_manifest, footprints) if min(row[2].distance(Point(p)) for p in spawns) >= SPAWN_CLEAR_M),
@@ -246,17 +259,17 @@ def place_climbs(
         return all(math.dist((site["x"], site["y"]), (other["x"], other["y"])) >= ACCESS_SPACING_M for other in (*ladders, *lifts))
 
     for source, building, footprint in ranked:
-        if len(ladders) < LADDERS_MAX and storeys(building) <= LADDER_MAX_STOREYS and not building.get("interior"):
+        if len(lifts) < LIFTS_MAX and LIFT_MIN_STOREYS <= storeys(building) <= LIFT_MAX_STOREYS:
+            site = lift_on(footprint, free, keep_out, float(building["height"]["height_m"]), _parapet_thickness(building))
+            if site is not None and spaced(site):
+                lifts.append(site)
+                used.add(source)
+    for source, building, footprint in ranked:
+        if source not in used and len(ladders) < LADDERS_MAX and storeys(building) <= LADDER_MAX_STOREYS:
             site = ladder_on(footprint, free, keep_out, float(building["height"]["height_m"]), float(building["roof"].get("parapet_m", 0.0)),
                              _parapet_thickness(building))
             if site is not None and spaced(site):
                 ladders.append(site)
-                used.add(source)
-    for source, building, footprint in ranked:
-        if source not in used and len(lifts) < LIFTS_MAX and LIFT_MIN_STOREYS <= storeys(building) <= LIFT_MAX_STOREYS:
-            site = lift_on(footprint, free, keep_out, float(building["height"]["height_m"]), _parapet_thickness(building))
-            if site is not None and spaced(site):
-                lifts.append(site)
     return {"ladders": ladders, "lifts": lifts}
 
 
