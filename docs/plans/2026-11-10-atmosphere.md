@@ -188,6 +188,7 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - Checklist por preset: sombras legibles, cielo coherente, niebla, fps ≥ 72 de mediana, draws ≤ 150 en las vistas A y B, memoria ≤ 1 GB.
 - El ADR-037 pasa a *accepted* solo con esa sesión.
 - **Decisión:** qué entra de la [parte 2](2026-11-10-atmosphere-advanced.md) y en qué orden.
+- **Estado (11 de noviembre de 2026).** El usuario probó en el casco cada incremento, de `pkg_18` a `pkg_21`, y los vio bien. Falta la parte medida (fps, draws, memoria), así que el ADR-037 sigue *proposed*.
 
 ---
 

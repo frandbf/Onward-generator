@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from onward_generator.export.lightmap import LightmapBudgetError, in_core, page_budget_density, pages_at_least, summarise
+from onward_generator.export.lightmap import LightmapBudgetError, estimate, in_core, page_budget_density, pages_at_least, summarise
 from onward_generator.export.package import _core_lightmap
 
 ADAPTER_CS = Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs"
@@ -46,8 +46,9 @@ def test_the_page_budget_counts_the_core_and_keeps_its_ratio() -> None:
     assert lowered == 8.75
     assert pages_at_least(areas, lowered, max_size=64, core=CORE, cell_m=100.0) == 1
     assert pages_at_least(areas, lowered + 0.25, max_size=64, core=CORE, cell_m=100.0) == 2
+    # 120 m² each at the 4 texels/m floor: 3840 texels fit one page alone, 5683 do not with the core.
     with pytest.raises(LightmapBudgetError, match=r"needs at least 2 pages at 4 texels/m"):
-        page_budget_density({((0, 0), "plaster"): 150.0, ((3, 0), "plaster"): 150.0}, requested=10.0, pages_max=1,
+        page_budget_density({((0, 0), "plaster"): 120.0, ((3, 0), "plaster"): 120.0}, requested=10.0, pages_max=0,
                             max_size=64, core=CORE, cell_m=100.0)
 
 
@@ -59,6 +60,7 @@ def test_the_core_option_is_the_preset_density_over_the_card() -> None:
     detail = {"core": {"half_side_m": 100.0}}
     assert _core_lightmap("golden_hour", _options(), detail) == {"half_side_m": 100.0, "scale": 1.4}
     assert _core_lightmap("golden_hour", _options(texels=12.0), detail) == {"half_side_m": 100.0, "scale": 1.1667}
+    assert _core_lightmap("golden_hour", _options(cell=1.0), detail) == {"half_side_m": 100.0, "scale": 1.4}
 
 
 @pytest.mark.parametrize(("preset", "options", "detail"), [
@@ -87,3 +89,24 @@ def test_the_adapter_scales_the_combined_core_cells() -> None:
     body = source.split("private static float CoreScale(", 1)[1].split("\n        }\n", 1)[0]
     assert "if (core == null || core.scale <= 1f || core.half_side_m <= 0f) return 1f;" in body
     assert "-h <= cx * cellM && (cx + 1) * cellM <= h && -h <= cz * cellM && (cz + 1) * cellM <= h" in body
+
+
+def test_a_one_metre_cell_can_be_in_the_core() -> None:
+    assert in_core((0, 0), CORE, 1.0) is True
+
+
+def test_without_a_cell_size_the_core_counts_nothing() -> None:
+    """The default cell_m 0 means no combining: no cell is in the core, as the adapter does without cells."""
+    areas = {((0, 0), "plaster"): 18.0, ((3, 0), "plaster"): 18.0}
+    assert summarise(areas, texels_per_m=10.0, max_size=64, core=CORE) == summarise(areas, texels_per_m=10.0, max_size=64)
+    assert pages_at_least(areas, 10.0, max_size=64, core=CORE) == 1
+    assert page_budget_density(areas, requested=10.0, pages_max=1, max_size=64, core=CORE) == 10.0
+
+
+def test_the_estimate_of_a_glb_counts_the_core() -> None:
+    from tests.unit.test_export_lightmap import _floor, _glb
+
+    visual = _glb(("plaster_cream", _floor(10.0, 20.0, 10.0, 20.0)), ("plaster_ochre", _floor(310.0, 320.0, 10.0, 20.0)))
+    plain = estimate(visual, texels_per_m=10.0, max_size=2048, cell_m=100.0)
+    boosted = estimate(visual, texels_per_m=10.0, max_size=2048, cell_m=100.0, core=CORE)
+    assert plain["texels"] == 20000 and boosted["texels"] == 10000 + 19600

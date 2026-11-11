@@ -77,6 +77,8 @@ def test_no_palette_keeps_the_atlas_byte_for_byte_and_a_palette_darkens_it(small
     walls = sorted(json.loads(small_table.read_text(encoding="utf-8"))["styles"]["mediterranean"]["atlas"]["walls"])
     before = sum(_luma(tuple(COLORS[w][:3])) for w in walls) / len(walls)
     assert block["wall_luminance_before"] == round(before, 4)
+    after = sum(_luma(palette_tint(COLORS[w], GOLDEN)) for w in walls) / len(walls)
+    assert block["wall_luminance_after"] == round(after, 4)
     plain_px = np.asarray(Image.open(io.BytesIO(plain.png)).convert("L"), dtype=float)
     toned_px = np.asarray(Image.open(io.BytesIO(toned.png)).convert("L"), dtype=float)
     assert toned_px.mean() < plain_px.mean()
@@ -99,3 +101,30 @@ def test_the_materials_stage_carries_the_preset_of_map_json(tmp_path: Path) -> N
     argv = list(materials_command(tmp_path / "golden" / "data" / "processed" / "scene_dress").argv)
     assert argv[-4:-2] == ["--atmosphere", "golden_hour"]
     assert "--atmosphere" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+
+
+def test_a_dark_channel_takes_the_linear_piece_both_ways() -> None:
+    """0.002 is under both knees: 0.025840 in sRGB, halved by the cap of 0.5 to 0.012920, back to 0.001."""
+    capped = palette_tint((1.0, 0.002, 0.0), WallPalette("p", 1.0, 0.0, 0.5))
+    assert capped == (0.214041, 0.001, 0.0)
+
+
+def test_the_cap_divides_by_the_peak() -> None:
+    """A peak of 0.906 (0.8 linear) capped at 0.5: every channel scales by 0.5 / 0.906."""
+    capped = palette_tint((0.8, 0.3, 0.1), WallPalette("p", 1.0, 0.0, 0.5))
+    assert capped == (0.214041, 0.084654, 0.030858)
+
+
+def test_green_and_blue_are_rounded_to_six_decimals() -> None:
+    tint = palette_tint((0.5, 0.123456789, 0.987654321), WallPalette("p", 1.0, 0.0, 1.0))
+    assert tint == (0.5, 0.123457, 0.987654)
+
+
+def test_an_alpha_channel_is_left_out() -> None:
+    assert palette_tint((0.5, 0.3, 0.1, 1.0), WallPalette("p", 1.0, 0.0, 0.5)) == palette_tint((0.5, 0.3, 0.1), WallPalette("p", 1.0, 0.0, 0.5))
+
+
+def test_the_luminance_after_is_rounded_to_four_decimals(small_table: Path) -> None:  # noqa: F811 - the fixture
+    """overcast's 5 % at 0.85 gives a mean of 0.62129..., which four decimals round to 0.6213."""
+    toned = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, palette=WallPalette("overcast", 1.2, 0.05, 0.85))
+    assert toned.report["atmosphere"]["wall_luminance_after"] == 0.6213

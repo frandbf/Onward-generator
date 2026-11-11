@@ -17,6 +17,7 @@ import pytest
 from onward_generator.cli import main
 from onward_generator.config.validation import REPO_ROOT
 from onward_generator.export import package as package_module
+from onward_generator.export.lightmap import estimate
 from onward_generator.export.package import ExportError, build_package
 from onward_generator.export.sun import StreetSun, street_sun
 from onward_generator.maps.workspace import (
@@ -369,3 +370,56 @@ def test_a_preset_leaves_a_map_without_fog_without_fog(inputs: tuple[Path, Path,
     plain = json.loads((_package(inputs, tmp_path / "plain").directory / "adapter_options.json").read_bytes())
     tinted = json.loads((golden.directory / "adapter_options.json").read_bytes())
     assert (tinted["fog_start_m"], tinted["fog_end_m"]) == (plain["fog_start_m"], plain["fog_end_m"])
+
+
+def _cored(inputs: tuple[Path, Path, Path], tmp_path: Path) -> Path:
+    """The fixture's detail folder with a 100 m core, so the four cells around the origin are inside it."""
+    detail = tmp_path / "detail"
+    shutil.copytree(inputs[0], detail)
+    document = json.loads((detail / "scene_detail.json").read_bytes())
+    (detail / "scene_detail.json").write_text(json.dumps({**document, "core": {**(document.get("core") or {}), "half_side_m": 100.0}}), encoding="utf-8")
+    return detail
+
+
+def _card(tmp_path: Path, **build: object) -> Path:
+    card = json.loads((REPO_ROOT / "config" / "export" / "onward.default.json").read_bytes())
+    card["build"].update(build)
+    path = tmp_path / f"card_{len(list(tmp_path.glob('card_*')))}.json"
+    path.write_text(json.dumps(card), encoding="utf-8")
+    return path
+
+
+def test_a_preset_bakes_the_core_denser_and_the_estimate_counts_it(inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    """Plan E10 without a page budget: the option, the applied list, the manifest block and the estimate."""
+    detail = _cored(inputs, tmp_path)
+    plain = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "plain", now=FIXED_NOW)
+    golden = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "golden", now=FIXED_NOW, atmosphere="golden_hour")
+    options = json.loads((golden.directory / "adapter_options.json").read_bytes())
+    assert options["lightmap_core"] == {"half_side_m": 100.0, "scale": 1.4}
+    assert "lightmap_core" not in json.loads((plain.directory / "adapter_options.json").read_bytes())
+    assert golden.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao", "fog", "lightmap_core"]
+    assert golden.manifest["atmosphere"]["lightmap_core"] == {"half_side_m": 100.0, "scale": 1.4}
+    visual = (detail / "scene_visual.glb").read_bytes()
+    expected = estimate(visual, texels_per_m=float(options["lightmap_texels_per_m"]), max_size=int(options["lightmap_max_size"]),
+                        cell_m=float(options["combine_cell_m"]), scales=options["lightmap_scales"], core=options["lightmap_core"])
+    assert golden.manifest["lightmap_estimate"] == expected
+    assert golden.manifest["lightmap_estimate"]["texels"] > plain.manifest["lightmap_estimate"]["texels"]
+
+
+def test_the_page_budget_counts_the_core(inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    """A budget of the pages the map needs without the core: with the core the budget lowers the density."""
+    detail = _cored(inputs, tmp_path)
+    plain = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "plain", now=FIXED_NOW)
+    pages = plain.manifest["lightmap_estimate"]["pages_at_least"]
+    golden_free = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "free", now=FIXED_NOW, atmosphere="golden_hour")
+    assert golden_free.manifest["lightmap_estimate"]["pages_at_least"] > pages
+    card = _card(tmp_path, lightmap_pages_max=pages)
+    golden = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "golden", now=FIXED_NOW, atmosphere="golden_hour", export_config=card)
+    options = json.loads((golden.directory / "adapter_options.json").read_bytes())
+    found = golden.manifest["lightmap_estimate"]
+    assert options["lightmap_texels_per_m"] < 10.0 and found["texels_per_m"] == options["lightmap_texels_per_m"]
+    assert found["pages_at_least"] <= pages and found["lightmap_pages_max"] == pages
+    expected = estimate((detail / "scene_visual.glb").read_bytes(), texels_per_m=options["lightmap_texels_per_m"],
+                        max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
+                        scales=options["lightmap_scales"], core=options["lightmap_core"])
+    assert {k: found[k] for k in expected} == expected

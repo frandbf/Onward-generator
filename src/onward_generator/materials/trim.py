@@ -496,11 +496,15 @@ def _luminance(tint: Sequence[float]) -> float:
 
 
 def _linear_to_srgb(value: float) -> float:
-    return value * 12.92 if value <= 0.0031308 else 1.055 * value ** (1.0 / 2.4) - 0.055
+    if value <= 0.0031308:  # pragma: no mutate: the two pieces meet at the knee; < and <= differ below the six-decimal rounding
+        return value * 12.92
+    return 1.055 * value ** (1.0 / 2.4) - 0.055
 
 
 def _srgb_to_linear(value: float) -> float:
-    return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+    if value <= 0.04045:  # pragma: no mutate: the two pieces meet at the knee; < and <= differ below the six-decimal rounding
+        return value / 12.92
+    return ((value + 0.055) / 1.055) ** 2.4
 
 
 def palette_tint(tint: Sequence[float], palette: WallPalette) -> tuple[float, float, float]:
@@ -509,7 +513,7 @@ def palette_tint(tint: Sequence[float], palette: WallPalette) -> tuple[float, fl
     mixed = [float(c) + palette.desaturation * (grey - float(c)) for c in tint[:3]]
     srgb = [_linear_to_srgb(max(c, 0.0)) for c in mixed]
     peak = max(srgb)
-    if peak > palette.value_max:
+    if peak > palette.value_max:  # pragma: no mutate: at peak == value_max the scale is 1, so >= changes nothing
         srgb = [c * palette.value_max / peak for c in srgb]
     r, g, b = (_srgb_to_linear(c) for c in srgb)
     return (round(r, 6), round(g, 6), round(b, 6))
@@ -608,12 +612,12 @@ def apply_trim(
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
     extra: dict[str, Any] = {}
-    if atmosphere is not None:
-        extra["atmosphere"] = atmosphere
     if regional_table is not None:
-        extra |= {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
+        extra = {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
         if "eras" in atlas:
             extra["era_bands"] = {"era_origin": "observed", "band_origin": "estimated", "buildings": dict(sorted(stats.eras.items()))}
+    if atmosphere is not None:
+        extra["atmosphere"] = atmosphere
     report = {
         **head,
         **extra,

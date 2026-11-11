@@ -38,7 +38,21 @@ Madrid Sol Arena on a Quest 3, the user's own judgement, one package at a time i
 
 Decisions: `golden_hour` keeps `Day` / `UrbanDay1`, since neither `Twilight`, `UrbanDay2` nor `SkyColor` changed anything the user could see; no `dusk` preset; `ENVIRONMENT_PROFILES` gains nothing; the built-in sky under the warm bake did not look wrong, so a custom sky (part 2) is not urgent. The sun's values stay as they are.
 
+## Headset session (plans E5 to E10, 11 November 2026)
+
+The same map and slot, each package adding one increment to `pkg_15`; every one judged good by the user:
+
+| Package | Adds | Bake |
+|---|---|---|
+| `pkg_18` | trilight ambient and AO (E5): the darkest quarter of each view 7 to 9 grey levels brighter | 2 min 02 s |
+| `pkg_19` | the preset's fog colour (E7) | 2 min 04 s |
+| `pkg_20` | the wall palette of the atlas (E8): mean wall luminance 0.7083 → 0.5589 | 2 min 15 s |
+| `pkg_21` | the core at 14 texels/m (E10): 7 lightmap pages instead of 5, 32 MB instead of 30 | 2 min 48 s |
+
+The measured checklist of plan E11 (median fps, draws in views A and B, graphics memory) has not been taken, so the status stays proposed.
+
 ## To check on the headset
 
-- Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours.
+- Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours: the user saw the warm fog and the lighter shade of `pkg_19`, so the bake and the fog reach the client.
+- The measured checklist of plan E11: median fps ≥ 72, draws ≤ 150 in views A and B, graphics memory ≤ 1 GB, on `pkg_21`.
 - Whether a soldier in the shade stays readable with the trilight ambient (plan E5): yes, by the user's judgement on `pkg_18`, 11 November 2026.

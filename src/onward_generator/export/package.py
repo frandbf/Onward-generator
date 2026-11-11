@@ -561,8 +561,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Which parts of the preset the package applies: the sun since plan E3, the ambient and the AO since E5.
             manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": applied, "sun": sun_record}
             if core_lightmap is not None:
-                manifest["atmosphere"]["lightmap_core"] = {
-                    **core_lightmap, "texels_per_m": round(core_lightmap["scale"] * float(options["lightmap_texels_per_m"]), 2)}
+                manifest["atmosphere"]["lightmap_core"] = core_lightmap
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:
