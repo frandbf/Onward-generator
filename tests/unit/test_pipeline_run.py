@@ -1915,4 +1915,5 @@ def test_an_unreadable_map_json_stops_the_run_before_any_step(tmp_path: Path, ca
     code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
                    radius_m=None, margin_m=None, out=str(root), execute=lambda argv: seen.append(argv) or 0, interactive=False)
     out = capsys.readouterr().out
-    assert code == 1 and out.startswith("FAILED map (exit 1). The following steps were not started.\n") and seen == []
+    assert code == 1 and seen == []
+    assert out.startswith(f"FAILED map (exit 1). The following steps were not started.\n{root / 'map.json'}: Expecting property name")

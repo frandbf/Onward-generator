@@ -914,7 +914,7 @@ def run_map(
     try:
         radius_m, margin_m = _area(root, radius_m, margin_m)
     except PipelineError as exc:
-        print(f"FAILED map (exit 1). The following steps were not started.\n{exc}", flush=True)
+        print(f"FAILED map (exit 1). The following steps were not started.\n{exc}", flush=True)  # pragma: no mutate: flush only changes when a pipe sees the line, not its text
         return 1
     prompting = sys.stdin.isatty() if interactive is None else interactive
     if not no_unity:
