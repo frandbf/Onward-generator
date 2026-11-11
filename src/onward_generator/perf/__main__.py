@@ -191,7 +191,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             points = doc.get(team)
             if isinstance(points, dict) and "points_m" in points:
                 parts.append(f"{team}={len(points['points_m'])}")
-        if "ladders" in doc and "lifts" in doc:
+        # playable_layout writes both keys; the measurement fixture neither.
+        if "ladders" in doc:
             parts.append(f"ladders={len(doc['ladders'])} lifts={len(doc['lifts'])}")
         print("layout: " + (" ".join(parts) if parts else str(doc.get("schema", "written"))))
     else:
