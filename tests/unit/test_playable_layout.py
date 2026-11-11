@@ -1107,6 +1107,30 @@ def test_spread_sites_start_at_the_attackers_and_take_the_farthest_fitting_point
     assert 2 <= len(few) < 6 and all(math.dist(p, q) >= SITE_GAP_M for i, p in enumerate(few) for q in few[i + 1:])
 
 
+def test_spread_sites_break_ties_to_the_north_then_east_and_keep_a_gap_of_exactly_20_m() -> None:
+    from onward_generator.perf.layout import _spread_sites
+
+    # Blocks fit up to 56 m from the centre: the corners tie on distance, and north wins, then east.
+    square = box(-58, -58, 58, 58)
+    assert _spread_sites(square, (0.0, 0.0), 3) == [(0.0, 0.0), (56.0, 56.0), (-56.0, 56.0)]
+    # A strip where blocks fit from x = -40 to 40: the ends, then the quarter points exactly 20 m from their neighbours.
+    strip = box(-42, -1, 42, 1)
+    assert _spread_sites(strip, (0.0, 0.0), 9) == [(0.0, 0.0), (40.0, 0.0), (-40.0, 0.0), (20.0, 0.0), (-20.0, 0.0)]
+
+
+def test_candidate_pairs_take_the_defenders_then_the_site_pairs_30_m_apart_once() -> None:
+    from onward_generator.perf.layout import _candidate_pairs
+
+    a = (0.0, 0.0)
+    sites = [a, (30.0, 0.0), (-29.9, 0.0), (0.0, 40.0)]
+    assert _candidate_pairs(a, [(0.0, 40.0), (50.0, 0.0)], sites) == [
+        (a, (0.0, 40.0)), (a, (50.0, 0.0)),            # the first rule's defenders
+        (a, (30.0, 0.0)),                              # exactly 30 m is enough; (a, (0, 40)) is not repeated
+        ((30.0, 0.0), (-29.9, 0.0)), ((30.0, 0.0), (0.0, 40.0)), ((-29.9, 0.0), (0.0, 40.0)),
+    ]
+    assert _candidate_pairs(a, [], [a, (29.9, 0.0)]) == []  # 29.9 m is too close
+
+
 def test_candidates_pair_the_spread_sites_and_move_the_attackers(monkeypatch: pytest.MonkeyPatch) -> None:
     import onward_generator.perf.layout as layout
     from onward_generator.gameplay import placement as P

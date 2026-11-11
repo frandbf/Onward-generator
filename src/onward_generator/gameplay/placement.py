@@ -166,12 +166,15 @@ def score_all(graph: NavGraph, candidates: Sequence[Placement | str], *, routes:
     return scores
 
 
-def _key(score: Score) -> tuple[int, float, float, float, int]:
-    """More routes first within ``CONTACT_TOLERANCE_PCT``, then the lower difference; past it, the difference first."""
+def _key(score: Score) -> tuple[float, float, float, int]:
+    """More routes first within ``CONTACT_TOLERANCE_PCT``, then the lower difference; past it, the difference first.
+
+    A key within starts with ``-routes``, below 0 since an admissible candidate has a route; a key past it starts
+    with a difference above 15. So every candidate within ranks before every candidate past it."""
     assert score.diff_pct is not None and score.routes is not None and score.max_overlap is not None  # pragma: no mutate: only admissible scores reach the key
     if score.diff_pct <= CONTACT_TOLERANCE_PCT:
-        return (0, -score.routes, score.diff_pct, score.max_overlap, score.index)
-    return (1, score.diff_pct, -score.routes, score.max_overlap, score.index)
+        return (-score.routes, score.diff_pct, score.max_overlap, score.index)
+    return (score.diff_pct, -score.routes, score.max_overlap, score.index)
 
 
 def admissible(score: Score, baseline: Score) -> bool:

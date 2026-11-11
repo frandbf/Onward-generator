@@ -362,19 +362,15 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     area, a = _spawn_site(base, detail_manifest)
     _, parts = _objective_ground(base, detail_manifest)
     graph = nav_graph(nav_islands(base, playable_area(detail_manifest)))
-    attack_node = snap(graph, a)
     candidates: list[Placement | str] = []
     defenders = _defender_candidates(area, a, K_DEFENDERS)
     sites = _spread_sites(area, a, K_SITES)
-    pairs = [(a, d) for d in defenders]
-    pairs += [(s, t) for i, s in enumerate(sites) for t in sites[i + 1:]
-              if math.dist(s, t) >= TEAM_SEPARATION_M and (s, t) not in pairs]
-    for attack, d in pairs:
+    for attack, d in _candidate_pairs(a, defenders, sites):
         midpoint = _placed(parts, attack, d, _midpoint_on(area, attack, d))
         candidates.append(midpoint)
         if isinstance(midpoint, str):
             continue
-        even = _even_uplink(graph, area, attack_node if attack == a else snap(graph, attack), midpoint)
+        even = _even_uplink(graph, area, snap(graph, attack), midpoint)
         if even is not None and even != midpoint.uplink:
             candidates.append(_placed(parts, attack, d, even))
     choice = select(score_all(graph, candidates))
@@ -404,6 +400,16 @@ def _spread_sites(area: BaseGeometry, a: tuple[float, float], limit: int) -> lis
             break
         sites.append(site)
     return sites
+
+
+def _candidate_pairs(
+    a: tuple[float, float], defenders: Sequence[tuple[float, float]], sites: Sequence[tuple[float, float]],
+) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """(attackers, defenders) centres in candidate order: ``a`` with each of ``defenders``, then every pair of
+    ``sites`` at least ``TEAM_SEPARATION_M`` apart, the first site attacking, without repeating a pair."""
+    pairs = [(a, d) for d in defenders]
+    pairs += [(s, t) for i, s in enumerate(sites) for t in sites[i + 1:] if math.dist(s, t) >= TEAM_SEPARATION_M and (s, t) not in pairs]
+    return pairs
 
 
 def _placed(parts: Sequence[BaseGeometry], a: tuple[float, float], d: tuple[float, float], uplink: tuple[float, float]) -> Placement | str:
