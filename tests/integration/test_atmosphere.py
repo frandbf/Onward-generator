@@ -1,6 +1,6 @@
-"""An atmosphere preset from the command to the package: the setting, the day-only rule and the package (ADR-037, plan E0).
+"""An atmosphere preset from the command to the package: the setting, the day-only rule and the package (ADR-037).
 
-E0 records the preset and changes nothing else: the adapter reads none of it yet. No Unity."""
+Plan E0 records the preset; plan E3 carries its sun to the adapter. No Unity."""
 
 from __future__ import annotations
 
@@ -255,9 +255,12 @@ def test_a_preset_is_recorded_in_the_options_and_the_manifest(inputs: tuple[Path
     golden = _package(inputs, tmp_path / "golden", atmosphere="golden_hour")
     options = json.loads((golden.directory / "adapter_options.json").read_bytes())
     before = json.loads((plain.directory / "adapter_options.json").read_bytes())
-    assert options == {**before, "variant": golden.manifest["package_id"], "atmosphere": "golden_hour"}
+    lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": 150.0, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5}
+    assert options == {**before, "variant": golden.manifest["package_id"], "atmosphere": "golden_hour", "lighting": lighting}
     assert golden.manifest["package_id"] != plain.manifest["package_id"]
-    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": []}
+    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun"],
+                                             "sun": {"elevation_deg": 30.0, "azimuth_deg": 150.0, "azimuth_source": "streets_pending"}}
+    assert "lighting" not in before
     assert _package(inputs, tmp_path / "overcast", atmosphere="overcast").manifest["package_id"] != golden.manifest["package_id"]
 
 
@@ -276,8 +279,20 @@ def test_the_export_command_takes_the_preset(inputs: tuple[Path, Path, Path], tm
     detail, layout, _night = inputs
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
     assert main([*args, "--out", str(tmp_path / "golden"), "--atmosphere", "golden_hour"]) == 0
-    assert "  atmosphere golden_hour (ADR-037 proposed): recorded; the adapter applies none of it yet\n" in capsys.readouterr().out
+    assert "  atmosphere golden_hour (ADR-037 proposed): applies sun; sun at 30 deg, azimuth 150 deg (streets_pending)\n" in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "plain")]) == 0
     assert "atmosphere" not in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "bad"), "--atmosphere", "sunset"]) == 1
     assert "  ERROR atmosphere: atmosphere must be one of" in capsys.readouterr().err
+
+
+def test_the_adapter_turns_the_sun_only_when_the_package_has_a_lighting_block() -> None:
+    """No Unity here: this pins the wiring. A bake of Madrid Sol Arena checked it (plan E3)."""
+    from onward_generator.config.validation import REPO_ROOT
+
+    source = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
+    assert "sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);\n                ApplySun(light, opt.lighting);\n                ApplyFog(opt);" in source
+    body = source[source.index("private static void ApplySun"):source.index("// ADR-014. Unity fog is measured from the camera.")]
+    assert "if (lighting == null || lighting.sun_intensity <= 0f) return;" in body
+    assert "Quaternion.Euler(lighting.sun_elevation_deg, lighting.sun_azimuth_deg + 180f, 0f)" in body
+    assert "light.shadowAngle = lighting.sun_shadow_angle_deg;" in body

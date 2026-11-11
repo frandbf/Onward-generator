@@ -25,7 +25,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
-from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, check_atmosphere
+from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, check_atmosphere, lighting, load_presets
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -441,9 +441,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
                         "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match.")
+    sun_record: dict[str, Any] | None = None
     if preset is not None:
-        # ADR-037: written only with a preset, so a map without one keeps its package_id. Nothing reads it yet.
+        # ADR-037: written only with a preset, so a map without one keeps its package_id.
         options["atmosphere"] = preset
+        options["lighting"], sun_record = lighting(load_presets()[preset])
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -510,8 +512,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Plan E2: what the client shows for each profile is unknown until a headset session (ADR-037).
             manifest["experimental_environment"] = {**experimental, "status": "untested"}
         if preset is not None:
-            # Which parts of the preset the package applies; the adapter reads none of it yet (plan E0).
-            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": []}
+            # Which parts of the preset the package applies: the sun since plan E3.
+            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": ["sun"], "sun": sun_record}
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

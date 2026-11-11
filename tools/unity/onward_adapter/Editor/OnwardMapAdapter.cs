@@ -137,6 +137,19 @@ namespace OnwardGenerator
             // Plan E2 (ADR-037, proposed): a headset test package replaces the SDK time of day and profile of a day
             // gameplay layout, and may set SharedLevelSettings.SkyColor. JsonUtility leaves the fields empty when absent.
             public ExperimentalEnvironment experimental_environment = new ExperimentalEnvironment();
+            // ADR-037 (proposed): the light of an atmosphere preset, in numbers. Absent (sun_intensity 0) keeps the
+            // light of before: 50 degrees, heading -30, intensity 1.2, white.
+            public Lighting lighting = new Lighting();
+        }
+
+        [Serializable]
+        private class Lighting
+        {
+            public float sun_elevation_deg;
+            public float sun_azimuth_deg;
+            public string sun_color = "";
+            public float sun_intensity;
+            public float sun_shadow_angle_deg;
         }
 
         [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
@@ -881,6 +894,7 @@ namespace OnwardGenerator
                 light.intensity = 1.2f;
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                ApplySun(light, opt.lighting);
                 ApplyFog(opt);
                 ApplyNight(light, pkg.Layout);
 
@@ -1321,6 +1335,24 @@ namespace OnwardGenerator
             // The suffix is the collision node, not a prop whose id happens to contain "glass".
             if (name.Contains("#glass")) return SetPhysicMaterial.EPhysicMaterialType.Glass;
             return SetPhysicMaterial.EPhysicMaterialType.Concrete;
+        }
+
+        // ADR-037, plan E3. The sun of an atmosphere preset. A directional light points away from the sun, so its
+        // heading is the sun's azimuth plus 180 degrees: the neutral sun at 150 degrees is the heading -30 above.
+        private static void ApplySun(Light light, Lighting lighting)
+        {
+            if (lighting == null || lighting.sun_intensity <= 0f) return;
+            if (!ColorUtility.TryParseHtmlString(lighting.sun_color, out Color colour))
+                throw new InvalidDataException($"lighting.sun_color {lighting.sun_color} is not #RRGGBB");
+            if (!(lighting.sun_elevation_deg > 0f && lighting.sun_elevation_deg < 90f))
+                throw new InvalidDataException($"lighting.sun_elevation_deg {lighting.sun_elevation_deg} must be between 0 and 90");
+            light.color = colour;
+            light.intensity = lighting.sun_intensity;
+            light.shadowAngle = lighting.sun_shadow_angle_deg;
+            light.transform.rotation = Quaternion.Euler(lighting.sun_elevation_deg, lighting.sun_azimuth_deg + 180f, 0f);
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} Sun (ADR-037): elevation {1:0.#}, azimuth {2:0.#}, {3}, intensity {4:0.##}, shadow angle {5:0.#}.",
+                LogPrefix, lighting.sun_elevation_deg, lighting.sun_azimuth_deg, lighting.sun_color, lighting.sun_intensity, lighting.sun_shadow_angle_deg));
         }
 
         // ADR-014. Unity fog is measured from the camera. Whether the Onward runtime or its

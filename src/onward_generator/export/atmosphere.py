@@ -20,6 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 PRESETS_DEFAULT = REPO_ROOT / "config" / "atmosphere.default.json"
 PRESETS_SCHEMA = REPO_ROOT / "config" / "atmosphere.schema.json"
 NEUTRAL = "neutral"
+# The neutral light points toward heading -30 (Quaternion.Euler(50, -30, 0)), so its sun stands at 150 degrees.
+NEUTRAL_SUN_AZIMUTH_DEG = 150.0
+STREETS = "streets"
 
 
 class AtmosphereError(ValueError):
@@ -62,4 +65,24 @@ def check_atmosphere(name: str, time_of_day: str, path: str | Path | None = None
     return name
 
 
-__all__ = ["NEUTRAL", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]
+def lighting(preset: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The ``lighting`` block of ``adapter_options.json`` for ``preset``, and what the manifest records of the sun.
+
+    Plan E3 carries the sun. ``azimuth: streets`` keeps the neutral azimuth until plan E6 measures the street axis;
+    the manifest says so with ``azimuth_source: streets_pending``."""
+    sun = preset["sun"]
+    streets = sun["azimuth"] == STREETS
+    azimuth = NEUTRAL_SUN_AZIMUTH_DEG if streets else float(sun["azimuth"])
+    block = {
+        "sun_elevation_deg": float(sun["elevation_deg"]),
+        "sun_azimuth_deg": azimuth,
+        "sun_color": str(sun["color"]),
+        "sun_intensity": float(sun["intensity"]),
+        "sun_shadow_angle_deg": float(sun["shadow_angle_deg"]),
+    }
+    record = {"elevation_deg": block["sun_elevation_deg"], "azimuth_deg": azimuth,
+              "azimuth_source": "streets_pending" if streets else "preset"}
+    return block, record
+
+
+__all__ = ["NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]

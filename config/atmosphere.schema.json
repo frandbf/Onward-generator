@@ -31,7 +31,7 @@
           "properties": {
             "elevation_deg": { "type": "number", "minimum": 5, "maximum": 89 },
             "azimuth": {
-              "description": "Degrees clockwise from north toward which the sun lies, or 'streets' to cross the dominant street axis of the playable core",
+              "description": "Where the sun stands, degrees clockwise from north (the neutral light stands at 150), or 'streets' to cross the dominant street axis of the playable core",
               "oneOf": [{ "const": "streets" }, { "type": "number", "minimum": -360, "maximum": 360 }]
             },
             "color": { "$ref": "#/$defs/colour" },

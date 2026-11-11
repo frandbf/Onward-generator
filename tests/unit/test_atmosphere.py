@@ -11,9 +11,11 @@ import pytest
 
 from onward_generator.export.atmosphere import (
     NEUTRAL,
+    NEUTRAL_SUN_AZIMUTH_DEG,
     PRESETS_DEFAULT,
     AtmosphereError,
     check_atmosphere,
+    lighting,
     load_presets,
     preset_names,
 )
@@ -36,7 +38,7 @@ def test_the_default_file_has_the_two_presets_of_the_plan() -> None:
     assert golden["sun"] == {"elevation_deg": 30, "azimuth": "streets", "color": "#FFE0B8", "intensity": 1.4, "shadow_angle_deg": 1.5}
     assert golden["ambient"] == {"mode": "trilight", "sky": "#8A9BB3", "equator": "#9A9080", "ground": "#5A5044"}
     assert presets["overcast"]["ambient"] == {"mode": "flat", "sky": "#9AA3AD"}
-    assert presets["overcast"]["sun"]["azimuth"] == -30
+    assert presets["overcast"]["sun"]["azimuth"] == 150
 
 
 def test_the_presets_cannot_be_changed_through_the_mapping() -> None:
@@ -173,3 +175,31 @@ def test_a_missing_or_broken_file_is_refused(tmp_path: Path) -> None:
 
 def test_neutral_is_the_name_of_no_preset() -> None:
     assert NEUTRAL == "neutral" and NEUTRAL not in load_presets()
+
+
+def test_the_neutral_sun_stands_opposite_the_heading_of_the_neutral_light() -> None:
+    """The adapter's light points toward heading -30; the sun it stands for is at 150 degrees."""
+    assert NEUTRAL_SUN_AZIMUTH_DEG == 150.0
+
+
+def test_the_lighting_block_carries_the_sun_of_the_preset() -> None:
+    block, record = lighting(load_presets()["overcast"])
+    assert block == {"sun_elevation_deg": 55.0, "sun_azimuth_deg": 150.0, "sun_color": "#DDE3EA", "sun_intensity": 0.7,
+                     "sun_shadow_angle_deg": 8.0}
+    assert record == {"elevation_deg": 55.0, "azimuth_deg": 150.0, "azimuth_source": "preset"}
+    assert all(type(v) is float for k, v in block.items() if k != "sun_color")
+
+
+def test_a_street_azimuth_keeps_the_neutral_one_until_the_street_axis_is_measured() -> None:
+    block, record = lighting(load_presets()["golden_hour"])
+    assert block == {"sun_elevation_deg": 30.0, "sun_azimuth_deg": 150.0, "sun_color": "#FFE0B8", "sun_intensity": 1.4,
+                     "sun_shadow_angle_deg": 1.5}
+    assert record == {"elevation_deg": 30.0, "azimuth_deg": 150.0, "azimuth_source": "streets_pending"}
+
+
+def test_an_integer_azimuth_becomes_a_float() -> None:
+    preset = {"sun": {"elevation_deg": 40, "azimuth": 200, "color": "#FFFFFF", "intensity": 1, "shadow_angle_deg": 0}}
+    block, record = lighting(preset)
+    assert block["sun_azimuth_deg"] == 200.0 and type(block["sun_azimuth_deg"]) is float
+    assert (block["sun_elevation_deg"], block["sun_intensity"], block["sun_shadow_angle_deg"]) == (40.0, 1.0, 0.0)
+    assert record["azimuth_source"] == "preset"

@@ -15,7 +15,7 @@
     },
     "overcast": {
       "description": "High soft sun, flat grey ambient, grey haze",
-      "sun": { "elevation_deg": 55, "azimuth": -30, "color": "#DDE3EA", "intensity": 0.7, "shadow_angle_deg": 8 },
+      "sun": { "elevation_deg": 55, "azimuth": 150, "color": "#DDE3EA", "intensity": 0.7, "shadow_angle_deg": 8 },
       "ambient": { "mode": "flat", "sky": "#9AA3AD" },
       "ao": { "max_distance_m": 1.5, "exponent_indirect": 1.0, "exponent_direct": 0.0 },
       "fog": { "start_m": 100, "end_m": 600, "color": "#C9CFD6" },

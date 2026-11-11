@@ -79,7 +79,9 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"{lit['width']} x {lit['height']} px at strength {lit['strength']:g}, about {lit['astc6x6_bytes']:,} bytes in ASTC 6x6")
     atmosphere = m.get("atmosphere")
     if atmosphere is not None:
-        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): recorded; the adapter applies none of it yet")
+        sun = atmosphere["sun"]
+        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): applies {', '.join(atmosphere['applied'])}; "
+              f"sun at {sun['elevation_deg']:g} deg, azimuth {sun['azimuth_deg']:g} deg ({sun['azimuth_source']})")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0
 
