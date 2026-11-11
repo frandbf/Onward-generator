@@ -422,7 +422,7 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
             z_top = max(float(p.mesh.vertices[:, 2].max()) for p in node.primitives if p.mesh.triangle_count)
             bands = building_bands(record, z_top, float(atlas["zocalo_m"]), float(atlas["max_band_m"]), look.zocalo)
             if background:
-                bands = Bands(0.0, bands.wall_top_m, 1, bands.wall_top_m, zocalo=False)
+                bands = Bands(0.0, bands.wall_top_m, 1, bands.wall_top_m, zocalo=False)  # pragma: no mutate: one band and no zocalo, so the zocalo and storey heights are never read
             cornice = layout.cornice if look.cornice and not background else None
             mesh, uvs = wall_uvs(prim.mesh, bands, strip, layout.zocalo, cornice, frame, phase_u, look.courses and not background)
             stats.wall_triangles_before += prim.mesh.triangle_count

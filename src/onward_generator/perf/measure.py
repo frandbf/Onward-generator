@@ -169,7 +169,7 @@ def combine_groups(path: str | Path, cell_m: float) -> dict[str, Any]:
         mesh = meshes[node["mesh"]]
         x, y, z = _node_centre(node, mesh, accessors)
         cell = (int(x // cell_m), int(z // cell_m))
-        building = furniture_building(str(node.get("name", "")))
+        building = furniture_building(str(node.get("name", "")))  # pragma: no mutate: any default name is not a furnish/ name
         if building is not None:
             # As the adapter: interior furniture is combined per building and storey, lit by its rooms' probes.
             index = furniture.setdefault(building, len(furniture))

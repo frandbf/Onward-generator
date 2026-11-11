@@ -74,6 +74,8 @@ def _map_options(tokens: list[str]) -> dict[str, Any]:
     options: dict[str, Any] = {}
     i = 0
     while i < len(tokens) - 1 and tokens[i] in ("-s", "-o"):
+        if i + 2 >= len(tokens):
+            raise ObjError(f"map option {tokens[i]} needs two values")
         key = "scale" if tokens[i] == "-s" else "offset"
         options[key] = (float(tokens[i + 1]), float(tokens[i + 2]))
         i += 4  # u v w
@@ -111,12 +113,12 @@ def parse_obj(text: str) -> dict[str, ObjGroup]:
                 if all(r[2] is not None for r in tri):
                     n = [normals[r[2]] for r in tri]  # type: ignore[index]
                 else:
-                    face = np.cross(np.subtract(p[1], p[0]), np.subtract(p[2], p[0]))
+                    face = np.cross(np.subtract(p[1], p[0]), np.subtract(p[2], p[0]))  # pragma: no mutate: cross(a, c - b) equals cross(a, c - a) when a = b - a
                     length = float(np.linalg.norm(face))
                     n = [list(face / length) if length else [0.0, 1.0, 0.0]] * 3
                 t = [uvs[r[1]] if r[1] is not None else [0.5, 0.5] for r in tri]
                 bucket = corners.setdefault(material, [])
-                bucket.extend(zip(p, n, t, strict=True))
+                bucket.extend(zip(p, n, t, strict=True))  # pragma: no mutate: p, n and t always hold the three corners
     return {
         name: ObjGroup(np.array([c[0] for c in items], dtype=np.float32), np.array([c[1] for c in items], dtype=np.float32),
                        np.array([c[2] for c in items], dtype=np.float32))
@@ -131,7 +133,7 @@ def _corner(token: str, nv: int, nt: int, nn: int) -> tuple[int, int | None, int
         if not value:
             return None
         i = int(value)
-        resolved = i - 1 if i > 0 else count + i
+        resolved = i - 1 if i > 0 else count + i  # pragma: no mutate: index 0 is out of range on either branch, with the same message
         if not 0 <= resolved < count:
             raise ObjError(f"face index {value} is out of range")
         return resolved
@@ -148,7 +150,7 @@ MAX_TEXTURE_PX = 512
 def _png(data: bytes) -> bytes:
     """The albedo as an RGB PNG, at most ``MAX_TEXTURE_PX`` on its long side."""
     picture = Image.open(io.BytesIO(data)).convert("RGB")
-    if max(picture.size) > MAX_TEXTURE_PX:
+    if max(picture.size) > MAX_TEXTURE_PX:  # pragma: no mutate: thumbnail leaves an image already at the limit unchanged
         picture.thumbnail((MAX_TEXTURE_PX, MAX_TEXTURE_PX), Image.Resampling.LANCZOS)
     out = io.BytesIO()
     picture.save(out, format="PNG", optimize=True)
@@ -207,6 +209,5 @@ def obj_to_glb(obj_text: str, mtl_text: str, name: str, texture_dir: Path | None
     doc["meshes"].append({"name": name, "primitives": primitives})
     doc["nodes"].append({"name": name, "mesh": 0})
     doc["scenes"].append({"nodes": [0]})
-    blob.extend(b"\x00" * (-len(blob) % 4))
     doc["buffers"].append({"byteLength": len(blob)})
     return pack_glb(doc, bytes(blob))

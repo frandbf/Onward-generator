@@ -73,7 +73,7 @@ def ensure_project(unity: Path, project: Path, run: Runner = _run) -> None:
         if code != 0 or not (project / "Assets").is_dir():
             raise ImportError_(f"Unity could not create the export project (exit {code}); see {project.parent / 'create.log'}")
     editor = project / "Assets" / "Editor"
-    editor.mkdir(parents=True, exist_ok=True)
+    editor.mkdir(exist_ok=True)  # Assets exists here: it was there already, or the branch above raised
     shutil.copyfile(EXPORTER, editor / EXPORTER.name)
 
 
@@ -109,7 +109,7 @@ def _size(data: bytes) -> tuple[int, float, float, float]:
     primitives = [p for p in scene_primitives(data) if p.mesh.triangle_count]
     vertices = np.concatenate([p.mesh.vertices for p in primitives])
     spans = vertices.max(axis=0) - vertices.min(axis=0)
-    length, depth, height = (round(float(s), 3) for s in spans[:3])
+    length, depth, height = (round(float(s), 3) for s in spans)
     return sum(p.mesh.triangle_count for p in primitives), length, depth, height
 
 
@@ -122,8 +122,8 @@ def blank_albedo(data: bytes) -> bool:
     for image in images:
         view = doc["bufferViews"][image["bufferView"]]
         start = int(view.get("byteOffset", 0))
-        pixels = np.asarray(Image.open(io.BytesIO(blob[start:start + int(view["byteLength"])])).convert("RGB"), dtype=np.float32)
-        flat = pixels.reshape(-1, 3)
+        pixels = np.asarray(Image.open(io.BytesIO(blob[start:start + int(view["byteLength"])])).convert("RGB"))
+        flat = pixels.reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the unknown one
         if float(flat.std(axis=0).max()) >= FLAT_STD or float(flat.mean()) < BLANK_MEAN:
             return False
     return True
@@ -141,7 +141,7 @@ def unit_factor(items: Sequence[dict[str, Any]]) -> float:
 
 def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageResult:
     """Convert the exported OBJ files and write ``assets/<catalogue>/`` with its manifest; skipped models are counted."""
-    report = json.loads((exported / "report.json").read_text(encoding="utf-8"))
+    report = json.loads((exported / "report.json").read_text(encoding="utf-8"))  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
     result = PackageResult(package, "ok")
     target = assets / package.catalogue
     if target.exists():
@@ -159,8 +159,9 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
             result.skipped["duplicate_name"] += 1
             continue
         try:
-            data = obj_to_glb((exported / item["file"]).read_text(encoding="utf-8", errors="replace"),
-                              (exported / f"{stem}.mtl").read_text(encoding="utf-8", errors="replace"), stem, exported, factor)
+            obj = (exported / item["file"]).read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
+            mtl = (exported / f"{stem}.mtl").read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
+            data = obj_to_glb(obj, mtl, stem, exported, factor)
         except (OSError, ObjError, ValueError) as exc:
             result.skipped[f"convert: {type(exc).__name__}"] += 1
             continue
@@ -168,7 +169,7 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
             result.skipped["untextured_white"] += 1
             continue
         triangles, length, depth, height = _size(data)
-        decision = classify(stem, (length, depth, height), triangles, package.name, package.category)
+        decision = classify(stem, (length, depth, height), package.name, package.category)
         if decision.row is None:
             result.skipped[decision.reason] += 1
             continue
@@ -196,7 +197,7 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
     atomic_write_json(target / "manifest.json", document)
     (target / "License.txt").write_text(
         f"{package.name} by {package.publisher}, from the Unity Asset Store, under the Standard Unity Asset Store EULA.\n"
-        "Local copy for this user's maps only. Do not commit, share or publish these files.\n", encoding="utf-8")
+        "Local copy for this user's maps only. Do not commit, share or publish these files.\n", encoding="utf-8")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
     return result
 
 

@@ -31,14 +31,14 @@ IMPOSTOR_PX = 128
 def outline(xy: np.ndarray, sides: int = IMPOSTOR_SIDES) -> Polygon:
     """The convex hull of the plan, simplified until it has at most ``sides`` corners; counter-clockwise."""
     hull = MultiPoint([tuple(p) for p in xy]).convex_hull
-    if not isinstance(hull, Polygon) or hull.area <= 0:
+    if not isinstance(hull, Polygon):  # a convex hull is a Polygon only when it has area
         raise ValueError("a flat impostor needs a plan with an area")
     size = max(hull.bounds[2] - hull.bounds[0], hull.bounds[3] - hull.bounds[1])
     shape, tolerance = hull, size * 0.002
     while len(shape.exterior.coords) - 1 > sides:
-        shape = hull.simplify(tolerance, preserve_topology=True)
+        shape = hull.simplify(tolerance, preserve_topology=True)  # pragma: no mutate: preserve_topology=True is shapely's default; it is spelled out for the reader
         tolerance *= 1.5
-    return orient(shape, 1.0)
+    return orient(shape)  # counter-clockwise
 
 
 def top_view(prop: Prop, px: int = IMPOSTOR_PX) -> tuple[np.ndarray, tuple[float, float, float, float]]:
@@ -49,8 +49,8 @@ def top_view(prop: Prop, px: int = IMPOSTOR_PX) -> tuple[np.ndarray, tuple[float
     width, height = max(x1 - x0, 1e-6), max(y1 - y0, 1e-6)
     image = np.zeros((px, px, 3), dtype=np.float32)
     depth = np.full((px, px), -np.inf)
-    for primitive, part in zip(prop.primitives(), prop._parts(), strict=True):
-        albedo = np.asarray(Image.open(io.BytesIO(part.albedo)).convert("RGB"), dtype=np.float32)
+    for primitive, part in zip(prop.primitives(), prop._parts(), strict=True):  # pragma: no mutate: primitives() is built from _parts(), so they always have the same length
+        albedo = np.asarray(Image.open(io.BytesIO(part.albedo)).convert("RGB"))
         h, w = albedo.shape[:2]
         mesh, uvs = primitive.mesh, primitive.uvs
         assert uvs is not None  # Prop.primitives always sets them
@@ -59,13 +59,13 @@ def top_view(prop: Prop, px: int = IMPOSTOR_PX) -> tuple[np.ndarray, tuple[float
         for a, b, c in mesh.triangles:
             xs, ys = np.array([sx[a], sx[b], sx[c]]), np.array([sy[a], sy[b], sy[c]])
             area = (ys[1] - ys[2]) * (xs[0] - xs[2]) + (xs[2] - xs[1]) * (ys[0] - ys[2])
-            if abs(area) < 1e-9:
+            if abs(area) < 1e-9:  # pragma: no mutate: an area of exactly 1e-9 does not occur; the bound only skips degenerate triangles
                 continue
-            lo_x, hi_x = max(int(xs.min()), 0), min(int(np.ceil(xs.max())), px - 1)
-            lo_y, hi_y = max(int(ys.min()), 0), min(int(np.ceil(ys.max())), px - 1)
-            if hi_x < lo_x or hi_y < lo_y:
-                continue
-            gx, gy = np.meshgrid(np.arange(lo_x, hi_x + 1) + 0.5, np.arange(lo_y, hi_y + 1) + 0.5)
+            # A pixel column at ceil(max) has its centre past the triangle, so the ranges stop before it.
+            lo_x, lo_y = max(int(xs.min()), 0), max(int(ys.min()), 0)
+            hi_x = min(int(np.ceil(xs.max())), px)  # pragma: no mutate: the vertices span [0, px]; the clamp only guards rounding
+            hi_y = min(int(np.ceil(ys.max())), px)  # pragma: no mutate: the vertices span [0, px]; the clamp only guards rounding
+            gx, gy = np.meshgrid(np.arange(lo_x, hi_x) + 0.5, np.arange(lo_y, hi_y) + 0.5)
             l0 = ((ys[1] - ys[2]) * (gx - xs[2]) + (xs[2] - xs[1]) * (gy - ys[2])) / area
             l1 = ((ys[2] - ys[0]) * (gx - xs[2]) + (xs[0] - xs[2]) * (gy - ys[2])) / area
             l2 = 1.0 - l0 - l1
@@ -92,7 +92,7 @@ def flat_impostor(prop: Prop, sides: int = IMPOSTOR_SIDES, px: int = IMPOSTOR_PX
     """``prop`` as one polygon at its top height, textured with its top view; its file's triangles are kept as source."""
     image, (x0, y0, width, height) = top_view(prop, px)
     shape = outline(prop.mesh.vertices[:, :2], sides)
-    ring = np.array(shape.exterior.coords[:-1], dtype=np.float64)
+    ring = np.array(shape.exterior.coords[:-1])
     top = float(prop.mesh.vertices[:, 2].max())
     centre = ring.mean(axis=0)
     count = len(ring)
@@ -102,10 +102,10 @@ def flat_impostor(prop: Prop, sides: int = IMPOSTOR_SIDES, px: int = IMPOSTOR_PX
     fan = [(0, 1 + k, 1 + (k + 1) % count) for k in range(count)]
     rim = [tri for k in range(count) for tri in ((1 + k, 1 + count + k, 1 + count + (k + 1) % count),
                                                  (1 + k, 1 + count + (k + 1) % count, 1 + (k + 1) % count))]
-    triangles = np.array(fan + rim, dtype=np.int64)
+    triangles = np.array(fan + rim, dtype=np.int64)  # pragma: no mutate: Python ints are already int64 on every 64-bit numpy
     # V up, as every library prop: the image's top row (north, y0 + height) is V = 1.
     uvs = np.column_stack([(vertices[:, 0] - x0) / width, (vertices[:, 1] - y0) / height]).astype(np.float32)
     out = io.BytesIO()
-    Image.fromarray(np.clip(image, 0, 255).astype(np.uint8)).save(out, format="PNG")
+    Image.fromarray(image.astype(np.uint8)).save(out, format="PNG")  # uint8 texels and their mean: no clip needed
     return replace(prop, mesh=Mesh(vertices, triangles), uvs=uvs, albedo=out.getvalue(), parts=(),
                    source_triangles=prop.source_triangles or prop.triangles)

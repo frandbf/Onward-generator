@@ -142,17 +142,17 @@ def test_obj_errors_name_what_is_wrong(tmp_path: Path) -> None:
     ("Chair", (0.5, 0.5, 20.0), "Furniture", "3D ModelsPropsFurniture", None, "size"),
 ])
 def test_classify(name: str, size: tuple, package: str, category: str, placement: str | None, reason: str) -> None:
-    decision = classify(name, size, 100, package, category)
+    decision = classify(name, size, package, category)
     assert decision.reason == reason
     assert (decision.row or {}).get("placement") == placement
 
 
 def test_furnish_hints_name_the_slot_the_sets_and_the_floors() -> None:
-    shelf = classify("Shelf_Wood", (1.2, 0.4, 1.8), 200, "Coffee Shop Props", "3D ModelsProps", ).row
+    shelf = classify("Shelf_Wood", (1.2, 0.4, 1.8), "Coffee Shop Props", "3D ModelsProps", ).row
     assert shelf is not None and shelf["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": True}
-    counter = classify("Cashier_Counter", (1.6, 0.7, 1.0), 300, "Lite Grocery Store", "3D ModelsEnvironments").row
+    counter = classify("Cashier_Counter", (1.6, 0.7, 1.0), "Lite Grocery Store", "3D ModelsEnvironments").row
     assert counter is not None and counter["furnish"] == {"slot": "counter", "shop_sets": ["generic"], "floors": False}
-    deep = classify("Wardrobe_Big", (1.8, 0.95, 2.0), 300, "Bedroom", "3D ModelsPropsFurniture").row
+    deep = classify("Wardrobe_Big", (1.8, 0.95, 2.0), "Bedroom", "3D ModelsPropsFurniture").row
     assert deep is not None and "furnish" not in deep
     assert words_of("SM_KitchenCabinet02_Blue") == ["sm", "kitchen", "cabinet", "blue"]
 

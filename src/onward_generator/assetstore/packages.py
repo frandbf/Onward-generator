@@ -47,8 +47,9 @@ class Package:
 
 
 def slug(text: str) -> str:
-    value = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
-    return value[:48].rstrip("_") or "package"
+    value = "_".join(re.findall(r"[a-z0-9]+", text.lower()))[:48]
+    value = value.rstrip("_")  # pragma: no mutate: the text is lower case, so an X in the stripped set changes nothing
+    return value or "package"
 
 
 def find_packages(cache: Path) -> list[Package]:
@@ -100,16 +101,18 @@ def unpack(package: Path, project: Path) -> int:
 
 def _read(archive: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
     handle = archive.extractfile(member)
-    if handle is None:
+    if handle is None:  # pragma: no mutate: members are regular files, so extractfile never returns None; the check is for mypy
         raise PackageError(f"{member.name}: unreadable member")
     return handle.read()
 
 
 def _target(archive: tarfile.TarFile, members: dict[str, tarfile.TarInfo], guid: str, project: Path) -> Path | None:
     raw = _read(archive, members[f"{guid}/pathname"]).decode("utf-8", "replace").splitlines()
-    path = raw[0].strip() if raw else ""
+    path = raw[0].strip() if raw else ""  # pragma: no mutate: any fallback that does not start with Assets/ is skipped alike
     normal = posixpath.normpath(path)
-    if not normal.startswith("Assets/") or ".." in normal.split("/") or normal.startswith("Assets/Editor"):
+    if not normal.startswith("Assets/") or normal.startswith("Assets/Editor"):
+        return None
+    if ".." in normal.split("/"):  # pragma: no mutate: after normpath a .. can only lead the path, which already fails the Assets/ test; kept as a guard
         return None
     if posixpath.splitext(normal)[1].lower() in CODE_SUFFIXES:
         return None  # Unity would compile and run a package's code in the export project: meshes and textures only

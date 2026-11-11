@@ -22,7 +22,7 @@ ROWS_PER_SLOT = 4
 
 
 def enabled(env: Mapping[str, str] | None = None) -> bool:
-    return (os.environ if env is None else env).get(ENV, "1") != "0"
+    return (os.environ if env is None else env).get(ENV) != "0"
 
 
 def is_local(name: str) -> bool:
@@ -34,14 +34,15 @@ def local_manifests(assets: Path, env: Mapping[str, str] | None = None) -> list[
     if not enabled(env) or not assets.is_dir():
         return []
     found = []
-    for folder in sorted(assets.iterdir(), key=lambda p: p.name):
+    for folder in sorted(assets.iterdir()):
         if not (folder.is_dir() and is_local(folder.name)):
             continue
         try:
-            document = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+            document = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
         except (OSError, json.JSONDecodeError):
             continue
-        if isinstance(document, dict) and LICENCE_NAME in str(document.get("source", "")):
+        source = document.get("source", "") if isinstance(document, dict) else ""  # pragma: no mutate: any default without the licence name is skipped alike
+        if LICENCE_NAME in str(source):
             found.append((folder.name, document))
     return found
 

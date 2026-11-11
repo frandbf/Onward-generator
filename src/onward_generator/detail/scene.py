@@ -1367,7 +1367,7 @@ def _furnish_by_priority(pending: Sequence[_PendingFurnish], furnishing: ShopFur
         furnish = passer.furnish_interior if entry.shop else passer.furnish_floors
         code = "shop_not_furnished" if entry.shop else "floor_not_furnished"
         messages = furnish(entry.bid, entry.interior, entry.built, entry.penetrations, cfg.interiors)
-        if entry.obj is not None and entry.built.light_anchors is not None:
+        if entry.obj is not None and entry.built.light_anchors is not None:  # pragma: no mutate: entry.obj is always set before furnishing; the check is for mypy
             entry.obj.light_anchors = entry.built.light_anchors
             lit[entry.lit_index] = (entry.shop, entry.built.light_anchors)
         emitted[entry.key][1].extend(Issue(code, "info", entry.bid, message) for message in messages)

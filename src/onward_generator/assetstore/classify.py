@@ -80,7 +80,7 @@ def _hint(text: str, hints: tuple[str, ...]) -> bool:
     return any(h in lower for h in hints)
 
 
-def classify(name: str, size: tuple[float, float, float], triangles: int, package: str, category: str) -> Decision:
+def classify(name: str, size: tuple[float, float, float], package: str, category: str) -> Decision:
     """The catalogue row of one exported model (without id or file), or why it is skipped.
 
     ``size`` is length (x), depth (y) and height (z) in metres; ``package`` and ``category`` are the package's name
@@ -105,10 +105,9 @@ def classify(name: str, size: tuple[float, float, float], triangles: int, packag
         anchor = "flat" if placement == "ground_cover" else "ground"
         return Decision(_row("barriers", _first(words, STREET_WORDS), placement, anchor, surfaces, "single",
                              f"Street object ({_label(name)}) from {package}, about {longest:.2f} m.", words), "street")
-    if words & STORAGE_WORDS and (exterior or not words & INTERIOR_WORDS):
-        if exterior:
-            return Decision(_row("waste", _first(words, STORAGE_WORDS), "wall_foot", "ground", ["sidewalk", "yard", "empty_lot", "courtyard"],
-                                 "cluster", f"Storage or waste item ({_label(name)}) from {package}, about {longest:.2f} m.", words), "storage_outdoor")
+    if words & STORAGE_WORDS and exterior:
+        return Decision(_row("waste", _first(words, STORAGE_WORDS), "wall_foot", "ground", ["sidewalk", "yard", "empty_lot", "courtyard"],
+                             "cluster", f"Storage or waste item ({_label(name)}) from {package}, about {longest:.2f} m.", words), "storage_outdoor")
     if words & (INTERIOR_WORDS | STORAGE_WORDS):
         row = _row("furniture", "room_furniture", "interior", "ground", ["interior"], "single",
                    f"Interior item ({_label(name)}) from {package}, about {longest:.2f} m on its longest side.", words)
@@ -133,24 +132,25 @@ def _furnish_hint(words: set[str], length: float, depth: float, height: float, c
     sets = ["generic"]
     if words & FOOD_WORDS or "bakery" in lower:
         sets.append("bakery")
-    if words & BAR_WORDS or "coffee" in lower or "cafe" in lower or "bar" in words:
+    if words & BAR_WORDS or "coffee" in lower or "cafe" in lower:
         sets.append("bar")
     return {"slot": slot, "shop_sets": sorted(sets), "floors": slot == "wall" and bool(words & RESIDENTIAL_WALL)}
 
 
 def _first(words: set[str], vocabulary: frozenset[str]) -> str:
-    return re.sub(r"[^a-z_]", "", sorted(words & vocabulary)[0]) or "prop"
+    """The first vocabulary word of ``words``; a row is only made when there is one, and words are lower-case letters."""
+    return sorted(words & vocabulary)[0]
 
 
 def _label(name: str) -> str:
-    return " ".join(words_of(name))[:60] or name[:60]
+    return " ".join(words_of(name))[:60]  # a row is only made when the name has a vocabulary word
 
 
 def _row(category: str, role: str, placement: str, anchor: str, surfaces: list[str], grouping: str, description: str,
          words: set[str]) -> dict[str, Any]:
-    tags = [w for w in sorted(words) if re.fullmatch(r"[a-z][a-z_]{1,23}", w)][:4] or ["prop"]
+    tags = [w for w in sorted(words) if re.fullmatch(r"[a-z][a-z_]{1,23}", w)][:4]  # the vocabulary word is always one
     return {
         "category": category, "role": role, "surfaces": surfaces, "anchor": anchor, "lane": "forbid", "clearance_m": 0.0,
-        "use": description[:120], "description": description[:140] if len(description) >= 10 else f"{description} item",
+        "use": description[:120], "description": description[:140],
         "placement": placement, "grouping": grouping, "condition": "intact", "tags": tags,
     }

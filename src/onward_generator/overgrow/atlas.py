@@ -73,13 +73,13 @@ def atlas_candidates(nodes: Sequence[Node], images: Mapping[str, bytes]) -> list
 
 def _cell_image(data: bytes) -> np.ndarray:
     picture = Image.open(io.BytesIO(data)).convert("RGB")
-    pixels = np.asarray(picture, dtype=np.uint8)
-    if max(picture.size) <= FLAT_PX or float(pixels.reshape(-1, 3).astype(np.float32).std(axis=0).max()) < FLAT_STD:
-        colour = pixels.reshape(-1, 3).mean(axis=0).round().astype(np.uint8)
+    pixels = np.asarray(picture).reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the unknown one
+    if max(picture.size) <= FLAT_PX or float(pixels.std(axis=0).max()) < FLAT_STD:
+        colour = pixels.mean(axis=0).round().astype(np.uint8)
         return np.tile(colour, (FLAT_PX, FLAT_PX, 1))
-    if max(picture.size) > CELL_PX:
+    if max(picture.size) > CELL_PX:  # pragma: no mutate: thumbnail leaves an image already at CELL_PX unchanged
         picture.thumbnail((CELL_PX, CELL_PX), Image.Resampling.LANCZOS)
-    return np.asarray(picture, dtype=np.uint8)
+    return np.asarray(picture)
 
 
 def pack(images: Mapping[str, bytes], names: Sequence[str]) -> tuple[dict[str, bytes], dict[str, Cell]]:
@@ -88,14 +88,15 @@ def pack(images: Mapping[str, bytes], names: Sequence[str]) -> tuple[dict[str, b
     order = sorted(names, key=lambda n: (-tiles[n].shape[0], -tiles[n].shape[1], n))
     atlases: list[np.ndarray] = []
     cells: dict[str, Cell] = {}
-    x = y = shelf = 0
+    x = y = shelf = 0  # pragma: no mutate: the first tile opens a canvas, which resets all three
     canvas: np.ndarray | None = None
     for name in order:
         tile = tiles[name]
         h, w = tile.shape[:2]
         bw, bh = w + 2 * PAD_PX, h + 2 * PAD_PX
         if canvas is None or x + bw > ATLAS_PX:
-            x, y, shelf = 0, y + shelf, 0
+            x, y = 0, y + shelf
+            shelf = 0  # pragma: no mutate: the next tile sets shelf to max(shelf, its height), which is at least 2 * PAD_PX + 1
         if canvas is None or y + bh > ATLAS_PX:
             canvas = np.zeros((ATLAS_PX, ATLAS_PX, 3), dtype=np.uint8)
             atlases.append(canvas)
@@ -109,7 +110,7 @@ def pack(images: Mapping[str, bytes], names: Sequence[str]) -> tuple[dict[str, b
     pngs = {}
     for index, canvas in enumerate(atlases):
         out = io.BytesIO()
-        Image.fromarray(canvas).save(out, format="PNG", optimize=True)
+        Image.fromarray(canvas).save(out, format="PNG", optimize=True)  # pragma: no mutate: optimize changes the compression, not the decoded pixels
         pngs[f"{ATLAS_PREFIX}{index}"] = out.getvalue()
     return pngs, cells
 

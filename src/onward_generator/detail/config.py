@@ -706,8 +706,8 @@ def with_local_furnishing(cfg: DetailConfig, assets: Path) -> DetailConfig:
     catalogues, or with ``ONWARD_LOCAL_CATALOGUES=0``, ``cfg`` comes back unchanged.
     """
     shops, floors = cfg.interiors.shops.furnish, cfg.interiors.furnish
-    new_shops = _merge_local(shops, local.furnish_rows(assets, floors=False), floors=False) if shops.enabled else shops
-    new_floors = _merge_local(floors, local.furnish_rows(assets, floors=True), floors=True) if floors.enabled else floors
+    new_shops = _merge_local(shops, local.furnish_rows(assets, floors=False), floors=False) if shops.enabled else shops  # pragma: no mutate: _merge_local reads floors=None as False
+    new_floors = _merge_local(floors, local.furnish_rows(assets, floors=True), floors=True) if floors.enabled else floors  # pragma: no mutate: floors=None and False read alike; True is pinned by the floors tests
     if new_shops is shops and new_floors is floors:
         return cfg
     interiors = replace(cfg.interiors, furnish=new_floors, shops=replace(cfg.interiors.shops, furnish=new_shops))
