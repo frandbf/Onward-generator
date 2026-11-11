@@ -11,7 +11,7 @@ import sys
 
 from onward_generator.ai.providers import OllamaProvider, ProviderError
 from onward_generator.export.atmosphere import NEUTRAL, preset_names
-from onward_generator.maps.workspace import TIME_OF_DAY_DEFAULT, TIMES_OF_DAY, MapError, create_map, load_map, map_directory, refresh_texture_plan
+from onward_generator.maps.workspace import MARGIN_DEFAULT_M, RADIUS_DEFAULT_M, TIME_OF_DAY_DEFAULT, TIMES_OF_DAY, MapError, create_map, load_map, map_directory, refresh_texture_plan
 from onward_generator.materials.plan import PlanError
 from onward_generator.next_step import emit, geo_command
 from onward_generator.osm.acquire import OsmDownloadError, download_map_osm, osm_target
@@ -29,8 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--name", required=True, help="Quest card title, 1–80 characters; the id and maps/<id> folder are the slug of this name")
     create.add_argument("--lat", type=float, default=None, help="centre latitude, WGS84 degrees")
     create.add_argument("--lon", type=float, default=None, help="centre longitude, WGS84 degrees")
-    create.add_argument("--radius-m", type=float, default=400.0, help="half-side of the square area, metres (50–1500)")
-    create.add_argument("--margin-m", type=float, default=30.0, help="inclusion margin around the square, metres")
+    create.add_argument("--radius-m", type=float, default=RADIUS_DEFAULT_M, help=f"half-side of the square area, metres (50–1500, default {RADIUS_DEFAULT_M:g})")
+    create.add_argument("--margin-m", type=float, default=MARGIN_DEFAULT_M, help="inclusion margin around the square, metres")
     create.add_argument("--seed", type=int, default=None, help="deterministic seed; default derives from the centre")
     create.add_argument("--description", default=None, help="card description, max 600 characters")
     create.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")

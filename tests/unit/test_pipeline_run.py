@@ -1851,3 +1851,68 @@ def test_a_changed_mid_ring_makes_detail_stale(tmp_path: Path) -> None:
     document = json.loads((root / "map.json").read_text(encoding="utf-8")) | {"mid_ring_m": 5}
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     assert not output_ready("detail", root)  # a refused width: run plans detail again and reports it
+
+
+# ------------------------------------------------------------------------------------------------ the area of a run (plan Q2b)
+
+
+def test_a_new_map_without_a_radius_gets_150_m_and_a_30_m_margin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    created: list[list[str]] = []
+
+    def execute(argv: list[str]) -> int:
+        if argv[:2] == ["map", "create"]:
+            created.append(list(argv))
+            return 2
+        return 0
+
+    code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   radius_m=None, margin_m=None, out="maps/murcia", execute=execute, interactive=False)
+    assert code == 2
+    argv = created[0]
+    assert (argv[argv.index("--radius-m") + 1], argv[argv.index("--margin-m") + 1]) == ("150.0", "30.0")
+    assert f"{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 150 m  margin 30 m" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(("radius", "margin"), [(None, None), (250.0, None), (None, 20.0), (250.0, 20.0)])
+def test_an_existing_map_takes_the_radius_and_margin_it_records(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], radius: float | None, margin: float | None,
+) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=250, margin_m=20)
+    seen: list[str] = []
+
+    def execute(argv: list[str]) -> int:
+        seen.append(argv[0])
+        return 0
+
+    code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   radius_m=radius, margin_m=margin, out=str(root), execute=execute, interactive=False)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "r 250 m  margin 20 m" in out and seen[0] == "osm"
+
+
+@pytest.mark.parametrize(("radius", "margin", "named"), [(400.0, None, "radius 250.0"), (None, 30.0, "margin 20.0")])
+def test_an_existing_map_still_refuses_another_radius_or_margin(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], radius: float | None, margin: float | None, named: str,
+) -> None:
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, radius_m=250, margin_m=20)
+    code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   radius_m=radius, margin_m=margin, out=str(root), execute=lambda argv: 0, interactive=False)
+    out = capsys.readouterr().out
+    assert code == 1 and f"already records {named}." in out
+
+
+def test_an_unreadable_map_json_stops_the_run_before_any_step(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "murcia"
+    root.mkdir()
+    (root / "map.json").write_text("{", encoding="utf-8")
+    seen: list[list[str]] = []
+    code = run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   radius_m=None, margin_m=None, out=str(root), execute=lambda argv: seen.append(argv) or 0, interactive=False)
+    out = capsys.readouterr().out
+    assert code == 1 and out.startswith("FAILED map (exit 1). The following steps were not started.\n") and seen == []

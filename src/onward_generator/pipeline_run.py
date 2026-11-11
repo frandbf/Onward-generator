@@ -18,12 +18,15 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Any
 
 from onward_generator.ai.providers import Provider
 from onward_generator.ai.street_profile import describe as describe_profile
 from onward_generator.ai.street_profile import profile_flags, resolve_street_profile
 from onward_generator.export.atmosphere import NEUTRAL
 from onward_generator.maps.workspace import (
+    MARGIN_DEFAULT_M,
+    RADIUS_DEFAULT_M,
     MapError,
     balanced_spawns_enabled,
     core_budget,
@@ -857,8 +860,8 @@ def run_map(
     name: str,
     latitude: float,
     longitude: float,
-    radius_m: float,
-    margin_m: float,
+    radius_m: float | None,
+    margin_m: float | None,
     out: str,
     seed: int | None = None,
     description: str | None = None,
@@ -902,9 +905,17 @@ def run_map(
     steps, so the Python stages can run where Unity is not installed. It does
     not check the Editor either. ``verbose`` adds each stage's own output.
     ``preview`` keeps the diagnostic PNGs of ``generate`` and ``detail``.
+
+    ``radius_m`` and ``margin_m`` left out (None) are what ``map.json`` records on an existing map, and
+    ``RADIUS_DEFAULT_M`` and ``MARGIN_DEFAULT_M`` on a new one (plan Q2b). Given, they must match ``map.json``.
     """
     runner = execute if execute is not None else _execute_cli
     root = Path(out)
+    try:
+        radius_m, margin_m = _area(root, radius_m, margin_m)
+    except PipelineError as exc:
+        print(f"FAILED map (exit 1). The following steps were not started.\n{exc}", flush=True)
+        return 1
     prompting = sys.stdin.isatty() if interactive is None else interactive
     if not no_unity:
         gate = confirm_unity_closed(
@@ -1222,6 +1233,20 @@ def _push_package(package: Path, host: HostProfile | None = None) -> int:
     if summary:
         print(summary, flush=True)
     return code
+
+
+def _area(root: Path, radius_m: float | None, margin_m: float | None) -> tuple[float, float]:
+    """The radius and margin of the run: those given, else what ``map.json`` records, else the defaults."""
+    recorded: Mapping[str, Any] = {}
+    if (root / "map.json").is_file() and (radius_m is None or margin_m is None):
+        try:
+            recorded = load_map(root)
+        except (MapError, ValueError) as exc:  # a map.json that is not JSON raises JSONDecodeError, a ValueError
+            raise PipelineError(f"{root / 'map.json'}: {exc}") from exc
+    return (
+        float(radius_m if radius_m is not None else recorded.get("radius_m", RADIUS_DEFAULT_M)),
+        float(margin_m if margin_m is not None else recorded.get("margin_m", MARGIN_DEFAULT_M)),
+    )
 
 
 def _same_request(root: Path, map_id: str, latitude: float, longitude: float, radius_m: float, margin_m: float) -> None:
