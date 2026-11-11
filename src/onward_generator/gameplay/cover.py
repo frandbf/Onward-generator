@@ -94,9 +94,13 @@ class CoverProp:
     def parts(self) -> int:
         return len(self.prop.images())
 
-    def key(self) -> tuple[bool, bool, int, str]:
-        """In the scene first (its material is reused), then tall enough to block sight, then fewer triangles, then id."""
-        return (not self.in_scene, self.height_m < SIGHT_BLOCK_HEIGHT_M, self.triangles, self.asset_id)
+    def key(self) -> tuple[bool, bool, bool, int, str]:
+        """A barrier first, then in the scene (its material is reused), then tall enough to block sight, then fewer
+        triangles, then id.
+
+        A barrier is made to stand in a street. On Rue Mouffetard the old order put a bare 1.3 m concrete cube,
+        overgrow's debris, in the middle of a clean pedestrian street five times (plan Q6)."""
+        return (self.prop.spec.role != "barrier", not self.in_scene, self.height_m < SIGHT_BLOCK_HEIGHT_M, self.triangles, self.asset_id)
 
 
 def _local(mesh: Mesh) -> tuple[np.ndarray, float, float, float]:

@@ -139,7 +139,11 @@ def test_stair_dimensions_and_colliders(rise: float) -> None:
 
 
 def test_urban_prototypes_have_closed_colliders_on_the_ground() -> None:
-    for kind, proto in urban_prototypes().items():
+    protos = urban_prototypes()
+    assert protos["wall_lamp"].collider is None  # it hangs on a facade above head height: test_urban checks it
+    for kind, proto in protos.items():
+        if kind == "wall_lamp":
+            continue
         assert proto.collider is not None, kind
         assert closed_manifold_defects(proto.collider) == 0 and signed_volume(proto.collider) > 0, kind
         allv = np.vstack([m.vertices for _, m in proto.parts])
@@ -378,3 +382,13 @@ def test_use_evidence_and_shop_evidence_agree_on_a_point_inside_a_sub_building()
     bakery = {"id": "in", "kind": "poi", "tags": {"shop": "bakery"}, "geometry": {"type": "Point", "coordinates": [-1.0, 7.0]}}
     assert dict(_use_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": [("in", {"shop": "bakery"}, "poi_inside")]}
     assert dict(_shop_evidence([bakery], footprints, CFG)) == {"osm-way-1:A_part1": ["in"]}
+
+
+def test_a_recess_draws_its_reveals_in_the_material_it_is_given() -> None:
+    """Plan Q6: the facades pass the wall's material, so the reveals read as the wall's own depth."""
+
+    default, walled = recess(1.0, 1.5, 0.15, "glass_dark"), recess(1.0, 1.5, 0.15, "glass_dark", "plaster_ochre")
+    assert [m for m, _ in default.parts] == ["frame_stone", "glass_dark"]
+    assert [m for m, _ in walled.parts] == ["plaster_ochre", "glass_dark"]
+    assert walled.key == "recess:1.000:1.500:0.150:glass_dark:plaster_ochre" and default.key.endswith(":frame_stone")
+    assert np.array_equal(default.parts[0][1].vertices, walled.parts[0][1].vertices)

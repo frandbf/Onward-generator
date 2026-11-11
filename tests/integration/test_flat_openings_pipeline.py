@@ -40,8 +40,10 @@ def test_flat_upper_openings_are_recorded_and_save_their_reveals(detail_inputs: 
     total = sum(r["facade"]["relief"]["flat_openings"] for r in records.values())
     assert total > 0 and flat.stats["flat_openings"] == total and deep.stats["flat_openings"] == 0
     assert "facade_mesh_not_watertight" not in flat.report()["issues_by_code"]
-    stone = flat.stats["visual_triangles_by_material"]["frame_stone"]
-    assert stone == deep.stats["visual_triangles_by_material"]["frame_stone"] - 8 * total
+    # The reveals a flat opening saves are in its wall's material since plan Q6, not in frame_stone.
+    by_flat, by_deep = flat.stats["visual_triangles_by_material"], deep.stats["visual_triangles_by_material"]
+    saved = {m: by_deep[m] - by_flat.get(m, 0) for m in by_deep if by_deep[m] != by_flat.get(m, 0)}
+    assert "frame_stone" not in saved and all(n > 0 and n % 8 == 0 for n in saved.values()) and sum(saved.values()) == 8 * total
     assert flat.stats["visual_triangles"] == deep.stats["visual_triangles"] - 8 * total
     assert flat.stats["visual_triangles_by_material"]["glass_dark"] == deep.stats["visual_triangles_by_material"]["glass_dark"]
     assert flat.stats["collision_triangles"] == deep.stats["collision_triangles"]

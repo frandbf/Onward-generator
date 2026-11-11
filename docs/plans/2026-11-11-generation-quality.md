@@ -69,10 +69,18 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 - `overgrow` coloca 0 árboles en este mapa.
 - **Hacer:** contar dentro y fuera del núcleo; recolocar a la acera más cercana lo que caiga a menos de 1 m; ver por qué `overgrow` no encuentra sitio para árboles.
 
+- **Hecho (11 de noviembre):** casi todo lo «no colocado» era correcto. 107 de las 116 farolas observadas sin sitio están sobre la línea de fachada: son farolas de pared, y ahora se dibujan así (ver Q6). Los semáforos de OSM están en el nodo del cruce, en mitad de la calzada. Los intentos generados (bancos y papeleras en calles peatonales estrechas) pasan a `info`. Los avisos de `detail` en Mouffetard bajan de 258 a 43.
+- Los «0 árboles» de `overgrow` no son un fallo: sus candidatos son los árboles de OSM, y los 16 del núcleo ya los planta `detail`. Lo que sí se vio es que la zona de `overgrow` es un bloque fijo de 110 m, mientras el núcleo mide 190 m: la ambientación cubre un tercio del núcleo. Ampliarla choca con el presupuesto (Mouffetard ya está en 234 953 triángulos), así que va con P0.
+
 ### Q6. Detalles que delatan lo generado
 
 - Marcos de ventana blancos que parecen flotar delante de la fachada, rejilla repetida en la losa de la plaza y bloques de hormigón de cobertura que no encajan en una calle comercial.
 - **Hacer:** hundir o sombrear el marco, variar o girar la textura de la losa, y elegir la cobertura según el contexto (macetas, puestos de mercado o vallas en una calle peatonal).
+- **Hecho (11 de noviembre):**
+  - **Farolas:** las farolas observadas guardan 8 m entre sí, como las generadas (una plaza tenía 12 postes en 30 × 37 m, todos con el brazo al este), y las de fachada se cuelgan de la pared. La separación mínima pasa de 6,6 a 8,1 m.
+  - **Marcos:** los derrames de las ventanas usan el material de la pared, no `frame_stone` casi blanco.
+  - **Cobertura:** las barreras van antes que el cubo de hormigón que `overgrow` ya había puesto. No hay macetas ni puestos de mercado con licencia registrada; los de la Asset Store quedan fuera a propósito.
+  - **Losa:** la rejilla de la plaza no se ve en las capturas fijas de `pkg_04`, así que queda pendiente de una captura que la muestre.
 
 ### Q7. Solape de superficies en mapas grandes
 

@@ -64,7 +64,7 @@ def recess(width: float, height: float, depth: float, back: str | None, frame_ma
     parts: list[tuple[str, Mesh]] = [(frame_material, reveals)]
     if back is not None:
         parts.append((back, quad((0, d, 0), (w, d, 0), (w, d, h), (0, d, h))))
-    return Prototype(_key("recess", w, h, d, back or "open"), tuple(parts))
+    return Prototype(_key("recess", w, h, d, back or "open", frame_material), tuple(parts))
 
 
 def flat_opening(width: float, height: float, back: str) -> Prototype:

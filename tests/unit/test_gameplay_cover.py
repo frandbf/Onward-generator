@@ -112,8 +112,8 @@ def test_the_cover_rule_keeps_solid_street_props_and_names_why_others_are_left_o
     ]
     licences = {p.spec.id: "CC0-1.0" for p in props if p.spec.id != "nolicence"}
     kept, refused = cover_props(props, licences, frozenset())
-    # All four are under 1.2 m and have 12 triangles: the id decides.
-    assert [p.asset_id for p in kept] == ["barrel", "barrier", "debris", "long_ok"]
+    # The barriers first (plan Q6); then all are under 1.2 m and have 12 triangles: the id decides.
+    assert [p.asset_id for p in kept] == ["barrier", "long_ok", "barrel", "debris"]
     assert refused == {
         "bench": "not_a_cover_role", "house": "not_a_cover_role", "long": "too_long", "low": "too_low",
         "nolicence": "no_licence", "plant": "not_a_cover_role", "thin": "too_thin", "wall_cam": "not_on_the_ground",
@@ -137,7 +137,17 @@ def test_props_rank_in_scene_then_sight_blockers_then_fewer_triangles_then_id() 
     same = _prop("e_same", size=(1.0, 0.5, 1.2))
     kept, _ = cover_props([short, many, tall, scene, same], licences, frozenset({"d_scene"}))
     assert [p.asset_id for p in kept] == ["d_scene", "b_tall", "c_many", "e_same", "a_short"]
-    assert kept[0].key() == (False, True, 12, "d_scene")
+    assert kept[0].key() == (False, False, True, 12, "d_scene")
+
+
+def test_a_barrier_outranks_debris_already_in_the_scene() -> None:
+    """Plan Q6: on Rue Mouffetard overgrow's concrete cube, in the scene, beat every barrier five times."""
+    cube = _prop("cube", "debris", (1.3, 1.3, 1.3), category="waste")
+    barrier = _prop("barrier", "barrier", (2.1, 0.8, 1.06))
+    barrel = _prop("barrel", "barrel", (0.5, 0.5, 0.87), category="waste")
+    licences = {name: "CC0-1.0" for name in ("cube", "barrier", "barrel")}
+    kept, _ = cover_props([cube, barrel, barrier], licences, frozenset({"cube", "barrel"}))
+    assert [p.asset_id for p in kept] == ["barrier", "cube", "barrel"]
 
 
 def test_a_prop_deeper_than_long_turns_a_quarter_and_rests_centred_on_the_ground() -> None:
