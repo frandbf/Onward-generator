@@ -131,6 +131,7 @@ El SDK define 12 `EProfileId` (`UrbanDay1/2`, `DesertDay1/2`, `ForestDay1/2` y s
 - **Qué mirar:** si el cielo acompaña al bake dorado; si el perfil cambia el grading; si se ve a un enemigo en la sombra; fps.
 - **Decisiones:** valores del sol; qué perfil usa cada preset; si se añade `dusk`. Si ningún perfil arregla el cielo azul, el preset se queda más cerca del neutral y la parte 2 del cielo (C8) pierde prioridad.
 - **Pausa para el usuario.**
+- **Resultado (11 de noviembre de 2026).** El usuario probó `pkg_15` (`Day`/`UrbanDay1`), `pkg_16` (`Twilight`) y `pkg_17` (`UrbanDay2` con `SkyColor #E8B890`) en el Quest 3: los tres se ven bien, y `Twilight`, `UrbanDay2` y `SkyColor` no cambian nada visible. `golden_hour` se queda en `Day`/`UrbanDay1`, no se añade `dusk`, el sol no cambia y el cielo propio de la parte 2 pierde prioridad. Detalle en ADR-037.
 
 ### E5. Ambiente Trilight y AO
 

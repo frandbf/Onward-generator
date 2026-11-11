@@ -26,8 +26,19 @@ Status: proposed · 10 November 2026. Plans E0 to E3 and E6 of [the atmosphere p
 - **One key for light and content** (a `smoke_dusk` preset with barriers and smoke). Light is free and reversible; barriers change routes and cover, and must be judged with the gameplay metrics of ADR-032.
 - **Presets in the export card.** The card is per package; the atmosphere is a choice about the map, like the time of day.
 
+## Headset session (plan E4, 11 November 2026)
+
+Madrid Sol Arena on a Quest 3, the user's own judgement, one package at a time in the local slot:
+
+| Package | Light | SDK environment | Seen |
+|---|---|---|---|
+| `pkg_15` | `golden_hour`, sun at 30°, azimuth 119.09° (streets) | `Day` / `UrbanDay1` | looks good |
+| `pkg_16` | the same | `Twilight` / `UrbanDay1` | looks good |
+| `pkg_17` | the same | `Day` / `UrbanDay2`, `SkyColor #E8B890` | looks good, no change from `pkg_16` |
+
+Decisions: `golden_hour` keeps `Day` / `UrbanDay1`, since neither `Twilight`, `UrbanDay2` nor `SkyColor` changed anything the user could see; no `dusk` preset; `ENVIRONMENT_PROFILES` gains nothing; the built-in sky under the warm bake did not look wrong, so a custom sky (part 2) is not urgent. The sun's values stay as they are.
+
 ## To check on the headset
 
-- Whether the built-in sky under a warm bake looks wrong, and whether a profile, `Twilight` or `SkyColor` changes it (plan E2, E4).
 - Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours.
 - Whether a soldier in the shade stays readable with the trilight ambient (plan E5).
