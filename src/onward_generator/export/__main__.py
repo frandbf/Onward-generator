@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--layout", required=True, help="perf_layout 0.1.0 or gameplay_layout 0.3.0")
     p.add_argument("--config", default=None, help="adapter configuration (default: config/export/onward.default.json)")
     p.add_argument("--out", required=True, help="new package directory; must not exist")
-    p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037, proposed)")  # pragma: no mutate: help text
+    p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037)")  # pragma: no mutate: help text
     v = sub.add_parser("verify", help="re-hash every file of a package")
     v.add_argument("package")
     w = sub.add_parser("views", help="write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1)")
@@ -81,7 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if atmosphere is not None:
         sun = atmosphere["sun"]
         applied = ", ".join(atmosphere["applied"])
-        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): applies {applied}; "
+        print(f"  atmosphere {atmosphere['preset']} (ADR-037): applies {applied}; "
               f"sun at {sun['elevation_deg']:g} deg, azimuth {sun['azimuth_deg']:g} deg ({sun['azimuth_source']})")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0

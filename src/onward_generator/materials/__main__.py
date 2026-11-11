@@ -116,7 +116,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         print(f"facades: {facades['mode']} style={facades['style']} ({facades['style_origin']}) {detail}")
         tone = facades.get("atmosphere")
         if tone:
-            print(f"facades: atmosphere {tone['preset']} (ADR-037 proposed): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
+            print(f"facades: atmosphere {tone['preset']} (ADR-037): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
                   f"desaturated, value at most {tone['wall_value_max']:g}; mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}")
     repetition = report.get("repetition")
     if repetition:

@@ -400,7 +400,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                   atmosphere: str | None = None) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
-    ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037, proposed). None or ``neutral``
+    ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
     changes nothing, the package id included."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()

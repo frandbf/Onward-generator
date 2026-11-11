@@ -294,7 +294,7 @@ def test_the_export_command_takes_the_preset(inputs: tuple[Path, Path, Path], tm
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
     assert main([*args, "--out", str(tmp_path / "golden"), "--atmosphere", "golden_hour"]) == 0
     sun = json.loads((tmp_path / "golden" / "onward_export.json").read_bytes())["atmosphere"]["sun"]
-    assert f"  atmosphere golden_hour (ADR-037 proposed): applies sun, ambient, ao, fog; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
+    assert f"  atmosphere golden_hour (ADR-037): applies sun, ambient, ao, fog; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "plain")]) == 0
     assert "atmosphere" not in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "bad"), "--atmosphere", "sunset"]) == 1

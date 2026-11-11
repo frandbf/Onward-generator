@@ -1,4 +1,4 @@
-"""Atmosphere presets: the baked light of a day map (ADR-037, proposed).
+"""Atmosphere presets: the baked light of a day map (ADR-037).
 
 A map names one preset in ``map.json`` (``atmosphere``). ``neutral``, or no key at all, is today's light and
 changes nothing, down to the package id. The presets themselves are numbers in ``config/atmosphere.default.json``;

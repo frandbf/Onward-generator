@@ -1,4 +1,4 @@
-"""Atmosphere presets: the presets file, its schema and the day-only rule (ADR-037, proposed)."""
+"""Atmosphere presets: the presets file, its schema and the day-only rule (ADR-037)."""
 
 from __future__ import annotations
 

@@ -121,7 +121,7 @@ namespace OnwardGenerator
             // texels and are lit by probes, or by the ambient light when combined, but stay ContributeGI and
             // cast the baked shadows. Absent in older packages, which bake the ring as before.
             public bool scenic_out_of_lightmap = false;
-            // Plan E10 (ADR-037, proposed): a combined cell wholly inside the core square bakes at scale times its
+            // Plan E10 (ADR-037): a combined cell wholly inside the core square bakes at scale times its
             // density. Absent (scale 0) in every package without an atmosphere preset.
             public LightmapCore lightmap_core = new LightmapCore();
             // Plan D5 spike (ADR-033, proposed): the facade_trim_* material drawn with PP_Opaque_Lit and the package's
@@ -137,10 +137,10 @@ namespace OnwardGenerator
             public float fog_start_m = 160f;
             public float fog_end_m = 1000f;
             public string fog_color = "#C8CDD2";
-            // Plan E2 (ADR-037, proposed): a headset test package replaces the SDK time of day and profile of a day
+            // Plan E2 (ADR-037): a headset test package replaces the SDK time of day and profile of a day
             // gameplay layout, and may set SharedLevelSettings.SkyColor. JsonUtility leaves the fields empty when absent.
             public ExperimentalEnvironment experimental_environment = new ExperimentalEnvironment();
-            // ADR-037 (proposed): the light of an atmosphere preset, in numbers. Absent (sun_intensity 0) keeps the
+            // ADR-037: the light of an atmosphere preset, in numbers. Absent (sun_intensity 0) keeps the
             // light of before: 50 degrees, heading -30, intensity 1.2, white.
             public Lighting lighting = new Lighting();
         }

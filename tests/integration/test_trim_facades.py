@@ -130,7 +130,7 @@ def test_the_cli_tones_the_atlas_with_a_preset(runs: dict[str, Path], tmp_path: 
     out = capsys.readouterr().out
     tone = json.loads((tmp_path / "g" / "materials_report.json").read_bytes())["facades"]["atmosphere"]
     assert (tone["preset"], tone["grime"], tone["wall_desaturation"], tone["wall_value_max"]) == ("golden_hour", 1.0, 0.08, 0.85)
-    assert (f"facades: atmosphere golden_hour (ADR-037 proposed): grime x1, walls 8% desaturated, value at most 0.85; "
+    assert (f"facades: atmosphere golden_hour (ADR-037): grime x1, walls 8% desaturated, value at most 0.85; "
             f"mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}\n") in out
     assert tone["wall_luminance_after"] < tone["wall_luminance_before"]
     assert (tmp_path / "g" / "facade_trim.png").read_bytes() != (runs["trim"] / "facade_trim.png").read_bytes()
