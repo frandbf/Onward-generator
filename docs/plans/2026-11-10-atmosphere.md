@@ -181,6 +181,7 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - Compone con el presupuesto de páginas de la enmienda C5 del ADR-005. Si `lightmap_pages_max` está activo, manda el presupuesto.
 - **Riesgo:** memoria de lightmaps y tiempo de bake. El ADR-005 registra que la estimación de páginas puede quedarse muy corta (París: 3 estimadas, 24 reales).
 - **Aceptación:** `lightmap_texels` del informe del bake y memoria gráfica ≤ 1 GB en el casco. Si no cabe, bajar a 12 o descartar.
+- **Hecho (11 de noviembre de 2026).** En Madrid, 146 mallas combinadas del núcleo bakean a ×1,4: la estimación pasa de 4 a 6 páginas (justo el presupuesto de la tarjeta) y el bake real de 5 a 7 páginas de 2048², unos 7 MB en ASTC; el bundle pasa de 30 a 32 MB. El presupuesto cuenta el núcleo, pero la estimación sigue siendo una cota inferior.
 
 ### E11. Sesión de casco final
 

@@ -25,7 +25,17 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
-from onward_generator.export.atmosphere import APPLIED, FOG, NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
+from onward_generator.export.atmosphere import (
+    APPLIED,
+    FOG,
+    LIGHTMAP_CORE,
+    NEUTRAL,
+    STREETS,
+    AtmosphereError,
+    check_atmosphere,
+    lighting,
+    load_presets,
+)
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -316,6 +326,23 @@ def _resolve_lightmap_scales(options: dict[str, Any], visual: bytes, *, scenic_o
     options["lightmap_scales"] = material_scales(names, class_scales, scenic_out_of_lightmap=scenic_out_of_lightmap)
 
 
+def _core_lightmap(preset: str | None, options: Mapping[str, Any], detail_manifest: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Plan E10: ``{"half_side_m", "scale"}`` when a preset asks the playable core for more texels than the card.
+
+    ``scale`` is the preset's ``lightmap_texels_per_m_core`` over the card's density, rounded to four decimals.
+    None without a preset, without a core, without combining (the adapter knows cells only when it combines) or
+    when the card already bakes at that density or more: the core never gets fewer texels than the rest."""
+    if preset is None or not (detail_manifest.get("core") or {}).get("half_side_m"):
+        return None
+    if float(options.get("combine_cell_m") or 0) <= 0:
+        return None
+    wanted = float(load_presets()[preset]["lightmap_texels_per_m_core"])
+    scale = round(wanted / float(options["lightmap_texels_per_m"]), 4)
+    if scale <= 1.0:
+        return None
+    return {"half_side_m": float(detail_manifest["core"]["half_side_m"]), "scale": scale}
+
+
 def _apply_page_budget(options: dict[str, Any], visual: bytes, *, scenic_out_of_lightmap: bool) -> dict[str, Any]:
     """Plan C5: lower ``lightmap_texels_per_m`` in the options until the estimate fits ``lightmap_pages_max``.
 
@@ -326,15 +353,17 @@ def _apply_page_budget(options: dict[str, Any], visual: bytes, *, scenic_out_of_
     requested = float(options["lightmap_texels_per_m"])
     pages_max = int(options["lightmap_pages_max"])
     max_size = int(options["lightmap_max_size"])
-    areas = lightmap_areas(visual, cell_m=float(options["combine_cell_m"]), scenic_out_of_lightmap=scenic_out_of_lightmap)
+    cell_m = float(options["combine_cell_m"])
+    core = options.get("lightmap_core")
+    areas = lightmap_areas(visual, cell_m=cell_m, scenic_out_of_lightmap=scenic_out_of_lightmap)
     try:
         applied = page_budget_density(areas, requested=requested, pages_max=pages_max, max_size=max_size,
-                                      scales=options["lightmap_scales"])
+                                      scales=options["lightmap_scales"], core=core, cell_m=cell_m)
     except LightmapBudgetError as exc:
         raise ExportError([f"export config: /build/lightmap_pages_max: {exc}"]) from exc
     if applied != requested:
         options["lightmap_texels_per_m"] = applied
-    found = summarise(areas, texels_per_m=applied, max_size=max_size, scales=options["lightmap_scales"])
+    found = summarise(areas, texels_per_m=applied, max_size=max_size, scales=options["lightmap_scales"], core=core, cell_m=cell_m)
     return {**found, "texels_per_m_requested": requested, "lightmap_pages_max": pages_max}
 
 
@@ -431,6 +460,10 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     # Plan C4: read, never written or normalised, so a card without the key keeps its package_id.
     scenic_out = options.get("scenic_out_of_lightmap") is True
     _resolve_lightmap_scales(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
+    # Plan E10 (ADR-037): a preset's core density, before the page budget so the budget counts it.
+    core_lightmap = _core_lightmap(preset, options, detail_manifest)
+    if core_lightmap is not None:
+        options["lightmap_core"] = core_lightmap
     # Plan C5: only a card with the key runs the page budget, so a card without it keeps its package_id.
     budget_estimate = (_apply_page_budget(options, visual_bytes, scenic_out_of_lightmap=scenic_out)
                        if "lightmap_pages_max" in options else None)
@@ -457,6 +490,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Plan E7: the preset tints the fog; where it starts and ends stays the map's, from its wall (ADR-014).
             options["fog_color"] = str(chosen["fog"]["color"])
             applied.append(FOG)
+        if core_lightmap is not None:
+            applied.append(LIGHTMAP_CORE)
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -511,7 +546,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             "lightmap_estimate": budget_estimate if budget_estimate is not None else estimate(
                 visual_bytes, texels_per_m=float(options["lightmap_texels_per_m"]),
                 max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
-                scales=options["lightmap_scales"], scenic_out_of_lightmap=scenic_out,
+                scales=options["lightmap_scales"], scenic_out_of_lightmap=scenic_out, core=options.get("lightmap_core"),
             ),
             "tiers": _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"])),
             "view_draws": _view_draws(visual_bytes, detail_manifest, layout_doc, float(options["combine_cell_m"])),
@@ -525,6 +560,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         if preset is not None:
             # Which parts of the preset the package applies: the sun since plan E3, the ambient and the AO since E5.
             manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": applied, "sun": sun_record}
+            if core_lightmap is not None:
+                manifest["atmosphere"]["lightmap_core"] = {
+                    **core_lightmap, "texels_per_m": round(core_lightmap["scale"] * float(options["lightmap_texels_per_m"]), 2)}
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

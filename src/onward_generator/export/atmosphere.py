@@ -30,6 +30,8 @@ STREETS = "streets"
 # E7 the colour of the fog, only when the map's card has its fog on).
 APPLIED = ("sun", "ambient", "ao")
 FOG = "fog"
+# E10: the playable core bakes at the preset's density, only with a core, combining and a lower card density.
+LIGHTMAP_CORE = "lightmap_core"
 
 
 class AtmosphereError(ValueError):
@@ -112,4 +114,4 @@ def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tupl
     return block, record
 
 
-__all__ = ["APPLIED", "FOG", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]
+__all__ = ["APPLIED", "FOG", "LIGHTMAP_CORE", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]

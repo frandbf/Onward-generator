@@ -121,6 +121,9 @@ namespace OnwardGenerator
             // texels and are lit by probes, or by the ambient light when combined, but stay ContributeGI and
             // cast the baked shadows. Absent in older packages, which bake the ring as before.
             public bool scenic_out_of_lightmap = false;
+            // Plan E10 (ADR-037, proposed): a combined cell wholly inside the core square bakes at scale times its
+            // density. Absent (scale 0) in every package without an atmosphere preset.
+            public LightmapCore lightmap_core = new LightmapCore();
             // Plan D5 spike (ADR-033, proposed): the facade_trim_* material drawn with PP_Opaque_Lit and the package's
             // lit_normal.png. Empty (absent in older packages and in every card without the key) keeps PP_Opaque_Simple_Lit.
             // lit_normal_strength is baked into the PNG by export package; the adapter does not read it.
@@ -163,6 +166,7 @@ namespace OnwardGenerator
         [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
 
         [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
+        [Serializable] private class LightmapCore { public float half_side_m; public float scale; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
@@ -668,6 +672,7 @@ namespace OnwardGenerator
             AssetDatabase.StartAssetEditing();
             var built = new List<(string, Mesh, int)>();
             var furnitureMeshes = new HashSet<string>(StringComparer.Ordinal);
+            var coreMeshes = new Dictionary<string, float>(StringComparer.Ordinal);
             int tangentMeshes = 0;
             try
             {
@@ -675,6 +680,8 @@ namespace OnwardGenerator
                 {
                     (int cx, int cz, int mat) = g.Key;
                     string name = $"K{cx}_{cz}_m{mat}".Replace('-', 'n');
+                    float core = furnitureGroups.Contains(g.Key) ? 1f : CoreScale(opt, cx, cz, cellM);
+                    if (core > 1f) coreMeshes[name] = core;
                     // CombineMeshes adds mesh.vertexCount for every instance. The submesh
                     // range is smaller, so using it leaves a 16-bit buffer that Unity then rejects.
                     long verts = g.Value.Sum(ci => (long)ci.mesh.vertexCount);
@@ -682,7 +689,7 @@ namespace OnwardGenerator
                     combined.CombineMeshes(g.Value.ToArray(), true, true, false);
                     combined.RecalculateBounds();
                     // Renderers out of the lightmap (props, trees, the scenic walls under plan C4) are still unwrapped.
-                    Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));
+                    Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * core * ScaleInLightmap(opt, visual.Doc.materials, mat)));
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
                     // Plan D5: only the promoted material's groups get tangents, after the unwrap.
@@ -712,7 +719,8 @@ namespace OnwardGenerator
                 renderer.shadowCastingMode = mat >= 0 && mat < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[mat])
                     ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                float coreScale = coreMeshes.TryGetValue(name, out float core) ? core : 1f;
+                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ? ScaleInLightmap(opt, visual.Doc.materials, mat) * coreScale : 0f;
                 if (!ContributesGi(renderer.sharedMaterial, opt))
                 {
                     renderer.receiveGI = ReceiveGI.LightProbes;
@@ -728,11 +736,25 @@ namespace OnwardGenerator
             }
 
             Debug.Log($"{LogPrefix} Combined visual: {built.Count} meshes from {groups.Values.Sum(l => l.Count)} primitives, cell {cellM} m");
+            if (coreMeshes.Count > 0)
+                Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} Core lightmap (ADR-037): {1} combined meshes inside {2:0.#} m at x{3:0.####}.",
+                    LogPrefix, coreMeshes.Count, opt.lightmap_core.half_side_m, opt.lightmap_core.scale));
             if (litNormal >= 0)
                 Debug.Log($"{LogPrefix} Lit normal: {tangentMeshes} combined meshes of {visual.Doc.materials[litNormal].name} got tangents.");
             Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
                 + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
+        }
+
+        // Plan E10: the scale of a combine cell wholly inside the core square, else 1. The square is centred on the
+        // local origin, so the sign convention of the cell's second index does not matter.
+        private static float CoreScale(Options opt, int cx, int cz, float cellM)
+        {
+            LightmapCore core = opt.lightmap_core;
+            if (core == null || core.scale <= 1f || core.half_side_m <= 0f) return 1f;
+            float h = core.half_side_m;
+            bool inside = -h <= cx * cellM && (cx + 1) * cellM <= h && -h <= cz * cellM && (cz + 1) * cellM <= h;
+            return inside ? core.scale : 1f;
         }
 
         // ---- Entry points ------------------------------------------------------------------
