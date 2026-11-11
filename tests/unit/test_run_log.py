@@ -342,6 +342,11 @@ def test_layout_warns_when_the_spawns_have_one_distinct_route(tmp_path: Path, ro
     # A stale report says nothing, its routes included.
     _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": "0" * 64})
     assert summarize("layout", ["--out", str(layout)]).alerts == ()
+    # It adds to the climbs' warning rather than replacing it.
+    bare = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [], "lifts": []})
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": sha256_file(bare)})
+    climbs = Alert("warning", "no ladder or lift reaches a roof (ADR-029)", 1)
+    assert summarize("layout", ["--out", str(bare)]).alerts == ((climbs, alert) if warned else (climbs,))
 
 
 def test_export_hides_the_standing_unverified_adapter_warning(tmp_path: Path) -> None:
