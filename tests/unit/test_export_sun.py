@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from onward_generator.export.atmosphere import lighting, load_presets
-from onward_generator.export.sun import OFFSET_DEG, StreetSun, azimuth_across, street_axis, street_sun, wall_votes
+from onward_generator.export.sun import OFFSET_DEG, StreetSun, _gap, azimuth_across, street_axis, street_sun, wall_votes
 from onward_generator.generation.gltf import Material, Node, Primitive, build_glb
 from onward_generator.generation.mesh import Mesh, quad
 
@@ -148,3 +148,52 @@ def test_lighting_takes_the_street_azimuth_and_records_the_axis() -> None:
 def test_a_numeric_azimuth_ignores_the_street_sun() -> None:
     block, record = lighting(load_presets()["overcast"], StreetSun(84.09, 119.09, 1.0))
     assert block["sun_azimuth_deg"] == 150.0 and record["azimuth_source"] == "preset" and "axis_deg" not in record
+
+
+def test_a_small_wall_votes_too() -> None:
+    """A wall of 0.4 square metres: its cross product is shorter than 1."""
+    headings, areas = _votes(("plaster_cream", _wall(30.0, length_m=0.4, height_m=1.0)))
+    assert len(headings) == 2 and areas.sum() == pytest.approx(0.4)
+
+
+def test_a_degenerate_triangle_inside_the_core_does_not_vote() -> None:
+    flat = Mesh(np.array([[0.0, 0, 0], [1, 0, 0], [2, 0, 0]]), np.array([[0, 1, 2]]))
+    assert len(_votes(("plaster_cream", flat), half_side_m=50.0)[0]) == 0
+
+
+def test_a_small_slanted_face_is_not_a_wall() -> None:
+    """Its normal leans 17 degrees from horizontal and its cross product is shorter than 1."""
+    steep = quad((0, 0, 0), (0.5, 0, 0), (0.5, 0.15, 0.5), (0, 0.15, 0.5))
+    assert len(_votes(("plaster_cream", steep))[0]) == 0
+
+
+def test_a_part_without_walls_does_not_stop_the_count() -> None:
+    floor = quad((0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0))
+    headings, _areas = _votes(("plaster_cream", floor), ("plaster_cream", _wall(30.0)))
+    assert len(headings) == 2
+
+
+def test_no_wall_is_two_empty_arrays() -> None:
+    headings, areas = _votes()
+    assert headings.shape == (0,) and areas.shape == (0,)
+
+
+@pytest.mark.parametrize(
+    ("headings", "areas", "expected"),
+    [([45.0, 37.0, 43.0], [4.0, 2.0, 2.0], 42.53), ([5.0, 4.0, 14.0], [3.0, 1.0, 4.0], 9.38), ([90.0, 87.0], [1.0, 1.0], 88.5)],
+)
+def test_the_smoothed_histogram_picks_the_axis(headings: list[float], areas: list[float], expected: float) -> None:
+    """Each case tells one smoothing, padding or last-bin rule from its neighbours (found by search)."""
+    assert street_axis(np.array(headings), np.array(areas)) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(("a", "b", "expected"), [(10.0, 350.0, 20.0), (350.0, 10.0, 20.0), (0.0, 180.0, 180.0), (150.0, 150.0, 0.0), (100.0, 300.0, 160.0)])
+def test_the_gap_between_two_azimuths(a: float, b: float, expected: float) -> None:
+    assert _gap(a, b) == pytest.approx(expected)
+
+
+def test_the_street_sun_counts_only_the_core_and_rounds_the_area() -> None:
+    visual = _glb(("plaster_cream", _wall(20.0, length_m=5.5, height_m=5.5)), ("plaster_cream", _wall(50.0, at=(80.0, 0.0))))
+    sun = street_sun(visual, 50.0)
+    assert sun.axis_deg == pytest.approx(20.0, abs=0.01) and sun.wall_area_m2 == 30.2
+    assert street_sun(visual, None).wall_area_m2 == 90.2

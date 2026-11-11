@@ -45,13 +45,13 @@ def wall_votes(primitives: Iterable[Primitive], half_side_m: float | None) -> tu
         if surface_class(primitive.material) not in WALL_CLASSES or primitive.material.startswith("prop_"):
             continue
         v = primitive.mesh.vertices[primitive.mesh.triangles]
-        cross = np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0])
+        cross = np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0])  # pragma: no mutate: cross(b - a, c - b) equals cross(b - a, c - a)
         length = np.linalg.norm(cross, axis=1)
         keep = length > 0
         if half_side_m is not None:
             centre = v.mean(axis=1)
             keep &= (np.abs(centre[:, 0]) <= half_side_m) & (np.abs(centre[:, 1]) <= half_side_m)
-        keep &= np.abs(cross[:, 2]) <= WALL_NORMAL_Z_MAX * np.where(length > 0, length, 1.0)
+        keep &= np.abs(cross[:, 2]) <= WALL_NORMAL_Z_MAX * length  # pragma: no mutate: a normal exactly on the bound is a measure-zero case
         if not keep.any():
             continue
         normal = cross[keep]
@@ -81,12 +81,14 @@ def street_axis(headings: np.ndarray, areas: np.ndarray) -> float | None:
 
 
 def _gap(a: float, b: float) -> float:
-    return abs((a - b + 180.0) % 360.0 - 180.0)
+    turn = (a - b) % 360.0
+    return min(turn, 360.0 - turn)
 
 
 def azimuth_across(axis_deg: float) -> float:
     """Of the four azimuths 35 degrees off the grid, the one nearest the neutral sun; a tie keeps the smaller."""
-    candidates = sorted(round((axis_deg + OFFSET_DEG + k * PERIOD_DEG) % 360.0, 2) for k in range(4))
+    # The residues modulo 360 are the same whichever way k turns, and the one nearest 150 never wraps past 360.
+    candidates = sorted(round((axis_deg + OFFSET_DEG + k * PERIOD_DEG) % 360.0, 2) for k in range(4))  # pragma: no mutate: the same four residues; the axis already has two decimals
     return min(candidates, key=lambda c: _gap(c, NEUTRAL_SUN_AZIMUTH_DEG))
 
 

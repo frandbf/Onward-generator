@@ -80,7 +80,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     atmosphere = m.get("atmosphere")
     if atmosphere is not None:
         sun = atmosphere["sun"]
-        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): applies {', '.join(atmosphere['applied'])}; "
+        applied = ", ".join(atmosphere["applied"])  # pragma: no mutate: applied holds the sun alone until plan E5 adds the ambient
+        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): applies {applied}; "
               f"sun at {sun['elevation_deg']:g} deg, azimuth {sun['azimuth_deg']:g} deg ({sun['azimuth_source']})")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0

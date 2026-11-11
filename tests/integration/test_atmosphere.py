@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,8 +15,9 @@ from typing import Any
 import pytest
 
 from onward_generator.cli import main
+from onward_generator.export import package as package_module
 from onward_generator.export.package import ExportError, build_package
-from onward_generator.export.sun import street_sun
+from onward_generator.export.sun import StreetSun, street_sun
 from onward_generator.maps.workspace import (
     MapError,
     create_map,
@@ -304,3 +306,30 @@ def test_the_adapter_turns_the_sun_only_when_the_package_has_a_lighting_block() 
     assert "if (lighting == null || lighting.sun_intensity <= 0f) return;" in body
     assert "Quaternion.Euler(lighting.sun_elevation_deg, lighting.sun_azimuth_deg + 180f, 0f)" in body
     assert "light.shadowAngle = lighting.sun_shadow_angle_deg;" in body
+
+
+def test_a_map_json_without_a_time_of_day_takes_a_preset_as_a_day_map(tmp_path: Path) -> None:
+    root = _map(tmp_path)
+    document = json.loads((root / "map.json").read_bytes())
+    document.pop("time_of_day", None)
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert store_atmosphere(root, "golden_hour") is True
+    assert map_atmosphere(root) == "golden_hour"
+
+
+def test_the_package_turns_the_sun_to_the_streets_of_the_core(inputs: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The street sun is asked for the core's half side, read from scene_detail.json."""
+    detail = tmp_path / "detail"
+    shutil.copytree(inputs[0], detail)
+    document = json.loads((detail / "scene_detail.json").read_bytes())
+    (detail / "scene_detail.json").write_text(json.dumps({**document, "core": {**(document.get("core") or {}), "half_side_m": 62.5}}), encoding="utf-8")
+    seen: list[float | None] = []
+
+    def spy(visual: bytes, half_side_m: float | None) -> StreetSun:
+        seen.append(half_side_m)
+        return StreetSun(10.0, 145.0, 12.5)
+
+    monkeypatch.setattr(package_module, "street_sun", spy)
+    result = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "pkg", now=FIXED_NOW, atmosphere="golden_hour")
+    assert seen == [62.5]
+    assert result.manifest["atmosphere"]["sun"] == {"elevation_deg": 30.0, "azimuth_source": "streets", "axis_deg": 10.0, "wall_area_m2": 12.5, "azimuth_deg": 145.0}

@@ -160,3 +160,13 @@ def test_run_export_has_a_views_step_after_the_scene() -> None:
     assert '[[ -e "$BUILD/scene_report.json" ]] || { log "run the scene step first' in body
     assert "-m onward_generator export views \"$PACKAGE\"" in body
     assert "-executeMethod OnwardGenerator.OnwardMapAdapter.CaptureViews -exportPackage \"$PACKAGE\"" in body
+
+
+def test_heading_and_eye_keep_their_decimals() -> None:
+    assert heading_deg((0.0, 0.0), (1.0, 2.0)) == 26.57
+    assert {v["position_m"][2] for v in capture_views(_layout(ground_z_m=0.1234))} == {1.823}
+
+
+def test_the_export_help_lists_the_views_command(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["export", "--help"]) == 0
+    assert "write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1)" in " ".join(capsys.readouterr().out.split())

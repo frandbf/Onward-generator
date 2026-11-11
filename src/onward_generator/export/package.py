@@ -442,12 +442,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
                         "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match.")
-    sun_record: dict[str, Any] | None = None
+    sun_record: dict[str, Any] | None = None  # pragma: no mutate: read only when a preset sets it below
     if preset is not None:
         # ADR-037: written only with a preset, so a map without one keeps its package_id.
         options["atmosphere"] = preset
         chosen = load_presets()[preset]
-        street = None
+        street = None  # pragma: no mutate: a preset with a numeric azimuth never reads it
         if chosen["sun"]["azimuth"] == STREETS:
             # Plan E6: the sun crosses the street axis of the playable core, or of the whole map without a core.
             street = street_sun(visual_bytes, (detail_manifest.get("core") or {}).get("half_side_m"))
