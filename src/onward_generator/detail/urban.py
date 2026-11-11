@@ -23,7 +23,6 @@ from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import Prototype, yaw_matrix
 from onward_generator.generation.surfaces import LinearWay
 
-
 WALL_MOUNT_M = 0.5
 """An OSM street lamp this close to a facade hangs on it (plan Q6): Paris maps its wall lamps on the facade line."""
 WALL_MOUNT_TAGS = {"lamp_mount": ("wall",), "support": ("wall_mounted", "wall")}
