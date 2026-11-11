@@ -101,8 +101,7 @@ def unpack(package: Path, project: Path) -> int:
 
 def _read(archive: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
     handle = archive.extractfile(member)
-    if handle is None:  # pragma: no mutate: members are regular files, so extractfile never returns None; the check is for mypy
-        raise PackageError(f"{member.name}: unreadable member")
+    assert handle is not None  # members are regular files, so extractfile always returns a handle
     return handle.read()
 
 

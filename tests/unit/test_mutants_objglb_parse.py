@@ -134,3 +134,8 @@ def test_an_index_one_past_the_end_is_out_of_range() -> None:
 def test_a_corner_without_a_vertex_is_named() -> None:
     with pytest.raises(ObjError, match=r"^face corner '/1' has no vertex$"):
         parse_obj(TRI + "vt 0 0\nf /1 2 3\n")
+
+
+def test_a_map_option_with_its_two_values_and_no_name_is_read() -> None:
+    material = parse_mtl("newmtl a\nmap_Kd -s 2 3\n")["a"]
+    assert material.scale == (2.0, 3.0) and material.texture == ""
