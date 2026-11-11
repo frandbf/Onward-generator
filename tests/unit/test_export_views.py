@@ -169,4 +169,5 @@ def test_heading_and_eye_keep_their_decimals() -> None:
 
 def test_the_export_help_lists_the_views_command(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["export", "--help"]) == 0
-    assert "write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1)" in " ".join(capsys.readouterr().out.split())
+    text = " ".join(capsys.readouterr().out.split())
+    assert " views write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1) options:" in text
