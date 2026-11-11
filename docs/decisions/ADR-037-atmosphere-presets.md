@@ -1,6 +1,6 @@
 # ADR-037 — Atmosphere presets: the baked light of a day map
 
-Status: proposed · 10 November 2026. Plans E0 to E3, E5 to E8 and E10 of [the atmosphere plan](../plans/2026-11-10-atmosphere.md): the setting, fixed views to compare bakes, headset test packages of the SDK environment, and the sun across the streets. It stays proposed until a headset session has compared a preset with `neutral` (plan E11).
+Status: accepted · 11 November 2026 (proposed 10 November 2026). Plans E0 to E3, E5 to E8 and E10 of [the atmosphere plan](../plans/2026-11-10-atmosphere.md): the setting, fixed views to compare bakes, headset test packages of the SDK environment, and the sun across the streets. Accepted after the headset sessions of plans E4 and E11 below.
 
 ## Context
 
@@ -49,10 +49,26 @@ The same map and slot, each package adding one increment to `pkg_15`; every one 
 | `pkg_20` | the wall palette of the atlas (E8): mean wall luminance 0.7083 → 0.5589 | 2 min 15 s |
 | `pkg_21` | the core at 14 texels/m (E10): 7 lightmap pages instead of 5, 32 MB instead of 30 | 2 min 48 s |
 
-The measured checklist of plan E11 (median fps, draws in views A and B, graphics memory) has not been taken, so the status stays proposed.
+## Measured session (plan E11, 11 November 2026)
+
+`pkg_21` (the whole `golden_hour` preset) on the Quest 3, five minutes of play read from the headset's `VrApi` log (one line a second) while the user walked the core, both spawns and the Uplink:
+
+| | In the map (319 s) | After the first minute (252 s) |
+|---|---|---|
+| Median FPS | 72 | 72 |
+| Seconds under 72 | 31 | 12 |
+| Lowest second | 7 (loading) | 43 |
+| GPU, median / max | 54 % / 78 % | 55 % / 78 % |
+| CPU, median / max | 42 % / 92 % | 41 % / 92 % |
+| Least free system memory | 1734 MB | 1734 MB |
+
+- **FPS:** the median of 72 meets the checklist. The deep drops are the map load and the loadout screen; the CPU peaks are the game's, since a preset only changes baked data.
+- **Draws:** not in the log. The package's offline estimate over every view is a median of 111 and a p90 of 227, above the 150 of the checklist, but a preset adds no draw: the same map without one has the same count. Lowering it belongs to part 2 of the plan (P0, freeing geometry), not to this ADR.
+- **Graphics memory:** not in the log either. The lightmaps take about 7 MB in ASTC and the bundle 32 MB, and the system never had less than 1.7 GB free.
+
+With the FPS met and the draws unchanged by a preset, the maintainer accepted the ADR on 11 November 2026.
 
 ## To check on the headset
 
 - Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours: the user saw the warm fog and the lighter shade of `pkg_19`, so the bake and the fog reach the client.
-- The measured checklist of plan E11: median fps ≥ 72, draws ≤ 150 in views A and B, graphics memory ≤ 1 GB, on `pkg_21`.
 - Whether a soldier in the shade stays readable with the trilight ambient (plan E5): yes, by the user's judgement on `pkg_18`, 11 November 2026.

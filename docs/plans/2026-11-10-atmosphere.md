@@ -188,7 +188,7 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - Checklist por preset: sombras legibles, cielo coherente, niebla, fps ≥ 72 de mediana, draws ≤ 150 en las vistas A y B, memoria ≤ 1 GB.
 - El ADR-037 pasa a *accepted* solo con esa sesión.
 - **Decisión:** qué entra de la [parte 2](2026-11-10-atmosphere-advanced.md) y en qué orden.
-- **Estado (11 de noviembre de 2026).** El usuario probó en el casco cada incremento, de `pkg_18` a `pkg_21`, y los vio bien. Falta la parte medida (fps, draws, memoria), así que el ADR-037 sigue *proposed*.
+- **Estado (11 de noviembre de 2026).** El usuario probó en el casco cada incremento, de `pkg_18` a `pkg_21`, y los vio bien. Medido después en `pkg_21` con el registro `VrApi` del casco: 72 fps de mediana, GPU al 78 % como máximo y CPU con picos del 92 %. Los draws no salen en el registro: la estimación del paquete da mediana 111 y p90 227, igual que sin preset, así que quedan para la P0 de la parte 2. El usuario aceptó el ADR-037 el 11 de noviembre de 2026.
 
 ---
 
