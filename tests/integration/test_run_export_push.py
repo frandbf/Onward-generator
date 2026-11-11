@@ -73,6 +73,25 @@ def _run(package: Path, env: dict[str, str], *args: str) -> subprocess.Completed
     return subprocess.run(["bash", str(SCRIPT), str(package), *args], env=env, capture_output=True, text=True, check=False)
 
 
+@pytest.mark.parametrize(("triangles", "allow", "pushed"), [
+    (250_000, None, True), (250_001, None, False), (250_001, "yes", True), (250_001, "no", False),
+])
+def test_push_refuses_a_package_over_the_triangle_limit(setup: tuple[Path, Path, dict[str, str]], triangles: int,
+                                                       allow: str | None, pushed: bool) -> None:
+    """Plan Q2: Unity's own count in scene_report.json, over 250 000, stops the push unless ALLOW_OVER_BUDGET=yes."""
+    package, folder, env = setup
+    (package / "build" / "scene_report.json").write_text(json.dumps({"triangles": triangles}), encoding="utf-8")
+    if allow is not None:
+        env = {**env, "ALLOW_OVER_BUDGET": allow}
+    result = _run(package, env, "push")
+    assert (result.returncode == 0) is pushed, result.stdout + result.stderr
+    assert (folder / f"{LOCAL_ID}.content3").exists() is pushed
+    if not pushed:
+        assert result.returncode == 2
+        assert f"{triangles} Unity triangles, over the 250000 limit: not pushed" in result.stdout + result.stderr
+        assert not Path(env["FAKE_DEVICE"] + ".calls").exists()  # the device is not touched
+
+
 def test_default_push_keeps_the_local_slot(setup: tuple[Path, Path, dict[str, str]]) -> None:
     package, folder, env = setup
     (folder / f"{LOCAL_ID}.info3").write_text("old", encoding="utf-8")

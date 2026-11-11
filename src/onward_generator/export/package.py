@@ -59,6 +59,7 @@ from onward_generator.export.normal_map import (
 )
 from onward_generator.export.sun import street_sun
 from onward_generator.export.thumbnail import render_listing_thumbnail
+from onward_generator.export.triangle_budget import budget_warning, triangle_budget
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
 from onward_generator.perf.climbs import LADDERS_MAX, LIFTS_MAX
@@ -492,6 +493,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             applied.append(FOG)
         if core_lightmap is not None:
             applied.append(LIGHTMAP_CORE)
+    tiers = _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"]))
+    # Plan Q2: the Unity total, estimated now so a map over the official limit is known before the bake.
+    budget = triangle_budget(visual_bytes, layout_doc, tiers, (detail_manifest.get("core") or {}).get("half_side_m"))
+    over = budget_warning(budget)
+    if over is not None:
+        warnings.append(over)
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -548,7 +555,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 max_size=int(options["lightmap_max_size"]), cell_m=float(options["combine_cell_m"]),
                 scales=options["lightmap_scales"], scenic_out_of_lightmap=scenic_out, core=options.get("lightmap_core"),
             ),
-            "tiers": _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"])),
+            "tiers": tiers,
+            "triangle_budget": budget,
             "view_draws": _view_draws(visual_bytes, detail_manifest, layout_doc, float(options["combine_cell_m"])),
             "warnings": warnings,
         }

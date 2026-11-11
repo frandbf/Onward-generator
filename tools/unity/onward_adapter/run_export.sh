@@ -8,7 +8,8 @@
 # verified (Python and C#) before every Unity step. Outputs go to
 # PACKAGE_DIR/build/ and are never overwritten.
 # "push" replaces the headset's local test map (the SDK Launcher always names it
-# unity-export.local.*): it requires CONFIRM_PUSH=yes and backs up the device copy first.
+# unity-export.local.*): it requires CONFIRM_PUSH=yes and backs up the device copy first. It refuses a package whose
+# scene_report.json counts more than 250 000 triangles unless ALLOW_OVER_BUDGET=yes (plan Q2).
 # The listing mode (push only) comes from --listing, else ONWARD_QUEST_LISTING, else
 # "local": today's install, the one that loaded Hunt. local-thumb, named and
 # named-thumb are unverified candidates for the map's own name and thumbnail
@@ -103,6 +104,16 @@ step_tool() {
   log "copied ${#COPIED[@]} changed file(s) into the project: ${COPIED[*]:-none, all unchanged}"
 }
 
+# Unity's triangle count against the official limit (plan Q2): "<triangles> <limit>", or nothing before the scene step.
+unity_triangles() {
+  [[ -f "$BUILD/scene_report.json" ]] || return 0
+  PYTHONPATH="$REPO/src" "$PYTHON" - "$BUILD/scene_report.json" <<'PY'
+import json, sys
+from onward_generator.export.triangle_budget import UNITY_TRIANGLE_LIMIT
+print(int(json.load(open(sys.argv[1], encoding="utf-8"))["triangles"]), UNITY_TRIANGLE_LIMIT)
+PY
+}
+
 step_scene() {
   verify
   [[ -e "$BUILD/scene_report.json" ]] && { log "$BUILD/scene_report.json exists; the scene step runs once per package"; exit 1; }
@@ -114,6 +125,15 @@ step_scene() {
   # The adapter's own "Lightmapper: ... fallback no" line is left out.
   grep -iE 'fall(ing)? ?back' "$LOG_DIR/${PACKAGE_ID}-scene.log" | grep -v '\[OnwardAdapter\]' | grep -iE 'cpu|lightmapper|opencl' \
     | head -3 | sed 's/^/[export] lightmapper: /' || true
+  local counted triangles limit
+  counted="$(unity_triangles)"
+  [[ -n "$counted" ]] || return 0
+  read -r triangles limit <<<"$counted"
+  if (( triangles > limit )); then
+    log "WARNING triangles: $triangles in Unity, over the $limit limit; push will refuse this package [unity_triangle_budget]"
+  else
+    log "triangles: $triangles in Unity of $limit"
+  fi
 }
 
 step_views() {
@@ -181,6 +201,15 @@ step_push() {
   [[ -f "$content" && -f "$info" ]] || { log "run the launcher step first"; exit 1; }
   local thumb="$BUILD/launcher/thumbnail.png"
   [[ -f "$thumb" ]] || { log "launcher thumbnail is missing; export package should contain thumbnail.png"; exit 1; }
+  local counted triangles limit
+  counted="$(unity_triangles)"
+  if [[ -n "$counted" ]]; then
+    read -r triangles limit <<<"$counted"
+    if (( triangles > limit )) && [[ "${ALLOW_OVER_BUDGET:-}" != "yes" ]]; then
+      log "$triangles Unity triangles, over the $limit limit: not pushed. Shrink the core, or re-run with ALLOW_OVER_BUDGET=yes [unity_triangle_budget]"
+      exit 2
+    fi
+  fi
   local item="unity-export.local" listing="$info"
   if [[ "$LISTING" != "local" ]]; then
     # Checked before the device is touched: a 512x256 PNG, BundleHash = MD5 of the bundle.
