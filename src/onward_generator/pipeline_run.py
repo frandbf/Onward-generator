@@ -1001,13 +1001,13 @@ def run_map(
             if storm is False and store_storm(root, False):
                 say("no storm now: run again with --from layout, then bake a new package")
             if atmosphere == NEUTRAL and store_atmosphere(root, NEUTRAL):
-                say("atmosphere is now neutral: run again with --from export, then bake a new package")
+                say("atmosphere is now neutral: run again with --from materials, then bake a new package")
             if time_of_day and store_time_of_day(root, time_of_day):
                 say(f"time of day is now {time_of_day}: run again with --from layout, then bake a new package")
             if storm and store_storm(root, True):
                 say("storm is on: run again with --from layout, then bake a new package")
             if atmosphere and atmosphere != NEUTRAL and store_atmosphere(root, atmosphere):
-                say(f"atmosphere is now {atmosphere}: run again with --from export, then bake a new package")
+                say(f"atmosphere is now {atmosphere}: run again with --from materials, then bake a new package")
             say(describe(choices(load_map(root))))
             resolve_profile(root, profile_provider)
             steps = resume_steps(root, preview=preview)

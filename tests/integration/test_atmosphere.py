@@ -183,11 +183,11 @@ def test_an_existing_map_stores_the_change_whatever_the_order_of_the_rules(
 def test_run_says_when_the_package_is_out_of_date(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = _map(tmp_path)
     _run_map(root, lambda _argv: 0, atmosphere="golden_hour")
-    assert "atmosphere is now golden_hour: run again with --from export, then bake a new package\n" in capsys.readouterr().out
+    assert "atmosphere is now golden_hour: run again with --from materials, then bake a new package\n" in capsys.readouterr().out
     _run_map(root, lambda _argv: 0, atmosphere="golden_hour")
     assert "atmosphere is now" not in capsys.readouterr().out
     _run_map(root, lambda _argv: 0, atmosphere="neutral")
-    assert "atmosphere is now neutral: run again with --from export, then bake a new package\n" in capsys.readouterr().out
+    assert "atmosphere is now neutral: run again with --from materials, then bake a new package\n" in capsys.readouterr().out
     _run_map(root, lambda _argv: 0, atmosphere="neutral")
     assert "atmosphere is now" not in capsys.readouterr().out
 

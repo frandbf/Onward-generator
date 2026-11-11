@@ -477,6 +477,53 @@ TRIM_BAKE_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
+class WallPalette:
+    """The wall palette of an atmosphere preset (plan E8, ADR-037).
+
+    ``grime`` scales the streaks and the darkening at the foot of the wall that the atlas bakes; ``desaturation``
+    moves each wall colour toward its own grey; ``value_max`` caps its brightest sRGB channel. Only the palette's
+    wall strips change: an observed colour (``building:colour``, a ``__tint_`` material) is not in the atlas.
+    """
+
+    preset: str
+    grime: float
+    desaturation: float
+    value_max: float
+
+
+def _luminance(tint: Sequence[float]) -> float:
+    return 0.2126 * float(tint[0]) + 0.7152 * float(tint[1]) + 0.0722 * float(tint[2])
+
+
+def _linear_to_srgb(value: float) -> float:
+    return value * 12.92 if value <= 0.0031308 else 1.055 * value ** (1.0 / 2.4) - 0.055
+
+
+def _srgb_to_linear(value: float) -> float:
+    return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+
+def palette_tint(tint: Sequence[float], palette: WallPalette) -> tuple[float, float, float]:
+    """A linear wall colour moved ``desaturation`` of the way to its grey, then its brightest sRGB channel capped."""
+    grey = _luminance(tint)
+    mixed = [float(c) + palette.desaturation * (grey - float(c)) for c in tint[:3]]
+    srgb = [_linear_to_srgb(max(c, 0.0)) for c in mixed]
+    peak = max(srgb)
+    if peak > palette.value_max:
+        srgb = [c * palette.value_max / peak for c in srgb]
+    r, g, b = (_srgb_to_linear(c) for c in srgb)
+    return (round(r, 6), round(g, 6), round(b, 6))
+
+
+def palette_atlas(atlas: Mapping[str, Any], palette: WallPalette) -> dict[str, Any]:
+    """``atlas`` with its streaks and its zocalo splash darkened by ``grime`` times what the style says."""
+    grime = dict(atlas["grime"])
+    grime["streak_dark"] = float(grime["streak_dark"]) * palette.grime
+    grime["base_splash_dark"] = float(grime["base_splash_dark"]) * palette.grime
+    return {**atlas, "grime": grime}
+
+
+@dataclass(frozen=True, slots=True)
 class TrimResult:
     """The facade atlas of one style applied to a scene, or the reason the legacy path stays."""
 
@@ -509,13 +556,15 @@ def apply_trim(
     cache: TileCache | None = None,
     regional: bool = False,
     regional_table_path: str | Path | None = None,
+    palette: WallPalette | None = None,
 ) -> TrimResult:
     """Choose the style, bake (or read from ``cache``) its atlas and remap the building nodes.
 
     ``colors`` are the linear wall colours of the scene by material id. A mode of
     ``legacy``, or a style without an atlas, returns the nodes unchanged. With
     ``regional`` (plan D1, off by default) a style whose atlas is null in the table
-    takes its recipe from the regional table, when that has one.
+    takes its recipe from the regional table, when that has one. A ``palette`` (plan E8) changes the wall colours
+    and the grime before the bake; without one the atlas is the one of before, byte for byte.
     """
     if mode not in FACADE_MODES:
         raise StyleError(f"unknown facade mode {mode!r}; known: {', '.join(FACADE_MODES)}")
@@ -537,6 +586,15 @@ def apply_trim(
     if missing:
         raise StyleError(f"style {name}: no colour for wall strips {', '.join(missing)}")
     tints = {wall: tuple(float(c) for c in colors[wall][:3]) for wall in sorted(atlas["walls"])}
+    atmosphere: dict[str, Any] | None = None
+    if palette is not None:
+        before = sum(_luminance(t) for t in tints.values()) / len(tints)
+        atlas = palette_atlas(atlas, palette)
+        tints = {wall: palette_tint(tint, palette) for wall, tint in tints.items()}
+        after = sum(_luminance(t) for t in tints.values()) / len(tints)
+        atmosphere = {"preset": palette.preset, "origin": "generated", "grime": palette.grime,
+                      "wall_desaturation": palette.desaturation, "wall_value_max": palette.value_max,
+                      "wall_luminance_before": round(before, 4), "wall_luminance_after": round(after, 4)}
     layout = trim_layout(atlas)
     key = trim_cache_key(name, atlas, tints, {k: r.sha256 for k, r in sorted(records.items())})
 
@@ -550,8 +608,10 @@ def apply_trim(
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
     extra: dict[str, Any] = {}
+    if atmosphere is not None:
+        extra["atmosphere"] = atmosphere
     if regional_table is not None:
-        extra = {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
+        extra |= {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
         if "eras" in atlas:
             extra["era_bands"] = {"era_origin": "observed", "band_origin": "estimated", "buildings": dict(sorted(stats.eras.items()))}
     report = {

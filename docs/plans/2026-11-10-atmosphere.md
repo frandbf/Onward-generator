@@ -167,6 +167,7 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - **Riesgo:** un atlas más oscuro baja la legibilidad en el Quest. Los valores son suaves a propósito.
 - **Tests:** atlas idéntico con `neutral`; luminancia menor con `golden_hour`; colores observados intactos.
 - Un mapa existente vuelve a correr desde `materials`.
+- **Hecho (11 de noviembre de 2026).** Los colores observados ya quedan fuera del atlas (son materiales `__tint_`), así que no hace falta excluirlos. En Madrid la luminancia media de los muros baja de 0.7083 a 0.5589; en las capturas horneadas las fachadas al sol bajan de 1 a 5 niveles de gris y la sombra no cambia.
 
 ### E9. Colliders de cobertura: test y docstring
 

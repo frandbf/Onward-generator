@@ -227,6 +227,7 @@ def materials_command(base: Path) -> StageCommand:
         *regional,
         *repetition,
         *profile_flags(root).get("materials", []),
+        *(("--atmosphere", atmosphere) if (atmosphere := _atmosphere(root) if root is not None else None) else ()),
         "--out", show(stage_path(base, STAGE_DIRS["materials"])),
     )
 
