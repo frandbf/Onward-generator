@@ -22,6 +22,7 @@ from PIL import Image
 from onward_generator.cli import main
 from onward_generator.config.loader import read_json_document
 from onward_generator.config.models import GeneratorConfig
+from onward_generator.config.validation import REPO_ROOT
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
     LIGHTMAP_DENSITY_STEP,
@@ -104,6 +105,60 @@ def test_package_is_complete_and_verifiable(inputs: tuple[Path, Path], tmp_path:
     checklist = (out / "quest_acceptance.md").read_text(encoding="utf-8")
     assert "Uplink" in checklist and "Free Roam" in checklist and m["package_id"] in checklist
     assert "docs/12-export.md" in checklist and "este `quest_acceptance.md` esté completo" in checklist
+
+
+def test_the_package_estimates_its_unity_triangles(inputs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan Q2: the GLB's triangles plus the adapter's 12 300 and its climb models, against the 250 000 limit."""
+    from onward_generator.export.triangle_budget import climb_triangles, visual_triangles
+
+    detail, layout = inputs
+    m = package(inputs, tmp_path / "pkg").manifest
+    glb = visual_triangles((detail / "scene_visual.glb").read_bytes())
+    climbs = climb_triangles(load(layout))
+    assert m["triangle_budget"] == {
+        "estimated_unity_triangles": glb + 12_300 + climbs, "visual_triangles": glb, "adapter_triangles": 12_300,
+        "climb_triangles": climbs, "limit": 250_000, "within": True, "origin": "estimated",
+    }
+    assert not [w for w in m["warnings"] if "[unity_triangle_budget]" in w]
+    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", glb)
+    over = package(inputs, tmp_path / "over").manifest
+    assert over["triangle_budget"]["within"] is False and over["triangle_budget"]["limit"] == glb
+    assert [w for w in over["warnings"] if "[unity_triangle_budget]" in w] == [
+        f"triangle_budget: an estimated {glb + 12_300 + climbs} Unity triangles, over the {glb} limit [unity_triangle_budget]"]
+
+
+FAKE_UNITY = """#!/usr/bin/env bash
+# Writes the scene report the real BuildScene would, and the adapter's OK marker.
+while [[ $# -gt 0 ]]; do
+  case "$1" in -logFile) log="$2"; shift ;; -exportReport) report="$2"; shift ;; esac
+  shift
+done
+echo '[OnwardAdapter] OK' > "$log"
+printf '{"triangles": %s}' "$FAKE_TRIANGLES" > "$report"
+"""
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+@pytest.mark.parametrize(("triangles", "line"), [
+    (250_000, "[export] triangles: 250000 in Unity of 250000"),
+    (250_001, "[export] WARNING triangles: 250001 in Unity, over the 250000 limit; push will refuse this package [unity_triangle_budget]"),
+])
+def test_the_scene_step_reports_unity_s_triangles(inputs: tuple[Path, Path], tmp_path: Path, triangles: int, line: str) -> None:
+    """Plan Q2: after the bake, run_export.sh prints Unity's own count against the limit. No Unity: a fake writes the report."""
+    import os
+    import subprocess
+    import sys
+
+    out = package(inputs, tmp_path / "pkg").directory
+    unity = tmp_path / "unity"
+    unity.write_text(FAKE_UNITY, encoding="utf-8")
+    unity.chmod(0o755)
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path), "ONWARD_PLATFORM": "linux", "UNITY": str(unity),
+           "PYTHON": sys.executable, "LOG_DIR": str(tmp_path / "logs"), "FAKE_TRIANGLES": str(triangles)}
+    script = REPO_ROOT / "tools" / "unity" / "onward_adapter" / "run_export.sh"
+    result = subprocess.run(["bash", str(script), str(out), "scene"], env=env, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert line in (result.stdout + result.stderr).splitlines()
 
 
 def test_package_id_depends_only_on_content(inputs: tuple[Path, Path], tmp_path: Path) -> None:
