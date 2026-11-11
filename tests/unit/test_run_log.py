@@ -300,6 +300,8 @@ def test_layout(tmp_path: Path) -> None:
 def test_layout_counts_the_climbs_and_warns_when_there_is_none(tmp_path: Path) -> None:
     layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [{}, {}], "lifts": [{}]})
     assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 2  lifts 1")
+    layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [{}], "lifts": [{}]})
+    assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 1  lifts 1")
     layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [], "lifts": [{}]})
     assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 1  ladders 0  lifts 1")
     layout = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [{}], "lifts": []})

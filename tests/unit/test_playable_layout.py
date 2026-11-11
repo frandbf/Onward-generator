@@ -797,6 +797,9 @@ def test_climb_ground_keeps_the_carriageway_and_leaves_out_the_urban_elements() 
     assert ground.covers(Point(0, 0)) and ground.covers(Point(0, 2.9))  # the carriageway
     assert not ground.intersects(Point(20, 10).buffer(0.95)) and ground.covers(Point(21.1, 10))  # the bench's 1 m circle
     assert climb_ground(base, {}, (0.0, -20.0)).covers(Point(20, 10))  # type: ignore[arg-type]
+    # The very hole free_ground cuts for the bench, polygon and all.
+    near = box(17, 7, 23, 13)
+    assert ground.intersection(near).equals(free_ground(base, [(20.0, 10.0)]).intersection(near))  # type: ignore[arg-type]
 
 
 # ------------------------------------------------------------------------------------------------ balanced spawns (plan C6)
