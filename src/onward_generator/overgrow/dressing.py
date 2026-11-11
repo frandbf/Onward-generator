@@ -1,7 +1,7 @@
 """Place downloaded props and invasive vegetation inside a zone.
 
-Colliders are not created. Vehicles and barriers stay visual so they cannot
-seal the drive lane. Vegetation has no collider at all.
+A solid prop (``ambient.is_solid``: vehicles, barriers, barrels, benches and anything shaped like cover) gets a box
+collider, so a player cannot walk or shoot through the car they hide behind. Vegetation has no collider at all.
 """
 
 from __future__ import annotations

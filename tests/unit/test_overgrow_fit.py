@@ -585,6 +585,26 @@ def test_a_bench_gets_a_collision_box() -> None:
 
 
 
+
+@pytest.mark.parametrize(
+    ("asset_id", "role", "category", "size", "solid"),
+    [("car_0", "wreck", "vehicles", (4.2, 1.8, 1.4), True), ("jersey_0", "barrier", "barriers", (2.0, 0.6, 0.8), True),
+     ("can_0", "can", "waste", (0.12, 0.12, 0.15), False)],
+)
+def test_vehicles_and_barriers_get_a_collision_box_and_a_can_does_not(
+    asset_id: str, role: str, category: str, size: tuple[float, float, float], solid: bool,
+) -> None:
+    """Plan E9 (ADR-037): a car or a barrier a player hides behind stops a body and a shot (part 2 relies on it)."""
+    prop = Prop(AssetSpec(asset_id, category, role, ("sidewalk",), "ground", "test"), _mesh(*size), np.zeros((24, 2), dtype=np.float32), b"")
+    result = Dressing()
+    _place_props([prop], [Spot("sidewalk", 0.0, 0.0, 0.0, "grid:0", "grid", 10.0)], STRtree([box(30.0, 30.0, 40.0, 40.0)]),
+                 None, [], square_zone(80.0), profile_for(100), 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == [asset_id]
+    assert result.records[0]["solid"] is solid
+    assert [node.name for node in result.colliders] == ([f"overgrow/collider/prop/{asset_id}/0"] if solid else [])
+    if solid:
+        assert result.colliders[0].extras == {"type": "collision", "origin": "generated", "asset_id": asset_id, "role": role}
+
 def _solid_prop(asset_id: str, role: str, category: str, size: tuple[float, float, float]) -> Prop:
     return Prop(AssetSpec(asset_id, category, role, ("sidewalk",), "ground", "test"), _mesh(*size), np.zeros((24, 2), dtype=np.float32), b"")
 
