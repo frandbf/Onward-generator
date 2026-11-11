@@ -178,10 +178,13 @@ def extra_spawn_block(
     raise LayoutError("no second spawn block fits for Assault")
 
 
+def _urban_positions(detail_manifest: Mapping[str, Any]) -> list[tuple[float, float]]:
+    return [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
+
+
 def _free_inside(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> BaseGeometry:
     """Free ground less the urban elements, inside the playable core when the map has one."""
-    urban = [tuple(o["position_m"]) for o in detail_manifest.get("objects", []) if o.get("type") == "urban_element"]
-    free = free_ground(base, urban)
+    free = free_ground(base, _urban_positions(detail_manifest))
     inside = playable_area(detail_manifest)
     if inside is not None:
         free = free.intersection(inside)
@@ -689,6 +692,19 @@ def reachable_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any], u
     return component_holding(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)), uplink).buffer(NAV_AGENT_RADIUS_M)
 
 
+def climb_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any], uplink: tuple[float, float]) -> BaseGeometry:
+    """Where a ladder's foot or a street cabin may stand: the ground a player reaches (``reachable_ground``, the
+    carriageway included, ADR-029) less the urban elements, each the 1 m circle ``free_ground`` gives it.
+
+    It used to be that ground intersected with ``free_ground``, which leaves out the carriageway, against the rule the
+    ADR states; the intersection also left its edge micrometres off the facades (see ``place_climbs``)."""
+    ground = reachable_ground(base, detail_manifest, uplink)
+    urban = _urban_positions(detail_manifest)
+    if urban:
+        ground = ground.difference(union_all([Point(x, y).buffer(1.0, 8) for x, y in urban]))
+    return ground
+
+
 def nav_islands(base: GeneratedScene, inside: BaseGeometry | None = None) -> list[BaseGeometry]:
     """The walkable ground the adapter bakes, shrunk by the agent radius, one piece per island.
 
@@ -938,7 +954,7 @@ def playable_layout(
 
     gameplay_points = [uplink, *ai, *ammo, *escort, evac, *drives, *occupied_pts]
     keep_out = climb_keep_out(gameplay_points, routes, detail_manifest)
-    reachable = free.intersection(reachable_ground(base, detail_manifest, uplink))
+    reachable = climb_ground(base, detail_manifest, uplink)
     climbs = place_climbs(detail_manifest, footprints or {}, reachable, keep_out, (attack, attack_b), (defend, defend_b))
 
     doc.update({

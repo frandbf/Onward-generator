@@ -17,7 +17,7 @@ from onward_generator.generation import load_generation_config
 from onward_generator.perf.layout import AMMO_OBJECTIVE_CLEAR_M, TEAM_SEPARATION_M, gameplay_layout, playable_layout
 
 
-def test_perf_layout_reads_the_footprints_of_the_scene(detail_inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+def test_perf_layout_reads_the_footprints_of_the_scene(detail_inputs: tuple[Path, Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     scene, heights, base = detail_inputs
     detail = tmp_path / "detail"
     assert main(["detail", "--scene", str(scene), "--heights", str(heights), "--base", str(base), "--out", str(detail), "--no-preview"]) == 0
@@ -26,6 +26,7 @@ def test_perf_layout_reads_the_footprints_of_the_scene(detail_inputs: tuple[Path
     layout = json.loads(out.read_text(encoding="utf-8"))
     assert isinstance(layout["ladders"], list) and isinstance(layout["lifts"], list)
     assert _check_layout(layout) == []
+    assert f" ladders={len(layout['ladders'])} lifts={len(layout['lifts'])}" in capsys.readouterr().out
 
 
 def test_perf_layout_hands_the_scene_footprints_to_the_layout(detail_inputs: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

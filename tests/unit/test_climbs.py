@@ -123,21 +123,47 @@ def test_a_lift_needs_room_on_the_roof_and_stays_out_of_what_is_kept_clear() -> 
     assert moved["y"] == -1.65 and abs(moved["x"] - 10.0) == 2.5  # slid along the same wall past the kept-clear point
 
 
-def test_the_rules_choose_ladders_up_to_3_storeys_and_lifts_from_3_to_6() -> None:
+def test_the_rules_choose_lifts_from_3_to_7_storeys_first_and_ladders_up_to_4() -> None:
     far = 35.0
-    objects = [_building(f"b{n}", n) for n in (1, 3, 6, 7)]
-    footprints = {f"b{n}": box(k * far * 2, 100, k * far * 2 + 20, 110) for k, n in enumerate((1, 3, 6, 7))}
+    counts = (1, 4, 5, 7, 8)
+    objects = [_building(f"b{n}", n) for n in counts]
+    footprints = {f"b{n}": box(k * far * 2, 100, k * far * 2 + 20, 110) for k, n in enumerate(counts)}
     placed = _place(objects, footprints)
-    centre = {site["x"] for site in placed["ladders"]}
-    assert centre == {10.0, 80.0}  # the 1 and the 3
-    assert [site["x"] for site in placed["lifts"]] == [150.0]  # the 6; the 3 is taken, the 7 is too high
+    assert [site["x"] for site in placed["ladders"]] == [10.0]  # the 1; the 4 went to a lift
+    assert sorted(site["x"] for site in placed["lifts"]) == [80.0, 150.0, 220.0]  # the 4, the 5 and the 7; the 8 is too high
+
+
+@pytest.mark.parametrize(("storey_count", "ladders"), [(4, 1), (5, 0)])
+def test_a_ladder_climbs_at_most_4_storeys_where_no_lift_fits(storey_count: int, ladders: int) -> None:
+    """The street in front is 3 m deep: a ladder's foot fits, a cabin and its apron do not."""
+    footprint = box(0, 100, 20, 110)
+    placed = _place([_building("b", storey_count)], {"b": footprint}, free=box(-50, 97, 70, 100))
+    assert (len(placed["ladders"]), placed["lifts"]) == (ladders, [])
+
+
+def test_an_interior_without_a_stair_to_the_roof_does_not_keep_a_ladder_away() -> None:
+    footprints = {"b": box(0, 100, 20, 110)}
+    building = _building("b", 2, interior=True)
+    assert len(_place([building], footprints)["ladders"]) == 1
+    no_stair = {"type": "interior", "source_ids": ["b"], "roof_access": False}
+    assert len(_place([building, no_stair], footprints)["ladders"]) == 1
+    stair = {"type": "interior", "source_ids": ["b"], "roof_access": True}
+    assert _place([building, stair], footprints) == {"ladders": [], "lifts": []}
+
+
+def test_a_foot_a_hair_off_the_free_ground_still_stands_on_it() -> None:
+    """The layout hands over an intersection whose edge along a facade lands micrometres off the wall."""
+    footprint = box(0, 100, 20, 110)
+    shaved = box(-50, 50, 70, 99.94999)  # the foot starts 0.05 m from the wall, at y 99.95
+    assert len(_place([_building("b", 2)], {"b": footprint}, free=shaved)["ladders"]) == 1
+    short = box(-50, 50, 70, 99.93)  # 2 cm short: past the 1 cm tolerance
+    assert _place([_building("b", 2)], {"b": footprint}, free=short)["ladders"] == []
 
 
 @pytest.mark.parametrize(
     "building",
     [
         _building("b", 2, roof="hip"),
-        _building("b", 2, interior=True),
         _building("b", 2, landmark=True),
         {**_building("b", 2), "tier": "scenic"},
         {**_building("b", 2), "tier": "mid"},  # plan D3: the intermediate ring is past the wall too
@@ -173,10 +199,10 @@ def test_no_access_goes_near_a_spawn() -> None:
 
 
 def test_the_building_closest_to_equidistant_goes_first_then_the_lowest() -> None:
-    objects = [_building("side", 1), _building("low", 2), _building("high", 3)]
+    objects = [_building("side", 1), _building("low", 2), _building("high", 2, height_m=6.9)]
     footprints = {"side": box(200, 0, 220, 10), "low": box(0, 200, 20, 210), "high": box(0, 0, 20, 10)}
     placed = place_climbs({"objects": objects}, footprints, FREE.difference(MultiPolygon(list(footprints.values()))), NOTHING, [ATTACK], [DEFEND])
-    assert [(s["x"], s["height_m"]) for s in placed["ladders"]] == [(10.0, 6.0), (10.0, 9.0), (210.0, 3.0)]
+    assert [(s["x"], s["height_m"]) for s in placed["ladders"]] == [(10.0, 6.0), (10.0, 6.9), (210.0, 3.0)]
 
 
 def test_fairness_counts_the_nearest_spawn_of_each_team() -> None:
@@ -262,18 +288,20 @@ def test_a_3_storey_building_with_an_interior_gets_a_lift() -> None:
     assert (placed["ladders"], len(placed["lifts"])) == ([], 1)
 
 
-def test_a_building_with_a_ladder_gets_no_lift_even_on_a_far_wall() -> None:
+def test_a_building_with_a_lift_gets_no_ladder_even_on_a_far_wall() -> None:
+    """The south street is 3 m deep, room for a ladder's foot only; the lift takes the north wall first."""
     footprint = box(0, 100, 60, 135)
     free = box(-50, 97, 110, 100).union(box(-50, 135, 110, 200))
     placed = _place([_building("b", 3)], {"b": footprint}, free=free)
-    assert (len(placed["ladders"]), placed["lifts"]) == (1, [])
+    assert (placed["ladders"], len(placed["lifts"])) == ([], 1)
+    assert placed["lifts"][0]["y"] > 135
 
 
 def test_differences_inside_the_balance_step_go_to_the_lower_roof() -> None:
-    objects = [_building("lean", 2), _building("fair", 3)]
+    objects = [_building("lean", 2), _building("fair", 2, height_m=6.9)]
     footprints = {"lean": box(-8, 100, 12, 110), "fair": box(-10, 300, 10, 310)}
     placed = _place(objects, footprints)
-    assert [site["height_m"] for site in placed["ladders"]] == [6.0, 9.0]
+    assert [site["height_m"] for site in placed["ladders"]] == [6.0, 6.9]
 
 
 def test_accesses_exactly_at_the_spacing_are_allowed_and_closer_lifts_are_not() -> None:

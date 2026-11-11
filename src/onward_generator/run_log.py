@@ -354,13 +354,20 @@ def _layout(out: Path) -> StageReport:
         points = layout.get(team)
         if isinstance(points, dict) and "points_m" in points:
             parts.append(f"{team} {len(points['points_m'])}")
+    alerts: tuple[Alert, ...] = ()
+    # A layout from before ADR-029 has neither key.
+    if "ladders" in layout and "lifts" in layout:
+        ladders, lifts = len(layout["ladders"]), len(layout["lifts"])
+        parts.append(f"ladders {ladders}  lifts {lifts}")
+        if ladders + lifts == 0:
+            alerts = (Alert("warning", "no ladder or lift reaches a roof (ADR-029)", 1),)
     report_path = out.with_name(REPORT_FILE)
     # Only a report computed from this very layout.json: a stale one from an earlier run is not shown.
     if report_path.is_file():
         report = _read(report_path)
         if report.get("layout_sha256") == sha256_file(out):
             parts.append(f"gameplay: {headline_text(report)}")
-    return StageReport("  ".join(parts))
+    return StageReport("  ".join(parts), alerts=alerts)
 
 
 def _export(out: Path) -> StageReport:
