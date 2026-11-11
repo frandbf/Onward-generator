@@ -26,8 +26,10 @@ NEUTRAL = "neutral"
 # The neutral light points toward heading -30 (Quaternion.Euler(50, -30, 0)), so its sun stands at 150 degrees.
 NEUTRAL_SUN_AZIMUTH_DEG = 150.0
 STREETS = "streets"
-# The parts of a preset the package carries, in the order the plan added them (E3 the sun, E5 the ambient and the AO).
+# The parts of a preset the package carries, in the order the plan added them (E3 the sun, E5 the ambient and the AO,
+# E7 the colour of the fog, only when the map's card has its fog on).
 APPLIED = ("sun", "ambient", "ao")
+FOG = "fog"
 
 
 class AtmosphereError(ValueError):
@@ -110,4 +112,4 @@ def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tupl
     return block, record
 
 
-__all__ = ["APPLIED", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]
+__all__ = ["APPLIED", "FOG", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]

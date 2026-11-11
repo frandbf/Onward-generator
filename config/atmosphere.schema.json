@@ -66,10 +66,9 @@
         "fog": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["start_m", "end_m", "color"],
+          "description": "The colour of the map's fog; where it starts and ends stays the map's own, from its wall (ADR-014)",
+          "required": ["color"],
           "properties": {
-            "start_m": { "type": "number", "minimum": 0 },
-            "end_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 },
             "color": { "$ref": "#/$defs/colour" }
           }
         },

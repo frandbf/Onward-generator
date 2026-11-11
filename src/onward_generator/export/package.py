@@ -25,7 +25,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
-from onward_generator.export.atmosphere import APPLIED, NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
+from onward_generator.export.atmosphere import APPLIED, FOG, NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -452,6 +452,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Plan E6: the sun crosses the street axis of the playable core, or of the whole map without a core.
             street = street_sun(visual_bytes, (detail_manifest.get("core") or {}).get("half_side_m"))
         options["lighting"], sun_record = lighting(chosen, street)
+        applied = list(APPLIED)
+        if options.get("fog_enabled"):
+            # Plan E7: the preset tints the fog; where it starts and ends stays the map's, from its wall (ADR-014).
+            options["fog_color"] = str(chosen["fog"]["color"])
+            applied.append(FOG)
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -519,7 +524,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             manifest["experimental_environment"] = {**experimental, "status": "untested"}
         if preset is not None:
             # Which parts of the preset the package applies: the sun since plan E3, the ambient and the AO since E5.
-            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": list(APPLIED), "sun": sun_record}
+            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": applied, "sun": sun_record}
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

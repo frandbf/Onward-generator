@@ -122,9 +122,9 @@ _O = "presets.overcast"
         (f"{_G}.ao.max_distance_m", 10.5, "/presets/golden_hour/ao/max_distance_m"),
         (f"{_G}.ao.exponent_direct", -0.1, "/presets/golden_hour/ao/exponent_direct"),
         (f"{_G}.ao.exponent_indirect", 10.5, "/presets/golden_hour/ao/exponent_indirect"),
-        (f"{_G}.fog.start_m", -1, "/presets/golden_hour/fog/start_m"),
-        (f"{_G}.fog.end_m", 0, "/presets/golden_hour/fog/end_m"),
-        (f"{_G}.fog.end_m", 1001, "/presets/golden_hour/fog/end_m"),
+        (f"{_G}.fog.color", "#E8D2B", "/presets/golden_hour/fog/color"),
+        (f"{_G}.fog.color", _DELETE, "/presets/golden_hour/fog"),
+        (f"{_G}.fog.start_m", 140, "/presets/golden_hour/fog"),
         (f"{_G}.lightmap_texels_per_m_core", 0, "/presets/golden_hour/lightmap_texels_per_m_core"),
         (f"{_G}.lightmap_texels_per_m_core", 41, "/presets/golden_hour/lightmap_texels_per_m_core"),
         (f"{_G}.grime", -0.1, "/presets/golden_hour/grime"),
@@ -158,7 +158,6 @@ def test_the_schema_accepts_the_boundaries(tmp_path: Path) -> None:
     golden["sun"].update(elevation_deg=5, azimuth=-360, intensity=3, shadow_angle_deg=20)
     golden["ao"].update(max_distance_m=10, exponent_indirect=0, exponent_direct=10)
     golden.update(lightmap_texels_per_m_core=40, grime=2, wall_desaturation=0.5, wall_value_max=0.5)
-    golden["fog"].update(start_m=0, end_m=1000)
     document["presets"]["overcast"]["sun"].update(elevation_deg=89, azimuth=360)
     document["presets"]["overcast"].update(grime=0, wall_desaturation=0, wall_value_max=1)
     assert load_presets(_write(tmp_path, document))["golden_hour"]["sun"]["elevation_deg"] == 5

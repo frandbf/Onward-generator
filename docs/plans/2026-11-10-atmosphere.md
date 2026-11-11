@@ -153,6 +153,7 @@ El SDK define 12 `EProfileId` (`UrbanDay1/2`, `DesertDay1/2`, `ForestDay1/2` y s
 ### E7. Niebla por preset
 
 - La niebla lineal ya existe (`ApplyFog`, ADR-014). El preset solo cambia inicio, fin y color.
+- **Cambio al implementar (11 de noviembre de 2026):** el preset solo cambia el **color**. Inicio y fin siguen siendo los del mapa, calculados desde su muro: una distancia fija por preset metería niebla en la zona jugable de un mapa grande y no se vería en uno pequeño. Un mapa sin niebla sigue sin niebla.
 - Sigue sin saberse si el runtime de Onward respeta `RenderSettings.fog`: queda en el ADR-037.
 - **Tests:** valores del preset en `adapter_options.json`; sin preset no cambia nada.
 
