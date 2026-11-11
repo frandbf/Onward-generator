@@ -21,6 +21,9 @@ from onward_generator.gameplay.report import PAIRS, TEAMS
 
 Point = tuple[float, float]
 KEPT = "kept the current placement"
+CONTACT_TOLERANCE_PCT = 15.0
+"""ADR-032's proposed balance threshold. Among candidates within it, more distinct routes win (C6 amendment of
+11 November 2026); above it the contact difference still comes first."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,9 +138,9 @@ RouteScorer = Callable[[NavGraph, Placement, Score, Routes], Score]
 def score_all(graph: NavGraph, candidates: Sequence[Placement | str], *, routes: RouteScorer = route_score) -> list[Score]:
     """Stage 1 for every candidate, then stage 2 where it can change the choice.
 
-    Stage 2 runs for candidate 0, then for the others whose contact difference is not above candidate 0's,
-    lowest difference first (then lowest index). Once one is admissible, a candidate with a higher difference
-    can no longer win, so it keeps its stage 1 score. A candidate given as a string is invalid for that reason.
+    Stage 2 runs for candidate 0, then for every other whose contact difference is not above candidate 0's:
+    within ``CONTACT_TOLERANCE_PCT`` a higher difference with more routes can win, so none is skipped.
+    A candidate given as a string is invalid for that reason.
     """
     scores = [
         Score(index, reason=candidate) if isinstance(candidate, str) else contact_score(graph, candidate, index)
@@ -154,22 +157,23 @@ def score_all(graph: NavGraph, candidates: Sequence[Placement | str], *, routes:
     limit = baseline.diff_pct
     assert limit is not None  # pragma: no mutate: a valid score has a contact difference
     # Stage 1 leaves diff_pct None exactly when the candidate is invalid.
-    order = sorted((s for s in scores[1:] if s.diff_pct is not None and s.diff_pct <= limit), key=lambda s: (s.diff_pct, s.index))
-    best: float | None = None
-    for score in order:
-        assert score.diff_pct is not None  # pragma: no mutate: order holds only scored candidates
-        if best is not None and score.diff_pct > best:
-            break
+    for score in scores[1:]:
+        if score.diff_pct is None or score.diff_pct > limit:
+            continue
         candidate = candidates[score.index]
         assert isinstance(candidate, Placement)  # pragma: no mutate: a scored candidate is a placement
         scores[score.index] = routes(graph, candidate, score, cache)
-        if admissible(scores[score.index], baseline):
-            best = score.diff_pct
     return scores
 
 
-def _key(score: Score) -> tuple[float, int, float, int]:
+def _key(score: Score) -> tuple[float, float, float, int]:
+    """More routes first within ``CONTACT_TOLERANCE_PCT``, then the lower difference; past it, the difference first.
+
+    A key within starts with ``-routes``, below 0 since an admissible candidate has a route; a key past it starts
+    with a difference above 15. So every candidate within ranks before every candidate past it."""
     assert score.diff_pct is not None and score.routes is not None and score.max_overlap is not None  # pragma: no mutate: only admissible scores reach the key
+    if score.diff_pct <= CONTACT_TOLERANCE_PCT:
+        return (-score.routes, score.diff_pct, score.max_overlap, score.index)
     return (score.diff_pct, -score.routes, score.max_overlap, score.index)
 
 
@@ -191,7 +195,9 @@ def admissible(score: Score, baseline: Score) -> bool:
 
 
 def select(scores: Sequence[Score]) -> Choice:
-    """The lowest (diff_pct, -routes, max_overlap, index) among the admissible candidates.
+    """The lowest ``_key`` among the admissible candidates: within ``CONTACT_TOLERANCE_PCT`` of contact difference
+    the most distinct routes, then the lower difference, the lower overlap and the lower index; past it, the lower
+    difference first, as before the C6 amendment of 11 November 2026.
 
     Candidate 0 is the current placement. It stays unless another one is strictly lower on that key,
     and it stays with a reason when it cannot be scored itself.

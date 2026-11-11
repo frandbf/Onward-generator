@@ -329,6 +329,26 @@ def test_layout_adds_the_gameplay_headline_of_this_layout_only(tmp_path: Path) -
     assert summarize("layout", ["--out", str(layout)]) == StageReport("routes 2")
 
 
+@pytest.mark.parametrize(("routes", "warned"), [(1, True), (2, False), (0, False)])
+def test_layout_warns_when_the_spawns_have_one_distinct_route(tmp_path: Path, routes: int, warned: bool) -> None:
+    """Plan Q1: one route between the spawns plays as a corridor. 0 is the report's 'no path', a status of its own."""
+    from onward_generator.io import sha256_file
+
+    layout = _write(tmp_path / "layout.json", {"routes": [1, 2]})
+    headline = {"distinct_routes": routes, "longest_open_sight_m": 42.5, "contact_diff_pct": 7.1}
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": sha256_file(layout)})
+    alert = Alert("warning", "1 distinct route between the spawns: the map plays as a corridor (ADR-032)", 1)
+    assert summarize("layout", ["--out", str(layout)]).alerts == ((alert,) if warned else ())
+    # A stale report says nothing, its routes included.
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": "0" * 64})
+    assert summarize("layout", ["--out", str(layout)]).alerts == ()
+    # It adds to the climbs' warning rather than replacing it.
+    bare = _write(tmp_path / "layout.json", {"routes": [1], "ladders": [], "lifts": []})
+    _write(tmp_path / "gameplay_report.json", {"headline": headline, "layout_sha256": sha256_file(bare)})
+    climbs = Alert("warning", "no ladder or lift reaches a roof (ADR-029)", 1)
+    assert summarize("layout", ["--out", str(bare)]).alerts == ((climbs, alert) if warned else (climbs,))
+
+
 def test_export_hides_the_standing_unverified_adapter_warning(tmp_path: Path) -> None:
     out = tmp_path / "pkg_01"
     _write(out / "onward_export.json", {

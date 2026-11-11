@@ -367,6 +367,9 @@ def _layout(out: Path) -> StageReport:
         report = _read(report_path)
         if report.get("layout_sha256") == sha256_file(out):
             parts.append(f"gameplay: {headline_text(report)}")
+            # Plan Q1: one route between the spawns plays as a corridor; another centre or core may open more.
+            if (report.get("headline") or {}).get("distinct_routes") == 1:
+                alerts += (Alert("warning", "1 distinct route between the spawns: the map plays as a corridor (ADR-032)", 1),)
     return StageReport("  ".join(parts), alerts=alerts)
 
 

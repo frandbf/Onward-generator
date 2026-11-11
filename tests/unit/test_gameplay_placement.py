@@ -13,6 +13,7 @@ from shapely import Polygon, box
 
 from onward_generator.gameplay.metrics import MAX_OVERLAP, NavGraph, Route, balance, dijkstra, from_edges, nav_graph, snap
 from onward_generator.gameplay.placement import (
+    CONTACT_TOLERANCE_PCT,
     KEPT,
     Choice,
     Placement,
@@ -112,7 +113,18 @@ def test_select_keeps_the_current_placement_when_candidate_0_cannot_be_scored() 
 def test_select_is_deterministic() -> None:
     scores = [_s(0, 20.0), _s(1, 7.5, 4, 0.3), _s(2, 7.5, 4, 0.2), _s(3, 9.0, 6)]
     assert select(scores) == select(list(scores)) == select(scores[::-1])
-    assert select(scores).index == 2
+    assert select(scores).index == 3  # within 15 %, the most routes
+    tied = [_s(0, 20.0), _s(1, 7.5, 4, 0.3), _s(2, 7.5, 4, 0.2), _s(3, 9.0, 4)]
+    assert select(tied).index == 2  # the same routes: the lower difference, then the lower overlap
+
+
+def test_within_the_contact_tolerance_more_routes_win_and_past_it_the_balance() -> None:
+    """C6 amendment of 11 November 2026: ADR-032's 15 % proposal bounds where routes come first."""
+    assert CONTACT_TOLERANCE_PCT == 15.0
+    assert select([_s(0, 40.0, 2), _s(1, 0.5, 3), _s(2, 15.0, 5)]).index == 2  # 15 % is within
+    assert select([_s(0, 40.0, 2), _s(1, 0.5, 3), _s(2, 15.01, 5)]).index == 1  # just past it: the balance first
+    assert select([_s(0, 40.0, 2), _s(1, 20.0, 3), _s(2, 30.0, 5)]).index == 1  # both past it: the lower difference
+    assert select([_s(0, 40.0, 2), _s(1, 20.0, 3), _s(2, 20.0, 5)]).index == 2  # past it, a tie: then the routes
 
 
 # ------------------------------------------------------------------------------------------------ scores
@@ -198,7 +210,7 @@ def test_route_score_rounds_the_overlap_to_4_places_and_is_0_with_one_route() ->
 # ------------------------------------------------------------------------------------------------ stage 2
 
 
-def test_stage_2_runs_only_where_it_can_change_the_choice() -> None:
+def test_stage_2_scores_every_candidate_no_less_balanced_than_candidate_0() -> None:
     graph = _chain(11)
     calls: list[int] = []
     caches: list[Routes] = []
@@ -214,18 +226,19 @@ def test_stage_2_runs_only_where_it_can_change_the_choice() -> None:
         _place(a, d, (2.0, 0.0)),     # 1: worse than 0, never scored
         "no second block fits",       # 2: invalid
         _place(a, d, (8.0, 0.0)),     # 3: 8 / 12 m
-        _place(a, d, (10.0, 0.0)),    # 4: even, scored first
-        _place(a, d, (12.0, 0.0)),    # 5: the mirror of 3; 4 already won
+        _place(a, d, (10.0, 0.0)),    # 4: even
+        _place(a, d, (12.0, 0.0)),    # 5: the mirror of 3
     ]
     scores = score_all(graph, candidates, routes=fake)
-    assert calls == [0, 4]
+    # Within the tolerance a less balanced candidate with more routes may win, so 3 and 5 are scored too.
+    assert calls == [0, 3, 4, 5]
     # One cache, shared by every candidate.
     assert caches[0] == {} and caches[0] is caches[1]
     assert [s.index for s in scores] == [0, 1, 2, 3, 4, 5]
     assert scores[1].routes is None and scores[1].diff_pct is not None and scores[1].diff_pct > scores[0].diff_pct  # type: ignore[operator]
     assert scores[2] == Score(2, reason="no second block fits")
-    assert scores[3].routes is None and scores[5].routes is None
-    assert select(scores).index == 4
+    assert scores[3].routes == scores[5].routes == 3
+    assert select(scores).index == 4  # the same routes everywhere: the even one
 
 
 def test_stage_2_moves_on_while_the_better_balance_is_not_admissible() -> None:
@@ -239,8 +252,9 @@ def test_stage_2_moves_on_while_the_better_balance_is_not_admissible() -> None:
     a, d = (0.0, 0.0), (20.0, 0.0)
     candidates: list[Placement | str] = [_place(a, d, (6.0, 0.0)), _place(a, d, (8.0, 0.0)), _place(a, d, (10.0, 0.0)), _place(a, d, (12.0, 0.0))]
     scores = score_all(graph, candidates, routes=fake)
-    # 2 is even but has fewer routes; 1 and 3 tie on 20 %, so both are scored, and 1 wins on the index.
-    assert calls == [0, 2, 1, 3]
+    # 2 is even but has fewer routes than 0, so it is not admissible; 1 and 3 tie on 20 %, past the tolerance,
+    # and 1 wins on the index. Every candidate no less balanced than 0 is scored, in index order.
+    assert calls == [0, 1, 2, 3]
     assert select(scores).index == 1
 
 

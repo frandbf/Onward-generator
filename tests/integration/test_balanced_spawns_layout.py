@@ -111,7 +111,10 @@ def test_balanced_spawns_off_is_head_and_on_is_better_and_valid(
     )
     assert match, lines[0]
     index, count, diff0, diff1, routes0, routes1, overlap0, overlap1 = match.groups()
-    assert 0 < int(index) < int(count) <= 8
+    # At most two Uplinks for each of the K_DEFENDERS positions and for each pair of the K_SITES spread sites.
+    from onward_generator.perf.layout import K_DEFENDERS, K_SITES
+
+    assert 0 < int(index) < int(count) <= 2 * K_DEFENDERS + 2 * (K_SITES * (K_SITES - 1) // 2)
     assert (float(diff0), int(routes0), float(overlap0)) == (
         before["headline"]["contact_diff_pct"], before["headline"]["distinct_routes"], before["headline"]["max_overlap_pct"])
     assert (float(diff1), int(routes1), float(overlap1)) == (
@@ -119,8 +122,8 @@ def test_balanced_spawns_off_is_head_and_on_is_better_and_valid(
 
     doc, today = _read(on / "layout.json"), _read(off / "layout.json")
     assert set(doc) == set(today)
-    assert doc["attackers"] == today["attackers"]
-    assert doc["defenders"]["centre_m"] != today["defenders"]["centre_m"] or doc["uplink_m"] != today["uplink_m"]
+    # Since the C6 amendment of 11 November 2026 the attackers may move as well.
+    assert any(doc[key] != today[key] for key in ("attackers", "defenders", "uplink_m"))
     assert _check_layout(doc) == []
 
     scene, heights, base_dir = detail_inputs
