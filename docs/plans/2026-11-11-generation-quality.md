@@ -21,7 +21,7 @@
 
 Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo en `covers`, la calzada quedaba fuera contra lo que dice el ADR, y las reglas no dejaban ningún edificio candidato en un centro denso. Rue Mouffetard pasó de 0/0 a 2/3 (escaleras de mano/ascensores) y Madrid Sol arena de 0/0 a 0/1. `run` ahora avisa cuando un mapa queda sin accesos.
 
-**Falta en el casco:** subir una escalera de unos 12 m y viajar en un ascensor entre alturas distintas (10,4 y 21,5 m en `pkg_04`). «Se ve bien» no confirma todavía esos dos puntos de la lista de ADR-029.
+**Visto en el casco (11 de noviembre):** se subió por una escalera de mano y se viajó en un ascensor, y los dos funcionan bien, incluidos los ascensores entre alturas distintas. Queda anotado en ADR-029.
 
 ---
 

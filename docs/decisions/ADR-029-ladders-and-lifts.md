@@ -93,3 +93,5 @@ Measured with the same inputs, before and after (ladders / lifts): Rue Mouffetar
 `run` now prints `ladders N  lifts M` after the layout stage, and a warning when both are 0, so a map without any climb no longer passes unnoticed. Limiting the bot-route keep-out to the cabin, not its apron, was tried and added no site on Rue Mouffetard; it is not adopted.
 
 To check on the headset: a ladder of 4 storeys (about 12 m), and a lift to a 7-storey roof, for the climb time and for what the roof overlooks.
+
+**Seen on the headset, 11 November 2026** (Rue Mouffetard `pkg_04`, md5 `22c3311e…`): the user climbed a ladder and rode a lift and reported both fine. The ladders reach 10.6 m and 11.9 m roofs. The lifts reach 10.4 m, 18.9 m and 21.5 m roofs from street level, so the lifts work between different heights, which the "To check" list above asked about. Not measured: how long the climb takes, and what each roof overlooks.
