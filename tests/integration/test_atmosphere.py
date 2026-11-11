@@ -15,6 +15,7 @@ import pytest
 
 from onward_generator.cli import main
 from onward_generator.export.package import ExportError, build_package
+from onward_generator.export.sun import street_sun
 from onward_generator.maps.workspace import (
     MapError,
     create_map,
@@ -255,11 +256,17 @@ def test_a_preset_is_recorded_in_the_options_and_the_manifest(inputs: tuple[Path
     golden = _package(inputs, tmp_path / "golden", atmosphere="golden_hour")
     options = json.loads((golden.directory / "adapter_options.json").read_bytes())
     before = json.loads((plain.directory / "adapter_options.json").read_bytes())
-    lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": 150.0, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5}
+    detail = inputs[0]
+    street = street_sun((detail / "scene_visual.glb").read_bytes(), (json.loads((detail / "scene_detail.json").read_bytes()).get("core") or {}).get("half_side_m"))
+    assert street.axis_deg is not None and street.wall_area_m2 > 0
+    lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": street.azimuth_deg, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5}
     assert options == {**before, "variant": golden.manifest["package_id"], "atmosphere": "golden_hour", "lighting": lighting}
     assert golden.manifest["package_id"] != plain.manifest["package_id"]
     assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun"],
-                                             "sun": {"elevation_deg": 30.0, "azimuth_deg": 150.0, "azimuth_source": "streets_pending"}}
+                                             "sun": {"elevation_deg": 30.0, "azimuth_source": "streets", "axis_deg": street.axis_deg,
+                                                     "wall_area_m2": street.wall_area_m2, "azimuth_deg": street.azimuth_deg}}
+    overcast = _package(inputs, tmp_path / "overcast_sun", atmosphere="overcast").manifest["atmosphere"]["sun"]
+    assert overcast == {"elevation_deg": 55.0, "azimuth_source": "preset", "azimuth_deg": 150.0}
     assert "lighting" not in before
     assert _package(inputs, tmp_path / "overcast", atmosphere="overcast").manifest["package_id"] != golden.manifest["package_id"]
 
@@ -279,7 +286,8 @@ def test_the_export_command_takes_the_preset(inputs: tuple[Path, Path, Path], tm
     detail, layout, _night = inputs
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
     assert main([*args, "--out", str(tmp_path / "golden"), "--atmosphere", "golden_hour"]) == 0
-    assert "  atmosphere golden_hour (ADR-037 proposed): applies sun; sun at 30 deg, azimuth 150 deg (streets_pending)\n" in capsys.readouterr().out
+    sun = json.loads((tmp_path / "golden" / "onward_export.json").read_bytes())["atmosphere"]["sun"]
+    assert f"  atmosphere golden_hour (ADR-037 proposed): applies sun; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "plain")]) == 0
     assert "atmosphere" not in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "bad"), "--atmosphere", "sunset"]) == 1

@@ -12,9 +12,12 @@ from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jsonschema import Draft202012Validator
+
+if TYPE_CHECKING:
+    from onward_generator.export.sun import StreetSun
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PRESETS_DEFAULT = REPO_ROOT / "config" / "atmosphere.default.json"
@@ -65,23 +68,31 @@ def check_atmosphere(name: str, time_of_day: str, path: str | Path | None = None
     return name
 
 
-def lighting(preset: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     """The ``lighting`` block of ``adapter_options.json`` for ``preset``, and what the manifest records of the sun.
 
-    Plan E3 carries the sun. ``azimuth: streets`` keeps the neutral azimuth until plan E6 measures the street axis;
-    the manifest says so with ``azimuth_source: streets_pending``."""
+    An ``azimuth: streets`` preset takes the azimuth of ``street`` (plan E6, ``export.sun``): ``azimuth_source`` is
+    ``streets``, or ``streets_none`` when the core has no wall and the neutral azimuth stays. Without ``street`` it
+    keeps the neutral azimuth as ``streets_pending``."""
     sun = preset["sun"]
-    streets = sun["azimuth"] == STREETS
-    azimuth = NEUTRAL_SUN_AZIMUTH_DEG if streets else float(sun["azimuth"])
+    record: dict[str, Any] = {"elevation_deg": float(sun["elevation_deg"])}
+    if sun["azimuth"] != STREETS:
+        azimuth, record["azimuth_source"] = float(sun["azimuth"]), "preset"
+    elif street is None:
+        azimuth, record["azimuth_source"] = NEUTRAL_SUN_AZIMUTH_DEG, "streets_pending"
+    else:
+        azimuth = street.azimuth_deg
+        record["azimuth_source"] = "streets" if street.axis_deg is not None else "streets_none"
+        record["axis_deg"] = street.axis_deg
+        record["wall_area_m2"] = street.wall_area_m2
+    record["azimuth_deg"] = azimuth
     block = {
-        "sun_elevation_deg": float(sun["elevation_deg"]),
+        "sun_elevation_deg": record["elevation_deg"],
         "sun_azimuth_deg": azimuth,
         "sun_color": str(sun["color"]),
         "sun_intensity": float(sun["intensity"]),
         "sun_shadow_angle_deg": float(sun["shadow_angle_deg"]),
     }
-    record = {"elevation_deg": block["sun_elevation_deg"], "azimuth_deg": azimuth,
-              "azimuth_source": "streets_pending" if streets else "preset"}
     return block, record
 
 

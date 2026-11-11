@@ -25,7 +25,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
-from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, check_atmosphere, lighting, load_presets
+from onward_generator.export.atmosphere import NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -47,6 +47,7 @@ from onward_generator.export.normal_map import (
     encode_png,
     normal_map,
 )
+from onward_generator.export.sun import street_sun
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
@@ -445,7 +446,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     if preset is not None:
         # ADR-037: written only with a preset, so a map without one keeps its package_id.
         options["atmosphere"] = preset
-        options["lighting"], sun_record = lighting(load_presets()[preset])
+        chosen = load_presets()[preset]
+        street = None
+        if chosen["sun"]["azimuth"] == STREETS:
+            # Plan E6: the sun crosses the street axis of the playable core, or of the whole map without a core.
+            street = street_sun(visual_bytes, (detail_manifest.get("core") or {}).get("half_side_m"))
+        options["lighting"], sun_record = lighting(chosen, street)
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
