@@ -12,6 +12,7 @@ from onward_generator.dress.catalog import CatalogError
 from onward_generator.materials.apply import MaterialsError, apply_materials
 from onward_generator.materials.plan import PlanError
 from onward_generator.materials.polyhaven import DEFAULT_CACHE, DownloadError
+from onward_generator.materials.trim import WallPalette
 from onward_generator.materials.trim_style import AUTO, FACADE_MODES
 from onward_generator.next_step import after_materials, emit
 
@@ -65,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="config/street_profile.json; adds its block to materials_report.json (plan D2)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--atmosphere", default=None,
+        help="preset of config/atmosphere.default.json: its grime and wall palette for the facade atlas (plan E8, ADR-037); neutral or absent changes nothing",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--cell-m", type=cell_metres, default=100.0,
         help="combine cell in metres for --repetition (ADR-005)",  # pragma: no mutate: help text only
     )
@@ -75,6 +80,7 @@ def _run_apply(args: argparse.Namespace) -> int:
     from onward_generator.ai.street_profile import report_block
 
     block = report_block(args.street_profile) if args.street_profile is not None else None
+    palette = wall_palette(args.atmosphere)
     report = apply_materials(
         args.base,
         args.out,
@@ -92,6 +98,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         repetition=args.repetition,
         cell_m=args.cell_m,
         street_profile=block,
+        palette=palette,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -107,6 +114,10 @@ def _run_apply(args: argparse.Namespace) -> int:
     if facades:
         detail = f"materials={','.join(facades['materials'])}" if facades["mode"] == "trim" else f"reason={facades['reason']}"
         print(f"facades: {facades['mode']} style={facades['style']} ({facades['style_origin']}) {detail}")
+        tone = facades.get("atmosphere")
+        if tone:
+            print(f"facades: atmosphere {tone['preset']} (ADR-037): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
+                  f"desaturated, value at most {tone['wall_value_max']:g}; mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}")
     repetition = report.get("repetition")
     if repetition:
         over = ", ".join(repetition["over_limit"]) or "none"
@@ -114,6 +125,19 @@ def _run_apply(args: argparse.Namespace) -> int:
     print(f"wrote {Path(args.out).expanduser()}")
     emit(after_materials(Path(args.out)))
     return 0
+
+
+def wall_palette(atmosphere: str | None) -> WallPalette | None:
+    """The wall palette of a preset, or None for ``neutral`` or no preset. An unknown preset raises AtmosphereError."""
+    from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, load_presets
+
+    if atmosphere is None or atmosphere == NEUTRAL:
+        return None
+    presets = load_presets()
+    if atmosphere not in presets:
+        raise AtmosphereError(f"atmosphere must be one of {', '.join((NEUTRAL, *sorted(presets)))}, not {atmosphere!r}")
+    preset = presets[atmosphere]
+    return WallPalette(atmosphere, float(preset["grime"]), float(preset["wall_desaturation"]), float(preset["wall_value_max"]))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

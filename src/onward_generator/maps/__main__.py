@@ -10,6 +10,7 @@ import argparse
 import sys
 
 from onward_generator.ai.providers import OllamaProvider, ProviderError
+from onward_generator.export.atmosphere import NEUTRAL, preset_names
 from onward_generator.maps.workspace import TIME_OF_DAY_DEFAULT, TIMES_OF_DAY, MapError, create_map, load_map, map_directory, refresh_texture_plan
 from onward_generator.materials.plan import PlanError
 from onward_generator.next_step import emit, geo_command
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     create.add_argument("--time-of-day", choices=TIMES_OF_DAY, default=TIME_OF_DAY_DEFAULT, help="day or night: light, Onward profile and street lamps (ADR-026)")  # pragma: no mutate: help text
     create.add_argument("--storm", action="store_true", help="night maps only: lightning and thunder (ADR-028)")  # pragma: no mutate: help text
+    create.add_argument("--atmosphere", choices=preset_names(), default=NEUTRAL, help="day maps only: baked light preset (ADR-037)")  # pragma: no mutate: help text
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     create.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     create.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
@@ -71,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
                 panoramax=args.panoramax,
                 time_of_day=args.time_of_day,
                 storm=args.storm,
+                atmosphere=args.atmosphere,
                 lightmap_texels_per_m=args.lightmap_texels_per_m,
                 core_radius_m=args.core_radius_m,
                 core_target_triangles=args.core_target_triangles,

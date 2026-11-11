@@ -18,6 +18,7 @@ from shapely import box
 from onward_generator.ai.providers import Provider
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
+from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, check_atmosphere
 from onward_generator.export.package import ExportError, load_export_config
 from onward_generator.geo.aoi import AoiError, load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame, ProjectionError, frame_for_origin
@@ -71,6 +72,7 @@ def create_map(
     panoramax: bool = False,
     time_of_day: str = TIME_OF_DAY_DEFAULT,
     storm: bool = False,
+    atmosphere: str = NEUTRAL,
     lightmap_texels_per_m: float = _TEXELS_DEFAULT,
     core_radius_m: float | None = None,
     core_target_triangles: int | None = None,
@@ -81,7 +83,9 @@ def create_map(
 
     ``core_target_triangles`` turns on the budget core (ADR-017 amendment): ``map.json`` then gets
     ``core: {mode: "budget", target_triangles, max_half_side_m}``, the largest half-side being
-    ``core_radius_m`` when given and ``radius_m - CORE_RING_DEFAULT_M`` otherwise."""
+    ``core_radius_m`` when given and ``radius_m - CORE_RING_DEFAULT_M`` otherwise.
+
+    ``atmosphere`` other than ``neutral`` writes ``atmosphere`` in ``map.json`` (ADR-037); ``neutral`` writes no key."""
     root = Path(directory).expanduser().resolve()
     map_id = _map_id(map_id)
     title = _title(name)
@@ -91,6 +95,7 @@ def create_map(
     description = _description(title, latitude, longitude, description)
     brief = _brief(brief)
     texels = _texels(lightmap_texels_per_m)
+    atmosphere = _atmosphere(atmosphere, time_of_day)
     core = _core(core_radius_m, radius_m)
     budget = _core_budget(core_target_triangles, core_radius_m, core, radius_m)
     _guard_directory(root, overwrite=overwrite)
@@ -138,6 +143,7 @@ def create_map(
         "panoramax": bool(panoramax),
         "time_of_day": _time_of_day(time_of_day),
         "storm": _storm(storm, time_of_day),
+        **({"atmosphere": atmosphere} if atmosphere != NEUTRAL else {}),
         "center": {"latitude": latitude, "longitude": longitude},
         "radius_m": radius_m,
         "margin_m": margin_m,
@@ -736,6 +742,7 @@ def store_time_of_day(directory: str | Path, time_of_day: str) -> bool:
     document = load_map(root)
     changed = document.get("time_of_day", TIME_OF_DAY_DEFAULT) != _time_of_day(time_of_day)
     _storm(bool(document.get("storm")), time_of_day)
+    _atmosphere(str(document.get("atmosphere", NEUTRAL)), time_of_day)
     document["time_of_day"] = time_of_day
     atomic_write_json(root / "map.json", document)
     return changed
@@ -769,6 +776,36 @@ def _storm(storm: bool, time_of_day: str) -> bool:
     if storm and time_of_day != "night":
         raise MapError("storm needs a night map: a daytime flash looks wrong (ADR-028)")
     return storm
+
+
+def map_atmosphere(directory: str | Path) -> str:
+    """The map's atmosphere preset; a map from before the setting, or a folder without a map, is ``neutral``."""
+    path = Path(directory).expanduser() / "map.json"
+    if not path.is_file():
+        return NEUTRAL
+    return str(load_map(path.parent).get("atmosphere", NEUTRAL))
+
+
+def store_atmosphere(directory: str | Path, atmosphere: str) -> bool:
+    """Record the atmosphere on an existing map. True when it changed, so the package is out of date.
+
+    ``neutral`` removes the key, so the map reads as it did before the setting."""
+    root = Path(directory).expanduser().resolve()
+    document = load_map(root)
+    wanted = _atmosphere(atmosphere, str(document.get("time_of_day", TIME_OF_DAY_DEFAULT)))
+    changed = document.get("atmosphere", NEUTRAL) != wanted
+    document.pop("atmosphere", None)
+    if wanted != NEUTRAL:
+        document["atmosphere"] = wanted
+    atomic_write_json(root / "map.json", document)
+    return changed
+
+
+def _atmosphere(atmosphere: str, time_of_day: str) -> str:
+    try:
+        return check_atmosphere(atmosphere, time_of_day)
+    except AtmosphereError as exc:
+        raise MapError(str(exc)) from exc
 
 
 def store_brief(directory: str | Path, brief: str | None = None, *, ambient_ai: bool | None = None) -> None:

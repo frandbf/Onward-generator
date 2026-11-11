@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onward-generator.local/schemas/atmosphere.schema.json",
+  "title": "Atmosphere presets (ADR-037, proposed)",
+  "description": "The baked light of a day map. A preset is named in map.json (atmosphere); neutral is not listed here and changes nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "presets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "0.1.0" },
+    "presets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,31}$", "not": { "const": "neutral" } },
+      "additionalProperties": { "$ref": "#/$defs/preset" }
+    }
+  },
+  "$defs": {
+    "colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "sun", "ambient", "ao", "fog", "lightmap_texels_per_m_core", "grime", "wall_desaturation", "wall_value_max"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "sun": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["elevation_deg", "azimuth", "color", "intensity", "shadow_angle_deg"],
+          "properties": {
+            "elevation_deg": { "type": "number", "minimum": 5, "maximum": 89 },
+            "azimuth": {
+              "description": "Where the sun stands, degrees clockwise from north (the neutral light stands at 150), or 'streets' to cross the dominant street axis of the playable core",
+              "oneOf": [{ "const": "streets" }, { "type": "number", "minimum": -360, "maximum": 360 }]
+            },
+            "color": { "$ref": "#/$defs/colour" },
+            "intensity": { "type": "number", "exclusiveMinimum": 0, "maximum": 3 },
+            "shadow_angle_deg": { "type": "number", "minimum": 0, "maximum": 20 }
+          }
+        },
+        "ambient": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "sky"],
+          "properties": {
+            "mode": { "enum": ["trilight", "flat"] },
+            "sky": { "$ref": "#/$defs/colour" },
+            "equator": { "$ref": "#/$defs/colour" },
+            "ground": { "$ref": "#/$defs/colour" }
+          },
+          "if": { "properties": { "mode": { "const": "trilight" } } },
+          "then": { "required": ["equator", "ground"] },
+          "else": { "not": { "anyOf": [{ "required": ["equator"] }, { "required": ["ground"] }] } }
+        },
+        "ao": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_distance_m", "exponent_indirect", "exponent_direct"],
+          "properties": {
+            "max_distance_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 10 },
+            "exponent_indirect": { "type": "number", "minimum": 0, "maximum": 10 },
+            "exponent_direct": { "type": "number", "minimum": 0, "maximum": 10 }
+          }
+        },
+        "fog": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The colour of the map's fog; where it starts and ends stays the map's own, from its wall (ADR-014)",
+          "required": ["color"],
+          "properties": {
+            "color": { "$ref": "#/$defs/colour" }
+          }
+        },
+        "lightmap_texels_per_m_core": { "type": "number", "exclusiveMinimum": 0, "maximum": 40 },
+        "grime": { "description": "Factor on the grime baked into the facade atlas", "type": "number", "minimum": 0, "maximum": 2 },
+        "wall_desaturation": { "description": "Share of saturation removed from wall strips of the atlas", "type": "number", "minimum": 0, "maximum": 0.5 },
+        "wall_value_max": { "description": "Largest sRGB value of a wall strip of the atlas", "type": "number", "minimum": 0.5, "maximum": 1 }
+      }
+    }
+  }
+}

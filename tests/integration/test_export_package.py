@@ -697,8 +697,9 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     assert "f.role == \"thumbnail\"" in source
     assert "LoadListingThumbnail" in source
     assert "ContributesGi" in source
-    # Every combined mesh is unwrapped with a margin of 4 lightmap texels, not Unity's default fraction.
-    assert "Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));" in source
+    # Every combined mesh is unwrapped with a margin of 4 lightmap texels at its own density (a core cell's
+    # included, plan E10), not Unity's default fraction.
+    assert "Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * core * ScaleInLightmap(opt, visual.Doc.materials, mat)));" in source
     assert "internal const float LightmapMarginTexels = 4f;" in source
     assert "Mathf.Clamp(LightmapMarginTexels / side, param.packMargin, LightmapMarginMax)" in source
     assert "tree_" in source

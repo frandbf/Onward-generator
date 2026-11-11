@@ -131,6 +131,7 @@ El SDK define 12 `EProfileId` (`UrbanDay1/2`, `DesertDay1/2`, `ForestDay1/2` y s
 - **Qué mirar:** si el cielo acompaña al bake dorado; si el perfil cambia el grading; si se ve a un enemigo en la sombra; fps.
 - **Decisiones:** valores del sol; qué perfil usa cada preset; si se añade `dusk`. Si ningún perfil arregla el cielo azul, el preset se queda más cerca del neutral y la parte 2 del cielo (C8) pierde prioridad.
 - **Pausa para el usuario.**
+- **Resultado (11 de noviembre de 2026).** El usuario probó `pkg_15` (`Day`/`UrbanDay1`), `pkg_16` (`Twilight`) y `pkg_17` (`UrbanDay2` con `SkyColor #E8B890`) en el Quest 3: los tres se ven bien, y `Twilight`, `UrbanDay2` y `SkyColor` no cambian nada visible. `golden_hour` se queda en `Day`/`UrbanDay1`, no se añade `dusk`, el sol no cambia y el cielo propio de la parte 2 pierde prioridad. Detalle en ADR-037.
 
 ### E5. Ambiente Trilight y AO
 
@@ -152,6 +153,7 @@ El SDK define 12 `EProfileId` (`UrbanDay1/2`, `DesertDay1/2`, `ForestDay1/2` y s
 ### E7. Niebla por preset
 
 - La niebla lineal ya existe (`ApplyFog`, ADR-014). El preset solo cambia inicio, fin y color.
+- **Cambio al implementar (11 de noviembre de 2026):** el preset solo cambia el **color**. Inicio y fin siguen siendo los del mapa, calculados desde su muro: una distancia fija por preset metería niebla en la zona jugable de un mapa grande y no se vería en uno pequeño. Un mapa sin niebla sigue sin niebla.
 - Sigue sin saberse si el runtime de Onward respeta `RenderSettings.fog`: queda en el ADR-037.
 - **Tests:** valores del preset en `adapter_options.json`; sin preset no cambia nada.
 
@@ -165,6 +167,7 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - **Riesgo:** un atlas más oscuro baja la legibilidad en el Quest. Los valores son suaves a propósito.
 - **Tests:** atlas idéntico con `neutral`; luminancia menor con `golden_hour`; colores observados intactos.
 - Un mapa existente vuelve a correr desde `materials`.
+- **Hecho (11 de noviembre de 2026).** Los colores observados ya quedan fuera del atlas (son materiales `__tint_`), así que no hace falta excluirlos. En Madrid la luminancia media de los muros baja de 0.7083 a 0.5589; en las capturas horneadas las fachadas al sol bajan de 1 a 5 niveles de gris y la sombra no cambia.
 
 ### E9. Colliders de cobertura: test y docstring
 
@@ -178,12 +181,14 @@ Es el primer incremento que cambia `materials`, y por eso va después de la sesi
 - Compone con el presupuesto de páginas de la enmienda C5 del ADR-005. Si `lightmap_pages_max` está activo, manda el presupuesto.
 - **Riesgo:** memoria de lightmaps y tiempo de bake. El ADR-005 registra que la estimación de páginas puede quedarse muy corta (París: 3 estimadas, 24 reales).
 - **Aceptación:** `lightmap_texels` del informe del bake y memoria gráfica ≤ 1 GB en el casco. Si no cabe, bajar a 12 o descartar.
+- **Hecho (11 de noviembre de 2026).** En Madrid, 146 mallas combinadas del núcleo bakean a ×1,4: la estimación pasa de 4 a 6 páginas (justo el presupuesto de la tarjeta) y el bake real de 5 a 7 páginas de 2048², unos 7 MB en ASTC; el bundle pasa de 30 a 32 MB. El presupuesto cuenta el núcleo, pero la estimación sigue siendo una cota inferior.
 
 ### E11. Sesión de casco final
 
 - Checklist por preset: sombras legibles, cielo coherente, niebla, fps ≥ 72 de mediana, draws ≤ 150 en las vistas A y B, memoria ≤ 1 GB.
 - El ADR-037 pasa a *accepted* solo con esa sesión.
 - **Decisión:** qué entra de la [parte 2](2026-11-10-atmosphere-advanced.md) y en qué orden.
+- **Estado (11 de noviembre de 2026).** El usuario probó en el casco cada incremento, de `pkg_18` a `pkg_21`, y los vio bien. Medido después en `pkg_21` con el registro `VrApi` del casco: 72 fps de mediana, GPU al 78 % como máximo y CPU con picos del 92 %. Los draws no salen en el registro: la estimación del paquete da mediana 111 y p90 227, igual que sin preset, así que quedan para la P0 de la parte 2. El usuario aceptó el ADR-037 el 11 de noviembre de 2026.
 
 ---
 

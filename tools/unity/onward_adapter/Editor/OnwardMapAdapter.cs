@@ -121,6 +121,9 @@ namespace OnwardGenerator
             // texels and are lit by probes, or by the ambient light when combined, but stay ContributeGI and
             // cast the baked shadows. Absent in older packages, which bake the ring as before.
             public bool scenic_out_of_lightmap = false;
+            // Plan E10 (ADR-037): a combined cell wholly inside the core square bakes at scale times its
+            // density. Absent (scale 0) in every package without an atmosphere preset.
+            public LightmapCore lightmap_core = new LightmapCore();
             // Plan D5 spike (ADR-033, proposed): the facade_trim_* material drawn with PP_Opaque_Lit and the package's
             // lit_normal.png. Empty (absent in older packages and in every card without the key) keeps PP_Opaque_Simple_Lit.
             // lit_normal_strength is baked into the PNG by export package; the adapter does not read it.
@@ -134,9 +137,36 @@ namespace OnwardGenerator
             public float fog_start_m = 160f;
             public float fog_end_m = 1000f;
             public string fog_color = "#C8CDD2";
+            // Plan E2 (ADR-037): a headset test package replaces the SDK time of day and profile of a day
+            // gameplay layout, and may set SharedLevelSettings.SkyColor. JsonUtility leaves the fields empty when absent.
+            public ExperimentalEnvironment experimental_environment = new ExperimentalEnvironment();
+            // ADR-037: the light of an atmosphere preset, in numbers. Absent (sun_intensity 0) keeps the
+            // light of before: 50 degrees, heading -30, intensity 1.2, white.
+            public Lighting lighting = new Lighting();
         }
 
+        [Serializable]
+        private class Lighting
+        {
+            public float sun_elevation_deg;
+            public float sun_azimuth_deg;
+            public string sun_color = "";
+            public float sun_intensity;
+            public float sun_shadow_angle_deg;
+            // Plan E5. An empty ambient_mode keeps the default skybox ambient; ao_max_distance_m 0 keeps Unity's AO.
+            public string ambient_mode = "";
+            public string ambient_sky_color = "";
+            public string ambient_equator_color = "";
+            public string ambient_ground_color = "";
+            public float ao_max_distance_m;
+            public float ao_exponent_indirect;
+            public float ao_exponent_direct;
+        }
+
+        [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
+
         [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
+        [Serializable] private class LightmapCore { public float half_side_m; public float scale; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
@@ -642,6 +672,7 @@ namespace OnwardGenerator
             AssetDatabase.StartAssetEditing();
             var built = new List<(string, Mesh, int)>();
             var furnitureMeshes = new HashSet<string>(StringComparer.Ordinal);
+            var coreMeshes = new Dictionary<string, float>(StringComparer.Ordinal);
             int tangentMeshes = 0;
             try
             {
@@ -649,6 +680,8 @@ namespace OnwardGenerator
                 {
                     (int cx, int cz, int mat) = g.Key;
                     string name = $"K{cx}_{cz}_m{mat}".Replace('-', 'n');
+                    float core = furnitureGroups.Contains(g.Key) ? 1f : CoreScale(opt, cx, cz, cellM);
+                    if (core > 1f) coreMeshes[name] = core;
                     // CombineMeshes adds mesh.vertexCount for every instance. The submesh
                     // range is smaller, so using it leaves a 16-bit buffer that Unity then rejects.
                     long verts = g.Value.Sum(ci => (long)ci.mesh.vertexCount);
@@ -656,7 +689,7 @@ namespace OnwardGenerator
                     combined.CombineMeshes(g.Value.ToArray(), true, true, false);
                     combined.RecalculateBounds();
                     // Renderers out of the lightmap (props, trees, the scenic walls under plan C4) are still unwrapped.
-                    Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * ScaleInLightmap(opt, visual.Doc.materials, mat)));
+                    Unwrapping.GenerateSecondaryUVSet(combined, LightmapUnwrap(combined, opt.lightmap_texels_per_m * core * ScaleInLightmap(opt, visual.Doc.materials, mat)));
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
                     // Plan D5: only the promoted material's groups get tangents, after the unwrap.
@@ -686,7 +719,8 @@ namespace OnwardGenerator
                 renderer.shadowCastingMode = mat >= 0 && mat < visual.Doc.materials.Length && IsShopOverlay(visual.Doc.materials[mat])
                     ? ShadowCastingMode.Off : ShadowCastingMode.On;
                 GameObjectUtility.SetStaticEditorFlags(go, LightmapFlags(flags, renderer.sharedMaterials));
-                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ? ScaleInLightmap(opt, visual.Doc.materials, mat) : 0f;
+                float coreScale = coreMeshes.TryGetValue(name, out float core) ? core : 1f;
+                renderer.scaleInLightmap = ContributesGi(renderer.sharedMaterial, opt) ? ScaleInLightmap(opt, visual.Doc.materials, mat) * coreScale : 0f;
                 if (!ContributesGi(renderer.sharedMaterial, opt))
                 {
                     renderer.receiveGI = ReceiveGI.LightProbes;
@@ -702,11 +736,25 @@ namespace OnwardGenerator
             }
 
             Debug.Log($"{LogPrefix} Combined visual: {built.Count} meshes from {groups.Values.Sum(l => l.Count)} primitives, cell {cellM} m");
+            if (coreMeshes.Count > 0)
+                Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} Core lightmap (ADR-037): {1} combined meshes inside {2:0.#} m at x{3:0.####}.",
+                    LogPrefix, coreMeshes.Count, opt.lightmap_core.half_side_m, opt.lightmap_core.scale));
             if (litNormal >= 0)
                 Debug.Log($"{LogPrefix} Lit normal: {tangentMeshes} combined meshes of {visual.Doc.materials[litNormal].name} got tangents.");
             Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
                 + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
+        }
+
+        // Plan E10: the scale of a combine cell wholly inside the core square, else 1. The square is centred on the
+        // local origin, so the sign convention of the cell's second index does not matter.
+        private static float CoreScale(Options opt, int cx, int cz, float cellM)
+        {
+            LightmapCore core = opt.lightmap_core;
+            if (core == null || core.scale <= 1f || core.half_side_m <= 0f) return 1f;
+            float h = core.half_side_m;
+            bool inside = -h <= cx * cellM && (cx + 1) * cellM <= h && -h <= cz * cellM && (cz + 1) * cellM <= h;
+            return inside ? core.scale : 1f;
         }
 
         // ---- Entry points ------------------------------------------------------------------
@@ -876,6 +924,8 @@ namespace OnwardGenerator
                 light.intensity = 1.2f;
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                ApplySun(light, opt.lighting);
+                ApplyAmbient(opt.lighting);
                 ApplyFog(opt);
                 ApplyNight(light, pkg.Layout);
 
@@ -900,6 +950,7 @@ namespace OnwardGenerator
                 shared.Scene_Quest = AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath);
                 shared.UseBuiltInSkybox = true;
                 ApplyEnvironment(shared, pkg.Layout);
+                ApplyExperimentalEnvironment(shared, opt);
                 EditorUtility.SetDirty(shared);
 
                 GameObject descriptorObject = InstantiatePrefab("LevelDescriptor.prefab");
@@ -930,6 +981,92 @@ namespace OnwardGenerator
 
                 File.WriteAllText(reportOut, SceneReport(pkg, scenePath, visualObjects, colliders, buildSeconds, bakeSeconds));
                 Debug.Log($"{LogPrefix} Scene saved: {scenePath}. Lightmaps: {LightmapSettings.lightmaps.Length}. Report: {reportOut}");
+            });
+        }
+
+        // Plan E1 (ADR-037): fixed eye-level views of the baked scene, from build/views/views.json, which
+        // `onward-generator export views` writes. The scene is opened, not saved; the package is not touched.
+        [Serializable]
+        private class CaptureView
+        {
+            public string name;
+            public float[] position_m;
+            public float heading_deg;
+            public float pitch_deg;
+        }
+
+        [Serializable]
+        private class CaptureViewList
+        {
+            public string schema;
+            public int width;
+            public int height;
+            public float fov_deg;
+            public CaptureView[] views;
+        }
+
+        [MenuItem("ONWARD Murcia Export/3. Capture fixed views of the baked scene")]
+        public static void CaptureViews() => CaptureViewsFromPaths(RequireArg("-exportPackage"));
+
+        public static void CaptureViewsFromPaths(string packageDir)
+        {
+            RunGuarded(() =>
+            {
+                Package pkg = LoadPackage(packageDir);
+                string dir = Path.Combine(packageDir, "build", "views");
+                string listPath = Path.Combine(dir, "views.json");
+                if (!File.Exists(listPath))
+                    throw new FileNotFoundException($"{listPath} not found; run onward-generator export views first.");
+                var list = JsonUtility.FromJson<CaptureViewList>(File.ReadAllText(listPath));
+                if (list == null || list.schema != "onward_generator.capture_views" || list.views == null || list.views.Length == 0)
+                    throw new InvalidDataException($"{listPath} is not a capture_views document with views");
+                if (list.width <= 0 || list.height <= 0 || list.fov_deg <= 0f || list.fov_deg >= 180f)
+                    throw new InvalidDataException($"{listPath}: width, height and fov_deg are out of range");
+                string scenePath = ScenePath(pkg);
+                if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+                    throw new FileNotFoundException($"Scene {scenePath} not found; run the scene step first.");
+                ApplyQuestGraphics();
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                EnsureLightmapsAssigned();
+                var cameraObject = new GameObject("OnwardCaptureCamera");
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.fieldOfView = list.fov_deg;
+                camera.nearClipPlane = 0.1f;
+                camera.farClipPlane = pkg.Layout.far_clip_m > 0f ? pkg.Layout.far_clip_m : 1000f;
+                camera.clearFlags = CameraClearFlags.Skybox;
+                var target = new RenderTexture(list.width, list.height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
+                var image = new Texture2D(list.width, list.height, TextureFormat.RGB24, false);
+                camera.targetTexture = target;
+                try
+                {
+                    foreach (CaptureView view in list.views)
+                    {
+                        if (string.IsNullOrEmpty(view.name) || view.name.Any(c => !(char.IsLower(c) || char.IsDigit(c) || c == '_')))
+                            throw new InvalidDataException($"{listPath}: view name '{view.name}' must be lower case letters, digits and _");
+                        if (view.position_m == null || view.position_m.Length != 3)
+                            throw new InvalidDataException($"{listPath}: view {view.name} needs position_m [x, y, z]");
+                        string png = Path.Combine(dir, view.name + ".png");
+                        if (File.Exists(png))
+                            throw new IOException($"{png} exists; captures are never overwritten");
+                        // Local (x east, y north, z up) to Unity (x, z, y); heading is clockwise from north, Unity's yaw.
+                        cameraObject.transform.position = new Vector3(view.position_m[0], view.position_m[2], view.position_m[1]);
+                        cameraObject.transform.rotation = Quaternion.Euler(-view.pitch_deg, view.heading_deg, 0f);
+                        camera.Render();
+                        RenderTexture.active = target;
+                        image.ReadPixels(new Rect(0, 0, list.width, list.height), 0, 0);
+                        image.Apply();
+                        File.WriteAllBytes(png, image.EncodeToPNG());
+                        Debug.Log($"{LogPrefix} View {view.name}: {png}");
+                    }
+                }
+                finally
+                {
+                    RenderTexture.active = null;
+                    camera.targetTexture = null;
+                    UnityEngine.Object.DestroyImmediate(cameraObject);
+                    target.Release();
+                }
+                Debug.Log($"{LogPrefix} Captured {list.views.Length} views in {dir}.");
             });
         }
 
@@ -972,7 +1109,7 @@ namespace OnwardGenerator
                     description,
                     LevelDescriptor.EMapEnvironment.Desert,
                     LevelDescriptor.EMapSize.Medium,
-                    TimeOfDayOf(pkg.Layout),
+                    TimeOfDayFor(pkg),
                     "unity-export.local",
                     "0.1",
                     BuildTarget.Android,
@@ -1231,6 +1368,56 @@ namespace OnwardGenerator
             return SetPhysicMaterial.EPhysicMaterialType.Concrete;
         }
 
+        // ADR-037, plan E3. The sun of an atmosphere preset. A directional light points away from the sun, so its
+        // heading is the sun's azimuth plus 180 degrees: the neutral sun at 150 degrees is the heading -30 above.
+        private static void ApplySun(Light light, Lighting lighting)
+        {
+            if (lighting == null || lighting.sun_intensity <= 0f) return;
+            if (!ColorUtility.TryParseHtmlString(lighting.sun_color, out Color colour))
+                throw new InvalidDataException($"lighting.sun_color {lighting.sun_color} is not #RRGGBB");
+            if (!(lighting.sun_elevation_deg > 0f && lighting.sun_elevation_deg < 90f))
+                throw new InvalidDataException($"lighting.sun_elevation_deg {lighting.sun_elevation_deg} must be between 0 and 90");
+            light.color = colour;
+            light.intensity = lighting.sun_intensity;
+            light.shadowAngle = lighting.sun_shadow_angle_deg;
+            light.transform.rotation = Quaternion.Euler(lighting.sun_elevation_deg, lighting.sun_azimuth_deg + 180f, 0f);
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} Sun (ADR-037): elevation {1:0.#}, azimuth {2:0.#}, {3}, intensity {4:0.##}, shadow angle {5:0.#}.",
+                LogPrefix, lighting.sun_elevation_deg, lighting.sun_azimuth_deg, lighting.sun_color, lighting.sun_intensity, lighting.sun_shadow_angle_deg));
+        }
+
+        // ADR-037, plan E5. The ambient of a preset: trilight (sky, equator, ground) or flat. It lights the bake's
+        // shade and, through the light probes, the players: a dark ground colour would hide an enemy in the shade.
+        private static void ApplyAmbient(Lighting lighting)
+        {
+            if (lighting == null || string.IsNullOrEmpty(lighting.ambient_mode)) return;
+            Color sky = ParseColour("lighting.ambient_sky_color", lighting.ambient_sky_color);
+            if (lighting.ambient_mode == "trilight")
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                RenderSettings.ambientSkyColor = sky;
+                RenderSettings.ambientEquatorColor = ParseColour("lighting.ambient_equator_color", lighting.ambient_equator_color);
+                RenderSettings.ambientGroundColor = ParseColour("lighting.ambient_ground_color", lighting.ambient_ground_color);
+            }
+            else if (lighting.ambient_mode == "flat")
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = sky;
+            }
+            else
+            {
+                throw new InvalidDataException($"lighting.ambient_mode {lighting.ambient_mode} must be trilight or flat");
+            }
+            Debug.Log($"{LogPrefix} Ambient (ADR-037): {lighting.ambient_mode}, sky {lighting.ambient_sky_color}, equator {lighting.ambient_equator_color}, ground {lighting.ambient_ground_color}.");
+        }
+
+        private static Color ParseColour(string key, string value)
+        {
+            if (!ColorUtility.TryParseHtmlString(value, out Color colour) || value.Length != 7 || value[0] != '#')
+                throw new InvalidDataException($"{key} {value} is not #RRGGBB");
+            return colour;
+        }
+
         // ADR-014. Unity fog is measured from the camera. Whether the Onward runtime or its
         // post-processing profile overrides these RenderSettings is not known; checked on the headset.
         private static void ApplyFog(Options opt)
@@ -1262,6 +1449,32 @@ namespace OnwardGenerator
             if (IsSchema(layout.schema, "gameplay_layout"))
                 shared.EnableReverbInjection = true;
         }
+
+        // Plan E2 (ADR-037): only export package writes the block, and only for a day gameplay layout.
+        private static bool HasExperimentalEnvironment(Options opt) =>
+            opt.experimental_environment != null && !string.IsNullOrEmpty(opt.experimental_environment.profile);
+
+        private static void ApplyExperimentalEnvironment(SharedLevelSettings shared, Options opt)
+        {
+            if (!HasExperimentalEnvironment(opt)) return;
+            ExperimentalEnvironment test = opt.experimental_environment;
+            shared.TimeOfDay = (LevelDescriptor.ETimeOfDay)Enum.Parse(typeof(LevelDescriptor.ETimeOfDay), test.time_of_day);
+            shared.PPProfileId = (LevelDescriptor.EProfileId)Enum.Parse(typeof(LevelDescriptor.EProfileId), test.profile);
+            string sky = "unchanged";
+            if (!string.IsNullOrEmpty(test.sky_color))
+            {
+                if (!ColorUtility.TryParseHtmlString(test.sky_color, out Color colour))
+                    throw new InvalidDataException($"experimental_environment.sky_color {test.sky_color} is not #RRGGBB");
+                shared.SkyColor = colour;
+                sky = test.sky_color;
+            }
+            Debug.Log($"{LogPrefix} Experimental environment (plan E2): {test.time_of_day} / {test.profile}, sky colour {sky}. Do not publish.");
+        }
+
+        private static LevelDescriptor.ETimeOfDay TimeOfDayFor(Package pkg) =>
+            HasExperimentalEnvironment(pkg.Options)
+                ? (LevelDescriptor.ETimeOfDay)Enum.Parse(typeof(LevelDescriptor.ETimeOfDay), pkg.Options.experimental_environment.time_of_day)
+                : TimeOfDayOf(pkg.Layout);
 
         private static bool WalkableGround(string nodeName)
         {
@@ -2802,6 +3015,15 @@ namespace OnwardGenerator
             // Batch mode has no Scene view to bake first; the whole map converges at once.
             settings.prioritizeView = false;
             settings.ao = true;
+            if (opt.lighting != null && opt.lighting.ao_max_distance_m > 0f)
+            {
+                // ADR-037, plan E5: corners and the foot of walls darken over this distance.
+                settings.aoMaxDistance = opt.lighting.ao_max_distance_m;
+                settings.aoExponentIndirect = opt.lighting.ao_exponent_indirect;
+                settings.aoExponentDirect = opt.lighting.ao_exponent_direct;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} AO (ADR-037): max distance {1:0.##} m, indirect {2:0.##}, direct {3:0.##}.",
+                    LogPrefix, settings.aoMaxDistance, settings.aoExponentIndirect, settings.aoExponentDirect));
+            }
             settings.lightmapCompression = LightmapCompression.None;
             settings.filteringMode = LightingSettings.FilterMode.Advanced;
             settings.denoiserTypeDirect = LightingSettings.DenoiserType.OpenImage;

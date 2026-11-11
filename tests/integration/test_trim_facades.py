@@ -121,3 +121,21 @@ def test_the_cli_prints_the_facade_path(runs: dict[str, Path], tmp_path: Path, c
     assert "unknown facade style 'nordic'" in capsys.readouterr().err
     assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "o"),
                  "--facades", "fancy"]) == 2
+
+
+def test_the_cli_tones_the_atlas_with_a_preset(runs: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Plan E8: --atmosphere reaches apply_trim through apply_materials, and the CLI prints the palette."""
+    detail, plan = runs["detail"], runs["plan"]
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "g"), "--atmosphere", "golden_hour"]) == 0
+    out = capsys.readouterr().out
+    tone = json.loads((tmp_path / "g" / "materials_report.json").read_bytes())["facades"]["atmosphere"]
+    assert (tone["preset"], tone["grime"], tone["wall_desaturation"], tone["wall_value_max"]) == ("golden_hour", 1.0, 0.08, 0.85)
+    assert (f"facades: atmosphere golden_hour (ADR-037): grime x1, walls 8% desaturated, value at most 0.85; "
+            f"mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}\n") in out
+    assert tone["wall_luminance_after"] < tone["wall_luminance_before"]
+    assert (tmp_path / "g" / "facade_trim.png").read_bytes() != (runs["trim"] / "facade_trim.png").read_bytes()
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "n"), "--atmosphere", "neutral"]) == 0
+    assert "atmosphere" not in capsys.readouterr().out
+    assert "atmosphere" not in json.loads((tmp_path / "n" / "materials_report.json").read_bytes())["facades"]
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "d"), "--atmosphere", "dusk"]) == 1
+    assert "materials: atmosphere must be one of neutral, golden_hour, overcast, not 'dusk'" in capsys.readouterr().err

@@ -94,6 +94,17 @@ LIGHTMAP_DENSITY_STEP = 0.25
 LightmapAreas = dict[tuple[tuple[int, ...], str], float]
 
 
+def in_core(cell: tuple[int, ...], core: Mapping[str, Any] | None, cell_m: float) -> bool:
+    """True when the combine cell ``cell`` lies wholly inside the core square of ``core`` (plan E10, ADR-037).
+
+    ``core`` is the ``lightmap_core`` export option, ``{"half_side_m", "scale"}``; a per-node key (no combining)
+    is never in the core."""
+    if core is None or len(cell) != 2 or cell_m <= 0:
+        return False
+    half = float(core["half_side_m"])
+    return all(-half <= c * cell_m and (c + 1) * cell_m <= half for c in cell)
+
+
 class LightmapBudgetError(ValueError):
     """``build.lightmap_pages_max`` cannot be met at or above ``LIGHTMAP_TEXELS_FLOOR``."""
 
@@ -119,15 +130,20 @@ def lightmap_areas(visual: bytes, *, cell_m: float, scenic_out_of_lightmap: bool
 
 
 def summarise(areas: LightmapAreas, *, texels_per_m: float, max_size: int,
-              scales: Iterable[Mapping[str, Any]] = ()) -> dict[str, Any]:
-    """The estimate of ``areas`` at ``texels_per_m``: each renderer's texels capped at one page, then the pages."""
+              scales: Iterable[Mapping[str, Any]] = (), core: Mapping[str, Any] | None = None,
+              cell_m: float = 0.0) -> dict[str, Any]:
+    """The estimate of ``areas`` at ``texels_per_m``: each renderer's texels capped at one page, then the pages.
+
+    A renderer whose cell is in the ``core`` (plan E10) bakes at ``core["scale"]`` times its density."""
     by_material = _by_material(scales)
     page = max_size * max_size
     texels = 0.0
     capped = 0
     by_class: dict[str, float] = defaultdict(float)
-    for (_cell, material), area in areas.items():
+    for (cell, material), area in areas.items():
         density = texels_per_m * by_material.get(material, 1.0)
+        if core is not None and in_core(cell, core, cell_m):
+            density *= float(core["scale"])
         wanted = area * density * density
         if wanted > page:
             capped += 1
@@ -146,24 +162,28 @@ def summarise(areas: LightmapAreas, *, texels_per_m: float, max_size: int,
 
 
 def estimate(visual: bytes, *, texels_per_m: float, max_size: int, cell_m: float,
-             scales: Iterable[Mapping[str, Any]] = (), scenic_out_of_lightmap: bool = False) -> dict[str, Any]:
+             scales: Iterable[Mapping[str, Any]] = (), scenic_out_of_lightmap: bool = False,
+             core: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Texels the bake needs for the visual GLB, grouped as the adapter combines it.
 
     ``cell_m`` 0 means one renderer per node, as the adapter does without combining.
     ``scenic_out_of_lightmap`` leaves the ``scenic_*`` walls out, as ``contributes_gi`` does.
     """
     areas = lightmap_areas(visual, cell_m=cell_m, scenic_out_of_lightmap=scenic_out_of_lightmap)
-    return summarise(areas, texels_per_m=texels_per_m, max_size=max_size, scales=scales)
+    return summarise(areas, texels_per_m=texels_per_m, max_size=max_size, scales=scales, core=core, cell_m=cell_m)
 
 
 def pages_at_least(areas: LightmapAreas, texels_per_m: float, *, max_size: int,
-                   scales: Iterable[Mapping[str, Any]] = ()) -> int:
+                   scales: Iterable[Mapping[str, Any]] = (), core: Mapping[str, Any] | None = None,
+                   cell_m: float = 0.0) -> int:
     """``summarise(...)["pages_at_least"]``: the lower-bound page count of ``areas`` at ``texels_per_m``."""
-    return int(summarise(areas, texels_per_m=texels_per_m, max_size=max_size, scales=scales)["pages_at_least"])
+    return int(summarise(areas, texels_per_m=texels_per_m, max_size=max_size, scales=scales, core=core,
+                         cell_m=cell_m)["pages_at_least"])
 
 
 def page_budget_density(areas: LightmapAreas, *, requested: float, pages_max: int, max_size: int,
-                        scales: Iterable[Mapping[str, Any]] = ()) -> float:
+                        scales: Iterable[Mapping[str, Any]] = (), core: Mapping[str, Any] | None = None,
+                        cell_m: float = 0.0) -> float:
     """The texel density that keeps the estimate within ``pages_max`` pages (plan C5).
 
     Within budget (``pages_at_least`` at ``requested`` at most ``pages_max``) the requested density comes back
@@ -172,12 +192,13 @@ def page_budget_density(areas: LightmapAreas, *, requested: float, pages_max: in
     ``min(area × (density × scale)², page)``, which never falls as the density rises, so the page count is
     monotone in the density. The same areas in the same order always give the same density.
     The density is never raised and never goes below the floor: ``LightmapBudgetError`` when the budget cannot
-    be met there.
+    be met there. A ``core`` (plan E10) counts its cells at ``core["scale"]`` times the density, so the budget
+    wins over the core and the core keeps its ratio.
     """
     rows = list(scales)
 
     def fits(density: float) -> bool:
-        return pages_at_least(areas, density, max_size=max_size, scales=rows) <= pages_max
+        return pages_at_least(areas, density, max_size=max_size, scales=rows, core=core, cell_m=cell_m) <= pages_max
 
     if fits(requested):
         return requested
@@ -185,7 +206,7 @@ def page_budget_density(areas: LightmapAreas, *, requested: float, pages_max: in
     high = math.floor(requested / LIGHTMAP_DENSITY_STEP)
     if high < low or not fits(low * LIGHTMAP_DENSITY_STEP):
         lowest = min(requested, LIGHTMAP_TEXELS_FLOOR)
-        pages = pages_at_least(areas, lowest, max_size=max_size, scales=rows)
+        pages = pages_at_least(areas, lowest, max_size=max_size, scales=rows, core=core, cell_m=cell_m)
         raise LightmapBudgetError(
             f"build.lightmap_pages_max {pages_max} cannot be met: the lightmap needs at least {pages} pages at "
             f"{lowest:g} texels/m, and the density never goes below the {LIGHTMAP_TEXELS_FLOOR:g} texels/m floor (ADR-005)"

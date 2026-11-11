@@ -44,7 +44,7 @@ from onward_generator.materials.polyhaven import (
     ensure_diffuse_1k,
 )
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
-from onward_generator.materials.trim import apply_trim
+from onward_generator.materials.trim import WallPalette, apply_trim
 from onward_generator.materials.trim_style import AUTO
 from onward_generator.tiers import SCENIC_WALLS
 
@@ -401,6 +401,7 @@ def apply_materials(
     repetition: bool = False,
     cell_m: float = 100.0,
     street_profile: Mapping[str, Any] | None = None,
+    palette: WallPalette | None = None,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
 
@@ -468,7 +469,7 @@ def apply_materials(
     }
     trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
                       cache=None if trim_root is None else TileCache(trim_root),
-                      regional=regional_facades, regional_table_path=regional_table)
+                      regional=regional_facades, regional_table_path=regional_table, palette=palette)
     visual_nodes = trim.nodes
     # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
     # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.

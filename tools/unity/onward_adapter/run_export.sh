@@ -2,7 +2,7 @@
 # Phase 07: Onward export adapter (onward_unity 0.1.0).
 #
 #   run_export.sh [--platform macos|linux|auto] PACKAGE_DIR step... [--listing MODE] [--bake draft|final]
-#   steps: tool scene launcher push inspect archive
+#   steps: tool scene views launcher push inspect archive
 #
 # PACKAGE_DIR is written by `onward-generator export package`; its files are
 # verified (Python and C#) before every Unity step. Outputs go to
@@ -16,6 +16,8 @@
 # The bake profile (scene only) comes from --bake, else ONWARD_BAKE, else "draft":
 # fewer samples and bounces for iteration. "final" is the release bake. Unity gets it
 # as -onwardBake (docs/12-export.md, "Bake profiles").
+# "views" (plan E1) renders fixed eye-level views of the baked scene into PACKAGE_DIR/build/views/,
+# from the cameras `onward-generator export views` writes there; it needs the scene step first.
 # "inspect" is read-only: it lists the game's folder and copies its .info3 files.
 # "archive" clears the way for a new bake and deletes nothing: build/ moves beside the package as
 # PACKAGE_DIR.build-<time>, and the package's Unity scene to OnwardAdapterArchive/, outside Assets.
@@ -33,7 +35,7 @@ PYTHON="${PYTHON:-$REPO/.venv/bin/python}"
 DEVICE_DIR="/sdcard/Android/data/com.downpourinteractive.onward/files/CustomContent"
 
 log() { printf '[export] %s\n' "$*"; }
-usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|launcher|push|inspect|archive)... [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}]" >&2; exit 2; }
+usage() { echo "usage: $0 PACKAGE_DIR (tool|scene|views|launcher|push|inspect|archive)... [--listing ${QUEST_LISTINGS// /|}] [--bake ${BAKE_PROFILES// /|}]" >&2; exit 2; }
 
 [[ $# -ge 2 ]] || usage
 PACKAGE="$(cd "$1" && pwd)"
@@ -112,6 +114,14 @@ step_scene() {
   # The adapter's own "Lightmapper: ... fallback no" line is left out.
   grep -iE 'fall(ing)? ?back' "$LOG_DIR/${PACKAGE_ID}-scene.log" | grep -v '\[OnwardAdapter\]' | grep -iE 'cpu|lightmapper|opencl' \
     | head -3 | sed 's/^/[export] lightmapper: /' || true
+}
+
+step_views() {
+  verify
+  [[ -e "$BUILD/scene_report.json" ]] || { log "run the scene step first: views render the baked scene"; exit 1; }
+  PYTHONPATH="$REPO/src" "$PYTHON" -m onward_generator export views "$PACKAGE" || { log "views were refused"; exit 1; }
+  run_unity views -executeMethod OnwardGenerator.OnwardMapAdapter.CaptureViews -exportPackage "$PACKAGE"
+  ls -l "$BUILD/views"
 }
 
 step_launcher() {
@@ -243,7 +253,7 @@ mkdir -p "$LOG_DIR"
 [[ -x "$UNITY" ]] || { log "Unity $UNITY_VERSION not found at $UNITY"; exit 1; }
 for step in ${STEPS[@]+"${STEPS[@]}"}; do
   case "$step" in
-    tool|scene|launcher|push|inspect|archive) "step_$step" ;;
+    tool|scene|views|launcher|push|inspect|archive) "step_$step" ;;
     *) usage ;;
   esac
 done
