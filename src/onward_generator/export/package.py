@@ -410,6 +410,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 "detail: a playable export has no envelope/perimeter_wall; "
                 "run bounds on the dressed scene so the map edge is a closed wall"
             )
+    experimental = cfg["build"].get("experimental_environment")
+    if experimental is not None and not (is_schema(layout_doc.get("schema"), GAMEPLAY_SCHEMA) and layout_doc.get("time_of_day") == "Day"):
+        problems.append("export config: /build/experimental_environment: only for a day gameplay layout (plan E2)")
     if preset is not None:
         try:
             check_atmosphere(preset, str(layout_doc.get("time_of_day", "Day")).lower())
@@ -432,6 +435,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                        if "lightmap_pages_max" in options else None)
     # Plan D5 (ADR-033, proposed): read, never written or normalised, so a card without the key keeps its package_id.
     lit_normal = _lit_normal(options, visual_bytes, warnings) if "lit_normal_material" in options else None
+    if experimental is not None:
+        warnings.append("build.experimental_environment: a test package for the headset (plan E2, ADR-037); do not publish it")
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
@@ -501,6 +506,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         }
         if lit_normal is not None:
             manifest["lit_normal"] = lit_normal[1]
+        if experimental is not None:
+            # Plan E2: what the client shows for each profile is unknown until a headset session (ADR-037).
+            manifest["experimental_environment"] = {**experimental, "status": "untested"}
         if preset is not None:
             # Which parts of the preset the package applies; the adapter reads none of it yet (plan E0).
             manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": []}

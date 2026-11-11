@@ -134,7 +134,12 @@ namespace OnwardGenerator
             public float fog_start_m = 160f;
             public float fog_end_m = 1000f;
             public string fog_color = "#C8CDD2";
+            // Plan E2 (ADR-037, proposed): a headset test package replaces the SDK time of day and profile of a day
+            // gameplay layout, and may set SharedLevelSettings.SkyColor. JsonUtility leaves the fields empty when absent.
+            public ExperimentalEnvironment experimental_environment = new ExperimentalEnvironment();
         }
+
+        [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
 
         [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
@@ -900,6 +905,7 @@ namespace OnwardGenerator
                 shared.Scene_Quest = AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath);
                 shared.UseBuiltInSkybox = true;
                 ApplyEnvironment(shared, pkg.Layout);
+                ApplyExperimentalEnvironment(shared, opt);
                 EditorUtility.SetDirty(shared);
 
                 GameObject descriptorObject = InstantiatePrefab("LevelDescriptor.prefab");
@@ -1058,7 +1064,7 @@ namespace OnwardGenerator
                     description,
                     LevelDescriptor.EMapEnvironment.Desert,
                     LevelDescriptor.EMapSize.Medium,
-                    TimeOfDayOf(pkg.Layout),
+                    TimeOfDayFor(pkg),
                     "unity-export.local",
                     "0.1",
                     BuildTarget.Android,
@@ -1348,6 +1354,32 @@ namespace OnwardGenerator
             if (IsSchema(layout.schema, "gameplay_layout"))
                 shared.EnableReverbInjection = true;
         }
+
+        // Plan E2 (ADR-037): only export package writes the block, and only for a day gameplay layout.
+        private static bool HasExperimentalEnvironment(Options opt) =>
+            opt.experimental_environment != null && !string.IsNullOrEmpty(opt.experimental_environment.profile);
+
+        private static void ApplyExperimentalEnvironment(SharedLevelSettings shared, Options opt)
+        {
+            if (!HasExperimentalEnvironment(opt)) return;
+            ExperimentalEnvironment test = opt.experimental_environment;
+            shared.TimeOfDay = (LevelDescriptor.ETimeOfDay)Enum.Parse(typeof(LevelDescriptor.ETimeOfDay), test.time_of_day);
+            shared.PPProfileId = (LevelDescriptor.EProfileId)Enum.Parse(typeof(LevelDescriptor.EProfileId), test.profile);
+            string sky = "unchanged";
+            if (!string.IsNullOrEmpty(test.sky_color))
+            {
+                if (!ColorUtility.TryParseHtmlString(test.sky_color, out Color colour))
+                    throw new InvalidDataException($"experimental_environment.sky_color {test.sky_color} is not #RRGGBB");
+                shared.SkyColor = colour;
+                sky = test.sky_color;
+            }
+            Debug.Log($"{LogPrefix} Experimental environment (plan E2): {test.time_of_day} / {test.profile}, sky colour {sky}. Do not publish.");
+        }
+
+        private static LevelDescriptor.ETimeOfDay TimeOfDayFor(Package pkg) =>
+            HasExperimentalEnvironment(pkg.Options)
+                ? (LevelDescriptor.ETimeOfDay)Enum.Parse(typeof(LevelDescriptor.ETimeOfDay), pkg.Options.experimental_environment.time_of_day)
+                : TimeOfDayOf(pkg.Layout);
 
         private static bool WalkableGround(string nodeName)
         {

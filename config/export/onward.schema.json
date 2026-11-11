@@ -93,7 +93,18 @@
         "fog_enabled": { "type": "boolean" },
         "fog_start_m": { "type": "number", "minimum": 0, "maximum": 3000 },
         "fog_end_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 3000 },
-        "fog_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+        "fog_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "experimental_environment": {
+          "description": "Plan E2, ADR-037 (proposed): a test package for the headset. Replaces the SDK time of day and post-process profile of a day gameplay layout, and sets SharedLevelSettings.SkyColor when sky_color is given. The package is marked experimental; off when absent",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["time_of_day", "profile"],
+          "properties": {
+            "time_of_day": { "enum": ["Day", "Twilight"] },
+            "profile": { "enum": ["UrbanDay1", "UrbanDay2", "DesertDay1", "DesertDay2", "ForestDay1", "ForestDay2", "UrbanNight1", "UrbanNight2", "DesertNight1", "DesertNight2", "ForestNight1", "ForestNight2"] },
+            "sky_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+          }
+        }
       }
     }
   }
