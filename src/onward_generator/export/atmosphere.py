@@ -26,6 +26,8 @@ NEUTRAL = "neutral"
 # The neutral light points toward heading -30 (Quaternion.Euler(50, -30, 0)), so its sun stands at 150 degrees.
 NEUTRAL_SUN_AZIMUTH_DEG = 150.0
 STREETS = "streets"
+# The parts of a preset the package carries, in the order the plan added them (E3 the sun, E5 the ambient and the AO).
+APPLIED = ("sun", "ambient", "ao")
 
 
 class AtmosphereError(ValueError):
@@ -71,6 +73,9 @@ def check_atmosphere(name: str, time_of_day: str, path: str | Path | None = None
 def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     """The ``lighting`` block of ``adapter_options.json`` for ``preset``, and what the manifest records of the sun.
 
+    The block holds the sun (plan E3), the ambient (``trilight`` with sky, equator and ground colours, or ``flat`` with
+    the sky colour alone) and the baked ambient occlusion (plan E5).
+
     An ``azimuth: streets`` preset takes the azimuth of ``street`` (plan E6, ``export.sun``): ``azimuth_source`` is
     ``streets``, or ``streets_none`` when the core has no wall and the neutral azimuth stays. Without ``street`` it
     keeps the neutral azimuth as ``streets_pending``."""
@@ -93,7 +98,16 @@ def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tupl
         "sun_intensity": float(sun["intensity"]),
         "sun_shadow_angle_deg": float(sun["shadow_angle_deg"]),
     }
+    ambient, ao = preset["ambient"], preset["ao"]
+    block["ambient_mode"] = str(ambient["mode"])
+    block["ambient_sky_color"] = str(ambient["sky"])
+    if ambient["mode"] == "trilight":
+        block["ambient_equator_color"] = str(ambient["equator"])
+        block["ambient_ground_color"] = str(ambient["ground"])
+    block["ao_max_distance_m"] = float(ao["max_distance_m"])
+    block["ao_exponent_indirect"] = float(ao["exponent_indirect"])
+    block["ao_exponent_direct"] = float(ao["exponent_direct"])
     return block, record
 
 
-__all__ = ["NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]
+__all__ = ["APPLIED", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]

@@ -185,21 +185,27 @@ def test_the_neutral_sun_stands_opposite_the_heading_of_the_neutral_light() -> N
 def test_the_lighting_block_carries_the_sun_of_the_preset() -> None:
     block, record = lighting(load_presets()["overcast"])
     assert block == {"sun_elevation_deg": 55.0, "sun_azimuth_deg": 150.0, "sun_color": "#DDE3EA", "sun_intensity": 0.7,
-                     "sun_shadow_angle_deg": 8.0}
+                     "sun_shadow_angle_deg": 8.0, "ambient_mode": "flat", "ambient_sky_color": "#9AA3AD",
+                     "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.0}
     assert record == {"elevation_deg": 55.0, "azimuth_deg": 150.0, "azimuth_source": "preset"}
-    assert all(type(v) is float for k, v in block.items() if k != "sun_color")
+    assert all(type(v) is float for k, v in block.items() if not k.endswith(("_color", "_mode")))
 
 
 def test_a_street_azimuth_keeps_the_neutral_one_until_the_street_axis_is_measured() -> None:
     block, record = lighting(load_presets()["golden_hour"])
     assert block == {"sun_elevation_deg": 30.0, "sun_azimuth_deg": 150.0, "sun_color": "#FFE0B8", "sun_intensity": 1.4,
-                     "sun_shadow_angle_deg": 1.5}
+                     "sun_shadow_angle_deg": 1.5, "ambient_mode": "trilight", "ambient_sky_color": "#8A9BB3",
+                     "ambient_equator_color": "#9A9080", "ambient_ground_color": "#5A5044",
+                     "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2}
     assert record == {"elevation_deg": 30.0, "azimuth_deg": 150.0, "azimuth_source": "streets_pending"}
 
 
 def test_an_integer_azimuth_becomes_a_float() -> None:
-    preset = {"sun": {"elevation_deg": 40, "azimuth": 200, "color": "#FFFFFF", "intensity": 1, "shadow_angle_deg": 0}}
+    preset = {"sun": {"elevation_deg": 40, "azimuth": 200, "color": "#FFFFFF", "intensity": 1, "shadow_angle_deg": 0},
+              "ambient": {"mode": "flat", "sky": "#808080"}, "ao": {"max_distance_m": 2, "exponent_indirect": 1, "exponent_direct": 0}}
     block, record = lighting(preset)
     assert block["sun_azimuth_deg"] == 200.0 and type(block["sun_azimuth_deg"]) is float
     assert (block["sun_elevation_deg"], block["sun_intensity"], block["sun_shadow_angle_deg"]) == (40.0, 1.0, 0.0)
+    assert [type(block[k]) for k in ("ao_max_distance_m", "ao_exponent_indirect", "ao_exponent_direct")] == [float, float, float]
+    assert (block["ao_max_distance_m"], block["ao_exponent_indirect"], block["ao_exponent_direct"]) == (2.0, 1.0, 0.0)
     assert record["azimuth_source"] == "preset"

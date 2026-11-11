@@ -25,7 +25,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
-from onward_generator.export.atmosphere import NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
+from onward_generator.export.atmosphere import APPLIED, NEUTRAL, STREETS, AtmosphereError, check_atmosphere, lighting, load_presets
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -518,8 +518,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Plan E2: what the client shows for each profile is unknown until a headset session (ADR-037).
             manifest["experimental_environment"] = {**experimental, "status": "untested"}
         if preset is not None:
-            # Which parts of the preset the package applies: the sun since plan E3.
-            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": ["sun"], "sun": sun_record}
+            # Which parts of the preset the package applies: the sun since plan E3, the ambient and the AO since E5.
+            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": list(APPLIED), "sun": sun_record}
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

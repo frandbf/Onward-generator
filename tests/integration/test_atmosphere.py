@@ -261,10 +261,12 @@ def test_a_preset_is_recorded_in_the_options_and_the_manifest(inputs: tuple[Path
     detail = inputs[0]
     street = street_sun((detail / "scene_visual.glb").read_bytes(), (json.loads((detail / "scene_detail.json").read_bytes()).get("core") or {}).get("half_side_m"))
     assert street.axis_deg is not None and street.wall_area_m2 > 0
-    lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": street.azimuth_deg, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5}
+    lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": street.azimuth_deg, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5,
+                "ambient_mode": "trilight", "ambient_sky_color": "#8A9BB3", "ambient_equator_color": "#9A9080", "ambient_ground_color": "#5A5044",
+                "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2}
     assert options == {**before, "variant": golden.manifest["package_id"], "atmosphere": "golden_hour", "lighting": lighting}
     assert golden.manifest["package_id"] != plain.manifest["package_id"]
-    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun"],
+    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun", "ambient", "ao"],
                                              "sun": {"elevation_deg": 30.0, "azimuth_source": "streets", "axis_deg": street.axis_deg,
                                                      "wall_area_m2": street.wall_area_m2, "azimuth_deg": street.azimuth_deg}}
     overcast = _package(inputs, tmp_path / "overcast_sun", atmosphere="overcast").manifest["atmosphere"]["sun"]
@@ -289,7 +291,7 @@ def test_the_export_command_takes_the_preset(inputs: tuple[Path, Path, Path], tm
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
     assert main([*args, "--out", str(tmp_path / "golden"), "--atmosphere", "golden_hour"]) == 0
     sun = json.loads((tmp_path / "golden" / "onward_export.json").read_bytes())["atmosphere"]["sun"]
-    assert f"  atmosphere golden_hour (ADR-037 proposed): applies sun; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
+    assert f"  atmosphere golden_hour (ADR-037 proposed): applies sun, ambient, ao; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "plain")]) == 0
     assert "atmosphere" not in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "bad"), "--atmosphere", "sunset"]) == 1
@@ -301,7 +303,7 @@ def test_the_adapter_turns_the_sun_only_when_the_package_has_a_lighting_block() 
     from onward_generator.config.validation import REPO_ROOT
 
     source = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
-    assert "sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);\n                ApplySun(light, opt.lighting);\n                ApplyFog(opt);" in source
+    assert "sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);\n                ApplySun(light, opt.lighting);\n                ApplyAmbient(opt.lighting);" in source
     body = source[source.index("private static void ApplySun"):source.index("// ADR-014. Unity fog is measured from the camera.")]
     assert "if (lighting == null || lighting.sun_intensity <= 0f) return;" in body
     assert "Quaternion.Euler(lighting.sun_elevation_deg, lighting.sun_azimuth_deg + 180f, 0f)" in body
@@ -333,3 +335,23 @@ def test_the_package_turns_the_sun_to_the_streets_of_the_core(inputs: tuple[Path
     result = build_package(EXPORT_PROJECT, detail, inputs[1], tmp_path / "pkg", now=FIXED_NOW, atmosphere="golden_hour")
     assert seen == [62.5]
     assert result.manifest["atmosphere"]["sun"] == {"elevation_deg": 30.0, "azimuth_source": "streets", "axis_deg": 10.0, "wall_area_m2": 12.5, "azimuth_deg": 145.0}
+
+
+def test_the_adapter_sets_the_ambient_and_the_ao_only_when_the_lighting_block_has_them() -> None:
+    """No Unity here: this pins the wiring of plan E5. Whether the runtime keeps the ambient is a headset check (ADR-037)."""
+    from onward_generator.config.validation import REPO_ROOT
+
+    source = (REPO_ROOT / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs").read_text(encoding="utf-8")
+    assert "ApplySun(light, opt.lighting);\n                ApplyAmbient(opt.lighting);\n                ApplyFog(opt);" in source
+    body = source.split("private static void ApplyAmbient(Lighting lighting)", 1)[1].split("private static Color ParseColour", 1)[0]
+    assert "if (lighting == null || string.IsNullOrEmpty(lighting.ambient_mode)) return;" in body
+    assert "RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;" in body
+    assert "RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;" in body and "RenderSettings.ambientLight = sky;" in body
+    for field in ("ambient_mode", "ambient_sky_color", "ambient_equator_color", "ambient_ground_color"):
+        assert f'public string {field} = "";' in source
+    for field in ("ao_max_distance_m", "ao_exponent_indirect", "ao_exponent_direct"):
+        assert f"public float {field};" in source
+    assert "if (opt.lighting != null && opt.lighting.ao_max_distance_m > 0f)" in source
+    assert "settings.aoMaxDistance = opt.lighting.ao_max_distance_m;" in source
+    assert "settings.aoExponentIndirect = opt.lighting.ao_exponent_indirect;" in source
+    assert "settings.aoExponentDirect = opt.lighting.ao_exponent_direct;" in source

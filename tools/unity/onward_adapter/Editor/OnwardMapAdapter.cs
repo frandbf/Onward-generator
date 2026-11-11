@@ -150,6 +150,14 @@ namespace OnwardGenerator
             public string sun_color = "";
             public float sun_intensity;
             public float sun_shadow_angle_deg;
+            // Plan E5. An empty ambient_mode keeps the default skybox ambient; ao_max_distance_m 0 keeps Unity's AO.
+            public string ambient_mode = "";
+            public string ambient_sky_color = "";
+            public string ambient_equator_color = "";
+            public string ambient_ground_color = "";
+            public float ao_max_distance_m;
+            public float ao_exponent_indirect;
+            public float ao_exponent_direct;
         }
 
         [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
@@ -895,6 +903,7 @@ namespace OnwardGenerator
                 light.shadows = LightShadows.Soft;
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
                 ApplySun(light, opt.lighting);
+                ApplyAmbient(opt.lighting);
                 ApplyFog(opt);
                 ApplyNight(light, pkg.Layout);
 
@@ -1353,6 +1362,38 @@ namespace OnwardGenerator
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} Sun (ADR-037): elevation {1:0.#}, azimuth {2:0.#}, {3}, intensity {4:0.##}, shadow angle {5:0.#}.",
                 LogPrefix, lighting.sun_elevation_deg, lighting.sun_azimuth_deg, lighting.sun_color, lighting.sun_intensity, lighting.sun_shadow_angle_deg));
+        }
+
+        // ADR-037, plan E5. The ambient of a preset: trilight (sky, equator, ground) or flat. It lights the bake's
+        // shade and, through the light probes, the players: a dark ground colour would hide an enemy in the shade.
+        private static void ApplyAmbient(Lighting lighting)
+        {
+            if (lighting == null || string.IsNullOrEmpty(lighting.ambient_mode)) return;
+            Color sky = ParseColour("lighting.ambient_sky_color", lighting.ambient_sky_color);
+            if (lighting.ambient_mode == "trilight")
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+                RenderSettings.ambientSkyColor = sky;
+                RenderSettings.ambientEquatorColor = ParseColour("lighting.ambient_equator_color", lighting.ambient_equator_color);
+                RenderSettings.ambientGroundColor = ParseColour("lighting.ambient_ground_color", lighting.ambient_ground_color);
+            }
+            else if (lighting.ambient_mode == "flat")
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = sky;
+            }
+            else
+            {
+                throw new InvalidDataException($"lighting.ambient_mode {lighting.ambient_mode} must be trilight or flat");
+            }
+            Debug.Log($"{LogPrefix} Ambient (ADR-037): {lighting.ambient_mode}, sky {lighting.ambient_sky_color}, equator {lighting.ambient_equator_color}, ground {lighting.ambient_ground_color}.");
+        }
+
+        private static Color ParseColour(string key, string value)
+        {
+            if (!ColorUtility.TryParseHtmlString(value, out Color colour) || value.Length != 7 || value[0] != '#')
+                throw new InvalidDataException($"{key} {value} is not #RRGGBB");
+            return colour;
         }
 
         // ADR-014. Unity fog is measured from the camera. Whether the Onward runtime or its
@@ -2952,6 +2993,15 @@ namespace OnwardGenerator
             // Batch mode has no Scene view to bake first; the whole map converges at once.
             settings.prioritizeView = false;
             settings.ao = true;
+            if (opt.lighting != null && opt.lighting.ao_max_distance_m > 0f)
+            {
+                // ADR-037, plan E5: corners and the foot of walls darken over this distance.
+                settings.aoMaxDistance = opt.lighting.ao_max_distance_m;
+                settings.aoExponentIndirect = opt.lighting.ao_exponent_indirect;
+                settings.aoExponentDirect = opt.lighting.ao_exponent_direct;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} AO (ADR-037): max distance {1:0.##} m, indirect {2:0.##}, direct {3:0.##}.",
+                    LogPrefix, settings.aoMaxDistance, settings.aoExponentIndirect, settings.aoExponentDirect));
+            }
             settings.lightmapCompression = LightmapCompression.None;
             settings.filteringMode = LightingSettings.FilterMode.Advanced;
             settings.denoiserTypeDirect = LightingSettings.DenoiserType.OpenImage;
