@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--layout", required=True, help="perf_layout 0.1.0 or gameplay_layout 0.3.0")
     p.add_argument("--config", default=None, help="adapter configuration (default: config/export/onward.default.json)")
     p.add_argument("--out", required=True, help="new package directory; must not exist")
+    p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037, proposed)")  # pragma: no mutate: help text
     v = sub.add_parser("verify", help="re-hash every file of a package")
     v.add_argument("package")
     return parser
@@ -35,7 +36,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("package intact" if not problems else f"package damaged: {len(problems)} problem(s)")
         return 0 if not problems else 1
     try:
-        result = build_package(args.project, args.detail, args.layout, args.out, export_config=args.config)
+        result = build_package(args.project, args.detail, args.layout, args.out, export_config=args.config,
+                               atmosphere=args.atmosphere)
     except ExportError as exc:
         print("export package rejected; nothing written:", file=sys.stderr)
         for p in exc.problems:
@@ -63,6 +65,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if lit is not None:
         print(f"  lit normal (plan D5 spike, ADR-033 proposed): {lit['material']} on PP_Opaque_Lit, {lit['path']} "
               f"{lit['width']} x {lit['height']} px at strength {lit['strength']:g}, about {lit['astc6x6_bytes']:,} bytes in ASTC 6x6")
+    atmosphere = m.get("atmosphere")
+    if atmosphere is not None:
+        print(f"  atmosphere {atmosphere['preset']} (ADR-037 proposed): recorded; the adapter applies none of it yet")
     print(f"next: tools/unity/onward_adapter/run_export.sh {result.directory} tool scene launcher")
     return 0
 

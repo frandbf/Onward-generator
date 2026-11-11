@@ -22,6 +22,7 @@ from pathlib import Path
 from onward_generator.ai.providers import Provider
 from onward_generator.ai.street_profile import describe as describe_profile
 from onward_generator.ai.street_profile import profile_flags, resolve_street_profile
+from onward_generator.export.atmosphere import NEUTRAL
 from onward_generator.maps.workspace import (
     MapError,
     balanced_spawns_enabled,
@@ -34,6 +35,7 @@ from onward_generator.maps.workspace import (
     mid_ring_m,
     panoramax_enabled,
     sightline_cover_enabled,
+    store_atmosphere,
     store_brief,
     store_panoramax,
     store_sources,
@@ -102,6 +104,7 @@ def map_create_argv(
     panoramax: bool = False,
     time_of_day: str | None = None,
     storm: bool = False,
+    atmosphere: str | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float | None = None,
     core_target_triangles: int | None = None,
@@ -132,6 +135,8 @@ def map_create_argv(
         argv.extend(["--time-of-day", time_of_day])
     if storm:
         argv.append("--storm")
+    if atmosphere:
+        argv.extend(["--atmosphere", atmosphere])
     if overwrite:
         argv.append("--overwrite")
     return argv
@@ -864,6 +869,7 @@ def run_map(
     profile_provider: Provider | None = None,
     time_of_day: str | None = None,
     storm: bool | None = None,
+    atmosphere: str | None = None,
     sources: Mapping[str, bool] | None = None,
     lightmap_texels_per_m: float = 10.0,
     core_radius_m: float | None = None,
@@ -950,6 +956,7 @@ def run_map(
                     panoramax=panoramax,
                     time_of_day=time_of_day,
                     storm=bool(storm),
+                    atmosphere=atmosphere,
                     lightmap_texels_per_m=lightmap_texels_per_m,
                     core_radius_m=core_radius_m,
                     core_target_triangles=core_target_triangles,
@@ -989,13 +996,18 @@ def run_map(
                 store_street_profile(root, True)
             if sources:
                 store_sources(root, sources)
-            # Off first and on last: --time-of-day day --no-storm and --time-of-day night --storm are both valid.
+            # Off first and on last: --time-of-day day --no-storm and --time-of-day night --storm are both valid,
+            # and so are --time-of-day night --atmosphere neutral and --time-of-day day --atmosphere golden_hour.
             if storm is False and store_storm(root, False):
                 say("no storm now: run again with --from layout, then bake a new package")
+            if atmosphere == NEUTRAL and store_atmosphere(root, NEUTRAL):
+                say("atmosphere is now neutral: run again with --from export, then bake a new package")
             if time_of_day and store_time_of_day(root, time_of_day):
                 say(f"time of day is now {time_of_day}: run again with --from layout, then bake a new package")
             if storm and store_storm(root, True):
                 say("storm is on: run again with --from layout, then bake a new package")
+            if atmosphere and atmosphere != NEUTRAL and store_atmosphere(root, atmosphere):
+                say(f"atmosphere is now {atmosphere}: run again with --from export, then bake a new package")
             say(describe(choices(load_map(root))))
             resolve_profile(root, profile_provider)
             steps = resume_steps(root, preview=preview)

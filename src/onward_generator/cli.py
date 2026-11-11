@@ -114,6 +114,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         street_profile=args.street_profile,
         time_of_day=args.time_of_day,
         storm=args.storm,
+        atmosphere=args.atmosphere,
         sources=sources,
         lightmap_texels_per_m=args.lightmap_texels_per_m,
         core_radius_m=args.core_radius_m,
@@ -237,6 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--brief", default=None, help="how the city should feel; overgrow reads this")
     run.add_argument("--time-of-day", choices=("day", "night"), default=None, help="day or night: light, Onward profile and street lamps (default: what map.json has, else day; ADR-026)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--storm", action=argparse.BooleanOptionalAction, default=None, help="night maps only: lightning and thunder (default: what map.json has, else none; ADR-028)")  # pragma: no mutate: help text; argparse's default for an option is already None
+    run.add_argument("--atmosphere", default=None, help="day maps only: baked light preset from config/atmosphere.default.json, or neutral (default: what map.json has, else neutral; ADR-037, proposed)")  # pragma: no mutate: help text; argparse's default for an option is already None
     run.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
     run.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     run.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")

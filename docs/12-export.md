@@ -26,6 +26,8 @@ The generation engine does not know the adapter. The adapter only reads the pack
 
 `--detail` for a `gameplay_layout` must be the `bounds` copy (`envelope/perimeter_wall`), or the `scene_covered` copy `perf cover` makes of it when `map.json` has `"sightline_cover": true` (plan C7, [01-pipeline.md](01-pipeline.md#sightline-cover-off-by-default)); that copy keeps the wall and adds the cover colliders to `scene_collision.glb` only. `--project` is the configuration with `export.enabled`. `--config` is the card (`config/export.json` in that folder, or `config/export/onward.default.json` when it is omitted).
 
+`--atmosphere <preset>` names a preset of `config/atmosphere.default.json` ([ADR-037](decisions/ADR-037-atmosphere-presets.md), proposed). `run` passes it when `map.json` has `atmosphere`. Without it, or with `neutral`, the package is byte for byte the one of before. With a preset, `adapter_options.json` gains `atmosphere` (so `package_id` changes) and the manifest an `atmosphere` block: `preset`, `origin: generated` and `applied`, the parts of the preset the package carries. Plan E0 applies none (`applied: []`): the adapter ignores the key. An unknown preset, or a preset with a `Night` layout, is refused and nothing is written.
+
 The command writes nothing when:
 
 - the project is invalid or does not have `"export": {"adapter": "onward", "enabled": true}`;

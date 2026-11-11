@@ -25,6 +25,7 @@ from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
+from onward_generator.export.atmosphere import NEUTRAL, AtmosphereError, check_atmosphere
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
@@ -365,8 +366,13 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 
 
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
-                  export_config: str | Path | None = None, now: datetime | None = None) -> PackageResult:
-    """Validate every input, then write the package into ``out_dir``, which must not exist yet."""
+                  export_config: str | Path | None = None, now: datetime | None = None,
+                  atmosphere: str | None = None) -> PackageResult:
+    """Validate every input, then write the package into ``out_dir``, which must not exist yet.
+
+    ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037, proposed). None or ``neutral``
+    changes nothing, the package id included."""
+    preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     problems: list[str] = []
@@ -404,6 +410,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 "detail: a playable export has no envelope/perimeter_wall; "
                 "run bounds on the dressed scene so the map edge is a closed wall"
             )
+    if preset is not None:
+        try:
+            check_atmosphere(preset, str(layout_doc.get("time_of_day", "Day")).lower())
+        except AtmosphereError as exc:
+            problems.append(f"atmosphere: {exc}")
     if problems:
         raise ExportError(problems)
 
@@ -425,6 +436,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     if lights > cap:
         warnings.append(f"detail: the scene asks for {lights} interior lights; the adapter bakes the first {cap} "
                         "(build.interior_lights_max) in node order. Set interiors.lights_max in the detail configuration to match.")
+    if preset is not None:
+        # ADR-037: written only with a preset, so a map without one keeps its package_id. Nothing reads it yet.
+        options["atmosphere"] = preset
     content_id = hashlib.sha256(json.dumps(
         {"files": source_sha, "thumbnail": thumbnail_sha, "options": options, "map": cfg["map"]},
         sort_keys=True,
@@ -487,6 +501,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         }
         if lit_normal is not None:
             manifest["lit_normal"] = lit_normal[1]
+        if preset is not None:
+            # Which parts of the preset the package applies; the adapter reads none of it yet (plan E0).
+            manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": []}
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

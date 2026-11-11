@@ -383,7 +383,8 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     """``export package`` for the map at ``root``.
 
     ``--config`` is passed only when ``config/export.json`` exists. Without it
-    the exporter uses its default configuration.
+    the exporter uses its default configuration. ``--atmosphere`` is passed only
+    when ``map.json`` names a preset (ADR-037), so a map without one keeps its package.
     """
     parts = [
         "export", "package",
@@ -394,7 +395,19 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     if config.is_file():
         parts.extend(["--config", show(config)])
     parts.extend(["--layout", show(layout), "--out", show(out)])
+    atmosphere = _atmosphere(root)
+    if atmosphere is not None:
+        parts.extend(["--atmosphere", atmosphere])
     return invoke(*parts)
+
+
+def _atmosphere(root: Path) -> str | None:
+    """The preset ``map.json`` names, or None without the key; ``export package`` checks the name."""
+    path = root / "map.json"
+    if not path.is_file():
+        return None
+    value = json.loads(path.read_bytes()).get("atmosphere")
+    return None if value in (None, "neutral") else str(value)
 
 
 def _retrieved_at(source: Path) -> str | None:
