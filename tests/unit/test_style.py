@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 
 from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import load_catalog
@@ -160,3 +161,44 @@ def test_style_repeats_a_tint_at_its_base_scale_and_maps_a_tinted_roof_as_a_roof
     assert np.array_equal(uvs["brick_red__tint_white"], uvs["brick_red"])
     assert np.array_equal(uvs["party_brick_red__tint_white"], uvs["brick_red"])
     assert np.array_equal(uvs["roof_tile__tint_green"], uvs["roof_tile"])
+
+
+# ------------------------------------------------------------------------------------------------ seamless tiles (plan Q6)
+
+
+@pytest.mark.parametrize("kind", ["asphalt", "paving", "tiles", "wood", "foliage", "metal", "plaster", "water", "glass", "speckle"])
+@pytest.mark.parametrize("size", [256, 200])
+def test_every_generated_pattern_meets_its_neighbour_tile_without_a_seam(kind: str, size: int) -> None:
+    """The step across a tile edge is no larger than the largest step between two rows or columns inside it, within
+    10 %: on paving and roof tiles that largest step is a joint, and the noise on either side of one varies."""
+    from onward_generator.dress.atlas import _modulation
+
+    mod = _modulation(kind, size, 7)
+    for axis in (0, 1):
+        steps = np.abs(np.diff(mod, axis=axis)).mean(axis=1 - axis)
+        wrap = float(np.abs(np.take(mod, 0, axis=axis) - np.take(mod, -1, axis=axis)).mean())
+        assert wrap <= 1.1 * steps.max(), (kind, axis)
+
+
+@pytest.mark.parametrize(("size", "length", "cycles"), [(256, 9.0, 5), (256, 2.8, 15), (256, 500.0, 1), (200, 11.0, 3)])
+def test_a_wave_has_a_whole_number_of_cycles_per_tile(size: int, length: float, cycles: int) -> None:
+    from onward_generator.dress.atlas import _wave
+
+    assert _wave(size, length) == pytest.approx(2 * np.pi * cycles / size)
+
+
+def test_soft_noise_wraps_and_is_scaled_to_one() -> None:
+    from onward_generator.dress.atlas import _soft_noise
+
+    field = _soft_noise(np.random.default_rng(3), 128, 10.0)
+    assert float(np.abs(field).max()) == pytest.approx(1.0)
+    inner = np.abs(np.diff(field, axis=1)).mean()
+    assert np.abs(field[:, 0] - field[:, -1]).mean() < 3 * inner  # it continues across the edge like inside
+    assert np.abs(field[:, 0] - field[:, 64]).mean() > 3 * inner  # and it is not flat
+    assert np.array_equal(field, _soft_noise(np.random.default_rng(3), 128, 10.0))
+
+
+def test_a_tile_no_longer_darkens_its_first_row_and_column() -> None:
+    pixels = _tile_pixels("green", MIN_TILE_PX, 11)[..., :3].astype(float)
+    rows, columns = pixels.mean(axis=(1, 2)), pixels.mean(axis=(0, 2))
+    assert abs(rows[0] - rows[1:].mean()) < 6 and abs(columns[0] - columns[1:].mean()) < 6
