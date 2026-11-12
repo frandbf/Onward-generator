@@ -17,6 +17,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from onward_generator.generation.mesh import Mesh
+
 # A face whose UVs span less than this many texels of its image samples one swatch.
 SWATCH_TEXELS = 2.0
 # An image this small or smaller is one colour per material (the catalogue converters bake a material's colour into a
@@ -31,8 +33,7 @@ _DTYPES = {5121: np.uint8, 5123: np.uint16, 5125: np.uint32, 5126: np.float32}
 def flat_share(positions: np.ndarray, triangles: np.ndarray, uvs: np.ndarray | None, image_px: tuple[int, int] | None) -> tuple[float, float]:
     """Surface area of the faces that sample one swatch (all of them without UVs, without an image, or on an image of
     at most ``SOLID_IMAGE_PX``), and the whole area."""
-    corners = positions[triangles]
-    area = 0.5 * np.linalg.norm(np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=1)
+    area = Mesh(positions, triangles).triangle_areas()
     total = float(area.sum())
     if uvs is None or image_px is None or max(image_px) <= SOLID_IMAGE_PX:
         return total, total

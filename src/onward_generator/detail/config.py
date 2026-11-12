@@ -727,7 +727,7 @@ def _merge_local(furnish: ShopFurnish, rows: Sequence[tuple[str, Mapping[str, An
         entry = FurnishEntry(str(row["id"]))
         if _entry_problems(entry, slot, (catalogue, row)):
             continue
-        flat = assets is not None and flat_colour(assets / catalogue / str(row.get("file") or ""))
+        flat = assets is not None and flat_colour(assets / catalogue / str(row.get("file") or ""))  # pragma: no mutate: a row without a file names no GLB, whatever stands for it
         for name in names:
             added.setdefault((name, slot), []).append((flat, int(row.get("triangles") or 0), entry.id))
             catalogues.add(catalogue)

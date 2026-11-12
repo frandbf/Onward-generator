@@ -21,12 +21,19 @@ def _uvs(span: float) -> np.ndarray:
     return np.array([[0.25, 0.25], [0.25 + span, 0.25], [0.25 + span, 0.25 + span], [0.25, 0.25 + span]])
 
 
-def write_glb(path: Path, *, uv_span: float | None = 1.0, image_px: int = 64, external: bool = False) -> Path:
-    """A 2 x 1 m quad; ``uv_span`` None leaves the material untextured. ``external`` writes the image beside the GLB."""
+def write_glb(path: Path, *, uv_span: float | None = 1.0, image_px: int = 64, external: bool = False, image_first: bool = False) -> Path:
+    """A 2 x 1 m quad; ``uv_span`` None leaves the material untextured. ``external`` writes the image beside the GLB;
+    ``image_first`` puts an embedded image at the start of the buffer, its view without a ``byteOffset``."""
     positions = QUAD.astype(np.float32).tobytes()
     indices = TRIS.astype(np.uint16).tobytes()
-    blob = positions + indices
-    views = [{"buffer": 0, "byteOffset": 0, "byteLength": len(positions)}, {"buffer": 0, "byteOffset": len(positions), "byteLength": len(indices)}]
+    head = b""
+    if image_first:
+        png = io.BytesIO()
+        Image.new("RGB", (image_px, image_px), (120, 90, 60)).save(png, format="PNG")
+        head = png.getvalue() + b"\0" * (-len(png.getvalue()) % 4)
+    blob = head + positions + indices
+    views = [{"buffer": 0, "byteOffset": len(head), "byteLength": len(positions)},
+             {"buffer": 0, "byteOffset": len(head) + len(positions), "byteLength": len(indices)}]
     accessors = [{"bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3"},
                  {"bufferView": 1, "componentType": 5123, "count": 6, "type": "SCALAR"}]
     prim: dict = {"attributes": {"POSITION": 0}, "indices": 1, "material": 0}
@@ -39,7 +46,10 @@ def write_glb(path: Path, *, uv_span: float | None = 1.0, image_px: int = 64, ex
         prim["attributes"]["TEXCOORD_0"] = 2
         png = io.BytesIO()
         Image.new("RGB", (image_px, image_px), (120, 90, 60)).save(png, format="PNG")
-        if external:
+        if image_first:
+            views.append({"buffer": 0, "byteLength": len(head)})
+            doc["images"] = [{"bufferView": 3, "mimeType": "image/png"}]
+        elif external:
             (path.parent / "albedo.png").write_bytes(png.getvalue())
             doc["images"] = [{"uri": "albedo.png"}]
         else:
@@ -92,3 +102,30 @@ def test_flat_colour_reads_a_glb_file(tmp_path: Path) -> None:
     assert flat_colour(write_glb(tmp_path / "b" / "outside.glb", uv_span=1.0, image_px=4, external=True))
     (tmp_path / "broken.glb").write_bytes(b"glTF")
     assert not flat_colour(tmp_path / "broken.glb") and not flat_colour(tmp_path / "missing.glb")
+
+
+def test_a_quad_away_from_the_origin_has_the_same_area() -> None:
+    moved = QUAD + np.array([5.0, 3.0, 1.0])
+    assert flat_share(moved, TRIS, None, None) == (pytest.approx(2.0), pytest.approx(2.0))
+    triangle = np.array([[1.0, 1.0, 0.0], [3.0, 1.0, 0.0], [1.0, 4.0, 0.0]])
+    assert flat_share(triangle, np.array([[0, 1, 2]]), None, None)[1] == pytest.approx(3.0)
+
+
+def test_an_image_at_the_start_of_the_buffer_is_read(tmp_path: Path) -> None:
+    assert flat_colour(write_glb(tmp_path / "solid_first.glb", uv_span=1.0, image_px=4, image_first=True))
+    assert not flat_colour(write_glb(tmp_path / "photo_first.glb", uv_span=1.0, image_px=64, image_first=True))
+
+
+def test_a_rewritten_file_is_read_again(tmp_path: Path) -> None:
+    import os
+
+    path = tmp_path / "model.glb"
+    write_glb(path, uv_span=1.0 / 512, image_px=512)
+    assert flat_colour(path)
+    stamp = path.stat().st_mtime_ns
+    write_glb(path, uv_span=1.0, image_px=512)  # the same size: only the time tells
+    os.utime(path, ns=(stamp + 10**9, stamp + 10**9))
+    assert not flat_colour(path)
+    write_glb(path, uv_span=1.0 / 512, image_px=64)  # another size at the same time
+    os.utime(path, ns=(stamp + 10**9, stamp + 10**9))
+    assert flat_colour(path)

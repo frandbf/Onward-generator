@@ -118,7 +118,7 @@ def library(root: Path, catalogues: Sequence[str]) -> list[Candidate]:
                 continue
             found.append(Candidate(str(row["id"]), name, str(semantic.get("kind")), frozenset(semantic.get("settings") or ()),
                                    float(row.get("length_m") or 0), float(row.get("depth_m") or 0), float(row.get("height_m") or 0),
-                                   int(row.get("triangles") or 0), flat_colour(root / name / str(row.get("file") or ""))))
+                                   int(row.get("triangles") or 0), flat_colour(root / name / str(row.get("file") or ""))))  # pragma: no mutate: a row without a file names no GLB, whatever stands for it
     return found
 
 
