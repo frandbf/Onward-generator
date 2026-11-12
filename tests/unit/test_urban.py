@@ -286,7 +286,8 @@ def test_generated_lamps_keep_off_wall_lamps_too() -> None:
 
 
 def test_the_wall_lamp_prototype_hangs_above_head_height_without_a_collider() -> None:
-    lamp = PROTOS["wall_lamp"]
+    # Built here, not read from PROTOS: mutation testing maps a function to the tests that call it while they run.
+    lamp = urban_prototypes()["wall_lamp"]
     vertices = np.vstack([mesh.vertices for _, mesh in lamp.parts])
     assert lamp.collider is None and lamp.key == "urban:wall_lamp"
     assert vertices[:, 2].min() == pytest.approx(3.1) and vertices[:, 0].min() == pytest.approx(0.0)

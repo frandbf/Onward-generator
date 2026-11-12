@@ -392,3 +392,5 @@ def test_a_recess_draws_its_reveals_in_the_material_it_is_given() -> None:
     assert [m for m, _ in walled.parts] == ["plaster_ochre", "glass_dark"]
     assert walled.key == "recess:1.000:1.500:0.150:glass_dark:plaster_ochre" and default.key.endswith(":frame_stone")
     assert np.array_equal(default.parts[0][1].vertices, walled.parts[0][1].vertices)
+    # A through opening has no back: its key names it open, apart from every backed recess.
+    assert recess(1.0, 1.5, 0.15, None).key == "recess:1.000:1.500:0.150:open:frame_stone"
