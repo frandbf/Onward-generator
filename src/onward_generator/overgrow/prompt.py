@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from collections import defaultdict
 
+from onward_generator.ai.providers import BYTES_PER_TOKEN
 from onward_generator.overgrow.digest import Digest
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.plan import PLAN_VERSION
 
 PROMPT_VERSION = "0.2.0"
+# The library rows a prompt may carry, in the tokens ``ai.providers.context_window`` counts. With the system prompt
+# (about 1 000) and the largest digest (about 10 000) the prompt stays near 25 000 of the 32 768 the provider allows,
+# whatever catalogues are installed: 399 rows of the November 2026 library would need about 56 000.
+LIBRARY_BUDGET_TOKENS = 14000
+# A span needs a run and a cover a grid (``plan.bind_plan``): those rows go first in their role.
+PATTERN_GROUPINGS = ("run", "grid")
 
 SYSTEM_PROMPT = f"""You compose a handful of gestures for a 3D map. Reply with one JSON object and nothing else. No prose, no markdown, no code.
 
@@ -67,6 +76,46 @@ def _hints(prop: Prop) -> dict[str, object]:
     if prop.spec.tags:
         found["tags"] = list(prop.spec.tags)
     return found
+
+
+def _row_tokens(row: dict[str, object]) -> int:
+    return len(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()) // BYTES_PER_TOKEN + 1
+
+
+def prompt_props(props: list[Prop], brief: str, budget: int = LIBRARY_BUDGET_TOKENS) -> list[Prop]:
+    """The props whose rows the prompt carries: all of them when they fit ``budget`` tokens, else a varied subset.
+
+    The subset takes one prop of each role in turn (roles by name), so every kind of object stays offered. Within a
+    role a run or a grid comes first, then a prop whose role, category, tags or description share a word of four
+    letters or more with the brief, then the order of a hash of the id. Deterministic: the same props and brief give
+    the same subset. The model may only use the ids it was sent."""
+    rows = {str(row["id"]): row for row in library_rows(props)}
+    if sum(_row_tokens(row) for row in rows.values()) <= budget:  # pragma: no mutate: at exactly the budget the subset below takes every row in the same order
+        return list(props)
+    words = set(re.findall(r"[a-z]{4,}", brief.lower()))
+
+    def rank(prop: Prop) -> tuple[int, int, str]:
+        spec = prop.spec
+        text = " ".join((spec.role, spec.category, spec.description, *spec.tags)).lower()
+        matched = bool(words & set(re.findall(r"[a-z]{4,}", text)))
+        return (spec.grouping not in PATTERN_GROUPINGS, not matched, hashlib.sha256(spec.id.encode()).hexdigest())
+
+    by_role: dict[str, list[Prop]] = defaultdict(list)
+    for prop in props:
+        by_role[prop.spec.role].append(prop)
+    queues = [sorted(by_role[role], key=rank) for role in sorted(by_role)]
+    chosen: set[str] = set()
+    used = 0
+    for turn in range(max(len(queue) for queue in queues)):
+        for queue in queues:
+            if turn >= len(queue):
+                continue
+            cost = _row_tokens(rows[queue[turn].spec.id])
+            if used + cost > budget:
+                return [prop for prop in props if prop.spec.id in chosen]
+            used += cost
+            chosen.add(queue[turn].spec.id)
+    return [prop for prop in props if prop.spec.id in chosen]  # pragma: no mutate: unreachable, everything fit
 
 
 def instruction(brief: str, digest: Digest, props: list[Prop]) -> str:

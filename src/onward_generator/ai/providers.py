@@ -33,7 +33,7 @@ DEFAULT_OLLAMA_MODEL = "qwen3:14b"
 DEFAULT_TIMEOUT_S = 180.0
 MAX_HTTP_BYTES = 1024 * 1024
 # Ollama's default context (2048 to 4096 tokens, by version) silently drops the start of a
-# longer prompt, and the overgrow library alone is about 11k tokens. The window is sized
+# longer prompt; the overgrow prompt carries up to 14k tokens of library rows (overgrow/prompt.py). The window is sized
 # from the prompt at 3 bytes per token, plus room for the reply, in steps of 4096.
 BYTES_PER_TOKEN = 3
 REPLY_TOKENS = 4096

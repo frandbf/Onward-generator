@@ -8,6 +8,7 @@ and the installed library of this run declare.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from dataclasses import dataclass
@@ -75,6 +76,43 @@ class PlanError(ValueError):
 def plan_schema() -> dict[str, Any]:
     schema = json.loads(PLAN_SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
+    return schema
+
+
+# The digest ids each gesture names, and the curated grouping its asset needs ("" is an older row, which may repeat).
+_GESTURE_IDS: dict[str, tuple[tuple[str, str], ...]] = {
+    "span": (("from_id", "corner"), ("to_id", "corner")),
+    "cover": (("edge_id", "facade"),),
+    "watch": (("poi_id", "poi"),),
+    "place": (("anchor_id", "lane"),),
+}
+_GESTURE_GROUPING = {"span": "run", "cover": "grid"}
+
+
+def run_schema(anchor_ids: dict[str, set[str]], groupings: dict[str, str]) -> dict[str, Any]:
+    """The plan schema with this run's ids as enums, for the model's structured output only.
+
+    ``anchor_ids`` is ``Digest.anchor_ids()``; ``groupings`` maps each offered asset id to its curated grouping.
+    Ollama samples only what the schema allows, so a reply cannot name an id this run did not declare, or a span of
+    an asset that is not a run. A gesture with no id or no asset to offer is left out. The reply is still parsed
+    against the plain schema and bound by ``bind_plan``: the enums only make a valid reply likely."""
+    schema = copy.deepcopy(plan_schema())  # plan_schema is cached: never edit it in place
+    kept = []
+    for branch in schema["properties"]["actions"]["items"]["oneOf"]:
+        op = branch["properties"]["op"]["const"]
+        need = _GESTURE_GROUPING.get(op)
+        assets = sorted(a for a, grouping in groupings.items() if need is None or grouping in ("", need))
+        fields = _GESTURE_IDS[op]
+        if not assets or any(not anchor_ids.get(kind) for _, kind in fields):
+            continue
+        branch["properties"]["asset_id"] = {"enum": assets}
+        for name, kind in fields:
+            branch["properties"][name] = {"enum": sorted(anchor_ids[kind])}
+        kept.append(branch)
+    if kept:
+        schema["properties"]["actions"]["items"]["oneOf"] = kept
+    else:
+        schema["properties"]["actions"] = {"type": "array", "maxItems": 0}
     return schema
 
 

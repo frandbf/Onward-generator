@@ -43,8 +43,9 @@ from onward_generator.overgrow.plan import (
     WatchAction,
     bind_plan,
     parse_overgrow_plan,
+    run_schema,
 )
-from onward_generator.overgrow.prompt import PROMPT_VERSION, SYSTEM_PROMPT, instruction, instruction_sha256
+from onward_generator.overgrow.prompt import PROMPT_VERSION, SYSTEM_PROMPT, instruction, instruction_sha256, prompt_props
 from onward_generator.overgrow.zone import Zone
 
 _CROSS_ROLES = frozenset({"wreck", "gate", "barrier"})
@@ -131,9 +132,13 @@ def compose(
     """Ask for a plan, or reuse a stored reply with the same digest and prompt.
 
     A provider error or a plan that does not validate is tried once more. The
-    second attempt quotes that failure. Rules are used only after both fail.
+    second attempt quotes that failure. Rules are used only after both fail. The prompt carries at most
+    ``prompt.LIBRARY_BUDGET_TOKENS`` of library rows (``prompt_props``); the record's ``library`` says how many
+    of the fitted props it offered.
     """
-    usable = fitted_props(props)
+    fitted = fitted_props(props)
+    usable = prompt_props(fitted, brief)
+    library = {"offered": len(usable), "fitted": len(fitted)}
     digest = build_digest(scene)
     digest_hash = digest.sha256()
     prompt_hash = instruction_sha256(brief, digest, usable)
@@ -147,7 +152,7 @@ def compose(
         except PlanError:
             stored = None
         else:
-            return _accepted(digest_hash, prompt_hash, "replay", stored, plan, digest, usable, site, attempts=0)
+            return _with_library(_accepted(digest_hash, prompt_hash, "replay", stored, plan, digest, usable, site, attempts=0), library)
     last_error = ""
     last_text = ""
     for attempt in range(1, PLAN_ATTEMPTS + 1):
@@ -162,9 +167,15 @@ def compose(
         except PlanError as exc:
             last_error = str(exc)
             continue
-        return _accepted(digest_hash, prompt_hash, "ai_generated", text, plan, digest, usable, site, attempts=attempt)
+        return _with_library(_accepted(digest_hash, prompt_hash, "ai_generated", text, plan, digest, usable, site, attempts=attempt), library)
     record = _record(digest_hash, prompt_hash, "rules_fallback", last_text, last_error, 0, [], attempts=PLAN_ATTEMPTS)
+    record["library"] = library
     return ComposeResult(False, "rules_fallback", Dressing(), 0, record, last_error)
+
+
+def _with_library(result: ComposeResult, library: dict[str, int]) -> ComposeResult:
+    result.record["library"] = library
+    return result
 
 
 def _accepted(digest_hash, prompt_hash, origin, text, plan, digest, props, site, *, attempts: int) -> ComposeResult:
@@ -189,6 +200,12 @@ def _stored_reply(replay: Mapping[str, object] | None, digest_hash: str, prompt_
     return raw if isinstance(raw, str) and raw else None
 
 
+# The overgrow prompt carries up to ``LIBRARY_BUDGET_TOKENS`` of library rows, about 25 000 tokens in all: qwen3:14b
+# read it in 105 to 145 s on an Apple M4 Pro alone, and past the provider's default 180 s while the machine also ran a
+# build (Rue Mouffetard, 12 November 2026). A timed-out call is a lost attempt, so this stage waits longer.
+OVERGROW_TIMEOUT_S = 600.0
+
+
 def _ask(brief: str, digest: Digest, props: list[Prop], provider, *, correction: str | None) -> tuple[str, str | None]:
     message = instruction(brief, digest, props)
     if correction:
@@ -201,17 +218,12 @@ def _ask(brief: str, digest: Digest, props: list[Prop], provider, *, correction:
         if provider is None:
             from onward_generator.ai.providers import OllamaProvider
 
-            provider = OllamaProvider()
-        result = provider.complete(SYSTEM_PROMPT, message, _schema())
+            provider = OllamaProvider(timeout_s=OVERGROW_TIMEOUT_S)
+        schema = run_schema(digest.anchor_ids(), {prop.spec.id: prop.spec.grouping for prop in props})
+        result = provider.complete(SYSTEM_PROMPT, message, schema)
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
         return "", str(exc)
     return result.text, None
-
-
-def _schema() -> dict:
-    from onward_generator.overgrow.plan import plan_schema
-
-    return plan_schema()
 
 
 def _record(digest_hash: str, prompt_hash: str, origin: str, raw: str, reason: str | None, applied: int, dropped: list, *, attempts: int) -> dict:
