@@ -955,7 +955,7 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
         for board in (shop.get("sign"), *(shop.get("vinyls") or []))
         if board and board.get("centre_m") and board.get("normal")
     ]
-    plates = [Point(obj["position_m"][:2]) for obj in objects if obj.get("type") == "street_sign" and obj.get("position_m")]
+    plates = [Point(obj["position_m"][0], obj["position_m"][1]) for obj in objects if obj.get("type") == "street_sign" and obj.get("position_m")]
     return union_all([
         *[Point(p).buffer(CLIMB_KEEP_OUT_M) for p in (*points, *doors)],
         *[shape.buffer(CLIMB_SIGN_CLEAR_M) for shape in (*boards, *plates)],

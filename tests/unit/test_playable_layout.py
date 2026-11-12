@@ -710,6 +710,8 @@ def test_the_climb_keep_out_covers_shop_signs_window_vinyls_and_street_plates() 
         assert not keep_out.contains(Point(outside)), outside
     assert _board_line({"centre_m": [0.0, 0.0], "normal": [0.0, -1.0], "width_m": 2.0}).length == pytest.approx(2.0)
     assert sorted(_board_line({"centre_m": [5.0, 5.0], "normal": [1.0, 0.0], "width_m": 4.0}).coords) == [(5.0, 3.0), (5.0, 7.0)]
+    # A normal with a vertical part keeps only its plane part.
+    assert sorted(_board_line({"centre_m": [5.0, 5.0, 2.8], "normal": [1.0, 0.0, 0.0], "width_m": 4.0}).coords) == [(5.0, 3.0), (5.0, 7.0)]
 
 
 def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> None:
