@@ -22,6 +22,7 @@ from onward_generator.materials.trim import (
     Look,
     Strip,
     TrimStats,
+    _flat_v,
     apply_trim,
     band_mesh,
     building_bands,
@@ -119,7 +120,7 @@ def test_coplanar_faces_join_and_a_sloped_triangle_stays_whole() -> None:
     left, right = facade(4.0, 6.0, []), facade(4.0, 6.0, [], x0=4.0)
     sloped = Mesh(np.array([[0.0, 0.0, 1.0], [2.0, 0.0, 1.0], [1.0, 1.0, 5.0]]), np.array([[0, 1, 2]]))
     flat = Mesh(np.array([[0.0, 0.0, 2.0], [1.0, 0.0, 2.0], [2.0, 0.0, 2.0]]), np.array([[0, 1, 2]]))
-    out, band, plain, _ = band_mesh(merge([sloped, flat, left, right]), [0.9, 3.0, 6.0], [0.9, 6.0])
+    out, band, plain, cut = band_mesh(merge([sloped, flat, left, right]), [0.9, 3.0, 6.0], [0.9, 6.0])
     # The two quads join into one plain 8 x 6 m rectangle cut at 0.9 and 3 m: six triangles, plus the sloped one.
     assert out.triangle_count == 7
     assert area(out) == pytest.approx(48.0 + area(sloped))
@@ -127,13 +128,14 @@ def test_coplanar_faces_join_and_a_sloped_triangle_stays_whole() -> None:
     assert len(tilted) == 1
     assert set(band[tilted[0]].tolist()) == {1}  # centre at z = 7/3, between 0.9 and 3.0 of the full list
     assert not plain[tilted[0]].any()
+    assert not cut.any()  # no face was cut at the single levels, the sloped one neither
 
 
 def test_an_empty_mesh_stays_empty() -> None:
-    out, band, plain, _ = band_mesh(Mesh.empty(), [1.0], [1.0])
+    out, band, plain, cut = band_mesh(Mesh.empty(), [1.0], [1.0])
     assert out.triangle_count == 0
-    assert band.shape == (0,) and plain.shape == (0,)
-    assert band.dtype == np.int64 and plain.dtype == bool
+    assert band.shape == (0,) and plain.shape == (0,) and cut.shape == (0,)
+    assert band.dtype == np.int64 and plain.dtype == bool and cut.dtype == bool
     mesh, uvs = wall_uvs(Mesh.empty(), BANDS, LAYOUT.walls["plaster_white"], LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
     assert mesh.triangle_count == 0 and uvs.shape == (0, 2) and uvs.dtype == np.float32
 
@@ -1160,6 +1162,58 @@ def test_a_shell_of_the_rings_takes_one_strip_per_storey() -> None:
     assert faces_away(np.array([0.0, -1.0, 0.0]), np.array([4.0, -100.0, 9.0]))
     assert not faces_away(np.array([0.0, -1.0, 0.0]), np.array([4.0, 100.0, 9.0]))
     assert faces_away(np.array([1.0, 0.0, 0.0]), np.array([0.0, 0.0, 9.0]))  # on the centre line: away
+    # Both axes count: east of the centre facing west is toward it, whatever its y; a slanted face adds both parts.
+    assert not faces_away(np.array([1.0, 0.0, 0.0]), np.array([-5.0, 3.0, 9.0]))
+    assert faces_away(np.array([0.6, 0.8, 0.0]), np.array([2.0, -1.0, 9.0]))
+    # The away face keeps one strip from its foot to its head.
+    v_back = (back.uvs[:, 1] - strip.v0) / (strip.v1 - strip.v0)
+    z_back = back.mesh.vertices[:, 2]
+    assert np.allclose(v_back[np.isclose(z_back, 0.0)], PLAIN_V[0], atol=1e-5)
+    assert np.allclose(v_back[np.isclose(z_back, 18.0)], PLAIN_V[1], atol=1e-5)
+    # Far east, just south of the centre: its centre, not its corners' numbers, says it faces away.
+    east = transform(facade(8.0, 18.0, []), _translation(200.0, -10.0))
+    side = trim_building(Node("building/s3", (Primitive(east, "scenic_wall_warm"),), {"type": "building"}), record,
+                         "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats()).primitives[0]
+    assert side.mesh.triangle_count == 2
+
+
+def test_a_single_face_with_a_zocalo_and_a_cornice_bands_on_the_single_levels() -> None:
+    """wall_uvs on a face ``single`` names: zocalo, one body band, cornice, each from its own single level."""
+    strip = LAYOUT.walls["plaster_white"]
+    mesh, uvs = wall_uvs(facade(8.0, 10.0, []), BANDS, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0,
+                         single=lambda normal, centre: True)
+    assert BANDS.single_levels == [0.9, 9.0]
+    z, v = mesh.vertices[:, 2], uvs[:, 1]
+    assert mesh.triangle_count == 6
+    def at(height: float, strip_: Strip, local: float) -> None:
+        values = v[np.isclose(z, height)]
+        assert np.isclose(values, strip_.v0 + local * (strip_.v1 - strip_.v0), atol=1e-5).any(), (height, values)
+    at(0.0, LAYOUT.zocalo, 0.0)
+    at(0.9, LAYOUT.zocalo, 1.0)
+    at(0.9, strip, PLAIN_V[0])
+    at(9.0, strip, PLAIN_V[1])
+    at(9.0, LAYOUT.cornice, 0.0)
+    at(10.0, LAYOUT.cornice, 1.0)
+
+
+def test_flat_v_samples_each_flat_face_from_its_own_near_edge() -> None:
+    strip, storey = LAYOUT.walls["plaster_white"], 3.0
+    wall = facade(8.0, 10.0, [])
+    # A small soffit 1 m off the wall, 1 cm deep: its own near edge is its zero.
+    tiny = Mesh(np.array([[0, 1.0, 2.3], [0.01, 1.0, 2.3], [0.01, 1.01, 2.3], [0, 1.01, 2.3]], dtype=float), np.array([[0, 2, 1], [0, 3, 2]]))
+    # A 10 x 10 m face leaning 1 µm over its height: vertical within PLANE_TOL of its size.
+    lean = Mesh(np.array([[20, 0, 0], [30, 0, 0], [30, 1e-6, 10], [20, 1e-6, 10]], dtype=float), np.array([[0, 1, 2], [0, 2, 3]]))
+    line = Mesh(np.array([[40, 0, 0], [41, 0, 0], [42, 0, 0]], dtype=float), np.array([[0, 1, 2]]))  # no area
+    mesh = merge([wall, tiny, lean, line])
+    v = np.full(mesh.vertex_count, -1.0)
+    out = _flat_v(mesh, mesh.vertices[:, 1], storey, strip, v)
+    soffit = np.flatnonzero(np.isclose(mesh.vertices[:, 2], 2.3) & (mesh.vertices[:, 1] > 0.5))
+    assert len(soffit) == 4
+    local = (out[soffit] - strip.v0) / (strip.v1 - strip.v0)
+    expected = PLAIN_V[0] + (mesh.vertices[soffit, 1] - 1.0) / storey
+    assert np.allclose(local, expected, atol=1e-6)
+    others = np.setdiff1d(np.arange(mesh.vertex_count), soffit)
+    assert (out[others] == -1.0).all()
 
 
 def _translation(x: float, y: float) -> np.ndarray:

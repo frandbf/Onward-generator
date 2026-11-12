@@ -140,7 +140,7 @@ def band_mesh(mesh: Mesh, levels: Sequence[float], single_levels: Sequence[float
         # Simplifying with no tolerance drops the collinear points where two faces of one line met.
         face = union_all([Polygon([(flat[i], vertices[i, 2]) for i in triangles[t]]) for t in members]).simplify(0.0)
         plain = isinstance(face, Polygon) and not face.interiors and len(face.exterior.coords) == 5
-        cut_single = single is not None and bool(single(normal, vertices[triangles[members]].reshape(-1, 3).mean(axis=0)))
+        cut_single = single is not None and bool(single(normal, vertices[np.unique(triangles[members])].mean(axis=0)))
         lv = coarse if cut_single else full
         left, low, right, high = face.bounds
         cuts = [float(c) for c in lv if low < c < high]  # pragma: no mutate: a level on the face's own edge only adds an empty band
@@ -324,7 +324,7 @@ def _flat_v(mesh: Mesh, across_m: np.ndarray, storey_m: float, wall: Strip, v: n
     ``band_mesh`` keeps those triangles' vertices apart from the vertical faces', so changing them moves no wall."""
     cross = mesh.face_normals()
     length = np.linalg.norm(cross, axis=1)
-    flat = np.flatnonzero((length > 0) & (np.abs(cross[:, 2]) > PLANE_TOL * np.maximum(length, 1e-12)))
+    flat = np.flatnonzero(np.abs(cross[:, 2]) > PLANE_TOL * length)  # a triangle of no area has no z either: never flat
     if not len(flat):
         return v
     out = v.copy()
