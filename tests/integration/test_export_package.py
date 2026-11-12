@@ -789,6 +789,12 @@ def test_unity_adapter_matches_the_package_contract() -> None:
     # Each climbed roof gets probes 1 and 3 m over it, before the group is built.
     assert "private static readonly float[] ClimbRoofProbeHeightsM = { 1f, 3f };" in source
     assert source.index("AddClimbProbes(pkg.Layout, probes);") < source.index('AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));')
+    # Plan Q4: the report reads the baked probes where a player stands, at torso height, toward the four
+    # horizontal sides, so two bakes can be compared on the light a soldier in the shade gets.
+    assert 'sb.Append($"\\"probe_light\\":{ProbeLightJson()},");' in source
+    assert "private const float ProbeLightStepM = 4f;" in source and "private const float ProbeLightHeightM = 1.2f;" in source
+    assert "Vector3.forward, Vector3.back, Vector3.left, Vector3.right" in source
+    assert "LightProbes.GetInterpolatedProbe(hit.position + Vector3.up * ProbeLightHeightM, null, out SphericalHarmonicsL2 sh);" in source
     # ADR-014: linear fog from the options; the backdrop stays out of the lightmap.
     assert "FogMode.Linear" in source and 'n.Contains("horizon_backdrop")' in source
     # The ring alone is drawn with the SDK's unlit graph: lit, it took only the ambient light (Barcelona Sarria).
