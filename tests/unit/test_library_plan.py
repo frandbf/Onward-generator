@@ -7,14 +7,18 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from jsonschema import Draft202012Validator
 from PIL import Image
 
-from onward_generator.ai.providers import StaticProvider
+from onward_generator.ai.providers import ProviderResult, StaticProvider
 from onward_generator.maps.workspace import create_map, refresh_texture_plan
 from onward_generator.materials.library_plan import (
     COARSE_CONTRAST_LIMIT,
     REPO_ROOT,
+    SLOT_FAMILY,
     WALL_CONTRAST_LIMIT,
+    _pools,
+    choice_schema,
     coarse_contrast,
     deterministic_choices,
     is_calm,
@@ -557,3 +561,45 @@ def test_a_fallback_plan_keeps_the_name_the_brief_and_the_extended_gaps(extended
     assert direct["atmosphere"] == "abandoned"
     assert direct["description"].startswith("Textures for Murcia, chosen from the imported library (library).")
     assert ("roofs (roof)" in direct["description"]) is extended
+
+
+def test_the_choice_schema_pairs_each_slot_with_its_familys_ids() -> None:
+    rows = library_rows()
+    for extended in (False, True):
+        pools = _pools(rows, extended=extended)
+        schema = choice_schema(pools)
+        Draft202012Validator.check_schema(schema)
+        choices = schema["properties"]["choices"]
+        branches = {b["properties"]["slot"]["const"]: b["properties"]["library_id"]["enum"] for b in choices["items"]["anyOf"]}
+        filled = [slot for slot, family in SLOT_FAMILY.items() if pools.get(family)]
+        assert list(branches) == filled and choices["minItems"] == choices["maxItems"] == len(filled)
+        for slot, ids in branches.items():
+            assert ids == sorted(str(row["id"]) for row in pools[SLOT_FAMILY[slot]])
+        for branch in choices["items"]["anyOf"]:
+            slot = branch["properties"]["slot"]["const"]
+            assert branch == {"type": "object", "additionalProperties": False, "required": ["slot", "library_id"],
+                              "properties": {"slot": {"const": slot}, "library_id": {"enum": branches[slot]}}}
+        assert schema["required"] == ["choices"] and schema["additionalProperties"] is False
+    # A slot whose family has no texture is not offered (the November 2026 library has no bark).
+    empty = choice_schema({})
+    assert empty["properties"]["choices"] == {"type": "array", "minItems": 0, "maxItems": 0}
+
+
+def test_the_model_gets_the_choice_schema() -> None:
+    sent: list[dict] = []
+    instructions: list[str] = []
+
+    class _Recorder:
+        name = "recorder"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            sent.append(schema)
+            instructions.append(instruction)
+            return ProviderResult("{}", {})
+
+    rows = library_rows()
+    select_texture_plan(name="Plaza Café", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                        brief="calles de piedra", seed=3, provider=_Recorder(), library=rows, extended=True)
+    assert sent == [choice_schema(_pools(rows, extended=True))] * 2
+    # The instruction keeps the map's own letters, not \u escapes.
+    assert '"name": "Plaza Café"' in instructions[0] and "\\u00e9" not in instructions[0]
