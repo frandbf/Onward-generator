@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 from jsonschema import Draft202012Validator
 
 from onward_generator.ai.providers import ProviderError, ProviderResult, StaticProvider, context_window
@@ -625,3 +626,25 @@ def test_an_accepted_and_a_replayed_plan_record_the_library() -> None:
     assert record["library"] == library and record["attempts"] == 0 and record["raw"] == raw
     assert record["digest_sha256"] == first.record["digest_sha256"] and record["instruction_sha256"] == first.record["instruction_sha256"]
     assert record["origin"] == "replay"
+
+
+def test_the_default_provider_waits_for_a_long_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.ai.providers as providers
+    from onward_generator.overgrow import realize as realize_module
+
+    made: list[float] = []
+
+    class _Fake:
+        name = "fake"
+
+        def __init__(self, timeout_s: float = 0.0, **kwargs: object) -> None:
+            made.append(timeout_s)
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            raise ProviderError("no model")
+
+    monkeypatch.setattr(providers, "OllamaProvider", _Fake)
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    compose(scene, _props(), _site(features), brief="A quiet block")
+    assert made == [realize_module.OVERGROW_TIMEOUT_S] * 2 and realize_module.OVERGROW_TIMEOUT_S == 600.0

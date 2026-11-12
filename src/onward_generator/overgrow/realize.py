@@ -200,6 +200,12 @@ def _stored_reply(replay: Mapping[str, object] | None, digest_hash: str, prompt_
     return raw if isinstance(raw, str) and raw else None
 
 
+# The overgrow prompt carries up to ``LIBRARY_BUDGET_TOKENS`` of library rows, about 25 000 tokens in all: qwen3:14b
+# read it in 105 to 145 s on an Apple M4 Pro alone, and past the provider's default 180 s while the machine also ran a
+# build (Rue Mouffetard, 12 November 2026). A timed-out call is a lost attempt, so this stage waits longer.
+OVERGROW_TIMEOUT_S = 600.0
+
+
 def _ask(brief: str, digest: Digest, props: list[Prop], provider, *, correction: str | None) -> tuple[str, str | None]:
     message = instruction(brief, digest, props)
     if correction:
@@ -212,7 +218,7 @@ def _ask(brief: str, digest: Digest, props: list[Prop], provider, *, correction:
         if provider is None:
             from onward_generator.ai.providers import OllamaProvider
 
-            provider = OllamaProvider()
+            provider = OllamaProvider(timeout_s=OVERGROW_TIMEOUT_S)
         schema = run_schema(digest.anchor_ids(), {prop.spec.id: prop.spec.grouping for prop in props})
         result = provider.complete(SYSTEM_PROMPT, message, schema)
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
