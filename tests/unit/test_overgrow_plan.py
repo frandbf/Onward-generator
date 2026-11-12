@@ -18,7 +18,6 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_f
 from onward_generator.generation.mesh import box
 from onward_generator.overgrow.catalog import ASSETS_BY_ID
 from onward_generator.overgrow.digest import DigestLimits, build_digest
-from onward_generator.overgrow.fit import check_scene, write_report
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.place import overgrow
 from onward_generator.overgrow.plan import MAX_PER_ANCHOR, PlanError, bind_plan, parse_overgrow_plan, plan_schema, run_schema
@@ -318,7 +317,12 @@ class _Down:
         raise ProviderError("Ollama is not running")
 
 
-def test_replay_places_the_plan_and_fit_accepts_it(tmp_path: Path) -> None:
+def _pick_reply(*ids: str) -> str:
+    return json.dumps({"pick_version": "0.1.0", "mood": "A watched gate.", "asset_ids": list(ids)})
+
+
+def test_the_model_picks_the_props_and_the_rules_place_them(tmp_path: Path) -> None:
+    """ADR-010 amendment of 12 November 2026: the model names props, the rules place them; replayed later, rules on failure."""
     scene_path = tmp_path / "geo_scene.json"
     scene_path.write_text(json.dumps(_scene(
         _block_features(), longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830",
@@ -328,44 +332,38 @@ def test_replay_places_the_plan_and_fit_accepts_it(tmp_path: Path) -> None:
     library = tmp_path / "library"
     _library(library)
     out = tmp_path / "scene_overgrow"
-    provider = StaticProvider("replay", FIXTURE.read_text(encoding="utf-8"), "fixture")
-    report = overgrow(
-        base, scene_path, out, library=library, brief="A quiet block with a watched point",
-        ai=True, provider=provider,
-    )
-    assert report["ambient_mode"] == "ai"
-    assert report["ambient_origin"] == "ai_generated"
-    assert report["wrecks"] == 0
-    assert report["compose_actions"] == 4
-    assert report["moss"] == 0
-    checked, problems = check_scene(out, scene_path)
-    assert problems == []
-    assert checked >= 4
-    write_report(out / "fit.json", checked, "0" * 64)
-    nodes, _ = nodes_from_glb((out / "scene_visual.glb").read_bytes())
-    assert any(node.name.startswith("overgrow/prop/large_iron_gate/") for node in nodes)
+    ids = sorted(p.spec.id for p in _props())
+    seen: list[str] = []
+
+    class _Pick:
+        name = "pick"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            seen.append(instruction)
+            return ProviderResult(_pick_reply(*ids), {})
+
+    report = overgrow(base, scene_path, out, library=library, brief="A quiet block with a watched point", ai=True, provider=_Pick())
+    assert '"A quiet block with a watched point"' in seen[0] and report["compose_actions"] == 0
+    assert report["ambient_mode"] == "ai_pick" and report["ambient_origin"] == "ai_generated"
+    assert report["ambient_pick"] == ids and report["library_assets"] == len(ids) and report["compose_attempts"] == 1
+    assert set(report["placed_assets"]) <= set(ids) and report["compose_fallback"] is None
     stored = json.loads((out / "ambient_plan.json").read_text(encoding="utf-8"))
-    assert stored["origin"] == "ai_generated"
-    fresh = tmp_path / "scene_rules"
+    assert stored["origin"] == "ai_generated" and stored["asset_ids"] == ids and stored["mood"] == "A watched gate."
     down = _Down()
-    fallback = overgrow(
-        base, scene_path, fresh, library=library, brief="A quiet block with a watched point",
-        ai=True, provider=down,
-    )
+    fallback = overgrow(base, scene_path, tmp_path / "scene_rules", library=library, brief="A quiet block with a watched point",
+                        ai=True, provider=down)
     assert down.calls == 2
-    assert fallback["ambient_mode"] == "rules"
-    assert fallback["compose_attempts"] == 2
-    assert fallback["compose_fallback"]
-    assert fallback["wrecks"] >= 1
+    assert fallback["ambient_mode"] == "rules" and fallback["compose_actions"] == 0
+    assert fallback["compose_attempts"] == 2 and fallback["compose_fallback"] and fallback["ambient_pick"] == []
     reused_provider = _Down()
-    reused = overgrow(
-        base, scene_path, out, library=library, brief="A quiet block with a watched point",
-        ai=True, provider=reused_provider, overwrite=True,
-    )
+    reused = overgrow(base, scene_path, out, library=library, brief="A quiet block with a watched point",
+                      ai=True, provider=reused_provider, overwrite=True)
     assert reused_provider.calls == 0
-    assert reused["ambient_origin"] == "replay"
-    assert reused["wrecks"] == 0
-    assert reused["compose_actions"] == 4
+    assert reused["ambient_origin"] == "replay" and reused["ambient_pick"] == ids and reused["compose_attempts"] == 0
+    rules = overgrow(base, scene_path, tmp_path / "scene_off", library=library, brief="A quiet block with a watched point", ai=False)
+    assert rules["ambient_mode"] == "rules" and rules["ambient_pick"] == [] and rules["compose_attempts"] == 0
+    assert fallback["ambient_origin"] == rules["ambient_origin"] == "rules"
+    assert not (tmp_path / "scene_off" / "ambient_plan.json").exists()
 
 
 def test_a_failed_reply_is_tried_once_more_before_the_rules() -> None:
@@ -745,3 +743,22 @@ def test_the_correction_counts_the_dropped_actions_by_reason() -> None:
     rows = [{"reason": "outside_zone"}, {"reason": "outside_zone"}, {"reason": "budget"}]
     assert _nothing_placed(rows) == "no action could be placed (budget 1, outside_zone 2); choose other anchors and assets"
     assert _nothing_placed([]) == "no action could be placed (no actions); choose other anchors and assets"
+
+
+def test_a_brief_that_asks_for_chaos_lets_the_rules_block_the_street(tmp_path: Path) -> None:
+    """The rules keep the keyword street blocking when they place the whole library (and a pick)."""
+    scene_path = tmp_path / "geo_scene.json"
+    scene_path.write_text(json.dumps(_scene(
+        _block_features(), longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830",
+    )), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    library = tmp_path / "library"
+    _library(library)
+    quiet = overgrow(base, scene_path, tmp_path / "quiet", library=library, brief="A quiet block", ai=False)
+    chaos = overgrow(base, scene_path, tmp_path / "chaos", library=library, brief="A block in chaos", ai=False)
+    assert (quiet["street_blocking"], chaos["street_blocking"]) == (False, True)
+    nodes = {name: [n for n in nodes_from_glb((tmp_path / name / "scene_visual.glb").read_bytes())[0] if n.name.startswith("overgrow/prop/")]
+             for name in ("quiet", "chaos")}
+    assert len(nodes["quiet"]) == len(nodes["chaos"]) > 0
+    assert [n.matrix.tolist() for n in nodes["quiet"]] != [n.matrix.tolist() for n in nodes["chaos"]]

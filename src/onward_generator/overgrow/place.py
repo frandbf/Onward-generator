@@ -59,8 +59,9 @@ from onward_generator.overgrow.growth import (
 )
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
+from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
-from onward_generator.overgrow.realize import Site, compose, load_replay
+from onward_generator.overgrow.realize import load_replay
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
 from onward_generator.tiers import core_of
@@ -237,19 +238,18 @@ def overgrow(
         records.append(_record("tree", "generated", spot, edge.feature_id, z))
         tree_count += 1
 
-    composed = None
+    # The model picks which props suit the map; the rules below place them (``overgrow/pick.py``, ADR-010 amendment).
+    picked = None
     if use_ai:
         replay_path = out / "ambient_plan.json"
         replay = load_replay(replay_path.read_text(encoding="utf-8")) if replay_path.is_file() else None
-        composed = compose(
-            geo, props,
-            Site(area, buildings, lanes, lane_tree, spawns, floor=floor),
-            brief=brief_text, provider=provider, replay=replay,
-        )
-    use_plan = composed is not None and composed.ok
+        picked = pick_props(props, brief=brief_text, provider=provider, replay=replay)
+        if picked.ok:
+            props = [prop for prop in props if prop.spec.id in set(picked.asset_ids)]
+    use_pick = picked is not None and picked.ok
     wreck_count = 0
     wreck_colliders: list[Node] = []
-    if not use_plan:
+    if wreck_cap:  # no wreck budget, no wreck spot to try
         for spot, yaw in _wreck_spots(lanes, buildings, seed, block_streets=plan.street_blocking):
             if wreck_count >= wreck_cap:
                 break
@@ -289,10 +289,10 @@ def overgrow(
             records.append(row)
             wreck_count += 1
     planted = dress(
-        [] if use_plan else props,
+        props,
         edges, features, buildings, lanes, lane_tree, area, years, seed, spawns,
         grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)), triangle_budget=MAX_LIBRARY_TRIS,
-        block_streets=False if use_plan else plan.street_blocking,
+        block_streets=plan.street_blocking,
         placed_roles={"wreck": wreck_count},
         floor=floor,
         occupied=_occupied(records),
@@ -300,16 +300,6 @@ def overgrow(
         keep_out=detail_elements(manifest),
         signs=sign_footprints(manifest),
     )
-    if use_plan and composed is not None:
-        planted.nodes.extend(composed.dressing.nodes)
-        planted.records.extend(composed.dressing.records)
-        planted.colliders.extend(composed.dressing.colliders)
-        planted.images.update(composed.dressing.images)
-        planted.triangles += composed.dressing.triangles
-        planted.placed_ids.extend(composed.dressing.placed_ids)
-        planted.rejects.extend(composed.dressing.rejects)
-        for key, count in composed.dressing.reject_counts.items():
-            planted.reject_counts[key] = planted.reject_counts.get(key, 0) + count
     tuft_meshes.extend(planted.grass)
     by_id = {prop.spec.id: prop for prop in props}
     records.extend(planted.records)
@@ -428,12 +418,13 @@ def overgrow(
         "trees": tree_count,
         "trees_observed": sum(1 for row in records if row["kind"] == "tree" and row["origin"] == "observed"),
         "brief": plan.brief,
-        "street_blocking": False if use_plan else plan.street_blocking,
-        "ambient_origin": composed.origin if use_plan and composed is not None else plan.origin,
-        "ambient_mode": "ai" if use_plan else "rules",
-        "compose_actions": composed.applied if use_plan and composed is not None else 0,
-        "compose_attempts": int(composed.record.get("attempts") or 0) if composed is not None else 0,
-        "compose_fallback": None if composed is None or composed.ok else composed.reason,
+        "street_blocking": plan.street_blocking,
+        "ambient_origin": picked.origin if use_pick and picked is not None else plan.origin,
+        "ambient_mode": "ai_pick" if use_pick else "rules",
+        "ambient_pick": list(picked.asset_ids) if picked is not None else [],
+        "compose_actions": 0,
+        "compose_attempts": picked.record["attempts"] if picked is not None else 0,
+        "compose_fallback": picked.reason if picked is not None and not picked.ok else None,
         "colliders": len(colliders),
         "wrecks": wreck_count,
         "props": len(planted.placed_ids),
@@ -461,8 +452,8 @@ def overgrow(
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         summary["street_profile"] = dict(street_profile)
     atomic_write_json(targets[4], summary)
-    if composed is not None:
-        atomic_write_json(out / "ambient_plan.json", composed.record)
+    if picked is not None:
+        atomic_write_json(out / "ambient_plan.json", picked.record)
     if not compare["identical"]:
         raise OvergrowError("overgrow changed a geographic object record; this is a bug")
     return summary
