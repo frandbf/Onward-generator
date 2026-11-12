@@ -8,6 +8,7 @@ slot and is supplied by the ``materials`` stage, not invented here.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -139,8 +140,29 @@ def pattern_kind(color_id: str) -> str:
     return "speckle"
 
 
+def _wave(size: int, length_px: float) -> float:
+    """The angular frequency nearest one cycle per ``length_px`` that fits a whole number of cycles in ``size``.
+
+    A wave whose period does not divide the tile jumps at its edge, and the jump repeats every tile: on Rue
+    Mouffetard the generated grass read as a checkerboard (plan Q6)."""
+    return 2.0 * math.pi * max(1, round(size / (2.0 * math.pi * length_px))) / size
+
+
+def _soft_noise(rng: np.random.Generator, size: int, feature_px: float) -> np.ndarray:
+    """Smooth noise that repeats with the tile, scaled to [-1, 1]: white noise low-passed in the Fourier domain,
+    which wraps by construction. Irregular blotches about ``feature_px`` across, not the checkerboard of a sine
+    times a cosine."""
+    freq = np.fft.fftfreq(size)
+    radius = np.hypot(*np.meshgrid(freq, freq))
+    spectrum = np.fft.fft2(rng.normal(0.0, 1.0, (size, size))) * np.exp(-((radius * feature_px) ** 2))
+    field = np.fft.ifft2(spectrum).real
+    peak = float(np.abs(field).max())
+    return field / peak if peak > 0 else field
+
+
 def _modulation(kind: str, size: int, seed: int) -> np.ndarray:
-    """Per-pixel multiplier in ~0.62–1.12 so ``_BaseColor * _BaseMap`` stays readable."""
+    """Per-pixel multiplier in ~0.62–1.12 so ``_BaseColor * _BaseMap`` stays readable. Every pattern repeats with
+    the tile: waves have whole cycles per tile and joints divide it, so tiles meet without a seam."""
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[0:size, 0:size].astype(np.float64)
     noise = rng.normal(0.0, 1.0, (size, size))
@@ -155,24 +177,24 @@ def _modulation(kind: str, size: int, seed: int) -> np.ndarray:
         return np.where(grout, 0.62, field)
     if kind == "tiles":
         row = max(size // 10, 8)
-        wave = ((xx + 5.0 * np.sin(yy / 6.0)) % (row * 1.6)) < 2.0
-        grout_y = (yy % row) < 2
+        course = size / max(1, round(size / (row * 1.6)))
+        wave = ((xx + 5.0 * np.sin(yy * _wave(size, 6.0))) % course) < 2.0
+        grout_y = (yy % (size / max(1, round(size / row)))) < 2
         field = 0.94 + 0.06 * noise
         return np.where(wave | grout_y, 0.58, field)
     if kind == "wood":
-        return 0.82 + 0.14 * np.sin(xx / 2.8) + 0.05 * noise
+        return 0.82 + 0.14 * np.sin(xx * _wave(size, 2.8)) + 0.05 * noise
     if kind == "foliage":
-        blobs = np.sin(xx / 9.0) * np.cos(yy / 11.0)
-        return 0.80 + 0.16 * blobs + 0.08 * noise
+        return 0.80 + 0.16 * _soft_noise(rng, size, 10.0) + 0.08 * noise
     if kind == "metal":
-        return 0.78 + 0.16 * np.sin(yy / 2.2) + 0.04 * noise
+        return 0.78 + 0.16 * np.sin(yy * _wave(size, 2.2)) + 0.04 * noise
     if kind == "plaster":
-        mottling = np.sin((xx + yy) / 13.0) * np.cos(xx / 17.0)
+        mottling = np.sin((xx + yy) * _wave(size, 13.0)) * np.cos(xx * _wave(size, 17.0))
         return 0.86 + 0.10 * mottling + 0.06 * noise
     if kind == "water":
-        return 0.76 + 0.14 * np.sin(xx / 7.0 + yy / 11.0) + 0.04 * noise
+        return 0.76 + 0.14 * np.sin(xx * _wave(size, 7.0) + yy * _wave(size, 11.0)) + 0.04 * noise
     if kind == "glass":
-        return 0.72 + 0.10 * np.sin((xx + yy) / 8.0) + 0.03 * noise
+        return 0.72 + 0.10 * np.sin((xx + yy) * _wave(size, 8.0)) + 0.03 * noise
     return 0.88 + 0.08 * noise
 
 
@@ -180,9 +202,9 @@ def _tile_pixels(color_id: str, size: int, seed: int) -> np.ndarray:
     mod = np.clip(_modulation(pattern_kind(color_id), size, seed), 0.55, 1.15)
     # Neutral grey so the shader tint (``_BaseColor``) keeps the material hue.
     rgb = np.clip(np.round(200.0 * mod[..., None]), MIN_MEAN_LUMA, 255).astype(np.uint8)
+    # No darker first row and column: they drew a line every tile on grass and water (plan Q6). Paving and roof
+    # tiles keep their joints from their own pattern.
     rgb = np.broadcast_to(rgb, (size, size, 3)).copy()
-    rgb[0, :, :] = np.clip(rgb[0, :, :].astype(np.int16) - 18, 0, 255).astype(np.uint8)
-    rgb[:, 0, :] = np.clip(rgb[:, 0, :].astype(np.int16) - 18, 0, 255).astype(np.uint8)
     alpha = np.full((size, size, 1), 255, dtype=np.uint8)
     return np.concatenate([rgb, alpha], axis=2)
 

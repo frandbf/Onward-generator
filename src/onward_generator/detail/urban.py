@@ -23,6 +23,43 @@ from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import Prototype, yaw_matrix
 from onward_generator.generation.surfaces import LinearWay
 
+WALL_MOUNT_M = 0.5
+"""An OSM street lamp this close to a facade hangs on it (plan Q6): Paris maps its wall lamps on the facade line."""
+WALL_MOUNT_TAGS = {"lamp_mount": ("wall",), "support": ("wall_mounted", "wall")}
+
+
+def wall_mounted(tags: Mapping[str, str], point: Point, buildings: BaseGeometry) -> bool:
+    """Whether an observed street lamp hangs on a facade: tagged so, or standing within ``WALL_MOUNT_M`` of one."""
+    if any(tags.get(key) in values for key, values in WALL_MOUNT_TAGS.items()):
+        return True
+    return not buildings.is_empty and buildings.distance(point) < WALL_MOUNT_M
+
+
+def facade_frame(point: Point, buildings: BaseGeometry) -> tuple[float, float, float]:
+    """The facade point nearest ``point`` and the heading (radians) that points out of the building there.
+
+    The outward side is the one whose probe 0.1 m away lies outside every footprint; the heading is the normal of
+    the nearest wall, so a lamp on the facade line faces the street even when it stands exactly on that line."""
+    boundary = buildings.boundary
+    along = boundary.project(point)
+    near = boundary.interpolate(along)
+    ahead, behind = boundary.interpolate(along + 0.05), boundary.interpolate(max(0.0, along - 0.05))
+    tx, ty = ahead.x - behind.x, ahead.y - behind.y
+    length = math.hypot(tx, ty) or 1.0
+    nx, ny = -ty / length, tx / length
+    if buildings.contains(Point(near.x + 0.1 * nx, near.y + 0.1 * ny)):
+        nx, ny = -nx, -ny
+    return near.x, near.y, math.atan2(ny, nx)
+
+
+def away_from_buildings(point: Point, buildings: BaseGeometry) -> float:
+    """The heading from the nearest facade to ``point``: a free-standing lamp's arm reaches toward the street."""
+    if buildings.is_empty:
+        return 0.0
+    near = buildings.boundary.interpolate(buildings.boundary.project(point))
+    dx, dy = point.x - near.x, point.y - near.y
+    return math.atan2(dy, dx) if math.hypot(dx, dy) > 1e-9 else 0.0
+
 
 @dataclass(frozen=True, slots=True)
 class Element:
@@ -70,6 +107,11 @@ def place_elements(
 
     A generated element also keeps off ``doors``, the ground in front of the buildings' doors. An observed one
     stays where OSM puts it: the doors are generated.
+
+    An observed street lamp on a facade (``wall_mounted``) becomes a ``wall_lamp`` on the nearest facade point, facing
+    out; a free-standing one reaches its arm away from the nearest facade. Every street lamp, observed or generated,
+    keeps ``street_lamps.min_spacing_m`` from the lamps already placed, in id order (plan Q6: twelve observed poles
+    stood within 30 x 37 m on one Rue Mouffetard square).
     """
     placed: list[Element] = []
     rejected: list[Rejected] = []
@@ -88,12 +130,33 @@ def place_elements(
         placed.append(element)
         return None
 
+    lamps = cfg.street_lamps
+    lamp_points: list[Point] = []
+
+    def lamp_spaced(point: Point) -> bool:
+        return all(point.distance(q) >= lamps.min_spacing_m for q in lamp_points)
+
     for f in sorted(features, key=lambda f: f["id"]):
         if f.get("kind") != "poi":
             continue
-        kind = classify_poi(f.get("tags") or {}, cfg)
+        tags = f.get("tags") or {}
+        kind = classify_poi(tags, cfg)
         if kind is None:
             continue
+        if kind == "street_lamp":
+            p = shape(f["geometry"])
+            if wall_mounted(tags, p, buildings) and "wall_lamp" in prototypes and not buildings.is_empty:
+                x, y, heading = facade_frame(p, buildings)
+                if not lamp_spaced(Point(x, y)):
+                    rejected.append(Rejected(f["id"], "wall_lamp", "too_close_to_another_lamp"))
+                    continue
+                placed.append(Element(f"urban/wall_lamp/{f['id']}", "wall_lamp", yaw_matrix(x, y, 0.0, heading), "observed", (f["id"],),
+                                      "osm_poi_on_the_nearest_facade"))
+                lamp_points.append(Point(x, y))
+                continue
+            if not lamp_spaced(p):
+                rejected.append(Rejected(f["id"], kind, "too_close_to_another_lamp"))
+                continue
         proto_kind = kind
         if kind == "tree":
             options = [k for k in ("tree", "tree_1", "tree_2") if k in prototypes]
@@ -102,15 +165,20 @@ def place_elements(
         if proto_kind not in prototypes:
             continue
         p = shape(f["geometry"])
-        yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw") if kind == "tree" else 0.0
+        if kind == "tree":
+            yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw")
+        elif kind == "street_lamp":
+            yaw = away_from_buildings(p, buildings)
+        else:
+            yaw = 0.0
         element = Element(f"urban/{kind}/{f['id']}", proto_kind, yaw_matrix(p.x, p.y, 0.0, yaw), "observed", (f["id"],), "osm_poi_position")
         reason = try_place(element)
         if reason:
             rejected.append(Rejected(f["id"], kind, reason))
+        elif kind == "street_lamp":
+            lamp_points.append(p)
 
-    lamps = cfg.street_lamps
     if lamps.enabled and "street_lamp" in prototypes:
-        lamp_points: list[Point] = [Point(e.matrix[0, 3], e.matrix[1, 3]) for e in placed if e.kind == "street_lamp"]
         for way in sorted((w for w in ways if w.road_class == "vehicular" and isinstance(w.geometry, LineString)), key=lambda w: w.id):
             line = way.geometry
             n_lamps = int(line.length // lamps.spacing_m)

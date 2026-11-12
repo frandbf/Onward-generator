@@ -545,6 +545,12 @@ def test_a_street_light_hangs_under_each_lamp_head_nearest_the_focus_first() -> 
     assert street_lights({"objects": []}, (0.0, 0.0)) == []
 
 
+def test_a_wall_lamp_lights_under_its_lantern_0_57_m_out_of_the_facade() -> None:
+    """Plan Q6: the lights follow the wall lamps too, under the lantern rather than a pole's head."""
+    wall = {"type": "urban_element", "kind": "wall_lamp", "position_m": [20.0, 5.0], "yaw_deg": 90.0}
+    assert street_lights({"objects": [wall, _lamp(40.0, 0.0)]}, (0.0, 0.0)) == [20.0, 5.57, 4.2, 41.0, 0.0, 4.2]
+
+
 def test_street_lights_stop_at_the_cap_keeping_the_nearest() -> None:
     manifest = {"objects": [_lamp(float(i), 0.0) for i in range(STREET_LIGHTS_MAX + 5, 0, -1)]}
     lights = street_lights(manifest, (0.0, 0.0))

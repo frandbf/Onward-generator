@@ -830,6 +830,8 @@ TIME_OF_DAY_SETTINGS: Mapping[str, tuple[str, str]] = {"day": ("Day", "UrbanDay1
 STREET_LIGHTS_MAX = 64
 """As many as the schema allows interior lights. A baked light costs bake time, not frame time."""
 LAMP_HEAD_REACH_M = 1.0
+WALL_LAMP_REACH_M = 0.57
+"""The middle of a wall lamp's lantern, out from the facade (``urban:wall_lamp`` in ``detail.modules``)."""
 LAMP_LIGHT_HEIGHT_M = 4.2
 """Under the head of the ``street_lamp`` prototype (``detail/modules.py``): 1 m along its arm, just below 4.25 m."""
 
@@ -838,10 +840,11 @@ def street_lights(detail_manifest: Mapping[str, Any], focus: tuple[float, float]
     """Flat ``x, y, z`` triples of a light under each street lamp's head, nearest the focus first, at most ``STREET_LIGHTS_MAX``."""
     heads: list[tuple[float, float]] = []
     for element in detail_manifest.get("objects", []):
-        if element.get("type") == "urban_element" and element.get("kind") == "street_lamp":
+        if element.get("type") == "urban_element" and element.get("kind") in ("street_lamp", "wall_lamp"):
             x, y = element["position_m"][:2]
             yaw = math.radians(float(element.get("yaw_deg", 0.0)))
-            heads.append((x + LAMP_HEAD_REACH_M * math.cos(yaw), y + LAMP_HEAD_REACH_M * math.sin(yaw)))
+            reach = LAMP_HEAD_REACH_M if element["kind"] == "street_lamp" else WALL_LAMP_REACH_M
+            heads.append((x + reach * math.cos(yaw), y + reach * math.sin(yaw)))
     heads.sort(key=lambda head: (math.dist(head, focus), head))
     return [value for x, y in heads[:STREET_LIGHTS_MAX] for value in (round(x, 2), round(y, 2), LAMP_LIGHT_HEIGHT_M)]
 

@@ -37,8 +37,10 @@ TEMPLATE = CFG.template_for("residential_multi", False)
 WALL = "plaster_ochre"
 ROOF = "roof_flat_grey"
 FOOTPRINT = Polygon([(0, 0), (14, 0), (14, 9), (0, 9)])
-# The 14 × 9 m, five-storey building below, built by the code before ADR-025: every opening recessed.
-RECESSED_SHA256 = "d35fecc6af15745dacb67381fe71666b6de06a275a86a5063736f376b9508eea"
+# The 14 × 9 m, five-storey building below, built by the code before ADR-025: every opening recessed. Plan Q6
+# (11 November 2026) moved the 480 reveal triangles from frame_stone to the wall's material and changed nothing
+# else: the same 1384 triangles at the same places. Before it the digest was d35fecc6af15745d...
+RECESSED_SHA256 = "21464fb859703538d7895a6fa515969ca8a9288de8f6b672091b9348344f248d"
 
 
 def _hole(kind: str = "window", storey: int = 2, back: str | None = "glass_dark", v0: float | None = None) -> Hole:
@@ -116,9 +118,10 @@ def test_upper_storeys_are_flat_and_the_shell_stays_closed() -> None:
     flat = [h for h in layout.holes if h.storey >= 2]
     assert {h.kind for h in flat} == {"window", "balcony_door"}
     assert shell.relief == {"relief_storeys": 2, "flat_openings": len(flat), "recessed_openings": len(layout.holes) - len(flat)}
-    # Each flat opening drops its four reveals (8 triangles); its back stays 2 triangles; the wall and balconies do not change.
-    assert _tris(shell, "frame_stone") == _tris(recessed, "frame_stone") - 8 * len(flat)
-    for material in ("glass_dark", "door_wood", WALL, "railing_metal", ROOF):
+    # Each flat opening drops its four reveals (8 triangles), in the wall's material since plan Q6; its back stays
+    # 2 triangles; the wall face, the coping and the balconies do not change.
+    assert _tris(shell, WALL) == _tris(recessed, WALL) - 8 * len(flat)
+    for material in ("glass_dark", "door_wood", "frame_stone", "railing_metal", ROOF):
         assert _tris(shell, material) == _tris(recessed, material), material
     assert shell.counts == recessed.counts
     # The flat glass lies in the wall plane; the glass below the threshold stays 0.15 m in.
@@ -136,9 +139,10 @@ def test_zero_flattens_every_window_but_keeps_the_door() -> None:
     doors = [h for h in layout.holes if h.kind == "door"]
     assert len(doors) == 1
     assert shell.relief == {"relief_storeys": 0, "flat_openings": len(layout.holes) - 1, "recessed_openings": 1}
-    # Only the door's reveals are left of the openings: the rest of frame_stone is the coping and the balcony slabs.
+    # Only the door's reveals are left of the openings, in the wall's material since plan Q6.
     recessed, _ = _building(1000)
-    assert _tris(shell, "frame_stone") == _tris(recessed, "frame_stone") - 8 * (len(layout.holes) - 1)
+    assert _tris(shell, WALL) == _tris(recessed, WALL) - 8 * (len(layout.holes) - 1)
+    assert _tris(shell, "frame_stone") == _tris(recessed, "frame_stone")  # the coping and the balcony slabs
 
 
 def test_one_flat_window_is_two_triangles_and_watertight_in_its_wall() -> None:
@@ -146,8 +150,8 @@ def test_one_flat_window_is_two_triangles_and_watertight_in_its_wall() -> None:
     deep, _ = _building(3, [_hole("window", storey=2)])
     assert flat.defects == deep.defects == 0
     assert _tris(flat, "glass_dark") == _tris(deep, "glass_dark") == 2
-    assert _tris(deep, "frame_stone") - _tris(flat, "frame_stone") == 8
-    assert _tris(flat, WALL) == _tris(deep, WALL)
+    assert _tris(deep, WALL) - _tris(flat, WALL) == 8  # the four reveals, in the wall's material (plan Q6)
+    assert _tris(flat, "frame_stone") == _tris(deep, "frame_stone")
     assert np.allclose(_depth(merge(flat.parts["glass_dark"])), 0.0)
     assert np.allclose(_depth(merge(deep.parts["glass_dark"])), CFG.recess_depth_m)
     assert flat.counts == deep.counts == {"window": 1}

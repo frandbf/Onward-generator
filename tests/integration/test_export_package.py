@@ -322,8 +322,10 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
 # Plan D5: the integration fixture card built on workshop/d4 HEAD 02ee02a, before the D5 change. The package id
 # hashes the scene, so it was re-pinned on 10 November 2026 when the shop windows gained their #glass panes and more
 # props became solid. The adapter options were re-pinned with it: their only change is "variant", the package id.
-GOLDEN_PACKAGE_ID = "murcia_belluga_6477379f29"
-GOLDEN_OPTIONS_SHA256 = "697198d4040c5906334355b09186590366381c21c9846ef5285ab4e75f7d24f9"
+# Re-pinned again on 11 November 2026 (plans Q5, Q6): the window reveals took the wall's material and the street lamps
+# their spacing, which changes the scene; compared with main, the options again differ only in "variant".
+GOLDEN_PACKAGE_ID = "murcia_belluga_5f5747aaa9"
+GOLDEN_OPTIONS_SHA256 = "62a8410d03134868e8b1e8307780108d9e937bf5b09a9ffd1970a67068a2ce3c"
 
 
 def test_lit_normal_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:

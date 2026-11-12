@@ -64,7 +64,7 @@ def recess(width: float, height: float, depth: float, back: str | None, frame_ma
     parts: list[tuple[str, Mesh]] = [(frame_material, reveals)]
     if back is not None:
         parts.append((back, quad((0, d, 0), (w, d, 0), (w, d, h), (0, d, h))))
-    return Prototype(_key("recess", w, h, d, back or "open"), tuple(parts))
+    return Prototype(_key("recess", w, h, d, back or "open", frame_material), tuple(parts))
 
 
 def flat_opening(width: float, height: float, back: str) -> Prototype:
@@ -205,6 +205,15 @@ def urban_prototypes(*, tree_sides: int = 8, tree_variants: int = 1) -> dict[str
             "urban:street_lamp",
             ((m, merge([_post(0.08, 4.5), box(0.0, 1.0, -0.04, 0.04, 4.4, 4.5), box(0.8, 1.2, -0.12, 0.12, 4.25, 4.4)])),),
             box(-0.1, 0.1, -0.1, 0.1, 0.0, 4.5),
+        ),
+        # A lantern on a bracket, fixed to a facade: local +x points out of the wall (plan Q6). On Rue Mouffetard 107 of
+        # the 116 OSM street lamps that found no free ground stood within 0.5 m of a facade, as Paris hangs them.
+        # No collider: it hangs above the players' heads.
+        "wall_lamp": Prototype(
+            "urban:wall_lamp",
+            ((m, merge([box(0.0, 0.04, -0.08, 0.08, 3.35, 3.75, omit=("-x",)), box(0.04, 0.65, -0.03, 0.03, 3.62, 3.68, omit=("-x",)),
+                        box(0.42, 0.72, -0.15, 0.15, 3.1, 3.55)])),),
+            None,
         ),
         "bollard": Prototype("urban:bollard", ((m, _post(0.1, 0.9, 8)),), box(-0.1, 0.1, -0.1, 0.1, 0.0, 0.9)),
         "bicycle_parking": Prototype(

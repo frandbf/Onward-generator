@@ -593,7 +593,9 @@ def build_shell(
             opened_walls.append((seg, face_mesh, rects))
         for h in holes:
             flat = is_flat(h, cfg.relief_storeys)
-            proto = flat_opening(h.width, h.height, str(h.back)) if flat else recess(h.width, h.height, h.depth, h.back)
+            # The reveals are the wall's own depth, so they take its material (plan Q6): in frame_stone, near white,
+            # sunlit jambs read as strips floating off a darker facade on Rue Mouffetard.
+            proto = flat_opening(h.width, h.height, str(h.back)) if flat else recess(h.width, h.height, h.depth, h.back, wall_material)
             m = seg.module_matrix(h.s0, h.v0)
             _bake(parts, proto, m)
             counts[h.kind] += 1
