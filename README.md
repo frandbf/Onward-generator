@@ -101,6 +101,62 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
 
+### Every option that is off by default
+
+A new map gets the base pipeline: OSM, the height sources that cover its centre, trim-sheet facades in the style of its region, the playable core, furnished shops and flats, street lamps, the rule-based dressing, the Hunt layout and the `neutral` light. Each feature below stays off until you turn it on: most are proposed until a headset session validates them, and a map made without them is built as before. `maps/rue_mouffetard` is the reference map with all the day switches on.
+
+**Switches of `map create` and `run`** (stored in `map.json`; on an existing map, set the key to `true` and rerun from the stage it feeds):
+
+| Flag | `map.json` key | What it adds |
+| --- | --- | --- |
+| `--atmosphere golden_hour` or `overcast` | `atmosphere` | Light preset of a day map: sun, ambient, AO, fog colour, wall palette; `golden_hour` doubles the bounced light ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)) |
+| `--repetition` | `repetition` | Calm roof and paving pools and a per-cell ground phase, less visible tiling (plan C1) |
+| `--overture-tints` | `overture_tints` | Facade tints from Overture building colours where OSM has none (plan C2) |
+| `--lidar-roofs` | `lidar_roofs` | Flat or pitched roofs from the LiDAR nDSM where OSM has no roof tag (plan C3; needs a LiDAR source: `es.pnoa_ndsm`, `fr.lidar_hd`) |
+| `--regional-facades` | `regional_facades` | Regional trim atlases for `central_european`, `anglo` and `latin_american` (plan D1) |
+| `--street-profile` | `street_profile` | Local Ollama picks a street profile (facade style, palette, props, abandonment, cover) that code turns into stage flags (plan D2) |
+| `--ai` | `ambient_ai` | Local Ollama composes the dressing plan; a rejected reply keeps the rules ([ADR-010](docs/decisions/ADR-010-overgrow-ai-plan.md)) |
+| `--panoramax` | `panoramax` | Under development: 360° street photos projected onto exposed facades |
+| `--panoramax-atlas` | `panoramax_atlas` | With `--panoramax`: one decal image per combine cell, tinted trim walls, coverage report |
+| `--gameplay-report` | `gameplay_report` | `gameplay_report.json`: routes, sightlines, contact balance ([ADR-032](docs/decisions/ADR-032-gameplay-metrics.md)) |
+| `--balanced-spawns` | `balanced_spawns` | Spawns and Uplink chosen by the gameplay metrics (plan C6) |
+| `--sightline-cover` | `sightline_cover` | Solid cover props on open sightlines past 60 m (plan C7) |
+
+`--street-profile` and `--ai` need [Ollama](https://ollama.com) with `qwen3:14b`; without it they fall back to rules. In Docker on macOS the container reaches it as `host.docker.internal` on its own.
+
+**Night instead of a preset:** `--time-of-day night` (lit by the street lamps, [ADR-026](docs/decisions/ADR-026-time-of-day.md)) and `--storm` (lightning and thunder). A night map refuses every `--atmosphere` but `neutral`.
+
+**Size and core:**
+
+| Option | What it does |
+| --- | --- |
+| `--core-target-triangles N` | Budget core: the core half-side is solved for N core triangles instead of a fixed radius ([ADR-017](docs/decisions/ADR-017-playable-core.md) amendment) |
+| `map.json` `"mid_ring_m": W` | 10 to 1000 m of intermediate HLOD ring around the core (plan D3) |
+| `map.json` `"facades": {"mode": "trim" \| "legacy", "style": "<name>" \| "auto"}` | Force a facade style or the old per-material facades |
+
+**Data sources:** `--source nl.ahn` and `--source de.nrw_ndom` are opt-in LiDAR heights, used only inside their coverage. `onward-generator source list` shows every source; `--no-source <id>` turns one off.
+
+**Export card** (`maps/<id>/config/export.json`, keys under `build`, [docs/12-export.md](docs/12-export.md)):
+
+| Key | What it does |
+| --- | --- |
+| `scenic_out_of_lightmap: true` | Scenic shell walls leave the lightmap (plan C4) |
+| `lightmap_pages_max: N` | Lowers the texel density until the lightmap fits N pages, never below 4 texels/m (plan C5) |
+| `lit_normal_material: "facade_trim_…"`, `lit_normal_strength` | Spike: one facade material lit with a derived normal map ([ADR-033](docs/decisions/ADR-033-lit-normal-spike.md)) |
+
+**Build and headset:** `ONWARD_BAKE=final task unity` bakes the final lighting (default `draft`). `ONWARD_QUEST_LISTING=local-thumb`, `named` or `named-thumb` try experimental card listings ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)). `task unity` asks before every upload.
+
+**On by default, can be turned off:** shop furnishing (`interiors.shops.furnish.enabled`), flat furnishing (`interiors.furnish.enabled`), semantic furniture sets (`ONWARD_SEMANTIC_SETS=0` off) and your local Asset Store catalogues (`ONWARD_LOCAL_CATALOGUES=0` hides them).
+
+Every switch at once, for a day map:
+
+```bash
+onward-generator map create --name "My map" --lat 48.84045 --lon 2.34981 \
+  --atmosphere golden_hour --repetition --overture-tints --lidar-roofs --regional-facades \
+  --street-profile --ai --panoramax --panoramax-atlas \
+  --gameplay-report --balanced-spawns --sightline-cover
+```
+
 `onward-generator map create` also takes one flag per `map.json` switch, such as `--regional-facades`, `--balanced-spawns`, `--sightline-cover` or `--repetition`, so a new map needs no hand edit ([docs/02-configuration.md](docs/02-configuration.md)). With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
 
 **If something goes wrong:**
