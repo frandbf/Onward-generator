@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--textures", action="store_true", help="write or replace only config/texture_plan.json")
     # Plan Q8: the map.json switches, so a new map needs no hand edit and no second --textures run.
     for switch, text in MAP_SWITCHES.items():
-        create.add_argument("--" + switch.replace("_", "-"), dest=switch, action="store_true", help=f"store map.json {switch}: {text}")
+        create.add_argument("--" + switch.replace("_", "-"), action="store_true", help=f"store map.json {switch}: {text}")
 
     show = sub.add_parser("show", help="print a map folder and the geo command that reads it")
     show.add_argument("directory", help="map directory containing map.json")
