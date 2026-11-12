@@ -8,6 +8,7 @@ from shapely.geometry.polygon import Polygon
 
 from onward_generator.perf.climbs import (
     ACCESS_SPACING_M,
+    CABIN_APRON_M,
     LADDERS_MAX,
     LIFTS_MAX,
     ROOF_MIN_M2,
@@ -110,9 +111,11 @@ def test_a_lift_has_a_cabin_in_the_street_and_one_on_the_roof_with_opposite_door
 
 
 def test_a_lift_keeps_a_clear_apron_in_front_of_the_street_door() -> None:
+    """1.5 m in front of the 3.2 m cabin, 0.05 m off the wall: 4.75 m of street (ADR-029 amendment of 12 November 2026)."""
+    assert CABIN_APRON_M == 1.5
     footprint = box(0, 0, 20, 10)
-    assert lift_on(footprint, box(-30, -6.3, 50, 0), NOTHING, 15.0)["y"] == -1.65
-    assert lift_on(footprint, box(-30, -6.2, 50, 0), NOTHING, 15.0) is None
+    assert lift_on(footprint, box(-30, -4.8, 50, 0), NOTHING, 15.0)["y"] == -1.65
+    assert lift_on(footprint, box(-30, -4.7, 50, 0), NOTHING, 15.0) is None
 
 
 def test_a_street_cabin_takes_the_lift_ground_and_a_ladder_the_whole_ground() -> None:
