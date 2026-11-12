@@ -81,6 +81,8 @@ Axes: local `(x east, y north, z up)` becomes glTF `(x, z, −y)`.
 | `surface_gap` above 0.5 m², `overlapping_buildings`, `duplicate_building_skipped`, `footprint_repaired` | warning |
 | `slivers_dropped`, `degenerate_triangles_dropped`, `degenerate_hole_dropped`, `short_edge_collapsed`, `footprint_weld_cleaned`, `feature_not_generated`, `building_outside_map` | info |
 
+**One grid for the partition (plan Q7).** The buildings of the partition are snapped to `precision_m` (1 mm) like the surfaces, and every clip, cut and union of the partition runs with that `grid_size`, so the whole partition shares one grid. Before 12 November 2026 only the surfaces were snapped: each moved its vertices up to half a cell into the unsnapped buildings, and the overlaps added up along every facade. Rue Mouffetard at 400 m went from `surface_overlap` 0.8288 m² (critical) to 0.1124 m², and its gap from 2.22 to 1.52 m²; 300 random 400 m scenes from 0.41 to 0.21 m² at most (median 0.042 to 0). The building meshes come from the footprints and do not move. A map regenerated from `generate` gets new surface triangles; existing scenes are not touched.
+
 ### Large maps with Catastro
 
 The check stays all or nothing: one critical issue fails the phase. Each failure class seen on large Catastro maps (Madrid r200 and r300) is fixed in the stage that creates it, and the one object that cannot be fixed is quarantined there, never here:
