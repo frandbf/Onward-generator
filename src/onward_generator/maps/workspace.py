@@ -905,7 +905,7 @@ def _export_document(map_id: str, title: str, description: str, texels: float, w
         "build": {
             "combine_cell_m": 100.0,
             "static_batching": False,
-            "occlusion_culling": False,
+            "occlusion_culling": True,
             "lightmap_texels_per_m": texels,
             "lightmap_max_size": 2048,
             "lightmap_directional": False,

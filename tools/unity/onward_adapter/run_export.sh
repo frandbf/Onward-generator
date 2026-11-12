@@ -9,7 +9,7 @@
 # PACKAGE_DIR/build/ and are never overwritten.
 # "push" replaces the headset's local test map (the SDK Launcher always names it
 # unity-export.local.*): it requires CONFIRM_PUSH=yes and backs up the device copy first. It refuses a package whose
-# scene_report.json counts more than 250 000 triangles unless ALLOW_OVER_BUDGET=yes (plan Q2).
+# scene_report.json counts more than 300 000 triangles unless ALLOW_OVER_BUDGET=yes (plan Q2).
 # The listing mode (push only) comes from --listing, else ONWARD_QUEST_LISTING, else
 # "local": today's install, the one that loaded Hunt. local-thumb, named and
 # named-thumb are unverified candidates for the map's own name and thumbnail
