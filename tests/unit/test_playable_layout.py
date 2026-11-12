@@ -1207,6 +1207,29 @@ def _fake_base(*pieces: BaseGeometry) -> object:
     return _base(partition=Partition())
 
 
+def test_the_playable_layout_patrols_the_shrunk_islands_of_the_uplink(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan Q1b: hunt_routes gets the islands shrunk by the route clearance and the Uplink's piece of them."""
+    from onward_generator.perf import layout as module
+
+    ways = [LinearWay(f"w{i}", "pedestrian", LineString([(-55, y), (190, y)]), 4.0, "config_default") for i, y in enumerate(range(-50, 60, 10))]
+    base = _base(*ways, partition=build_partition(box(-60, -60, 200, 60), [], ways, [], load_generation_config()))
+    base.objects = []  # type: ignore[attr-defined]
+    seen: list[tuple[object, object]] = []
+    real = module.hunt_routes
+
+    def spy(base_: object, free: object, islands: object, home: object, count: int, focus: tuple[float, float]) -> object:
+        seen.append((islands, home))
+        return real(base_, free, islands, home, count, focus)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(module, "hunt_routes", spy)
+    doc = module.playable_layout(base, {"objects": []}, {})  # type: ignore[arg-type]
+    patrol, home = route_islands(nav_islands(base), tuple(doc["uplink_m"]))  # type: ignore[arg-type]
+    assert len(seen) == 1
+    islands, given_home = seen[0]
+    assert isinstance(islands, list) and [part.wkb for part in islands] == [part.wkb for part in patrol]
+    assert isinstance(given_home, BaseGeometry) and given_home.equals(home)
+
+
 def test_objective_ground_keeps_every_piece_with_1_m_clearance() -> None:
     from onward_generator.perf.layout import _objective_ground
 
