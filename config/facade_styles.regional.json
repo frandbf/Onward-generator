@@ -250,6 +250,64 @@
           "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
         }
       }
+    },
+    "haussmann": {
+      "size_px": 2048,
+      "height_px": 4096,
+      "gutter_px": 8,
+      "fit_row_px": 384,
+      "fit_cell_px": 192,
+      "cornice_px": 128,
+      "zocalo_px": 128,
+      "stone_px": 64,
+      "wall_repeat_m": 12.0,
+      "zocalo_m": 1.1,
+      "zocalo_repeat_m": 6.0,
+      "cornice_repeat_m": 6.0,
+      "stone_repeat_m": 1.0,
+      "storey_ref_m": 3.0,
+      "max_band_m": 4.5,
+      "walls": {
+        "plaster_ochre": "ashlar",
+        "plaster_cream": "ashlar",
+        "plaster_white": "ashlar",
+        "plaster_salmon": "ashlar",
+        "stone_warm": "ashlar",
+        "brick_red": "brick"
+      },
+      "wall_tints": {
+        "plaster_ochre": [0.7, 0.6, 0.45],
+        "plaster_cream": [0.74, 0.66, 0.52],
+        "plaster_white": [0.78, 0.72, 0.6],
+        "plaster_salmon": [0.72, 0.62, 0.5],
+        "stone_warm": [0.68, 0.6, 0.47]
+      },
+      "scenic_walls": {
+        "scenic_wall_light": "plaster_white",
+        "scenic_wall_warm": "plaster_cream",
+        "scenic_wall_ochre": "plaster_ochre"
+      },
+      "sources": { "plaster": "ph_painted_plaster_wall", "stone": "acg_concrete012", "brick": "acg_bricks023" },
+      "source_tile_m": { "plaster": 2.0, "stone": 2.0, "brick": 1.0 },
+      "zocalo_color": [0.55, 0.5, 0.42],
+      "cornice_color": [0.8, 0.75, 0.64],
+      "stone_color": [0.8, 0.76, 0.66],
+      "window_families": [
+        { "kind": "casement", "frame": [0.85, 0.84, 0.8], "shutter": [0.62, 0.63, 0.62], "closed": [0.0, 0.25] },
+        { "kind": "casement", "frame": [0.25, 0.27, 0.28], "shutter": [0.55, 0.56, 0.55], "closed": [0.0, 0.2] }
+      ],
+      "door_colors": [[0.1, 0.2, 0.16], [0.08, 0.1, 0.14]],
+      "tones": [[1.0, 1.0, 1.0], [0.97, 0.96, 0.93], [1.0, 0.97, 0.9]],
+      "dress": { "zocalo_share": 1.0, "cornice_share": 0.95, "course_share": 0.9 },
+      "grime": {
+        "streaks_per_strip": 80,
+        "streak_dark": 0.12,
+        "streak_length_m": [0.3, 1.8],
+        "under_course_dark": 0.24,
+        "base_splash_dark": 0.3,
+        "base_splash_m": 0.35,
+        "mottle": 0.05
+      }
     }
   }
 }

@@ -5,6 +5,13 @@
   "default_style": "generic",
   "selection": [
     {
+      "style": "haussmann",
+      "note": "Paris inside the Boulevard Périphérique, with a margin (plan Q3)",
+      "boxes": [
+        [48.8, 48.93, 2.2, 2.5]
+      ]
+    },
+    {
       "style": "mediterranean",
       "note": "Mediterranean basin and Iberia, the Maghreb, the Levant and western Turkey, the Canary Islands, coastal California",
       "boxes": [
@@ -115,6 +122,10 @@
     },
     "latin_american": {
       "note": "Planned: bright lime-washed render, a painted zocalo band, iron window grilles, flat parapets.",
+      "atlas": null
+    },
+    "haussmann": {
+      "note": "Paris (plan Q3): light limestone ashlar on every storey, a stone plinth, a cornice and a string course at every storey, tall casements in painted or dark grey frames. Opt-in atlas in facade_styles.regional.json. Wrought-iron balconies and zinc mansards are geometry and not drawn yet.",
       "atlas": null
     },
     "generic": {

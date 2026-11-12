@@ -43,9 +43,11 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     assert table.path == STYLE_TABLE_PATH
     assert len(table.sha256) == 64
     assert {name for name, style in table.styles.items() if style.atlas is not None} == {"mediterranean"}
-    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "generic"}
-    assert [style for style, _ in table.rules] == ["mediterranean", "anglo", "latin_american", "central_european"]
-    assert table.rules[0][1][0] == (35.0, 44.5, -10.0, 29.0)
+    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "haussmann", "generic"}
+    # Plan Q3: Paris comes first, so its box wins over every coarser one.
+    assert [style for style, _ in table.rules] == ["haussmann", "mediterranean", "anglo", "latin_american", "central_european"]
+    assert table.rules[0][1] == ((48.8, 48.93, 2.2, 2.5),)
+    assert table.rules[1][1][0] == (35.0, 44.5, -10.0, 29.0)
     assert table.styles["anglo"].note.startswith("Planned")
 
 
@@ -59,6 +61,9 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     (19.4326, -99.1332, "latin_american"),  # Mexico City
     (-34.6037, -58.3816, "latin_american"),  # Buenos Aires
     (35.6762, 139.6503, "generic"),  # Tokyo
+    (48.84045, 2.34981, "haussmann"),  # Paris, Rue Mouffetard (plan Q3)
+    (48.8566, 2.3522, "haussmann"),  # Paris, Hôtel de Ville
+    (48.6, 2.35, "generic"),  # south of Paris, outside its box
 ])
 def test_the_map_centre_picks_the_style(lat: float, lon: float, style: str) -> None:
     assert select_style(load_style_table(), lat, lon) == style
@@ -189,9 +194,10 @@ def test_layout_rows_and_uvs() -> None:
     assert last.u1 == pytest.approx((8 * 192 - 8) / 2048)
 
 
-# The shipped main table, unchanged by plan D1: materials reports and the Panoramax tint read its hash.
-MAIN_TABLE_SHA256 = "a1282b14f763b38ebdc66ad7d1b807f8ad5ee962a139a4cb6f7f302ef1068237"
-REGIONAL = ("central_european", "anglo", "latin_american")
+# The shipped main table, unchanged by plan D1 and changed by plan Q3 (the Paris box): materials reports and the
+# Panoramax tint read its hash.
+MAIN_TABLE_SHA256 = "f09eb4b54d64fe326e311042cdafb492396bb683c8207ece62a0458aeaeff5bb"
+REGIONAL = ("central_european", "anglo", "latin_american", "haussmann")
 
 
 def _regional_doc() -> dict[str, Any]:
@@ -213,16 +219,22 @@ def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
     regional = load_regional_table(table)
     assert regional.path == REGIONAL_TABLE_PATH and len(regional.sha256) == 64
     assert set(regional.atlases) == set(REGIONAL)
-    kinds = {"central_european": {"casement"}, "anglo": {"sash", "casement"}, "latin_american": {"grille", "casement"}}
+    kinds = {"central_european": {"casement"}, "anglo": {"sash", "casement"}, "latin_american": {"grille", "casement"},
+             "haussmann": {"casement"}}
     for name, atlas in regional.atlases.items():
         # The Panoramax tint moves inside a wall family: every family is still there.
         assert set(atlas["walls"]) == set(table.styles["mediterranean"].atlas["walls"])  # type: ignore[index]
-        assert set(atlas["walls"].values()) == {"plaster", "ashlar", "brick"}
+        # Paris is limestone whatever the palette says (plan Q3): ashlar and brick, no render.
+        assert set(atlas["walls"].values()) == ({"ashlar", "brick"} if name == "haussmann" else {"plaster", "ashlar", "brick"})
         assert len(fit_cells(atlas)) * atlas["fit_cell_px"] <= atlas["size_px"]
         assert wall_strip_px(atlas) == 184
         assert {f["kind"] for f in atlas["window_families"]} == kinds[name]
-        assert set(atlas["eras"]) == set(ERA_PERIODS)
+        assert set(atlas.get("eras") or ERA_PERIODS) == set(ERA_PERIODS)
         assert atlas["sources"]["plaster"] != "acg_paintedplaster010"
+    haussmann = regional.atlases["haussmann"]
+    assert set(haussmann["wall_tints"]) == {wall for wall, kind in haussmann["walls"].items() if kind == "ashlar"}
+    assert haussmann["dress"] == {"zocalo_share": 1.0, "cornice_share": 0.95, "course_share": 0.9}
+    assert "eras" not in haussmann and "wall_tints" not in regional.atlases["central_european"]
 
 
 def test_era_periods_follow_detail() -> None:
@@ -272,6 +284,12 @@ def test_regional_table_refusals(tmp_path: Path) -> None:
             "style anglo: 12 cells of 192 px do not fit the atlas width")
     refused(lambda d: d["atlases"]["anglo"]["scenic_walls"].update(scenic_wall_light="plaster_grey"),
             "style anglo: scenic wall scenic_wall_light maps to plaster_grey, which has no strip")
+    # Plan Q3: a fixed tint names a wall that has a strip, and is an RGB triple in 0-1.
+    refused(lambda d: d["atlases"]["haussmann"]["wall_tints"].update(plaster_grey=[0.5, 0.5, 0.5]),
+            "style haussmann: wall tint plaster_grey has no strip")
+    refused(lambda d: d["atlases"]["haussmann"]["wall_tints"].update(plaster_cream=[0.5, 0.5]), "atlases/haussmann/wall_tints/plaster_cream")
+    refused(lambda d: d["atlases"]["haussmann"]["wall_tints"].update(plaster_cream=[0.5, 0.5, 1.1]), "atlases/haussmann/wall_tints/plaster_cream")
+    refused(lambda d: d["atlases"]["haussmann"].update(wall_tints={}), "atlases/haussmann/wall_tints")
     # The last valid indices pass.
     doc = _regional_doc()
     doc["atlases"]["anglo"]["eras"]["pre_1900"].update(tones=[2], window_families=[2])
