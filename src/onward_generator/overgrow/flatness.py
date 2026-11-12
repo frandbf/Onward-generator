@@ -12,6 +12,7 @@ import io
 import json
 import struct
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -111,14 +112,10 @@ def _albedo_size(data: bytes) -> tuple[int, int] | None:
 
 def prop_flat(prop: Prop) -> bool:
     """Whether a loaded library prop is drawn in flat colours: each albedo part read like ``flat_colour`` reads a GLB."""
-    swatch = total = 0.0
-    start = 0
-    for part in prop._parts():
-        part_swatch, part_total = flat_share(prop.mesh.vertices, prop.mesh.triangles[start:part.end], prop.uvs, _albedo_size(part.albedo))
-        swatch += part_swatch
-        total += part_total
-        start = part.end
-    return is_flat(swatch, total)
+    parts = prop._parts()
+    shares = [flat_share(prop.mesh.vertices, prop.mesh.triangles[lo:hi], prop.uvs, _albedo_size(part.albedo))
+              for (lo, hi), part in zip(pairwise([0, *(part.end for part in parts)]), parts, strict=True)]
+    return is_flat(sum(swatch for swatch, _ in shares), sum(total for _, total in shares))
 
 
 def flat_colour(path: Path) -> bool:

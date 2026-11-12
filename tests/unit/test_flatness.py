@@ -160,3 +160,30 @@ def test_a_loaded_prop_is_read_part_by_part() -> None:
     # Two parts: the first triangle on a photo, the second on a 4 px colour: half the surface, not flat.
     assert not prop_flat(Prop(spec, mesh, _uvs(1.0), _png(64), parts=(PropPart(1, _png(64)), PropPart(2, _png(4)))))
     assert prop_flat(Prop(spec, mesh, _uvs(1.0), _png(64), parts=(PropPart(1, _png(4)), PropPart(2, _png(4)))))
+
+
+def test_each_part_counts_its_own_triangles_by_area() -> None:
+    from onward_generator.generation.mesh import Mesh
+    from onward_generator.overgrow.catalog import ASSETS_BY_ID
+    from onward_generator.overgrow.flatness import prop_flat
+    from onward_generator.overgrow.library import Prop, PropPart
+
+    spec = ASSETS_BY_ID["concrete_road_barrier"]
+
+    def tri(x: float, area: float) -> np.ndarray:
+        return np.array([[x, 0.0, 0.0], [x + 2 * area, 0.0, 0.0], [x, 0.0, 1.0]])
+
+    def prop(areas: tuple[float, float], solid_first: bool) -> Prop:
+        vertices = np.vstack([tri(0.0, areas[0]), tri(10.0, areas[1])])
+        uvs = np.tile(np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), (2, 1))
+        first, second = (_png(4), _png(64)) if solid_first else (_png(64), _png(4))
+        return Prop(spec, Mesh(vertices, np.array([[0, 1, 2], [3, 4, 5]])), uvs, first, parts=(PropPart(1, first), PropPart(2, second)))
+
+    # A large solid part and a small photo one: 1 of 1.05 m2 is swatch, flat; the photo's triangle is not counted twice.
+    assert prop_flat(prop((1.0, 0.05), solid_first=True))
+    # 0.8 of 1 m2: not flat, by a tenth.
+    assert not prop_flat(prop((0.8, 0.2), solid_first=True))
+    assert prop_flat(prop((0.9, 0.1), solid_first=True))
+    # The photo part first: its triangle stays its own.
+    assert prop_flat(prop((0.05, 1.0), solid_first=False))
+    assert not prop_flat(prop((0.2, 0.8), solid_first=False))
