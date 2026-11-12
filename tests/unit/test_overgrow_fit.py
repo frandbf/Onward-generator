@@ -23,6 +23,7 @@ from onward_generator.overgrow.catalog import AssetSpec
 from onward_generator.overgrow.dressing import Dressing, Spot, _covers_sign, _in_keep_out, _on_solid, _place_props, _repeats, dress
 from onward_generator.overgrow.fit import (
     ROLE_SIZE_M,
+    SIZE_TOLERANCE_M,
     apply_fit_scale,
     check_scene,
     collider_mesh,
@@ -1179,5 +1180,16 @@ def test_a_mesh_its_band_cannot_hold_whole_is_refused() -> None:
     for size in ((0.8, 0.8, 0.6), (0.8, 0.8, 1.0)):  # the band's edges are inside it
         assert size_reason("barrel", *size) is None, size
     assert fit_scale("barrel", 0.5, 0.5, 0.0) == 1.0  # no height: nothing to scale by
+    assert fit_scale("barrel", 0.0, 0.0, 0.8) == 1.0  # no footprint: only the height counts
     assert set(ROLE_SIZE_M) >= {"barrel", "cone", "barrier", "bench", "pallet", "debris", "vehicle", "container"}
     assert all(low <= high and longest > 0 for low, high, longest in ROLE_SIZE_M.values())
+
+
+def test_a_size_band_holds_its_rounding_tolerance_and_nothing_past_it() -> None:
+    low, high, longest = ROLE_SIZE_M["barrel"]
+    side = longest / 2
+    for size in ((side, side, low - SIZE_TOLERANCE_M), (side, side, high + SIZE_TOLERANCE_M), (longest + SIZE_TOLERANCE_M, side, high)):
+        assert size_reason("barrel", *size) is None, size
+    past = 2 * SIZE_TOLERANCE_M
+    for size in ((side, side, low - past), (side, side, high + past), (longest + past, side, high)):
+        assert size_reason("barrel", *size) == "wrong_size", size

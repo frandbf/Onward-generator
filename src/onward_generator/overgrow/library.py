@@ -304,7 +304,8 @@ def read_interior_catalogue(
             if asset_id in props:
                 raise LibraryError(f"{asset_id}: declared in {props[asset_id].catalogue} and {directory.name}")
             assert licence is not None  # a catalogue without one refused every row above
-            prop = interior_size(prop, str(((row.get("semantic") or {}).get("kind")) or ""))
+            kind = (row.get("semantic") or {}).get("kind")
+            prop = interior_size(prop, str(kind or ""))  # pragma: no mutate: a missing kind names no cap, whatever placeholder stands for it
             props[asset_id] = InteriorProp(level_of_detail(prop), directory.name, licence, hashlib.sha256(data).hexdigest())
     return props, rejects
 
@@ -321,7 +322,8 @@ def interior_size(prop: Prop, kind: str) -> Prop:
     if cap is None or largest <= cap:
         return prop
     scale = cap / largest
-    return replace(prop, mesh=transform(prop.mesh, np.diag([scale, scale, scale, 1.0])), fit_scale=prop.fit_scale * scale)
+    matrix = np.diag([scale, scale, scale, 1.0])  # pragma: no mutate: transform reads only the top three rows
+    return replace(prop, mesh=transform(prop.mesh, matrix), fit_scale=prop.fit_scale * scale)
 
 
 def lod_target(mesh: Mesh, scale: float = 1.0) -> int:

@@ -160,9 +160,9 @@ def _role_scale(band: tuple[float, float, float], length_m: float, width_m: floa
     low, high, longest = band
     if height_m <= 0.0:
         return 1.0
-    scale = low / height_m if height_m < low else high / height_m if height_m > high else 1.0
-    side = max(length_m, width_m) * scale
-    return scale * longest / side if side > longest else scale
+    scale = min(max(height_m, low), high) / height_m
+    largest = max(length_m, width_m)
+    return min(scale, longest / largest) if largest > 0.0 else scale
 
 
 def apply_fit_scale(mesh: Mesh, role: str) -> tuple[Mesh, float]:
