@@ -16,6 +16,7 @@ from onward_generator.export.views import (
     ViewError,
     capture_views,
     heading_deg,
+    spawn_heading,
     views_document,
     write_views,
 )
@@ -51,6 +52,28 @@ def test_each_spawn_looks_at_the_other_and_the_uplink_at_each() -> None:
         {"name": "uplink_to_attackers", "position_m": [100.0, 0.0, EYE_HEIGHT_M], "heading_deg": 270.0, "pitch_deg": 0.0},
         {"name": "uplink_to_defenders", "position_m": [100.0, 0.0, EYE_HEIGHT_M], "heading_deg": 315.0, "pitch_deg": 0.0},
     ]
+
+
+def test_a_spawn_view_faces_the_way_its_players_spawn() -> None:
+    """Rue Mouffetard: the straight line to the defenders crossed a block, the players face down the street."""
+    points = [{"x": 0.0, "y": float(i), "yaw": yaw} for i, yaw in enumerate((-49.0, -49.2, -49.4, -49.6))]
+    layout = _layout(attackers={"centre_m": [0.0, 0.0], "points_m": points},
+                     defenders={"centre_m": [0.0, 100.0], "points_m": [{"x": 0.0, "y": 100.0, "yaw": 90.0}]})
+    views = {v["name"]: v["heading_deg"] for v in capture_views(layout)}
+    assert views == {"attackers": 310.7, "defenders": 90.0, "uplink_to_attackers": 270.0, "uplink_to_defenders": 315.0}
+
+
+@pytest.mark.parametrize(("yaws", "expected"), [((350.0, 10.0), 0.0), ((-10.0, 10.0), 0.0), ((80.0, 100.0), 90.0),
+                                                ((180.0,), 180.0), ((-90.0,), 270.0), ((0.0, 90.0), 45.0)])
+def test_the_spawn_heading_is_a_circular_mean(yaws: tuple[float, ...], expected: float) -> None:
+    assert spawn_heading({"points_m": [{"x": 0, "y": 0, "yaw": y} for y in yaws]}) == expected
+
+
+def test_a_block_without_yaws_has_no_spawn_heading() -> None:
+    assert spawn_heading({}) is None
+    assert spawn_heading({"points_m": []}) is None
+    assert spawn_heading({"points_m": [{"x": 0, "y": 0}, "bad"]}) is None
+    assert spawn_heading({"points_m": [{"x": 0, "y": 0}, {"x": 1, "y": 0, "yaw": 45}]}) == 45.0
 
 
 def test_without_an_uplink_only_the_spawns_look() -> None:
