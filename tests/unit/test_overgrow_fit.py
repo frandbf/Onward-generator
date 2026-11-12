@@ -22,6 +22,8 @@ from onward_generator.overgrow.ambient import cross_yaw, is_solid
 from onward_generator.overgrow.catalog import AssetSpec
 from onward_generator.overgrow.dressing import Dressing, Spot, _covers_sign, _in_keep_out, _on_solid, _place_props, _repeats, dress
 from onward_generator.overgrow.fit import (
+    ROLE_SIZE_M,
+    SIZE_TOLERANCE_M,
     apply_fit_scale,
     check_scene,
     collider_mesh,
@@ -399,26 +401,26 @@ def _ground(name: str, role: str, kind: str, x: float) -> Node:
 @pytest.mark.parametrize(
     ("second", "x", "problem"),
     [
-        (("barrel", "waste"), 0.7, True),  # 0.3 m2 shared
-        (("barrel", "waste"), 0.75, False),  # exactly 0.25 m2: allowed
-        (("barrel", "waste"), 0.76, False),  # 0.24 m2
+        (("crate", "waste"), 0.7, True),  # 0.3 m2 shared
+        (("crate", "waste"), 0.75, False),  # exactly 0.25 m2: allowed
+        (("crate", "waste"), 0.76, False),  # 0.24 m2
         (("shed", "structures"), 0.7, True),  # solid by its category, not its role
         (("plant", "vegetation"), 0.2, False),  # a plant does not stop anyone
-        (("barrel", "waste"), 3.0, False),
+        (("crate", "waste"), 3.0, False),
     ],
 )
 def test_fit_fails_two_solid_props_inside_each_other(tmp_path: Path, second: tuple[str, str], x: float, problem: bool) -> None:
-    nodes = [_ground("barrel_a", "barrel", "waste", 0.0), _ground("other", *second, x)]
+    nodes = [_ground("crate_a", "crate", "waste", 0.0), _ground("other", *second, x)]
     _checked, problems = _fit_scene(tmp_path, nodes)
-    expected = ["overgrow/prop/barrel_a/0 overlaps overgrow/prop/other/0 0.30m2"] if problem else []
+    expected = ["overgrow/prop/crate_a/0 overlaps overgrow/prop/other/0 0.30m2"] if problem else []
     assert problems == expected
 
 
 def test_fit_counts_a_wreck_as_solid(tmp_path: Path) -> None:
     wreck = Node("overgrow/wreck/0", (Primitive(_mesh(4.0, 1.6, 1.5), "abandoned_wreck"),), {"kind": "wreck"},
                  yaw_matrix(0.0, -6.0, 0.0, 0.0))
-    _checked, problems = _fit_scene(tmp_path, [wreck, _ground("barrel_a", "barrel", "waste", 1.0)])
-    assert problems == ["overgrow/wreck/0 overlaps overgrow/prop/barrel_a/0 1.00m2"]
+    _checked, problems = _fit_scene(tmp_path, [wreck, _ground("crate_a", "crate", "waste", 1.0)])
+    assert problems == ["overgrow/wreck/0 overlaps overgrow/prop/crate_a/0 1.00m2"]
 
 
 
@@ -462,7 +464,7 @@ def _road() -> Node:
     ],
 )
 def test_fit_fails_a_prop_that_misses_the_ground(tmp_path: Path, x: float, y: float, z: float, problem: str | None) -> None:
-    barrel = Node("overgrow/prop/barrel_a/0", (Primitive(_mesh(1.0, 1.0, 1.0), "prop_barrel"),),
+    barrel = Node("overgrow/prop/barrel_a/0", (Primitive(_mesh(0.6, 0.6, 0.9), "prop_barrel"),),
                   {"role": "barrel", "kind": "waste"}, yaw_matrix(x, y, z, 0.0))
     _checked, problems = _fit_scene(tmp_path, [_road(), barrel])
     assert [p.split()[1] for p in problems] == ([problem] if problem else [])
@@ -834,10 +836,10 @@ def _bench(x: float, y: float) -> dict:
 @pytest.mark.parametrize(
     ("node", "problem"),
     [
-        (_ground("barrel_a", "barrel", "waste", 0.0), True),  # on the bench at (1.5, -6)
+        (_ground("crate_a", "crate", "waste", 0.0), True),  # on the bench at (1.5, -6)
         (Node("overgrow/prop/cover/0", (Primitive(_mesh(1.0, 1.0, 0.07), "prop_cover"),), {"role": "manhole", "kind": "barriers"},
               yaw_matrix(1.5, -6.0, 0.0, 0.0)), False),  # flat: lies under it
-        (_ground("barrel_b", "barrel", "waste", 5.0), False),
+        (_ground("crate_b", "crate", "waste", 5.0), False),
     ],
 )
 def test_fit_fails_a_ground_prop_on_an_urban_element(tmp_path: Path, node: Node, problem: bool) -> None:
@@ -848,7 +850,7 @@ def test_fit_fails_a_ground_prop_on_an_urban_element(tmp_path: Path, node: Node,
 def test_fit_holds_no_wall_prop_or_scene_without_a_manifest_to_the_urban_elements(tmp_path: Path) -> None:
     _checked, problems = _fit_scene(tmp_path / "wall", [_mounted("aircon", 0.08)], urban=[_bench(0.0, 7.5)])
     assert problems == []
-    _checked, problems = _fit_scene(tmp_path / "bare", [_ground("barrel_a", "barrel", "waste", 0.0)])
+    _checked, problems = _fit_scene(tmp_path / "bare", [_ground("crate_a", "crate", "waste", 0.0)])
     assert problems == []
 
 
@@ -1146,3 +1148,48 @@ def test_the_kenney_u_fence_collides_with_its_panels_widened_by_5_cm() -> None:
     # Square ends 5 cm past each panel, a 2.5 cm simplification: 3.77 m2 of a 6.1 x 3.1 m box, in 156 triangles.
     assert plan.area == pytest.approx(3.770, abs=0.005)
     assert collider.triangle_count <= 160
+
+
+# --- real sizes by role (12 November 2026) ------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("role", "size", "scale"),
+    [
+        ("barrel", (0.79, 0.79, 1.17), 1.0 / 1.17),  # too tall: the height comes down to the band's top
+        ("barrel", (0.58, 0.58, 0.88), 1.0),  # a real oil drum keeps its size
+        ("barrel", (0.4, 0.4, 0.3), 0.6 / 0.3),  # too low: up to the band's foot
+        ("debris", (1.3, 1.3, 1.3), 0.8 / 1.3),  # the kit cube: its height and its side capped
+        ("bench", (0.4, 0.2, 0.13), 0.4 / 0.13),  # a toy bench grows to a seat's height
+        ("pallet", (1.65, 1.37, 0.19), 1.3 / 1.65),  # only the longest side is over: scaled to it
+        ("barrier", (1.74, 0.68, 1.66), 1.3 / 1.66),
+        ("rock", (5.0, 5.0, 5.0), 1.0),  # a role without a band keeps its size
+    ],
+)
+def test_a_role_with_a_real_size_is_scaled_into_it(role: str, size: tuple[float, float, float], scale: float) -> None:
+    assert fit_scale(role, *size) == pytest.approx(scale)
+    scaled = tuple(v * scale for v in size)
+    assert size_reason(role, *scaled) is None
+
+
+def test_a_mesh_its_band_cannot_hold_whole_is_refused() -> None:
+    # A barrel 0.6 m tall but 1.6 m across: its height is in the band, and capping the width drops it below the foot.
+    assert fit_scale("barrel", 1.6, 1.6, 0.6) == pytest.approx(0.8 / 1.6)
+    assert size_reason("barrel", 0.8, 0.8, 0.3) == "wrong_size"
+    for size in ((0.5, 0.5, 0.59), (0.5, 0.5, 1.01), (0.81, 0.5, 0.9), (0.5, 0.81, 0.9)):
+        assert size_reason("barrel", *size) == "wrong_size", size
+    for size in ((0.8, 0.8, 0.6), (0.8, 0.8, 1.0)):  # the band's edges are inside it
+        assert size_reason("barrel", *size) is None, size
+    assert fit_scale("barrel", 0.5, 0.5, 0.0) == 1.0  # no height: nothing to scale by
+    assert fit_scale("barrel", 0.0, 0.0, 0.8) == 1.0  # no footprint: only the height counts
+    assert set(ROLE_SIZE_M) >= {"barrel", "cone", "barrier", "bench", "pallet", "debris", "vehicle", "container"}
+    assert all(low <= high and longest > 0 for low, high, longest in ROLE_SIZE_M.values())
+
+
+def test_a_size_band_holds_its_rounding_tolerance_and_nothing_past_it() -> None:
+    low, high, longest = ROLE_SIZE_M["barrel"]
+    side = longest / 2
+    for size in ((side, side, low - SIZE_TOLERANCE_M), (side, side, high + SIZE_TOLERANCE_M), (longest + SIZE_TOLERANCE_M, side, high)):
+        assert size_reason("barrel", *size) is None, size
+    past = 2 * SIZE_TOLERANCE_M
+    for size in ((side, side, low - past), (side, side, high + past), (longest + past, side, high)):
+        assert size_reason("barrel", *size) == "wrong_size", size

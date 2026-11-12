@@ -98,7 +98,7 @@ def test_shop_bays_get_a_glazed_door_and_display_windows_on_a_stallriser() -> No
     ]
     first, door, _ = holes
     assert (first.s0, first.v0, first.width, first.height) == pytest.approx((0.85, 0.25, 3.1, 2.3))
-    assert (door.s0, door.v0, door.width, door.height) == pytest.approx((5.2, 0.0, 1.6, 2.5))
+    assert (door.s0, door.v0, door.width, door.height) == pytest.approx((5.45, 0.0, 1.1, 2.3))  # centred in its bay
 
 
 @pytest.mark.parametrize("kind", ["door", "landmark_door", "interior_door"])
@@ -319,7 +319,7 @@ def test_shop_config_is_read_as_given() -> None:
     assert list(shops.generic_names) == sorted(shops.generic_names)
     assert (cfg.shopfront.min_width_m, cfg.shopfront.max_width_m, cfg.shopfront.sill_m, cfg.shopfront.min_height_m,
             cfg.shopfront.max_height_m, cfg.shopfront.head_m) == (2.0, 3.4, 0.25, 1.9, 3.2, 0.45)
-    assert (cfg.shop_door.width_m, cfg.shop_door.height_m) == (1.6, 2.5)
+    assert (cfg.shop_door.width_m, cfg.shop_door.height_m) == (1.1, 2.3)
     assert cfg.shops == CFG.shops and cfg.shopfront == CFG.shopfront
     assert (FASCIA_GAP_M, FASCIA_CLEAR_M) == (0.05, 0.07)
     assert dict(cfg.shop_catastro_uses) == {"4_1_office": "Oficina", "4_2_retail": "Comercio"}

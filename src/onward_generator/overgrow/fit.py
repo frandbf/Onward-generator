@@ -56,6 +56,37 @@ SKIP_HIGHWAYS = frozenset({
 })
 
 
+# Real sizes by role, in metres: (lowest height, highest height, longest side). A library mesh keeps the size its author
+# gave it, and Asset Store and kit packs disagree: on Rue Mouffetard a 1.3 m debris cube, 1.66 m concrete barriers, 1.17 m
+# barrels and 1.65 m pallets stood on the sidewalk (12 November 2026). ``fit_scale`` scales a mesh uniformly into its
+# band; one the band cannot hold whole (too slender or too squat for it) is refused as ``wrong_size``. Estimates from
+# common street furniture, not measurements of one city.
+ROLE_SIZE_M: dict[str, tuple[float, float, float]] = {
+    "barrel": (0.6, 1.0, 0.8),
+    "cone": (0.3, 0.9, 0.5),
+    "barrier": (0.1, 1.3, 4.0),  # from a wheel stop to a jersey barrier
+    "bench": (0.4, 1.0, 2.6),
+    "box": (0.15, 1.2, 1.6),
+    "crate": (0.3, 1.2, 1.3),
+    "pallet": (0.1, 1.5, 1.3),
+    "giftbox": (0.1, 0.6, 0.6),
+    "bag": (0.15, 1.0, 1.2),
+    "can": (0.1, 1.0, 0.7),
+    "bucket": (0.2, 0.5, 0.5),
+    "basket": (0.2, 0.6, 0.6),
+    "trashcan": (0.6, 1.2, 0.9),
+    "dumpster": (1.0, 1.9, 2.6),
+    "suitcase": (0.4, 0.9, 0.9),
+    "debris": (0.0, 0.8, 0.8),
+    "hydrant": (0.5, 1.0, 0.6),
+    "bollard": (0.5, 1.2, 0.6),
+    "planter": (0.3, 1.2, 3.0),
+    "vehicle": (1.0, 3.6, 9.0),
+    "container": (2.0, 2.9, 12.5),
+}
+SIZE_TOLERANCE_M = 1e-6
+
+
 class FitError(ValueError):
     """The dressed scene cannot be checked."""
 
@@ -84,6 +115,11 @@ def size_reason(role: str, length_m: float, width_m: float, height_m: float) -> 
         return "too_deep"
     if role == "plant" and max(length_m, width_m) > PLANT_MAX_M:
         return "wrong_size"
+    band = ROLE_SIZE_M.get(role)
+    if band is not None:
+        low, high, longest = band
+        if not (low - SIZE_TOLERANCE_M <= height_m <= high + SIZE_TOLERANCE_M) or max(length_m, width_m) > longest + SIZE_TOLERANCE_M:
+            return "wrong_size"
     return None
 
 
@@ -96,6 +132,9 @@ def fit_scale(role: str, length_m: float, width_m: float, height_m: float) -> fl
     if role == "plant":
         # Never above 1: a plant within the band keeps its size.
         return PLANT_MAX_M / max(length_m, width_m, PLANT_MAX_M)
+    band = ROLE_SIZE_M.get(role)
+    if band is not None:
+        return _role_scale(band, length_m, width_m, height_m)
     if role != "wreck" or size_reason(role, length_m, width_m, height_m) is None:
         return 1.0
     if min(length_m, width_m, height_m) <= 0.0:
@@ -114,6 +153,16 @@ def fit_scale(role: str, length_m: float, width_m: float, height_m: float) -> fl
         PASSAGE_WIDTH_M / width_m,
         WRECK_HEIGHT_M[1] / height_m,
     )
+
+
+def _role_scale(band: tuple[float, float, float], length_m: float, width_m: float, height_m: float) -> float:
+    """The uniform scale that brings the height into ``band``, then the longest side under its cap; 1 inside it."""
+    low, high, longest = band
+    if height_m <= 0.0:
+        return 1.0
+    scale = min(max(height_m, low), high) / height_m
+    largest = max(length_m, width_m)
+    return min(scale, longest / largest) if largest > 0.0 else scale
 
 
 def apply_fit_scale(mesh: Mesh, role: str) -> tuple[Mesh, float]:

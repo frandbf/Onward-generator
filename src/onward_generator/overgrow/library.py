@@ -42,7 +42,7 @@ from PIL import Image
 
 from onward_generator.assetstore import local
 from onward_generator.generation.gltf import Primitive, images_by_material, read_glb, scene_primitives
-from onward_generator.generation.mesh import Mesh, merge
+from onward_generator.generation.mesh import Mesh, merge, transform
 from onward_generator.overgrow.catalog import ASSETS_BY_ID, AssetSpec
 from onward_generator.overgrow.constants import (
     DECOR_BOX_FRACTION,
@@ -304,8 +304,26 @@ def read_interior_catalogue(
             if asset_id in props:
                 raise LibraryError(f"{asset_id}: declared in {props[asset_id].catalogue} and {directory.name}")
             assert licence is not None  # a catalogue without one refused every row above
+            kind = (row.get("semantic") or {}).get("kind")
+            prop = interior_size(prop, str(kind or ""))  # pragma: no mutate: a missing kind names no cap, whatever placeholder stands for it
             props[asset_id] = InteriorProp(level_of_detail(prop), directory.name, licence, hashlib.sha256(data).hexdigest())
     return props, rejects
+
+
+# The largest real size of small things set on a table or a counter, by semantic kind (ADR-036): on Rue Mouffetard
+# coffee cups were 45 cm long and croissants 37 cm (12 November 2026). A larger mesh is scaled down uniformly.
+INTERIOR_MAX_M: dict[str, float] = {"decor_tableware": 0.3, "decor_food": 0.4}
+
+
+def interior_size(prop: Prop, kind: str) -> Prop:
+    """``prop`` scaled down so its largest side fits ``INTERIOR_MAX_M[kind]``, or ``prop`` itself."""
+    cap = INTERIOR_MAX_M.get(kind)
+    largest = max(_span(prop.mesh, axis) for axis in range(3))
+    if cap is None or largest <= cap:
+        return prop
+    scale = cap / largest
+    matrix = np.diag([scale, scale, scale, 1.0])  # pragma: no mutate: transform reads only the top three rows
+    return replace(prop, mesh=transform(prop.mesh, matrix), fit_scale=prop.fit_scale * scale)
 
 
 def lod_target(mesh: Mesh, scale: float = 1.0) -> int:

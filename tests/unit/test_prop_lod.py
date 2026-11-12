@@ -32,7 +32,7 @@ from tests.unit.test_overgrow_plan import _scene as _plan_scene
 
 PNG_A = b"\x89PNG\r\n\x1a\nA"
 PNG_B = b"\x89PNG\r\n\x1a\nB"
-BARREL = AssetSpec("synth_barrel", "waste", "barrel", ("sidewalk",), "ground", "test")
+BARREL = AssetSpec("synth_barrel", "waste", "crate", ("sidewalk",), "ground", "test")  # a crate band holds the 0.5 m test meshes at scale 1
 WRECK = AssetSpec("synth_wreck", "waste", "wreck", ("curb",), "ground", "test")  # the wreck fit scale, not a vehicle: vehicles keep their mesh
 CAR = AssetSpec("synth_car", "vehicles", "wreck", ("curb",), "ground", "test")
 
@@ -274,3 +274,20 @@ def test_a_vehicle_keeps_its_whole_mesh() -> None:
     assert level_of_detail(prop) is prop
     assert level_of_detail(_prop(car, WRECK)) is not prop
 
+
+
+def test_a_cup_or_a_croissant_is_scaled_down_to_its_real_size() -> None:
+    """Rue Mouffetard: coffee cups 45 cm long and croissants 37 cm stood on the tables (12 November 2026)."""
+    cup = _prop(Mesh(np.array([[0.0, 0.0, 0.0], [0.45, 0.0, 0.0], [0.0, 0.31, 0.0], [0.0, 0.0, 0.25]]), np.array([[0, 1, 2], [0, 2, 3]])))
+    small = library.interior_size(cup, "decor_tableware")
+    assert max(np.ptp(small.mesh.vertices, axis=0)) == pytest.approx(0.3)
+    assert small.fit_scale == pytest.approx(0.3 / 0.45)
+    assert np.allclose(small.mesh.vertices.min(axis=0), 0.0)  # scaled about the origin, as fit_scale is
+    croissant = library.interior_size(cup, "decor_food")
+    assert max(np.ptp(croissant.mesh.vertices, axis=0)) == pytest.approx(0.4)
+    # A kind without a cap, or a piece already within it, is the same object.
+    assert library.interior_size(cup, "wardrobe") is cup
+    assert library.interior_size(cup, "") is cup
+    tiny = _prop(Mesh(np.array([[0.0, 0.0, 0.0], [0.3, 0.0, 0.0], [0.0, 0.1, 0.0]]), np.array([[0, 1, 2]])))
+    assert library.interior_size(tiny, "decor_tableware") is tiny
+    assert library.INTERIOR_MAX_M == {"decor_tableware": 0.3, "decor_food": 0.4}

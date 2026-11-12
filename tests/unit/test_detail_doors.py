@@ -158,13 +158,13 @@ def test_door_walls_fall_back_to_short_walls_that_touch_no_neighbour() -> None:
 
 
 def test_a_shop_without_room_for_its_door_gets_a_low_glazed_one() -> None:
-    low = Storeys(3, 8 / 3, "heights_levels")
+    low = Storeys(3, 2.5, "heights_levels")  # 2.5 m storeys leave 2.15 m under the lintel for the 2.3 m door
     layout = Layout([Hole("shopfront", 0, 0.85, 0.25, 3.1, 1.97, 0.15, "glass_dark", 0, 0)])
     rule = ensure_door(layout, [_wall(12.0)], low, "shop_door", CFG.shop_door, TEMPLATE, box(0, 0, 12, 10), CFG)
     assert rule == "fallback"
     door = next(h for h in layout.holes if h.kind == "shop_door")
     assert (door.back, door.width) == ("glass_dark", CFG.shop_door.width_m)
-    assert door.height == pytest.approx(8 / 3 - CFG.head_clearance_m)
+    assert door.height == pytest.approx(2.5 - CFG.head_clearance_m)
 
 
 def test_the_ground_in_front_of_each_ground_floor_door_is_kept_for_the_door() -> None:

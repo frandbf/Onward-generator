@@ -56,3 +56,7 @@ Python scales the albedo to 512 px at most. Outdoor rows with their long side on
 - **A Python FBX reader (or Blender, or FBX2glTF).** It is a new dependency or install, and it ignores prefab scale and materials. The user already has the right editor.
 - **`AssetDatabase.ImportPackage` or `-importPackage`.** Both import after the batch method has run, so the export saw nothing.
 - **Import into the Onward Unity project.** It would grow by gigabytes and mix third-party content with the export adapter.
+
+## Amendment (12 November 2026): real sizes by role
+
+Status: accepted. The import keeps a model at the size its author gave it (`unit_factor` 1.0 in all 68 local catalogues), and placement scaled only wrecks, fire escapes and plants. On Rue Mouffetard concrete barriers stood 1.66 m tall, barrels 1.17 m, pallets 1.65 m long, a kit debris cube 1.3 m, and coffee cups on the shop tables 45 cm long. `overgrow/fit.py` `ROLE_SIZE_M` now gives every common street role a height band and a longest side, and a mesh is scaled uniformly into it or refused (`wrong_size`); tableware and food set on tables and counters are capped by semantic kind (`INTERIOR_MAX_M`). The shop door shrinks from 1.6 × 2.5 m to 1.1 × 2.3 m. The walkable `interior_door` keeps 1.2 × 2.4 m: its width is the 1.2 m clear path VR players and bots need (ADR-031). On the map the estimated Unity triangles barely move (242 234 → 241 507).
