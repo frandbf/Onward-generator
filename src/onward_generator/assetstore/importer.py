@@ -25,6 +25,7 @@ from PIL import Image
 from onward_generator.assetstore.classify import classify
 from onward_generator.assetstore.objglb import ObjError, obj_to_glb
 from onward_generator.assetstore.packages import LICENCE_NAME, Package, PackageError, unpack
+from onward_generator.assetstore.recover import recover_albedos
 from onward_generator.generation.gltf import read_glb, scene_primitives
 from onward_generator.io import atomic_write_bytes, atomic_write_json
 from onward_generator.overgrow.library_catalog import LibraryError
@@ -161,6 +162,8 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
         try:
             obj = (exported / item["file"]).read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
             mtl = (exported / f"{stem}.mtl").read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
+            # A raw model whose dressing prefab was refused keeps its own untextured materials: read the prefab's albedos.
+            mtl, _recovered = recover_albedos(package.path, str(item.get("prefab", "")), mtl, exported, stem)
             data = obj_to_glb(obj, mtl, stem, exported, factor)
         except (OSError, ObjError, ValueError) as exc:
             result.skipped[f"convert: {type(exc).__name__}"] += 1
