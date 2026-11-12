@@ -350,7 +350,8 @@ def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitu
         "Use only listed ids, one id once, and the family named for that slot. "
         "Reply with JSON only."
     )
-    result = provider.complete(system, json.dumps(instruction, ensure_ascii=False), choice_schema(pools))
+    prompt = json.dumps(instruction, ensure_ascii=False)  # pragma: no mutate: None is falsy like False and writes the same JSON
+    result = provider.complete(system, prompt, choice_schema(pools))
     return _parse_choices(result.text, rows, extended=extended)
 
 
