@@ -39,10 +39,6 @@ The object has exactly these keys:
 """
 
 
-# How the library rows are written into the prompt: keys sorted, non-ASCII text as it is.
-_ROWS_JSON: dict[str, bool] = {"sort_keys": True, "ensure_ascii": False}
-
-
 @dataclass
 class PickResult:
     ok: bool
@@ -59,7 +55,7 @@ class PickError(ValueError):
 def instruction(brief: str, props: list[Prop]) -> str:
     quoted = json.dumps(brief, ensure_ascii=False)  # pragma: no mutate: None is falsy like False and writes the same text
     rows = library_rows(props)
-    library_json = json.dumps(rows, **_ROWS_JSON)
+    library_json = json.dumps(rows, sort_keys=True, ensure_ascii=False)  # pragma: no mutate: ensure_ascii=None is false, as False; the sort and the non-ASCII text are pinned by tests
     return f"Brief (quoted exactly):\n{quoted}\n\nLibrary:\n{library_json}\n"
 
 
