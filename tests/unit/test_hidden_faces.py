@@ -33,6 +33,19 @@ def test_a_wall_is_hidden_past_six_metres_of_the_reached_ground() -> None:
     assert not hidden_face(back, ground)
     assert hidden_face(back, Point(6.0, -6.5).buffer(0.1))  # 7.4 m from (6, 1)
     assert not hidden_face(SEG, Point(6.0, -6.5).buffer(0.1))  # 5.4 m from (6, -1)
+    # Exactly HIDDEN_FACE_M away is still seen.
+    assert not hidden_face(SEG, box(0, -2 - HIDDEN_FACE_M, 12, -1 - HIDDEN_FACE_M))
+    # The probe is the wall's middle: ground 5.95 m below (6, -1) is seen, though 6.28 m from (4, -1).
+    assert not hidden_face(SEG, Point(6.0, -6.95))
+
+
+def test_the_probe_stands_probe_out_m_in_front_of_the_wall(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.detail import reach
+
+    monkeypatch.setattr(reach, "PROBE_OUT_M", 2.0)
+    # The probe now stands at (6, -2): ground 6.5 m below it is hidden, ground 5.5 m below it is not.
+    assert hidden_face(SEG, Point(6.0, -8.5))
+    assert not hidden_face(SEG, Point(6.0, -7.5))
 
 
 def test_the_reached_ground_is_the_largest_island_and_leaves_the_carriageway_out() -> None:
@@ -48,6 +61,18 @@ def test_the_reached_ground_is_the_largest_island_and_leaves_the_carriageway_out
     assert not reached.contains(Point(0, 0))  # the carriageway
     # Shrunk by the agent radius off the block's north face at y = -10.
     assert not reached.contains(Point(0, -9.8)) and reached.contains(Point(0, -9.5))
+
+
+def test_ground_too_narrow_for_the_agent_reaches_nothing() -> None:
+    from types import SimpleNamespace
+
+    from onward_generator.generation.surfaces import SurfaceClass
+
+    strip = box(0, 0, 20, 2 * AGENT_RADIUS_M - 0.1)  # a sidewalk the agent cannot stand on
+    surfaces = {SurfaceClass.SIDEWALK: SimpleNamespace(geometry=strip), SurfaceClass.CARRIAGEWAY: SimpleNamespace(geometry=box(0, 1, 20, 9))}
+    partition = SimpleNamespace(surfaces=surfaces, crossings=Polygon(), buildings=Polygon())
+    reached = reached_ground(SimpleNamespace(partition=partition))  # type: ignore[arg-type]
+    assert reached.is_empty
 
 
 def _layout(hidden: bool, ground: str = "shopfront", door: bool = False) -> Layout:

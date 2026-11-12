@@ -782,3 +782,12 @@ def test_a_hidden_wall_window_is_never_pierced() -> None:
     assert (opened, omitted) == (1, 0)
     assert layout.holes[0] == hidden  # untouched: glass_dark, its own depth
     assert layout.holes[1].back == GLASS_VIEW
+
+
+def test_a_window_at_the_accessible_ceiling_is_not_pierced_and_one_below_it_is() -> None:
+    footprint, inner, segments = _square()
+    ceiling = 6.0
+    at, below = _window(4.0, ceiling - 1e-6), replace(_window(10.0, ceiling - 0.5), height=0.4)  # a transom under the ceiling
+    layout = Layout(holes=[at, below])
+    assert pierce_room_windows(layout, segments, inner, footprint, 0.3, ceiling) == (1, 0)
+    assert layout.holes[0] == at and layout.holes[1].back == GLASS_VIEW

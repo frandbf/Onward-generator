@@ -432,3 +432,25 @@ def test_a_mid_ring_follows_the_solved_core_and_leaves_the_budget_alone(grid: Gr
         assert o.colliders == [] and o.record["visual"]["triangles"] <= 150
     # Measured against the solved core, not map.json's: some mid buildings lie inside the largest half-side.
     assert any(core_reach(feature[o.record["source_ids"][0]]) < grid.cap for o in mid)
+
+
+def test_a_core_run_asks_each_exposed_wall_whether_it_is_hidden(ring_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan P0 (ADR-017 amendment of 12 November 2026): only a run with a core lays walls out plain."""
+    from onward_generator.detail import scene as scene_module
+
+    scene, heights, base = ring_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    calls: list[tuple[bool, object]] = []
+    real = scene_module.layout_segment
+
+    def spy(seg: Any, *args: Any, **kwargs: Any) -> Any:
+        calls.append((seg.exposed, kwargs.get("hidden")))
+        return real(seg, *args, **kwargs)
+
+    monkeypatch.setattr(scene_module, "layout_segment", spy)
+    monkeypatch.setattr(scene_module, "hidden_face", lambda seg, reached: True)
+    detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0)
+    assert calls and all(hidden is exposed for exposed, hidden in calls)
+    calls.clear()
+    detail_scene(generated, ref, heights, scene, CFG)
+    assert calls and all(hidden is False for _, hidden in calls)
