@@ -10,9 +10,9 @@ from collections import defaultdict
 from onward_generator.ai.providers import BYTES_PER_TOKEN
 from onward_generator.overgrow.digest import Digest
 from onward_generator.overgrow.library import Prop
-from onward_generator.overgrow.plan import PLAN_VERSION
+from onward_generator.overgrow.plan import MAX_PER_ANCHOR, PLAN_VERSION
 
-PROMPT_VERSION = "0.2.0"
+PROMPT_VERSION = "0.3.0"
 # The library rows a prompt may carry, in the tokens ``ai.providers.context_window`` counts. With the system prompt
 # (about 1 000) and the largest digest (about 10 000) the prompt stays near 25 000 of the 32 768 the provider allows,
 # whatever catalogues are installed: 399 rows of the November 2026 library would need about 56 000.
@@ -36,6 +36,7 @@ Fields:
     count is an integer from 1 to 3. Put that facade asset on the wall that faces the point.
   - {{"op":"place","asset_id":"...","anchor_id":"...","crosswise":false}}
     One copy on a lane anchor. crosswise true turns it 90 degrees only for a wreck, a gate, or a barrier that sits on a lane anchor.
+    Use one lane anchor for at most {MAX_PER_ANCHOR} place actions; spread the copies over the anchors.
 
 Library rows may carry curated hints. description says what the object is and its state. placement says where it belongs: street (may stand in the carriageway), kerb (sidewalk edge by the road), wall_foot (on the ground against a wall), wall_mounted (on a facade), boundary (along a lot or block edge), open_ground (yards, lots, plazas, parks), ground_cover (flat on the ground). grouping says how copies sit: run (end to end in a line), grid (along and up a wall), cluster (a few loose copies), single (one copy). The code refuses a span whose asset is not a run and a cover whose asset is not a grid. condition (intact, worn, damaged, wrecked, burned) and tags help match the brief.
 

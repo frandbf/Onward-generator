@@ -21,10 +21,10 @@ from onward_generator.overgrow.digest import DigestLimits, build_digest
 from onward_generator.overgrow.fit import check_scene, write_report
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.place import overgrow
-from onward_generator.overgrow.plan import bind_plan, parse_overgrow_plan, plan_schema, run_schema
+from onward_generator.overgrow.plan import MAX_PER_ANCHOR, PlanError, bind_plan, parse_overgrow_plan, plan_schema, run_schema
 from onward_generator.overgrow.prompt import SYSTEM_PROMPT, _row_tokens, library_rows, prompt_props
-from onward_generator.overgrow.realize import Site, compose, fitted_props, realize
-from onward_generator.overgrow.zone import default_block_zone
+from onward_generator.overgrow.realize import Site, _nothing_placed, compose, fitted_props, realize
+from onward_generator.overgrow.zone import default_block_zone, zone_from_polygon
 from tests.conftest import MURCIA_CENTER
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "overgrow" / "ambient_replay.json"
@@ -583,8 +583,9 @@ def test_compose_sends_the_run_schema() -> None:
             raise ProviderError("no model")
 
     props = _props()
-    compose(scene, props, _site(features), brief="A quiet block", provider=_Recorder())
-    digest = build_digest(scene)
+    site = _site(features)
+    compose(scene, props, site, brief="A quiet block", provider=_Recorder())
+    digest = build_digest(scene, zone=site.zone)
     expected = run_schema(digest.anchor_ids(), {p.spec.id: p.spec.grouping for p in fitted_props(props)})
     assert schemas == [expected, expected]
 
@@ -648,3 +649,99 @@ def test_the_default_provider_waits_for_a_long_prompt(monkeypatch: pytest.Monkey
     scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
     compose(scene, _props(), _site(features), brief="A quiet block")
     assert made == [realize_module.OVERGROW_TIMEOUT_S] * 2 and realize_module.OVERGROW_TIMEOUT_S == 600.0
+
+
+# --- the zone, crowded anchors and plans that place nothing (12 November 2026) ----------------------------------------
+
+def _plan(*anchors: str, asset: str = "concrete_road_barrier") -> str:
+    actions = [{"op": "place", "asset_id": asset, "anchor_id": a, "crosswise": False} for a in anchors]
+    return json.dumps({"plan_version": "0.1.0", "mood": "kerb", "actions": actions})
+
+
+def test_the_digest_offers_only_ids_inside_the_zone() -> None:
+    from shapely.geometry import Point
+
+    scene = _scene(_block_features(), longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    whole = build_digest(scene)
+    first = whole.anchors[0]
+    zone = zone_from_polygon(Point(first.x, first.y).buffer(1.5))
+    inside = build_digest(scene, zone=zone)
+    assert first in inside.anchors and len(inside.anchors) < len(whole.anchors)
+    assert all(zone.contains(a.x, a.y) for a in inside.anchors)
+    assert all(zone.contains(c.x, c.y) for c in inside.corners) and all(zone.contains(p.x, p.y) for p in inside.places)
+    assert all(zone.contains(*f.mid) for f in inside.facades)
+    assert len(inside.facades) < len(whole.facades) or not whole.facades
+    # A zone around a facade's middle keeps that facade.
+    facade = whole.facades[0]
+    assert facade in build_digest(scene, zone=zone_from_polygon(Point(*facade.mid).buffer(1.5))).facades
+
+
+def test_a_lane_anchor_takes_at_most_two_place_actions() -> None:
+    scene = _scene(_block_features(), longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    anchors = build_digest(scene).anchor_ids()
+    lane = sorted(anchors["lane"])[0]
+    assets = {"concrete_road_barrier"}
+    assert MAX_PER_ANCHOR == 2
+    bind_plan(parse_overgrow_plan(_plan(lane, lane)), asset_ids=assets, anchor_ids=anchors)
+    with pytest.raises(PlanError) as error:
+        bind_plan(parse_overgrow_plan(_plan(lane, lane, lane, lane)), asset_ids=assets, anchor_ids=anchors)
+    crowded = [d for d in error.value.diagnostics if d.code == "crowded_anchor"]
+    assert len(crowded) == 1 and crowded[0].path == "/actions/2/anchor_id" and lane in crowded[0].message
+    assert crowded[0].severity == "error"
+    assert f"at most {MAX_PER_ANCHOR} place actions" in SYSTEM_PROMPT
+
+
+class _Replies:
+    name = "replies"
+
+    def __init__(self, *texts: str) -> None:
+        self.texts = list(texts)
+        self.instructions: list[str] = []
+
+    def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+        self.instructions.append(instruction)
+        return ProviderResult(self.texts.pop(0), {})
+
+
+def test_a_plan_that_places_nothing_is_asked_again_then_left_to_the_rules() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    lane = sorted(build_digest(scene, zone=_site(features).zone).anchor_ids()["lane"])[0]
+    nothing = _plan(lane, asset="modular_fire_escape")  # a facade asset on a lane anchor: dropped as wrong_anchor
+    good = FIXTURE.read_text(encoding="utf-8")
+    second = _Replies(nothing, good)
+    result = compose(scene, _props(), _site(features), brief="A quiet block", provider=second)
+    assert result.ok and result.origin == "ai_generated" and result.applied > 0 and result.record["attempts"] == 2
+    assert "no action could be placed (wrong_anchor 1)" in second.instructions[1]
+    twice = _Replies(nothing, nothing)
+    fallback = compose(scene, _props(), _site(features), brief="A quiet block", provider=twice)
+    assert not fallback.ok and fallback.origin == "rules_fallback" and len(twice.instructions) == 2
+    assert fallback.reason == "no action could be placed (wrong_anchor 1); choose other anchors and assets"
+
+
+def test_a_stored_reply_that_places_nothing_is_not_replayed() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    lane = sorted(build_digest(scene, zone=_site(features).zone).anchor_ids()["lane"])[0]
+    stored = compose(scene, _props(), _site(features), brief="A quiet block",
+                     provider=StaticProvider("replay", FIXTURE.read_text(encoding="utf-8"), "test")).record
+    empty = {**stored, "raw": _plan(lane, asset="modular_fire_escape")}
+    asked = _Replies(FIXTURE.read_text(encoding="utf-8"))
+    again = compose(scene, _props(), _site(features), brief="A quiet block", provider=asked, replay=empty)
+    assert len(asked.instructions) == 1 and again.origin == "ai_generated"
+
+
+def test_the_digest_caps_each_list_inside_the_zone() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    zone = _site(features).zone
+    whole = build_digest(scene, zone=zone)
+    assert len(whole.corners) > 1 and len(whole.places) == 1 and len(whole.anchors) > 1
+    one = build_digest(scene, zone=zone, limits=DigestLimits(facades=1, corners=1, gaps=1, streets=1, places=0, anchors=1))
+    assert (len(one.corners), len(one.places), len(one.anchors)) == (1, 0, 1)
+
+
+def test_the_correction_counts_the_dropped_actions_by_reason() -> None:
+    rows = [{"reason": "outside_zone"}, {"reason": "outside_zone"}, {"reason": "budget"}]
+    assert _nothing_placed(rows) == "no action could be placed (budget 1, outside_zone 2); choose other anchors and assets"
+    assert _nothing_placed([]) == "no action could be placed (no actions); choose other anchors and assets"

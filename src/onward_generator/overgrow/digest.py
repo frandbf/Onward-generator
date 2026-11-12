@@ -20,6 +20,7 @@ from shapely.geometry.polygon import orient
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.overgrow.constants import LANE_M
 from onward_generator.overgrow.fit import SKIP_HIGHWAYS
+from onward_generator.overgrow.zone import Zone
 
 PLACE_KEYS = ("amenity", "leisure", "shop", "tourism", "historic")
 MIN_EDGE_M = 2.5
@@ -173,18 +174,29 @@ class Digest:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def build_digest(scene: Mapping[str, object], *, limits: DigestLimits | None = None) -> Digest:
-    """Digest of ``scene['features']`` only. Frame, origin, and CRS are ignored."""
+def build_digest(scene: Mapping[str, object], *, limits: DigestLimits | None = None, zone: Zone | None = None) -> Digest:
+    """Digest of ``scene['features']`` only. Frame, origin, and CRS are ignored.
+
+    With ``zone``, a facade (by its middle), corner, place or lane anchor outside it is left out before the cap: the
+    placement refuses everything outside the zone, so an id there could only be dropped (on Rue Mouffetard, 12
+    November 2026, the model put all 24 copies on one anchor outside the zone and the map got no props)."""
     cap = limits or DigestLimits()
     features = [item for item in (scene.get("features") or []) if isinstance(item, dict)]
     buildings = _building_tree(features)
-    facades = _nearest(_facades(features), cap.facades)
-    corners = _nearest(_corners(features), cap.corners)
+    facades = _nearest(_inside(_facades(features), zone), cap.facades)
+    corners = _nearest(_inside(_corners(features), zone), cap.corners)
     streets = _nearest(_streets(features), cap.streets)
-    places = _nearest(_places(features), cap.places)
-    anchors = _nearest(_anchors(streets, buildings), cap.anchors)
+    places = _nearest(_inside(_places(features), zone), cap.places)
+    anchors = _nearest(_inside(_anchors(streets, buildings), zone), cap.anchors)
     gaps = _gaps(corners, buildings)[: cap.gaps]
     return Digest(tuple(facades), tuple(corners), tuple(gaps), tuple(streets), tuple(places), tuple(anchors))
+
+
+def _inside(items: list, zone: Zone | None) -> list:
+    """``items`` whose point lies in ``zone``; all of them without one."""
+    if zone is None:
+        return items
+    return [item for item in items if zone.contains(*(item.mid if isinstance(item, Facade) else (item.x, item.y)))]
 
 
 def _round(value: float, digits: int = 3) -> float:

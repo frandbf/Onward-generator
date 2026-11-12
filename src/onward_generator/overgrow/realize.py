@@ -9,6 +9,7 @@ The library GLB is not rewritten.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
@@ -131,15 +132,16 @@ def compose(
 ) -> ComposeResult:
     """Ask for a plan, or reuse a stored reply with the same digest and prompt.
 
-    A provider error or a plan that does not validate is tried once more. The
-    second attempt quotes that failure. Rules are used only after both fail. The prompt carries at most
+    A provider error, a plan that does not validate, or a plan none of whose actions could be placed is tried once
+    more; the second attempt quotes that failure. Rules are used only after both fail, so a reply that places nothing
+    never leaves the map without props. The digest offers only ids inside ``site.zone``. The prompt carries at most
     ``prompt.LIBRARY_BUDGET_TOKENS`` of library rows (``prompt_props``); the record's ``library`` says how many
     of the fitted props it offered.
     """
     fitted = fitted_props(props)
     usable = prompt_props(fitted, brief)
     library = {"offered": len(usable), "fitted": len(fitted)}
-    digest = build_digest(scene)
+    digest = build_digest(scene, zone=site.zone)
     digest_hash = digest.sha256()
     prompt_hash = instruction_sha256(brief, digest, usable)
     asset_ids = {prop.spec.id for prop in usable}
@@ -152,7 +154,9 @@ def compose(
         except PlanError:
             stored = None
         else:
-            return _with_library(_accepted(digest_hash, prompt_hash, "replay", stored, plan, digest, usable, site, attempts=0), library)
+            replayed = _accepted(digest_hash, prompt_hash, "replay", stored, plan, digest, usable, site, attempts=0)
+            if replayed.applied:
+                return _with_library(replayed, library)
     last_error = ""
     last_text = ""
     for attempt in range(1, PLAN_ATTEMPTS + 1):
@@ -167,10 +171,21 @@ def compose(
         except PlanError as exc:
             last_error = str(exc)
             continue
-        return _with_library(_accepted(digest_hash, prompt_hash, "ai_generated", text, plan, digest, usable, site, attempts=attempt), library)
+        accepted = _accepted(digest_hash, prompt_hash, "ai_generated", text, plan, digest, usable, site, attempts=attempt)
+        if not accepted.applied:
+            last_error = _nothing_placed(accepted.record["dropped"])
+            continue
+        return _with_library(accepted, library)
     record = _record(digest_hash, prompt_hash, "rules_fallback", last_text, last_error, 0, [], attempts=PLAN_ATTEMPTS)
     record["library"] = library
     return ComposeResult(False, "rules_fallback", Dressing(), 0, record, last_error)
+
+
+def _nothing_placed(dropped: list[dict]) -> str:
+    """The correction for a plan of which no action could be placed: how many were dropped, by reason."""
+    reasons = Counter(str(row.get("reason")) for row in dropped)
+    summary = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
+    return f"no action could be placed ({summary or 'no actions'}); choose other anchors and assets"
 
 
 def _with_library(result: ComposeResult, library: dict[str, int]) -> ComposeResult:

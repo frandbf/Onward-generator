@@ -200,9 +200,16 @@ def parse_overgrow_plan(text: str) -> OvergrowPlan:
     return OvergrowPlan(document["mood"], tuple(actions), document)
 
 
+# Place actions one lane anchor may carry: copies spaced on one spot, and on Rue Mouffetard (12 November 2026) all 24
+# copies of a reply stood on one anchor.
+MAX_PER_ANCHOR = 2
+
+
 def bind_plan(plan: OvergrowPlan, *, asset_ids: set[str], anchor_ids: dict[str, set[str]]) -> None:
-    """Reject ids this run did not declare. ``anchor_ids`` maps ``corner``, ``facade``, ``poi``, ``lane``."""
+    """Reject ids this run did not declare, and more than ``MAX_PER_ANCHOR`` place actions on one lane anchor.
+    ``anchor_ids`` maps ``corner``, ``facade``, ``poi``, ``lane``."""
     problems: list[Diagnostic] = []
+    on_anchor: dict[str, int] = {}
     for index, action in enumerate(plan.actions):
         path = f"/actions/{index}"
         if action.asset_id not in asset_ids:
@@ -219,6 +226,12 @@ def bind_plan(plan: OvergrowPlan, *, asset_ids: set[str], anchor_ids: dict[str, 
             _known(problems, anchor_ids["poi"], action.poi_id, f"{path}/poi_id")
         else:
             _known(problems, anchor_ids["lane"], action.anchor_id, f"{path}/anchor_id")
+            on_anchor[action.anchor_id] = on_anchor.get(action.anchor_id, 0) + 1
+            if on_anchor[action.anchor_id] == MAX_PER_ANCHOR + 1:
+                problems.append(Diagnostic(
+                    "error", "crowded_anchor", f"{path}/anchor_id",
+                    f"more than {MAX_PER_ANCHOR} place actions on {action.anchor_id!r}; spread them over other lane anchors",
+                ))
     if problems:
         raise PlanError(problems)
 

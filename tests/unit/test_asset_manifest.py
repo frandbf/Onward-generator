@@ -192,7 +192,7 @@ def test_the_prompt_sends_the_curated_hints_only_when_present() -> None:
     assert rows["crate"]["condition"] == "worn"
     assert rows["crate"]["tags"] == ["wood", "box"]
     assert set(rows["old"]) == {"id", "role", "category", "anchor", "surfaces", "length_m", "width_m", "height_m"}
-    assert PROMPT_VERSION == "0.2.0"
+    assert PROMPT_VERSION == "0.3.0"
     assert "a span whose asset is not a run" in SYSTEM_PROMPT
     assert "a cover whose asset is not a grid" in SYSTEM_PROMPT
 
