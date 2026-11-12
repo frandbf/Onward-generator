@@ -303,6 +303,10 @@ The same planner as *Furnishing* above (ADR-031), on each floor record `<buildin
 
 Measured on Madrid (40.40657, −3.719187) with Catastro: see [09-perf.md](09-perf.md#playable-core).
 
+#### Hidden walls
+
+A core building's exposed wall that faces no ground a player reaches is laid out plain (plan P0, [ADR-017 amendment of 12 November 2026](decisions/ADR-017-playable-core.md)): flat windows on every storey, no balcony, no shopfront; its main door stays, and an interior does not pierce its windows. The reached ground is the largest island of walkable ground of the whole map (`detail/reach.py`, the rule `perf layout` bakes for the navmesh), and a wall is hidden when the ground 1 m in front of its middle lies more than 6 m from it: a closed block's courtyard, an alley no street joins. A map without a core is unchanged.
+
 #### Intermediate ring
 
 `--mid-ring-m W` (with `--core-radius-m`; `map.json` `mid_ring_m`, see [02-configuration.md](02-configuration.md#one-folder-per-map)) adds a third tier between the core and the scenic ring ([ADR-017 amendment of 9 November 2026](decisions/ADR-017-playable-core.md#amendment-9-november-2026-an-intermediate-hlod-ring-plan-d3)). It is off by default until a headset session validates it; without it nothing changes, byte for byte.

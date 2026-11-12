@@ -552,14 +552,17 @@ def pierce_room_windows(
     ``glass_view`` on the rest) when that opening lands on the inner wall: any ring of any room in ``inner``. The inner wall is cut on the same span. Otherwise
     the opening is removed. Glass above the ceiling stays ``glass_dark``, and so does glass in a wall
     of a footprint part outside ``hosts`` (the parts that hold a room; ``None`` checks no part).
-    Returns how many openings were pierced and how many were removed.
+    A window of a hidden wall (``Hole.plain``) is kept as it is. Returns how many openings were pierced and how many
+    were removed.
     """
     rings = _rings(inner)
     edges = [edge for coords in rings for edge in pairwise(coords)]
     opened = omitted = 0
     kept: list[Hole] = []
     for hole in layout.holes:
-        if hole.kind not in ROOM_GLASS or hole.v0 >= ceiling_z - 1e-6:
+        if hole.kind not in ROOM_GLASS or hole.v0 >= ceiling_z - 1e-6 or hole.plain:
+            # A window of a hidden wall (plan P0) stays a flat dark pane: with or without a room behind it the shell costs
+            # the same, so a budget core priced from its probe keeps its prediction.
             kept.append(hole)
             continue
         seg = segments[hole.segment]
