@@ -45,3 +45,9 @@ Shops got five pieces each, and homes six, all against the walls (ADR-031, ADR-0
 - The sets now follow the library. Re-describing a manifest, or adding a catalogue, can change which models a map gets. The sets are recorded in each room's `furnishing` block, as before.
 - The kinds are estimated from names. A misnamed model can land in the wrong slot. The size limits per slot bound how wrong that looks, and a reviewed block corrects it.
 - Not done: a second storey of shelving, wall-hung pieces, and kitchen or bedroom zones inside one home floor (a floor is one room).
+
+## Amendment (12 November 2026): textured models before flat colours
+
+On Rue Mouffetard (pkg_05, on the headset) a shop held a pale bookcase, a pale cabinet and a white fridge that read as untextured beside the photographic walls and floor. Their textures were intact: each face of these low-poly models samples one swatch of a palette, or a material is a 4 x 4 image of one colour, so the model has no grain. The selection took the lightest rows first, and the flat models are the lightest. Of the 1 505 interior rows on the measuring machine, 812 are flat (all of Kenney Furniture, Quaternius, Dollhouse, Low Poly Storage and Office, Customizable Kitchen; part of Apartment Kit and Clean Cozy), and the 46 Persian carpets lost their texture in conversion: every vertex samples one texel of a 4 x 4 image.
+
+`overgrow/flatness.py` tells a model drawn in flat colours from the GLB's JSON, accessors and image sizes, never the pixels: a face is a swatch when its UVs span under 2 texels, or its image is at most 8 px, or it has no texture; a model is flat when nine tenths of its surface are swatches. `choose` sorts each kind's candidates textured first, then by weight (or size for small things), and the local rows of `with_local_furnishing` likewise, so a flat model is chosen only where fewer than `POOL` (or `ROWS_PER_SLOT`) textured models fit the slot. The 812 flat rows stay in the library.

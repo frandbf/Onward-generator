@@ -702,20 +702,23 @@ def with_local_furnishing(cfg: DetailConfig, assets: Path) -> DetailConfig:
     """``cfg`` with the hinted interior rows of the local catalogues added to its enabled furnishing sets.
 
     A row joins a set slot only if it passes the checks of the shared rows (``_entry_problems``); at most
-    ``ROWS_PER_SLOT`` join each slot, lightest first, so the distinct rows stay near ``max_assets``. Without local
+    ``ROWS_PER_SLOT`` join each slot, textured before flat colours (``overgrow/flatness.py``), then lightest first, so the
+    distinct rows stay near ``max_assets``. Without local
     catalogues, or with ``ONWARD_LOCAL_CATALOGUES=0``, ``cfg`` comes back unchanged.
     """
     shops, floors = cfg.interiors.shops.furnish, cfg.interiors.furnish
-    new_shops = _merge_local(shops, local.furnish_rows(assets, floors=False), floors=False) if shops.enabled else shops  # pragma: no mutate: _merge_local reads floors=None as False
-    new_floors = _merge_local(floors, local.furnish_rows(assets, floors=True), floors=True) if floors.enabled else floors  # pragma: no mutate: floors=None and False read alike; True is pinned by the floors tests
+    new_shops = _merge_local(shops, local.furnish_rows(assets, floors=False), floors=False, assets=assets) if shops.enabled else shops  # pragma: no mutate: _merge_local reads floors=None as False
+    new_floors = _merge_local(floors, local.furnish_rows(assets, floors=True), floors=True, assets=assets) if floors.enabled else floors  # pragma: no mutate: floors=None and False read alike; True is pinned by the floors tests
     if new_shops is shops and new_floors is floors:
         return cfg
     interiors = replace(cfg.interiors, furnish=new_floors, shops=replace(cfg.interiors.shops, furnish=new_shops))
     return replace(cfg, interiors=interiors)
 
 
-def _merge_local(furnish: ShopFurnish, rows: Sequence[tuple[str, Mapping[str, Any]]], *, floors: bool) -> ShopFurnish:
-    added: dict[tuple[str, str], list[tuple[int, str]]] = {}
+def _merge_local(furnish: ShopFurnish, rows: Sequence[tuple[str, Mapping[str, Any]]], *, floors: bool, assets: Path | None = None) -> ShopFurnish:
+    from onward_generator.overgrow.flatness import flat_colour  # overgrow imports detail; load it on use
+
+    added: dict[tuple[str, str], list[tuple[bool, int, str]]] = {}
     catalogues: set[str] = set()
     for catalogue, row in rows:
         hint = row["furnish"]
@@ -724,14 +727,15 @@ def _merge_local(furnish: ShopFurnish, rows: Sequence[tuple[str, Mapping[str, An
         entry = FurnishEntry(str(row["id"]))
         if _entry_problems(entry, slot, (catalogue, row)):
             continue
+        flat = assets is not None and flat_colour(assets / catalogue / str(row.get("file") or ""))  # pragma: no mutate: a row without a file names no GLB, whatever stands for it
         for name in names:
-            added.setdefault((name, slot), []).append((int(row.get("triangles") or 0), entry.id))
+            added.setdefault((name, slot), []).append((flat, int(row.get("triangles") or 0), entry.id))
             catalogues.add(catalogue)
     if not added:
         return furnish
     sets = dict(furnish.sets)
     for (name, slot), candidates in sorted(added.items()):
-        chosen = tuple(FurnishEntry(asset_id) for _, asset_id in sorted(candidates)[:local.ROWS_PER_SLOT])
+        chosen = tuple(FurnishEntry(asset_id) for _, _, asset_id in sorted(candidates)[:local.ROWS_PER_SLOT])
         current = sets[name]
         sets[name] = replace(current, **{slot: current.slot(slot) + chosen})
     return replace(furnish, catalogues=tuple(sorted({*furnish.catalogues, *catalogues})), sets=MappingProxyType(sets))

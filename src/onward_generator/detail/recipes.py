@@ -3,7 +3,9 @@
 With ``selection: semantic`` a furnishing block's sets are not hand lists: each room type has a recipe, the kinds of
 piece each slot takes (``overgrow/semantics.py``), and the sets are filled from every allowed interior catalogue whose
 rows carry a matching ``semantic`` block. Per slot, a few models are chosen deterministically from the map's seed: the
-lightest candidates first, kinds taken in turn so a room mixes them, each within the slot's size limits. A slot no row
+lightest candidates first, kinds taken in turn so a room mixes them, each within the slot's size limits. A model drawn in
+flat colours (``overgrow/flatness.py``) comes after every textured one of its kind, so it is chosen only where too few
+textured models fit (ADR-036 amendment of 12 November 2026). A slot no row
 fills keeps the configuration's hand-written entries. Nothing is observed: the kinds are estimated from names.
 """
 
@@ -28,6 +30,7 @@ from onward_generator.detail.config import (
     ShopFurnish,
 )
 from onward_generator.detail.facades import stable_unit
+from onward_generator.overgrow.flatness import flat_colour
 from onward_generator.overgrow.semantics import HOME, SHOPS
 
 SHOP_RECIPES: Mapping[str, Mapping[str, Any]] = {
@@ -74,6 +77,7 @@ class Candidate:
     depth_m: float
     height_m: float
     triangles: int
+    flat: bool = False
 
 
 def _fits(slot: str, c: Candidate) -> tuple[bool, int]:
@@ -99,7 +103,8 @@ def _fits(slot: str, c: Candidate) -> tuple[bool, int]:
 
 
 def library(root: Path, catalogues: Sequence[str]) -> list[Candidate]:
-    """Every placeable interior row of ``catalogues`` under ``root`` with its semantic block (no GLB is read)."""
+    """Every placeable interior row of ``catalogues`` under ``root`` with its semantic block. Of the GLB only the JSON,
+    the accessors and the images' sizes are read, to tell a model drawn in flat colours (``flat_colour``)."""
     found: list[Candidate] = []
     for name in sorted(catalogues):
         try:
@@ -111,14 +116,15 @@ def library(root: Path, catalogues: Sequence[str]) -> list[Candidate]:
             if (not isinstance(semantic, dict) or row.get("placement") != "interior" or semantic.get("mount") == "none"
                     or row.get("refused") or row.get("id") in FURNISH_EXCLUDED_IDS):
                 continue
+            file = str(row.get("file") or "")  # pragma: no mutate: a row without a file names no GLB, whatever stands for it
             found.append(Candidate(str(row["id"]), name, str(semantic.get("kind")), frozenset(semantic.get("settings") or ()),
                                    float(row.get("length_m") or 0), float(row.get("depth_m") or 0), float(row.get("height_m") or 0),
-                                   int(row.get("triangles") or 0)))
+                                   int(row.get("triangles") or 0), flat_colour(root / name / file)))
     return found
 
 
 def choose(slot: str, kinds: Sequence[str], settings: Sequence[str], pool: Sequence[Candidate], seed: int, key: str) -> list[FurnishEntry]:
-    """Up to ``MODELS_PER_SLOT[slot]`` entries: per kind the ``POOL`` lightest fitting rows, one kind after another."""
+    """Up to ``MODELS_PER_SLOT[slot]`` entries: per kind the ``POOL`` lightest fitting rows, textured before flat, one kind after another."""
     cap = MAX_TRIANGLES.get(slot, FURNITURE_MAX_TRIANGLES)
     wanted = set(settings)
     by_kind: dict[str, list[tuple[Candidate, int]]] = {}
@@ -132,9 +138,9 @@ def choose(slot: str, kinds: Sequence[str], settings: Sequence[str], pool: Seque
                 rows.append((c, turn))
         if slot in ("decor", "top"):
             # Small things are chosen big first: a cake or a coffee machine reads from the door, a chopstick does not.
-            rows.sort(key=lambda item: (-max(item[0].length_m, item[0].depth_m, item[0].height_m), item[0].asset_id))
+            rows.sort(key=lambda item: (item[0].flat, -max(item[0].length_m, item[0].depth_m, item[0].height_m), item[0].asset_id))
         else:
-            rows.sort(key=lambda item: (item[0].triangles, item[0].asset_id))
+            rows.sort(key=lambda item: (item[0].flat, item[0].triangles, item[0].asset_id))
         lightest = rows[:POOL]
         if lightest:
             start = int(stable_unit(seed, key, slot, kind) * len(lightest))
