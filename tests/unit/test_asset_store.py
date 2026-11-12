@@ -250,6 +250,24 @@ def test_local_rows_per_slot_are_capped_lightest_first(tmp_path: Path, monkeypat
     assert merged.interiors.furnish == base.interiors.furnish  # floors: False
 
 
+def test_local_rows_per_slot_take_textured_models_before_flat_ones(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.unit.test_flatness import write_glb
+
+    base = load_detail_config()
+    monkeypatch.setenv(local.ENV, "1")
+    folder = tmp_path / "asset_store_mixed"
+    folder.mkdir(parents=True)
+    write_glb(folder / "flat.glb", uv_span=1.0 / 512, image_px=512)
+    write_glb(folder / "photo.glb", uv_span=1.0, image_px=64)
+    rows = [{"id": f"as_mixed_shelf_{k}", "file": "flat.glb" if k < 4 else "photo.glb", "placement": "interior", "triangles": 100 + k,
+             "length_m": 1.0, "depth_m": 0.4, "height_m": 1.5, "furnish": {"slot": "wall", "shop_sets": ["generic"], "floors": False}}
+            for k in range(8)]
+    (folder / "manifest.json").write_text(json.dumps({"source": f"{local.LICENCE_NAME} local", "assets": rows}), encoding="utf-8")
+    merged = with_local_furnishing(base, tmp_path)
+    ids = [e.id for e in merged.interiors.shops.furnish.sets["generic"].wall if e.id.startswith("as_")]
+    assert ids == ["as_mixed_shelf_4", "as_mixed_shelf_5", "as_mixed_shelf_6", "as_mixed_shelf_7"]
+
+
 def test_no_tracked_file_carries_the_asset_store_licence_or_a_local_catalogue() -> None:
     top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=REPO, capture_output=True, text=True, check=False)
     if top.returncode != 0 or Path(top.stdout.strip()).resolve() != REPO.resolve():

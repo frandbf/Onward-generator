@@ -27,8 +27,8 @@ from onward_generator.detail.recipes import Candidate, choose, library, semantic
 SEED = 48152
 
 
-def _c(asset_id: str, kind: str, size=(1.0, 0.4, 1.8), triangles=100, settings=("shop",), catalogue="cat") -> Candidate:
-    return Candidate(asset_id, catalogue, kind, frozenset(settings), *size, triangles)
+def _c(asset_id: str, kind: str, size=(1.0, 0.4, 1.8), triangles=100, settings=("shop",), catalogue="cat", flat=False) -> Candidate:
+    return Candidate(asset_id, catalogue, kind, frozenset(settings), *size, triangles, flat)
 
 
 # ---- choose ---------------------------------------------------------------------------------------------------------
@@ -489,3 +489,25 @@ def test_a_recipe_falls_back_to_its_own_written_set_before_generic() -> None:
     sets, _ = semantic_sets(replace(shops, sets={"generic": shops.sets["generic"], "bar": bar}), {"bar": recipes.SHOP_RECIPES["bar"]}, [],
                             SEED, "shops")
     assert sets["bar"].wall == (FurnishEntry("bar_only_shelf"),)
+
+
+def test_a_flat_colour_model_comes_after_every_textured_one() -> None:
+    """Rue Mouffetard: the lightest shelves were a pale palette bookcase; a textured shelf now goes first."""
+    pool = [_c("flat_light", "shelf_tall", triangles=50, flat=True), _c("photo_heavy", "shelf_tall", triangles=800)]
+    assert {e.id for e in choose("wall", ("shelf_tall",), ("shop",), pool, SEED, "k")} == {"photo_heavy", "flat_light"}
+    chosen = choose("wall", ("shelf_tall",), ("shop",), [*pool, *(_c(f"photo{k}", "shelf_tall", triangles=600 + k) for k in range(3))], SEED, "k")
+    assert "flat_light" not in {e.id for e in chosen} and len(chosen) == recipes.POOL
+    # Too few textured models: the flat one still fills the slot, after them.
+    assert {e.id for e in choose("wall", ("shelf_tall",), ("shop",), [pool[0]], SEED, "k")} == {"flat_light"}
+    decor = [_c("flat_big", "decor_food", size=(0.4, 0.4, 0.4), flat=True), *(_c(f"cake{k}", "decor_food", size=(0.1, 0.1, 0.1)) for k in range(4))]
+    assert "flat_big" not in {e.id for e in choose("decor", ("decor_food",), ("bakery",), decor, SEED, "k")}
+
+
+def test_library_tells_a_flat_colour_model(tmp_path: Path) -> None:
+    from tests.unit.test_flatness import write_glb
+
+    folder = tmp_path / "cat"
+    _manifest(folder, [_lib_row("a", "shelf_tall", file="flat.glb"), _lib_row("b", "shelf_tall", file="photo.glb"), _lib_row("c", "shelf_tall")])
+    write_glb(folder / "flat.glb", uv_span=1.0 / 512, image_px=512)
+    write_glb(folder / "photo.glb", uv_span=1.0, image_px=64)
+    assert {c.asset_id: c.flat for c in library(tmp_path, ["cat"])} == {"a": True, "b": False, "c": False}
