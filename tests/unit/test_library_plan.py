@@ -575,6 +575,10 @@ def test_the_choice_schema_pairs_each_slot_with_its_familys_ids() -> None:
         assert list(branches) == filled and choices["minItems"] == choices["maxItems"] == len(filled)
         for slot, ids in branches.items():
             assert ids == sorted(str(row["id"]) for row in pools[SLOT_FAMILY[slot]])
+        for branch in choices["items"]["anyOf"]:
+            slot = branch["properties"]["slot"]["const"]
+            assert branch == {"type": "object", "additionalProperties": False, "required": ["slot", "library_id"],
+                              "properties": {"slot": {"const": slot}, "library_id": {"enum": branches[slot]}}}
         assert schema["required"] == ["choices"] and schema["additionalProperties"] is False
     # A slot whose family has no texture is not offered (the November 2026 library has no bark).
     empty = choice_schema({})
@@ -583,15 +587,19 @@ def test_the_choice_schema_pairs_each_slot_with_its_familys_ids() -> None:
 
 def test_the_model_gets_the_choice_schema() -> None:
     sent: list[dict] = []
+    instructions: list[str] = []
 
     class _Recorder:
         name = "recorder"
 
         def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
             sent.append(schema)
+            instructions.append(instruction)
             return ProviderResult("{}", {})
 
     rows = library_rows()
-    select_texture_plan(name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
-                        brief=None, seed=3, provider=_Recorder(), library=rows, extended=True)
+    select_texture_plan(name="Plaza Café", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                        brief="calles de piedra", seed=3, provider=_Recorder(), library=rows, extended=True)
     assert sent == [choice_schema(_pools(rows, extended=True))] * 2
+    # The instruction keeps the map's own letters, not \u escapes.
+    assert '"name": "Plaza Café"' in instructions[0] and "\\u00e9" not in instructions[0]
