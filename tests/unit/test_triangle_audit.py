@@ -97,7 +97,7 @@ def _subdivide(mesh: Mesh, times: int) -> Mesh:
 
 def test_one_band_has_no_storey_or_zocalo_cut() -> None:
     one = Bands(0.0, 12.0, 1, 12.0, zocalo=False)
-    assert one.levels == [12.0] and one.plain_levels == [12.0]
+    assert one.levels == [12.0] and one.single_levels == [12.0]
     storeyed = Bands(0.9, 3.0, 4, 12.0)
     assert storeyed.levels == [0.9, 3.0, 6.0, 9.0, 12.0]
     assert replace(storeyed, storeys=1, zocalo=False).levels == [12.0]

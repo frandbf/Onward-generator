@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
@@ -85,22 +85,24 @@ def scenic_trim_material(style: str) -> str:
     return f"{SCENIC_TRIM_PREFIX}{style}"
 
 
-def band_mesh(mesh: Mesh, levels: Sequence[float], plain_levels: Sequence[float]) -> tuple[Mesh, np.ndarray, np.ndarray]:
-    """Cut a wall mesh at horizontal planes. Return the mesh, each vertex's band and whether its face is plain.
+def band_mesh(mesh: Mesh, levels: Sequence[float], single_levels: Sequence[float],
+              single: Callable[[np.ndarray, np.ndarray], bool] | None = None) -> tuple[Mesh, np.ndarray, np.ndarray, np.ndarray]:
+    """Cut a wall mesh at horizontal planes. Return the mesh, each vertex's band, whether its face is plain, and
+    whether its face was cut at ``single_levels``.
 
     The triangles of each vertical plane are joined back into the face they came
     from, the face is cut into bands and each band is triangulated again
     (constrained Delaunay, as ``cap`` does), so a band costs a few triangles
-    instead of splitting every sliver that crossed it. A face with openings is
-    cut at ``levels``; a plain face (no hole, one rectangle: a party wall, a
-    blind wall) only at ``plain_levels``. Band ``b`` lies between the ``b``-th
+    instead of splitting every sliver that crossed it. Every face is cut at ``levels``, a plain face (no hole, one
+    rectangle: a party wall, a blind wall) too; a face for which ``single(normal, centre)`` holds is cut only at
+    ``single_levels`` (a shell face no player sees, 12 November 2026). Band ``b`` lies between the ``b``-th
     and the ``b+1``-th sorted level of its list (band 0 below the first). A
     vertex is written once per face and band, so a corner keeps a vertex (and a normal) on each
     of its faces, and a point on a level one in each band. A triangle that is not vertical
     is kept whole, in the band of its centre; a triangle of no area is dropped.
     Faces keep their outward side.
     """
-    full, coarse = np.unique(levels), np.unique(plain_levels)
+    full, coarse = np.unique(levels), np.unique(single_levels)
     vertices, triangles = mesh.vertices, mesh.triangles
     cross = mesh.face_normals()
     length = np.linalg.norm(cross, axis=1)
@@ -108,15 +110,17 @@ def band_mesh(mesh: Mesh, levels: Sequence[float], plain_levels: Sequence[float]
     out_v: list[np.ndarray] = []
     out_b: list[int] = []
     out_p: list[bool] = []
+    out_c: list[bool] = []
     out_t: list[tuple[int, int, int]] = []
 
-    def vertex(face: int, band: int, plain: bool, point: np.ndarray) -> int:
+    def vertex(face: int, band: int, plain: bool, point: np.ndarray, cut_single: bool = False) -> int:
         key = (face, band, float(plain), *point.tolist())
         if key not in keys:
             keys[key] = len(out_v)
             out_v.append(point)
             out_b.append(band)
             out_p.append(plain)
+            out_c.append(cut_single)
         return keys[key]
 
     planes: dict[tuple[float, ...], tuple[np.ndarray, float, list[int]]] = {}
@@ -136,7 +140,8 @@ def band_mesh(mesh: Mesh, levels: Sequence[float], plain_levels: Sequence[float]
         # Simplifying with no tolerance drops the collinear points where two faces of one line met.
         face = union_all([Polygon([(flat[i], vertices[i, 2]) for i in triangles[t]]) for t in members]).simplify(0.0)
         plain = isinstance(face, Polygon) and not face.interiors and len(face.exterior.coords) == 5
-        lv = coarse if plain else full
+        cut_single = single is not None and bool(single(normal, vertices[np.unique(triangles[members])].mean(axis=0)))
+        lv = coarse if cut_single else full
         left, low, right, high = face.bounds
         cuts = [float(c) for c in lv if low < c < high]  # pragma: no mutate: a level on the face's own edge only adds an empty band
         for lo, hi in pairwise([low, *cuts, high]):
@@ -147,10 +152,10 @@ def band_mesh(mesh: Mesh, levels: Sequence[float], plain_levels: Sequence[float]
                     # Counter-clockwise in (along, up) faces the way ``normal`` does.
                     if between((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]), -INF, 0.0):  # pragma: no mutate: shapely winds every triangle one way, so any bound below the smallest doubled area sorts them alike
                         b, c = c, b
-                    out_t.append(tuple(vertex(face_index, band, plain, origin + x * along + np.array([0.0, 0.0, z])) for x, z in (a, b, c)))  # type: ignore[arg-type]
+                    out_t.append(tuple(vertex(face_index, band, plain, origin + x * along + np.array([0.0, 0.0, z]), cut_single) for x, z in (a, b, c)))  # type: ignore[arg-type]
     if not out_t:
-        return Mesh.empty(), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool)
-    return Mesh(np.array(out_v), np.array(out_t)), np.array(out_b), np.array(out_p)
+        return Mesh.empty(), np.zeros(0, dtype=np.int64), np.zeros(0, dtype=bool), np.zeros(0, dtype=bool)
+    return Mesh(np.array(out_v), np.array(out_t)), np.array(out_b), np.array(out_p), np.array(out_c)
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,7 +173,8 @@ class Bands:
         return [*self._foot, *(k * self.storey_m for k in range(1, self.storeys)), self.wall_top_m]
 
     @property
-    def plain_levels(self) -> list[float]:
+    def single_levels(self) -> list[float]:
+        """The cuts of a face drawn in one body band: the zocalo line, when there is one, and the wall top."""
         return [*self._foot, self.wall_top_m]
 
     @property
@@ -271,27 +277,30 @@ def _strip_v(strip: Strip, local: np.ndarray) -> np.ndarray:
 
 
 def wall_uvs(mesh: Mesh, bands: Bands, wall: Strip, zocalo: Strip, cornice: Strip | None,
-             frame: Mapping[str, Any] | None, phase_u: float, courses: bool = True) -> tuple[Mesh, np.ndarray]:
+             frame: Mapping[str, Any] | None, phase_u: float, courses: bool = True,
+             single: Callable[[np.ndarray, np.ndarray], bool] | None = None) -> tuple[Mesh, np.ndarray]:
     """Cut a wall primitive into bands and give each piece the UVs of its strip.
 
-    A plain face has one body band from the zocalo to the parapet; it samples the
-    middle of its wall strip (``PLAIN_V``), stretched, so it shows no string course.
-    Without ``courses`` every storey samples that middle too. Band 0 takes the
+    A plain face is cut at every storey like the others, and each storey samples the middle of its wall strip
+    (``PLAIN_V``), so it shows no string course and no strip spans more than one storey (a whole 18 m party wall
+    on one strip read as vertical planks, 12 November 2026). Without ``courses`` every storey samples that middle
+    too. A face ``single`` names (``band_mesh``) keeps one body band. A face that is not vertical (the soffit of a recess or an overhang) has no height to band: its V runs in
+    metres across its own plane, one storey to the strip, from the bottom of ``PLAIN_V``. Band 0 takes the
     zocalo strip only when ``bands`` has a zocalo, and the top band the cornice
     strip only when there is a ``cornice``; otherwise they take the wall strip.
     """
-    sliced, band, plain = band_mesh(mesh, bands.levels, bands.plain_levels)
+    sliced, band, plain, cut_single = band_mesh(mesh, bands.levels, bands.single_levels, single)
     if not sliced.triangle_count:
         return sliced, np.zeros((0, 2), dtype=np.float32)
     z = sliced.vertices[:, 2]
-    full, coarse = np.unique(bands.levels), np.unique(bands.plain_levels)
+    full, coarse = np.unique(bands.levels), np.unique(bands.single_levels)
     top = float(z.max())
-    plain_band = np.minimum(band, len(coarse))
-    lower = np.where(plain, np.concatenate([[0.0], coarse])[plain_band], np.concatenate([[0.0], full])[band])
-    upper = np.where(plain, np.concatenate([coarse, [top]])[plain_band], np.concatenate([full, [top]])[band])
+    single_band = np.minimum(band, len(coarse))
+    lower = np.where(cut_single, np.concatenate([[0.0], coarse])[single_band], np.concatenate([[0.0], full])[band])
+    upper = np.where(cut_single, np.concatenate([coarse, [top]])[single_band], np.concatenate([full, [top]])[band])
     local = (z - lower) / (upper - lower)
-    last = np.where(plain, len(coarse), len(full))
-    body = np.where(plain | (not courses), PLAIN_V[0] + local * (PLAIN_V[1] - PLAIN_V[0]), local)
+    last = np.where(cut_single, len(coarse), len(full))
+    body = np.where(plain | cut_single | (not courses), PLAIN_V[0] + local * (PLAIN_V[1] - PLAIN_V[0]), local)
     v = _strip_v(wall, body)
     on_zocalo = (band == 0) & bands.zocalo
     v = np.where(on_zocalo, _strip_v(zocalo, local), v)
@@ -304,8 +313,28 @@ def wall_uvs(mesh: Mesh, bands: Bands, wall: Strip, zocalo: Strip, cornice: Stri
         on_cornice = band == last
         v = np.where(on_cornice, _strip_v(cornice, local), v)
         u = np.where(on_cornice, u * wall.repeat_m / cornice.repeat_m, u)
+    v = _flat_v(sliced, base[:, 1] * wall.repeat_m, bands.storey_m, wall, v)
     recentred = recentre_uvs(np.column_stack([u, np.zeros_like(u)]), sliced.triangles, runs)
     return sliced, np.column_stack([recentred[:, 0], v]).astype(np.float32)
+
+
+def _flat_v(mesh: Mesh, across_m: np.ndarray, storey_m: float, wall: Strip, v: np.ndarray) -> np.ndarray:
+    """``v`` with the vertices of the faces that are not vertical sampling ``wall`` in metres across their plane.
+
+    ``band_mesh`` keeps those triangles' vertices apart from the vertical faces', so changing them moves no wall."""
+    cross = mesh.face_normals()
+    length = np.linalg.norm(cross, axis=1)
+    flat = np.flatnonzero(np.abs(cross[:, 2]) > PLANE_TOL * length)  # a triangle of no area has no z either: never flat
+    if not len(flat):
+        return v
+    out = v.copy()
+    triangles = mesh.triangles[flat]
+    span = PLAIN_V[1] - PLAIN_V[0]
+    for group in _triangle_groups(triangles).values():
+        index = np.unique(triangles[group])
+        local = (across_m[index] - float(across_m[index].min())) / storey_m
+        out[index] = _strip_v(wall, PLAIN_V[0] + np.minimum(local, span))
+    return out
 
 
 def stone_uvs(mesh: Mesh, stone: Strip) -> np.ndarray:
@@ -395,6 +424,12 @@ def estimated_wall(record: Mapping[str, Any] | None, material: str) -> bool:
     return picked.get("wall_origin") == "generated" and picked.get("wall") == material
 
 
+def faces_away(normal: np.ndarray, centre: np.ndarray) -> bool:
+    """Whether a face turns its back on the map centre (the local origin, the middle of the playable core): a shell
+    face of the rings that no player sees, so it keeps one band instead of one per storey."""
+    return float(normal[0] * centre[0] + normal[1] * centre[1]) >= 0.0
+
+
 def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atlas: Mapping[str, Any],
                   layout: TrimLayout, windows: Sequence[Sequence[str]], stats: TrimStats,
                   observed: frozenset[str] = frozenset()) -> Node:
@@ -440,9 +475,11 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
             z_top = max(float(p.mesh.vertices[:, 2].max()) for p in node.primitives if p.mesh.triangle_count)
             bands = building_bands(record, z_top, float(atlas["zocalo_m"]), float(atlas["max_band_m"]), look.zocalo)
             if background:
-                bands = Bands(0.0, bands.wall_top_m, 1, bands.wall_top_m, zocalo=False)  # pragma: no mutate: one band and no zocalo, so the zocalo and storey heights are never read
+                # Storey bands and no zocalo: one strip over the whole wall stretched it eightfold (12 November 2026).
+                bands = Bands(0.0, bands.storey_m, bands.storeys, bands.wall_top_m, zocalo=False)  # pragma: no mutate: with no zocalo its height is never read
             cornice = layout.cornice if look.cornice and not background else None
-            mesh, uvs = wall_uvs(prim.mesh, bands, strip, layout.zocalo, cornice, frame, phase_u, look.courses and not background)
+            mesh, uvs = wall_uvs(prim.mesh, bands, strip, layout.zocalo, cornice, frame, phase_u, look.courses and not background,
+                                 single=faces_away if background else None)
             stats.wall_triangles_before += prim.mesh.triangle_count
             stats.wall_triangles_after += mesh.triangle_count
         elif material in STONE_MATERIALS:
