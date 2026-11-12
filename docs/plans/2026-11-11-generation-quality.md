@@ -87,6 +87,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 - Al ajustar cada superficie a la rejilla de 1 mm se meten vértices en lo ya ocupado. Probamos un arreglo que restaba lo ocupado tras el ajuste, y se retiró: en una escena sintética la unión de GEOS fallaba con las aristas casi coincidentes que dejaba, y el chequeo daba un solape falso de 933 m². El parche está guardado en `cache/surfaces-unsnapped-rest.patch`, fuera de git.
 - **Hacer:** ajustar también los edificios de la partición a la misma rejilla y hacer las operaciones con `grid_size`, para que toda la partición comparta una sola rejilla. Las mallas de los edificios no cambian (diferencia ≤ 0,5 mm). Probar con 300 escenas aleatorias, además de Mouffetard a 400 m.
 - **Nota:** cambia la base de todos los mapas, que habría que regenerar desde `generate`.
+- **Hecho (12 de noviembre):** los edificios de la partición se ajustan a la rejilla de 1 mm y todas las operaciones usan `grid_size`. Mouffetard a 400 m pasa de 0,8288 m² de solape (crítico) a 0,1009 m², y el hueco de 2,22 a 1,52 m². En 300 escenas aleatorias de 400 m, el máximo baja de 0,41 a 0,21 m² (la mediana, de 0,042 a 0). Las mallas de los 1158 edificios no cambian. El caso del plan, `maps/q7_mouffetard_400`, es local.
 
 ### Q8. `map create` y los interruptores
 

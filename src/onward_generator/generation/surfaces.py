@@ -103,7 +103,12 @@ def build_partition(
     config: GenerationConfig,
 ) -> Partition:
     precision, min_area = config.precision_m, config.min_surface_area_m2
-    buildings = union_all(list(building_footprints)) if building_footprints else Polygon()
+    # Plan Q7: the buildings share the surfaces' grid, and every operation below keeps it (grid_size). Snapping only the
+    # surfaces moved their vertices up to half a cell into the buildings, and the overlaps added up along every facade.
+    buildings = (
+        shapely.set_precision(make_valid(union_all(list(building_footprints), grid_size=precision)), precision)
+        if building_footprints else Polygon()
+    )
 
     def buffered(way: LinearWay) -> BaseGeometry:
         return way.geometry.buffer(way.width_m / 2.0, cap_style="round", join_style="round", quad_segs=4)
@@ -139,11 +144,11 @@ def build_partition(
     taken: BaseGeometry = buildings
     for surface in PRECEDENCE:
         raw, sources = candidates[surface]
-        region = raw.intersection(site).difference(taken) if not raw.is_empty else Polygon()
+        region = raw.intersection(site, grid_size=precision).difference(taken, grid_size=precision) if not raw.is_empty else Polygon()
         geometry, dropped = _polygonal(region, precision, min_area)
         if not geometry.is_empty:
             partition.surfaces[surface] = Surface(surface, geometry, sources, dropped)
-            taken = union_all([taken, geometry])
+            taken = union_all([taken, geometry], grid_size=precision)
     carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
     if carriageway is not None:
         partition.crossings, _ = _polygonal(crossing_strips(vehicular, carriageway.geometry), precision, min_area)
