@@ -63,7 +63,8 @@ def test_a_document_without_the_block_loads_with_furnishing_off() -> None:
 
 def test_the_enabled_default_sets_load() -> None:
     furnish = config_from_document(_doc()).interiors.shops.furnish
-    assert furnish.enabled and furnish.walk_width_m == 1.2 and furnish.max_triangles == 70000 and furnish.selection == "semantic"
+    assert furnish.enabled and furnish.walk_width_m == 1.2 and furnish.max_triangles == 45000 and furnish.selection == "semantic"
+    assert furnish.max_pieces_per_room == 8  # plan P0: more shops furnished, each with fewer pieces
     assert furnish.set_for("butcher") is furnish.sets["generic"]
 
 
