@@ -17,12 +17,12 @@ from typing import Any
 
 from onward_generator import __version__
 from onward_generator.ai.providers import (
-    DEFAULT_OLLAMA_HOST,
     DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_S,
     OllamaProvider,
     Provider,
     ProviderError,
+    default_ollama_host,
 )
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.dress.catalog import CatalogError, load_catalog
@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--recommendations", help="recommendation JSON for --provider none (otherwise rules are used)")
     c.add_argument("--replay", help="classify_run.json to re-validate (--provider replay)")
     c.add_argument("--model", default=DEFAULT_OLLAMA_MODEL)
-    c.add_argument("--host", default=DEFAULT_OLLAMA_HOST)
+    c.add_argument("--host", default=default_ollama_host())
     c.add_argument("--seed", type=int, default=0)
     c.add_argument("--timeout-s", type=float, default=DEFAULT_TIMEOUT_S)
     c.add_argument("--apply", action="store_true", help="refused: applying materials is not enabled yet")

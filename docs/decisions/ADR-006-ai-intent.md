@@ -48,3 +48,15 @@ The intent above is not widened: `config/intent.schema.json` stays at 0.1.0. A s
 5. **Provenance.** A model reply and its replay are `ai_generated`; the neutral rules profile is `estimated`. Nothing the profile drives is ever `observed`, and an observed OSM or Catastro colour, era or typology always wins: `dominant_typology` picks only the map-wide atlas, it never reclassifies a building (ADR-024).
 
 Widening this profile again means a schema version, a table row, a guard pointer and tests, as decision 3 says for the intent.
+
+## Amendment (12 November 2026): the machine's loopback seen from a container
+
+Status: accepted (plan Q9, option B chosen by the maintainer).
+
+Decision 6 limits the provider to Ollama on loopback. The pipeline runs in Docker, and on macOS the container's `127.0.0.1` is Docker Desktop's Linux VM, not the Mac where Ollama listens: every AI stage fell back to its rules. Running the AI stages from the native `.venv` instead (option A) needed dependencies installed beside the container and a second environment to keep in step.
+
+1. **One more name, only in a container.** `check_loopback` accepts the exact host `host.docker.internal` when `/.dockerenv` exists. Outside a container the name is refused. Any other name, `gateway.docker.internal` included, is refused as before.
+2. **Private addresses only, pinned.** The name must resolve, and every address it resolves to must be private (`ipaddress.is_private`). The provider then connects to the lowest of those addresses, so a later resolution cannot move it, as `localhost` is pinned to `127.0.0.1`. A public address, an empty answer or a failed lookup is refused before connecting. Proxies stay bypassed.
+3. **Default from the environment.** The default host is `$ONWARD_OLLAMA_HOST`, else `http://127.0.0.1:11434`, and is checked like `--host`. `tools/docker/run.sh` sets it to `http://host.docker.internal:11434` on macOS only; Linux keeps `127.0.0.1` through the host network. The test suite clears it.
+
+What the model receives, the validation of its reply and the replay records are unchanged. The provenance records the pinned address (`http://192.168.65.254:11434` on Docker Desktop for Mac).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import socket
 import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,7 +25,13 @@ from onward_generator.ai.planner import (
     load_base,
     output_documents,
 )
-from onward_generator.ai.providers import OllamaProvider, ProviderError, check_loopback, context_window
+from onward_generator.ai.providers import (
+    OllamaProvider,
+    ProviderError,
+    check_loopback,
+    context_window,
+    default_ollama_host,
+)
 from onward_generator.config.models import GeneratorConfig
 from tests.conftest import MURCIA_CENTER
 
@@ -389,6 +396,92 @@ def test_loopback_hosts_are_accepted(url: str, expected: str) -> None:
 def test_non_local_or_malformed_hosts_are_refused(url: str) -> None:
     with pytest.raises(ProviderError):
         check_loopback(url)
+
+
+def _addresses(*ips: str) -> Any:
+    def fake(host: str, port: int, *args: Any, **kwargs: Any) -> list[Any]:
+        assert (host, port) == ("host.docker.internal", 8080)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port)) for ip in ips]
+    return fake
+
+
+@pytest.fixture
+def in_container(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    marker = tmp_path / ".dockerenv"
+    marker.touch()
+    monkeypatch.setattr(providers, "DOCKERENV", marker)
+
+
+def test_the_container_host_is_pinned_to_its_private_address(in_container: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses("192.168.65.254", "192.168.65.254"))
+    assert check_loopback("http://host.docker.internal:8080/") == "http://192.168.65.254:8080"
+
+
+def test_the_container_host_takes_the_lowest_of_several_private_addresses(in_container: None,
+                                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses("192.168.65.254", "10.0.0.2"))
+    assert check_loopback("http://host.docker.internal:8080") == "http://10.0.0.2:8080"
+
+
+def test_the_container_host_keeps_the_default_port(in_container: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake(host: str, port: int, *args: Any, **kwargs: Any) -> list[Any]:
+        assert port == 11434
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.65.254", port))]
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
+    assert check_loopback("http://host.docker.internal") == "http://192.168.65.254:11434"
+
+
+@pytest.mark.parametrize("ips", [("8.8.8.8",), ("192.168.65.254", "8.8.8.8")])
+def test_the_container_host_is_refused_when_it_resolves_to_a_public_address(
+        in_container: None, monkeypatch: pytest.MonkeyPatch, ips: tuple[str, ...]) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses(*ips))
+    with pytest.raises(ProviderError, match="not only to private addresses"):
+        check_loopback("http://host.docker.internal:8080")
+
+
+def test_the_container_host_is_refused_when_it_resolves_to_nothing(in_container: None,
+                                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses())
+    with pytest.raises(ProviderError, match="resolves to nothing"):
+        check_loopback("http://host.docker.internal:8080")
+
+
+def test_the_container_host_is_refused_when_it_does_not_resolve(in_container: None,
+                                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*args: Any, **kwargs: Any) -> list[Any]:
+        raise socket.gaierror("no such host")
+    monkeypatch.setattr(socket, "getaddrinfo", fail)
+    with pytest.raises(ProviderError, match="needs Docker Desktop"):
+        check_loopback("http://host.docker.internal:8080")
+
+
+def test_the_container_host_is_refused_outside_a_container(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(providers, "DOCKERENV", tmp_path / ".dockerenv")
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses("192.168.65.254"))
+    with pytest.raises(ProviderError, match="outside a container"):
+        check_loopback("http://host.docker.internal:8080")
+
+
+@pytest.mark.parametrize("url", ["http://docker.internal:11434", "http://host.docker.internal.example.com:11434",
+                                 "https://host.docker.internal:11434", "http://gateway.docker.internal:11434"])
+def test_only_the_exact_container_host_is_special(in_container: None, monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _addresses("192.168.65.254"))
+    with pytest.raises(ProviderError, match="only loopback|must look like"):
+        check_loopback(url)
+
+
+def test_the_default_host_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ONWARD_OLLAMA_HOST", raising=False)
+    assert default_ollama_host() == "http://127.0.0.1:11434"
+    assert OllamaProvider().host == "http://127.0.0.1:11434"
+    monkeypatch.setenv("ONWARD_OLLAMA_HOST", "")
+    assert default_ollama_host() == "http://127.0.0.1:11434"
+    monkeypatch.setenv("ONWARD_OLLAMA_HOST", "http://[::1]:9999")
+    assert default_ollama_host() == "http://[::1]:9999"
+    assert OllamaProvider().host == "http://[::1]:9999"
+    monkeypatch.setenv("ONWARD_OLLAMA_HOST", "http://example.com:11434")
+    with pytest.raises(ProviderError, match="only loopback"):
+        OllamaProvider()
 
 
 class FakeOllama(BaseHTTPRequestHandler):
