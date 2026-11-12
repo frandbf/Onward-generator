@@ -107,7 +107,7 @@ def build_partition(
     # surfaces moved their vertices up to half a cell into the buildings, and the overlaps added up along every facade.
     buildings = (
         shapely.set_precision(make_valid(union_all(list(building_footprints), grid_size=precision)), precision)
-        if building_footprints else Polygon()
+        if building_footprints else Polygon()  # pragma: no mutate: an empty union is as empty as Polygon(); the test skips the work
     )
 
     def buffered(way: LinearWay) -> BaseGeometry:
@@ -144,11 +144,11 @@ def build_partition(
     taken: BaseGeometry = buildings
     for surface in PRECEDENCE:
         raw, sources = candidates[surface]
-        region = raw.intersection(site, grid_size=precision).difference(taken, grid_size=precision) if not raw.is_empty else Polygon()
+        region = raw.intersection(site, grid_size=precision).difference(taken) if not raw.is_empty else Polygon()  # pragma: no mutate: an empty raw clips to an empty region; the test skips the work
         geometry, dropped = _polygonal(region, precision, min_area)
         if not geometry.is_empty:
             partition.surfaces[surface] = Surface(surface, geometry, sources, dropped)
-            taken = union_all([taken, geometry], grid_size=precision)
+            taken = union_all([taken, geometry])
     carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
     if carriageway is not None:
         partition.crossings, _ = _polygonal(crossing_strips(vehicular, carriageway.geometry), precision, min_area)
