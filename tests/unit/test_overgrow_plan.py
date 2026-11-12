@@ -23,7 +23,7 @@ from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.place import overgrow
 from onward_generator.overgrow.plan import MAX_PER_ANCHOR, PlanError, bind_plan, parse_overgrow_plan, plan_schema, run_schema
 from onward_generator.overgrow.prompt import SYSTEM_PROMPT, _row_tokens, library_rows, prompt_props
-from onward_generator.overgrow.realize import Site, compose, fitted_props, realize
+from onward_generator.overgrow.realize import Site, _nothing_placed, compose, fitted_props, realize
 from onward_generator.overgrow.zone import default_block_zone, zone_from_polygon
 from tests.conftest import MURCIA_CENTER
 
@@ -687,6 +687,7 @@ def test_a_lane_anchor_takes_at_most_two_place_actions() -> None:
         bind_plan(parse_overgrow_plan(_plan(lane, lane, lane, lane)), asset_ids=assets, anchor_ids=anchors)
     crowded = [d for d in error.value.diagnostics if d.code == "crowded_anchor"]
     assert len(crowded) == 1 and crowded[0].path == "/actions/2/anchor_id" and lane in crowded[0].message
+    assert crowded[0].severity == "error"
     assert f"at most {MAX_PER_ANCHOR} place actions" in SYSTEM_PROMPT
 
 
@@ -728,3 +729,19 @@ def test_a_stored_reply_that_places_nothing_is_not_replayed() -> None:
     asked = _Replies(FIXTURE.read_text(encoding="utf-8"))
     again = compose(scene, _props(), _site(features), brief="A quiet block", provider=asked, replay=empty)
     assert len(asked.instructions) == 1 and again.origin == "ai_generated"
+
+
+def test_the_digest_caps_each_list_inside_the_zone() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    zone = _site(features).zone
+    whole = build_digest(scene, zone=zone)
+    assert len(whole.corners) > 1 and len(whole.places) == 1 and len(whole.anchors) > 1
+    one = build_digest(scene, zone=zone, limits=DigestLimits(facades=1, corners=1, gaps=1, streets=1, places=0, anchors=1))
+    assert (len(one.corners), len(one.places), len(one.anchors)) == (1, 0, 1)
+
+
+def test_the_correction_counts_the_dropped_actions_by_reason() -> None:
+    rows = [{"reason": "outside_zone"}, {"reason": "outside_zone"}, {"reason": "budget"}]
+    assert _nothing_placed(rows) == "no action could be placed (budget 1, outside_zone 2); choose other anchors and assets"
+    assert _nothing_placed([]) == "no action could be placed (no actions); choose other anchors and assets"

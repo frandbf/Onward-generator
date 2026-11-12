@@ -9,6 +9,7 @@ The library GLB is not rewritten.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 
@@ -182,9 +183,7 @@ def compose(
 
 def _nothing_placed(dropped: list[dict]) -> str:
     """The correction for a plan of which no action could be placed: how many were dropped, by reason."""
-    reasons: dict[str, int] = {}
-    for row in dropped:
-        reasons[str(row.get("reason"))] = reasons.get(str(row.get("reason")), 0) + 1
+    reasons = Counter(str(row.get("reason")) for row in dropped)
     summary = ", ".join(f"{reason} {count}" for reason, count in sorted(reasons.items()))
     return f"no action could be placed ({summary or 'no actions'}); choose other anchors and assets"
 
