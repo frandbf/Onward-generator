@@ -1,7 +1,8 @@
-"""The Unity triangle count of a package, estimated before the bake, against the official 250 000 (plan Q2).
+"""The Unity triangle count of a package, estimated before the bake, against the 300 000 limit (plan Q2).
 
-The guide's rough Quest limit is about 250 000 triangles (docs/11-onward-sdk.md), and since 10 November 2026 a
-package must stay within it. The figure only exists after the Unity scene step (``scene_report.json``), minutes
+The guide's rough Quest figure is about 250 000 triangles (docs/11-onward-sdk.md). From 10 November 2026 a package had
+to stay within it; on 12 November 2026 the maintainer raised the limit to 300 000, with occlusion culling on by
+default (ADR-005 amendment), after Rue Mouffetard played well on the headset at 233 323. The figure only exists after the Unity scene step (``scene_report.json``), minutes
 later and on the host; this module predicts it from the visual GLB and the layout, so ``export package`` can warn.
 
 On 23 baked packages of five maps (11 November 2026) Unity counted the GLB's visual triangles plus 12 300, plus
@@ -20,7 +21,7 @@ from typing import Any
 
 from onward_generator.generation.gltf import scene_primitives
 
-UNITY_TRIANGLE_LIMIT = 250_000
+UNITY_TRIANGLE_LIMIT = 300_000
 ADAPTER_BASE_TRIANGLES = 12_300
 """Unity's ``scene_report.json`` ``triangles`` less the GLB's visual triangles, the same on every day package measured."""
 BOX_TRIANGLES = 12

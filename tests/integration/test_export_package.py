@@ -108,7 +108,7 @@ def test_package_is_complete_and_verifiable(inputs: tuple[Path, Path], tmp_path:
 
 
 def test_the_package_estimates_its_unity_triangles(inputs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Plan Q2: the GLB's triangles plus the adapter's 12 300 and its climb models, against the 250 000 limit."""
+    """Plan Q2: the GLB's triangles plus the adapter's 12 300 and its climb models, against the 300 000 limit."""
     from onward_generator.export.triangle_budget import climb_triangles, visual_triangles
 
     detail, layout = inputs
@@ -117,7 +117,7 @@ def test_the_package_estimates_its_unity_triangles(inputs: tuple[Path, Path], tm
     climbs = climb_triangles(load(layout))
     assert m["triangle_budget"] == {
         "estimated_unity_triangles": glb + 12_300 + climbs, "visual_triangles": glb, "adapter_triangles": 12_300,
-        "climb_triangles": climbs, "limit": 250_000, "within": True, "origin": "estimated",
+        "climb_triangles": climbs, "limit": 300_000, "within": True, "origin": "estimated",
     }
     assert not [w for w in m["warnings"] if "[unity_triangle_budget]" in w]
     monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", glb)
@@ -140,8 +140,8 @@ printf '{"triangles": %s}' "$FAKE_TRIANGLES" > "$report"
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 @pytest.mark.parametrize(("triangles", "line"), [
-    (250_000, "[export] triangles: 250000 in Unity of 250000"),
-    (250_001, "[export] WARNING triangles: 250001 in Unity, over the 250000 limit; push will refuse this package [unity_triangle_budget]"),
+    (300_000, "[export] triangles: 300000 in Unity of 300000"),
+    (300_001, "[export] WARNING triangles: 300001 in Unity, over the 300000 limit; push will refuse this package [unity_triangle_budget]"),
 ])
 def test_the_scene_step_reports_unity_s_triangles(inputs: tuple[Path, Path], tmp_path: Path, triangles: int, line: str) -> None:
     """Plan Q2: after the bake, run_export.sh prints Unity's own count against the limit. No Unity: a fake writes the report."""

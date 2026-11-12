@@ -326,7 +326,7 @@ def test_without_a_target_map_json_and_export_json_are_unchanged(tmp_path: Path,
     assert list(stored) == list(_golden_map(radius, core))
     build = json.loads((root / "config" / "export.json").read_text(encoding="utf-8"))["build"]
     assert build == {
-        "combine_cell_m": 100.0, "static_batching": False, "occlusion_culling": False, "lightmap_texels_per_m": 10.0,
+        "combine_cell_m": 100.0, "static_batching": False, "occlusion_culling": True, "lightmap_texels_per_m": 10.0,
         "lightmap_max_size": 2048, "lightmap_directional": False, "fog_enabled": True, "fog_start_m": core,
         "fog_end_m": core + 600.0, "fog_color": "#C8CDD2", "interior_light_intensity": 3.0, "interior_lights_max": 160,
     }

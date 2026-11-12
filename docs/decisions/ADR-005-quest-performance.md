@@ -68,3 +68,10 @@ On the same map the draws drop from 423 to 279. Per view, the median goes from 1
 
 The maintainer set the triangle target to the guide's figure: at most 250 000 triangles in Unity (`scene_report.json` `triangles`), no longer 220 000. That count holds the scene and the SDK prefabs. It does not hold the players' avatars or weapons, which the guide's figure includes, so a map near 250 000 leaves no margin for them. The headset session decides whether that holds at 72 fps. Madrid Sol Quest r200 is at 226 750.
 
+
+## Amendment (12 November 2026): occlusion culling on, 300 000 triangles
+
+Decision 3 kept occlusion culling off because v01 (before combining) did not reduce draws. Combined by 100 m cells, Rue Mouffetard was baked twice from one scene, without (pkg_07) and with occlusion culling (pkg_08): the same 233 323 triangles, 17 s more bake (115.6 s against 98.7 s) and 0.5 MB more bundle. The maintainer tried pkg_08 on the Quest 3, found it good, and decided:
+
+- A new map's export card sets `build.occlusion_culling: true` (`maps/workspace.py`); the adapter marks the static geometry Occluder and Occludee Static and runs `StaticOcclusionCulling.Compute()` in the bake. A card written before keeps its own value.
+- The Unity triangle limit (`export/triangle_budget.py` `UNITY_TRIANGLE_LIMIT`, `run_export.sh push`) is 300 000, above the guide's rough 250 000. The headset checks of `docs/09-perf.md` (72 fps median, at most 150 draws in views A and B) stay the way to tell whether a denser map still plays.

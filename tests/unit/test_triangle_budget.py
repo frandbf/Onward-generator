@@ -26,7 +26,7 @@ def _glb(quads: int) -> bytes:
 
 
 def test_the_constants_are_the_measured_ones() -> None:
-    assert (UNITY_TRIANGLE_LIMIT, ADAPTER_BASE_TRIANGLES, LIFT_TRIANGLES) == (250_000, 12_300, 120)
+    assert (UNITY_TRIANGLE_LIMIT, ADAPTER_BASE_TRIANGLES, LIFT_TRIANGLES) == (300_000, 12_300, 120)
 
 
 def test_visual_triangles_count_every_primitive() -> None:
@@ -53,7 +53,7 @@ def test_the_estimate_is_the_glb_plus_the_adapter_plus_the_climbs() -> None:
     block = triangle_budget(_glb(2), {"lifts": [{}]}, None, None)
     assert block == {
         "estimated_unity_triangles": 4 + 12_300 + 120, "visual_triangles": 4, "adapter_triangles": 12_300,
-        "climb_triangles": 120, "limit": 250_000, "within": True, "origin": "estimated",
+        "climb_triangles": 120, "limit": 300_000, "within": True, "origin": "estimated",
     }
     assert budget_warning(block) is None
 
@@ -73,14 +73,14 @@ def test_over_the_limit_a_core_map_gets_a_core_that_fits(monkeypatch: pytest.Mon
     # All 4 GLB triangles in the core: 3 of them fit, sqrt(3 / 4) of 100 m is 86.6, rounded down to 85.
     tiers = {"core": {"visual_triangles": 4}}
     assert triangle_budget(_glb(2), {}, tiers, 100.0)["suggested_core_radius_m"] == 85.0
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 250_000)
+    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 300_000)
     assert "suggested_core_radius_m" not in triangle_budget(_glb(2), {}, tiers, 100.0)  # within: no suggestion
 
 
 def test_the_suggested_core_scales_with_the_area_and_rounds_down() -> None:
     # Rue Mouffetard pkg_01: 252 179 in Unity, 223 307 of them in the 100 m core; 95 m gave 239 790.
-    assert suggested_core(100.0, 223_307, 252_179) == 95.0
-    assert suggested_core(100.0, 100_000, 350_000) is None  # the rest alone is over the limit
+    assert suggested_core(100.0, 223_307, 252_179, 250_000) == 95.0  # against the limit of that day
+    assert suggested_core(100.0, 100_000, 410_000) is None  # the rest alone (310 000) is over the 300 000 limit
     assert suggested_core(100.0, 0, 260_000) is None
     assert suggested_core(100.0, 0, 240_000) is None  # room, but no core triangles to scale
     assert suggested_core(100.0, 1, 250_001, 250_000) is None  # exactly no room left
