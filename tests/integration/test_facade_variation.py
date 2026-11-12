@@ -87,11 +87,12 @@ def test_every_building_gets_a_door_and_a_low_shop_gets_a_fallback_shop_door(
     records, stats = row
     rules = {b: r["facade"]["door"] for b, r in records.items()}
     # 604's storeys are too low for the 2.4 m door; 605 has no 2.5 m street-facing wall.
-    assert rules == {"601": "template", "602": "template", "603": "template", "604": "fallback", "605": "fallback", "606": "fallback"}
-    assert stats["doors"] == {"fallback": 3, "template": 3}
+    assert rules == {"601": "template", "602": "template", "603": "template", "604": "fallback", "605": "fallback", "606": "template"}
+    assert stats["doors"] == {"fallback": 2, "template": 4}
     for record in records.values():
         assert _doors(record) == 1
-    # 606 is a shop on 604's 2.67 m storeys: the 2.5 m shop door does not fit, the fallback shrinks it.
+    # 606 is a shop on 604's 2.67 m storeys: its 2.3 m shop door fits under the lintel (the 2.5 m one before 12 November
+    # 2026 did not); test_detail_doors keeps the low shop's fallback.
     assert records["606"]["facade"]["ground_floor"] == "shopfront"
     assert records["606"]["facade"]["openings"]["shop_door"] == 1
     assert records["606"]["door_box"] is None  # glazed: no door_wood back

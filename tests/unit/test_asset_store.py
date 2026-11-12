@@ -222,6 +222,14 @@ def test_local_rows_join_furnishing_only_when_enabled_and_never_from_a_shared_fo
     assert [p.name for p in library_directories(assets)] == ["asset_store_shop_props"]
     props, rejects = read_interior_catalogue(assets, ["asset_store_shop_props"])
     assert list(props) == ["as_shop_props_Shelf_Tall"] and rejects == []
+    # Each row's semantic kind reaches the size cap of small table things (interior_size).
+    manifest_path = assets / "asset_store_shop_props" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["assets"][0]["semantic"] = {**(manifest["assets"][0].get("semantic") or {}), "kind": "decor_tableware"}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    shrunk, _ = read_interior_catalogue(assets, ["asset_store_shop_props"])
+    piece = shrunk["as_shop_props_Shelf_Tall"].prop
+    assert max(np.ptp(piece.mesh.vertices, axis=0)) == pytest.approx(0.3) and piece.fit_scale < 1.0
     # The same EULA manifest in a folder that is not a local catalogue is refused whole.
     (assets / "asset_store_shop_props").rename(assets / "shared_props")
     props, rejects = read_interior_catalogue(assets, ["shared_props"])
