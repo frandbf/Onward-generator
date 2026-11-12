@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+from jsonschema import Draft202012Validator
 
-from onward_generator.ai.providers import ProviderError, ProviderResult, StaticProvider
+from onward_generator.ai.providers import ProviderError, ProviderResult, StaticProvider, context_window
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.generation.mesh import box
@@ -17,9 +20,9 @@ from onward_generator.overgrow.digest import DigestLimits, build_digest
 from onward_generator.overgrow.fit import check_scene, write_report
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.place import overgrow
-from onward_generator.overgrow.plan import bind_plan, parse_overgrow_plan
-from onward_generator.overgrow.prompt import SYSTEM_PROMPT
-from onward_generator.overgrow.realize import Site, compose, realize
+from onward_generator.overgrow.plan import bind_plan, parse_overgrow_plan, plan_schema, run_schema
+from onward_generator.overgrow.prompt import SYSTEM_PROMPT, _row_tokens, library_rows, prompt_props
+from onward_generator.overgrow.realize import Site, compose, fitted_props, realize
 from onward_generator.overgrow.zone import default_block_zone
 from tests.conftest import MURCIA_CENTER
 
@@ -453,3 +456,133 @@ def test_cover_needs_a_grid_when_the_grouping_is_curated() -> None:
         assert refused.rejects == [{"op_index": 0, "asset_id": "modular_fire_escape", "reason": "wrong_grouping"}]
     placed = realize(plan, digest, _grouped(_props(), "modular_fire_escape", "grid"), _site(features))
     assert [row for row in placed.records if row["op"] == "cover"]
+
+
+# --- library budget (the prompt must fit whatever catalogues are installed) ----------------------------------
+
+def _many(count: int, *, roles: tuple[str, ...] = ("barrier", "bench", "vehicle"), words: int = 40) -> list[Prop]:
+    base = _props()[3]
+    filler = " ".join(["worn"] * words)
+    return [
+        Prop(replace(base.spec, id=f"lib_{i:03d}", role=roles[i % len(roles)], grouping="single", tags=(),
+                     description=f"Generic object {i}. {filler}"), base.mesh, base.uvs, base.albedo)
+        for i in range(count)
+    ]
+
+
+def test_a_library_that_fits_is_offered_whole() -> None:
+    props = _props()
+    assert prompt_props(props, "A quiet block") == props
+    rows = sum(_row_tokens(row) for row in library_rows(props))
+    assert prompt_props(props, "", budget=rows) == props
+    assert prompt_props(props, "", budget=rows - 1) != props
+
+
+def test_a_large_library_is_cut_to_the_budget_one_role_at_a_time() -> None:
+    props = _many(60)
+    rows = {str(row["id"]): _row_tokens(row) for row in library_rows(props)}
+    budget = sum(sorted(rows.values())[:7])
+    chosen = prompt_props(props, "", budget=budget)
+    assert 0 < len(chosen) < len(props)
+    assert sum(rows[p.spec.id] for p in chosen) <= budget
+    # Round robin over the roles: no role has two more than another, every role is offered.
+    counts = Counter(p.spec.role for p in chosen)
+    assert set(counts) == {"barrier", "bench", "vehicle"} and max(counts.values()) - min(counts.values()) <= 1
+    # Same inputs, same subset, in the library's own order.
+    assert prompt_props(props, "", budget=budget) == chosen
+    assert [p.spec.id for p in chosen] == sorted(p.spec.id for p in chosen)
+    # A row that does not fit ends the subset: nothing is offered with a budget below the first row.
+    assert prompt_props(props, "", budget=min(rows.values()) - 1) == []
+
+
+def test_runs_grids_and_brief_words_come_first_in_their_role() -> None:
+    props = _many(30, roles=("barrier",))
+    run = Prop(replace(props[5].spec, grouping="run"), props[5].mesh, props[5].uvs, props[5].albedo)
+    grid = Prop(replace(props[6].spec, grouping="grid"), props[6].mesh, props[6].uvs, props[6].albedo)
+    # The prop that comes last by the hash of its id: only the brief word can bring it forward.
+    last = max(range(30), key=lambda i: "" if i in (5, 6) else hashlib.sha256(f"lib_{i:03d}".encode()).hexdigest())
+    tagged = Prop(replace(props[last].spec, id="lib_007x", tags=("sandbags",)), props[last].mesh, props[last].uvs,
+                  props[last].albedo)
+    props = [tagged if i == last else run if i == 5 else grid if i == 6 else prop for i, prop in enumerate(props)]
+    cost = {str(row["id"]): _row_tokens(row) for row in library_rows(props)}
+    two = cost["lib_005"] + cost["lib_006"]
+    first_two = prompt_props(props, "", budget=two)
+    assert {p.spec.id for p in first_two} == {"lib_005", "lib_006"}
+    first_three = prompt_props(props, "Stacked SANDBAGS and wire", budget=two + cost["lib_007x"])
+    assert {p.spec.id for p in first_three} == {"lib_005", "lib_006", "lib_007x"}
+    # Without the brief word the third is another one, chosen by the hash of its id.
+    assert "lib_007x" not in {p.spec.id for p in prompt_props(props, "short", budget=two + cost["lib_007x"])}
+
+
+def test_compose_offers_the_budgeted_library_and_records_it() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    seen: list[str] = []
+
+    class _Recorder:
+        name = "recorder"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            seen.append(instruction)
+            context_window(system, instruction)
+            raise ProviderError("no model")
+
+    props = [*_props(), *_many(400, words=60)]
+    result = compose(scene, props, _site(features), brief="A quiet block", provider=_Recorder())
+    assert result.origin == "rules_fallback" and len(seen) == 2
+    fitted = len(fitted_props(props))
+    library = result.record["library"]
+    assert library["fitted"] == fitted and 0 < library["offered"] < fitted
+    assert result.reason == "no model"
+    # Every offered id is in the prompt and nothing else of the library is.
+    offered = {p.spec.id for p in prompt_props(fitted_props(props), "A quiet block")}
+    assert len(offered) == library["offered"]
+    assert all(f'"id": "{asset_id}"' in seen[0] for asset_id in offered)
+    assert not any(f'"id": "lib_{i:03d}"' in seen[0] for i in range(400) if f"lib_{i:03d}" not in offered)
+    small = compose(scene, _props(), _site(features), brief="A quiet block", provider=_Recorder())
+    assert small.record["library"] == {"offered": len(fitted_props(_props())), "fitted": len(fitted_props(_props()))}
+
+
+def test_the_run_schema_enumerates_this_runs_ids() -> None:
+    anchors = {"corner": {"corner:b", "corner:a"}, "facade": {"facade:e"}, "poi": {"poi:p"}, "lane": {"lane:l"}}
+    groupings = {"fence": "run", "escape": "grid", "camera": "single", "old": ""}
+    schema = run_schema(anchors, groupings)
+    Draft202012Validator.check_schema(schema)
+    branches = {b["properties"]["op"]["const"]: b["properties"] for b in schema["properties"]["actions"]["items"]["oneOf"]}
+    assert set(branches) == {"span", "cover", "watch", "place"}
+    assert branches["span"]["asset_id"] == {"enum": ["fence", "old"]}
+    assert branches["span"]["from_id"] == branches["span"]["to_id"] == {"enum": ["corner:a", "corner:b"]}
+    assert branches["cover"]["asset_id"] == {"enum": ["escape", "old"]}
+    assert branches["cover"]["edge_id"] == {"enum": ["facade:e"]}
+    assert branches["watch"]["asset_id"] == {"enum": ["camera", "escape", "fence", "old"]}
+    assert branches["watch"]["poi_id"] == {"enum": ["poi:p"]}
+    assert branches["place"]["anchor_id"] == {"enum": ["lane:l"]}
+    assert branches["place"]["crosswise"] == plan_schema()["properties"]["actions"]["items"]["oneOf"][3]["properties"]["crosswise"]
+    # A gesture with nothing to name is left out; with nothing at all the plan may only be empty.
+    some = run_schema({**anchors, "corner": set(), "poi": set()}, {"camera": "single"})
+    ops = [b["properties"]["op"]["const"] for b in some["properties"]["actions"]["items"]["oneOf"]]
+    assert ops == ["place"]
+    none = run_schema({"corner": set(), "facade": set(), "poi": set(), "lane": set()}, groupings)
+    assert none["properties"]["actions"] == {"type": "array", "maxItems": 0}
+    assert run_schema(anchors, {})["properties"]["actions"] == {"type": "array", "maxItems": 0}
+    # The plain schema is untouched.
+    assert "enum" not in json.dumps(plan_schema())
+
+
+def test_compose_sends_the_run_schema() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    schemas: list[dict] = []
+
+    class _Recorder:
+        name = "recorder"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            schemas.append(schema)
+            raise ProviderError("no model")
+
+    props = _props()
+    compose(scene, props, _site(features), brief="A quiet block", provider=_Recorder())
+    digest = build_digest(scene)
+    expected = run_schema(digest.anchor_ids(), {p.spec.id: p.spec.grouping for p in fitted_props(props)})
+    assert schemas == [expected, expected]
