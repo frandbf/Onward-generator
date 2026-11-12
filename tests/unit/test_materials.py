@@ -422,13 +422,25 @@ def test_apply_threads_write_the_bytes_of_the_serial_path(tmp_path: Path, monkey
     assert images["tree_canopy"] == encode_opaque_png(_tile_pixels("tree_canopy", 256, 48152 + index))
 
 
-def test_apply_brick_only_when_osm_says_brick(tmp_path: Path) -> None:
+def test_apply_brick_only_when_osm_says_brick(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cache = tmp_path / "cache"
     _cache_plan(cache)
     base = _write_base(tmp_path, brick=True, cobble=False)
     out = tmp_path / "with_brick"
+    import onward_generator.materials.apply as apply_module
+
+    seen: list[object] = []
+    real_trim = apply_module.apply_trim
+
+    def spy(*args: object, **kwargs: object) -> object:
+        seen.append(kwargs.get("observed_walls"))
+        return real_trim(*args, **kwargs)
+
+    monkeypatch.setattr(apply_module, "apply_trim", spy)
     report = apply_materials(base, out, cache_dir=cache, download=False, plan_path=_polyhaven_plan(tmp_path / "plan_brick.json"))
     assert "building/osm-way-brick" in report["brick_nodes"]
+    # The OSM brick buildings reach the trim step, so an estimated_walls recipe never redraws them.
+    assert seen == [report["brick_nodes"]]
     assert report["cobble_applied"] is False
     doc, _ = read_glb((out / "scene_visual.glb").read_bytes())
     names = {m["name"] for m in doc["materials"]}

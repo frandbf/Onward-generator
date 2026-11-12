@@ -850,6 +850,11 @@ def test_an_estimated_wall_is_drawn_in_the_strip_the_atlas_names() -> None:
     assert not np.array_equal(redrawn.primitives[0].uvs, brick.primitives[0].uvs)
     assert stats.estimated_walls == {"brick_red": 1}
     assert stats.as_dict()["estimated_walls"] == {"brick_red": 1}
+    # Each wall primitive counts: a party wall of the same building is a second.
+    twice = TrimStats()
+    two = _building("brick_red", extra=(Primitive(facade(9.0, 10.0, WINDOWS_2X3), "party_brick_red"),))
+    trim_building(two, _picked("brick_red"), "mediterranean", atlas, LAYOUT, WINDOWS, twice)
+    assert twice.estimated_walls == {"brick_red": 2}
     # An observed wall keeps its strip: OSM building:material, an observed origin, another wall, no record.
     cases = [
         (_picked("brick_red"), frozenset({"building/b1"})),
