@@ -107,6 +107,7 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 - **Overpass is busy.** It is retried on its own. If it still fails, run `onward-generator osm download --map maps/<id>`.
 - **Unity is open.** The build asks you to close the editor first.
 - **Check your setup.** Run `tools/docker/run.sh onward-generator doctor`. It is read-only: a missing Unity, `adb` or SDK is a warning.
+- **The AI stages fall back to rules.** Ollama is not running, or the model is missing. On macOS the container reaches the Mac's Ollama as `host.docker.internal` on its own ([docs/10-ai.md](docs/10-ai.md#providers-and-privacy)).
 - **Latitude and longitude** are WGS84 decimals. A negative longitude uses the keyboard hyphen (`-3.65288`).
 
 Each map lives in `maps/<id>/`, the name in lower case with `_` between words. An export package is never overwritten: the next build of the same map is `pkg_02`. The headset has one local map slot, so its card is always called `Unity Export`; experimental listing modes try to show the map's own name and picture ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)).

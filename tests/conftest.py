@@ -41,6 +41,12 @@ def _no_tile_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ONWARD_GENERATOR_NO_TILE_CACHE", "1")
 
 
+@pytest.fixture(autouse=True)
+def _no_ollama_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach the Ollama that tools/docker/run.sh names on macOS (ONWARD_OLLAMA_HOST); a test sets its own."""
+    monkeypatch.delenv("ONWARD_OLLAMA_HOST", raising=False)
+
+
 @pytest.fixture
 def without_overture(monkeypatch: pytest.MonkeyPatch) -> None:
     """The registry without the world-wide ``overture`` plugin (ADR-021), for tests that pin the national plugins' stages."""

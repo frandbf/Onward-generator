@@ -4,20 +4,31 @@ A provider turns (system prompt, instruction, JSON schema) into raw text and
 reports what produced it. It never interprets the text: validation happens in
 ``intent.parse_intent``. Only local Ollama is supported; any host other than
 loopback is refused, and system proxies are bypassed so the prompt cannot leave
-the machine (docs/10-ai.md, ADR-006).
+the machine (docs/10-ai.md, ADR-006). Inside a container, and only there, the one
+name ``host.docker.internal`` stands for the machine's own loopback (ADR-006
+amendment of 12 November 2026): it must resolve to a private address, and the
+host is pinned to that address before connecting.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import json
+import os
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
+# tools/docker/run.sh sets it on macOS, where the container's 127.0.0.1 is not the Mac. It is checked like --host.
+OLLAMA_HOST_ENV = "ONWARD_OLLAMA_HOST"
+# Docker Desktop's name for the machine running the container, accepted only where DOCKERENV exists.
+CONTAINER_HOST = "host.docker.internal"
+DOCKERENV = Path("/.dockerenv")
 DEFAULT_OLLAMA_MODEL = "qwen3:14b"
 DEFAULT_TIMEOUT_S = 180.0
 MAX_HTTP_BYTES = 1024 * 1024
@@ -67,8 +78,32 @@ class StaticProvider:
         return ProviderResult(self.text, {"provider": self.name, "source": self.source, "model": None})
 
 
+def default_ollama_host() -> str:
+    """``$ONWARD_OLLAMA_HOST`` when it is set and not empty, else ``http://127.0.0.1:11434``."""
+    return os.environ.get(OLLAMA_HOST_ENV) or DEFAULT_OLLAMA_HOST
+
+
+def _container_host(port: int) -> str:
+    """The private address ``host.docker.internal`` resolves to, inside a container; refused anywhere else."""
+    if not DOCKERENV.exists():
+        raise ProviderError(f"refusing Ollama host {CONTAINER_HOST!r} outside a container: "
+                            "on this machine use http://127.0.0.1:11434")
+    try:
+        infos = socket.getaddrinfo(CONTAINER_HOST, port, proto=socket.IPPROTO_TCP)
+    except OSError as exc:
+        raise ProviderError(f"cannot resolve {CONTAINER_HOST!r} ({exc}): it needs Docker Desktop") from exc
+    addresses = sorted({str(info[4][0]) for info in infos})
+    if not addresses or not all(ipaddress.ip_address(a).is_private for a in addresses):
+        raise ProviderError(f"refusing Ollama host {CONTAINER_HOST!r}: it resolves to {', '.join(addresses) or 'nothing'}, "
+                            "not only to private addresses")
+    return addresses[0]
+
+
 def check_loopback(url: str) -> str:
-    """Return the normalised base URL, or raise if it is not plain http on a loopback address."""
+    """Return the normalised base URL, or raise if it is not plain http on a loopback address.
+
+    In a container, ``host.docker.internal`` is the machine's loopback and is pinned to the private address it
+    resolves to."""
     parts = urlsplit(url)
     if parts.scheme != "http" or not parts.hostname or parts.path not in ("", "/") or parts.query or parts.fragment:
         raise ProviderError(f"Ollama host must look like http://127.0.0.1:11434, got {url!r}")
@@ -76,13 +111,15 @@ def check_loopback(url: str) -> str:
         raise ProviderError("Ollama host must not contain credentials")
     # "localhost" is pinned to 127.0.0.1: name resolution could point it elsewhere.
     host = "127.0.0.1" if parts.hostname == "localhost" else parts.hostname
+    port = parts.port or 11434
+    if host == CONTAINER_HOST:
+        return f"http://{_container_host(port)}:{port}"
     try:
         if not ipaddress.ip_address(host).is_loopback:
             raise ValueError
     except ValueError:
         raise ProviderError(f"refusing non-local Ollama host {host!r}: only loopback addresses are allowed "
                             "(external AI providers are disabled)") from None
-    port = parts.port or 11434
     shown = f"[{host}]" if ":" in host else host
     return f"http://{shown}:{port}"
 
@@ -90,7 +127,7 @@ def check_loopback(url: str) -> str:
 @dataclass(slots=True)
 class OllamaProvider:
     model: str = DEFAULT_OLLAMA_MODEL
-    host: str = DEFAULT_OLLAMA_HOST
+    host: str = field(default_factory=default_ollama_host)
     seed: int = 0
     timeout_s: float = DEFAULT_TIMEOUT_S
     name: str = "ollama"

@@ -42,5 +42,13 @@ fi
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/onward-generator"
 mkdir -p "$cache"
 mounts+=(-v "$cache:/cache/onward-generator" -e ONWARD_GENERATOR_CACHE_DIR=/cache/onward-generator)
+# On macOS the container's 127.0.0.1 is Docker Desktop's VM, not the Mac where Ollama listens: the AI stages
+# reach it as host.docker.internal, which the generator accepts only inside a container (ADR-006 amendment of
+# 12 November 2026). Linux keeps 127.0.0.1 through the host network. An ONWARD_OLLAMA_HOST already set wins.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  mounts+=(-e "ONWARD_OLLAMA_HOST=${ONWARD_OLLAMA_HOST:-http://host.docker.internal:11434}")
+elif [[ -n "${ONWARD_OLLAMA_HOST:-}" ]]; then
+  mounts+=(-e "ONWARD_OLLAMA_HOST=$ONWARD_OLLAMA_HOST")
+fi
 # ${a[@]+"${a[@]}"} expands an empty array under set -u on macOS bash 3.2 too.
 exec "${compose[@]}" run --rm ${tty[@]+"${tty[@]}"} ${mounts[@]+"${mounts[@]}"} dev "$@"

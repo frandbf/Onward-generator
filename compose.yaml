@@ -22,5 +22,6 @@ services:
       - GIT_CONFIG_COUNT=1
       - GIT_CONFIG_KEY_0=safe.directory
       - GIT_CONFIG_VALUE_0=*
-    # Host network so the pipeline reaches loopback Ollama (127.0.0.1:11434) as it does natively.
+    # Host network so the pipeline reaches loopback Ollama (127.0.0.1:11434) as it does natively on Linux.
+    # On macOS 127.0.0.1 is Docker Desktop's VM: run.sh sets ONWARD_OLLAMA_HOST to host.docker.internal.
     network_mode: host

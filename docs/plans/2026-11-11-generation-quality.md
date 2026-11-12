@@ -101,6 +101,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 
 - AGENTS.md limita el modelo a Ollama en loopback. Desde un contenedor, `127.0.0.1` es el propio contenedor, no el Mac.
 - **Opciones (tu decisión):** ejecutar las etapas de IA en el `.venv` nativo (faltan dependencias como `laspy`, cuya instalación necesita tu aprobación), o aceptar `host.docker.internal` como loopback del anfitrión, lo que exige cambiar la regla.
+- **Hecho (opción B, enmienda de ADR-006 del 12 de noviembre):** dentro de un contenedor, y solo ahí, `host.docker.internal` cuenta como loopback si resuelve a direcciones privadas, y el proveedor se fija a esa dirección antes de conectar. En macOS, `tools/docker/run.sh` pone `ONWARD_OLLAMA_HOST=http://host.docker.internal:11434`. Comprobado: `ai plan` desde Docker llega a qwen3:14b en 11 s (antes caía a reglas). AGENTS.md recoge la excepción.
 
 ---
 

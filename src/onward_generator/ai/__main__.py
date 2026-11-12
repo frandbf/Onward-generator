@@ -34,13 +34,13 @@ from onward_generator.ai.planner import (
     system_prompt_sha256,
 )
 from onward_generator.ai.providers import (
-    DEFAULT_OLLAMA_HOST,
     DEFAULT_OLLAMA_MODEL,
     DEFAULT_TIMEOUT_S,
     OllamaProvider,
     Provider,
     ProviderError,
     StaticProvider,
+    default_ollama_host,
 )
 from onward_generator.config.diagnostics import Diagnostic
 from onward_generator.config.loader import ConfigLoadError, read_json_document
@@ -68,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--intent", help="intent JSON written by hand (--provider none)")
     p.add_argument("--replay", help="ai_run.json / proposal.json / rejected.json to re-apply (--provider replay)")
     p.add_argument("--model", default=DEFAULT_OLLAMA_MODEL)
-    p.add_argument("--host", default=DEFAULT_OLLAMA_HOST, help="loopback only")
+    p.add_argument("--host", default=default_ollama_host(), help="loopback only; default $ONWARD_OLLAMA_HOST or http://127.0.0.1:11434")
     p.add_argument("--seed", type=int, default=0, help="Ollama sampling seed")
     p.add_argument("--timeout-s", type=float, default=DEFAULT_TIMEOUT_S)
     p.add_argument("--project-config", default=None, help=f"base project configuration (default: {DEFAULT_PROJECT.name})")
