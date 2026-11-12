@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import socket
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 
 from onward_generator.ai.providers import OllamaProvider
 from onward_generator.cli import main
+from onward_generator.dress import __main__ as dress_main
 from onward_generator.dress.atlas import build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import CatalogError, load_catalog
 from onward_generator.dress.classify import (
@@ -334,3 +336,12 @@ def test_fingerprint_ignores_materials() -> None:
     a = [{"id": "building/1", "type": "building", "source_ids": ["a"], "footprint_area_m2": 10, "materials": ["x"]}]
     b = [{"id": "building/1", "type": "building", "source_ids": ["a"], "footprint_area_m2": 10, "materials": ["y"]}]
     assert compare_fingerprints(geometry_fingerprint(a), geometry_fingerprint(b))["identical"]
+
+
+def test_classify_host_defaults_to_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    def host_default() -> Any:
+        sub = next(a for a in dress_main.build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+        return next(a for a in sub.choices["classify"]._actions if a.dest == "host").default
+    assert host_default() == "http://127.0.0.1:11434"
+    monkeypatch.setenv("ONWARD_OLLAMA_HOST", "http://[::1]:9999")
+    assert host_default() == "http://[::1]:9999"

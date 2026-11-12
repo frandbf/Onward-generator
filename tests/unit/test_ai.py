@@ -480,6 +480,13 @@ def test_only_the_exact_container_host_is_special(in_container: None, monkeypatc
         check_loopback(url)
 
 
+def test_a_non_local_host_is_refused_with_the_reason() -> None:
+    with pytest.raises(ProviderError) as caught:
+        check_loopback("http://192.168.1.10:11434")
+    assert str(caught.value) == ("refusing non-local Ollama host '192.168.1.10': only loopback addresses are allowed "
+                                 "(external AI providers are disabled)")
+
+
 def test_the_default_host_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ONWARD_OLLAMA_HOST", raising=False)
     assert default_ollama_host() == "http://127.0.0.1:11434"
