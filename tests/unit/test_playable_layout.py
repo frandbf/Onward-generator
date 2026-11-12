@@ -23,6 +23,7 @@ from onward_generator.perf.layout import (
     MODE_CODES,
     NAV_AGENT_RADIUS_M,
     ROOF_WIND_MAX,
+    ROUTE_CLEARANCE_M,
     ROUTE_POINTS,
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
@@ -50,6 +51,7 @@ from onward_generator.perf.layout import (
     playable_area,
     reachable_ground,
     roof_wind,
+    route_islands,
     scatter_points,
     spread_routes,
     street_lights,
@@ -474,6 +476,35 @@ def test_hunt_routes_keep_every_origin_route_and_fill_from_other_islands() -> No
     assert routes[: len(on_home)] == on_home
     assert all(point["x"] == 100.0 for route in routes[len(on_home):] for point in route["points"])
     assert len({(route["points"][0]["x"], route["points"][0]["y"]) for route in routes}) == AI_COUNT
+
+
+def test_patrol_ground_leaves_a_narrow_strip_along_a_wall() -> None:
+    """Plan Q1b: a strip 0.8 m wide off a square is navmesh in 2D and not in Unity's voxels; patrols keep off it."""
+    square = box(0.0, 0.0, 20.0, 20.0)
+    strip = box(20.0, 9.6, 40.0, 10.4)
+    far = box(60.0, 0.0, 90.0, 30.0)
+    parts, home = route_islands([union_all([square, strip]), far], (5.0, 5.0))
+    assert ROUTE_CLEARANCE_M == 0.5
+    assert home.bounds[:2] == pytest.approx((0.5, 0.5), abs=1e-6) and home.bounds[2] < 20.0
+    assert not home.covers(Point(25.0, 10.0))
+    # Every island shrinks, the far one too, and stays a separate piece.
+    assert len(parts) == 2 and max(part.bounds[2] for part in parts) == pytest.approx(89.5)
+
+
+def test_patrol_home_is_the_largest_piece_of_the_uplink_island() -> None:
+    """A neck narrower than twice the clearance splits the island; the larger side is home, wherever the Uplink is."""
+    small = box(0.0, 0.0, 6.0, 6.0)
+    neck = box(6.0, 2.6, 8.0, 3.4)
+    large = box(8.0, 0.0, 30.0, 20.0)
+    parts, home = route_islands([union_all([small, neck, large])], (3.0, 3.0))
+    assert len(parts) == 2
+    assert home.bounds[1:] == pytest.approx((0.5, 29.5, 19.5), abs=1e-6) and home.bounds[0] > 7.0
+    assert not home.covers(Point(3.0, 3.0))
+
+
+def test_patrol_ground_refuses_an_uplink_island_with_no_room() -> None:
+    with pytest.raises(LayoutError, match=r"leaves no patrol ground 0.5 m from its edges"):
+        route_islands([box(0.0, 0.0, 0.9, 10.0)], (0.45, 5.0))
 
 
 def test_spread_routes_returns_nothing_for_no_room() -> None:
@@ -1174,6 +1205,29 @@ def _fake_base(*pieces: BaseGeometry) -> object:
         buildings = Polygon()
 
     return _base(partition=Partition())
+
+
+def test_the_playable_layout_patrols_the_shrunk_islands_of_the_uplink(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan Q1b: hunt_routes gets the islands shrunk by the route clearance and the Uplink's piece of them."""
+    from onward_generator.perf import layout as module
+
+    ways = [LinearWay(f"w{i}", "pedestrian", LineString([(-55, y), (190, y)]), 4.0, "config_default") for i, y in enumerate(range(-50, 60, 10))]
+    base = _base(*ways, partition=build_partition(box(-60, -60, 200, 60), [], ways, [], load_generation_config()))
+    base.objects = []  # type: ignore[attr-defined]
+    seen: list[tuple[object, object]] = []
+    real = module.hunt_routes
+
+    def spy(base_: object, free: object, islands: object, home: object, count: int, focus: tuple[float, float]) -> object:
+        seen.append((islands, home))
+        return real(base_, free, islands, home, count, focus)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(module, "hunt_routes", spy)
+    doc = module.playable_layout(base, {"objects": []}, {})  # type: ignore[arg-type]
+    patrol, home = route_islands(nav_islands(base), tuple(doc["uplink_m"]))  # type: ignore[arg-type]
+    assert len(seen) == 1
+    islands, given_home = seen[0]
+    assert isinstance(islands, list) and [part.wkb for part in islands] == [part.wkb for part in patrol]
+    assert isinstance(given_home, BaseGeometry) and given_home.equals(home)
 
 
 def test_objective_ground_keeps_every_piece_with_1_m_clearance() -> None:

@@ -78,6 +78,10 @@ ROUTE_STEP_M = 14.0
 # that to a wall or kerb is not on the mesh, and a gap narrower than twice that
 # splits it into islands.
 NAV_AGENT_RADIUS_M = 0.35
+# Plan Q1b. Unity voxelises the navmesh and trims a little more than the exact 2D outline: a patrol point 0.41 m from
+# the core wall and one 0.2 m off the eroded ground fell on strips Unity's grid never reached, and the adapter dropped
+# both routes on Rue Mouffetard. Patrol points keep this much more ground round them.
+ROUTE_CLEARANCE_M = 0.5
 # A second line along each sidewalk, this far past the kerb, for a street whose
 # facades leave less than the configured sidewalk width.
 KERB_OFFSET_M = 0.5
@@ -772,6 +776,19 @@ def navigation_estimate(islands: Sequence[BaseGeometry]) -> dict[str, float]:
     return {"walkable_area_m2": round(area, 1), "span_m": round(span, 1), "node_spacing_estimate_m": round(spacing, 2)}
 
 
+def route_islands(islands: Sequence[BaseGeometry], uplink: tuple[float, float]) -> tuple[list[BaseGeometry], BaseGeometry]:
+    """The navmesh islands shrunk by ``ROUTE_CLEARANCE_M`` for patrol points, and the largest piece of the Uplink's island.
+
+    A narrow strip along a wall or a kerb, and a neck narrower than the clearance, leave the patrol ground: Unity's
+    voxelised mesh trims them and a point there has no path (plan Q1b)."""
+    home = component_holding(islands, uplink)
+    parts = [piece for island in islands for piece in polygons_of(island.buffer(-ROUTE_CLEARANCE_M))]
+    pieces = [piece for piece in parts if piece.within(home)]
+    if not pieces:
+        raise LayoutError(f"the Uplink's ground leaves no patrol ground {ROUTE_CLEARANCE_M:g} m from its edges")
+    return parts, max(pieces, key=lambda piece: (piece.area, piece.centroid.x, piece.centroid.y))
+
+
 def hunt_routes(
     base: GeneratedScene, free: BaseGeometry, islands: Sequence[BaseGeometry], home: BaseGeometry, count: int, focus: tuple[float, float],
 ) -> tuple[list[dict[str, Any]], float]:
@@ -955,7 +972,8 @@ def playable_layout(
     focus = _focus_xy(base, heights) or uplink
 
     islands = nav_islands(base, inside)
-    routes, separation = hunt_routes(base, free, islands, component_holding(islands, uplink), AI_COUNT, focus)
+    patrol, home = route_islands(islands, uplink)
+    routes, separation = hunt_routes(base, free, patrol, home, AI_COUNT, focus)
     ai = patrol_spawns(routes, AI_COUNT, separation_m=separation)
     attack = (float(doc["attackers"]["centre_m"][0]), float(doc["attackers"]["centre_m"][1]))
     defend = (float(doc["defenders"]["centre_m"][0]), float(doc["defenders"]["centre_m"][1]))
