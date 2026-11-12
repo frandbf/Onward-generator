@@ -38,7 +38,7 @@ def flat_share(positions: np.ndarray, triangles: np.ndarray, uvs: np.ndarray | N
     if uvs is None or image_px is None or max(image_px) <= SOLID_IMAGE_PX:
         return total, total
     spans = uvs[triangles]
-    texels = (spans.max(axis=1) - spans.min(axis=1)) * np.asarray(image_px, dtype=np.float64)
+    texels = (spans.max(axis=1) - spans.min(axis=1)) * np.array(image_px)
     swatch = texels.max(axis=1) < SWATCH_TEXELS
     return float(area[swatch].sum()), total
 

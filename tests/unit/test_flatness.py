@@ -87,7 +87,7 @@ def test_no_uvs_no_image_or_a_solid_image_is_all_swatch() -> None:
 
 
 def test_a_model_is_flat_from_nine_tenths_of_its_surface() -> None:
-    assert is_flat(9.0, 10.0) and is_flat(10.0, 10.0)
+    assert is_flat(9.0, 10.0) and is_flat(10.0, 10.0) and is_flat(0.5, 0.5)
     assert not is_flat(8.99, 10.0) and not is_flat(0.0, 0.0)
 
 
@@ -129,3 +129,11 @@ def test_a_rewritten_file_is_read_again(tmp_path: Path) -> None:
     write_glb(path, uv_span=1.0 / 512, image_px=64)  # another size at the same time
     os.utime(path, ns=(stamp + 10**9, stamp + 10**9))
     assert flat_colour(path)
+
+
+def test_each_face_spans_its_own_uvs() -> None:
+    # Two swatches far apart in the palette: each face is still one swatch.
+    uvs = np.array([[0.1, 0.1], [0.1005, 0.1], [0.1005, 0.1005], [0.9, 0.9], [0.9005, 0.9], [0.9005, 0.9005]])
+    faces = np.array([[0, 1, 2], [3, 4, 5]])
+    corners = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [3.0, 0.0, 1.0]])
+    assert flat_share(corners, faces, uvs, (512, 512)) == (pytest.approx(1.0), pytest.approx(1.0))
