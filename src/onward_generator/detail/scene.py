@@ -82,6 +82,7 @@ from onward_generator.detail.lidar_roofs import FLAT, PITCHED, REASONS, RoofSpre
 from onward_generator.detail.lod2 import Lod2Index, Lod2Part, lod2_parts
 from onward_generator.detail.mid import MID_MAX_TRIANGLES, MID_REPRESENTATION, build_mid_shell
 from onward_generator.detail.modules import Prototype, urban_prototypes
+from onward_generator.detail.reach import hidden_face, reached_ground
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
@@ -1452,6 +1453,8 @@ def _detail_buildings(
     It is split from ``detail_scene`` only to keep each function short; it reads the values ``detail_scene`` built and changes none of its behaviour."""
     lod2_swap: set[str] = set()
     pending_furnish: list[_PendingFurnish] = []
+    # Plan P0: a core wall facing no ground a player reaches is laid out plain (``reach.hidden_face``).
+    reached = reached_ground(base) if core is not None else None
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1506,7 +1509,8 @@ def _detail_buildings(
             for seg in segments:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                 if seg.exposed or seg.index in floors:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                     layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
-                                   bid, refined, others, cfg, layout, floors.get(seg.index, 0.0))  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
+                                   bid, refined, others, cfg, layout, floors.get(seg.index, 0.0),  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
+                                   hidden=reached is not None and seg.exposed and hidden_face(seg, reached))
             return layout
 
         interior = None

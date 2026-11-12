@@ -193,6 +193,8 @@ class Hole:
     column: int
     storey: int
     balcony: bool = False
+    # A window on a wall no player sees from the ground he reaches (``reach.hidden_face``): drawn flat on any storey.
+    plain: bool = False
 
     def uv_rect(self) -> Polygon:
         return rect_uv(self.s0, self.v0, self.s0 + self.width, self.v0 + self.height)
@@ -206,8 +208,9 @@ FLAT_BACKS = frozenset({"glass_dark"})
 
 
 def is_flat(hole: Hole, relief_storeys: int) -> bool:
-    """Whether ``hole`` is drawn flat: a window or balcony door on storey ``relief_storeys`` or above, with an opaque back."""
-    return hole.kind in FLAT_KINDS and hole.back in FLAT_BACKS and hole.storey >= relief_storeys
+    """Whether ``hole`` is drawn flat: a window or balcony door on storey ``relief_storeys`` or above, or on a hidden
+    wall at any storey, with an opaque back."""
+    return hole.kind in FLAT_KINDS and hole.back in FLAT_BACKS and (hole.storey >= relief_storeys or hole.plain)
 
 
 # A 2.4 m door plus the 0.35 m lintel needs 2.75 m. Interior storeys are at least 2.8 m.
@@ -338,9 +341,13 @@ def layout_segment(
     cfg: DetailConfig,
     layout: Layout,
     floor_m: float = 0.0,
+    hidden: bool = False,
 ) -> None:
     """Lay the template's bays on one wall. With ``floor_m`` (a setback wall, ``setback_floor``),
-    a storey whose top is not above it is skipped and no opening starts below it."""
+    a storey whose top is not above it is skipped and no opening starts below it.
+
+    A ``hidden`` wall faces no ground a player reaches (a closed courtyard, plan P0): its bays are flat windows only,
+    with no balcony and no shopfront; the main door, when the wall carries it, stays."""
     length = seg.length
     usable = length - 2 * cfg.edge_margin_m
     if usable < template.narrow_window.width_m + cfg.min_pier_m:
@@ -361,7 +368,7 @@ def layout_segment(
         if not footprint.buffer(1e-6).contains(plan):
             layout.skipped["recess_outside_footprint"] += 1
             return False
-        layout.holes.append(Hole(kind, seg.index, s0, v0, o.width_m, o.height_m, depth, back, column, storey))
+        layout.holes.append(Hole(kind, seg.index, s0, v0, o.width_m, o.height_m, depth, back, column, storey, plain=hidden))
         return True
 
     def window(centre: float, z0: float, column: int, storey: int) -> None:
@@ -382,12 +389,12 @@ def layout_segment(
                         add(door_kind, c, 0.0, main_door, DOOR_BACK[door_kind], j, 0, depth=door_depth)
                     else:
                         layout.skipped["door_does_not_fit"] += 1
-                elif ground == "shopfront" and shop is not None:
+                elif ground == "shopfront" and shop is not None and not hidden:
                     add("shopfront", c, shop.sill_m, shop, "glass_dark", j, 0)
                 elif ground != "main_door_only":
                     window(c, z0, j, i)
                 continue
-            b = template.balcony
+            b = None if hidden else template.balcony
             if b is not None and stable_unit(cfg.seed, building_id, "balcony", seg.index, j) < b.share:
                 door = b.door
                 fits = door.width_m + cfg.min_pier_m <= bay_w and door.height_m + cfg.head_clearance_m <= storeys.height_m

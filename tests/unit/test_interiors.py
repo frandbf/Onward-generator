@@ -771,3 +771,23 @@ def test_furnished_floor_keeps_probes_outside_its_pieces_and_the_union_path_is_u
     assert all(_columns(r["probes_m"]) == kept for r in union["rooms"])
     both = light_anchors(plan, rooms, furniture=pieces, room_furniture={"block-light/L1": Point(xs[0], ys[0]).buffer(0.3)})
     assert _columns(both["rooms"][1]["probes_m"]) == kept - {(xs[0], ys[0])}
+
+
+def test_a_hidden_wall_window_is_never_pierced() -> None:
+    """Plan P0: a hidden wall's window stays a flat dark pane with a room behind it, so the shell costs the same."""
+    footprint, inner, segments = _square()
+    seen, hidden = _window(4.0, 1.0), replace(_window(4.0, 1.0), plain=True)
+    layout = Layout(holes=[hidden, seen])
+    opened, omitted = pierce_room_windows(layout, segments, inner, footprint, 0.3, 6.0)
+    assert (opened, omitted) == (1, 0)
+    assert layout.holes[0] == hidden  # untouched: glass_dark, its own depth
+    assert layout.holes[1].back == GLASS_VIEW
+
+
+def test_a_window_at_the_accessible_ceiling_is_not_pierced_and_one_below_it_is() -> None:
+    footprint, inner, segments = _square()
+    ceiling = 6.0
+    at, below = _window(4.0, ceiling - 1e-6), replace(_window(10.0, ceiling - 0.5), height=0.4)  # a transom under the ceiling
+    layout = Layout(holes=[at, below])
+    assert pierce_room_windows(layout, segments, inner, footprint, 0.3, ceiling) == (1, 0)
+    assert layout.holes[0] == at and layout.holes[1].back == GLASS_VIEW
