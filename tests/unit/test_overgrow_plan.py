@@ -333,8 +333,17 @@ def test_the_model_picks_the_props_and_the_rules_place_them(tmp_path: Path) -> N
     _library(library)
     out = tmp_path / "scene_overgrow"
     ids = sorted(p.spec.id for p in _props())
-    report = overgrow(base, scene_path, out, library=library, brief="A quiet block with a watched point", ai=True,
-                      provider=StaticProvider("replay", _pick_reply(*ids), "fixture"))
+    seen: list[str] = []
+
+    class _Pick:
+        name = "pick"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            seen.append(instruction)
+            return ProviderResult(_pick_reply(*ids), {})
+
+    report = overgrow(base, scene_path, out, library=library, brief="A quiet block with a watched point", ai=True, provider=_Pick())
+    assert '"A quiet block with a watched point"' in seen[0] and report["compose_actions"] == 0
     assert report["ambient_mode"] == "ai_pick" and report["ambient_origin"] == "ai_generated"
     assert report["ambient_pick"] == ids and report["library_assets"] == len(ids) and report["compose_attempts"] == 1
     assert set(report["placed_assets"]) <= set(ids) and report["compose_fallback"] is None
@@ -344,7 +353,7 @@ def test_the_model_picks_the_props_and_the_rules_place_them(tmp_path: Path) -> N
     fallback = overgrow(base, scene_path, tmp_path / "scene_rules", library=library, brief="A quiet block with a watched point",
                         ai=True, provider=down)
     assert down.calls == 2
-    assert fallback["ambient_mode"] == "rules" and fallback["ambient_origin"] != "ai_generated"
+    assert fallback["ambient_mode"] == "rules" and fallback["compose_actions"] == 0
     assert fallback["compose_attempts"] == 2 and fallback["compose_fallback"] and fallback["ambient_pick"] == []
     reused_provider = _Down()
     reused = overgrow(base, scene_path, out, library=library, brief="A quiet block with a watched point",
@@ -353,6 +362,7 @@ def test_the_model_picks_the_props_and_the_rules_place_them(tmp_path: Path) -> N
     assert reused["ambient_origin"] == "replay" and reused["ambient_pick"] == ids and reused["compose_attempts"] == 0
     rules = overgrow(base, scene_path, tmp_path / "scene_off", library=library, brief="A quiet block with a watched point", ai=False)
     assert rules["ambient_mode"] == "rules" and rules["ambient_pick"] == [] and rules["compose_attempts"] == 0
+    assert fallback["ambient_origin"] == rules["ambient_origin"] == "rules"
     assert not (tmp_path / "scene_off" / "ambient_plan.json").exists()
 
 

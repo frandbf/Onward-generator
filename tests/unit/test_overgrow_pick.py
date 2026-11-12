@@ -18,7 +18,10 @@ from onward_generator.overgrow.pick import (
     MIN_PICK,
     MIN_ROLES,
     PICK_SCHEMA,
+    SYSTEM_PROMPT,
     PickError,
+    instruction,
+    instruction_sha256,
     parse_pick,
     pick_props,
     pick_schema,
@@ -153,3 +156,102 @@ def test_the_default_provider_waits_for_the_overgrow_timeout(monkeypatch: pytest
     monkeypatch.setattr(providers, "OllamaProvider", _Fake)
     assert not pick_props(_props(), brief="").ok
     assert made == [pick_module.OVERGROW_TIMEOUT_S] == [600.0]
+
+
+def test_the_schema_is_whole() -> None:
+    assert pick_schema(["b", "a"], 4) == {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["pick_version", "mood", "asset_ids"],
+        "properties": {
+            "pick_version": {"const": "0.1.0"},
+            "mood": {"type": "string", "minLength": 1, "maxLength": 240},
+            "asset_ids": {"type": "array", "items": {"enum": ["a", "b"]}, "uniqueItems": True, "minItems": 4, "maxItems": MAX_PICK},
+        },
+    }
+
+
+def test_the_instruction_quotes_the_brief_as_written_and_sorts_each_row() -> None:
+    props = _props(roles=("barrier",), per_role=1)
+    text = instruction("Ruelle à l'abandon", props)
+    assert text.startswith('Brief (quoted exactly):\n"Ruelle à l\'abandon"\n\nLibrary:\n[{')
+    row = text.split("Library:\n", 1)[1]
+    assert row.index('"category"') < row.index('"id"') < row.index('"role"')
+    assert json.loads(row) == json.loads(json.dumps(pick_module.library_rows(props)))
+    assert instruction_sha256("x", props) == __import__("hashlib").sha256((SYSTEM_PROMPT + "\n" + instruction("x", props)).encode()).hexdigest()
+
+
+def test_the_reasons_a_pick_is_refused_are_named() -> None:
+    offered = _offered(_props())
+    ids = ["barrier_0", "barrier_1", "bench_0", "bench_1", "barrel_0", "cone_0"]
+    for text, message in (
+        (_reply(*ids, mood=""), "the reply needs a mood sentence"),
+        (json.dumps({"pick_version": "0.1.0", "mood": "m", "asset_ids": "x"}), "asset_ids must be a list of ids"),
+        (_reply(*ids[:4], "zz_1", "aa_2"), "ids that are not in the library: aa_2, zz_1"),
+        (_reply(*ids[:5], ids[0]), "each id may be chosen once"),
+    ):
+        with pytest.raises(PickError) as error:
+            parse_pick(text, offered)
+        assert str(error.value) == message
+
+
+def test_the_retry_repeats_the_instruction_and_the_records_are_whole() -> None:
+    props = _props()
+    ids = ("barrier_0", "barrier_1", "bench_0", "bench_1", "barrel_0", "cone_0")
+    asked = _Replies("{bad", _reply(*ids))
+    result = pick_props(props, brief="Calle cortada", provider=asked)
+    usable = pick_module.prompt_props(pick_module.fitted_props(props), "Calle cortada")
+    first, second = asked.calls[0][0], asked.calls[1][0]
+    assert first == instruction("Calle cortada", usable) and second.startswith(first)
+    assert '"Calle cortada"' in first
+    assert result.record == {
+        "schema": PICK_SCHEMA, "pick_version": "0.1.0", "instruction_sha256": instruction_sha256("Calle cortada", usable),
+        "origin": "ai_generated", "raw": _reply(*ids), "reason": None, "asset_ids": list(ids), "mood": "A barricaded street.",
+        "attempts": 2, "library": {"offered": 12, "fitted": 12},
+    }
+    replayed = pick_props(props, brief="Calle cortada", provider=_Replies(), replay=result.record)
+    assert replayed.record == {**result.record, "origin": "replay", "attempts": 0}
+    down = _Replies("{bad", "{worse")
+    failed = pick_props(props, brief="Calle cortada", provider=down)
+    assert failed.ok is False
+    assert failed.record == {
+        "schema": PICK_SCHEMA, "pick_version": "0.1.0", "instruction_sha256": instruction_sha256("Calle cortada", usable),
+        "origin": "rules_fallback", "raw": "{worse", "reason": failed.reason, "asset_ids": [], "mood": None,
+        "attempts": 2, "library": {"offered": 12, "fitted": 12},
+    }
+    assert failed.reason.startswith("the reply is not JSON")
+    silent = pick_props(props, brief="b", provider=_Replies(ProviderError("x"), ProviderError("y")))
+    assert silent.record["raw"] == "" and silent.reason == "y"
+
+
+def test_the_model_gets_the_system_prompt_and_the_small_library_bound() -> None:
+    small = _props(roles=("barrier", "bench"), per_role=2)
+
+    class _Seen:
+        name = "seen"
+        system = ""
+        schema: dict = {}
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            self.system, self.schema = system, schema
+            return ProviderResult(_reply(*(p.spec.id for p in small)), {})
+
+    seen = _Seen()
+    assert pick_props(small, brief="", provider=seen).ok
+    assert seen.system == SYSTEM_PROMPT and seen.schema["properties"]["asset_ids"]["minItems"] == 4
+
+
+def test_a_large_library_is_cut_by_the_brief() -> None:
+    many = _props(roles=("barrier", "bench", "barrel", "cone", "crate", "pallet", "debris"), per_role=40)
+    calls: list[str] = []
+
+    class _Seen:
+        name = "seen"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            calls.append(instruction)
+            raise ProviderError("off")
+
+    pick_props(many, brief="barrier", provider=_Seen())
+    expected = pick_module.prompt_props(pick_module.fitted_props(many), "barrier")
+    assert calls[0] == instruction("barrier", expected)

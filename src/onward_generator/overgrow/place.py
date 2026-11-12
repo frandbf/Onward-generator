@@ -249,44 +249,45 @@ def overgrow(
     use_pick = picked is not None and picked.ok
     wreck_count = 0
     wreck_colliders: list[Node] = []
-    for spot, yaw in _wreck_spots(lanes, buildings, seed, block_streets=plan.street_blocking):
-        if wreck_count >= wreck_cap:
-            break
-        turn = cross_yaw("wreck", wreck_count, street_blocking=plan.street_blocking, on_street=True)
-        z = floor.z(float(spot[0]), float(spot[1]))
-        matrix = yaw_matrix(float(spot[0]), float(spot[1]), z, yaw + turn)
-        reason = block_reason(
-            float(spot[0]), float(spot[1]), zone=area, buildings=buildings,
-            lane_tree=lane_tree, lanes=lanes, spawns=spawns,
-            allow_lane=plan.street_blocking,
-        ) or object_reason(role="wreck", mesh=wreck, matrix=matrix, buildings=buildings, lanes=lanes)
-        if reason is None and any(_footprint(wreck, matrix).intersects(area) for area in urban_areas):
-            reason = "on_urban_element"
-        if reason:
-            _note(rejects, reject_counts, "wreck", reason, spot)
-            continue
-        if not keep(seed, years.wrecks, f"{spot[0]:.1f}", f"{spot[1]:.1f}", "wreck-keep"):
-            continue
-        if not budget.take(wreck.triangle_count):
-            break
-        extra_nodes.append(Node(
-            f"overgrow/wreck/{wreck_count}",
-            (Primitive(wreck, "abandoned_wreck"),),
-            {"type": "overgrowth", "origin": "generated", "kind": "wreck", "crosswise": turn != 0.0},
-            matrix,
-            "overgrow:wreck",
-        ))
-        wreck_colliders.append(Node(
-            f"overgrow/collider/wreck/{wreck_count}",
-            (Primitive(collider_mesh(wreck, "wreck"), "collider"),),  # pragma: no mutate: any role but tree or lamp gives the whole box
-            {"type": "collision", "origin": "generated", "role": "wreck"},
-            matrix,
-        ))
-        row = _record("wreck", "generated", spot, None, z)
-        if turn:
-            row["crosswise"] = True
-        records.append(row)
-        wreck_count += 1
+    if wreck_cap:  # no wreck budget, no wreck spot to try
+        for spot, yaw in _wreck_spots(lanes, buildings, seed, block_streets=plan.street_blocking):
+            if wreck_count >= wreck_cap:
+                break
+            turn = cross_yaw("wreck", wreck_count, street_blocking=plan.street_blocking, on_street=True)
+            z = floor.z(float(spot[0]), float(spot[1]))
+            matrix = yaw_matrix(float(spot[0]), float(spot[1]), z, yaw + turn)
+            reason = block_reason(
+                float(spot[0]), float(spot[1]), zone=area, buildings=buildings,
+                lane_tree=lane_tree, lanes=lanes, spawns=spawns,
+                allow_lane=plan.street_blocking,
+            ) or object_reason(role="wreck", mesh=wreck, matrix=matrix, buildings=buildings, lanes=lanes)
+            if reason is None and any(_footprint(wreck, matrix).intersects(area) for area in urban_areas):
+                reason = "on_urban_element"
+            if reason:
+                _note(rejects, reject_counts, "wreck", reason, spot)
+                continue
+            if not keep(seed, years.wrecks, f"{spot[0]:.1f}", f"{spot[1]:.1f}", "wreck-keep"):
+                continue
+            if not budget.take(wreck.triangle_count):
+                break
+            extra_nodes.append(Node(
+                f"overgrow/wreck/{wreck_count}",
+                (Primitive(wreck, "abandoned_wreck"),),
+                {"type": "overgrowth", "origin": "generated", "kind": "wreck", "crosswise": turn != 0.0},
+                matrix,
+                "overgrow:wreck",
+            ))
+            wreck_colliders.append(Node(
+                f"overgrow/collider/wreck/{wreck_count}",
+                (Primitive(collider_mesh(wreck, "wreck"), "collider"),),  # pragma: no mutate: any role but tree or lamp gives the whole box
+                {"type": "collision", "origin": "generated", "role": "wreck"},
+                matrix,
+            ))
+            row = _record("wreck", "generated", spot, None, z)
+            if turn:
+                row["crosswise"] = True
+            records.append(row)
+            wreck_count += 1
     planted = dress(
         props,
         edges, features, buildings, lanes, lane_tree, area, years, seed, spawns,
@@ -299,6 +300,7 @@ def overgrow(
         keep_out=detail_elements(manifest),
         signs=sign_footprints(manifest),
     )
+    tuft_meshes.extend(planted.grass)
     by_id = {prop.spec.id: prop for prop in props}
     records.extend(planted.records)
     rejects.extend(planted.rejects)
