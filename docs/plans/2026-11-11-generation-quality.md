@@ -62,6 +62,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 
 - **Hacer:** medir la luminancia en la calle con las capturas fijas de E1 y probar más luz ambiental en `golden_hour`, sondas de luz más densas en las calles estrechas o un sol algo más alto cuando la calle es muy estrecha. Ningún cambio debe alterar el `neutral`.
 - **Aceptación:** un soldado se distingue a 30 m en la calle en sombra (casco).
+- **Hecho (11 de noviembre, salvo el casco):** `scene_report.json` mide ahora `probe_light`, la luz de las sondas donde está un jugador (PR #33). En Mouffetard el p10 era 0,0143. Una luz ambiental más clara lo subía a 0,016, y sondas exteriores más densas o con menos holgura lo dejaban entre 0,013 y 0,017: la sombra de una calle estrecha la iluminan sus paredes, no su franja de cielo. `golden_hour` hornea ahora la luz rebotada al doble (`indirect_intensity` 2, PR #34): p10 0,0227, mediana 0,0594 → 0,1083, suelo de la calle en sombra ×2 y el soleado +26 %. `neutral` y `overcast` no cambian. Falta la comprobación en el casco.
 
 ### Q5. Mobiliario urbano y árboles
 
