@@ -310,6 +310,27 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]], *, extended: bo
     return chosen
 
 
+def choice_schema(pools: Mapping[str, Sequence[Mapping[str, Any]]]) -> dict[str, Any]:
+    """``_CHOICE_SCHEMA`` with each slot's listed ids as an enum, for the model's structured output only.
+
+    One choice per slot whose family has a pool, each ``slot`` a const and its ``library_id`` one id of that pool, so
+    Ollama cannot pair a slot with another family's texture. The reply is still checked by ``_parse_choices``."""
+    branches = [
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["slot", "library_id"],
+            "properties": {"slot": {"const": slot}, "library_id": {"enum": sorted(str(row["id"]) for row in pools[family])}},
+        }
+        for slot, family in SLOT_FAMILY.items()
+        if pools.get(family)
+    ]
+    choices: dict[str, Any] = {"type": "array", "minItems": len(branches), "maxItems": len(branches)}
+    if branches:
+        choices["items"] = {"anyOf": branches}
+    return {**_CHOICE_SCHEMA, "properties": {"choices": choices}}
+
+
 def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], complaint: str | None,
          extended: bool) -> dict[str, str]:
     pools = _pools(rows, extended=extended)
@@ -329,7 +350,7 @@ def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitu
         "Use only listed ids, one id once, and the family named for that slot. "
         "Reply with JSON only."
     )
-    result = provider.complete(system, json.dumps(instruction, ensure_ascii=False), _CHOICE_SCHEMA)
+    result = provider.complete(system, json.dumps(instruction, ensure_ascii=False), choice_schema(pools))
     return _parse_choices(result.text, rows, extended=extended)
 
 
