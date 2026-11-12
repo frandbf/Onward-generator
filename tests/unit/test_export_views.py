@@ -194,3 +194,9 @@ def test_the_export_help_lists_the_views_command(capsys: pytest.CaptureFixture[s
     assert main(["export", "--help"]) == 0
     text = " ".join(capsys.readouterr().out.split())
     assert " views write build/views/views.json, the fixed eye-level cameras the adapter's views step renders (plan E1) options:" in text
+
+
+def test_the_spawn_heading_keeps_two_decimals() -> None:
+    # A mean of 0.00075 degrees rounds to 0.0 at two decimals (and would read 0.001 at three).
+    assert spawn_heading({"points_m": [{"x": 0, "y": 0, "yaw": 0.0}, {"x": 0, "y": 0, "yaw": 0.0015}]}) == 0.0
+    assert spawn_heading({"points_m": [{"x": 0, "y": 0, "yaw": 10.0123}, {"x": 0, "y": 0, "yaw": 10.0127}]}) == 10.01  # 10.013 at three
