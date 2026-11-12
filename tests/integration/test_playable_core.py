@@ -112,7 +112,7 @@ def test_a_scenic_building_is_a_plain_shell_without_a_collider(cored: Any, ring_
         "materials": {"wall": wall, "wall_origin": "generated", "roof": SCENIC_ROOF, "roof_origin": "generated"},
         "use": facade["use"],
         "typology": facade["typology"],
-        "door": "none", "doors_m": [],
+        "door": "none", "doors_m": [], "balconies_m": [],
     }
     assert facade["use"]["use"] == "retail"
     assert facade["typology"]["origin"] == "estimated"
