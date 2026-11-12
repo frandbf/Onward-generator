@@ -586,3 +586,42 @@ def test_compose_sends_the_run_schema() -> None:
     digest = build_digest(scene)
     expected = run_schema(digest.anchor_ids(), {p.spec.id: p.spec.grouping for p in fitted_props(props)})
     assert schemas == [expected, expected]
+
+
+def test_a_row_costs_its_bytes_over_three_plus_one_whole_tokens() -> None:
+    row = {"id": "abcd"}  # {"id": "abcd"} is 14 bytes
+    assert _row_tokens(row) == 5 and isinstance(_row_tokens(row), int)
+    assert _row_tokens({"id": "abcde"}) == 6  # 15 bytes
+
+
+def test_a_short_role_does_not_end_the_turn_of_the_others() -> None:
+    short = _many(1, roles=("aaa",))
+    longer = [Prop(replace(p.spec, id=f"z_{i}"), p.mesh, p.uvs, p.albedo) for i, p in enumerate(_many(5, roles=("bbb",)))]
+    props = [*short, *longer]
+    cost = {str(row["id"]): _row_tokens(row) for row in library_rows(props)}
+    budget = sum(cost.values()) - 1  # everything but a part of the last row
+    chosen = {p.spec.id for p in prompt_props(props, "", budget=budget)}
+    assert "lib_000" in chosen and len(chosen) == 5
+
+
+def test_an_accepted_and_a_replayed_plan_record_the_library() -> None:
+    features = _block_features()
+    scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")
+    raw = FIXTURE.read_text(encoding="utf-8")
+    props = _props()
+    library = {"offered": len(fitted_props(props)), "fitted": len(fitted_props(props))}
+    first = compose(scene, props, _site(features), brief="A quiet block", provider=StaticProvider("replay", raw, "test"))
+    assert first.origin == "ai_generated" and first.record["library"] == library
+
+    class _Never:
+        name = "never"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            raise AssertionError("a stored reply is replayed without a call")
+
+    again = compose(scene, props, _site(features), brief="A quiet block", provider=_Never(), replay=first.record)
+    assert again.origin == "replay" and again.ok
+    record = again.record
+    assert record["library"] == library and record["attempts"] == 0 and record["raw"] == raw
+    assert record["digest_sha256"] == first.record["digest_sha256"] and record["instruction_sha256"] == first.record["instruction_sha256"]
+    assert record["origin"] == "replay"

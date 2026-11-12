@@ -90,7 +90,7 @@ def prompt_props(props: list[Prop], brief: str, budget: int = LIBRARY_BUDGET_TOK
     letters or more with the brief, then the order of a hash of the id. Deterministic: the same props and brief give
     the same subset. The model may only use the ids it was sent."""
     rows = {str(row["id"]): row for row in library_rows(props)}
-    if sum(_row_tokens(row) for row in rows.values()) <= budget:
+    if sum(_row_tokens(row) for row in rows.values()) <= budget:  # pragma: no mutate: at exactly the budget the subset below takes every row in the same order
         return list(props)
     words = set(re.findall(r"[a-z]{4,}", brief.lower()))
 
