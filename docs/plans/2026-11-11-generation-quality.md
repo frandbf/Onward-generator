@@ -46,6 +46,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 - **Hacer:** averiguar qué parte cierra el paso (pasos más estrechos que un jugador, cruces que faltan, manzanas que tocan el muro) y si `routes 1` es real o un efecto de la rejilla de 2 m del informe. Que `run` avise cuando el suelo alcanzable caiga por debajo de un umbral.
 - **Aceptación:** al menos 2 rutas distintas en Mouffetard, y ninguna ruta de bot descartada en Unity.
 - **Hecho (Q1a, enmienda C6 de ADR-032 del 11 de noviembre):** `balanced_spawns` también mueve a los atacantes, y con diferencia de contacto ≤ 15 % gana el candidato con más rutas. Madrid Sol arena pasa de 3 a 5 rutas y Madrid Sol workshop de 2 a 6. `run` avisa cuando un mapa queda con 1 ruta. Mouffetard sigue con 1: es un pasillo real, porque la calle del mercado es la única conexión norte–sur que pisan los bots, y eso lo cambia la elección del centro y del núcleo, no la colocación. Las rutas de bots que Unity descarta quedan pendientes.
+- **Hecho (Q1b, 11 de noviembre):** los puntos de patrulla se muestrean sobre las islas encogidas 0,5 m más (`route_islands`). Los dos puntos que Unity descartaba en Mouffetard estaban a 0,41 m del muro del núcleo y a 0,2 m fuera del suelo encogido. Con el margen, el `launcher` conserva las 32 rutas: no ancla ningún waypoint ni descarta ninguno.
 
 ### Q2. Presupuesto de triángulos y radio por defecto
 

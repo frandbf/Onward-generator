@@ -23,6 +23,7 @@ from onward_generator.perf.layout import (
     MODE_CODES,
     NAV_AGENT_RADIUS_M,
     ROOF_WIND_MAX,
+    ROUTE_CLEARANCE_M,
     ROUTE_POINTS,
     ROUTE_STEP_M,
     SPAWN_SEPARATION_M,
@@ -50,6 +51,7 @@ from onward_generator.perf.layout import (
     playable_area,
     reachable_ground,
     roof_wind,
+    route_islands,
     scatter_points,
     spread_routes,
     street_lights,
@@ -474,6 +476,35 @@ def test_hunt_routes_keep_every_origin_route_and_fill_from_other_islands() -> No
     assert routes[: len(on_home)] == on_home
     assert all(point["x"] == 100.0 for route in routes[len(on_home):] for point in route["points"])
     assert len({(route["points"][0]["x"], route["points"][0]["y"]) for route in routes}) == AI_COUNT
+
+
+def test_patrol_ground_leaves_a_narrow_strip_along_a_wall() -> None:
+    """Plan Q1b: a strip 0.8 m wide off a square is navmesh in 2D and not in Unity's voxels; patrols keep off it."""
+    square = box(0.0, 0.0, 20.0, 20.0)
+    strip = box(20.0, 9.6, 40.0, 10.4)
+    far = box(60.0, 0.0, 90.0, 30.0)
+    parts, home = route_islands([union_all([square, strip]), far], (5.0, 5.0))
+    assert ROUTE_CLEARANCE_M == 0.5
+    assert home.bounds[:2] == pytest.approx((0.5, 0.5), abs=1e-6) and home.bounds[2] < 20.0
+    assert not home.covers(Point(25.0, 10.0))
+    # Every island shrinks, the far one too, and stays a separate piece.
+    assert len(parts) == 2 and max(part.bounds[2] for part in parts) == pytest.approx(89.5)
+
+
+def test_patrol_home_is_the_largest_piece_of_the_uplink_island() -> None:
+    """A neck narrower than twice the clearance splits the island; the larger side is home, wherever the Uplink is."""
+    small = box(0.0, 0.0, 6.0, 6.0)
+    neck = box(6.0, 2.6, 8.0, 3.4)
+    large = box(8.0, 0.0, 30.0, 20.0)
+    parts, home = route_islands([union_all([small, neck, large])], (3.0, 3.0))
+    assert len(parts) == 2
+    assert home.bounds[1:] == pytest.approx((0.5, 29.5, 19.5), abs=1e-6) and home.bounds[0] > 7.0
+    assert not home.covers(Point(3.0, 3.0))
+
+
+def test_patrol_ground_refuses_an_uplink_island_with_no_room() -> None:
+    with pytest.raises(LayoutError, match=r"leaves no patrol ground 0.5 m from its edges"):
+        route_islands([box(0.0, 0.0, 0.9, 10.0)], (0.45, 5.0))
 
 
 def test_spread_routes_returns_nothing_for_no_room() -> None:
