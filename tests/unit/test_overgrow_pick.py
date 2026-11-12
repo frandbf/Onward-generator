@@ -16,7 +16,7 @@ from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.pick import (
     MAX_PICK,
     MIN_PICK,
-    MIN_ROLES,
+    MIN_SPOTS,
     PICK_SCHEMA,
     SYSTEM_PROMPT,
     PickError,
@@ -30,12 +30,15 @@ from onward_generator.overgrow.pick import (
 PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx"
        b"\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82")
 BASE = ASSETS_BY_ID["concrete_road_barrier"]
+# One placement rule (spot) per role: barriers_curb, furniture_off_lane, waste_ground, structures_edge.
+CATEGORY = {"barrier": "barriers", "bench": "furniture", "barrel": "waste", "cone": "structures"}
 
 
 def _props(roles: tuple[str, ...] = ("barrier", "bench", "barrel", "cone"), per_role: int = 3) -> list[Prop]:
     mesh = box(-0.3, 0.3, -0.2, 0.2, 0.0, 0.8)
     uvs = np.zeros((mesh.vertex_count, 2), dtype=np.float32)
-    return [Prop(replace(BASE, id=f"{role}_{k}", role=role), mesh, uvs, PNG) for role in roles for k in range(per_role)]
+    return [Prop(replace(BASE, id=f"{role}_{k}", role=role, category=CATEGORY.get(role, "waste")), mesh, uvs, PNG)
+            for role in roles for k in range(per_role)]
 
 
 def _reply(*ids: str, version: str = "0.1.0", mood: object = "A barricaded street.") -> str:
@@ -46,8 +49,8 @@ def _offered(props: list[Prop]) -> dict[str, Prop]:
     return {p.spec.id: p for p in props}
 
 
-def test_a_pick_names_six_to_twenty_offered_ids_of_three_roles() -> None:
-    assert (MIN_PICK, MAX_PICK, MIN_ROLES) == (6, 20, 3)
+def test_a_pick_names_six_to_twenty_offered_ids_of_three_spots() -> None:
+    assert (MIN_PICK, MAX_PICK, MIN_SPOTS) == (6, 20, 3)
     offered = _offered(_props())
     ids = ("barrier_0", "barrier_1", "bench_0", "bench_1", "barrel_0", "cone_0")
     assert parse_pick(_reply(*ids), offered) == (ids, "A barricaded street.")
@@ -62,7 +65,7 @@ def test_a_pick_names_six_to_twenty_offered_ids_of_three_roles() -> None:
         (_reply(*ids[:5], "lamp_9"), "not in the library: lamp_9"),
         (_reply(*ids[:5], "barrier_0"), "chosen once"),
         (_reply(*ids[:5]), "from 6 to 20 ids, not 5"),
-        (_reply("barrier_0", "barrier_1", "barrier_2", "bench_0", "bench_1", "bench_2"), "at least 3 roles, not 2"),
+        (_reply("barrier_0", "barrier_1", "barrier_2", "bench_0", "bench_1", "bench_2"), "at least 3 spots, not 2"),
     ):
         with pytest.raises(PickError, match=message):
             parse_pick(text, offered)
@@ -177,7 +180,8 @@ def test_the_instruction_quotes_the_brief_as_written_and_sorts_each_row() -> Non
     assert text.startswith('Brief (quoted exactly):\n"Ruelle à l\'abandon"\n\nLibrary:\n[{')
     row = text.split("Library:\n", 1)[1]
     assert row.index('"category"') < row.index('"id"') < row.index('"role"')
-    assert json.loads(row) == json.loads(json.dumps(pick_module.library_rows(props)))
+    assert json.loads(row) == [r | {"spot": "barriers_curb"} for r in json.loads(json.dumps(pick_module.library_rows(props)))]
+    assert row.index('"role"') < row.index('"spot"') < row.index('"surfaces"')
     accented = [Prop(replace(props[0].spec, description="Barrière usée"), props[0].mesh, props[0].uvs, PNG)]
     assert "Barrière usée" in instruction("", accented)
     assert instruction_sha256("x", props) == __import__("hashlib").sha256((SYSTEM_PROMPT + "\n" + instruction("x", props)).encode()).hexdigest()
@@ -257,3 +261,28 @@ def test_a_large_library_is_cut_by_the_brief() -> None:
     pick_props(many, brief="barrier", provider=_Seen())
     expected = pick_module.prompt_props(pick_module.fitted_props(many), "barrier")
     assert calls[0] == instruction("barrier", expected)
+
+
+def test_only_props_the_rules_place_are_offered() -> None:
+    """Rue Mouffetard: a traffic light and lamp posts were picked and never placed; a gift box stood on the sidewalk."""
+    props = _props()
+    lamp = Prop(replace(BASE, id="lamp_0", role="lamppost", category="barriers"), props[0].mesh, props[0].uvs, PNG)
+    gift = Prop(replace(BASE, id="gift_0", role="giftbox", category="waste"), props[0].mesh, props[0].uvs, PNG)
+    assert pick_module._spot(lamp) == "" and pick_module._spot(gift) == "waste_ground"
+    assert [p.spec.id for p in pick_module.placeable([*props, lamp, gift])] == [p.spec.id for p in props]
+    calls: list[str] = []
+
+    class _Seen:
+        name = "seen"
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            calls.append(instruction)
+            raise ProviderError("off")
+
+    result = pick_props([*props, lamp, gift], brief="", provider=_Seen())
+    assert "lamp_0" not in calls[0] and "gift_0" not in calls[0] and result.record["library"] == {"offered": 12, "fitted": 14}
+    # Three spots are needed even when the ids span four roles of one rule.
+    waste = _offered(_props(roles=("crate", "pallet", "bag", "sack"), per_role=2) + _props(roles=("barrier", "bench"), per_role=1))
+    with pytest.raises(PickError, match="at least 3 spots, not 1"):
+        parse_pick(_reply("crate_0", "crate_1", "pallet_0", "pallet_1", "bag_0", "sack_0"), waste)
+    assert parse_pick(_reply("crate_0", "crate_1", "pallet_0", "bag_0", "barrier_0", "bench_0"), waste)[0][-1] == "bench_0"

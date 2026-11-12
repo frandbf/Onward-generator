@@ -2,7 +2,7 @@
 
 The placement plan asked the model where each copy goes, by digest ids. ``qwen3:14b`` put every copy on one lane
 anchor in each of three runs on Rue Mouffetard (12 November 2026), even when the retry said to spread them, so the
-rules placed every prop of those maps. Here the model only names 6 to 20 offered asset ids of at least 3 roles, and
+rules placed every prop of those maps. Here the model only names 6 to 20 offered asset ids of at least 3 spots, and
 a mood; ``place.overgrow`` then hands the rules that subset of the library, so the props are the model's and the
 spacing, the passage and the keep-outs are the rules'. The prompt carries no digest, so it is short.
 
@@ -17,6 +17,8 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from onward_generator.overgrow.catalog import rules_for
+from onward_generator.overgrow.dressing import INDOOR_ROLES
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.prompt import library_rows, prompt_props
 from onward_generator.overgrow.realize import OVERGROW_TIMEOUT_S, fitted_props
@@ -25,12 +27,15 @@ PICK_VERSION = "0.1.0"
 PICK_SCHEMA = "onward_generator.overgrow_ambient_pick"
 MIN_PICK = 6
 MAX_PICK = 20
-MIN_ROLES = 3
+# Spots: the placement rules (``catalog.PLACEMENT_RULES``) a pick spans. Each rule caps its copies for all its props
+# together, so a pick of 13 waste props and one car on Rue Mouffetard (12 November 2026) got 13 copies; the whole
+# library, over 9 rules, got 34.
+MIN_SPOTS = 3
 PICK_ATTEMPTS = 2
 
 SYSTEM_PROMPT = f"""You choose the props of a 3D city map. Reply with one JSON object and nothing else. No prose, no markdown, no code.
 
-The user message has a brief in quotes and the installed library. Choose the library rows that suit the brief: from {MIN_PICK} to {MAX_PICK} different asset ids, of at least {MIN_ROLES} different roles. When the brief is empty, choose what an abandoned street of any city holds. You do not place anything: the code spreads the chosen props along the streets and keeps the passages clear.
+The user message has a brief in quotes and the installed library. Choose the library rows that suit the brief: from {MIN_PICK} to {MAX_PICK} different asset ids, of at least {MIN_SPOTS} different spot values (each spot is a kind of place on the street, and caps how many copies stand there). When the brief is empty, choose what an abandoned street of any city holds. You do not place anything: the code spreads the chosen props along the streets and keeps the passages clear.
 
 The object has exactly these keys:
 - pick_version: always "{PICK_VERSION}".
@@ -54,7 +59,8 @@ class PickError(ValueError):
 
 def instruction(brief: str, props: list[Prop]) -> str:
     quoted = json.dumps(brief, ensure_ascii=False)  # pragma: no mutate: None is falsy like False and writes the same text
-    rows = library_rows(props)
+    spots = {prop.spec.id: _spot(prop) for prop in props}
+    rows = [row | {"spot": spots[str(row["id"])]} for row in library_rows(props)]
     library_json = json.dumps(rows, sort_keys=True, ensure_ascii=False)  # pragma: no mutate: ensure_ascii=None is false, as False; the sort and the non-ASCII text are pinned by tests
     return f"Brief (quoted exactly):\n{quoted}\n\nLibrary:\n{library_json}\n"
 
@@ -63,9 +69,21 @@ def instruction_sha256(brief: str, props: list[Prop]) -> str:
     return hashlib.sha256((SYSTEM_PROMPT + "\n" + instruction(brief, props)).encode("utf-8")).hexdigest()
 
 
+def _spot(prop: Prop) -> str:
+    """The placement rule that places ``prop`` (``catalog.rules_for``), or ``""`` when no rule does."""
+    rules = rules_for(prop.spec)
+    return rules[0].id if rules else ""
+
+
+def placeable(props: list[Prop]) -> list[Prop]:
+    """The props the rules can place: a placement rule takes them and their role is not an indoor one. A lamp post or
+    a traffic light no rule places was offered, picked and never placed (five of 20 picks on Rue Mouffetard)."""
+    return [prop for prop in props if _spot(prop) and prop.spec.role not in INDOOR_ROLES]
+
+
 def _bounds(offered: Mapping[str, Prop]) -> tuple[int, int]:
-    """The fewest ids and roles a pick needs: ``MIN_PICK`` and ``MIN_ROLES``, or all a small library offers."""
-    return min(MIN_PICK, len(offered)), min(MIN_ROLES, len({prop.spec.role for prop in offered.values()}))
+    """The fewest ids and spots a pick needs: ``MIN_PICK`` and ``MIN_SPOTS``, or all a small library offers."""
+    return min(MIN_PICK, len(offered)), min(MIN_SPOTS, len({_spot(prop) for prop in offered.values()}))
 
 
 def pick_schema(asset_ids: list[str], fewest: int = MIN_PICK) -> dict:
@@ -103,19 +121,19 @@ def parse_pick(text: str, offered: Mapping[str, Prop]) -> tuple[tuple[str, ...],
     chosen = tuple(dict.fromkeys(ids))
     if len(chosen) != len(ids):
         raise PickError("each id may be chosen once")
-    fewest, fewest_roles = _bounds(offered)
+    fewest, fewest_spots = _bounds(offered)
     if not fewest <= len(chosen) <= MAX_PICK:
         raise PickError(f"choose from {fewest} to {MAX_PICK} ids, not {len(chosen)}")
-    roles = {offered[item].spec.role for item in chosen}
-    if len(roles) < fewest_roles:
-        raise PickError(f"choose ids of at least {fewest_roles} roles, not {len(roles)}")
+    spots = {_spot(offered[item]) for item in chosen}
+    if len(spots) < fewest_spots:
+        raise PickError(f"choose ids of at least {fewest_spots} spots, not {len(spots)}")
     return chosen, mood
 
 
 def pick_props(props: list[Prop], *, brief: str, provider=None, replay: Mapping[str, object] | None = None) -> PickResult:
     """Ask for a pick of ``props``, or replay a stored one with the same instruction."""
     fitted = fitted_props(props)
-    usable = prompt_props(fitted, brief)
+    usable = prompt_props(placeable(fitted), brief)
     offered = {prop.spec.id: prop for prop in usable}
     library = {"offered": len(usable), "fitted": len(fitted)}
     digest = instruction_sha256(brief, usable)
@@ -162,5 +180,5 @@ def _record(origin: str, digest: str, raw: str, reason: str | None, ids: tuple[s
     }
 
 
-__all__ = ["MAX_PICK", "MIN_PICK", "MIN_ROLES", "PICK_SCHEMA", "PICK_VERSION", "PickError", "PickResult", "parse_pick",
+__all__ = ["MAX_PICK", "MIN_PICK", "MIN_SPOTS", "PICK_SCHEMA", "PICK_VERSION", "PickError", "PickResult", "parse_pick", "placeable",
            "pick_props", "pick_schema"]
