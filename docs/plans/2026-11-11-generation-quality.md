@@ -91,6 +91,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 ### Q8. `map create` y los interruptores
 
 - **Hacer:** que `map create` acepte los mismos interruptores que `map.json` y cree el plan de texturas con ellos, para no tener que repetir `--textures`.
+- **Hecho (12 de noviembre):** `map create` acepta un flag por cada interruptor booleano de `map.json` (`--street-profile`, `--repetition`, `--overture-tints`, `--lidar-roofs`, `--regional-facades`, `--gameplay-report`, `--balanced-spawns`, `--sightline-cover` y `--panoramax-atlas`). Solo escribe los que se activan, y con `--repetition` el plan de texturas sale ya con las paletas calmadas.
 
 ### Q9. IA desde Docker en macOS
 

@@ -11,7 +11,18 @@ import sys
 
 from onward_generator.ai.providers import OllamaProvider, ProviderError
 from onward_generator.export.atmosphere import NEUTRAL, preset_names
-from onward_generator.maps.workspace import MARGIN_DEFAULT_M, RADIUS_DEFAULT_M, TIME_OF_DAY_DEFAULT, TIMES_OF_DAY, MapError, create_map, load_map, map_directory, refresh_texture_plan
+from onward_generator.maps.workspace import (
+    MAP_SWITCHES,
+    MARGIN_DEFAULT_M,
+    RADIUS_DEFAULT_M,
+    TIME_OF_DAY_DEFAULT,
+    TIMES_OF_DAY,
+    MapError,
+    create_map,
+    load_map,
+    map_directory,
+    refresh_texture_plan,
+)
 from onward_generator.materials.plan import PlanError
 from onward_generator.next_step import emit, geo_command
 from onward_generator.osm.acquire import OsmDownloadError, download_map_osm, osm_target
@@ -44,6 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     create.add_argument("--overwrite", action="store_true", help="replace map.json and configs when processed/ is empty")
     create.add_argument("--textures", action="store_true", help="write or replace only config/texture_plan.json")
+    # Plan Q8: the map.json switches, so a new map needs no hand edit and no second --textures run.
+    for switch, text in MAP_SWITCHES.items():
+        create.add_argument("--" + switch.replace("_", "-"), dest=switch, action="store_true", help=f"store map.json {switch}: {text}")
 
     show = sub.add_parser("show", help="print a map folder and the geo command that reads it")
     show.add_argument("directory", help="map directory containing map.json")
@@ -79,10 +93,14 @@ def main(argv: list[str] | None = None) -> int:
                 core_target_triangles=args.core_target_triangles,
                 overwrite=args.overwrite,
                 texture_provider=_texture_provider(args.seed),
+                switches=[switch for switch in MAP_SWITCHES if getattr(args, switch)],
             )
             print(f"map {document['id']} ({document['name']}) at {directory}")
             print(f"texture plan {directory / 'config' / 'texture_plan.json'}")
             print(f"centre {document['center']['latitude']}, {document['center']['longitude']}  radius {document['radius_m']} m  lightmap {args.lightmap_texels_per_m:g} texels/m")
+            on = [switch for switch in MAP_SWITCHES if document.get(switch)]
+            if on:
+                print("switches " + ", ".join(on))
             existing = osm_target(directory)
             if existing.is_file() and not args.overwrite:
                 print(f"osm already at {existing}")

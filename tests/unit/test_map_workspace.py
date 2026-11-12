@@ -14,6 +14,7 @@ from onward_generator.cli import main
 from onward_generator.geo.aoi import load_aoi_geojson
 from onward_generator.geo.projection import LocalFrame
 from onward_generator.maps.workspace import (
+    MAP_SWITCHES,
     MapError,
     combine_cell_m,
     core_budget,
@@ -21,6 +22,8 @@ from onward_generator.maps.workspace import (
     gameplay_report_enabled,
     load_map,
     panoramax_atlas_enabled,
+    refresh_texture_plan,
+    repetition_enabled,
     source_enabled,
     store_gameplay_report,
     store_sources,
@@ -888,3 +891,66 @@ def test_mid_ring_value_accepts_a_budget_core_without_a_radius() -> None:
     assert _mid_ring_value({"core_radius_m": 100.0}, 20) == 20.0
     with pytest.raises(MapError, match="needs a playable core"):
         _mid_ring_value({"core_radius_m": 0}, 20)
+
+
+# ------------------------------------------------------------------------------------- plan Q8: map create switches
+
+
+def test_create_writes_only_the_switches_it_is_given_after_the_paths(tmp_path: Path) -> None:
+    plain = create_map(tmp_path / "plain", map_id="plain", name="Plain", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON)
+    assert not set(MAP_SWITCHES) & set(plain)
+    assert list(plain)[-1] == "paths"
+    chosen = create_map(tmp_path / "on", map_id="on", name="On", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                        switches=["sightline_cover", "repetition", "gameplay_report"])
+    # map.json order, not the order given.
+    assert list(chosen)[-4:] == ["paths", "repetition", "gameplay_report", "sightline_cover"]
+    assert all(chosen[name] is True for name in ("repetition", "gameplay_report", "sightline_cover"))
+    stored = json.loads((tmp_path / "on" / "map.json").read_text(encoding="utf-8"))
+    assert stored == chosen
+    assert repetition_enabled(tmp_path / "on") and gameplay_report_enabled(tmp_path / "on")
+    assert list(MAP_SWITCHES) == ["street_profile", "repetition", "overture_tints", "lidar_roofs", "regional_facades",
+                                  "gameplay_report", "balanced_spawns", "sightline_cover", "panoramax_atlas"]
+
+
+def test_create_with_repetition_writes_the_plan_a_texture_refresh_would(tmp_path: Path) -> None:
+    on = tmp_path / "on"
+    create_map(on, map_id="on", name="Same", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, seed=3, switches=["repetition"])
+    created = (on / "config" / "texture_plan.json").read_bytes()
+    refresh_texture_plan(on)
+    assert (on / "config" / "texture_plan.json").read_bytes() == created
+    off = tmp_path / "off"
+    create_map(off, map_id="off", name="Same", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON, seed=3)
+    assert (off / "config" / "texture_plan.json").read_bytes() != created
+
+
+def test_create_refuses_an_unknown_switch_before_writing(tmp_path: Path) -> None:
+    with pytest.raises(MapError, match=r"^unknown map switch fast_mode, turbo; known: street_profile, repetition, "):
+        create_map(tmp_path / "x", map_id="x", name="X", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+                   switches=["turbo", "repetition", "fast_mode"])
+    assert not (tmp_path / "x").exists()
+
+
+def test_map_create_cli_takes_every_switch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from types import SimpleNamespace
+
+    import onward_generator.maps.__main__ as map_cli
+
+    monkeypatch.setattr(map_cli, "download_map_osm", lambda directory, overwrite=False: SimpleNamespace(
+        size_bytes=1, sha256="abc", path=str(Path(directory) / "data" / "raw" / "x.osm")))
+    monkeypatch.chdir(tmp_path)
+    flags = ["--" + name.replace("_", "-") for name in MAP_SWITCHES]
+    assert main(["map", "create", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", *flags]) == 0
+    stored = json.loads((tmp_path / "maps" / "lorca" / "map.json").read_text(encoding="utf-8"))
+    assert {name: stored[name] for name in MAP_SWITCHES} == dict.fromkeys(MAP_SWITCHES, True)
+    assert "switches " + ", ".join(MAP_SWITCHES) + "\n" in capsys.readouterr().out
+    assert main(["map", "create", "--name", "Yecla", "--lat", "38.61", "--lon", "-1.11", "--balanced-spawns"]) == 0
+    yecla = json.loads((tmp_path / "maps" / "yecla" / "map.json").read_text(encoding="utf-8"))
+    assert [name for name in MAP_SWITCHES if name in yecla] == ["balanced_spawns"]
+    assert "switches balanced_spawns\n" in capsys.readouterr().out
+    assert main(["map", "create", "--name", "Mula", "--lat", "38.04", "--lon", "-1.49"]) == 0
+    assert "switches" not in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        main(["map", "create", "--help"])
+    shown = " ".join(capsys.readouterr().out.split())
+    assert "--sightline-cover store map.json sightline_cover: cover props on long open sightlines (plan C7)" in shown
+    assert "--repetition store map.json repetition: calm roof and paving pools" in shown
