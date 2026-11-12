@@ -39,6 +39,8 @@ def test_the_default_file_has_the_two_presets_of_the_plan() -> None:
     assert golden["ambient"] == {"mode": "trilight", "sky": "#8A9BB3", "equator": "#9A9080", "ground": "#5A5044"}
     assert presets["overcast"]["ambient"] == {"mode": "flat", "sky": "#9AA3AD"}
     assert presets["overcast"]["sun"]["azimuth"] == 150
+    # Plan Q4: golden_hour doubles the bounced light so a soldier in a shaded narrow street reads; overcast keeps Unity's.
+    assert golden["indirect_intensity"] == 2.0 and "indirect_intensity" not in presets["overcast"]
 
 
 def test_the_presets_cannot_be_changed_through_the_mapping() -> None:
@@ -125,6 +127,9 @@ _O = "presets.overcast"
         (f"{_G}.fog.color", "#E8D2B", "/presets/golden_hour/fog/color"),
         (f"{_G}.fog.color", _DELETE, "/presets/golden_hour/fog"),
         (f"{_G}.fog.start_m", 140, "/presets/golden_hour/fog"),
+        (f"{_G}.indirect_intensity", 0.9, "/presets/golden_hour/indirect_intensity"),
+        (f"{_G}.indirect_intensity", 4.1, "/presets/golden_hour/indirect_intensity"),
+        (f"{_G}.indirect_intensity", "2", "/presets/golden_hour/indirect_intensity"),
         (f"{_G}.lightmap_texels_per_m_core", 0, "/presets/golden_hour/lightmap_texels_per_m_core"),
         (f"{_G}.lightmap_texels_per_m_core", 41, "/presets/golden_hour/lightmap_texels_per_m_core"),
         (f"{_G}.grime", -0.1, "/presets/golden_hour/grime"),
@@ -157,10 +162,12 @@ def test_the_schema_accepts_the_boundaries(tmp_path: Path) -> None:
     golden = document["presets"]["golden_hour"]
     golden["sun"].update(elevation_deg=5, azimuth=-360, intensity=3, shadow_angle_deg=20)
     golden["ao"].update(max_distance_m=10, exponent_indirect=0, exponent_direct=10)
-    golden.update(lightmap_texels_per_m_core=40, grime=2, wall_desaturation=0.5, wall_value_max=0.5)
+    golden.update(lightmap_texels_per_m_core=40, grime=2, wall_desaturation=0.5, wall_value_max=0.5, indirect_intensity=4)
     document["presets"]["overcast"]["sun"].update(elevation_deg=89, azimuth=360)
-    document["presets"]["overcast"].update(grime=0, wall_desaturation=0, wall_value_max=1)
-    assert load_presets(_write(tmp_path, document))["golden_hour"]["sun"]["elevation_deg"] == 5
+    document["presets"]["overcast"].update(grime=0, wall_desaturation=0, wall_value_max=1, indirect_intensity=1)
+    loaded = load_presets(_write(tmp_path, document))
+    assert loaded["golden_hour"]["sun"]["elevation_deg"] == 5
+    assert (loaded["golden_hour"]["indirect_intensity"], loaded["overcast"]["indirect_intensity"]) == (4, 1)
 
 
 def test_a_missing_or_broken_file_is_refused(tmp_path: Path) -> None:
@@ -195,8 +202,9 @@ def test_a_street_azimuth_keeps_the_neutral_one_until_the_street_axis_is_measure
     assert block == {"sun_elevation_deg": 30.0, "sun_azimuth_deg": 150.0, "sun_color": "#FFE0B8", "sun_intensity": 1.4,
                      "sun_shadow_angle_deg": 1.5, "ambient_mode": "trilight", "ambient_sky_color": "#8A9BB3",
                      "ambient_equator_color": "#9A9080", "ambient_ground_color": "#5A5044",
-                     "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2}
+                     "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2, "indirect_intensity": 2.0}
     assert record == {"elevation_deg": 30.0, "azimuth_deg": 150.0, "azimuth_source": "streets_pending"}
+    assert type(block["indirect_intensity"]) is float
 
 
 def test_an_integer_azimuth_becomes_a_float() -> None:
@@ -208,3 +216,6 @@ def test_an_integer_azimuth_becomes_a_float() -> None:
     assert [type(block[k]) for k in ("ao_max_distance_m", "ao_exponent_indirect", "ao_exponent_direct")] == [float, float, float]
     assert (block["ao_max_distance_m"], block["ao_exponent_indirect"], block["ao_exponent_direct"]) == (2.0, 1.0, 0.0)
     assert record["azimuth_source"] == "preset"
+    assert "indirect_intensity" not in block
+    block, _record = lighting({**preset, "indirect_intensity": 3})
+    assert block["indirect_intensity"] == 3.0 and type(block["indirect_intensity"]) is float

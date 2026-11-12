@@ -265,14 +265,17 @@ def test_a_preset_is_recorded_in_the_options_and_the_manifest(inputs: tuple[Path
     assert street.axis_deg is not None and street.wall_area_m2 > 0
     lighting = {"sun_elevation_deg": 30.0, "sun_azimuth_deg": street.azimuth_deg, "sun_color": "#FFE0B8", "sun_intensity": 1.4, "sun_shadow_angle_deg": 1.5,
                 "ambient_mode": "trilight", "ambient_sky_color": "#8A9BB3", "ambient_equator_color": "#9A9080", "ambient_ground_color": "#5A5044",
-                "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2}
+                "ao_max_distance_m": 1.5, "ao_exponent_indirect": 1.0, "ao_exponent_direct": 0.2, "indirect_intensity": 2.0}
     assert before["fog_enabled"] is True and before["fog_color"] == "#C8CDD2"
     assert options == {**before, "variant": golden.manifest["package_id"], "atmosphere": "golden_hour", "lighting": lighting, "fog_color": "#E8D2B4"}
     assert golden.manifest["package_id"] != plain.manifest["package_id"]
-    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun", "ambient", "ao", "fog"],
+    assert golden.manifest["atmosphere"] == {"preset": "golden_hour", "origin": "generated", "applied": ["sun", "ambient", "ao", "indirect", "fog"],
                                              "sun": {"elevation_deg": 30.0, "azimuth_source": "streets", "axis_deg": street.axis_deg,
                                                      "wall_area_m2": street.wall_area_m2, "azimuth_deg": street.azimuth_deg}}
-    overcast = _package(inputs, tmp_path / "overcast_sun", atmosphere="overcast").manifest["atmosphere"]["sun"]
+    overcast_block = _package(inputs, tmp_path / "overcast_sun", atmosphere="overcast").manifest["atmosphere"]
+    # Plan Q4: only golden_hour scales the bounced light; overcast keeps Unity's.
+    assert overcast_block["applied"] == ["sun", "ambient", "ao", "fog"]
+    overcast = overcast_block["sun"]
     assert overcast == {"elevation_deg": 55.0, "azimuth_source": "preset", "azimuth_deg": 150.0}
     assert "lighting" not in before
     assert _package(inputs, tmp_path / "overcast", atmosphere="overcast").manifest["package_id"] != golden.manifest["package_id"]
@@ -294,7 +297,7 @@ def test_the_export_command_takes_the_preset(inputs: tuple[Path, Path, Path], tm
     args = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
     assert main([*args, "--out", str(tmp_path / "golden"), "--atmosphere", "golden_hour"]) == 0
     sun = json.loads((tmp_path / "golden" / "onward_export.json").read_bytes())["atmosphere"]["sun"]
-    assert f"  atmosphere golden_hour (ADR-037): applies sun, ambient, ao, fog; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
+    assert f"  atmosphere golden_hour (ADR-037): applies sun, ambient, ao, indirect, fog; sun at 30 deg, azimuth {sun['azimuth_deg']:g} deg (streets)\n" in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "plain")]) == 0
     assert "atmosphere" not in capsys.readouterr().out
     assert main([*args, "--out", str(tmp_path / "bad"), "--atmosphere", "sunset"]) == 1
@@ -354,6 +357,11 @@ def test_the_adapter_sets_the_ambient_and_the_ao_only_when_the_lighting_block_ha
     assert "settings.aoMaxDistance = opt.lighting.ao_max_distance_m;" in source
     assert "settings.aoExponentIndirect = opt.lighting.ao_exponent_indirect;" in source
     assert "settings.aoExponentDirect = opt.lighting.ao_exponent_direct;" in source
+    # Plan Q4: the bounced light, only when the block scales it; absent, Unity's Indirect Intensity of 1 stays.
+    assert "public float indirect_intensity;" in source
+    assert "if (opt.lighting != null && opt.lighting.indirect_intensity > 0f)" in source
+    assert "settings.indirectScale = opt.lighting.indirect_intensity;" in source
+    assert source.count("settings.indirectScale") == 2
 
 
 def test_a_preset_leaves_a_map_without_fog_without_fog(inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
@@ -365,7 +373,7 @@ def test_a_preset_leaves_a_map_without_fog_without_fog(inputs: tuple[Path, Path,
     result = _package(inputs, tmp_path / "pkg", atmosphere="golden_hour", export_config=path)
     options = json.loads((result.directory / "adapter_options.json").read_bytes())
     assert options["fog_enabled"] is False and options["fog_color"] == card["build"]["fog_color"]
-    assert result.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao"]
+    assert result.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao", "indirect"]
     golden = _package(inputs, tmp_path / "golden", atmosphere="golden_hour")
     plain = json.loads((_package(inputs, tmp_path / "plain").directory / "adapter_options.json").read_bytes())
     tinted = json.loads((golden.directory / "adapter_options.json").read_bytes())
@@ -397,7 +405,7 @@ def test_a_preset_bakes_the_core_denser_and_the_estimate_counts_it(inputs: tuple
     options = json.loads((golden.directory / "adapter_options.json").read_bytes())
     assert options["lightmap_core"] == {"half_side_m": 100.0, "scale": 1.4}
     assert "lightmap_core" not in json.loads((plain.directory / "adapter_options.json").read_bytes())
-    assert golden.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao", "fog", "lightmap_core"]
+    assert golden.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao", "indirect", "fog", "lightmap_core"]
     assert golden.manifest["atmosphere"]["lightmap_core"] == {"half_side_m": 100.0, "scale": 1.4}
     visual = (detail / "scene_visual.glb").read_bytes()
     expected = estimate(visual, texels_per_m=float(options["lightmap_texels_per_m"]), max_size=int(options["lightmap_max_size"]),

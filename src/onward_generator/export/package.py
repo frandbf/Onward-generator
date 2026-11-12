@@ -28,6 +28,7 @@ from onward_generator.contracts import is_schema
 from onward_generator.export.atmosphere import (
     APPLIED,
     FOG,
+    INDIRECT,
     LIGHTMAP_CORE,
     NEUTRAL,
     STREETS,
@@ -487,6 +488,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             street = street_sun(visual_bytes, (detail_manifest.get("core") or {}).get("half_side_m"))
         options["lighting"], sun_record = lighting(chosen, street)
         applied = list(APPLIED)
+        if "indirect_intensity" in options["lighting"]:
+            applied.append(INDIRECT)
         if options.get("fog_enabled"):
             # Plan E7: the preset tints the fog; where it starts and ends stays the map's, from its wall (ADR-014).
             options["fog_color"] = str(chosen["fog"]["color"])
