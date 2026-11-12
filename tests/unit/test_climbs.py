@@ -115,6 +115,21 @@ def test_a_lift_keeps_a_clear_apron_in_front_of_the_street_door() -> None:
     assert lift_on(footprint, box(-30, -6.2, 50, 0), NOTHING, 15.0) is None
 
 
+def test_a_street_cabin_takes_the_lift_ground_and_a_ladder_the_whole_ground() -> None:
+    """ADR-029 amendment of 12 November 2026: the layout hands a lift ground without the carriageway."""
+    footprint = box(0, 0, 20, 10)
+    ground = FREE.difference(footprint)
+    lift = _building("b", 5)
+    whole = place_climbs({"objects": [lift]}, {"b": footprint}, ground, NOTHING, [ATTACK], [DEFEND])["lifts"]
+    assert [(site["x"], site["y"]) for site in whole] == [(10.0, -1.65)]  # the south face, in the street
+    no_street = ground.difference(box(-30, -8, 50, 0))  # a carriageway along the south face
+    moved = place_climbs({"objects": [lift]}, {"b": footprint}, ground, NOTHING, [ATTACK], [DEFEND], lift_free=no_street)["lifts"]
+    assert moved and all(no_street.contains(Point(site["x"], site["y"])) for site in moved)
+    # Without lift_free the cabin takes the ground every climb takes.
+    same = place_climbs({"objects": [lift]}, {"b": footprint}, ground, NOTHING, [ATTACK], [DEFEND], lift_free=None)["lifts"]
+    assert same == whole
+
+
 def test_a_lift_needs_room_on_the_roof_and_stays_out_of_what_is_kept_clear() -> None:
     small = box(0, 0, 5, 5)
     assert lift_on(small, FREE.difference(small), NOTHING, 15.0) is None

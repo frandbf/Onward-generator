@@ -40,10 +40,12 @@ from tests.conftest import FIXED_NOW
 REPO = Path(__file__).resolve().parents[2]
 EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 # perf layout --playable --gameplay-report on this fixture at workshop/c5 (c3c90b4), before C6 changed any code.
-HEAD_LAYOUT_SHA256 = "cd51c366f376154aedc9faba4951fca3da63f72a53f482b53a31cdbd1d128a61"
+# Re-pinned on 12 November 2026 (ADR-029 amendment): lift 1 left the carriageway, so it and its roof wind moved;
+# nothing else in the layout changed, and the report changed only its layout_sha256.
+HEAD_LAYOUT_SHA256 = "b4a41ccf2c3a36c57e76c96e2a7d5f6c545ff2042d7180deec50c97450fecef7"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
-HEAD_REPORT_SHA256 = "2c6bda06dd8295099679e214c21e7f498307fd7f9c34e0be4758772dee6eb59a"
+HEAD_REPORT_SHA256 = "f4065bb07ea796bc60bb4ec037b10a30d83c8f9ed3e47d711d3f4f7b4f4615e9"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 

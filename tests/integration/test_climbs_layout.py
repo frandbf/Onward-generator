@@ -14,6 +14,7 @@ from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail import detail_scene, load_base, load_detail_config
 from onward_generator.export.package import _check_layout
 from onward_generator.generation import load_generation_config
+from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.perf.layout import AMMO_OBJECTIVE_CLEAR_M, TEAM_SEPARATION_M, gameplay_layout, playable_layout
 
 
@@ -54,6 +55,13 @@ def test_the_adapter_builds_both_after_the_navigation_bake() -> None:
     assert 'InstantiatePrefab("Ladder.prefab")' in source and 'InstantiatePrefab("Elevator.prefab")' in source
     assert 'InstantiatePrefab("AreaLadderPerch.prefab")' in source
     assert "street.PairedElevator = roof;" in source and "roof.PairedElevator = street;" in source
+    # The street cabins are Not Walkable boxes in the bake, so no bot path runs through one.
+    bake = source[source.index("private static void BakeNavigation("):source.index("NavMeshBuilder.BuildNavMeshData(")]
+    assert "BlockLiftCabins(layout, sources, blocked);" in bake
+    block = source[source.index("private static void BlockLiftCabins("):source.index("private static void BlockBuildingFootprints(")]
+    assert "shape = NavMeshBuildSourceShape.ModifierBox" in block and "area = blocked" in block
+    assert "Quaternion.Euler(0f, site.yaw, 0f)" in block and "Local(site.x, site.y, 1.6f)" in block
+    assert "LiftBlockWidthM = 3.4f" in source and "LiftBlockDepthM = 3.5f" in source
 
 
 def test_the_layout_carries_the_climbs_and_blows_wind_on_their_roofs(detail_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,8 +72,11 @@ def test_the_layout_carries_the_climbs_and_blows_wind_on_their_roofs(detail_inpu
     site = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "parapet_m": 0.7, "roof_x": 500.0, "roof_y": 500.0}
     seen: list[tuple] = []
 
-    def fake_place(*args: object) -> dict:
+    kwargs_seen: list[dict] = []
+
+    def fake_place(*args: object, **kwargs: object) -> dict:
         seen.append(args)
+        kwargs_seen.append(kwargs)
         return {"ladders": [site], "lifts": []}
 
     monkeypatch.setattr("onward_generator.perf.layout.place_climbs", fake_place)
@@ -77,6 +88,13 @@ def test_the_layout_carries_the_climbs_and_blows_wind_on_their_roofs(detail_inpu
     assert detail_arg is manifest and set(footprints) == {"b"}
     assert keep_out.contains(Point(layout["uplink_m"])) and keep_out.contains(Point(layout["ai_m"][0]["x"], layout["ai_m"][0]["y"]))
     assert free.area > 0
+    # A street cabin gets the same ground less the carriageway (ADR-029 amendment of 12 November 2026).
+    lift_free = kwargs_seen[0]["lift_free"]
+    carriageway = generated.partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
+    assert lift_free.difference(free).area < 1e-6
+    assert lift_free.intersection(carriageway).area < 1e-6
+    assert free.intersection(carriageway).area > 1.0
+    assert lift_free.area == pytest.approx(free.difference(carriageway).area)
     assert tuple(layout["attackers"]["centre_m"]) in attackers and tuple(layout["defenders"]["centre_m"]) in defenders
     assert tuple(layout["attackers_b"]["centre_m"]) in attackers and tuple(layout["defenders_b"]["centre_m"]) in defenders
 

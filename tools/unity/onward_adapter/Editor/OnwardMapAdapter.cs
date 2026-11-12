@@ -1504,6 +1504,7 @@ namespace OnwardGenerator
             int blocked = NavMesh.GetAreaFromName("Not Walkable");
             if (blocked < 0) blocked = 1;
             BlockBuildingFootprints(collisionRoot, sources, blocked);
+            BlockLiftCabins(layout, sources, blocked);
             Renderer[] renderers = collisionRoot.GetComponentsInChildren<Renderer>();
             Bounds bounds = renderers.Length > 0 ? renderers[0].bounds : new Bounds(collisionRoot.transform.position, Vector3.one * 20f);
             foreach (Renderer renderer in renderers) bounds.Encapsulate(renderer.bounds);
@@ -2276,6 +2277,28 @@ namespace OnwardGenerator
                 if (best > maxDepth) maxDepth = best;
             }
             return new NavWalk { nodes = count, largest = maxDepth, depth = maxDepth };
+        }
+
+        // A street cabin and its shell (PlaceCabin, about 3.4 x 3.5 m, door side local +Z) are placed after the bake, so
+        // the navmesh would run through them and bots would walk into a cabin (Rue Mouffetard, 12 November 2026). Each one
+        // is a Not Walkable box in the bake; the roof cabins stand on roofs, which have no navmesh.
+        private const float LiftBlockWidthM = 3.4f;
+        private const float LiftBlockDepthM = 3.5f;
+
+        private static void BlockLiftCabins(Layout layout, List<NavMeshBuildSource> sources, int blocked)
+        {
+            Climb[] lifts = layout.lifts ?? new Climb[0];
+            foreach (Climb site in lifts)
+            {
+                sources.Add(new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.ModifierBox,
+                    transform = Matrix4x4.TRS(Local(site.x, site.y, 1.6f), Quaternion.Euler(0f, site.yaw, 0f), Vector3.one),
+                    size = new Vector3(LiftBlockWidthM, 4f, LiftBlockDepthM),
+                    area = blocked,
+                });
+            }
+            if (lifts.Length > 0) Debug.Log($"{LogPrefix} Navigation: {lifts.Length} street cabins blocked.");
         }
 
         private static void BlockBuildingFootprints(GameObject collisionRoot, List<NavMeshBuildSource> sources, int blocked)
