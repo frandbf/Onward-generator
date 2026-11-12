@@ -44,8 +44,23 @@ def _point(value: Any, what: str) -> tuple[float, float]:
     return float(value[0]), float(value[1])
 
 
+def spawn_heading(block: Mapping[str, Any]) -> float | None:
+    """The circular mean of the ``yaw`` of a spawn block's points, the way its players face, or ``None`` without one.
+
+    A point's ``yaw`` is Unity's: degrees clockwise from north, the heading of this file."""
+    yaws = [float(p["yaw"]) for p in block.get("points_m") or [] if isinstance(p, Mapping) and "yaw" in p]
+    if not yaws:
+        return None
+    east = sum(math.sin(math.radians(y)) for y in yaws)
+    north = sum(math.cos(math.radians(y)) for y in yaws)
+    return round(math.degrees(math.atan2(east, north)), 2) % 360.0
+
+
 def capture_views(layout: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The views of a gameplay layout: both spawns, then the Uplink toward each spawn when the layout has one."""
+    """The views of a gameplay layout: both spawns, then the Uplink toward each spawn when the layout has one.
+
+    A spawn view faces the way its players spawn (``spawn_heading``), so it shows what they see first; a block
+    without yaws faces the other spawn. The Uplink views face each spawn."""
     if not is_schema(layout.get("schema"), GAMEPLAY_SCHEMA):
         raise ViewError("capture views need a gameplay layout: a perf layout has no spawns to look from")
     attackers = _point((layout.get("attackers") or {}).get("centre_m"), "attackers.centre_m")
@@ -55,8 +70,13 @@ def capture_views(layout: Mapping[str, Any]) -> list[dict[str, Any]]:
         uplink = _point(layout["uplink_m"], "uplink_m")
         pairs += [("uplink_to_attackers", uplink, attackers), ("uplink_to_defenders", uplink, defenders)]
     eye = float(layout.get("ground_z_m", 0.0)) + EYE_HEIGHT_M
-    return [{"name": name, "position_m": [origin[0], origin[1], round(eye, 3)], "heading_deg": heading_deg(origin, target), "pitch_deg": 0.0}
-            for name, origin, target in pairs]
+    faced = {name: spawn_heading(layout.get(name) or {}) for name in ("attackers", "defenders")}
+    views = []
+    for name, origin, target in pairs:
+        heading = faced.get(name)
+        views.append({"name": name, "position_m": [origin[0], origin[1], round(eye, 3)],
+                      "heading_deg": heading_deg(origin, target) if heading is None else heading, "pitch_deg": 0.0})
+    return views
 
 
 def views_document(layout: Mapping[str, Any]) -> dict[str, Any]:
@@ -86,4 +106,4 @@ def write_views(package: str | Path) -> Path:
     return folder / VIEWS_FILE
 
 
-__all__ = ["EYE_HEIGHT_M", "FOV_DEG", "ViewError", "capture_views", "heading_deg", "views_document", "write_views"]
+__all__ = ["EYE_HEIGHT_M", "FOV_DEG", "ViewError", "capture_views", "heading_deg", "spawn_heading", "views_document", "write_views"]
