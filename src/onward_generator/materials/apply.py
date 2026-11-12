@@ -469,7 +469,8 @@ def apply_materials(
     }
     trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
                       cache=None if trim_root is None else TileCache(trim_root),
-                      regional=regional_facades, regional_table_path=regional_table, palette=palette)
+                      regional=regional_facades, regional_table_path=regional_table, palette=palette,
+                      observed_walls=brick_nodes)
     visual_nodes = trim.nodes
     # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
     # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.

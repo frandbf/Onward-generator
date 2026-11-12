@@ -144,6 +144,9 @@ def _check_atlas(name: str, atlas: Mapping[str, Any]) -> None:
     for wall in atlas.get("wall_tints") or {}:
         if wall not in atlas["walls"]:
             raise StyleError(f"style {name}: wall tint {wall} has no strip")
+    for wall, target in (atlas.get("estimated_walls") or {}).items():
+        if wall not in atlas["walls"] or target not in atlas["walls"]:
+            raise StyleError(f"style {name}: estimated wall {wall} -> {target} needs a strip for both")
     if wall_strip_px(atlas) < 4 * int(atlas["gutter_px"]):
         strips = len(atlas["walls"]) * len(atlas["tones"])
         raise StyleError(f"style {name}: {strips} wall strips do not fit the atlas height")

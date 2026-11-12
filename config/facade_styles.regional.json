@@ -275,6 +275,7 @@
         "stone_warm": "ashlar",
         "brick_red": "brick"
       },
+      "estimated_walls": { "brick_red": "plaster_cream" },
       "wall_tints": {
         "plaster_ochre": [0.7, 0.6, 0.45],
         "plaster_cream": [0.74, 0.66, 0.52],
