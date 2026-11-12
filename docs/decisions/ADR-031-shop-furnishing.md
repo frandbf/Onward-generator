@@ -77,3 +77,12 @@ Then this ADR goes from proposed to accepted, or is corrected.
 - **Placing furniture in overgrow's street placement.** Its fit check flags anything in a footprint as `inside_building`, and its loader must keep refusing interior rows so no shelf lands on a street.
 - **Drawing the furniture in `detail`'s visual GLB.** `detail` writes no library mesh today; overgrow already loads, reduces and textures library GLBs, and its report records them.
 - **The Mini Shop rows at their file size.** 1.2 to 2.1 m deep shelves would fill a 4 m room; they are refused by the depth limits until their scale is reviewed.
+
+## Amendment (12 November 2026): a smaller shop budget spread over more shops (plan P0)
+
+Status: proposed until a headset session, like the record.
+
+- **Context.** On Rue Mouffetard with every switch on (radius 150 m, core 95 m, a 30 m mid ring), furniture was 92 000 of 229 000 visual triangles, more than every building together: shops 69 690 of their 70 000, homes 22 356. The map was estimated at 264 000 Unity triangles, over the 250 000 limit, and only fitted with the core cut to 85 m. Even so the shop budget ran out after 27 of 42 rooms (13 refused for `triangle_budget`).
+- **Decision.** `interiors.shops.furnish.max_triangles` 70 000 → 45 000 and `max_pieces_per_room` 12 → 8 for shops (homes keep 30 000 and 12). The per-room cap still excludes decor, tops, rugs and seats.
+- **Measured** (`run --from detail` on a copy of the map, Docker on an Apple M4 Pro; generator estimates, not a bake): core 95 m with the mid ring at 236 861 estimated Unity triangles with the budget alone (15 of 42 shops furnished), and 237 251 with the budget and 8 pieces per room (33 of 42 shops furnished, 355 pieces, 44 496 triangles). The second is the decision: more shops look lived in, each with fewer pieces, and the map keeps its 95 m core.
+- **Consequences.** Every map's shop furnishing changes, so `detail` is stale for maps rerun after this change. A dense shop row shows fewer pieces per window.

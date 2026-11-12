@@ -168,9 +168,9 @@
       "furnish": {
         "enabled": true,
         "selection": "semantic",
-        "max_triangles": 70000,
+        "max_triangles": 45000,
         "max_collision_triangles": 8000,
-        "max_pieces_per_room": 12,
+        "max_pieces_per_room": 8,
         "max_assets": 64,
         "walk_width_m": 1.2,
         "wall_gap_m": 0.03,

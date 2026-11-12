@@ -197,7 +197,7 @@ On by default since 10 November 2026: `interiors.shops.furnish.enabled` is `true
 - island rows with an aisle;
 - the walls again.
 
-The cap is one piece per 8 m² (at least 4, at most `max_pieces_per_room`, 12). Decor, tops, rugs and seats are left out of the cap. A slot no row fills keeps the hand-written entries, and a set with no zone slot keeps the plan below exactly. `ONWARD_SEMANTIC_SETS=0` keeps the hand-written sets. Budgets: shops 70 000 triangles, 8 000 collision, 64 assets; homes 30 000, 4 000, 64. The record's `slot` takes the new names.
+The cap is one piece per 8 m² (at least 4, at most `max_pieces_per_room`: 8 in a shop since plan P0, 12 in a home). Decor, tops, rugs and seats are left out of the cap. A slot no row fills keeps the hand-written entries, and a set with no zone slot keeps the plan below exactly. `ONWARD_SEMANTIC_SETS=0` keeps the hand-written sets. Budgets: shops 45 000 triangles (70 000 before plan P0, 12 November 2026), 8 000 collision, 64 assets; homes 30 000, 4 000, 64. The record's `slot` takes the new names.
 
 `detail` plans catalogue furniture in each reachable shop room after the room is built and charged (`detail/furnish.py`); `overgrow place` builds it (`docs/01-pipeline.md`, 8c). Every piece is `attribute_origin: generated`, and the rows' semantics are `estimated` (no person reviewed a rendered view).
 
