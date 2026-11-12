@@ -513,8 +513,31 @@ def _turn(prop: Prop, spot: Spot, role_placed: Counter[str], block_streets: bool
     )
 
 
+# A ``wall_foot`` prop (a crate, a sack, a pallet) stands within this of a building's wall (12 November 2026: on Rue
+# Mouffetard the rules left boxes in the middle of the sidewalk by the kerb, the hint was only read by the model).
+WALL_FOOT_M = 1.5
+# Where an ``open_ground`` prop (a yard, a lot, a plaza) may not stand.
+STREET_SURFACES = frozenset({"carriageway", "sidewalk", "curb"})
+# Roles that belong indoors: never placed on the street (a gift box stood on a Rue Mouffetard sidewalk).
+INDOOR_ROLES = frozenset({"giftbox"})
+
+
+def placement_reason(prop: Prop, spot: Spot, x: float, y: float, buildings) -> str | None:
+    """Why the library row's curated ``placement`` refuses a copy landing at ``(x, y)`` on ``spot``, or ``None``."""
+    if prop.spec.role in INDOOR_ROLES:
+        return "indoor_only"
+    if prop.spec.placement == "wall_foot" and not len(buildings.query(Point(x, y).buffer(WALL_FOOT_M), predicate="intersects")):
+        return "not_wall_foot"
+    if prop.spec.placement == "open_ground" and spot.surface in STREET_SURFACES:
+        return "not_open_ground"
+    return None
+
+
 def _spot_reason(prop, spot, zone, buildings, lane_tree, lanes, spawns, allow_lane, clearance_m, block_streets=False, turn: float = 0.0, floor: RoadFloor | None = None) -> str | None:
     matrix, matrix_x, matrix_y, _z = _frame(prop, spot, block_streets, turn, floor)
+    placed = placement_reason(prop, spot, matrix_x, matrix_y, buildings)
+    if placed:
+        return placed
     if prop.length_m > 0.0 and spot.edge_length and prop.length_m > spot.edge_length + 0.4 and spot.surface in {"facade", "block_edge"}:
         return "edge_too_short"
     if prop.spec.anchor == "facade" and spot.wall_height and prop.height_m > spot.wall_height + 0.2 and prop.spec.role == "fire_escape":

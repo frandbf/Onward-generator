@@ -11,7 +11,7 @@ Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/
 | Field | Values | Read by |
 | --- | --- | --- |
 | `description` | One sentence, 10 to 140 characters: what it is, how it looks, its state | The placement model |
-| `placement` | `kit_only`, `wall_mounted`, `street`, `kerb`, `wall_foot`, `boundary`, `open_ground`, `ground_cover` | The model; the library refuses `kit_only` |
+| `placement` | `kit_only`, `wall_mounted`, `street`, `kerb`, `wall_foot`, `boundary`, `open_ground`, `ground_cover` | The model; the library refuses `kit_only`; the rules keep a `wall_foot` copy within 1.5 m of a wall and an `open_ground` copy off the carriageway, sidewalk and kerb (12 November 2026, `dressing.placement_reason`) |
 | `grouping` | `single`, `cluster`, `run`, `grid` | The model; `realize` refuses a `span` that is not a `run` and a `cover` that is not a `grid` (`wrong_grouping`) |
 | `condition` | `intact`, `worn`, `damaged`, `wrecked`, `burned` | The model |
 | `tags` | Up to four lowercase words | The model |

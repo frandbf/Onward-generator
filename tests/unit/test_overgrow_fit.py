@@ -1193,3 +1193,47 @@ def test_a_size_band_holds_its_rounding_tolerance_and_nothing_past_it() -> None:
     past = 2 * SIZE_TOLERANCE_M
     for size in ((side, side, low - past), (side, side, high + past), (longest + past, side, high)):
         assert size_reason("barrel", *size) == "wrong_size", size
+
+
+# --- the curated placement reaches the rules (12 November 2026) -------------------------------------------------------
+
+def test_the_rules_keep_a_prop_where_its_placement_says() -> None:
+    from onward_generator.overgrow.dressing import INDOOR_ROLES, STREET_SURFACES, WALL_FOOT_M, placement_reason
+
+    assert (WALL_FOOT_M, INDOOR_ROLES, STREET_SURFACES) == (1.5, frozenset({"giftbox"}), frozenset({"carriageway", "sidewalk", "curb"}))
+    walls = STRtree([box(0.0, 0.0, 10.0, 10.0)])
+    crate = _prop("crate_1", "crate", _mesh(0.6, 0.6, 0.6))
+    crate = replace(crate, spec=replace(crate.spec, placement="wall_foot"))
+    sidewalk = Spot("sidewalk", 5.0, -1.0, 0.0, "k", "grid", 10.0)
+    yard = Spot("yard", 5.0, -1.0, 0.0, "k", "grid", 10.0)
+    assert placement_reason(crate, sidewalk, 5.0, -1.4, walls) is None
+    assert placement_reason(crate, sidewalk, 5.0, -1.6, walls) == "not_wall_foot"
+    assert placement_reason(crate, sidewalk, 5.0, -1.0, STRtree([])) == "not_wall_foot"
+    lot = replace(crate, spec=replace(crate.spec, placement="open_ground"))
+    assert placement_reason(lot, yard, 5.0, -30.0, walls) is None
+    for surface in sorted(STREET_SURFACES):
+        assert placement_reason(lot, replace(yard, surface=surface), 5.0, -30.0, walls) == "not_open_ground"
+    plain = replace(crate, spec=replace(crate.spec, placement=""))
+    assert placement_reason(plain, sidewalk, 5.0, -30.0, walls) is None
+    gift = replace(plain, spec=replace(plain.spec, role="giftbox"))
+    assert placement_reason(gift, yard, 5.0, -1.0, walls) == "indoor_only"
+
+
+def test_a_spot_is_refused_where_the_placement_says_at_the_copy_s_own_position() -> None:
+    from onward_generator.overgrow.dressing import _spot_reason
+
+    walls = STRtree([box(0.0, 0.0, 10.0, 10.0)])
+    lane = LineString([(-40.0, -20.0), (40.0, -20.0)])
+    crate = _prop("crate_1", "crate", _mesh(0.6, 0.6, 0.6), surfaces=("sidewalk",))
+    crate = replace(crate, spec=replace(crate.spec, placement="wall_foot"))
+
+    def reason(prop: Prop, spot: Spot, tree: STRtree = walls) -> str | None:
+        return _spot_reason(prop, spot, square_zone(80.0), tree, STRtree([lane]), [lane], [], False, 0.0)
+
+    assert reason(crate, Spot("sidewalk", 5.0, -1.0, 0.0, "near", "grid", 10.0)) is None
+    assert reason(crate, Spot("sidewalk", 5.0, -6.0, 0.0, "far", "grid", 10.0)) == "not_wall_foot"
+    assert reason(crate, Spot("sidewalk", -1.0, 5.0, 0.0, "west", "grid", 10.0)) is None  # the x of the copy counts
+    assert reason(crate, Spot("sidewalk", -6.0, 5.0, 0.0, "west_far", "grid", 10.0)) == "not_wall_foot"
+    lot = replace(crate, spec=replace(crate.spec, placement="open_ground"))
+    assert reason(lot, Spot("sidewalk", 5.0, -6.0, 0.0, "s", "grid", 10.0)) == "not_open_ground"
+    assert reason(lot, Spot("yard", 5.0, -6.0, 0.0, "y", "grid", 10.0)) is None
