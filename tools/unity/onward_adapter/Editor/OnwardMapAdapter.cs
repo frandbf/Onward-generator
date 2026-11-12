@@ -3159,10 +3159,50 @@ namespace OnwardGenerator
             int probeCount = UnityEngine.Object.FindObjectsOfType<LightProbeGroup>().Sum(g => g.probePositions.Length);
             sb.Append($"\"lights\":{UnityEngine.Object.FindObjectsOfType<Light>().Length},\"light_probes\":{probeCount},");
             sb.Append($"\"lightmap_bake\":{JsonUtility.ToJson(lastBake)},");
+            sb.Append($"\"probe_light\":{ProbeLightJson()},");
             sb.Append(string.Format(CultureInfo.InvariantCulture, "\"seconds\":{{\"scene\":{0:F1},\"bake\":{1:F1}", buildSeconds, bakeSeconds));
             sb.Append(PhaseSecondsJson());
             sb.Append("}}");
             return sb.ToString();
+        }
+
+        // Plan Q4: the baked light a player standing on the navmesh would get, read from the light probes
+        // at torso height (ProbeLightHeightM) every ProbeLightStepM, averaged over four horizontal
+        // directions (a soldier's sides, not the sky over him). Linear luminance; the low percentiles are the
+        // shaded narrow streets. An editor figure to compare bakes, not a device measurement.
+        private const float ProbeLightStepM = 4f;
+        private const float ProbeLightHeightM = 1.2f;
+        private static readonly Vector3[] ProbeLightDirections = { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+
+        private static string ProbeLightJson()
+        {
+            var values = new List<float>();
+            NavMeshTriangulation tri = NavMesh.CalculateTriangulation();
+            if (LightmapSettings.lightProbes != null && tri.vertices != null && tri.vertices.Length > 0)
+            {
+                LightProbes.Tetrahedralize();
+                var bounds = new Bounds(tri.vertices[0], Vector3.zero);
+                foreach (Vector3 v in tri.vertices) bounds.Encapsulate(v);
+                int walkable = NavMesh.GetAreaFromName("Walkable");
+                int mask = walkable >= 0 ? 1 << walkable : NavMesh.AllAreas;
+                var colours = new Color[ProbeLightDirections.Length];
+                for (float x = bounds.min.x + ProbeLightStepM / 2f; x <= bounds.max.x; x += ProbeLightStepM)
+                {
+                    for (float z = bounds.min.z + ProbeLightStepM / 2f; z <= bounds.max.z; z += ProbeLightStepM)
+                    {
+                        NavMeshHit hit;
+                        if (!NavMesh.SamplePosition(new Vector3(x, bounds.center.y, z), out hit, ProbeLightStepM / 2f, mask)) continue;
+                        LightProbes.GetInterpolatedProbe(hit.position + Vector3.up * ProbeLightHeightM, null, out SphericalHarmonicsL2 sh);
+                        sh.Evaluate(ProbeLightDirections, colours);
+                        values.Add(colours.Average(c => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b));
+                    }
+                }
+            }
+            values.Sort();
+            float At(float q) => values.Count == 0 ? 0f : values[Mathf.Clamp(Mathf.FloorToInt(q * (values.Count - 1)), 0, values.Count - 1)];
+            return string.Format(CultureInfo.InvariantCulture,
+                "{{\"points\":{0},\"step_m\":{1:0.##},\"height_m\":{2:0.##},\"p10\":{3:0.####},\"p25\":{4:0.####},\"median\":{5:0.####}}}",
+                values.Count, ProbeLightStepM, ProbeLightHeightM, At(0.10f), At(0.25f), At(0.50f));
         }
 
         // The launcher step's own timings; scene_report.json belongs to the scene step and is not rewritten.
