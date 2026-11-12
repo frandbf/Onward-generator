@@ -123,7 +123,7 @@ def test_a_mid_building_is_a_shell_with_painted_windows_and_no_collider(on: Any,
         "shops": [],
         "materials": {"wall": wall, "wall_origin": "generated", "roof": record["roof"]["material"],
                       "roof_origin": record["roof"]["origin"], "roof_source": None},
-        "use": facade["use"], "typology": facade["typology"], "door": "none", "doors_m": [],
+        "use": facade["use"], "typology": facade["typology"], "door": "none", "doors_m": [], "balconies_m": [],
     }
     assert facade["mid"]["windows"] > 0
     # One estimated level of the heights stage: the storey and the UV frame follow it.

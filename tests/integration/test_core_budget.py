@@ -10,6 +10,7 @@ kept ``detail`` run, not the cost model.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -454,3 +455,19 @@ def test_a_core_run_asks_each_exposed_wall_whether_it_is_hidden(ring_inputs: tup
     calls.clear()
     detail_scene(generated, ref, heights, scene, CFG)
     assert calls and all(hidden is False for _, hidden in calls)
+
+
+def test_a_core_building_records_each_column_of_balconies(ring_inputs: tuple[Path, Path, Path]) -> None:
+    """ADR-029 amendment of 12 November 2026: facade.balconies_m, one span per column, as wide as the template's balcony."""
+    scene, heights, base = ring_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    manifest = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0).manifest()
+    buildings = [o for o in manifest["objects"] if o.get("type") == "building"]
+    with_balconies = [b for b in buildings if b["facade"]["openings"].get("balcony")]
+    assert with_balconies
+    for building in with_balconies:
+        spans = building["facade"]["balconies_m"]
+        assert 0 < len(spans) <= building["facade"]["openings"]["balcony"]
+        width = CFG.template_for("residential_multi", False).balcony.width_m
+        assert all(abs(math.dist(a, b) - width) < 2e-3 for a, b in spans), spans
+    assert all(b["facade"]["balconies_m"] == [] for b in buildings if not b["facade"]["openings"].get("balcony"))

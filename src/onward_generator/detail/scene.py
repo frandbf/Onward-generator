@@ -859,6 +859,16 @@ def _door_centres(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[li
     return [[round(float(c), 3) for c in segments[h.segment].point(h.s0 + h.width / 2)[:2]] for h in _ground_doors(holes)]
 
 
+def _balcony_spans(balconies: Sequence[tuple[int, float, float]], segments: Sequence[Segment], width_m: float) -> list[list[list[float]]]:
+    """``facade.balconies_m``: each column of balconies as its span on the wall line, ``[[x, y], [x, y]]`` in metres,
+    once however many storeys it has. ``perf.layout.climb_keep_out`` keeps ladders and cabins off them."""
+    spans = {
+        tuple(tuple(round(float(c), 3) for c in segments[seg].point(s)[:2]) for s in (s0, s0 + width_m))
+        for seg, s0, _ in balconies
+    }
+    return [[list(a), list(b)] for a, b in sorted(spans)]
+
+
 def _door_fronts(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[Polygon]:
     """The ground in front of each ground-floor door, outside the wall."""
     fronts = []
@@ -1043,6 +1053,7 @@ def _scenic_building(o: Any, geom: BaseGeometry, landmark: bool, use: FacadeUse,
             "use": use.to_record(),
             "door": "none",
             "doors_m": [],
+            "balconies_m": [],
         },
         "roof": roof,
         "interior": False,
@@ -1101,6 +1112,7 @@ def _mid_building(o: Any, geom: BaseGeometry, others: BaseGeometry, levels: int 
             "use": use.to_record(),
             "door": "none",
             "doors_m": [],
+            "balconies_m": [],
         },
         "roof": roof,
         "interior": False,
@@ -1706,6 +1718,7 @@ def _detail_buildings(
                 "use": use.to_record(),
                 "door": door_rule,
                 "doors_m": _door_centres(layout.holes, segments),
+                "balconies_m": _balcony_spans(layout.balconies, segments, spec.width_m) if spec is not None else [],
             },
             "roof": shell.roof,
             "interior": interior_record is not None,

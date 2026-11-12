@@ -900,6 +900,9 @@ CLIMB_PROP_CLEAR_M = 1.0
 CLIMB_TREE_CLEAR_M = 2.0
 """From an overgrow tree: a generated crown is about 3.8 m across, and it once stood in a street cabin."""
 CLIMB_SIGN_CLEAR_M = 1.5
+# Around each column of balconies (``facade.balconies_m``): a ladder up its wall would run through every slab, as one
+# did on Rue Mouffetard (12 November 2026); the balconies stand about 1 m out, so the span is widened along the wall too.
+CLIMB_BALCONY_CLEAR_M = 0.5
 """From a shop's fascia or blade sign, a vinyl on its window and a street plate: a cabin once hid a shop's sign and its
 window on Rue Mouffetard (12 November 2026)."""
 CLIMB_FLAT_GROWTH = frozenset({"grass", "vine", "moss"})
@@ -935,7 +938,8 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
     ground-floor door of a facade, the bots' routes and the overgrow props. The layout runs after ``overgrow``, which knew
     nothing of the cabins: bricks and a tree stood in one. On Barcelona Sarria two ladders stood over a facade door.
     Also ``CLIMB_SIGN_CLEAR_M`` around each shop sign and window vinyl (``facade.shops``) and each street plate: every
-    shop window carries a vinyl, so a cabin no longer stands against a shopfront."""
+    shop window carries a vinyl, so a cabin no longer stands against a shopfront. And ``CLIMB_BALCONY_CLEAR_M`` around
+    each column of balconies (``facade.balconies_m``), so no ladder climbs through them."""
     objects = detail_manifest.get("objects", [])
     doors = [
         *(tuple(connection["position_m"])
@@ -956,7 +960,13 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
         if board and board.get("centre_m") and board.get("normal")
     ]
     plates = [Point(obj["position_m"][0], obj["position_m"][1]) for obj in objects if obj.get("type") == "street_sign" and obj.get("position_m")]
+    balconies = [
+        LineString(span).buffer(CLIMB_BALCONY_CLEAR_M)
+        for building in objects if building.get("type") == "building"
+        for span in (building.get("facade") or {}).get("balconies_m", [])
+    ]
     return union_all([
+        *balconies,
         *[Point(p).buffer(CLIMB_KEEP_OUT_M) for p in (*points, *doors)],
         *[shape.buffer(CLIMB_SIGN_CLEAR_M) for shape in (*boards, *plates)],
         *[LineString([(p["x"], p["y"]) for p in route["points"]]).buffer(CLIMB_ROUTE_KEEP_OUT_M) for route in routes],
