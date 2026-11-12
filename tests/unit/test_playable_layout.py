@@ -14,6 +14,7 @@ from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
+    CLIMB_BALCONY_CLEAR_M,
     AMMO_COUNT,
     AMMO_SPAWN_CLEAR_M,
     BLOCK_GAP_M,
@@ -712,6 +713,21 @@ def test_the_climb_keep_out_covers_shop_signs_window_vinyls_and_street_plates() 
     assert sorted(_board_line({"centre_m": [5.0, 5.0], "normal": [1.0, 0.0], "width_m": 4.0}).coords) == [(5.0, 3.0), (5.0, 7.0)]
     # A normal with a vertical part keeps only its plane part.
     assert sorted(_board_line({"centre_m": [5.0, 5.0, 2.8], "normal": [1.0, 0.0, 0.0], "width_m": 4.0}).coords) == [(5.0, 3.0), (5.0, 7.0)]
+
+
+def test_the_climb_keep_out_covers_every_column_of_balconies() -> None:
+    """Rue Mouffetard: a ladder climbed a wall through a column of four balconies."""
+    manifest = {"objects": [
+        {"type": "building", "facade": {"balconies_m": [[[100.0, 0.0], [101.5, 0.0]], [[200.0, 0.0], [200.0, 1.5]]]}},
+        {"type": "building", "facade": {}},  # a manifest from before facade.balconies_m
+        {"type": "interior"},
+    ]}
+    assert CLIMB_BALCONY_CLEAR_M == 0.5
+    keep_out = climb_keep_out([(-500.0, -500.0)], [], manifest)
+    for inside in ((100.75, -0.45), (99.6, 0.0), (101.9, 0.0), (200.45, 0.75), (200.0, 1.95)):
+        assert keep_out.contains(Point(inside)), inside
+    for outside in ((100.75, -0.55), (99.4, 0.0), (102.1, 0.0), (200.0, 2.1)):
+        assert not keep_out.contains(Point(outside)), outside
 
 
 def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> None:

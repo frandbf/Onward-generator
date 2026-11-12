@@ -183,3 +183,14 @@ def test_the_ground_in_front_of_each_ground_floor_door_is_kept_for_the_door() ->
     # ``facade.doors_m``: the same doors, by the middle of each on the wall line, to the millimetre.
     assert _door_centres(holes, walls) == [[2.6, 0.0], [20.0, 5.5]]
     assert _door_centres([Hole("door", 0, 1.0 / 3, 0.0, 1.0, 2.4, 0.15, "door_wood", 1, 0)], walls) == [[0.833, 0.0]]
+
+
+def test_each_column_of_balconies_is_recorded_once_by_its_span_on_the_wall() -> None:
+    from onward_generator.detail.scene import _balcony_spans
+
+    walls = [_wall(20.0), Segment(0, 0, 1, (20.0, 0.0), (20.0, 10.0), True)]
+    # Two storeys of one column on the first wall, one balcony on the second wall.
+    balconies = [(0, 4.0, 3.0), (0, 4.0, 6.0), (1, 2.0, 3.0)]
+    assert _balcony_spans(balconies, walls, 1.5) == [[[4.0, 0.0], [5.5, 0.0]], [[20.0, 2.0], [20.0, 3.5]]]
+    assert _balcony_spans([(0, 1.0 / 3, 3.0)], walls, 1.0) == [[[0.333, 0.0], [1.333, 0.0]]]
+    assert _balcony_spans([], walls, 1.5) == []
