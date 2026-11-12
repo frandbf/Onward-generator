@@ -20,12 +20,14 @@ from onward_generator.materials.trim import (
     TRIM_BAKE_VERSION,
     Bands,
     Look,
+    Strip,
     TrimStats,
     apply_trim,
     band_mesh,
     building_bands,
     building_look,
     era_band,
+    faces_away,
     look_key,
     observed_period,
     opening_cell,
@@ -79,7 +81,7 @@ BANDS = Bands(0.9, 3.0, 3, 9.0)
 
 def test_bands_cut_a_face_with_openings_at_every_level() -> None:
     wall = facade(9.0, 10.0, WINDOWS_2X3)
-    out, band, plain = band_mesh(wall, BANDS.levels, BANDS.plain_levels)
+    out, band, plain, _ = band_mesh(wall, BANDS.levels, BANDS.single_levels)
     assert BANDS.levels == [0.9, 3.0, 6.0, 9.0]
     assert area(out) == pytest.approx(area(wall))
     assert not plain.any()
@@ -98,16 +100,17 @@ def test_bands_cut_a_face_with_openings_at_every_level() -> None:
     assert out.triangle_count == 5 * 2 + 6 * 6
 
 
-def test_a_plain_face_takes_only_the_zocalo_and_parapet_lines() -> None:
+def test_a_plain_face_is_cut_at_every_storey() -> None:
+    """12 November 2026: one band from the zocalo to the parapet stretched a strip over the whole wall."""
     wall = facade(8.0, 10.0, [])
-    out, band, plain = band_mesh(wall, BANDS.levels, BANDS.plain_levels)
+    out, band, plain, _ = band_mesh(wall, BANDS.levels, BANDS.single_levels)
     assert plain.all()
-    assert out.triangle_count == 6
-    assert sorted(set(band.tolist())) == [0, 1, 2]
+    assert out.triangle_count == 10
+    assert sorted(set(band.tolist())) == [0, 1, 2, 3, 4]
     assert area(out) == pytest.approx(80.0)
-    assert out.vertex_count == 12
+    assert out.vertex_count == 20
     assert band.dtype == np.int64 and plain.dtype == bool and out.triangles.dtype == np.int64
-    assert sorted({round(float(z), 6) for z in out.vertices[:, 2]}) == [0.0, 0.9, 9.0, 10.0]
+    assert sorted({round(float(z), 6) for z in out.vertices[:, 2]}) == [0.0, 0.9, 3.0, 6.0, 9.0, 10.0]
     assert np.allclose(out.vertices[:, 1], 0.0)
     assert (out.face_normals()[:, 1] < 0).all()
 
@@ -116,9 +119,9 @@ def test_coplanar_faces_join_and_a_sloped_triangle_stays_whole() -> None:
     left, right = facade(4.0, 6.0, []), facade(4.0, 6.0, [], x0=4.0)
     sloped = Mesh(np.array([[0.0, 0.0, 1.0], [2.0, 0.0, 1.0], [1.0, 1.0, 5.0]]), np.array([[0, 1, 2]]))
     flat = Mesh(np.array([[0.0, 0.0, 2.0], [1.0, 0.0, 2.0], [2.0, 0.0, 2.0]]), np.array([[0, 1, 2]]))
-    out, band, plain = band_mesh(merge([sloped, flat, left, right]), [0.9, 3.0, 6.0], [0.9, 6.0])
-    # The two quads join into one plain 8 x 6 m rectangle cut at 0.9 m: four triangles, plus the sloped one.
-    assert out.triangle_count == 5
+    out, band, plain, _ = band_mesh(merge([sloped, flat, left, right]), [0.9, 3.0, 6.0], [0.9, 6.0])
+    # The two quads join into one plain 8 x 6 m rectangle cut at 0.9 and 3 m: six triangles, plus the sloped one.
+    assert out.triangle_count == 7
     assert area(out) == pytest.approx(48.0 + area(sloped))
     tilted = [t for t in out.triangles if abs(out.face_normals()[list(out.triangles.tolist()).index(t.tolist())][2]) > 1e-6]
     assert len(tilted) == 1
@@ -127,7 +130,7 @@ def test_coplanar_faces_join_and_a_sloped_triangle_stays_whole() -> None:
 
 
 def test_an_empty_mesh_stays_empty() -> None:
-    out, band, plain = band_mesh(Mesh.empty(), [1.0], [1.0])
+    out, band, plain, _ = band_mesh(Mesh.empty(), [1.0], [1.0])
     assert out.triangle_count == 0
     assert band.shape == (0,) and plain.shape == (0,)
     assert band.dtype == np.int64 and plain.dtype == bool
@@ -140,7 +143,7 @@ def test_building_bands_from_the_record() -> None:
     bands = building_bands(record, 13.8, 0.9, 4.5)
     assert bands == Bands(0.9, 3.2, 4, 12.8)
     assert bands.levels == pytest.approx([0.9, 3.2, 6.4, 9.6, 12.8])
-    assert bands.plain_levels == [0.9, 12.8]
+    assert bands.single_levels == [0.9, 12.8]
     # Without storeys the wall top is the mesh top less the parapet, in fallback storeys.
     assert building_bands({"roof": {"type": "flat_parapet", "parapet_m": 1.0}}, 13.0, 0.9, 4.5) == Bands(0.9, 3.0, 4, 12.0)
     assert building_bands(None, 7.0, 0.9, 4.5) == Bands(0.9, 3.5, 2, 7.0)
@@ -160,7 +163,7 @@ def test_wall_uvs_put_each_band_in_its_strip() -> None:
     mesh, uvs = wall_uvs(facade(9.0, 10.0, WINDOWS_2X3), BANDS, wall_strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
     z = mesh.vertices[:, 2]
     v = uvs[:, 1]
-    _, band, _ = band_mesh(facade(9.0, 10.0, WINDOWS_2X3), BANDS.levels, BANDS.plain_levels)
+    _, band, _, _ = band_mesh(facade(9.0, 10.0, WINDOWS_2X3), BANDS.levels, BANDS.single_levels)
     zocalo, cornice = band == 0, band == 4
     assert np.allclose(v[zocalo & (z < 1e-9)], LAYOUT.zocalo.v0)
     assert np.allclose(v[zocalo & np.isclose(z, 0.9)], LAYOUT.zocalo.v1)
@@ -341,7 +344,7 @@ def test_party_walls_keep_their_lightmap_class_on_the_atlas() -> None:
     ochre = LAYOUT.walls["plaster_ochre"]
     inside = [(s.v0, s.v1) for s in (ochre, LAYOUT.zocalo, LAYOUT.cornice)]
     assert all(any(lo - 1e-6 <= x <= hi + 1e-6 for lo, hi in inside) for x in v)
-    assert node.primitives[1].mesh.triangle_count == 6
+    assert node.primitives[1].mesh.triangle_count == 10
 
 
 def test_scenic_walls_take_their_own_trim_material() -> None:
@@ -469,31 +472,31 @@ def _rotated(wall: Mesh, degrees: float) -> Mesh:
 def test_planes_are_told_apart_by_direction_and_offset() -> None:
     # Two plain walls of 4 x 6 m, one turned 37 degrees, one 53: each keeps its own plane.
     a, b = _rotated(facade(4.0, 6.0, []), 37.0), _rotated(facade(4.0, 6.0, []), 53.0)
-    out, band, plain = band_mesh(merge([a, b]), [0.9, 3.0], [0.9, 6.0])
-    assert out.triangle_count == 2 * 2 * 2
+    out, band, plain, _ = band_mesh(merge([a, b]), [0.9, 3.0], [0.9, 6.0])
+    assert out.triangle_count == 2 * 3 * 2  # two walls, three bands, two triangles
     assert area(out) == pytest.approx(48.0)
     normals = out.face_normals() / np.linalg.norm(out.face_normals(), axis=1, keepdims=True)
     for source in (a, b):
         n = source.face_normals()[0] / np.linalg.norm(source.face_normals()[0])
         on_plane = np.isclose((out.vertices - source.vertices[0]) @ n, 0.0, atol=1e-9)
-        # Its own eight corners, and the four the other face writes on the edge they share.
-        assert on_plane.sum() == 12
-        assert (np.isclose(normals @ n, 1.0)).sum() == 4
+        # Its own twelve corners (three bands), and the six the other face writes on the edge they share.
+        assert on_plane.sum() == 18
+        assert (np.isclose(normals @ n, 1.0)).sum() == 6
     # Two parallel south walls 0.3 m apart do not join either.
     back = transform(facade(4.0, 6.0, []), np.array([[1.0, 0, 0, 0], [0, 1, 0, -0.3], [0, 0, 1, 0], [0, 0, 0, 1]]))
-    out, _, _ = band_mesh(merge([facade(4.0, 6.0, []), back]), [0.9], [0.9])
+    out, _, _, _ = band_mesh(merge([facade(4.0, 6.0, []), back]), [0.9], [0.9])
     assert out.triangle_count == 8 and area(out) == pytest.approx(48.0)
     assert sorted({round(float(y), 6) for y in out.vertices[:, 1]}) == [-0.3, 0.0]
 
 
 def test_a_single_triangle_plane_and_small_faces_keep_their_side() -> None:
     gable = Mesh(np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [2.0, 0.0, 2.0]]), np.array([[0, 1, 2]]))
-    out, band, _ = band_mesh(gable, [0.9], [0.9])
+    out, band, _, _ = band_mesh(gable, [0.9], [0.9])
     assert area(out) == pytest.approx(4.0)
     assert (out.face_normals()[:, 1] < 0).all()
     assert sorted(set(band.tolist())) == [0, 1]
     small = facade(0.6, 0.5, [(0.1, 0.1, 0.3, 0.3)])
-    out, _, _ = band_mesh(small, [0.2], [0.2])
+    out, _, _, _ = band_mesh(small, [0.2], [0.2])
     assert (out.face_normals()[:, 1] < 0).all()
     assert area(out) == pytest.approx(area(small))
 
@@ -513,16 +516,18 @@ def test_a_plain_face_keeps_its_zocalo_and_parapet_strips() -> None:
     strip = LAYOUT.walls["plaster_white"]
     mesh, uvs = wall_uvs(facade(8.0, 10.0, []), BANDS, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
     z, v = mesh.vertices[:, 2], uvs[:, 1]
-    _, band, plain = band_mesh(facade(8.0, 10.0, []), BANDS.levels, BANDS.plain_levels)
+    _, band, plain, _ = band_mesh(facade(8.0, 10.0, []), BANDS.levels, BANDS.single_levels)
     assert plain.all()
-    body = band == 1
     low, high = (strip.v0 + p * (strip.v1 - strip.v0) for p in PLAIN_V)
-    assert np.allclose(v[body & np.isclose(z, 0.9)], low) and (body & np.isclose(z, 0.9)).sum() == 2
-    assert np.allclose(v[body & np.isclose(z, 9.0)], high) and (body & np.isclose(z, 9.0)).sum() == 2
+    # Each storey samples the middle of the strip, from its foot to its head.
+    for b, (foot, head) in enumerate([(0.9, 3.0), (3.0, 6.0), (6.0, 9.0)], start=1):
+        body = band == b
+        assert np.allclose(v[body & np.isclose(z, foot)], low) and (body & np.isclose(z, foot)).sum() == 2
+        assert np.allclose(v[body & np.isclose(z, head)], high) and (body & np.isclose(z, head)).sum() == 2
     zocalo = band == 0
     assert np.allclose(v[zocalo & np.isclose(z, 0.0)], LAYOUT.zocalo.v0)
     assert np.allclose(v[zocalo & np.isclose(z, 0.9)], LAYOUT.zocalo.v1) and (zocalo & np.isclose(z, 0.9)).sum() == 2
-    cornice = band == 2
+    cornice = band == 4
     assert np.allclose(v[cornice & np.isclose(z, 10.0)], LAYOUT.cornice.v1)
     assert np.allclose(v[cornice & np.isclose(z, 9.0)], LAYOUT.cornice.v0) and (cornice & np.isclose(z, 9.0)).sum() == 2
     assert np.ptp(uvs[cornice, 0]) == pytest.approx(8.0 / 6.0)
@@ -618,8 +623,9 @@ def test_apply_trim_reports_its_key_png_and_materials(small_table: Path) -> None
     assert report["atlas"]["cache_key"] == key
     assert report["atlas"]["sha256"] == hashlib.sha256(result.png).hexdigest()
     assert report["atlas"]["sha256"] == SMALL_ATLAS_SHA256_BY_BAKE[TRIM_BAKE_VERSION]
-    # The record (3 storeys of 3 m, a parapet) cuts the 10 m wall into 46 triangles, not the fallback's 44.
-    assert report["stats"]["wall_triangles_after"] == 46 + 6 + 4
+    # The record (3 storeys of 3 m, a parapet) cuts the 10 m wall into 46 triangles, not the fallback's 44; the
+    # plain party wall is cut at its storeys too (10), and the 6 m shell at its two fallback storeys (6).
+    assert report["stats"]["wall_triangles_after"] == 46 + 10 + 6
     assert report["atlas"]["license"] == "project-generated from CC0 photographs"
     assert [s["credit"] for s in report["atlas"]["sources"]] == [
         "Created using Bricks105 from ambientCG.com, licensed under CC0 1.0.",
@@ -670,7 +676,7 @@ def test_a_corner_keeps_one_vertex_on_each_face() -> None:
     rot = np.eye(4)
     rot[:3, :3] = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
     rot[:3, 3] = (4.0, 0.0, 0.0)
-    out, _, _ = band_mesh(merge([facade(4.0, 6.0, []), transform(facade(4.0, 6.0, []), rot)]), [0.9], [0.9])
+    out, _, _, _ = band_mesh(merge([facade(4.0, 6.0, []), transform(facade(4.0, 6.0, []), rot)]), [0.9], [0.9])
     corner = np.isclose(out.vertices[:, 0], 4.0) & np.isclose(out.vertices[:, 1], 0.0)
     # Two faces, two bands each meeting at z = 0, 0.9 (twice) and 6: eight vertices, not four.
     assert corner.sum() == 8
@@ -724,7 +730,7 @@ def test_building_look_follows_the_shares_and_spreads_the_tones() -> None:
 def test_bands_without_a_zocalo_start_with_the_ground_storey() -> None:
     bands = Bands(0.9, 3.0, 3, 9.0, zocalo=False)
     assert bands.levels == [3.0, 6.0, 9.0]
-    assert bands.plain_levels == [9.0]
+    assert bands.single_levels == [9.0]
     assert building_bands(RECORD, 10.0, 0.9, 4.5, zocalo=False) == Bands(0.9, 3.0, 3, 9.0, False)
     assert building_bands(RECORD, 10.0, 0.9, 4.5).zocalo
 
@@ -738,7 +744,7 @@ def test_a_wall_without_zocalo_cornice_or_courses_stays_on_its_strip() -> None:
     # Every band, the ground and the parapet included, samples the middle of the wall strip.
     assert (v >= low - 1e-6).all() and (v <= high + 1e-6).all()
     assert np.allclose(v[np.isclose(z, 0.0)], low)
-    _, band, _ = band_mesh(facade(9.0, 10.0, WINDOWS_2X3), bands.levels, bands.plain_levels)
+    _, band, _, _ = band_mesh(facade(9.0, 10.0, WINDOWS_2X3), bands.levels, bands.single_levels)
     assert np.allclose(v[(band == 1) & np.isclose(z, 3.0)], low) and np.allclose(v[(band == 0) & np.isclose(z, 3.0)], high)
     # U keeps the wall repeat on every band: 9 m of 12.
     assert np.ptp(uvs[:, 0]) == pytest.approx(9.0 / 12.0)
@@ -746,12 +752,12 @@ def test_a_wall_without_zocalo_cornice_or_courses_stays_on_its_strip() -> None:
     _, coursed = wall_uvs(facade(9.0, 10.0, WINDOWS_2X3), bands, strip, LAYOUT.zocalo, None, None, 0.0)
     assert coursed[:, 1].min() == pytest.approx(strip.v0)
     assert coursed[:, 1].max() == pytest.approx(strip.v1)
-    # A plain face without a zocalo is one body band and the parapet.
+    # A plain face without a zocalo is three storeys and the parapet.
     plain, puv = wall_uvs(facade(8.0, 10.0, []), bands, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
     top = np.isclose(plain.vertices[:, 2], 10.0)
     assert np.allclose(puv[top, 1], LAYOUT.cornice.v1)
     assert np.allclose(puv[np.isclose(plain.vertices[:, 2], 0.0), 1], low)
-    assert plain.triangle_count == 4
+    assert plain.triangle_count == 8
 
 
 def test_a_building_takes_the_strip_of_its_tone_and_its_dress() -> None:
@@ -1117,3 +1123,72 @@ def test_a_mid_building_part_takes_the_scenic_trim() -> None:
     assert [p.material for p in node.primitives] == ["scenic_trim_mediterranean"]
     core = trim_building(part, {"tier": "core"}, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
     assert [p.material for p in core.primitives] == ["facade_trim_mediterranean"]
+
+
+def _v_per_m(mesh: Mesh, uvs: np.ndarray, strip: Strip) -> np.ndarray:
+    """Strip heights per metre up each vertical triangle: 1 / storey for a strip spanning one storey."""
+    tri = mesh.triangles
+    z, v = mesh.vertices[tri, 2], (uvs[tri, 1] - strip.v0) / (strip.v1 - strip.v0)
+    rates = []
+    for zz, vv in zip(z, v, strict=True):
+        if np.ptp(zz) > 1e-6:
+            rates.append(abs(np.polyfit(zz, vv, 1)[0]) if len(set(np.round(zz, 6))) > 1 else 0.0)
+    return np.array(rates)
+
+
+def test_a_shell_of_the_rings_takes_one_strip_per_storey() -> None:
+    """The mid and scenic rings: no zocalo, no cornice, no course, but a strip spans one storey, not the wall."""
+    record = {"tier": "scenic", "facade": {"storeys": {"count": 6, "height_m": 3.0}}, "roof": {"type": "flat"}}
+    # North of the core, facing south toward it (the facade's normal is -y).
+    toward = transform(facade(8.0, 18.0, []), _translation(0.0, 100.0))
+    node = Node("building/s1", (Primitive(toward, "scenic_wall_warm"),), {"type": "building"})
+    out = trim_building(node, record, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    prim = out.primitives[0]
+    assert prim.material == "scenic_trim_mediterranean"
+    strip = LAYOUT.tones["plaster_cream"][0]
+    rates = _v_per_m(prim.mesh, prim.uvs, strip)
+    span = PLAIN_V[1] - PLAIN_V[0]
+    assert len(rates) == prim.mesh.triangle_count == 12
+    assert np.allclose(rates, span / 3.0)  # 0.75 of a strip per 3 m storey: never the 18 m wall on one strip
+    v = (prim.uvs[:, 1] - strip.v0) / (strip.v1 - strip.v0)
+    assert v.min() == pytest.approx(PLAIN_V[0], abs=1e-5) and v.max() == pytest.approx(PLAIN_V[1], abs=1e-5)
+    # South of the core the same face turns its back on it: no player sees it, it keeps one band.
+    away = transform(facade(8.0, 18.0, []), _translation(0.0, -100.0))
+    back = trim_building(Node("building/s2", (Primitive(away, "scenic_wall_warm"),), {"type": "building"}), record,
+                         "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats()).primitives[0]
+    assert back.mesh.triangle_count == 2
+    assert faces_away(np.array([0.0, -1.0, 0.0]), np.array([4.0, -100.0, 9.0]))
+    assert not faces_away(np.array([0.0, -1.0, 0.0]), np.array([4.0, 100.0, 9.0]))
+    assert faces_away(np.array([1.0, 0.0, 0.0]), np.array([0.0, 0.0, 9.0]))  # on the centre line: away
+
+
+def _translation(x: float, y: float) -> np.ndarray:
+    m = np.eye(4)
+    m[0, 3], m[1, 3] = x, y
+    return m
+
+
+def test_a_flat_face_of_a_wall_runs_its_strip_in_metres() -> None:
+    """A soffit (the underside of a recess head) used one row of texels across its whole depth."""
+    strip = LAYOUT.walls["plaster_white"]
+    soffit = Mesh(np.array([[0, 0, 2.3], [2.7, 0, 2.3], [2.7, 0.6, 2.3], [0, 0.6, 2.3]], dtype=float),
+                  np.array([[0, 2, 1], [0, 3, 2]]))
+    deep = Mesh(np.array([[5, 0, 2.3], [6, 0, 2.3], [6, 9.0, 2.3], [5, 9.0, 2.3]], dtype=float), np.array([[0, 2, 1], [0, 3, 2]]))
+    wall = facade(8.0, 10.0, [])
+    mesh, uvs = wall_uvs(merge([wall, soffit, deep]), BANDS, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
+    normals = mesh.face_normals()
+    flat = np.unique(mesh.triangles[np.abs(normals[:, 2]) > 0.5])
+    y = mesh.vertices[flat, 1]
+    local = (uvs[flat, 1] - strip.v0) / (strip.v1 - strip.v0)
+    near, far = flat[np.isclose(y, 0.0)], flat[np.isclose(y, 0.6)]
+    assert len(near) == 4 and len(far) == 2
+    v = (uvs[:, 1] - strip.v0) / (strip.v1 - strip.v0)
+    assert np.allclose(v[near], PLAIN_V[0], atol=1e-5)
+    assert np.allclose(v[far], PLAIN_V[0] + 0.6 / BANDS.storey_m, atol=1e-5)
+    # A face deeper than the strip's middle stops at its top rather than leave the strip.
+    assert np.allclose(v[flat[np.isclose(y, 9.0)]], PLAIN_V[1], atol=1e-5)
+    assert (local >= PLAIN_V[0] - 1e-6).all() and (local <= PLAIN_V[1] + 1e-6).all()
+    # The vertical wall keeps its storey mapping: its vertices are apart from the flat faces'.
+    alone, alone_uvs = wall_uvs(wall, BANDS, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
+    vertical = np.setdiff1d(np.arange(mesh.vertex_count), flat)
+    assert sorted(map(tuple, np.round(uvs[vertical, 1:], 6))) == sorted(map(tuple, np.round(alone_uvs[:, 1:], 6)))
