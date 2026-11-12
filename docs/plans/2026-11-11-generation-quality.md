@@ -58,6 +58,7 @@ Ningún mapa reciente tenía accesos a las azoteas. Había un error de redondeo 
 - `config/facade_styles.json` tiene `mediterranean` (con atlas), `central_european`, `anglo` y `latin_american` (atlas regionales), y `generic` sin atlas. París resuelve a `generic`, así que E8 (tono del atlas por atmósfera) no se aplica.
 - **Hacer:** un estilo haussmanniano: piedra caliza clara, planta baja almohadillada, balcones corridos de forja en la 2.ª y la 5.ª planta, mansarda de zinc con buhardillas y molduras sobre las ventanas. Necesita texturas con licencia verificada (CC0 de ambientCG o similar) y un ADR o enmienda del ADR-020/027.
 - **Riesgo:** las mansardas son tejado inclinado. ADR-029 no pone accesos en tejados inclinados, así que habría menos azoteas jugables.
+- **Hecho (Q3a, 12 de noviembre):** París resuelve a `haussmann`, y con `regional_facades` su atlas pinta sillería caliza clara (juntas dibujadas en código sobre el grano CC0 de `acg_concrete012`), plinto de piedra, cornisa, imposta en cada planta y ventanas de marco pintado o gris oscuro. La clave `wall_tints` fija el tinte de la caliza, sea cual sea la paleta. No hace falta ninguna textura nueva; enmienda de ADR-020. Pendiente (Q3b): balcones de forja y mansardas de zinc, que son geometría.
 
 ### Q4. Calles estrechas muy oscuras
 

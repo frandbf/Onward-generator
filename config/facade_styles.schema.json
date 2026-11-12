@@ -112,6 +112,12 @@
           "type": "object",
           "additionalProperties": { "type": "string" }
         },
+        "wall_tints": {
+          "description": "Plan Q3: the linear RGB tint of a wall strip, in place of the colour of the generation palette, for a style whose walls are one material whatever the palette says (Paris limestone). Every key must be a wall of walls.",
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/rgb" }
+        },
         "sources": {
           "type": "object",
           "additionalProperties": false,

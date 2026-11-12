@@ -66,6 +66,13 @@ The trim path takes 20 % of the predicted draws off Madrid (−44) and 29 % off 
 
 The scenic and mid buildings (ADR-017) stand behind the fog, past the play area. They now take one band per wall: no zocalo, no cornice, no string course, no storey cuts. Before, every scenic face was cut into three bands, and a mid face into one band per storey, for lines no player can make out at 100–200 m. On Madrid r200 the mid ring drops from 40 004 to 27 584 triangles and the scenic ring from 29 716 to 19 888, with the same materials and so the same draws. The core buildings are unchanged.
 
+## Amendment (12 November 2026): a Paris style (plan Q3)
+
+- **Context.** Paris resolved to `generic`, which has no atlas, so a Paris map kept the per-material facades and the atmosphere palette (ADR-037, E8) never reached them. Rue Mouffetard read as a generic city.
+- **Decision.** A `haussmann` style with the first selection box of `config/facade_styles.json` (Paris and a margin) and an opt-in regional recipe, read with `regional_facades` like the plan D1 recipes. A regional recipe may carry `wall_tints`, the tint of a wall strip in place of the palette's colour: Paris is limestone whatever colour the palette gave a building, so its five rendered and stone walls are ashlar with fixed cream tints, and brick stays brick. No new texture: the ashlar joints are drawn in code over the CC0 grain of `acg_concrete012`, already in the library.
+- **Consequences.** The main table's hash changes, so every materials report records a new `style_table_sha256`; the AI street-profile vocabulary gains `haussmann`, which changes its prompt and input hashes. Wrought-iron balconies and zinc mansards are geometry, a later increment; a mansard is a pitched roof, so ADR-029 would put fewer climbs on Paris roofs.
+- **Pending.** A headset look at a Paris map with the option on.
+
 ## Consequences
 
 - Facade draws per cell drop from up to fifteen to at most three, with one texture for all of them: −20 % predicted draws on Madrid, −29 % on Kraków. Triangles grow by the band cuts (two per storey and face with openings, four per plain face): +5.0 % on Madrid, +8.4 % on Kraków. Texture memory grows by 21 MiB.

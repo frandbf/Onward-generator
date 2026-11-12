@@ -586,10 +586,12 @@ def apply_trim(
     for key, record in records.items():
         if not record.license.upper().startswith("CC0"):
             raise StyleError(f"style {name}: source {key} ({record.asset_id}) is {record.license}, not CC0")
-    missing = sorted(set(atlas["walls"]) - set(colors))
+    # Plan Q3: a style may fix a strip's tint (Paris limestone) instead of taking the palette's colour.
+    fixed = atlas.get("wall_tints") or {}
+    missing = sorted(set(atlas["walls"]) - set(colors) - set(fixed))
     if missing:
         raise StyleError(f"style {name}: no colour for wall strips {', '.join(missing)}")
-    tints = {wall: tuple(float(c) for c in colors[wall][:3]) for wall in sorted(atlas["walls"])}
+    tints = {wall: tuple(float(c) for c in (fixed[wall] if wall in fixed else colors[wall])[:3]) for wall in sorted(atlas["walls"])}
     atmosphere: dict[str, Any] | None = None
     if palette is not None:
         before = sum(_luminance(t) for t in tints.values()) / len(tints)

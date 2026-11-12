@@ -829,7 +829,8 @@ def test_an_rgba_scene_colour_tints_its_strip_by_rgb_only(small_table: Path) -> 
 KRAKOW = [19.9366, 50.0614]
 LONDON = [-0.1276, 51.5072]
 MEXICO_CITY = [-99.1332, 19.4326]
-CENTRES = {"central_european": KRAKOW, "anglo": LONDON, "latin_american": MEXICO_CITY}
+PARIS = [2.34981, 48.84045]
+CENTRES = {"central_european": KRAKOW, "anglo": LONDON, "latin_american": MEXICO_CITY, "haussmann": PARIS}
 REGIONAL_ATLAS = load_regional_table(load_style_table()).atlases["central_european"]
 
 
@@ -899,6 +900,25 @@ def test_the_option_bakes_the_regional_atlas(style: str, small_regional_table: P
     again = apply_trim([_building()], manifest, COLORS, regional=True, regional_table_path=small_regional_table,
                        cache=TileCache(tmp_path / "tiles"))
     assert again.png == result.png and again.report == report
+
+
+def test_the_paris_atlas_fixes_its_limestone_whatever_the_palette(small_regional_table: Path) -> None:
+    """Plan Q3: the ashlar strips take the recipe's wall_tints; only brick still reads the palette."""
+    manifest = {"frame": {"origin_wgs84": PARIS}}
+    result = apply_trim([_building()], manifest, COLORS, regional=True, regional_table_path=small_regional_table)
+    assert result.mode == "trim" and result.style == "haussmann" and result.report["atlas_origin"] == "regional"
+    assert result.materials == ("facade_trim_haussmann",)
+    other = {k: (0.1, 0.9, 0.1) if k.startswith(("plaster_", "stone_")) else v for k, v in COLORS.items()}
+    same = apply_trim([_building()], manifest, other, regional=True, regional_table_path=small_regional_table)
+    assert same.png == result.png
+    # A palette without the ashlar colours still bakes: the recipe has them.
+    bare = {k: v for k, v in COLORS.items() if k == "brick_red"}
+    assert apply_trim([_building()], manifest, bare, regional=True, regional_table_path=small_regional_table).png == result.png
+    redder = apply_trim([_building()], manifest, {**COLORS, "brick_red": (0.9, 0.1, 0.1)}, regional=True,
+                        regional_table_path=small_regional_table)
+    assert redder.png != result.png
+    with pytest.raises(StyleError, match="style haussmann: no colour for wall strips brick_red$"):
+        apply_trim([], manifest, {}, regional=True, regional_table_path=small_regional_table)
 
 
 def test_a_regional_source_must_be_cc0(monkeypatch: pytest.MonkeyPatch, small_regional_table: Path) -> None:

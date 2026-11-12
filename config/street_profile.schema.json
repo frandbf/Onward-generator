@@ -10,7 +10,7 @@
     "profile_version": { "const": "0.1.0" },
     "dominant_typology": {
       "description": "The map-wide facade atlas style of config/facade_styles.json (materials --facade-style, ADR-020/027). It never reclassifies a building (ADR-024).",
-      "enum": ["map_default", "mediterranean", "central_european", "anglo", "latin_american", "generic"]
+      "enum": ["map_default", "mediterranean", "central_european", "anglo", "latin_american", "haussmann", "generic"]
     },
     "palette": {
       "description": "extended_pools: the calm roof and paving pools and the per-cell ground phase (materials --repetition, ADR-009 C1).",

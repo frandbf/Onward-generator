@@ -60,7 +60,7 @@ CONDITION_GROUPS: Mapping[str, tuple[str, ...]] = {
 }
 PROFILE_YEARS: Mapping[str, int] = {"years_10": 10, "years_30": 30, "years_100": 100}
 COVER_PROPS: Mapping[str, int] = {"off": 0, "light": 8, "full": 24}
-STYLE_IDS = ("anglo", "central_european", "generic", "latin_american", "mediterranean")
+STYLE_IDS = ("anglo", "central_european", "generic", "haussmann", "latin_american", "mediterranean")
 
 # The only settings a profile can reach. Anything else that differs is refused.
 ALLOWED_POINTERS = frozenset({
@@ -92,6 +92,8 @@ _ROWS = (
            "the map-wide facade atlas style is central_european; no building is reclassified", "ADR-020, ADR-027"),
     Effect("dominant_typology", "generic", "/materials/facade_style", "generic", "materials", "--facade-style",
            "the map-wide facade atlas style is generic; no building is reclassified", "ADR-020, ADR-027"),
+    Effect("dominant_typology", "haussmann", "/materials/facade_style", "haussmann", "materials", "--facade-style",
+           "the map-wide facade atlas style is haussmann; no building is reclassified", "ADR-020, ADR-027"),
     Effect("dominant_typology", "latin_american", "/materials/facade_style", "latin_american", "materials", "--facade-style",
            "the map-wide facade atlas style is latin_american; no building is reclassified", "ADR-020, ADR-027"),
     Effect("dominant_typology", "mediterranean", "/materials/facade_style", "mediterranean", "materials", "--facade-style",
