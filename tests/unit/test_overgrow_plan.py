@@ -14,7 +14,7 @@ from jsonschema import Draft202012Validator
 
 from onward_generator.ai.providers import ProviderError, ProviderResult, StaticProvider, context_window
 from onward_generator.generation.config import Material
-from onward_generator.generation.gltf import Node, Primitive, build_glb
+from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
 from onward_generator.generation.mesh import box
 from onward_generator.overgrow.catalog import ASSETS_BY_ID
 from onward_generator.overgrow.digest import DigestLimits, build_digest
@@ -743,3 +743,22 @@ def test_the_correction_counts_the_dropped_actions_by_reason() -> None:
     rows = [{"reason": "outside_zone"}, {"reason": "outside_zone"}, {"reason": "budget"}]
     assert _nothing_placed(rows) == "no action could be placed (budget 1, outside_zone 2); choose other anchors and assets"
     assert _nothing_placed([]) == "no action could be placed (no actions); choose other anchors and assets"
+
+
+def test_a_brief_that_asks_for_chaos_lets_the_rules_block_the_street(tmp_path: Path) -> None:
+    """The rules keep the keyword street blocking when they place the whole library (and a pick)."""
+    scene_path = tmp_path / "geo_scene.json"
+    scene_path.write_text(json.dumps(_scene(
+        _block_features(), longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830",
+    )), encoding="utf-8")
+    base = tmp_path / "base"
+    _base(base)
+    library = tmp_path / "library"
+    _library(library)
+    quiet = overgrow(base, scene_path, tmp_path / "quiet", library=library, brief="A quiet block", ai=False)
+    chaos = overgrow(base, scene_path, tmp_path / "chaos", library=library, brief="A block in chaos", ai=False)
+    assert (quiet["street_blocking"], chaos["street_blocking"]) == (False, True)
+    nodes = {name: [n for n in nodes_from_glb((tmp_path / name / "scene_visual.glb").read_bytes())[0] if n.name.startswith("overgrow/prop/")]
+             for name in ("quiet", "chaos")}
+    assert len(nodes["quiet"]) == len(nodes["chaos"]) > 0
+    assert [n.matrix.tolist() for n in nodes["quiet"]] != [n.matrix.tolist() for n in nodes["chaos"]]

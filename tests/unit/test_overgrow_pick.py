@@ -178,6 +178,8 @@ def test_the_instruction_quotes_the_brief_as_written_and_sorts_each_row() -> Non
     row = text.split("Library:\n", 1)[1]
     assert row.index('"category"') < row.index('"id"') < row.index('"role"')
     assert json.loads(row) == json.loads(json.dumps(pick_module.library_rows(props)))
+    accented = [Prop(replace(props[0].spec, description="Barrière usée"), props[0].mesh, props[0].uvs, PNG)]
+    assert "Barrière usée" in instruction("", accented)
     assert instruction_sha256("x", props) == __import__("hashlib").sha256((SYSTEM_PROMPT + "\n" + instruction("x", props)).encode()).hexdigest()
 
 
