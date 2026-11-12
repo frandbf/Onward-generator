@@ -7,6 +7,7 @@
       "sun": { "elevation_deg": 30, "azimuth": "streets", "color": "#FFE0B8", "intensity": 1.4, "shadow_angle_deg": 1.5 },
       "ambient": { "mode": "trilight", "sky": "#8A9BB3", "equator": "#9A9080", "ground": "#5A5044" },
       "ao": { "max_distance_m": 1.5, "exponent_indirect": 1.0, "exponent_direct": 0.2 },
+      "indirect_intensity": 2.0,
       "fog": { "color": "#E8D2B4" },
       "lightmap_texels_per_m_core": 14,
       "grime": 1.0,

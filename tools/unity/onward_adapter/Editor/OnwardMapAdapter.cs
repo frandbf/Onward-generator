@@ -161,6 +161,8 @@ namespace OnwardGenerator
             public float ao_max_distance_m;
             public float ao_exponent_indirect;
             public float ao_exponent_direct;
+            // Plan Q4. 0 (absent) keeps Unity's Indirect Intensity of 1.
+            public float indirect_intensity;
         }
 
         [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
@@ -3023,6 +3025,13 @@ namespace OnwardGenerator
                 settings.aoExponentDirect = opt.lighting.ao_exponent_direct;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} AO (ADR-037): max distance {1:0.##} m, indirect {2:0.##}, direct {3:0.##}.",
                     LogPrefix, settings.aoMaxDistance, settings.aoExponentIndirect, settings.aoExponentDirect));
+            }
+            if (opt.lighting != null && opt.lighting.indirect_intensity > 0f)
+            {
+                // Plan Q4: more bounced light lifts the shade of a narrow street and the probes lighting a player there;
+                // the direct sun stays as it is.
+                settings.indirectScale = opt.lighting.indirect_intensity;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} Indirect intensity (plan Q4): {1:0.##}.", LogPrefix, settings.indirectScale));
             }
             settings.lightmapCompression = LightmapCompression.None;
             settings.filteringMode = LightingSettings.FilterMode.Advanced;

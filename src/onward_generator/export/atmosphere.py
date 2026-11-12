@@ -32,6 +32,8 @@ APPLIED = ("sun", "ambient", "ao")
 FOG = "fog"
 # E10: the playable core bakes at the preset's density, only with a core, combining and a lower card density.
 LIGHTMAP_CORE = "lightmap_core"
+# Plan Q4: the bake's bounced light, only when the preset scales it.
+INDIRECT = "indirect"
 
 
 class AtmosphereError(ValueError):
@@ -78,7 +80,8 @@ def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tupl
     """The ``lighting`` block of ``adapter_options.json`` for ``preset``, and what the manifest records of the sun.
 
     The block holds the sun (plan E3), the ambient (``trilight`` with sky, equator and ground colours, or ``flat`` with
-    the sky colour alone) and the baked ambient occlusion (plan E5).
+    the sky colour alone) and the baked ambient occlusion (plan E5), and ``indirect_intensity`` when the preset scales the
+    bounced light (plan Q4).
 
     An ``azimuth: streets`` preset takes the azimuth of ``street`` (plan E6, ``export.sun``): ``azimuth_source`` is
     ``streets``, or ``streets_none`` when the core has no wall and the neutral azimuth stays. Without ``street`` it
@@ -111,7 +114,10 @@ def lighting(preset: Mapping[str, Any], street: StreetSun | None = None) -> tupl
     block["ao_max_distance_m"] = float(ao["max_distance_m"])
     block["ao_exponent_indirect"] = float(ao["exponent_indirect"])
     block["ao_exponent_direct"] = float(ao["exponent_direct"])
+    if "indirect_intensity" in preset:
+        # Plan Q4: the bounced light lifts the shade of a narrow street, where a soldier read too dark.
+        block["indirect_intensity"] = float(preset["indirect_intensity"])
     return block, record
 
 
-__all__ = ["APPLIED", "FOG", "LIGHTMAP_CORE", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]
+__all__ = ["APPLIED", "FOG", "INDIRECT", "LIGHTMAP_CORE", "NEUTRAL", "NEUTRAL_SUN_AZIMUTH_DEG", "STREETS", "lighting", "PRESETS_DEFAULT", "AtmosphereError", "check_atmosphere", "load_presets", "preset_names"]

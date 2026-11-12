@@ -72,6 +72,7 @@
             "color": { "$ref": "#/$defs/colour" }
           }
         },
+        "indirect_intensity": { "description": "Scale of the bounced light in the bake (Unity's Indirect Intensity, 1 when absent): it lifts the shade of narrow streets and the probes that light the players there, and leaves the direct sun as it is (plan Q4)", "type": "number", "minimum": 1, "maximum": 4 },
         "lightmap_texels_per_m_core": { "type": "number", "exclusiveMinimum": 0, "maximum": 40 },
         "grime": { "description": "Factor on the grime baked into the facade atlas", "type": "number", "minimum": 0, "maximum": 2 },
         "wall_desaturation": { "description": "Share of saturation removed from wall strips of the atlas", "type": "number", "minimum": 0, "maximum": 0.5 },

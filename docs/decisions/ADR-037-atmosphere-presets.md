@@ -68,6 +68,14 @@ The same map and slot, each package adding one increment to `pkg_15`; every one 
 
 With the FPS met and the draws unchanged by a preset, the maintainer accepted the ADR on 11 November 2026.
 
+## Amendment: bounced light (plan Q4, 11 November 2026)
+
+- **Context.** On Rue Mouffetard with `golden_hour` the narrow streets in shade were too dark to read a soldier. The scene report's `probe_light` (the probes a player stands in, toward his sides) gave p10 0.0143 against a median of 0.0594.
+- **Decision.** A preset may carry `indirect_intensity` (1 to 4), the bake's Indirect Intensity; `golden_hour` takes 2. It enters the `lighting` block and `applied` (`indirect`); `neutral` and `overcast` are unchanged, byte for byte.
+- **Measured.** p10 0.0143 → 0.0227, median 0.0594 → 0.1083; the shaded street ground of the fixed views about doubles and the sunlit ground rises by a quarter, so the sunny and shaded sides of a street stay apart.
+- **Rejected.** A lighter ambient (p10 0.016), outdoor probe columns every 6 m (0.0172) or with 0.5 m of room (0.0134): the shade of a narrow street is lit by its walls more than by its slot of sky. A higher sun in narrow streets would shorten the long shadows the preset is for.
+- **Pending.** The headset check of plan Q4: a soldier reads at 30 m in the shaded street.
+
 ## To check on the headset
 
 - Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours: the user saw the warm fog and the lighter shade of `pkg_19`, so the bake and the fog reach the client.
