@@ -97,9 +97,11 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 | `--ai` | Ask local Ollama for the prop plan; a rejected answer falls back to the rules. |
 | `--no-source <id>` | Switch off a data source; `onward-generator source list` shows them. |
 | `--time-of-day night` | A night map, lit by the street lamps ([ADR-026](docs/decisions/ADR-026-time-of-day.md)). |
-| `--atmosphere golden_hour` | A light preset for a day map, `golden_hour` or `overcast` ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md), proposed: the sun so far). |
+| `--atmosphere golden_hour` | A light preset for a day map, `golden_hour` or `overcast`: sun, ambient, fog and wall palette. `golden_hour` doubles the bounced light so a soldier in a narrow shaded street stays readable ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)). |
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
+
+`onward-generator map create` also takes one flag per `map.json` switch, such as `--regional-facades`, `--balanced-spawns`, `--sightline-cover` or `--repetition`, so a new map needs no hand edit ([docs/02-configuration.md](docs/02-configuration.md)). With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
 
 **If something goes wrong:**
 
