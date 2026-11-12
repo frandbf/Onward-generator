@@ -41,6 +41,7 @@ from onward_generator.overgrow.fit import (
     object_reason,
     size_reason,
 )
+from onward_generator.overgrow.flatness import prop_flat
 from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.profiles import Profile, rule_factor, scaled_cap
@@ -198,7 +199,9 @@ def _place_props(
 ) -> None:
     counts: Counter[str] = Counter()
     role_placed = placed_roles if placed_roles is not None else Counter()
-    props = [_fitted(prop) for prop in props]
+    # Textured props first: a rule's cap is shared by its props, so a model drawn in flat colours takes only what the
+    # textured ones leave (``flatness.prop_flat``, 12 November 2026; the order is otherwise kept).
+    props = sorted((_fitted(prop) for prop in props), key=prop_flat)
     for prop in props:
         rules = _spot_rules(prop)
         if not rules:

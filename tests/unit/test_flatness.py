@@ -137,3 +137,26 @@ def test_each_face_spans_its_own_uvs() -> None:
     faces = np.array([[0, 1, 2], [3, 4, 5]])
     corners = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [3.0, 0.0, 1.0]])
     assert flat_share(corners, faces, uvs, (512, 512)) == (pytest.approx(1.0), pytest.approx(1.0))
+
+
+def _png(px: int) -> bytes:
+    out = io.BytesIO()
+    Image.new("RGB", (px, px), (120, 90, 60)).save(out, format="PNG")
+    return out.getvalue()
+
+
+def test_a_loaded_prop_is_read_part_by_part() -> None:
+    from onward_generator.generation.mesh import Mesh
+    from onward_generator.overgrow.catalog import ASSETS_BY_ID
+    from onward_generator.overgrow.flatness import prop_flat
+    from onward_generator.overgrow.library import Prop, PropPart
+
+    spec = ASSETS_BY_ID["concrete_road_barrier"]
+    mesh = Mesh(QUAD, TRIS)
+    assert prop_flat(Prop(spec, mesh, _uvs(1.0 / 512), _png(512)))
+    assert not prop_flat(Prop(spec, mesh, _uvs(1.0), _png(64)))
+    assert prop_flat(Prop(spec, mesh, _uvs(1.0), b""))  # an albedo that is no image is no texture
+    assert prop_flat(Prop(spec, mesh, _uvs(1.0), _png(4)))
+    # Two parts: the first triangle on a photo, the second on a 4 px colour: half the surface, not flat.
+    assert not prop_flat(Prop(spec, mesh, _uvs(1.0), _png(64), parts=(PropPart(1, _png(64)), PropPart(2, _png(4)))))
+    assert prop_flat(Prop(spec, mesh, _uvs(1.0), _png(64), parts=(PropPart(1, _png(4)), PropPart(2, _png(4)))))

@@ -1237,3 +1237,25 @@ def test_a_spot_is_refused_where_the_placement_says_at_the_copy_s_own_position()
     lot = replace(crate, spec=replace(crate.spec, placement="open_ground"))
     assert reason(lot, Spot("sidewalk", 5.0, -6.0, 0.0, "s", "grid", 10.0)) == "not_open_ground"
     assert reason(lot, Spot("yard", 5.0, -6.0, 0.0, "y", "grid", 10.0)) is None
+
+
+def test_a_textured_prop_takes_a_shared_spot_before_a_flat_one() -> None:
+    """12 November 2026: a rule's cap is shared, so the textured props go first; a flat one takes what they leave."""
+    import io
+
+    from PIL import Image
+
+    def png(px: int) -> bytes:
+        out = io.BytesIO()
+        Image.new("RGB", (px, px), (90, 90, 90)).save(out, format="PNG")
+        return out.getvalue()
+
+    mesh = _mesh(1.0, 1.0, 1.0)
+    span = np.tile(np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float32), (8, 1))[:mesh.vertex_count]
+    flat = Prop(AssetSpec("a_flat", "furniture", "bench", ("sidewalk",), "ground", "test"), mesh, span / 512, png(512))
+    photo = Prop(AssetSpec("z_photo", "furniture", "bench", ("sidewalk",), "ground", "test"), mesh, span, png(64))
+    spots = _spots(("grid:only", 0.0))
+    result = Dressing()
+    _place_props([flat, photo], spots, STRtree([box(30.0, 30.0, 40.0, 40.0)]), None, [], square_zone(80.0), profile_for(100),
+                 48152, [], 60_000, result, used=[], seen=set())
+    assert result.placed_ids == ["z_photo"]

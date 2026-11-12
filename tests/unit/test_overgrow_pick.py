@@ -286,3 +286,27 @@ def test_only_props_the_rules_place_are_offered() -> None:
     with pytest.raises(PickError, match="at least 3 spots, not 1"):
         parse_pick(_reply("crate_0", "crate_1", "pallet_0", "pallet_1", "bag_0", "sack_0"), waste)
     assert parse_pick(_reply("crate_0", "crate_1", "pallet_0", "bag_0", "barrier_0", "bench_0"), waste)[0][-1] == "bench_0"
+
+
+def test_a_spot_with_three_textured_props_offers_no_flat_one() -> None:
+    import io
+
+    from PIL import Image
+
+    def png(px: int) -> bytes:
+        out = io.BytesIO()
+        Image.new("RGB", (px, px), (90, 90, 90)).save(out, format="PNG")
+        return out.getvalue()
+
+    assert pick_module.TEXTURED_PER_SPOT == 3
+    mesh = box(-0.3, 0.3, -0.2, 0.2, 0.0, 0.8)
+    full = np.tile(np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float32), (8, 1))[:mesh.vertex_count]
+
+    def prop(asset_id: str, category: str, textured: bool) -> Prop:
+        return Prop(replace(BASE, id=asset_id, role="crate", category=category), mesh, full if textured else full / 512,
+                    png(64) if textured else png(512))
+
+    waste = [prop(f"photo_{k}", "waste", True) for k in range(3)] + [prop("flat_w", "waste", False)]
+    furniture = [prop(f"photo_f{k}", "furniture", True) for k in range(2)] + [prop("flat_f", "furniture", False)]
+    offered = [p.spec.id for p in pick_module.placeable([*waste, *furniture])]
+    assert "flat_w" not in offered and "flat_f" in offered and len(offered) == 6

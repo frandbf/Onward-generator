@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from onward_generator.overgrow.catalog import rules_for
 from onward_generator.overgrow.dressing import INDOOR_ROLES
+from onward_generator.overgrow.flatness import prop_flat
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.prompt import library_rows, prompt_props
 from onward_generator.overgrow.realize import OVERGROW_TIMEOUT_S, fitted_props
@@ -75,10 +77,19 @@ def _spot(prop: Prop) -> str:
     return rules[0].id if rules else ""
 
 
+# A spot with at least this many textured props offers no prop drawn in flat colours (``flatness.prop_flat``).
+TEXTURED_PER_SPOT = 3
+
+
 def placeable(props: list[Prop]) -> list[Prop]:
     """The props the rules can place: a placement rule takes them and their role is not an indoor one. A lamp post or
-    a traffic light no rule places was offered, picked and never placed (five of 20 picks on Rue Mouffetard)."""
-    return [prop for prop in props if _spot(prop) and prop.spec.role not in INDOOR_ROLES]
+    a traffic light no rule places was offered, picked and never placed (five of 20 picks on Rue Mouffetard). A prop
+    drawn in flat colours is left out where its spot has ``TEXTURED_PER_SPOT`` textured ones (the low-poly storage
+    pack's flat boxes and sacks filled most of a Rue Mouffetard pick, 12 November 2026)."""
+    usable = [prop for prop in props if _spot(prop) and prop.spec.role not in INDOOR_ROLES]
+    flat = {prop.spec.id: prop_flat(prop) for prop in usable}
+    textured = Counter(_spot(prop) for prop in usable if not flat[prop.spec.id])
+    return [prop for prop in usable if not flat[prop.spec.id] or textured[_spot(prop)] < TEXTURED_PER_SPOT]
 
 
 def _bounds(offered: Mapping[str, Prop]) -> tuple[int, int]:

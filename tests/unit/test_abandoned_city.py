@@ -881,3 +881,10 @@ def test_no_camera_hangs_over_a_shop_sign(tmp_path: Path) -> None:
     second = json.loads((tmp_path / "second" / "scene_detail.json").read_text())["objects"]
     assert report["reject_counts"]["covers_sign"] >= 1
     assert all(math.dist(row["position_m"][:2], (x, y)) > 1.0 for row in second if row.get("asset_id") == "synth_cam")
+
+
+def test_the_street_prop_caps_were_doubled() -> None:
+    """12 November 2026: the maintainer asked for more props on Rue Mouffetard."""
+    caps = {rule.id: rule.cap for rule in PLACEMENT_RULES}
+    assert caps == {"vehicles_curb": 12, "waste_ground": 24, "furniture_off_lane": 12, "structures_edge": 8, "facade_wall": 16,
+                    "barriers_curb": 8, "manhole_lane": 2, "manhole_sidewalk": 6, "plants": 16, "bushes": 4, "trees": 2}
