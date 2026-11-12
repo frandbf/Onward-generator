@@ -1718,7 +1718,7 @@ def _detail_buildings(
                 "use": use.to_record(),
                 "door": door_rule,
                 "doors_m": _door_centres(layout.holes, segments),
-                "balconies_m": _balcony_spans(layout.balconies, segments, spec.width_m if spec is not None else 0.0),
+                "balconies_m": _balcony_spans(layout.balconies, segments, spec.width_m) if spec is not None else [],
             },
             "roof": shell.roof,
             "interior": interior_record is not None,

@@ -14,10 +14,10 @@ from onward_generator.generation.config import load_generation_config
 from onward_generator.generation.surfaces import LinearWay, build_partition
 from onward_generator.perf.layout import (
     AI_COUNT,
-    CLIMB_BALCONY_CLEAR_M,
     AMMO_COUNT,
     AMMO_SPAWN_CLEAR_M,
     BLOCK_GAP_M,
+    CLIMB_BALCONY_CLEAR_M,
     GAMEPLAY_VERSION,
     GRID_M,
     MIN_SPAWN_SEPARATION_M,
