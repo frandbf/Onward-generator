@@ -899,6 +899,9 @@ CLIMB_PROP_CLEAR_M = 1.0
 """From the spot of an overgrow prop: the radius ``free_ground`` gives a detail urban element. An estimate, not a measured footprint."""
 CLIMB_TREE_CLEAR_M = 2.0
 """From an overgrow tree: a generated crown is about 3.8 m across, and it once stood in a street cabin."""
+CLIMB_SIGN_CLEAR_M = 1.5
+"""From a shop's fascia or blade sign, a vinyl on its window and a street plate: a cabin once hid a shop's sign and its
+window on Rue Mouffetard (12 November 2026)."""
 CLIMB_FLAT_GROWTH = frozenset({"grass", "vine", "moss"})
 """Overgrowth a cabin may stand on or beside: flat on the ground or on a facade."""
 
@@ -919,10 +922,20 @@ def ammo_points(
     return scatter_points(region if not region.is_empty else open_ground, AMMO_COUNT, 6.0, origin)
 
 
+def _board_line(board: Mapping[str, Any]) -> LineString:
+    """A shop sign or vinyl as the segment it covers along its facade: ``width_m`` across ``normal`` at ``centre_m``."""
+    x, y = (float(v) for v in board["centre_m"][:2])
+    nx, ny = (float(v) for v in board["normal"][:2])
+    half = float(board["width_m"]) / 2
+    return LineString([(x + ny * half, y - nx * half), (x - ny * half, y + nx * half)])
+
+
 def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
     """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and every other
     ground-floor door of a facade, the bots' routes and the overgrow props. The layout runs after ``overgrow``, which knew
-    nothing of the cabins: bricks and a tree stood in one. On Barcelona Sarria two ladders stood over a facade door."""
+    nothing of the cabins: bricks and a tree stood in one. On Barcelona Sarria two ladders stood over a facade door.
+    Also ``CLIMB_SIGN_CLEAR_M`` around each shop sign and window vinyl (``facade.shops``) and each street plate: every
+    shop window carries a vinyl, so a cabin no longer stands against a shopfront."""
     objects = detail_manifest.get("objects", [])
     doors = [
         *(tuple(connection["position_m"])
@@ -935,8 +948,17 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
         Point(prop["position_m"]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)
         for prop in objects if prop.get("type") == "overgrowth" and prop.get("kind") not in CLIMB_FLAT_GROWTH
     ]
+    boards = [
+        _board_line(board)
+        for building in objects if building.get("type") == "building"
+        for shop in (building.get("facade") or {}).get("shops") or []
+        for board in (shop.get("sign"), *(shop.get("vinyls") or []))
+        if board and board.get("centre_m") and board.get("normal")
+    ]
+    plates = [Point(obj["position_m"][:2]) for obj in objects if obj.get("type") == "street_sign" and obj.get("position_m")]
     return union_all([
         *[Point(p).buffer(CLIMB_KEEP_OUT_M) for p in (*points, *doors)],
+        *[shape.buffer(CLIMB_SIGN_CLEAR_M) for shape in (*boards, *plates)],
         *[LineString([(p["x"], p["y"]) for p in route["points"]]).buffer(CLIMB_ROUTE_KEEP_OUT_M) for route in routes],
         *props,
     ])
@@ -1015,7 +1037,11 @@ def playable_layout(
     gameplay_points = [uplink, *ai, *ammo, *escort, evac, *drives, *occupied_pts]
     keep_out = climb_keep_out(gameplay_points, routes, detail_manifest)
     reachable = climb_ground(base, detail_manifest, uplink)
-    climbs = place_climbs(detail_manifest, footprints or {}, reachable, keep_out, (attack, attack_b), (defend, defend_b))
+    # A street cabin stays off the carriageway (ADR-029 amendment of 12 November 2026); a ladder's foot may stand on it.
+    carriageway = base.partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
+    lift_ground = reachable if carriageway is None else reachable.difference(carriageway.geometry)
+    climbs = place_climbs(detail_manifest, footprints or {}, reachable, keep_out, (attack, attack_b), (defend, defend_b),
+                          lift_free=lift_ground)
 
     doc.update({
         "schema": GAMEPLAY_SCHEMA,

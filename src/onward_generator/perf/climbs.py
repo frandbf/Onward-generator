@@ -233,6 +233,7 @@ def place_climbs(
     keep_out: BaseGeometry,
     attackers: Sequence[tuple[float, float]],
     defenders: Sequence[tuple[float, float]],
+    lift_free: BaseGeometry | None = None,
 ) -> dict[str, list[dict[str, float]]]:
     """``ladders`` on buildings of at most 4 storeys, ``lifts`` on buildings of 3 to 7.
 
@@ -244,8 +245,12 @@ def place_climbs(
     hands over an intersection of two grounds, whose edge along a facade lands a few micrometres off the wall, and
     ``covers`` is exact. On Rue Mouffetard every foot missed the ground by less than 0.000001 m2, and neither it nor
     Madrid Sol got a ladder or a lift.
+
+    ``lift_free``, when given, is the ground a street cabin and its apron must lie on instead of ``free`` (the layout
+    leaves the carriageway out of it).
     """
     free = free.buffer(COVER_TOLERANCE_M)
+    cabin_free = free if lift_free is None else lift_free.buffer(COVER_TOLERANCE_M)
     spawns = [*attackers, *defenders]
     ranked = sorted(
         (row for row in _candidates(detail_manifest, footprints) if min(row[2].distance(Point(p)) for p in spawns) >= SPAWN_CLEAR_M),
@@ -260,7 +265,7 @@ def place_climbs(
 
     for source, building, footprint in ranked:
         if len(lifts) < LIFTS_MAX and LIFT_MIN_STOREYS <= storeys(building) <= LIFT_MAX_STOREYS:
-            site = lift_on(footprint, free, keep_out, float(building["height"]["height_m"]), _parapet_thickness(building))
+            site = lift_on(footprint, cabin_free, keep_out, float(building["height"]["height_m"]), _parapet_thickness(building))
             if site is not None and spaced(site):
                 lifts.append(site)
                 used.add(source)

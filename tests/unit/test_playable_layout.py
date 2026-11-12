@@ -32,6 +32,7 @@ from onward_generator.perf.layout import (
     TIME_OF_DAY_SETTINGS,
     LayoutError,
     _block,
+    _board_line,
     _defenders,
     _patrol_lines,
     _routes,
@@ -689,6 +690,26 @@ def test_the_climb_keep_out_covers_every_ground_floor_door_of_a_facade() -> None
         assert keep_out.contains(Point(inside)), inside
     for outside in ((403.1, 0.0), (600.0, 0.0)):
         assert not keep_out.contains(Point(outside)), outside
+
+
+def test_the_climb_keep_out_covers_shop_signs_window_vinyls_and_street_plates() -> None:
+    """Rue Mouffetard: a cabin hid a shop's fascia and stood against its window."""
+    sign = {"centre_m": [100.0, 0.0, 2.8], "normal": [0.0, -1.0], "width_m": 4.0, "height_m": 0.4}
+    vinyl = {"centre_m": [200.0, 0.0, 1.6], "normal": [1.0, 0.0], "width_m": 2.0, "glass": "shop_glass"}
+    manifest = {"objects": [
+        {"type": "building", "facade": {"shops": [{"sign": sign, "vinyls": [vinyl]}, {"sign": None, "vinyls": []}, {}]}},
+        {"type": "building", "facade": {"shops": [{"sign": {"centre_m": [300.0, 0.0]}}]}},  # no normal: skipped
+        {"type": "street_sign", "position_m": [0.0, 300.0, 2.5]},
+        {"type": "street_sign"},
+    ]}
+    keep_out = climb_keep_out([(-500.0, -500.0)], [], manifest)
+    # The fascia runs 4 m along x at y = 0: 1.5 m around its whole length, not just its centre.
+    for inside in ((101.9, 1.4), (98.1, -1.4), (103.4, 0.0), (200.0, 2.4), (200.0, -2.4), (201.4, 0.0), (0.0, 301.4)):
+        assert keep_out.contains(Point(inside)), inside
+    for outside in ((103.6, 0.0), (100.0, 1.6), (200.0, 2.6), (201.6, 0.0), (0.0, 301.6), (300.0, 0.0)):
+        assert not keep_out.contains(Point(outside)), outside
+    assert _board_line({"centre_m": [0.0, 0.0], "normal": [0.0, -1.0], "width_m": 2.0}).length == pytest.approx(2.0)
+    assert sorted(_board_line({"centre_m": [5.0, 5.0], "normal": [1.0, 0.0], "width_m": 4.0}).coords) == [(5.0, 3.0), (5.0, 7.0)]
 
 
 def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> None:
