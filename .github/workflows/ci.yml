@@ -23,8 +23,8 @@ jobs:
   linux:
     name: linux (docker)
     runs-on: ubuntu-latest
-    # About four times the measured p90 (1.5 min).
-    timeout-minutes: 6
+    # The whole suite now takes 6 to 7 min locally; every run since 11 November 2026 (PR #28) was cancelled at 6.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: arduino/setup-task@v3
