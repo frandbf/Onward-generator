@@ -118,6 +118,12 @@
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/rgb" }
         },
+        "estimated_walls": {
+          "description": "A wall the generation palette estimated (facade.materials.wall_origin generated), drawn in the strip of another wall: Paris takes no estimated brick. A building whose OSM building:material sets its wall keeps it. Every key and value must be a wall of walls.",
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" }
+        },
         "sources": {
           "type": "object",
           "additionalProperties": false,

@@ -290,6 +290,13 @@ def test_regional_table_refusals(tmp_path: Path) -> None:
     refused(lambda d: d["atlases"]["haussmann"]["wall_tints"].update(plaster_cream=[0.5, 0.5]), "atlases/haussmann/wall_tints/plaster_cream")
     refused(lambda d: d["atlases"]["haussmann"]["wall_tints"].update(plaster_cream=[0.5, 0.5, 1.1]), "atlases/haussmann/wall_tints/plaster_cream")
     refused(lambda d: d["atlases"]["haussmann"].update(wall_tints={}), "atlases/haussmann/wall_tints")
+    # An estimated wall and the wall it is drawn as both have a strip.
+    refused(lambda d: d["atlases"]["haussmann"]["estimated_walls"].update(brick_red="plaster_grey"),
+            "style haussmann: estimated wall brick_red -> plaster_grey needs a strip for both")
+    refused(lambda d: d["atlases"]["haussmann"]["estimated_walls"].update(brick_grey="plaster_cream"),
+            "style haussmann: estimated wall brick_grey -> plaster_cream needs a strip for both")
+    refused(lambda d: d["atlases"]["haussmann"].update(estimated_walls={}), "atlases/haussmann/estimated_walls")
+    refused(lambda d: d["atlases"]["haussmann"]["estimated_walls"].update(brick_red=1), "atlases/haussmann/estimated_walls/brick_red")
     # The last valid indices pass.
     doc = _regional_doc()
     doc["atlases"]["anglo"]["eras"]["pre_1900"].update(tones=[2], window_families=[2])

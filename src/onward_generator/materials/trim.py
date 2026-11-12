@@ -366,6 +366,8 @@ class TrimStats:
     looks: dict[str, int] = field(default_factory=dict)
     # Buildings by era band, only for an atlas that has eras: the period, ``no_band`` or ``unknown``.
     eras: dict[str, int] = field(default_factory=dict)
+    # Wall primitives an atlas's ``estimated_walls`` drew in another strip, by palette wall.
+    estimated_walls: dict[str, int] = field(default_factory=dict)
 
     def count_look(self, look: Look) -> None:
         names = [f"tone_{look.tone}"] + [name for name, on in (("zocalo", look.zocalo), ("cornice", look.cornice),
@@ -383,13 +385,25 @@ class TrimStats:
             "openings_by_cell": dict(sorted(self.cells.items())),
             "looks": dict(sorted(self.looks.items())),
             **({"eras": dict(sorted(self.eras.items()))} if self.eras else {}),
+            **({"estimated_walls": dict(sorted(self.estimated_walls.items()))} if self.estimated_walls else {}),
         }
 
 
+def estimated_wall(record: Mapping[str, Any] | None, material: str) -> bool:
+    """Whether ``material`` is the wall the generation palette picked for this building, not an observed one."""
+    picked = ((record or {}).get("facade") or {}).get("materials") or {}
+    return picked.get("wall_origin") == "generated" and picked.get("wall") == material
+
+
 def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atlas: Mapping[str, Any],
-                  layout: TrimLayout, windows: Sequence[Sequence[str]], stats: TrimStats) -> Node:
-    """One building node with every part the atlas covers in one primitive of the trim material."""
+                  layout: TrimLayout, windows: Sequence[Sequence[str]], stats: TrimStats,
+                  observed: frozenset[str] = frozenset()) -> Node:
+    """One building node with every part the atlas covers in one primitive of the trim material.
+
+    An atlas's ``estimated_walls`` draws a wall the palette estimated in another strip (Paris has no brick in its
+    palette); a building in ``observed`` (OSM ``building:material``) keeps its own wall."""
     walls = atlas["walls"]
+    estimated = atlas.get("estimated_walls") or {}
     scenic = atlas["scenic_walls"]
     extras = node.extras or {}
     frame = extras.get("uv_frame")
@@ -418,7 +432,11 @@ def trim_building(node: Node, record: Mapping[str, Any] | None, style: str, atla
             kept.append(prim)
             continue
         if material in walls or material in scenic:
-            strip = layout.tones[material if material in walls else scenic[material]][look.tone]
+            wall = material if material in walls else scenic[material]
+            if wall in estimated and node.name not in observed and estimated_wall(record, material):
+                stats.estimated_walls[wall] = stats.estimated_walls.get(wall, 0) + 1
+                wall = estimated[wall]
+            strip = layout.tones[wall][look.tone]
             z_top = max(float(p.mesh.vertices[:, 2].max()) for p in node.primitives if p.mesh.triangle_count)
             bands = building_bands(record, z_top, float(atlas["zocalo_m"]), float(atlas["max_band_m"]), look.zocalo)
             if background:
@@ -456,7 +474,8 @@ def window_families(atlas: Mapping[str, Any]) -> list[list[str]]:
 
 
 def trim_nodes(nodes: Sequence[Node], records: Mapping[str, Mapping[str, Any]], style: str,
-               atlas: Mapping[str, Any], layout: TrimLayout) -> tuple[list[Node], TrimStats]:
+               atlas: Mapping[str, Any], layout: TrimLayout,
+               observed: frozenset[str] = frozenset()) -> tuple[list[Node], TrimStats]:
     """Every building, building part and landmark tower node (no matrix) through ``trim_building``; the rest as they are."""
     stats = TrimStats()
     windows = window_families(atlas)
@@ -467,7 +486,7 @@ def trim_nodes(nodes: Sequence[Node], records: Mapping[str, Mapping[str, Any]], 
             out.append(node)
             continue
         record = records.get(str(extras.get("object_id") or node.name))
-        out.append(trim_building(node, record, style, atlas, layout, windows, stats))
+        out.append(trim_building(node, record, style, atlas, layout, windows, stats, observed))
     return out, stats
 
 
@@ -561,6 +580,7 @@ def apply_trim(
     regional: bool = False,
     regional_table_path: str | Path | None = None,
     palette: WallPalette | None = None,
+    observed_walls: Sequence[str] = (),
 ) -> TrimResult:
     """Choose the style, bake (or read from ``cache``) its atlas and remap the building nodes.
 
@@ -569,6 +589,8 @@ def apply_trim(
     ``regional`` (plan D1, off by default) a style whose atlas is null in the table
     takes its recipe from the regional table, when that has one. A ``palette`` (plan E8) changes the wall colours
     and the grime before the bake; without one the atlas is the one of before, byte for byte.
+    ``observed_walls`` names the buildings whose wall OSM gives (``building:material=brick``): ``estimated_walls``
+    never redraws them.
     """
     if mode not in FACADE_MODES:
         raise StyleError(f"unknown facade mode {mode!r}; known: {', '.join(FACADE_MODES)}")
@@ -610,7 +632,7 @@ def apply_trim(
 
     png = bake() if cache is None else cache.fetch(key, bake)
     records_by_id = {str(o.get("id")): o for o in manifest.get("objects") or [] if isinstance(o, dict)}
-    out, stats = trim_nodes(nodes, records_by_id, name, atlas, layout)
+    out, stats = trim_nodes(nodes, records_by_id, name, atlas, layout, frozenset(observed_walls))
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
     extra: dict[str, Any] = {}

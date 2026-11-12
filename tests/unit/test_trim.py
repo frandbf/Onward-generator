@@ -834,6 +834,47 @@ CENTRES = {"central_european": KRAKOW, "anglo": LONDON, "latin_american": MEXICO
 REGIONAL_ATLAS = load_regional_table(load_style_table()).atlases["central_european"]
 
 
+def _picked(wall: str, origin: str = "generated") -> dict[str, object]:
+    return {**RECORD, "facade": {**RECORD["facade"], "materials": {"wall": wall, "wall_origin": origin}}}
+
+
+def test_an_estimated_wall_is_drawn_in_the_strip_the_atlas_names() -> None:
+    """Paris takes no estimated brick: brick_red the palette picked samples the plaster_cream strip."""
+    atlas = {**ATLAS, "estimated_walls": {"brick_red": "plaster_cream"}}
+    stats = TrimStats()
+    redrawn = trim_building(_building("brick_red"), _picked("brick_red"), "mediterranean", atlas, LAYOUT, WINDOWS, stats)
+    cream = trim_building(_building("plaster_cream"), _picked("plaster_cream"), "mediterranean", atlas, LAYOUT, WINDOWS,
+                          TrimStats())
+    brick = trim_building(_building("brick_red"), RECORD, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+    assert np.array_equal(redrawn.primitives[0].uvs, cream.primitives[0].uvs)
+    assert not np.array_equal(redrawn.primitives[0].uvs, brick.primitives[0].uvs)
+    assert stats.estimated_walls == {"brick_red": 1}
+    assert stats.as_dict()["estimated_walls"] == {"brick_red": 1}
+    # An observed wall keeps its strip: OSM building:material, an observed origin, another wall, no record.
+    cases = [
+        (_picked("brick_red"), frozenset({"building/b1"})),
+        (_picked("brick_red", origin="observed"), frozenset()),
+        (_picked("plaster_ochre"), frozenset()),
+        (None, frozenset()),
+    ]
+    for record, observed in cases:
+        kept_stats = TrimStats()
+        kept = trim_building(_building("brick_red"), record, "mediterranean", atlas, LAYOUT, WINDOWS, kept_stats, observed)
+        plain = trim_building(_building("brick_red"), record, "mediterranean", ATLAS, LAYOUT, WINDOWS, TrimStats())
+        assert np.array_equal(kept.primitives[0].uvs, plain.primitives[0].uvs)
+        assert kept_stats.estimated_walls == {} and "estimated_walls" not in kept_stats.as_dict()
+
+
+def test_apply_trim_keeps_the_brick_of_an_osm_brick_building(small_regional_table: Path) -> None:
+    manifest = {"frame": {"origin_wgs84": PARIS}, "objects": [{"id": "building/b1", **_picked("brick_red")}]}
+    redrawn = apply_trim([_building("brick_red")], manifest, COLORS, regional=True, regional_table_path=small_regional_table)
+    assert redrawn.report["stats"]["estimated_walls"] == {"brick_red": 1}
+    kept = apply_trim([_building("brick_red")], manifest, COLORS, regional=True, regional_table_path=small_regional_table,
+                      observed_walls=["building/b1"])
+    assert "estimated_walls" not in kept.report["stats"]
+    assert not np.array_equal(kept.nodes[0].primitives[0].uvs, redrawn.nodes[0].primitives[0].uvs)
+
+
 def _era(period: object, origin: str = "observed") -> dict[str, object]:
     return {**RECORD, "facade": {**RECORD["facade"], "typology": {"era": {"year": 1890, "period": period, "origin": origin}}}}
 
