@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +62,21 @@ class MapError(ValueError):
     """The map folder cannot be created from these inputs."""
 
 
+# Plan Q8: the boolean switches of map.json that map create can turn on, in the order it writes them, and the
+# help each flag shows. Absent is off, so a map created without them is the one of before.
+MAP_SWITCHES: Mapping[str, str] = {
+    "street_profile": "local Ollama picks a street profile of enumerated ids for the stage flags (plan D2)",
+    "repetition": "calm roof and paving pools and a per-cell ground phase; the texture plan takes the pools (plan C1)",
+    "overture_tints": "facade tints from Overture building colours where OSM has none (plan C2)",
+    "lidar_roofs": "flat or pitched roofs from the LiDAR nDSM spread where OSM has no roof tag (plan C3)",
+    "regional_facades": "regional trim atlases from config/facade_styles.regional.json (plan D1)",
+    "gameplay_report": "write gameplay_report.json beside the layout (ADR-032)",
+    "balanced_spawns": "place the spawns and the Uplink by the gameplay metrics (plan C6)",
+    "sightline_cover": "cover props on long open sightlines (plan C7)",
+    "panoramax_atlas": "pack the street-photo decals per combine cell; acts only with --panoramax (ADR-020 amendment)",
+}
+
+
 def create_map(
     directory: str | Path,
     *,
@@ -84,6 +99,7 @@ def create_map(
     core_target_triangles: int | None = None,
     overwrite: bool = False,
     texture_provider: Provider | None = None,
+    switches: Collection[str] = (),
 ) -> dict[str, Any]:
     """Write ``map.json``, configs and a metric AOI. The CLI then fetches OSM.
 
@@ -91,7 +107,10 @@ def create_map(
     ``core: {mode: "budget", target_triangles, max_half_side_m}``, the largest half-side being
     ``core_radius_m`` when given and ``radius_m - CORE_RING_DEFAULT_M`` otherwise.
 
-    ``atmosphere`` other than ``neutral`` writes ``atmosphere`` in ``map.json`` (ADR-037); ``neutral`` writes no key."""
+    ``atmosphere`` other than ``neutral`` writes ``atmosphere`` in ``map.json`` (ADR-037); ``neutral`` writes no key.
+
+    ``switches`` names the ``MAP_SWITCHES`` to turn on (plan Q8): each is written ``true`` after ``paths``, the others are
+    left out, and ``repetition`` also gives the texture plan its calm pools."""
     root = Path(directory).expanduser().resolve()
     map_id = _map_id(map_id)
     title = _title(name)
@@ -104,6 +123,9 @@ def create_map(
     atmosphere = _atmosphere(atmosphere, time_of_day)
     core = _core(core_radius_m, radius_m)
     budget = _core_budget(core_target_triangles, core_radius_m, core, radius_m)
+    unknown = sorted(set(switches) - set(MAP_SWITCHES))
+    if unknown:
+        raise MapError(f"unknown map switch {', '.join(unknown)}; known: {', '.join(MAP_SWITCHES)}")
     _guard_directory(root, overwrite=overwrite)
 
     try:
@@ -126,7 +148,7 @@ def create_map(
     atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, core or radius_m + margin_m))
     _write_texture_plan(
         root, map_id=map_id, name=title, latitude=latitude, longitude=longitude,
-        brief=brief, seed=seed, provider=texture_provider,
+        brief=brief, seed=seed, provider=texture_provider, extended="repetition" in switches,
     )
 
     project_result = validate_config_file(root / project_rel)
@@ -164,6 +186,7 @@ def create_map(
             "raw": "data/raw",
             "processed": "data/processed",
         },
+        **{name: True for name in MAP_SWITCHES if name in switches},
     }
     atomic_write_json(root / "map.json", document)
     return document
