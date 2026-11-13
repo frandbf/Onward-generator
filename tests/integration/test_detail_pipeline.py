@@ -562,3 +562,25 @@ def test_detail_scene_hands_its_prototypes_and_extra_urban_to_the_element_pass(d
     placed = [o for o in detailed.objects if o.type == "urban_element"]
     assert len(elements) == len(placed) > 0
     assert detailed.prototypes and {id(p) for p in detailed.prototypes.values()} <= {id(p) for p in custom.values()}
+
+
+def test_on_a_haussmann_map_the_flat_building_without_an_interior_takes_the_mansard(
+        row_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    import onward_generator.detail.scene as scene_module
+
+    asked: list[tuple[object, object, object]] = []
+    real = scene_module.mansard_for
+
+    def tall(haussmann, landmark, storeys, template):  # the row is three storeys high: ask as if it were taller
+        asked.append((haussmann, landmark, template))
+        return real(haussmann, landmark, SimpleNamespace(count=99, height_m=storeys.height_m), template)
+
+    monkeypatch.setattr(scene_module, "regional_style", lambda base: "haussmann")
+    monkeypatch.setattr(scene_module, "mansard_for", tall)
+    detailed = _detail(row_inputs)
+    roofs = {o.id: o.record["roof"]["type"] for o in detailed.objects if o.type == "building"}
+    assert roofs["building/osm-way-605"] == "mansard"
+    assert sum(kind == "mansard" for kind in roofs.values()) == 1
+    assert len(asked) == 3 and all(h is True and isinstance(lm, bool) and hasattr(t, "pitched") for h, lm, t in asked)

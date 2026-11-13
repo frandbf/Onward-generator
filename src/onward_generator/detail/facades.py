@@ -397,14 +397,11 @@ def mansard_ring(segments: Sequence[Segment], inset: float) -> list[tuple[np.nda
     return ends
 
 
-def _step(seg: Segment, before_exposed: bool, eaves: float, height: float, start: np.ndarray, previous_end: np.ndarray) -> Mesh:
-    """The upright triangle where an exposed piece's sloped face and a party piece's upright one meet on one line,
-    facing the lower, exposed side."""
-    tri = np.array([[*seg.a, eaves], [*start, height], [*previous_end, height]], dtype=float)
-    normal = np.cross(tri[1] - tri[0], tri[2] - tri[0])
-    facing = -seg.u if before_exposed else seg.u
-    order = [0, 1, 2] if float(normal @ facing) > 0 else [0, 2, 1]
-    return Mesh(tri, np.array([order]))
+def _step(seg: Segment, eaves: float, height: float, start: np.ndarray, previous_end: np.ndarray) -> Mesh:
+    """The upright triangle where an exposed piece's sloped face and a party piece's upright one meet on one line. The
+    outer ring runs counter-clockwise, so the corner at the eaves, the piece's start and the previous piece's end face
+    the lower, exposed side in that order, whichever side it is."""
+    return Mesh(np.array([[*seg.a, eaves], [*start, height], [*previous_end, height]]), np.array([[0, 1, 2]]))
 
 
 def _translation(x: float, y: float, z: float) -> np.ndarray:
@@ -644,7 +641,7 @@ def build_shell(
         ring = deck = None
     dormers: list[tuple[Segment, float]] = []
     for h in layout.holes:
-        if ring is not None and h.v0 + h.height > eaves + 1e-6:
+        if ring is not None and h.v0 + h.height > eaves + 1e-6:  # pragma: no mutate: a window top lies clear of the eaves or on them, never 1e-6 above to the bit
             dormers.append((segments[h.segment], h.s0 + h.width / 2))  # a window of the top storey becomes a dormer
             continue
         holes_by_seg[h.segment].append(h)
@@ -668,7 +665,7 @@ def build_shell(
     parapet_collider: Mesh | None = None
 
     roof_area = 0.0
-    if ring is not None and deck is not None and mansard is not None:
+    if ring is not None and deck is not None and mansard is not None:  # pragma: no mutate: a ring comes only with a deck and a mansard; the rest narrows the types
         z_top = eaves
         outer = [s for s in segments if s.part == 0 and s.ring == 0]  # pragma: no mutate: a mansard footprint is one polygon without holes, every segment part 0 and ring 0
         for i, (seg, (start, end)) in enumerate(zip(outer, ring, strict=True)):  # pragma: no mutate: mansard_ring returns one end pair per outer segment
@@ -677,7 +674,7 @@ def build_shell(
             roof_area += upward_area(face)  # the slopes and the deck cover the footprint between them
             previous_end = ring[i - 1][1]
             if float(np.linalg.norm(previous_end - start)) > WELD_M:  # pragma: no mutate: the ends meet or lie the inset apart, never WELD_M to the bit  # one line, an exposed and a party piece: an upright step
-                parts[wall_material].append(_step(seg, outer[i - 1].exposed, eaves, height, start, previous_end))
+                parts[wall_material].append(_step(seg, eaves, height, start, previous_end))
         top = cap(Polygon([p for start, end in ring for p in (start, end)]), height)
         parts[roof_material].append(top)
         roof_area += upward_area(top)
@@ -771,7 +768,7 @@ def build_shell(
         if proto.collider is not None:
             balcony_colliders.append(transform(proto.collider, m))
         counts["balcony_filant"] += 1
-    if ring is not None and mansard is not None:
+    if ring is not None and mansard is not None:  # pragma: no mutate: a ring comes only with a mansard; the rest narrows the type
         sill, rise = min(DORMER_SILL_M, mansard.rise_m * 0.15), min(DORMER_HEIGHT_M, mansard.rise_m * 0.6)
         front = mansard.inset_m * DORMER_FRONT
         back = mansard.inset_m * (sill + rise) / mansard.rise_m + 0.05  # the slope's depth at the dormer's top, and a little

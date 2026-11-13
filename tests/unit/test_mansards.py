@@ -119,11 +119,11 @@ def test_each_step_faces_the_exposed_piece_below_it() -> None:
     refined, segments = refine_exposure(box(0, 0, 12, 10), box(4, -5, 8, 0), CFG)
     party = next(s for s in segments if not s.exposed)
     after = next(s for s in segments if s.a == party.b)
-    for seg, before_exposed, start, previous_end, side in (
-        (party, True, np.array([4.0, 0.0]), np.array([4.0, 1.0]), -1.0),  # the exposed piece lies west, toward -x
-        (after, False, np.array([8.0, 1.0]), np.array([8.0, 0.0]), 1.0),  # the exposed piece lies east
+    for seg, start, previous_end, side in (
+        (party, np.array([4.0, 0.0]), np.array([4.0, 1.0]), -1.0),  # the exposed piece lies west, toward -x
+        (after, np.array([8.0, 1.0]), np.array([8.0, 0.0]), 1.0),  # the exposed piece lies east
     ):
-        step = _step(seg, before_exposed, 15.0, 18.0, start, previous_end)
+        step = _step(seg, 15.0, 18.0, start, previous_end)
         v = step.vertices
         normal = np.cross(v[step.triangles[0][1]] - v[step.triangles[0][0]], v[step.triangles[0][2]] - v[step.triangles[0][0]])
         assert np.sign(normal[0]) == side and abs(normal[1]) < 1e-9 and abs(normal[2]) < 1e-9
@@ -134,7 +134,9 @@ def test_a_triangle_and_a_courtyard_ring_and_a_rise_to_the_millimetre() -> None:
     from shapely.geometry import Polygon as P
 
     _, tri = refine_exposure(P([(0, 0), (20, 0), (10, 15)]), Polygon(), CFG)
-    assert mansard_ring(tri, 1.0) is not None and len(mansard_ring(tri, 1.0)) == 3
+    triangle = mansard_ring(tri, 1.0)  # slanted corners: the moved edges meet where their lines cross
+    assert triangle is not None and [[np.round(a, 4).tolist(), np.round(b, 4).tolist()] for a, b in triangle] == [
+        [[1.8685, 1.0], [18.1315, 1.0]], [[18.1315, 1.0], [10.0, 13.1972]], [[10.0, 13.1972], [1.8685, 1.0]]]
     court = Polygon([(0, 0), (20, 0), (20, 20), (0, 20)], [[(5, 5), (15, 5), (15, 15), (5, 15)]])
     _, segments = refine_exposure(court, Polygon(), CFG)
     ring = mansard_ring(segments, 1.0)
@@ -144,20 +146,19 @@ def test_a_triangle_and_a_courtyard_ring_and_a_rise_to_the_millimetre() -> None:
     assert shell.roof["rise_m"] == 3.123
 
 
-def test_only_a_tall_flat_haussmann_building_without_interior_or_landmark_gets_a_mansard() -> None:
+def test_only_a_tall_flat_haussmann_building_without_a_landmark_gets_a_mansard() -> None:
     from types import SimpleNamespace
 
     from onward_generator.detail.scene import mansard_for
 
     five = SimpleNamespace(count=5, height_m=3.1)
     flat = SimpleNamespace(pitched=None, hip=None)
-    assert mansard_for(True, False, False, five, flat) == Mansard(3.1)
-    assert mansard_for(True, False, False, SimpleNamespace(count=4, height_m=3.1), flat) is None
-    assert mansard_for(False, False, False, five, flat) is None
-    assert mansard_for(True, True, False, five, flat) is None
-    assert mansard_for(True, False, True, five, flat) is None
-    assert mansard_for(True, False, False, five, SimpleNamespace(pitched=object(), hip=None)) is None
-    assert mansard_for(True, False, False, five, SimpleNamespace(pitched=None, hip=object())) is None
+    assert mansard_for(True, False, five, flat) == Mansard(3.1)
+    assert mansard_for(True, False, SimpleNamespace(count=4, height_m=3.1), flat) is None
+    assert mansard_for(False, False, five, flat) is None
+    assert mansard_for(True, True, five, flat) is None
+    assert mansard_for(True, False, five, SimpleNamespace(pitched=object(), hip=None)) is None
+    assert mansard_for(True, False, five, SimpleNamespace(pitched=None, hip=object())) is None
 
 
 def test_a_deck_under_a_quarter_of_the_footprint_keeps_the_roof() -> None:
