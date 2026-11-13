@@ -344,3 +344,7 @@ def test_a_lamp_post_stays_street_furniture(name: str) -> None:
     assert decision.reason == "street" and decision.row is not None and decision.row["role"] == "lamppost"
     assert classify("coneLamps", (1.1, 0.4, 1.1), "POLYGON Dining Room", "3D ModelsEnvironments").reason == "interior"
     assert classify("Floor_Lamp", (0.4, 0.4, 1.6), "Bedroom", "3D ModelsPropsFurniture").reason == "interior"
+    sign = classify("Sign_Post", (0.3, 0.3, 2.5), "City Props", "3D ModelsEnvironmentsUrban").row  # a post without a lamp
+    assert sign is not None and sign["role"] == "post"
+    desk = classify("Desk_Lamp", (0.3, 0.3, 0.5), "Office Pack", "3D ModelsPropsFurniture")  # a lamp without a post
+    assert desk.reason == "interior"
