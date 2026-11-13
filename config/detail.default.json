@@ -249,6 +249,7 @@
     "shop_glass": { "color": [0.80, 0.87, 0.90, 1.0], "roughness": 0.1 },
     "door_wood": { "color": [0.36, 0.24, 0.16, 1.0], "roughness": 0.7 },
     "railing_metal": { "color": [0.16, 0.16, 0.17, 1.0], "roughness": 0.5 },
+    "roof_zinc": { "color": [0.43, 0.47, 0.52, 1.0], "roughness": 0.45 },
     "urban_metal": { "color": [0.22, 0.24, 0.24, 1.0], "roughness": 0.5 },
     "tree_trunk": { "color": [0.40, 0.31, 0.22, 1.0], "roughness": 1.0 },
     "tree_canopy": { "color": [0.30, 0.46, 0.24, 1.0], "roughness": 1.0 },

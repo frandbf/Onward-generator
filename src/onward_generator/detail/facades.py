@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import groupby, pairwise
 
@@ -26,7 +27,19 @@ from onward_generator.detail.config import PARTY_PREFIX, DetailConfig, Opening, 
 from onward_generator.detail.modules import Prototype, balcony, flat_opening, frame_matrix, recess, recess_rim
 from onward_generator.detail.roofs import BuiltRoof, build_roof
 from onward_generator.detail.s3db import tint_base
-from onward_generator.generation.mesh import Mesh, cap, merge, open_edge_defects, polygons_of, prism, quad, transform, upward_area, walls
+from onward_generator.generation.mesh import (
+    Mesh,
+    box,
+    cap,
+    merge,
+    open_edge_defects,
+    polygons_of,
+    prism,
+    quad,
+    transform,
+    upward_area,
+    walls,
+)
 
 SNAP_M = 0.05
 # A neighbour footprint within this gap outside a party wall hides the wall up to the lower of the two tops.
@@ -329,6 +342,77 @@ FILANT_MIN_M = 3.0
 FILANT_STOREYS = (2, 5)
 
 
+# Haussmann's zinc mansard (plan Q3b, option B of 12 November 2026): the top storey of the OSM height turns into a roof
+# whose street faces lean MANSARD_INSET_M inward, in zinc, with its windows as dormers; party sides stay upright and a
+# flat deck closes the top. The building keeps its height.
+MANSARD_INSET_M = 1.0
+MANSARD_MIN_STOREYS = 5
+MANSARD_MATERIAL = "roof_zinc"
+DORMER_WIDTH_M = 1.0
+DORMER_SILL_M = 0.4
+DORMER_HEIGHT_M = 1.5
+DORMER_FRONT = 0.35
+"""The dormer's front stands this share of the inset back from the wall line."""
+
+
+@dataclass(frozen=True, slots=True)
+class Mansard:
+    """A mansard on a building's top storey of ``rise_m``."""
+
+    rise_m: float
+    inset_m: float = MANSARD_INSET_M
+
+
+def _offset_line(seg: Segment, d: float) -> tuple[np.ndarray, np.ndarray]:
+    return np.asarray(seg.a, dtype=float) - seg.n_out[:2] * d, seg.u[:2]
+
+
+def _meet(first: tuple[np.ndarray, np.ndarray], second: tuple[np.ndarray, np.ndarray]) -> np.ndarray | None:
+    (p, u), (q, v) = first, second
+    cross = u[0] * v[1] - u[1] * v[0]
+    if abs(cross) < 1e-9:
+        return None
+    t = ((q[0] - p[0]) * v[1] - (q[1] - p[1]) * v[0]) / cross
+    return p + t * u
+
+
+def mansard_ring(segments: Sequence[Segment], inset: float) -> list[tuple[np.ndarray, np.ndarray]] | None:
+    """For each segment of the outer ring (part 0, ring 0, in order), where its mansard face meets the deck: the start
+    and end of its edge moved ``inset`` inward when the segment is exposed, not at all when it is a party wall.
+    ``None`` when a moved edge folds or shrinks under 0.2 m (a narrow or ragged footprint)."""
+    ring = [s for s in segments if s.part == 0 and s.ring == 0]
+    if len(ring) < 3:
+        return None
+    lines = [_offset_line(s, inset if s.exposed else 0.0) for s in ring]
+    ends: list[tuple[np.ndarray, np.ndarray]] = []
+    for i, seg in enumerate(ring):
+        d = inset if seg.exposed else 0.0
+        start = _meet(lines[i - 1], lines[i])
+        end = _meet(lines[i], lines[(i + 1) % len(ring)])
+        start = np.asarray(seg.a, dtype=float) - seg.n_out[:2] * d if start is None else start
+        end = np.asarray(seg.b, dtype=float) - seg.n_out[:2] * d if end is None else end
+        if float((end - start) @ seg.u[:2]) < 0.2:
+            return None
+        ends.append((start, end))
+    return ends
+
+
+def _step(seg: Segment, before_exposed: bool, eaves: float, height: float, start: np.ndarray, previous_end: np.ndarray) -> Mesh:
+    """The upright triangle where an exposed piece's sloped face and a party piece's upright one meet on one line,
+    facing the lower, exposed side."""
+    tri = np.array([[*seg.a, eaves], [*start, height], [*previous_end, height]], dtype=float)
+    normal = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+    facing = -seg.u if before_exposed else seg.u
+    order = [0, 1, 2] if float(normal @ facing) > 0 else [0, 2, 1]
+    return Mesh(tri, np.array([order]))
+
+
+def _translation(x: float, y: float, z: float) -> np.ndarray:
+    m = np.eye(4)
+    m[:3, 3] = (x, y, z)
+    return m
+
+
 def filant_storeys(count: int) -> frozenset[int]:
     """The storeys (0 the ground floor) that carry a balcon filant on a building of ``count`` storeys: the second and
     the fifth, the fifth falling to the top storey on a lower building; none below four storeys."""
@@ -548,13 +632,23 @@ def build_shell(
     roof_material: str,
     building_id: str,
     cfg: DetailConfig,
+    mansard: Mansard | None = None,
 ) -> Shell:
     parts: dict[str, list[Mesh]] = defaultdict(list)
     holes_by_seg: dict[int, list[Hole]] = defaultdict(list)
+    polygons = polygons_of(refined)
+    eaves = height - mansard.rise_m if mansard is not None else height
+    ring = mansard_ring(segments, mansard.inset_m) if mansard is not None and len(polygons) == 1 and not polygons[0].interiors else None
+    deck = Polygon([p for start, end in ring for p in (start, end)]).buffer(0) if ring is not None else None
+    if deck is not None and (not isinstance(deck, Polygon) or deck.area < 0.25 * refined.area):
+        ring = deck = None
+    dormers: list[tuple[Segment, float]] = []
     for h in layout.holes:
+        if ring is not None and h.v0 + h.height > eaves + 1e-6:
+            dormers.append((segments[h.segment], h.s0 + h.width / 2))  # a window of the top storey becomes a dormer
+            continue
         holes_by_seg[h.segment].append(h)
 
-    polygons = polygons_of(refined)
     roof_info: dict[str, object] = {}
     parapet = template.parapet_m
     hip = _hip_roof(polygons[0], height, template) if len(polygons) == 1 and parapet == 0 else None
@@ -574,7 +668,20 @@ def build_shell(
     parapet_collider: Mesh | None = None
 
     roof_area = 0.0
-    if inner is not None:
+    if ring is not None and deck is not None and mansard is not None:
+        z_top = eaves
+        outer = [s for s in segments if s.part == 0 and s.ring == 0]
+        for i, (seg, (start, end)) in enumerate(zip(outer, ring, strict=True)):
+            parts[MANSARD_MATERIAL if seg.exposed else wall_material].append(quad((*seg.a, eaves), (*seg.b, eaves), (*end, height), (*start, height)))
+            previous_end = ring[i - 1][1]
+            if float(np.linalg.norm(previous_end - start)) > WELD_M:  # one line, an exposed and a party piece: an upright step
+                parts[wall_material].append(_step(seg, outer[i - 1].exposed, eaves, height, start, previous_end))
+        top = cap(Polygon([p for start, end in ring for p in (start, end)]), height)
+        parts[roof_material].append(top)
+        roof_area = upward_area(top)
+        roof_deck = deck
+        roof_info = {"type": "mansard", "rise_m": round(mansard.rise_m, 3), "inset_m": mansard.inset_m, "slope_material": MANSARD_MATERIAL}
+    elif inner is not None:
         assert strip is not None
         parts[roof_material].append(cap(inner, height))
         parts[wall_material].append(walls(inner, height, z_top, inward=True))
@@ -662,6 +769,15 @@ def build_shell(
         if proto.collider is not None:
             balcony_colliders.append(transform(proto.collider, m))
         counts["balcony_filant"] += 1
+    if ring is not None and mansard is not None:
+        sill, rise = min(DORMER_SILL_M, mansard.rise_m * 0.15), min(DORMER_HEIGHT_M, mansard.rise_m * 0.6)
+        front = mansard.inset_m * DORMER_FRONT
+        back = mansard.inset_m * (sill + rise) / mansard.rise_m + 0.05  # the slope's depth at the dormer's top, and a little
+        for seg, centre in dormers:
+            m = seg.module_matrix(centre - DORMER_WIDTH_M / 2, eaves + sill)
+            parts["frame_stone"].append(transform(box(0.0, DORMER_WIDTH_M, front, back, 0.0, rise, omit=("-y", "+y")), m))
+            _bake(parts, flat_opening(DORMER_WIDTH_M - 0.3, rise - 0.3, "glass_dark"), m @ _translation(0.15, front - 0.005, 0.15))
+            counts["dormer"] += 1
 
     footprint_area = sum(p.area for p in polygons)
     return Shell(

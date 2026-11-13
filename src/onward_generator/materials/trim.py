@@ -263,6 +263,8 @@ def building_bands(record: Mapping[str, Any] | None, z_top: float, zocalo_m: flo
     roof = (record or {}).get("roof") or {}
     count = int(storeys.get("count") or 0)
     height = float(storeys.get("height_m") or 0.0)
+    if roof.get("type") == "mansard":
+        count -= 1  # the top storey is the mansard (plan Q3b): the walls, and their cornice, end under it
     parapet = float(roof.get("parapet_m") or 0.0) if roof.get("type") == "flat_parapet" else 0.0
     measured = count >= 1 and height > 0.0
     wall_top = count * height if measured else z_top - parapet
