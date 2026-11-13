@@ -21,3 +21,12 @@ Status: accepted · 12 November 2026. Asked by the maintainer: decals cost almos
 - 20 to 40 more triangles and one more material per map; the transparent pages add some overdraw where a decal is in view, to check on the headset with the next package.
 - This is a second transparent material family besides the shop overlays; every other exported material stays `PP_Opaque_Simple_Lit` with an albedo only.
 - The decals are generic wear. They do not represent the state of any real wall.
+
+## Amendment, 13 November 2026: laid on the built facade
+
+On the headset, with pkg_09 of Rue Mouffetard, decals hung over windows and doors, and some floated away from the wall. There were two causes. First, the signs stage reads the materials stage, where a trim-sheet map has re-skinned every opening into one facade material, so the material blocker found no glass or door. Second, the built facade does not always stand on the footprint's wall line; it can sit up to 0.3 m behind it, so a quad 1 cm in front of the line floated.
+
+- **Surface probe** (`signs/decals.py`, `wall_surface`). Before a position is taken, a grid of horizontal rays at most 0.3 m apart (`PROBE_STEP_M`) crosses the decal. Each ray starts 0.6 m outside the line (`PROBE_OUT_M`) and looks straight in. Every ray must first meet a face that is not an obstacle, all within 2 cm of one depth (`FLAT_M`), and that depth must lie within 0.5 m of the line (`PROBE_REACH_M`). A window or door recess, flush glass, a frame, a sign, a prop in front of the wall, or the end of the wall breaks the probe. The decal is drawn 1 cm in front of the depth it finds (`Placed.depth_m`).
+- **Openings of the untrimmed scene** (`signs/place.py`, `untrimmed`). When the base is a materials stage, the blocker and the probe read the scene that stage was baked from (`materials_report.json` → `base_dir`; a container `/work` path maps to the repository). The trim sheet only re-skins, so its geometry is the same and the openings keep their own materials.
+
+Result on Rue Mouffetard: all 17 decals lie 1 cm in front of plaster, stone or brick, and none covers glass, a door or a recess or overhangs a wall end. Before, 7 covered glass (2 over a window recess) and 3 hung partly in the air.
