@@ -38,6 +38,7 @@ from onward_generator.detail.facades import (
     ensure_door,
     entrance,
     exposed_frontage,
+    filant_storeys,
     interior_storey,
     layout_segment,
     refine_exposure,
@@ -859,12 +860,32 @@ def _door_centres(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[li
     return [[round(float(c), 3) for c in segments[h.segment].point(h.s0 + h.width / 2)[:2]] for h in _ground_doors(holes)]
 
 
-def _balcony_spans(balconies: Sequence[tuple[int, float, float]], segments: Sequence[Segment], width_m: float) -> list[list[list[float]]]:
-    """``facade.balconies_m``: each column of balconies as its span on the wall line, ``[[x, y], [x, y]]`` in metres,
-    once however many storeys it has. ``perf.layout.climb_keep_out`` keeps ladders and cabins off them."""
+def regional_style(base: GeneratedScene) -> str:
+    """The regional facade style of the map's centre (``materials.trim_style.select_style``), as the materials stage
+    resolves it by default; ``generic`` without a centre. A map's own ``facades.style`` does not reach detail."""
+    from onward_generator.materials.trim_style import load_style_table, select_style  # materials imports detail; load it on use
+
+    origin = (base.manifest().get("frame") or {}).get("origin_wgs84")
+    if not origin:
+        return "generic"
+    return select_style(load_style_table(), float(origin[1]), float(origin[0]))
+
+
+def _balcony_columns(layout: Layout, spec: Any) -> list[tuple[int, float, float]]:
+    """Each bay balcony of ``layout`` as ``(segment, s0, s1)`` on its wall."""
+    if spec is None:  # pragma: no mutate: a template without a balcony lays out none
+        return []
+    return [(seg, bs0, bs0 + spec.width_m) for seg, bs0, _ in layout.balconies]
+
+
+def _balcony_spans(balconies: Sequence[tuple[int, float, float]], segments: Sequence[Segment],
+                   filants: Sequence[tuple[int, float, float]] = ()) -> list[list[list[float]]]:
+    """``facade.balconies_m``: each column of balconies (``(segment, s0, s1)``) and each balcon filant as its span on the
+    wall line, ``[[x, y], [x, y]]`` in metres, once however many storeys it has. ``perf.layout.climb_keep_out`` keeps
+    ladders and cabins off them."""
     spans = {
-        tuple(tuple(round(float(c), 3) for c in segments[seg].point(s)[:2]) for s in (s0, s0 + width_m))
-        for seg, s0, _ in balconies
+        tuple(tuple(round(float(c), 3) for c in segments[seg].point(s)[:2]) for s in (s0, s1))
+        for seg, s0, s1 in (*balconies, *filants)
     }
     return [[list(a), list(b)] for a, b in sorted(spans)]
 
@@ -1467,6 +1488,8 @@ def _detail_buildings(
     pending_furnish: list[_PendingFurnish] = []
     # Plan P0: a core wall facing no ground a player reaches is laid out plain (``reach.hidden_face``).
     reached = reached_ground(base) if core is not None else None
+    # Plan Q3b: a map whose centre falls in the Haussmann box gets balcons filants on its core and ring street walls.
+    haussmann = regional_style(base) == "haussmann"
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1522,7 +1545,8 @@ def _detail_buildings(
                 if seg.exposed or seg.index in floors:  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                     layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                                    bid, refined, others, cfg, layout, floors.get(seg.index, 0.0),  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
-                                   hidden=reached is not None and seg.exposed and hidden_face(seg, reached))
+                                   hidden=reached is not None and seg.exposed and hidden_face(seg, reached),
+                                   filants=filant_storeys(storeys_used.count) if haussmann and seg.exposed else frozenset())
             return layout
 
         interior = None
@@ -1718,7 +1742,7 @@ def _detail_buildings(
                 "use": use.to_record(),
                 "door": door_rule,
                 "doors_m": _door_centres(layout.holes, segments),
-                "balconies_m": _balcony_spans(layout.balconies, segments, spec.width_m) if spec is not None else [],
+                "balconies_m": _balcony_spans(_balcony_columns(layout, spec), segments, [(seg, fs0, fs1) for seg, fs0, fs1, _ in layout.filants]),
             },
             "roof": shell.roof,
             "interior": interior_record is not None,
