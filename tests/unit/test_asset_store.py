@@ -377,6 +377,8 @@ def test_rocks_are_open_ground_vegetation_and_craft_no_street_holds_are_refused(
     assert rock.row is not None and (rock.row["category"], rock.row["role"], rock.row["placement"], rock.reason) == (
         "vegetation", "rock", "open_ground", "rock")
     assert rock.row["surfaces"] == ["yard", "empty_lot", "plaza", "courtyard"]
+    assert (rock.row["anchor"], rock.row["grouping"]) == ("ground", "cluster")
+    assert rock.row["description"] == "Rock (rock) from Horned Holly Tree, about 4.50 m."
     for name in ("Helicopter", "Fishing_Boat", "Jet_Plane"):
         assert classify(name, (8.0, 3.0, 3.0), "Police Car Helicopter", "3D ModelsVehicles").reason == "aircraft_or_boat", name
     car = classify("Interceptor", (2.5, 5.8, 1.7), "Police Car Helicopter", "3D ModelsVehicles")
@@ -391,15 +393,15 @@ def test_a_coarser_level_of_detail_is_not_a_model_of_its_own(tmp_path: Path) -> 
     package, exported = _export(tmp_path)
     report = json.loads((exported / "report.json").read_text(encoding="utf-8"))
     quad = (exported / "Shelf_Tall.obj").read_text(encoding="utf-8")
-    for stem in ("Shelf_Short_LOD0", "Shelf_Short_LOD1"):
+    for stem in ("Shelf_Short_LOD0", "Shelf_Short_LOD1", "Shelf_Short_LOD2", "Shelf_Wide"):
         (exported / f"{stem}.obj").write_text(quad, encoding="utf-8")
         (exported / f"{stem}.mtl").write_text("newmtl m\nKd 0.5 0.5 0.5\n", encoding="utf-8")
         report["items"].append({"prefab": f"Assets/P/{stem}.prefab", "file": f"{stem}.obj", "status": "exported", "size": [1, 0.4, 1.6]})
     (exported / "report.json").write_text(json.dumps(report), encoding="utf-8")
     result = build_catalogue(package, exported, tmp_path / "assets")
-    assert result.skipped["lod_copy"] == 1
+    assert result.skipped["lod_copy"] == 2  # both coarser levels, and the model after them still read
     files = [row["file"] for row in json.loads((tmp_path / "assets" / package.catalogue / "manifest.json").read_text(encoding="utf-8"))["assets"]]
-    assert "Shelf_Short_LOD0.glb" in files and "Shelf_Short_LOD1.glb" not in files
+    assert "Shelf_Short_LOD0.glb" in files and "Shelf_Wide.glb" in files and "Shelf_Short_LOD1.glb" not in files
 
 
 def test_the_exporter_draws_glass_opaque_refuses_cut_outs_and_lends_white_pieces_the_package_palette() -> None:
