@@ -348,3 +348,5 @@ def test_a_lamp_post_stays_street_furniture(name: str) -> None:
     assert sign is not None and sign["role"] == "post"
     desk = classify("Desk_Lamp", (0.3, 0.3, 0.5), "Office Pack", "3D ModelsPropsFurniture")  # a lamp without a post
     assert desk.reason == "interior"
+    bare = classify("Lamp_01", (0.3, 0.3, 0.5), "Misc Props", "3D ModelsProps")  # a lamp alone, in a package of no setting
+    assert bare.reason == "interior"
