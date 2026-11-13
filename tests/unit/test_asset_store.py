@@ -279,3 +279,74 @@ def test_no_tracked_file_carries_the_asset_store_licence_or_a_local_catalogue() 
         if name.startswith("assets/") and name.endswith("manifest.json"):
             assert local.LICENCE_NAME not in (REPO / name).read_text(encoding="utf-8"), name
     assert "assets/asset_store_*/" in (REPO / ".gitignore").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(("name", "size", "package", "category", "row", "reason"), [
+    # Large storage is a structure on open ground, a cargo container too, never a vehicle (12 November 2026 review).
+    ("Container_01_Blue", (2.5, 6.3, 2.5), "Low Poly Storage Pack", "3D ModelsEnvironmentsIndustrial", ("structures", "container", "open_ground"), "large_storage"),
+    ("Cargo_container_v1_LD1closed", (8.0, 3.0, 3.0), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", ("structures", "container", "open_ground"), "large_storage"),
+    ("Bags_on_pallet_v1_1", (2.52, 1.6, 2.5), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", ("structures", "bag", "open_ground"), "large_storage"),
+    ("Barrel_v1", (0.6, 0.6, 1.0), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", ("waste", "barrel", "wall_foot"), "storage_outdoor"),
+    ("Crate_Big", (2.5, 1.0, 1.0), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", ("waste", "crate", "wall_foot"), "storage_outdoor"),
+    ("Crate_Huge", (2.6, 1.0, 1.0), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", ("structures", "crate", "open_ground"), "large_storage"),
+    ("Electric_Box_01", (1.2, 0.6, 1.2), "Low Poly Storage Pack", "3D ModelsEnvironmentsIndustrial", ("structures", "utility_box", "wall_foot"), "utility"),
+    ("Giftbox_01_Blue", (0.3, 0.2, 0.3), "Low Poly Storage Pack", "3D ModelsEnvironmentsIndustrial", ("furniture", "room_furniture", "interior"), "interior"),
+    ("coneLamps", (1.1, 0.4, 1.1), "POLYGON Dining Room", "3D ModelsEnvironments", ("furniture", "room_furniture", "interior"), "interior"),
+    ("FFK_Bench_01_01", (2.2, 1.1, 1.6), "Fast Food Restaurant Kit", "3D ModelsPropsInterior", ("furniture", "room_furniture", "interior"), "interior"),
+    ("Bench_Park", (2.2, 0.6, 0.9), "City Props", "3D ModelsEnvironmentsUrban", ("barriers", "bench", "kerb"), "street"),
+    # A loose door is a kit piece; a painting or a mirror as thin and tall stays an interior row.
+    ("Cargo_container_v1_LD1doorL", (0.1, 1.4, 2.7), "RPG/FPS Industrial Set", "3D ModelsEnvironmentsIndustrial", None, "kit_piece"),
+    ("Sample_House_Door_Frame", (0.13, 0.88, 1.9), "P3D Indoor", "3D ModelsProps", None, "kit_piece"),
+    ("Canvas_Painting_01", (0.116, 1.5, 1.5), "Apartment Kit", "3D ModelsEnvironments", ("furniture", "room_furniture", "interior"), "interior"),
+    ("Thin_Barrier", (0.149, 2.0, 1.01), "City Props", "3D ModelsEnvironmentsUrban", None, "kit_piece"),
+    ("Low_Barrier", (0.149, 2.0, 1.0), "City Props", "3D ModelsEnvironmentsUrban", ("barriers", "barrier", "kerb"), "street"),
+    ("Wide_Barrier", (0.15, 2.0, 1.2), "City Props", "3D ModelsEnvironmentsUrban", ("barriers", "barrier", "kerb"), "street"),
+])
+def test_the_reviewed_classification(name: str, size: tuple, package: str, category: str, row: tuple | None, reason: str) -> None:
+    decision = classify(name, size, package, category)
+    assert decision.reason == reason
+    assert (None if decision.row is None else (decision.row["category"], decision.row["role"], decision.row["placement"])) == row
+    if decision.row is not None and decision.row["category"] == "structures" and decision.row["role"] != "utility_box":
+        assert decision.row["surfaces"] == ["yard", "empty_lot", "plaza", "block_edge"] and decision.row["grouping"] == "single"
+
+
+def test_the_reviewed_rows_are_whole() -> None:
+    utility = classify("Electric_Box_01", (1.2, 0.6, 1.4), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+    assert utility is not None
+    assert (utility["anchor"], utility["surfaces"], utility["grouping"]) == ("ground", ["sidewalk", "yard", "empty_lot", "courtyard"], "single")
+    assert utility["description"] == "Utility cabinet (electric box) from Storage Pack, about 1.40 m."
+    for name in ("Container_01_Blue", "Crate_Huge"):
+        row = classify(name, (2.6, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+        assert row is not None and row["anchor"] == "ground", name
+        assert row["description"].startswith("Large structure (") and row["description"].endswith("from Storage Pack, 2.6 m long."), name
+    small = classify("Container_Small", (2.5, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial")
+    assert small.reason == "storage_outdoor" and small.row is not None and small.row["category"] == "waste"
+    assert classify("Mystery_Big", (3.0, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial").reason == "unclassified"
+    gift = classify("Giftbox_Long", (0.3, 0.9, 0.4), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+    assert gift is not None and gift["description"] == "Interior item (giftbox long) from Storage Pack, about 0.90 m on its longest side."
+    bench = classify("FFK_Bench_01_01", (2.2, 1.1, 1.6), "Fast Food Restaurant Kit", "3D ModelsPropsInterior").row
+    assert bench is not None and bench["description"].endswith("from Fast Food Restaurant Kit, about 2.20 m on its longest side.")
+    display = classify("Display_Bench", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert display is not None and display["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": False}
+    lamp = classify("Bench_Lamp", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert lamp is not None and lamp["description"].startswith("Interior item (bench lamp) from Coffee Shop Kit")
+
+
+def test_a_gift_shelf_is_indoors_and_furnished_by_its_package() -> None:
+    row = classify("Gift_Shelf", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert row is not None and row["placement"] == "interior"
+    assert row["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": True}  # a shelf also furnishes a home
+
+
+@pytest.mark.parametrize("name", ["LampPost_A", "StreetProps_LampPost_B", "street_lamp_2"])
+def test_a_lamp_post_stays_street_furniture(name: str) -> None:
+    decision = classify(name, (0.4, 0.4, 4.0), "Low Poly Street Pack", "3D ModelsEnvironmentsUrban")
+    assert decision.reason == "street" and decision.row is not None and decision.row["role"] == "lamppost"
+    assert classify("coneLamps", (1.1, 0.4, 1.1), "POLYGON Dining Room", "3D ModelsEnvironments").reason == "interior"
+    assert classify("Floor_Lamp", (0.4, 0.4, 1.6), "Bedroom", "3D ModelsPropsFurniture").reason == "interior"
+    sign = classify("Sign_Post", (0.3, 0.3, 2.5), "City Props", "3D ModelsEnvironmentsUrban").row  # a post without a lamp
+    assert sign is not None and sign["role"] == "post"
+    desk = classify("Desk_Lamp", (0.3, 0.3, 0.5), "Office Pack", "3D ModelsPropsFurniture")  # a lamp without a post
+    assert desk.reason == "interior"
+    bare = classify("Lamp_01", (0.3, 0.3, 0.5), "Misc Props", "3D ModelsProps")  # a lamp alone, in a package of no setting
+    assert bare.reason == "interior"

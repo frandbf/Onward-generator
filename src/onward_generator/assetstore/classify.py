@@ -49,6 +49,16 @@ EXTERIOR_HINTS = ("exterior", "urban", "vehicles", "roadways", "industrial", "hi
                   "parking", "traffic", "village", "survival", "apocalypse")
 INTERIOR_HINTS = ("interior", "furniture", "food", "appliances", "electronics", "kitchen", "bedroom", "office", "dining", "bathroom",
                   "coffee", "bakery", "grocery", "shop", "living", "home", "house")
+# Reviewed 12 November 2026 (ADR-035 amendment): a shipping container, an oil tank or a pallet of sacks is a large
+# structure, not a box against a wall; a cargo container is not a vehicle; an electric cabinet is a utility box; a gift
+# box, a lamp shaped like a cone and a bench from a restaurant or a flat belong indoors.
+LARGE_STORAGE_M = 2.5
+CONTAINER_WORDS = frozenset({"container", "tank"})
+UTILITY_WORDS = frozenset({"electric", "electrical", "transformer", "fusebox"})
+INDOOR_ONLY_WORDS = frozenset({"giftbox", "gift"})
+# A piece thinner than this across its footprint and taller than a metre is a loose door or panel of a kit, unless an
+# interior word names it (a painting, a mirror, a television hang flat on a wall).
+PANEL_M = 0.15
 MAX_WALL_DEPTH_M = 0.8
 MAX_COUNTER_DEPTH_M = 1.0
 
@@ -87,35 +97,56 @@ def classify(name: str, size: tuple[float, float, float], package: str, category
     and its Asset Store category folder, which decide an ambiguous word such as ``barrel`` or ``bin``.
     """
     words = _with_singulars(words_of(name))
+    if "lamp" in words and words & {"post", "street"}:
+        words = (words - {"lamp"}) | {"lamppost"}  # a lamp post or a street lamp is street furniture, not a room's lamp
     length, depth, height = size
     longest = max(size)
     if words & KIT_WORDS and not words & (INTERIOR_WORDS | VEHICLE_WORDS | STREET_WORDS | STORAGE_WORDS):
         return Decision(None, "kit_piece")
     if longest < 0.03 or longest > 12.0 or height <= 0.0:
         return Decision(None, "size")
+    if min(length, depth) < PANEL_M and height > 1.0 and ("door" in words or not words & INTERIOR_WORDS):
+        return Decision(None, "kit_piece")
     context = f"{package} {category}"
     exterior = _hint(context, EXTERIOR_HINTS) and not _hint(context, INTERIOR_HINTS)
+    if words & INDOOR_ONLY_WORDS:
+        return _interior(name, words, length, depth, height, package, context)
+    if words & CONTAINER_WORDS and longest > LARGE_STORAGE_M:
+        return Decision(_row("structures", _first(words, CONTAINER_WORDS), "open_ground", "ground", ["yard", "empty_lot", "plaza", "block_edge"],
+                             "single", f"Large structure ({_label(name)}) from {package}, {longest:.1f} m long.", words), "large_storage")
     if words & VEHICLE_WORDS:
         if longest < 2.5:
             return Decision(None, "vehicle_too_small")
         return Decision(_row("vehicles", "vehicle", "street", "ground", ["curb", "carriageway", "sidewalk", "empty_lot"],
                              "single", f"Vehicle ({_label(name)}) from {package}, {longest:.1f} m long.", words), "vehicle")
+    if words & STREET_WORDS and (words & INTERIOR_WORDS or (_hint(context, INTERIOR_HINTS) and not _hint(context, EXTERIOR_HINTS))):
+        return _interior(name, words, length, depth, height, package, context)
     if words & STREET_WORDS:
         placement, surfaces = ("kerb", ["curb", "sidewalk", "plaza"]) if height > 0.3 else ("ground_cover", ["sidewalk", "carriageway", "plaza"])
         anchor = "flat" if placement == "ground_cover" else "ground"
         return Decision(_row("barriers", _first(words, STREET_WORDS), placement, anchor, surfaces, "single",
                              f"Street object ({_label(name)}) from {package}, about {longest:.2f} m.", words), "street")
+    if words & UTILITY_WORDS and exterior:
+        return Decision(_row("structures", "utility_box", "wall_foot", "ground", ["sidewalk", "yard", "empty_lot", "courtyard"],
+                             "single", f"Utility cabinet ({_label(name)}) from {package}, about {longest:.2f} m.", words), "utility")
+    if words & STORAGE_WORDS and longest > LARGE_STORAGE_M and exterior:
+        return Decision(_row("structures", _first(words, STORAGE_WORDS), "open_ground", "ground", ["yard", "empty_lot", "plaza", "block_edge"],
+                             "single", f"Large structure ({_label(name)}) from {package}, {longest:.1f} m long.", words), "large_storage")
     if words & STORAGE_WORDS and exterior:
         return Decision(_row("waste", _first(words, STORAGE_WORDS), "wall_foot", "ground", ["sidewalk", "yard", "empty_lot", "courtyard"],
                              "cluster", f"Storage or waste item ({_label(name)}) from {package}, about {longest:.2f} m.", words), "storage_outdoor")
     if words & (INTERIOR_WORDS | STORAGE_WORDS):
-        row = _row("furniture", "room_furniture", "interior", "ground", ["interior"], "single",
-                   f"Interior item ({_label(name)}) from {package}, about {longest:.2f} m on its longest side.", words)
-        hint = _furnish_hint(words, length, depth, height, context)
-        if hint is not None:
-            row["furnish"] = hint
-        return Decision(row, "interior")
+        return _interior(name, words, length, depth, height, package, context)
     return Decision(None, "unclassified")
+
+
+def _interior(name: str, words: set[str], length: float, depth: float, height: float, package: str, context: str) -> Decision:
+    row = _row("furniture", "room_furniture", "interior", "ground", ["interior"], "single",
+               f"Interior item ({_label(name)}) from {package}, about {max(length, depth, height):.2f} m on its longest side.", words)
+    hint = _furnish_hint(words, length, depth, height, context)
+    if hint is not None:
+        row["furnish"] = hint
+    return Decision(row, "interior")
 
 
 def _furnish_hint(words: set[str], length: float, depth: float, height: float, context: str) -> dict[str, Any] | None:
