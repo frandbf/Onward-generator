@@ -2694,6 +2694,11 @@ namespace OnwardGenerator
         // After the navigation bake: bots do not climb, and neither the rungs nor the cabins enter the navmesh.
         private const float ElevatorPivotM = 1.52f; // ExampleScene: the cabin's 3 m helper cube is centred on the pivot.
         private const float LadderRailWidthM = 0.5f;
+        // A rung level is drawn as a crossbar only where the SDK grips it on the crossbar. The prefab's three
+        // ExtensionRungs above the roof edge are grips on the rails (x = 0.253 m): on the headset a crossbar drawn
+        // there was a rung the hand passed through.
+        internal const float CrossbarGripHalfM = LadderRailWidthM / 2f - 0.05f;
+        private const float GripReachM = 0.02f;
 
         private static void AddClimbs(Layout layout, string root)
         {
@@ -2740,9 +2745,31 @@ namespace OnwardGenerator
                 Box(new Vector3(-LadderRailWidthM / 2f, (foot + top) / 2f, 0f), new Vector3(0.05f, top - foot, 0.08f)),
                 Box(new Vector3(LadderRailWidthM / 2f, (foot + top) / 2f, 0f), new Vector3(0.05f, top - foot, 0.08f)),
             };
-            foreach (float y in ladder.Rungs.Where(r => r.Transform.position.y > foot).Select(r => (float)Math.Round(r.Transform.position.y, 2)).Distinct())
+            List<Vector3> grips = ladder.Rungs.Select(r => go.transform.InverseTransformPoint(r.Transform.position) + new Vector3(0f, go.transform.position.y, 0f)).ToList();
+            List<float> bars = grips.GroupBy(g => (float)Math.Round(g.y, 2))
+                .Where(level => level.Key > foot && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))
+                .Select(level => level.Key).OrderBy(y => y).ToList();
+            foreach (float y in bars)
                 boxes.Add(Box(new Vector3(0f, y, 0f), new Vector3(LadderRailWidthM, 0.04f, 0.04f)));
+            CheckLadderGrips(go.name, grips, bars, foot, top);
             AddClimbLook(go.name + "_Look", Local(site.x, site.y, 0f), go.transform.rotation, boxes, material, root);
+        }
+
+        // What the player sees must be what the SDK grips: every crossbar has its grips, and every grip lies on a crossbar
+        // or on a rail. ``grips`` are in the ladder's frame, heights from the ground like ``bars``, ``foot`` and ``top``.
+        internal static void CheckLadderGrips(string name, IReadOnlyList<Vector3> grips, IReadOnlyList<float> bars, float foot, float top)
+        {
+            foreach (float bar in bars)
+                if (!grips.Any(g => Math.Abs(g.y - bar) <= GripReachM && Math.Abs(g.x) <= CrossbarGripHalfM))
+                    throw new InvalidOperationException($"{name}: a crossbar at {bar:F2} m has no grip on it.");
+            int onBars = 0, onRails = 0;
+            foreach (Vector3 g in grips.Where(g => g.y > foot))
+            {
+                if (Math.Abs(g.x) <= CrossbarGripHalfM && bars.Any(bar => Math.Abs(g.y - bar) <= GripReachM)) onBars++;
+                else if (Math.Abs(Math.Abs(g.x) - LadderRailWidthM / 2f) <= 0.03f && g.y <= top + GripReachM) onRails++;
+                else throw new InvalidOperationException($"{name}: the grip at x {g.x:F3} m, {g.y:F2} m has nothing drawn under the hand.");
+            }
+            Debug.Log($"{LogPrefix} {name} grips: {onBars} on crossbars, {onRails} on the rails, every crossbar gripped.");
         }
 
         private static void FillRungsToGround(Ladder ladder, float baseM)

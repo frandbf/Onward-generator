@@ -8,7 +8,8 @@ later and on the host; this module predicts it from the visual GLB and the layou
 On 23 baked packages of five maps (11 November 2026) Unity counted the GLB's visual triangles plus 12 300, plus
 the adapter's ladder and lift models: the SDK prefabs and the adapter's fixed pieces do not depend on the map.
 Each climb model is boxes of the built-in cube, 12 triangles each (``AddClimbLook`` in the adapter): a ladder is two
-rails and one rung every 0.342 m (the prefab's spacing) from 0.21 m to 0.57 m over its parapet. A lift measured 120
+rails and one crossbar every 0.342 m (the prefab's spacing) from 0.21 m to 0.35 m under its roof and parapet. The three
+grips above the roof edge are on the rails, so no crossbar is drawn there (13 November 2026). A lift measured 120
 more triangles per pair on Barcelona Sarria night and Rue Mouffetard: two shells of four boxes, and 24 of the SDK's
 own cabins.
 """
@@ -28,8 +29,9 @@ BOX_TRIANGLES = 12
 LIFT_TRIANGLES = 2 * 4 * BOX_TRIANGLES + 24
 """A street shell and a roof shell, each a back wall, two side walls and a roof, and 24 the two SDK cabins add (measured)."""
 RUNG_SPACING_M = 0.342
-LADDER_RUNG_SPAN_M = 0.36
-"""From the lowest rung at 0.21 m to the top rung 0.57 m over the parapet, beyond ``height_m + parapet_m``."""
+LADDER_RUNG_SPAN_M = -0.56
+"""From the lowest crossbar at 0.21 m to the top one, the vault rung 0.35 m under ``height_m + parapet_m``: the crossbars
+span that height less 0.56 m."""
 CORE_STEP_M = 5.0
 """A suggested core is rounded down to this step."""
 MIN_CORE_M = 50.0
@@ -42,7 +44,7 @@ def visual_triangles(visual: bytes) -> int:
 
 
 def ladder_triangles(height_m: float, parapet_m: float) -> int:
-    """A ladder's model: two rails and its rungs, rounded up."""
+    """A ladder's model: two rails and its crossbars, rounded up."""
     rungs = math.ceil((height_m + parapet_m + LADDER_RUNG_SPAN_M) / RUNG_SPACING_M) + 1
     return (2 + rungs) * BOX_TRIANGLES
 

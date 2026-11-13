@@ -870,3 +870,18 @@ def test_default_fog_colour_is_the_backdrop_haze() -> None:
     build = load(EXPORT_CONFIG_DEFAULT)["build"]
     assert build["fog_enabled"] is True and build["fog_end_m"] > build["fog_start_m"]
     assert build["fog_color"] == HAZE_HEX == "#C8CDD2"
+
+
+def test_unity_adapter_draws_a_crossbar_only_where_the_sdk_grips_it() -> None:
+    """On the headset the three rungs drawn over the roof edge had no grip: the prefab's ExtensionRungs grip the rails
+    (x 0.253 m), so the hand passed through the crossbars. The adapter draws crossbars only where both grips of a level
+    sit on the crossbar, and checks every ladder: each crossbar gripped, each grip on a crossbar or a rail."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    look = source[source.index("private static void AddLadder"):source.index("private static void FillRungsToGround")]
+    assert "internal const float CrossbarGripHalfM = LadderRailWidthM / 2f - 0.05f;" in source
+    assert ".Where(level => level.Key > foot && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))" in look
+    assert "foreach (float y in bars)" in look and "ladder.Rungs.Where(r => r.Transform.position.y > foot)" not in look
+    assert look.index("CheckLadderGrips(go.name, grips, bars, foot, top);") < look.index("AddClimbLook(go.name")
+    check = source[source.index("internal static void CheckLadderGrips"):]
+    assert "has no grip on it." in check and "has nothing drawn under the hand." in check
+    assert "Math.Abs(Math.Abs(g.x) - LadderRailWidthM / 2f) <= 0.03f && g.y <= top + GripReachM" in check

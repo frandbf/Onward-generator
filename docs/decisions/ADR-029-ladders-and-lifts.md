@@ -113,3 +113,11 @@ Rue Mouffetard had no lift in any run: its sidewalks, without the carriageway (`
 ## Amendment (12 November 2026): roof links
 
 At the maintainer's request, a squad may play along a run of roofs. After the street ladders and lifts, `perf/climbs.roof_links` spreads breadth first from the roofs they reach to the flat-roofed candidates of rule 1 (core, flat, at least 30 m², 30 m from the spawns): two roofs are linked when their footprints touch along at least 2 m of straight wall and the higher stands at most 6 m above the lower. The link is a ladder against the higher building's wall with its foot on the lower deck, clear of the lower parapet, and its landing on the higher deck (`link_ladder`); each roof is reached once and at most 6 links are placed. A ladder is climbed both ways, so every linked roof leads back to the street through the ladder or lift that reached the first one, and no link is a one-way drop. A link joins `ladders` with `base_m`, the lower roof's height, and `link`, the two sources; the adapter stands it on that roof (its rungs stop at `base_m`) and the triangle estimate counts only its rise. A mansard roof (ADR-020) is not a candidate. Bots do not use roofs; the navmesh is unchanged.
+
+## Amendment, 13 November 2026: a crossbar only where the hand grips
+
+On the headset, with pkg_11 of Rue Mouffetard, the top 2 or 3 rungs of every ladder had no grip: the hand passed through them. The SDK prefab has 14 rung levels gripped on the crossbar (x ±0.137 m, up to the vault rung at 0.35 m under the roof edge). Its three `ExtensionRungs` above the roof edge are grips on the rails (x ±0.253 m). The adapter drew a crossbar at every level, so the three over the roof looked like rungs but could not be held.
+
+- `AddLadder` draws a crossbar only at a level whose grips all sit on it (`|x| <= CrossbarGripHalfM`, 0.20 m). Above the roof edge the player holds the rails, which already rise to the top grip.
+- `CheckLadderGrips` fails the export if a crossbar has no grip within 2 cm, or if a grip has neither a crossbar nor a rail under it. It logs each ladder's grips on crossbars and on rails.
+- `triangle_budget.ladder_triangles` counts crossbars up to the vault rung, so it no longer counts the three over the roof.

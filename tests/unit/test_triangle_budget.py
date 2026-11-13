@@ -34,12 +34,12 @@ def test_visual_triangles_count_every_primitive() -> None:
 
 
 @pytest.mark.parametrize(("height", "parapet", "expected"), [
-    # Rue Mouffetard pkg_04: 10.59 m and 11.85 m roofs under a 0.7 m parapet.
-    (10.59, 0.7, (2 + 36) * 12), (11.85, 0.7, (2 + 39) * 12),
-    # A rung exactly on the span: 0.342 * 10 = 3.42 m for 3.06 m of roof, no parapet.
-    (3.06, 0.0, (2 + 11) * 12), (3.07, 0.0, (2 + 12) * 12),
+    # Rue Mouffetard pkg_04: 10.59 m and 11.85 m roofs under a 0.7 m parapet; no crossbar over the roof edge.
+    (10.59, 0.7, (2 + 33) * 12), (11.85, 0.7, (2 + 37) * 12),
+    # A crossbar exactly on the span: 0.342 * 10 = 3.42 m for 3.98 m of roof, no parapet.
+    (3.98, 0.0, (2 + 11) * 12), (3.99, 0.0, (2 + 12) * 12),
 ])
-def test_a_ladder_is_two_rails_and_a_rung_every_0_342_m(height: float, parapet: float, expected: int) -> None:
+def test_a_ladder_is_two_rails_and_a_crossbar_every_0_342_m_up_to_the_vault_rung(height: float, parapet: float, expected: int) -> None:
     assert ladder_triangles(height, parapet) == expected
 
 
