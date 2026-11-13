@@ -137,7 +137,7 @@ def _license_from_info(info: Mapping[str, Any], asset_id: str) -> str:
     raise DownloadError(f"{asset_id}: license {raw!r} is not CC0; refusing to download")
 
 
-def _map_1k_jpg(files: Mapping[str, Any], map_key: str = "Diffuse") -> tuple[str, str, int]:
+def _map_1k_jpg(files: Mapping[str, Any], map_key: str) -> tuple[str, str, int]:
     block = ((files.get(map_key) or {}).get("1k") or {}).get("jpg") or {}
     url = block.get("url")
     md5 = block.get("md5")
