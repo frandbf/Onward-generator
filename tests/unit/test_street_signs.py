@@ -186,7 +186,7 @@ def test_shop_signs_are_drawn_and_reported(tmp_path: Path, capsys: pytest.Captur
     data = (out / "scene_visual.glb").read_bytes()
     extras = read_glb(data)[0]["extras"]
     assert {k: v for k, v in extras.items() if k != "wall_decals"} == {"manifest": "scene_detail.json", "street_signs": 2, "shop_signs": 2}
-    assert 10 <= extras["wall_decals"] <= 20
+    assert 30 <= extras["wall_decals"] <= 50
     nodes, _ = nodes_from_glb(data)
     node = next(n for n in nodes if n.name == "shop_signs/osm-way-north")
     assert [p.material for p in node.primitives] == ["shop_sign_atlas_0", "shop_sign_edge"]
@@ -791,7 +791,8 @@ def test_the_model_picks_the_wall_decals_of_an_ai_map(tmp_path: Path, monkeypatc
     _scene(scene)
     base = tmp_path / "base"
     _shop_base(base)
-    chosen = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "gen_plaster_crack", "gen_torn_poster", "gen_splash_grime"]
+    chosen = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "gen_plaster_crack", "gen_torn_poster", "gen_splash_grime",
+              "gen_bullet_holes", "gen_moss_patch", "gen_peeling_paint", "gen_water_streaks", "gen_chalk_marks", "gen_ghost_sign"]
 
     class _Pick:
         name = "pick"
@@ -808,12 +809,12 @@ def test_the_model_picks_the_wall_decals_of_an_ai_map(tmp_path: Path, monkeypatc
     report = place_signs(base, scene, tmp_path / "out", provider=provider)
     decals = report["wall_decals"]
     assert provider.calls == 1 and decals["pick"]["origin"] == "ai_generated"
-    assert decals["count"] >= 6 and {row["decal"] for row in decals["decals"]} <= set(chosen)
+    assert decals["count"] >= 12 and {row["decal"] for row in decals["decals"]} <= set(chosen)
     again = place_signs(base, scene, tmp_path / "out", provider=_Pick(), overwrite=True)
     assert again["wall_decals"]["pick"]["origin"] == "replay"
     monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
     rules = place_signs(base, scene, tmp_path / "rules", provider=_Pick())
-    assert rules["wall_decals"]["pick"] is None and rules["wall_decals"]["distinct"] == 7
+    assert rules["wall_decals"]["pick"] is None and rules["wall_decals"]["distinct"] == 13
 
 
 def test_the_ambient_switch_is_read_from_the_map_folder(tmp_path: Path) -> None:
@@ -833,14 +834,27 @@ def test_the_ambient_switch_is_read_from_the_map_folder(tmp_path: Path) -> None:
 
 
 GOLDEN_DECALS = [
-    ["gen_paint_scribble", "osm-way-short", [-1.99, 17.207, 0.9]], ["gen_torn_poster", "osm-way-short", [-8.01, 17.149, 0.9]],
-    ["gen_soot_streak", "osm-way-north", [-0.01, 15.179, 1.4]], ["gen_plaster_crack", "osm-way-north", [14.828, 11.99, 1.4]],
-    ["gen_splash_grime", "osm-way-east", [30.01, 5.263, 1.4]], ["gen_rust_drip", "osm-way-east", [13.99, -2.779, 1.4]],
-    ["gen_damp_stain", "osm-way-north", [10.965, 28.01, 1.4]], ["gen_paint_scribble", "osm-way-east", [25.075, -4.01, 1.4]],
-    ["gen_torn_poster", "osm-way-north", [20.01, 22.896, 1.4]], ["gen_soot_streak", "osm-way-east", [29.108, 18.01, 1.4]],
-    ["gen_plaster_crack", "osm-way-north", [-0.01, 13.769, 1.4]], ["gen_splash_grime", "osm-way-north", [11.241, 11.99, 1.4]],
-    ["gen_rust_drip", "osm-way-east", [30.01, 16.779, 1.4]], ["gen_damp_stain", "osm-way-east", [13.99, 12.904, 1.4]],
-    ["gen_paint_scribble", "osm-way-north", [7.619, 28.01, 1.4]],
+    ["gen_moss_patch", "osm-way-short", [-1.99, 17.214, 0.9]], ["gen_chalk_marks", "osm-way-short", [-8.01, 15.917, 0.9]],
+    ["gen_paint_scribble", "osm-way-short", [-4.793, 13.99, 0.9]], ["gen_water_streaks", "osm-way-north", [-0.01, 16.65, 1.4]],
+    ["gen_torn_poster", "osm-way-north", [13.654, 11.99, 1.4]], ["gen_soot_streak", "osm-way-east", [30.01, -2.951, 1.4]],
+    ["gen_plaster_crack", "osm-way-east", [13.99, 1.191, 1.4]], ["gen_peeling_paint", "osm-way-north", [8.601, 28.01, 1.4]],
+    ["gen_splash_grime", "osm-way-east", [20.795, -4.01, 1.4]], ["gen_bullet_holes", "osm-way-north", [20.01, 24.756, 1.4]],
+    ["gen_ghost_sign", "osm-way-east", [20.044, 18.01, 1.4]], ["gen_rust_drip", "osm-way-north", [-0.01, 19.335, 1.4]],
+    ["gen_damp_stain", "osm-way-north", [11.972, 11.99, 1.4]], ["gen_moss_patch", "osm-way-east", [30.01, -0.705, 1.4]],
+    ["gen_chalk_marks", "osm-way-east", [13.99, 14.004, 1.4]], ["gen_paint_scribble", "osm-way-north", [6.624, 28.01, 1.4]],
+    ["gen_water_streaks", "osm-way-east", [29.088, -4.01, 1.4]], ["gen_torn_poster", "osm-way-north", [20.01, 22.896, 1.4]],
+    ["gen_soot_streak", "osm-way-east", [29.108, 18.01, 1.4]], ["gen_plaster_crack", "osm-way-north", [-0.01, 14.737, 1.4]],
+    ["gen_peeling_paint", "osm-way-north", [15.357, 11.99, 1.4]], ["gen_splash_grime", "osm-way-east", [30.01, 5.263, 1.4]],
+    ["gen_bullet_holes", "osm-way-east", [13.99, 16.18, 1.4]], ["gen_ghost_sign", "osm-way-north", [4.099, 28.01, 1.4]],
+    ["gen_rust_drip", "osm-way-east", [14.792, -4.01, 1.4]], ["gen_damp_stain", "osm-way-north", [20.01, 19.242, 1.4]],
+    ["gen_moss_patch", "osm-way-east", [26.942, 18.01, 1.4]], ["gen_chalk_marks", "osm-way-short", [-6.083, 20.01, 0.9]],
+    ["gen_paint_scribble", "osm-way-short", [-8.01, 18.749, 0.9]], ["gen_water_streaks", "osm-way-north", [-0.01, 13.197, 1.4]],
+    ["gen_torn_poster", "osm-way-north", [17.118, 11.99, 1.4]], ["gen_soot_streak", "osm-way-east", [30.01, 1.444, 1.4]],
+    ["gen_plaster_crack", "osm-way-east", [13.99, -0.274, 1.4]], ["gen_peeling_paint", "osm-way-north", [1.674, 28.01, 1.4]],
+    ["gen_splash_grime", "osm-way-east", [23.709, -4.01, 1.4]], ["gen_bullet_holes", "osm-way-north", [20.01, 26.729, 1.4]],
+    ["gen_ghost_sign", "osm-way-east", [17.13, 18.01, 1.4]], ["gen_rust_drip", "osm-way-north", [-0.01, 27.18, 1.4]],
+    ["gen_damp_stain", "osm-way-north", [18.824, 11.99, 1.4]], ["gen_moss_patch", "osm-way-east", [30.01, 7.754, 1.4]],
+    ["gen_chalk_marks", "osm-way-east", [13.99, 12.525, 1.4]],
 ]
 
 
@@ -859,9 +873,10 @@ def test_the_wall_decals_of_the_shop_street_are_pinned(tmp_path: Path, monkeypat
     decals = report["wall_decals"]
     assert [[d["decal"], d["wall_feature"], d["position_m"]] for d in decals["decals"]] == GOLDEN_DECALS
     manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
-    assert (decals["count"], decals["wanted"], decals["distinct"], decals["pick"]) == (15, decal_count(_seed(manifest)), 7, None)
+    assert (decals["count"], decals["wanted"], decals["distinct"], decals["pick"]) == (41, decal_count(_seed(manifest)), 13, None)
     assert json.loads((tmp_path / "out" / "detail_report.json").read_text(encoding="utf-8"))["wall_decals"] == {
-        "count": 15, "kinds": ["crack", "graffiti", "grime", "poster", "rust", "soot", "stain"]}
+        "count": 41, "kinds": ["bullets", "chalk", "crack", "ghost_sign", "graffiti", "grime", "moss", "peeling", "poster", "rust", "soot",
+                               "stain", "water"]}
     written = json.loads((tmp_path / "out" / "scene_detail.json").read_text(encoding="utf-8"))
     assert [o["decal"] for o in written["objects"] if o.get("type") == "wall_decal"] == [d[0] for d in GOLDEN_DECALS]
 

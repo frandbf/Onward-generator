@@ -1,4 +1,4 @@
-"""Wall decals (ADR-038): from 10 to 20 on every map, varied, clear of what they must not cover."""
+"""Wall decals (ADR-038): from 30 to 50 on every map, varied, clear of what they must not cover."""
 
 from __future__ import annotations
 
@@ -51,12 +51,12 @@ def never(plan: Polygon, bottom: float, top: float) -> bool:
     return False
 
 
-def test_every_map_gets_ten_to_twenty_decals_and_the_drawn_ones_are_stable() -> None:
-    assert (MIN_DECALS, MAX_DECALS, DECAL_MATERIAL) == (10, 20, "wall_decal_atlas_{}")
+def test_every_map_gets_thirty_to_fifty_decals_and_the_drawn_ones_are_stable() -> None:
+    assert (MIN_DECALS, MAX_DECALS, DECAL_MATERIAL) == (30, 50, "wall_decal_atlas_{}")
     counts = {decal_count(seed) for seed in range(400)}
-    assert min(counts) == 10 and max(counts) == 20
+    assert min(counts) == 30 and max(counts) == 50
     first, again = procedural_decals(7), procedural_decals(7)
-    assert [d.id for d in first] == [f"gen_{name}" for name in PROCEDURAL] and len(first) == 7
+    assert [d.id for d in first] == [f"gen_{name}" for name in PROCEDURAL] and len(first) == 13
     assert all(np.array_equal(a.rgba, b.rgba) for a, b in zip(first, again, strict=True))
     assert any(not np.array_equal(a.rgba, b.rgba) for a, b in zip(first, procedural_decals(8), strict=True))
     for decal in first:
@@ -209,21 +209,21 @@ class _Replies:
         return ProviderResult(str(answer), {})
 
 
-def test_a_decal_pick_names_six_to_twelve_offered_ids_of_three_kinds() -> None:
-    assert (MIN_PICK, MAX_PICK, MIN_KINDS) == (6, 12, 3)
+def test_a_decal_pick_names_twelve_to_twenty_four_offered_ids_of_five_kinds() -> None:
+    assert (MIN_PICK, MAX_PICK, MIN_KINDS) == (12, 24, 5)
     pool = procedural_decals(1)
     ids = [d.id for d in pool]
-    assert parse(_reply(*ids[:6]), pool) == tuple(ids[:6])
+    assert parse(_reply(*ids[:12]), pool) == tuple(ids[:12])
     for text, message in (
         ("{", "not JSON"), ("[]", "pick_version"), (json.dumps({"pick_version": "0.1.0", "decal_ids": "x"}), "list of ids"),
-        (_reply(*ids[:5], "gen_unknown"), "not offered: gen_unknown"), (_reply(*ids[:5], ids[0]), "chosen once"),
-        (_reply(*ids[:5]), "from 6 to 12 ids, not 5"),
+        (_reply(*ids[:11], "gen_unknown"), "not offered: gen_unknown"), (_reply(*ids[:11], ids[0]), "chosen once"),
+        (_reply(*ids[:11]), "from 12 to 24 ids, not 11"),
     ):
         with pytest.raises(DecalPickError, match=message):
             parse(text, pool)
-    same_kind = [_decal(f"s{k}") for k in range(8)] + [Decal("p", "poster", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated")]
+    same_kind = [_decal(f"s{k}") for k in range(12)] + [Decal("p", "poster", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated")]
     with pytest.raises(DecalPickError, match="at least 2 kinds"):
-        parse(_reply(*[f"s{k}" for k in range(6)]), same_kind)
+        parse(_reply(*[f"s{k}" for k in range(12)]), same_kind)
     sch = schema(pool[:4])
     assert sch["properties"]["decal_ids"]["minItems"] == 4 and sch["properties"]["decal_ids"]["items"]["enum"] == sorted(ids[:4])
 
@@ -231,9 +231,9 @@ def test_a_decal_pick_names_six_to_twelve_offered_ids_of_three_kinds() -> None:
 def test_a_failed_pick_is_asked_again_then_every_decal_is_used_and_a_stored_one_replayed() -> None:
     pool = procedural_decals(1)
     ids = [d.id for d in pool]
-    second = _Replies("{bad", _reply(*ids[:6]))
+    second = _Replies("{bad", _reply(*ids[:12]))
     picked = pick_decals(pool, brief="Calle quemada", provider=second)
-    assert picked.ok and picked.decal_ids == tuple(ids[:6]) and picked.record["attempts"] == 2
+    assert picked.ok and picked.decal_ids == tuple(ids[:12]) and picked.record["attempts"] == 2
     assert "previous reply was rejected" in second.calls[1][1] and '"Calle quemada"' in second.calls[0][1]
     assert "gen_soot_streak" in second.calls[0][1] and "Black soot" in second.calls[0][1]
     down = pick_decals(pool, brief="", provider=_Replies(ProviderError("off"), ProviderError("off")))
@@ -247,9 +247,9 @@ def test_a_failed_pick_is_asked_again_then_every_decal_is_used_and_a_stored_one_
 
     again = pick_decals(pool, brief="Calle quemada", provider=_Never(), replay=picked.record)
     assert again.decal_ids == picked.decal_ids and again.record["origin"] == "replay" and again.record["attempts"] == 0
-    asked = _Replies(_reply(*ids[1:7]))
-    assert pick_decals(pool, brief="other", provider=asked, replay=picked.record).decal_ids == tuple(ids[1:7])
-    assert pick_decals(pool, brief="Calle quemada", provider=_Replies(_reply(*ids[:6])), replay={**picked.record, "raw": "{"}).ok
+    asked = _Replies(_reply(*ids[1:13]))
+    assert pick_decals(pool, brief="other", provider=asked, replay=picked.record).decal_ids == tuple(ids[1:13])
+    assert pick_decals(pool, brief="Calle quemada", provider=_Replies(_reply(*ids[:12])), replay={**picked.record, "raw": "{"}).ok
 
 
 # --- the decals are deterministic: pinned pixels, placement, quads and page (generated in the Docker image) ------------
@@ -258,16 +258,20 @@ import hashlib  # noqa: E402 - the pinned section of this file
 
 DIGESTS = {"gen_damp_stain": "f3501cfe3d427187", "gen_soot_streak": "f862dbd66ee9eb1b", "gen_rust_drip": "bb56a372c739b3b8",
            "gen_plaster_crack": "15117665b2f22852", "gen_torn_poster": "06711467ae46fd73", "gen_paint_scribble": "811451e3d45be684",
-           "gen_splash_grime": "1bb0d559c78a14ec"}
+           "gen_splash_grime": "1bb0d559c78a14ec", "gen_bullet_holes": "4cc54c86e539ce0a", "gen_moss_patch": "8d6d89a319ad402f",
+           "gen_peeling_paint": "c1a8f5f2bb88edb0", "gen_water_streaks": "4e53c16029081537", "gen_chalk_marks": "7f6a89008af6dd28",
+           "gen_ghost_sign": "39eee0fc614ff1c7"}
 
 
 def test_the_drawn_decals_are_pinned() -> None:
     assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:16] for d in procedural_decals(7)} == DIGESTS
-    assert [decal_count(s) for s in range(8)] == [11, 12, 13, 11, 11, 11, 20, 11]
+    assert [decal_count(s) for s in range(8)] == [32, 33, 36, 33, 32, 33, 50, 32]
     assert [(d.kind, d.width_m, d.height_m, d.origin) for d in procedural_decals(7)] == [
         ("stain", 1.4, 1.4, "generated"), ("soot", 1.0, 2.0, "generated"), ("rust", 0.8, 1.6, "generated"),
         ("crack", 1.0, 1.6, "generated"), ("poster", 0.7, 1.0, "generated"), ("graffiti", 1.6, 0.9, "generated"),
-        ("grime", 2.4, 0.8, "generated")]
+        ("grime", 2.4, 0.8, "generated"), ("bullets", 1.2, 1.0, "generated"), ("moss", 1.6, 0.7, "generated"),
+        ("peeling", 1.2, 1.2, "generated"), ("water", 1.2, 2.2, "generated"), ("chalk", 0.8, 0.6, "generated"),
+        ("ghost_sign", 2.4, 1.2, "generated")]
     assert all(d.description.endswith(".") for d in procedural_decals(7))
 
 
@@ -279,18 +283,18 @@ def test_the_placement_quads_and_page_of_a_known_street_are_pinned() -> None:
                                      np.array([[0, 1, 2], [0, 2, 3]])), "glass_dark"),), {})
     placed = place_decals(walls, NOTHING, decal_blocker([pane]), procedural_decals(7), 11, 9)
     assert [(p.decal.id, p.wall.feature_id, round(p.s_m, 4), round(p.z_m, 4)) for p in placed] == [
-        ("gen_rust_drip", "w1", 11.1058, 1.4), ("gen_paint_scribble", "w2", 1.0137, 1.4), ("gen_soot_streak", "w1", 6.9942, 1.4),
-        ("gen_damp_stain", "w2", 2.9275, 1.4), ("gen_splash_grime", "w1", 3.1761, 3.6), ("gen_torn_poster", "w2", 4.4619, 1.4),
-        ("gen_plaster_crack", "w1", 8.6519, 1.4), ("gen_rust_drip", "w2", 7.0371, 1.4), ("gen_paint_scribble", "w1", 13.0972, 1.4)]
+        ("gen_water_streaks", "w1", 7.3683, 1.4), ("gen_peeling_paint", "w2", 3.0249, 1.4), ("gen_rust_drip", "w1", 11.1058, 1.4),
+        ("gen_paint_scribble", "w2", 1.0137, 1.4), ("gen_moss_patch", "w1", 13.0205, 1.4), ("gen_soot_streak", "w2", 6.1539, 1.4),
+        ("gen_bullet_holes", "w1", 0.8846, 1.4), ("gen_damp_stain", "w2", 1.5132, 3.6), ("gen_splash_grime", "w1", 3.1761, 3.6)]
     nodes, _, images, rows = decal_nodes(placed[:3])
     assert nodes[0].primitives[0].mesh.vertices.round(4).tolist() == [
-        [10.7058, -0.01, 0.6], [11.5058, -0.01, 0.6], [11.5058, -0.01, 2.2], [10.7058, -0.01, 2.2]]
+        [6.7683, -0.01, 0.3], [7.9683, -0.01, 0.3], [7.9683, -0.01, 2.5], [6.7683, -0.01, 2.5]]
     assert nodes[0].primitives[0].uvs.round(5).tolist() == [[0.00195, 0.87305], [0.12695, 0.87305], [0.12695, 0.99805], [0.00195, 0.99805]]
-    assert hashlib.sha256(images["wall_decal_atlas_0"]).hexdigest()[:16] == "30932d1155d142a1"
-    assert rows[0] == {"id": "wall_decal/0", "type": "wall_decal", "decal": "gen_rust_drip", "kind": "rust", "origin": "generated",
-                       "wall_feature": "w1", "position_m": [11.106, -0.01, 1.4], "size_m": [0.8, 1.6], "attribute_origin": "generated"}
+    assert hashlib.sha256(images["wall_decal_atlas_0"]).hexdigest()[:16] == "056f23e8003bdeb8"
+    assert rows[0] == {"id": "wall_decal/0", "type": "wall_decal", "decal": "gen_water_streaks", "kind": "water", "origin": "generated",
+                       "wall_feature": "w1", "position_m": [7.368, -0.01, 1.4], "size_m": [1.2, 2.2], "attribute_origin": "generated"}
     assert nodes[0].name == "wall_decal/0" and nodes[0].extras == {
-        "type": "wall_decal", "decal": "gen_rust_drip", "kind": "rust", "wall": "w1", "attribute_origin": "generated"}
+        "type": "wall_decal", "decal": "gen_water_streaks", "kind": "water", "wall": "w1", "attribute_origin": "generated"}
 
 
 SEED_MOUFFETARD = 1043396788
@@ -298,7 +302,9 @@ SEED_NULL_ISLAND = 1382503250
 SEED_ROUNDED = 396029759
 DRAWN_HASHES = {"gen_damp_stain": "f3501cfe3d42", "gen_soot_streak": "f862dbd66ee9", "gen_rust_drip": "bb56a372c739",
                 "gen_plaster_crack": "15117665b2f2", "gen_torn_poster": "06711467ae46", "gen_paint_scribble": "811451e3d45b",
-                "gen_splash_grime": "1bb0d559c78a"}
+                "gen_splash_grime": "1bb0d559c78a", "gen_bullet_holes": "4cc54c86e539", "gen_moss_patch": "8d6d89a319ad",
+                "gen_peeling_paint": "c1a8f5f2bb88", "gen_water_streaks": "4e53c1602908", "gen_chalk_marks": "7f6a89008af6",
+                "gen_ghost_sign": "39eee0fc614f"}
 
 
 def test_the_map_seed_is_its_centre() -> None:
@@ -313,13 +319,13 @@ def test_the_decal_schema_and_records_are_whole() -> None:
     assert schema(pool) == {
         "type": "object", "additionalProperties": False, "required": ["pick_version", "decal_ids"],
         "properties": {"pick_version": {"const": "0.1.0"}, "decal_ids": {"type": "array", "items": {"enum": sorted(d.id for d in pool)},
-                                                                          "uniqueItems": True, "minItems": 4, "maxItems": 12}}}
+                                                                          "uniqueItems": True, "minItems": 4, "maxItems": 24}}}
     ids = [d.id for d in procedural_decals(1)]
-    picked = pick_decals(procedural_decals(1), brief="b", provider=_Replies(_reply(*ids[:6])))
+    picked = pick_decals(procedural_decals(1), brief="b", provider=_Replies(_reply(*ids[:12])))
     assert set(picked.record) == {"pick_version", "instruction_sha256", "origin", "raw", "decal_ids", "reason", "attempts"}
     assert (picked.record["pick_version"], picked.record["origin"], picked.record["reason"], picked.record["attempts"]) == ("0.1.0", "ai_generated", None, 1)
-    assert picked.record["raw"] == _reply(*ids[:6]) and len(picked.record["instruction_sha256"]) == 64
-    assert picked.record["decal_ids"] == ids[:6]
+    assert picked.record["raw"] == _reply(*ids[:12]) and len(picked.record["instruction_sha256"]) == 64
+    assert picked.record["decal_ids"] == ids[:12]
 
 
 def _png_bytes(size: tuple[int, int], alpha_left: int, mode: str = "RGBA", colour: tuple[int, int, int] = (120, 60, 40)) -> bytes:
@@ -429,22 +435,22 @@ def test_a_street_of_slanted_and_short_walls_is_pinned() -> None:
     pool = [*procedural_decals(7), Decal("long", "banner", 4.0, 0.4, np.zeros((4, 40, 4), np.uint8), "generated", "x")]
     placed = place_decals(walls, NOTHING, decal_blocker(nodes, [(box(24.5, 3.0, 25.5, 5.0), 2.0, 3.0)]), pool, 23, 14)
     assert [(p.decal.id, p.wall.feature_id, round(p.s_m, 4), round(p.z_m, 4)) for p in placed] == [
-        ("gen_damp_stain", "w2", 8.5577, 1.4), ("gen_splash_grime", "w1", 9.854, 1.4), ("gen_torn_poster", "w3", 1.6287, 1.4),
-        ("gen_soot_streak", "w2", 10.6075, 1.4), ("long", "w1", 10.6266, 2.4), ("gen_plaster_crack", "w3", 1.8392, 3.6),
-        ("gen_paint_scribble", "w2", 0.9445, 1.4), ("gen_rust_drip", "w1", 13.7846, 1.4), ("gen_damp_stain", "w2", 6.1529, 0.9),
-        ("gen_splash_grime", "w1", 1.4135, 1.4), ("gen_torn_poster", "w2", 10.7201, 3.6), ("gen_soot_streak", "w1", 13.779, 3.6),
-        ("long", "w2", 4.2601, 3.6), ("gen_plaster_crack", "w1", 0.7823, 3.6)]
+        ("gen_moss_patch", "w2", 1.6531, 1.4), ("gen_damp_stain", "w1", 13.6495, 1.4), ("gen_splash_grime", "w2", 8.9321, 1.4),
+        ("gen_torn_poster", "w1", 0.7158, 1.4), ("gen_soot_streak", "w3", 1.8951, 1.4), ("gen_peeling_paint", "w2", 6.0496, 0.9),
+        ("gen_chalk_marks", "w1", 9.1679, 1.4), ("long", "w2", 9.4163, 2.4), ("gen_ghost_sign", "w1", 10.4941, 3.6),
+        ("gen_plaster_crack", "w3", 1.8392, 3.6), ("gen_bullet_holes", "w2", 2.9178, 3.6), ("gen_paint_scribble", "w1", 11.1621, 1.4),
+        ("gen_rust_drip", "w2", 0.5616, 3.6), ("gen_water_streaks", "w1", 2.4074, 1.4)]
     nodes_out, materials, images, _ = decal_nodes(placed)
     assert [n.primitives[0].mesh.vertices.round(3).tolist() for n in nodes_out[:4]] == [
-        [[25.01, 5.858, 0.7], [25.01, 7.258, 0.7], [25.01, 7.258, 2.1], [25.01, 5.858, 2.1]],
-        [[11.832, 3.151, 1.0], [14.197, 3.556, 1.0], [14.197, 3.556, 1.8], [11.832, 3.151, 1.8]],
-        [[41.279, -0.01, 0.9], [41.979, -0.01, 0.9], [41.979, -0.01, 1.9], [41.279, -0.01, 1.9]],
-        [[25.01, 8.108, 0.4], [25.01, 9.108, 0.4], [25.01, 9.108, 2.4], [25.01, 8.108, 2.4]]]
+        [[25.01, -1.147, 1.05], [25.01, 0.453, 1.05], [25.01, 0.453, 1.75], [25.01, -1.147, 1.75]],
+        [[16.065, 3.876, 0.7], [17.445, 4.112, 0.7], [17.445, 4.112, 2.1], [16.065, 3.876, 2.1]],
+        [[25.01, 5.732, 1.0], [25.01, 8.132, 1.0], [25.01, 8.132, 1.8], [25.01, 5.732, 1.8]],
+        [[3.662, 1.752, 0.9], [4.352, 1.87, 0.9], [4.352, 1.87, 1.9], [3.662, 1.752, 1.9]]]
     assert [n.primitives[0].mesh.triangles.tolist() for n in nodes_out[:1]] == [[[0, 1, 2], [0, 2, 3]]]
     assert [n.primitives[0].uvs.round(5).tolist() for n in nodes_out[:2]] == [
         [[0.00195, 0.87305], [0.12695, 0.87305], [0.12695, 0.99805], [0.00195, 0.99805]],
         [[0.19727, 0.87305], [0.32227, 0.87305], [0.32227, 0.99805], [0.19727, 0.99805]]]
-    assert {k: hashlib.sha256(v).hexdigest()[:16] for k, v in images.items()} == {"wall_decal_atlas_0": "bfba4218f58523f4"}
+    assert {k: hashlib.sha256(v).hexdigest()[:16] for k, v in images.items()} == {"wall_decal_atlas_0": "433c67095d8d7082"}
     assert {k: (m.color, m.roughness) for k, m in materials.items()} == {"wall_decal_atlas_0": ((1.0, 1.0, 1.0, 1.0), 0.8)}
 
 
@@ -476,13 +482,13 @@ def test_the_pick_sends_its_prompt_and_schema_and_keeps_whole_records(monkeypatc
 
     pool = procedural_decals(1)
     ids = [d.id for d in pool]
-    asked = _Replies(_reply(*ids[:6]))
+    asked = _Replies(_reply(*ids[:12]))
     picked = pick_decals(pool, brief="Muros quemados", provider=asked)
     system, message, sent = asked.calls[0]
     assert system == pick_module.SYSTEM_PROMPT and sent == schema(pool) and message == pick_module.instruction("Muros quemados", pool)
     assert picked.ok is True
     rows = json.loads(message.split("Decals:\n", 1)[1])
-    assert rows[0] == {"id": "gen_damp_stain", "kind": "stain", "description": "A brown damp stain spreading on a wall."}
+    assert rows[0] == {"id": "gen_bullet_holes", "kind": "bullets", "description": "A cluster of bullet holes with chipped plaster round them."}
     replayed = pick_decals(pool, brief="Muros quemados", provider=_Replies(), replay=picked.record)
     assert replayed.ok is True and replayed.record == {**picked.record, "origin": "replay", "attempts": 0}
     again = pick_decals(pool, brief="Muros quemados", provider=_Replies(), replay=replayed.record)  # a replay replays too
@@ -508,19 +514,19 @@ def test_the_pick_sends_its_prompt_and_schema_and_keeps_whole_records(monkeypatc
 
 
 def test_the_pick_bounds_and_messages() -> None:
-    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(8)]
+    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(12)]
     ids = [d.id for d in pool]
-    assert len(parse(_reply(*ids[:12]), pool)) == 12
+    assert len(parse(_reply(*ids[:24]), pool)) == 24
     with pytest.raises(DecalPickError) as error:
-        parse(_reply(*ids[:13]), pool)
-    assert str(error.value) == "choose from 6 to 12 ids, not 13"
-    three_kinds = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "x0", "x1", "x2"]
-    assert parse(_reply(*three_kinds), pool) == tuple(three_kinds)
+        parse(_reply(*ids[:25]), pool)
+    assert str(error.value) == "choose from 12 to 24 ids, not 25"
+    five_kinds = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "gen_plaster_crack", *(f"x{k}" for k in range(8))]
+    assert parse(_reply(*five_kinds), pool) == tuple(five_kinds)
     for text, message in (
         (json.dumps({"pick_version": "0.1.0", "decal_ids": "x"}), "decal_ids must be a list of ids"),
-        (_reply(*ids[:4], "zz", "aa"), "ids that are not offered: aa, zz"),
-        (_reply(*ids[:5], ids[0]), "each id may be chosen once"),
-        (_reply("x0", "x1", "x2", "x3", "x4", "gen_damp_stain"), "choose ids of at least 3 kinds"),
+        (_reply(*ids[:10], "zz", "aa"), "ids that are not offered: aa, zz"),
+        (_reply(*ids[:11], ids[0]), "each id may be chosen once"),
+        (_reply(*(f"x{k}" for k in range(9)), "gen_damp_stain", "gen_soot_streak", "gen_rust_drip"), "choose ids of at least 5 kinds"),
     ):
         with pytest.raises(DecalPickError) as error:
             parse(text, pool)
@@ -531,9 +537,9 @@ def test_the_seed_rounds_the_centre_to_the_micro_degree_and_kinds_count_exactly(
     from onward_generator.signs.place import _seed
 
     assert _seed({"frame": {"origin_wgs84": [2.3498149, 48.8404549]}}) == SEED_ROUNDED
-    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(4)]
-    exactly_three = ["gen_damp_stain", "gen_soot_streak", "x0", "x1", "x2", "x3"]
-    assert parse(_reply(*exactly_three), pool) == tuple(exactly_three)
+    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(8)]
+    exactly_five = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "gen_plaster_crack", *(f"x{k}" for k in range(8))]
+    assert parse(_reply(*exactly_five), pool) == tuple(exactly_five)
 
 
 def test_a_decal_that_fits_nowhere_is_skipped_and_the_others_still_go() -> None:
@@ -751,3 +757,19 @@ def test_the_probe_grid_reaches_the_left_edge_and_stays_as_sparse_as_its_step() 
     assert between(_wall(20, 30), 5.0, 2.0, 1.6, 1.2) is not None  # a 2 cm band between the rows at 1.42 and 1.71 m
     middle = wall_surface([_facade_at(20, 30, _quad((30, -0.001), (20, -0.001), 1.99, 2.01, "glass_dark"))])
     assert middle(_wall(20, 30), 5.0, 2.0, 1.6, 0.2) is not None  # two rows under a 20 cm decal straddle a band at its middle
+
+
+TWELVE_SEEDS = {"gen_damp_stain": "47ef8f2d2915", "gen_soot_streak": "bcc498df6231", "gen_rust_drip": "caad9f8c1ebf",
+                "gen_plaster_crack": "ab3fede9492c", "gen_torn_poster": "ab0133642b15", "gen_paint_scribble": "ee6ac62dd1f0",
+                "gen_splash_grime": "7c51e0ff1add", "gen_bullet_holes": "18a4e10a0820", "gen_moss_patch": "faa7622f0c5a",
+                "gen_peeling_paint": "2a984e181a37", "gen_water_streaks": "d0cdf0e03247", "gen_chalk_marks": "f82231e35628",
+                "gen_ghost_sign": "cb08b31b5a00"}
+
+
+def test_every_drawn_kind_is_pinned_over_twelve_maps() -> None:
+    # One seed leaves a drawer's rarer branches unseen (a second group of chalk tallies, a hole clipped at the edge).
+    drawn = {f"gen_{name}": b"" for name in PROCEDURAL}
+    for seed in range(1, 13):
+        for decal in procedural_decals(seed):
+            drawn[decal.id] += decal.rgba.tobytes()
+    assert {k: hashlib.sha256(v).hexdigest()[:12] for k, v in drawn.items()} == TWELVE_SEEDS

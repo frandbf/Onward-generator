@@ -218,7 +218,7 @@ def place_signs(
     shops = shop_signs(manifest, boarded)
     materials.update(shops.materials)
     images.update(shops.images)
-    # Wall decals (ADR-038): from 10 to 20 on the exposed core walls, clear of glass, doors, signs and the plates.
+    # Wall decals (ADR-038): from 30 to 50 on the exposed core walls, clear of glass, doors, signs and the plates.
     # With the map's ambient_ai the model picks which decals (decal_pick); the rules place them either way.
     built = untrimmed(base, nodes)
     pool = [*procedural_decals(_seed(manifest)), *(library_decals(REPO_ROOT / "assets") if local.enabled() else [])]

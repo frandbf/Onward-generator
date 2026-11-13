@@ -30,3 +30,19 @@ On the headset, with pkg_09 of Rue Mouffetard, decals hung over windows and door
 - **Openings of the untrimmed scene** (`signs/place.py`, `untrimmed`). When the base is a materials stage, the blocker and the probe read the scene that stage was baked from (`materials_report.json` → `base_dir`; a container `/work` path maps to the repository). The trim sheet only re-skins, so its geometry is the same and the openings keep their own materials.
 
 Result on Rue Mouffetard: all 17 decals lie 1 cm in front of plaster, stone or brick, and none covers glass, a door or a recess or overhangs a wall end. Before, 7 covered glass (2 over a window recess) and 3 hung partly in the air.
+
+## Amendment, 13 November 2026: more decals, more kinds
+
+On the headset, with pkg_10, the maintainer asked for more decals and more variety, since they cost almost no triangles.
+
+- **30 to 50 per map** (`MIN_DECALS`, `MAX_DECALS`), at most 100 triangles.
+- **Thirteen drawn kinds.** The seven of the first version are unchanged, pixel for pixel. Six more are drawn from the map's seed:
+  - bullet holes with chipped plaster;
+  - moss at the foot of a wall;
+  - peeling paint;
+  - rain streaks;
+  - chalk tally marks;
+  - a faded painted advert whose lettering has worn away.
+
+  None carries letters or numbers. With the 16 brick patches of a local Asset Store pack, a map can draw on 29 decals.
+- **The model names 12 to 24 ids of at least 5 kinds** (`MIN_PICK`, `MAX_PICK`, `MIN_KINDS`), so its pick fits one 2048 px atlas page of 25 cells. The rules fallback uses every decal, which can need a second page and so one more transparent material.
