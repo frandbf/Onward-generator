@@ -145,3 +145,28 @@ def test_the_cli_takes_the_flag_and_prints_the_variants(monkeypatch: pytest.Monk
                                                                          "texture_variants": {"added_materials": 0, "materials": {}}})
     assert cli.main(["apply", "--base", str(tmp_path), "--out", str(tmp_path / "o")]) == 0
     assert "texture variants: 0 materials added (none)\n" in capsys.readouterr().out
+
+
+def test_the_plan_s_own_photograph_is_never_a_variant() -> None:
+    rows = [{"id": i, "family": "roof", "path": "missing.jpg"} for i in ("a", "b", "c")]
+    for seed in range(20):
+        picks = variant_picks([SimpleNamespace(id="roofs", library_id="b")], rows, seed, extended=True)["roofs"]
+        assert sorted(picks) == ["a", "c"]
+
+
+def test_the_repetition_switch_reaches_the_variant_picks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import onward_generator.materials.apply as apply_module
+
+    seen: list[object] = []
+
+    def spy(entries, rows, seed, *, extended):
+        seen.append(extended)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(apply_module, "variant_picks", spy)
+    plan = SimpleNamespace(entries=[])
+    with pytest.raises(RuntimeError, match="stop"):
+        apply_module._apply_variants([], plan, [], {}, {}, [], seed=1, wide=False, extended=True)
+    with pytest.raises(RuntimeError, match="stop"):
+        apply_module._apply_variants([], plan, [], {}, {}, [], seed=1, wide=False, extended=False)
+    assert seen == [True, False]

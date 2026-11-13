@@ -242,3 +242,23 @@ def test_texture_variants_give_buildings_their_own_roof_photograph(runs: dict[st
     off = apply_materials(detail, tmp_path / "off", plan_path=plan, scene_path=runs["scene"])
     assert "texture_variants" not in off
     assert (tmp_path / "off" / "scene_visual.glb").read_bytes() == (runs["trim"] / "scene_visual.glb").read_bytes()
+
+
+def test_repetition_hands_the_variants_the_extended_limits(runs: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.materials.apply as apply_module
+
+    lon, lat = MURCIA_CENTER
+    plan = tmp_path / "calm_plan.json"
+    plan.write_text(json.dumps(select_texture_plan(name="Murcia", map_id="murcia", latitude=lat, longitude=lon, brief=None, seed=1,
+                                                   extended=True)))
+    seen: list[dict] = []
+    real = apply_module._apply_variants
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(apply_module, "_apply_variants", spy)
+    apply_materials(runs["detail"], tmp_path / "r", plan_path=plan, scene_path=runs["scene"], texture_variants=True, repetition=True,
+                    wide_library=True, seed=5)
+    assert seen == [{"seed": 5, "wide": True, "extended": True}]
