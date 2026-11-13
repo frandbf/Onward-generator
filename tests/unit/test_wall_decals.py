@@ -148,6 +148,10 @@ def _decal_package(cache: Path) -> Path:
     return path
 
 
+def loaded_description(assets: Path) -> str:
+    return library_decals(assets)[0].description
+
+
 def test_a_decal_package_becomes_a_local_catalogue_of_its_transparent_albedos(tmp_path: Path) -> None:
     _decal_package(tmp_path / "cache")
     package = find_packages(tmp_path / "cache")[0]
@@ -155,11 +159,17 @@ def test_a_decal_package_becomes_a_local_catalogue_of_its_transparent_albedos(tm
     rows = decal_rows(package, assets)
     assert [r["id"] for r in rows] == ["as_bricks_decals_free_Decals_Bricks_01"]  # no normal map, no opaque texture
     row = rows[0]
-    assert row["kind"] == "brick_patch" and row["license"] == "LicenseRef-Unity-Asset-Store-EULA"
+    assert row == {"id": "as_bricks_decals_free_Decals_Bricks_01", "file": "Decals_Bricks_01.png", "kind": "brick_patch",
+                   "description": "Wall decal (decals bricks 01) from Bricks Decals FREE: brick showing through broken plaster.",
+                   "width_m": 2.263, "height_m": 1.131, "license": "LicenseRef-Unity-Asset-Store-EULA"}
     assert row["width_m"] == pytest.approx(1.6 * 2 ** 0.5, abs=1e-3) and row["height_m"] == pytest.approx(1.6 / 2 ** 0.5, abs=1e-3)
     folder = assets / "asset_store_bricks_decals_free"
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema"] == DECALS_SCHEMA and "Do not commit" in (folder / "License.txt").read_text(encoding="utf-8")
+    assert manifest["schema"] == DECALS_SCHEMA and manifest["schema_version"] == "0.1.0" and manifest["assets"] == rows
+    assert manifest["package"] == {"publisher": "Pub", "category": "Textures MaterialsBricks", "name": "Bricks Decals FREE"}
+    assert manifest["source"].startswith("Unity Asset Store EULA (Extension Asset), local only: Pub / Bricks Decals FREE.")
+    assert "Do not commit" in (folder / "License.txt").read_text(encoding="utf-8")
+    assert loaded_description(assets) == row["description"]
     with Image.open(folder / "Decals_Bricks_01.png") as image:
         assert image.size == (512, 256) and image.mode == "RGBA"
     found = read_decal_catalogues(assets)
@@ -240,3 +250,69 @@ def test_a_failed_pick_is_asked_again_then_every_decal_is_used_and_a_stored_one_
     asked = _Replies(_reply(*ids[1:7]))
     assert pick_decals(pool, brief="other", provider=asked, replay=picked.record).decal_ids == tuple(ids[1:7])
     assert pick_decals(pool, brief="Calle quemada", provider=_Replies(_reply(*ids[:6])), replay={**picked.record, "raw": "{"}).ok
+
+
+# --- the decals are deterministic: pinned pixels, placement, quads and page (generated in the Docker image) ------------
+
+import hashlib  # noqa: E402 - the pinned section of this file
+
+DIGESTS = {"gen_damp_stain": "f3501cfe3d427187", "gen_soot_streak": "f862dbd66ee9eb1b", "gen_rust_drip": "bb56a372c739b3b8",
+           "gen_plaster_crack": "15117665b2f22852", "gen_torn_poster": "06711467ae46fd73", "gen_paint_scribble": "811451e3d45be684",
+           "gen_splash_grime": "1bb0d559c78a14ec"}
+
+
+def test_the_drawn_decals_are_pinned() -> None:
+    assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:16] for d in procedural_decals(7)} == DIGESTS
+    assert [decal_count(s) for s in range(8)] == [11, 12, 13, 11, 11, 11, 20, 11]
+    assert [(d.kind, d.width_m, d.height_m, d.origin) for d in procedural_decals(7)] == [
+        ("stain", 1.4, 1.4, "generated"), ("soot", 1.0, 2.0, "generated"), ("rust", 0.8, 1.6, "generated"),
+        ("crack", 1.0, 1.6, "generated"), ("poster", 0.7, 1.0, "generated"), ("graffiti", 1.6, 0.9, "generated"),
+        ("grime", 2.4, 0.8, "generated")]
+    assert all(d.description.endswith(".") for d in procedural_decals(7))
+
+
+def test_the_placement_quads_and_page_of_a_known_street_are_pinned() -> None:
+    walls = [_wall(0, 14, height=9.0, fid="w1"),
+             Wall("w2", np.array([20.0, 0.0]), np.array([20.0, 8.0]), np.array([1.0, 0.0]), None),
+             _wall(30, 32, height=9.0, fid="w3")]
+    pane = Node("b", (Primitive(Mesh(np.array([[2, 0.05, 1.0], [6, 0.05, 1.0], [6, 0.05, 2.5], [2, 0.05, 2.5]], float),
+                                     np.array([[0, 1, 2], [0, 2, 3]])), "glass_dark"),), {})
+    placed = place_decals(walls, NOTHING, decal_blocker([pane]), procedural_decals(7), 11, 9)
+    assert [(p.decal.id, p.wall.feature_id, round(p.s_m, 4), round(p.z_m, 4)) for p in placed] == [
+        ("gen_rust_drip", "w1", 11.1058, 1.4), ("gen_paint_scribble", "w2", 1.0137, 1.4), ("gen_soot_streak", "w1", 6.9942, 1.4),
+        ("gen_damp_stain", "w2", 2.9275, 1.4), ("gen_splash_grime", "w1", 3.1761, 3.6), ("gen_torn_poster", "w2", 4.4619, 1.4),
+        ("gen_plaster_crack", "w1", 8.6519, 1.4), ("gen_rust_drip", "w2", 7.0371, 1.4), ("gen_paint_scribble", "w1", 13.0972, 1.4)]
+    nodes, _, images, rows = decal_nodes(placed[:3])
+    assert nodes[0].primitives[0].mesh.vertices.round(4).tolist() == [
+        [10.7058, -0.01, 0.6], [11.5058, -0.01, 0.6], [11.5058, -0.01, 2.2], [10.7058, -0.01, 2.2]]
+    assert nodes[0].primitives[0].uvs.round(5).tolist() == [[0.00195, 0.87305], [0.12695, 0.87305], [0.12695, 0.99805], [0.00195, 0.99805]]
+    assert hashlib.sha256(images["wall_decal_atlas_0"]).hexdigest()[:16] == "30932d1155d142a1"
+    assert rows[0] == {"id": "wall_decal/0", "type": "wall_decal", "decal": "gen_rust_drip", "kind": "rust", "origin": "generated",
+                       "wall_feature": "w1", "position_m": [11.106, -0.01, 1.4], "size_m": [0.8, 1.6], "attribute_origin": "generated"}
+    assert nodes[0].name == "wall_decal/0" and nodes[0].extras == {
+        "type": "wall_decal", "decal": "gen_rust_drip", "kind": "rust", "wall": "w1", "attribute_origin": "generated"}
+
+
+SEED_MOUFFETARD = 1043396788
+SEED_NULL_ISLAND = 1382503250
+
+
+def test_the_map_seed_is_its_centre() -> None:
+    from onward_generator.signs.place import _seed
+
+    assert _seed({"frame": {"origin_wgs84": [2.34981, 48.84045]}}) == SEED_MOUFFETARD
+    assert _seed({}) == _seed({"frame": {}}) == SEED_NULL_ISLAND
+
+
+def test_the_decal_schema_and_records_are_whole() -> None:
+    pool = procedural_decals(1)[:4]
+    assert schema(pool) == {
+        "type": "object", "additionalProperties": False, "required": ["pick_version", "decal_ids"],
+        "properties": {"pick_version": {"const": "0.1.0"}, "decal_ids": {"type": "array", "items": {"enum": sorted(d.id for d in pool)},
+                                                                          "uniqueItems": True, "minItems": 4, "maxItems": 12}}}
+    ids = [d.id for d in procedural_decals(1)]
+    picked = pick_decals(procedural_decals(1), brief="b", provider=_Replies(_reply(*ids[:6])))
+    assert set(picked.record) == {"pick_version", "instruction_sha256", "origin", "raw", "decal_ids", "reason", "attempts"}
+    assert (picked.record["pick_version"], picked.record["origin"], picked.record["reason"], picked.record["attempts"]) == ("0.1.0", "ai_generated", None, 1)
+    assert picked.record["raw"] == _reply(*ids[:6]) and len(picked.record["instruction_sha256"]) == 64
+    assert picked.record["decal_ids"] == ids[:6]
