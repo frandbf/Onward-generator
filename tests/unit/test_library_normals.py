@@ -118,3 +118,16 @@ def test_a_grey_or_large_map_is_written_as_rgb_scaled_smoothly_and_the_limit_is_
         assert image.mode == "RGB" and image.size == (1024, 439) and np.array_equal(np.asarray(image), np.asarray(expected))
     monkeypatch.setattr(library_normals, "NORMAL_MAPS_MAX_BYTES", astc6x6_bytes(1024, 439))
     assert library_normals.normal_map_files({"x": binding}, repo=tmp_path)[1]["limit_bytes"] == astc6x6_bytes(1024, 439)
+
+
+def test_the_materials_cli_says_none_for_an_empty_list(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+                                                        tmp_path: Path) -> None:
+    import onward_generator.materials.__main__ as cli
+
+    report = {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False,
+              "normal_maps": {"enabled": True, "materials": {}, "without": []}}
+    monkeypatch.setattr(cli, "apply_materials", lambda *args, **kwargs: report)
+    monkeypatch.setattr(cli, "emit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cli, "after_materials", lambda out: None)
+    assert cli.main(["apply", "--base", str(tmp_path), "--out", str(tmp_path / "o"), "--normal-maps"]) == 0
+    assert "normal maps: 0 materials (none); without one: none\n" in capsys.readouterr().out

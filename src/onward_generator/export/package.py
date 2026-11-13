@@ -407,9 +407,8 @@ def _library_normals(options: dict[str, Any], visual: bytes) -> tuple[dict[str, 
     bindings = scene_normal_maps(visual)
     if not bindings:
         return None
-    lit = options.get("lit_normal_material")
     try:
-        pngs, block = normal_map_files(bindings, lit_normal_material=None if lit is None else str(lit))
+        pngs, block = normal_map_files(bindings, lit_normal_material=options.get("lit_normal_material"))
     except LibraryNormalError as exc:
         raise ExportError([f"normal maps: {exc}"]) from exc
     options["normal_maps"] = [{"material": name, "path": path} for name, path in sorted(block["materials"].items())]
