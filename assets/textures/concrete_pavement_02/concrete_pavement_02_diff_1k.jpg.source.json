@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "concrete_pavement_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Charlotte Baglioni"
+  ],
+  "page_url": "https://polyhaven.com/a/concrete_pavement_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_pavement_02/concrete_pavement_02_diff_1k.jpg",
+  "md5": "bdee8d4deebb78609414453a5fb299e2",
+  "sha256": "e129ee6b59b6ed7f65b4c4c5ba9eb583d13d040ec26bef5d5d4e0080fe342e7a",
+  "size_bytes": 1052909,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/concrete_pavement_02/concrete_pavement_02_diff_1k.jpg",
+  "retrieved_at": "2026-11-13T15:35:27+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

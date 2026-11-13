@@ -74,6 +74,7 @@ MAP_SWITCHES: Mapping[str, str] = {
     "balanced_spawns": "place the spawns and the Uplink by the gameplay metrics (plan C6)",
     "sightline_cover": "cover props on long open sightlines (plan C7)",
     "panoramax_atlas": "pack the street-photo decals per combine cell; acts only with --panoramax (ADR-020 amendment)",
+    "wide_library": "the texture plan also draws on the wide CC0 library of config/dress/wide_library.json (plan T1)",
 }
 
 
@@ -148,7 +149,7 @@ def create_map(
     atomic_write_json(root / export_rel, _export_document(map_id, title, description, texels, core or radius_m + margin_m))
     _write_texture_plan(
         root, map_id=map_id, name=title, latitude=latitude, longitude=longitude,
-        brief=brief, seed=seed, provider=texture_provider, extended="repetition" in switches,
+        brief=brief, seed=seed, provider=texture_provider, extended="repetition" in switches, wide="wide_library" in switches,
     )
 
     project_result = validate_config_file(root / project_rel)
@@ -312,6 +313,15 @@ def repetition_enabled(directory: str | Path) -> bool:
     value = document.get("repetition", False)
     if not isinstance(value, bool):
         raise MapError(f'map.json "repetition" must be true or false, got {value!r}')
+    return value
+
+
+def wide_library_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"wide_library": true`` (plan T1, off by default): the texture plan then also
+    draws on ``config/dress/wide_library.json``. A value that is not a bool is refused."""
+    value = load_map(directory).get("wide_library", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "wide_library" must be true or false, got {value!r}')
     return value
 
 
@@ -601,7 +611,8 @@ def _square_ring(frame: LocalFrame, radius_m: float) -> list[list[float]]:
 def refresh_texture_plan(directory: str | Path, *, texture_provider: Provider | None = None) -> Path:
     """Replace only ``config/texture_plan.json`` on a map that already exists.
 
-    With the ``"repetition"`` switch on, roofs and paving come from their calm pools too.
+    With the ``"repetition"`` switch on, roofs and paving come from their calm pools too; with ``"wide_library"`` every
+    pool also holds the wide library.
     """
     root = Path(directory).expanduser().resolve()
     document = load_map(root)
@@ -618,6 +629,7 @@ def refresh_texture_plan(directory: str | Path, *, texture_provider: Provider | 
         seed=seed,
         provider=texture_provider,
         extended=extended,
+        wide=wide_library_enabled(root),
     )
     return path
 
@@ -633,6 +645,7 @@ def _write_texture_plan(
     seed: int,
     provider: Provider | None,
     extended: bool = False,
+    wide: bool,
 ) -> Path:
     document = select_texture_plan(
         name=name,
@@ -643,6 +656,7 @@ def _write_texture_plan(
         seed=seed,
         provider=provider,
         extended=extended,
+        wide=wide,
     )
     path = root / "config" / "texture_plan.json"
     atomic_write_json(path, document)

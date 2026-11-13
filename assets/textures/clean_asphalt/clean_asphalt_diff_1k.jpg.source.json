@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "clean_asphalt",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/clean_asphalt",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clean_asphalt/clean_asphalt_diff_1k.jpg",
+  "md5": "7edccb95cbf72e63889baade8455f9e5",
+  "sha256": "ddf9224e9cfa3eb2998d9097e4cd34bd3630c85e0e6798e5a0a000415a684083",
+  "size_bytes": 697630,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/clean_asphalt/clean_asphalt_diff_1k.jpg",
+  "retrieved_at": "2026-11-13T15:35:41+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

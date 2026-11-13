@@ -25,6 +25,8 @@ from onward_generator.materials.polyhaven import TextureRecord
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LIBRARY_PATH = REPO_ROOT / "config" / "dress" / "imported_library.json"
+WIDE_LIBRARY_PATH = REPO_ROOT / "config" / "dress" / "wide_library.json"
+"""Plan T1: CC0 Poly Haven albedos that join the pools only for a map with the map.json ``wide_library`` switch."""
 
 SLOT_BINDINGS: dict[str, tuple[str, ...]] = {
     "historic_facades": ("historic_plaster_cream",),
@@ -79,7 +81,7 @@ _CHOICE_SCHEMA = {
 
 
 def texture_record(library_id: str, rows: Sequence[Mapping[str, Any]] | None = None) -> TextureRecord:
-    catalog = list(rows) if rows is not None else library_rows()
+    catalog = list(rows) if rows is not None else catalogue_rows()
     row = next((item for item in catalog if item.get("id") == library_id), None)
     if row is None:
         raise PlanError(f"{library_id} is not in the imported library")
@@ -119,7 +121,15 @@ def library_rows(path: Path | None = None) -> list[dict[str, Any]]:
     return [row for row in rows if isinstance(row, dict) and row.get("id")]
 
 
+def catalogue_rows() -> list[dict[str, Any]]:
+    """Every texture a plan may name: the imported library and the wide one (plan T1). Only the pools decide which
+    a map draws on, so a plan written with ``wide`` still resolves later without the switch."""
+    return library_rows() + library_rows(WIDE_LIBRARY_PATH)
+
+
 def texture_family(row: Mapping[str, Any]) -> str | None:
+    if row.get("family"):  # the wide library names its family; the imported one is read from the file name
+        return str(row["family"])
     name = str(row.get("name") or "").lower()
     if name.startswith(("paintedplaster", "painted_plaster", "plastered_wall")):
         return "plaster"
@@ -366,9 +376,11 @@ def select_texture_plan(
     provider: Provider | None = None,
     library: Sequence[Mapping[str, Any]] | None = None,
     extended: bool = False,
+    wide: bool = False,
 ) -> dict[str, Any]:
-    """``extended`` chooses roofs and paving from their calm pools too (the map.json "repetition" switch)."""
-    rows = list(library) if library is not None else library_rows()
+    """``extended`` chooses roofs and paving from their calm pools too (the map.json "repetition" switch); ``wide``
+    adds the wide library to every pool (the map.json "wide_library" switch, plan T1)."""
+    rows = list(library) if library is not None else (catalogue_rows() if wide else library_rows())
     if provider is None:
         choices = deterministic_choices(rows, seed, extended=extended)
         return _document(name, choices, rows, selector="library", brief=brief, extended=extended)
@@ -394,7 +406,7 @@ def select_texture_plan(
 def assert_library_entries(
     document: Mapping[str, Any], rows: Sequence[Mapping[str, Any]] | None = None, *, extended: bool = False,
 ) -> None:
-    catalog = list(rows) if rows is not None else library_rows()
+    catalog = list(rows) if rows is not None else catalogue_rows()
     by_id = {str(row["id"]): row for row in catalog}
     seen: set[str] = set()
     for raw in document["entries"]:
