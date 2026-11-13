@@ -71,7 +71,8 @@ class _Package:
 
 def material_overrides(package: _Package, model_path: str) -> dict[int, str]:
     """``{submesh index: .mat GUID}`` a prefab of the package sets on the model at ``model_path``, or ``{}``."""
-    return dict(package.overrides().get(package.guid_of.get(model_path) or "", {}))
+    guid = package.guid_of.get(model_path, "")  # pragma: no mutate: a model the package lacks finds no overrides under any missing key
+    return dict(package.overrides().get(guid, {}))
 
 
 def albedo_png(package: _Package, material: str) -> bytes | None:
