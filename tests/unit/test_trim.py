@@ -1373,3 +1373,21 @@ def test_the_facade_block_may_hold_all_three_keys(tmp_path: Path) -> None:
     document["facades"] = {"mode": "trim", "style": "auto", "weathering": "heavy"}
     (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
     assert facade_options(root) == ["--facades", "trim", "--facade-style", "auto", "--facade-weathering", "heavy"]
+
+
+def test_a_source_without_a_calm_match_does_not_stop_the_others() -> None:
+    from onward_generator.materials.library_plan import WIDE_LIBRARY_PATH, library_rows
+    from onward_generator.materials.trim import calm_sources
+    from onward_generator.materials.trim_style import load_regional_table, load_style_table
+
+    central = load_regional_table(load_style_table(), None).atlases["central_european"]
+    rock_only = [row for row in library_rows(WIDE_LIBRARY_PATH) if row["family"] == "rock"]
+    traded, swaps = calm_sources(central, rock_only)  # brick comes first and finds nothing; stone still does
+    assert [(s["key"], s["to"]) for s in swaps] == [("stone", "ph_old_stone_wall")] and traded["sources"]["brick"] == "acg_bricks023"
+
+
+def test_a_regional_atlas_keeps_its_calm_sources_in_the_report() -> None:
+    paris = {"frame": {"origin_wgs84": [2.34981, 48.84045]}, "objects": [{"id": "building/b1", **RECORD}]}
+    result = apply_trim([_building()], paris, COLORS, regional=True, wide=True)
+    assert result.style == "haussmann" and result.report["atlas_origin"] == "regional"
+    assert [(s["key"], s["to"]) for s in result.report["calm_sources"]] == [("brick", "ph_factory_brick")]
