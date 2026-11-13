@@ -22,7 +22,9 @@ from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator import __version__
+from onward_generator.assetstore import local
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
+from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.atlas import encode_png_rgba
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
@@ -31,6 +33,9 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, images_
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.signs.decal_pick import pick_decals
+from onward_generator.signs.decals import Wall as DecalWall
+from onward_generator.signs.decals import decal_blocker, decal_count, decal_nodes, library_decals, place_decals, procedural_decals
 from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
 from onward_generator.signs.shop import ATLAS_PX, PAD_PX, pack, page_height, shop_signs
 from onward_generator.tiers import core_of
@@ -153,6 +158,7 @@ def place_signs(
     *,
     overwrite: bool = False,
     max_signs: int = MAX_SIGNS,
+    provider: Any = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -204,11 +210,28 @@ def place_signs(
     shops = shop_signs(manifest, boarded)
     materials.update(shops.materials)
     images.update(shops.images)
+    # Wall decals (ADR-038): from 10 to 20 on the exposed core walls, clear of glass, doors, signs and the plates.
+    # With the map's ambient_ai the model picks which decals (decal_pick); the rules place them either way.
+    pool = [*procedural_decals(_seed(manifest)), *(library_decals(REPO_ROOT / "assets") if local.enabled() else [])]
+    brief, use_ai = _ambient(base)
+    picked = None
+    if use_ai and pool:
+        previous = out / OUTPUT_FILES[4]
+        replay = (json.loads(previous.read_text(encoding="utf-8")).get("wall_decals") or {}).get("pick") if previous.is_file() else None  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
+        picked = pick_decals(pool, brief=brief, provider=provider, replay=replay)
+        pool = [d for d in pool if d.id in set(picked.decal_ids)]
+    decals = place_decals(
+        [DecalWall(w.feature_id, w.a, w.b, w.outward, w.height_m) for w in walls], STRtree(_footprints(geo.get("features") or [])),
+        decal_blocker([*nodes, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, _seed(manifest), decal_count(_seed(manifest)),
+    )
+    decal_meshes, decal_materials, decal_images, decal_rows = decal_nodes(decals)
+    materials.update(decal_materials)
+    images.update(decal_images)
 
     visual = build_glb(
-        [*nodes, *sign_nodes, *shops.nodes],
+        [*nodes, *sign_nodes, *shops.nodes, *decal_meshes],
         materials,
-        extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows)},
+        extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows), "wall_decals": len(decal_rows)},
         repeat_images=images,
         preserve_uvs=True,
     )
@@ -230,6 +253,7 @@ def place_signs(
         })
     for n, row in enumerate(shops.rows):
         objects.append({"id": f"shop_sign/{row['building']}/{n}", "type": "shop_sign", "attribute_origin": "generated", **row})
+    objects.extend(decal_rows)
     written["objects"] = objects
     atomic_write_json(targets[2], written)
     report_src = base / "detail_report.json"
@@ -238,6 +262,7 @@ def place_signs(
     compare = compare_fingerprints(before, after)
     detail_report["street_signs"] = {"count": len(signs), "geometry": compare}
     detail_report["shop_signs"] = {"count": len(shops.rows), "skipped": shops.skipped}
+    detail_report["wall_decals"] = {"count": len(decal_rows), "kinds": sorted({str(row["kind"]) for row in decal_rows})}
     atomic_write_json(targets[3], detail_report)
     signs_report = {
         "schema": "onward_generator.street_signs",
@@ -266,6 +291,11 @@ def place_signs(
             "triangles": sum(row["triangles"] for row in shops.rows),
             "signs": shops.rows,
         },
+        "wall_decals": {
+            "count": len(decal_rows), "wanted": decal_count(_seed(manifest)),
+            "distinct": len({row["decal"] for row in decal_rows}), "decals": decal_rows,
+            "pick": picked.record if picked is not None else None,
+        },
         "geometry": compare,
         "input_hashes": {
             "scene_detail.json": file_sha256(base / "scene_detail.json"),
@@ -276,6 +306,27 @@ def place_signs(
     if not compare["identical"]:
         raise SignsError("street signs changed a geographic object record; this is a bug")
     return signs_report
+
+
+def _ambient(base: Path) -> tuple[str, bool]:
+    """The map's brief and ``ambient_ai`` (``map.json``), or nothing outside a map folder."""
+    from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    if root is None:
+        return "", False
+    try:
+        document = load_map(root)
+    except (MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
+        return "", False
+    return str(document.get("brief") or ""), bool(document.get("ambient_ai"))
+
+
+def _seed(manifest: Mapping[str, Any]) -> int:
+    """A seed for a map's decals: its centre, so every run of one map draws and places the same ones."""
+    origin = (manifest.get("frame") or {}).get("origin_wgs84") or [0.0, 0.0]
+    return int(hashlib.sha256(json.dumps([round(float(v), 6) for v in origin]).encode()).hexdigest()[:8], 16)
 
 
 def _geographic(manifest: Mapping[str, Any]) -> dict[str, str]:

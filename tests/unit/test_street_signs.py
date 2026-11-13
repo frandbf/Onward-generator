@@ -180,7 +180,9 @@ def test_shop_signs_are_drawn_and_reported(tmp_path: Path, capsys: pytest.Captur
         ("fascia", "Farmacia", "estimated"), ("vinyl", "Farmacia", "estimated"),
     ]
     data = (out / "scene_visual.glb").read_bytes()
-    assert read_glb(data)[0]["extras"] == {"manifest": "scene_detail.json", "street_signs": 2, "shop_signs": 2}
+    extras = read_glb(data)[0]["extras"]
+    assert {k: v for k, v in extras.items() if k != "wall_decals"} == {"manifest": "scene_detail.json", "street_signs": 2, "shop_signs": 2}
+    assert 10 <= extras["wall_decals"] <= 20
     nodes, _ = nodes_from_glb(data)
     node = next(n for n in nodes if n.name == "shop_signs/osm-way-north")
     assert [p.material for p in node.primitives] == ["shop_sign_atlas_0", "shop_sign_edge"]
@@ -773,3 +775,149 @@ def test_the_cap_keeps_one_plate_per_street_before_a_second_one_nearest_the_cent
     assert [s.name for s in _cap(tie, 1)] == ["Calle A"]  # the same distance: by name
     south = Sign("Calle Sur", "m", np.array([0.0, -3.0, 2.55]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), "f")
     assert [s.name for s in _cap([south, plate("Calle Este", 2.5)], 1)] == ["Calle Este"]  # 2.5 m from the centre, not 3 m
+
+
+def test_the_model_picks_the_wall_decals_of_an_ai_map(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-038: with the map's ambient_ai the decals placed are the model's pick; replayed on the next run."""
+    from onward_generator.ai.providers import ProviderResult
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.place import place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    chosen = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "gen_plaster_crack", "gen_torn_poster", "gen_splash_grime"]
+
+    class _Pick:
+        name = "pick"
+        calls = 0
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            self.calls += 1
+            assert '"A burnt street"' in instruction  # the map's brief reaches the model
+            return ProviderResult(json.dumps({"pick_version": "0.1.0", "decal_ids": chosen}), {})
+
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("A burnt street", True))
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    provider = _Pick()
+    report = place_signs(base, scene, tmp_path / "out", provider=provider)
+    decals = report["wall_decals"]
+    assert provider.calls == 1 and decals["pick"]["origin"] == "ai_generated"
+    assert decals["count"] >= 6 and {row["decal"] for row in decals["decals"]} <= set(chosen)
+    again = place_signs(base, scene, tmp_path / "out", provider=_Pick(), overwrite=True)
+    assert again["wall_decals"]["pick"]["origin"] == "replay"
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    rules = place_signs(base, scene, tmp_path / "rules", provider=_Pick())
+    assert rules["wall_decals"]["pick"] is None and rules["wall_decals"]["distinct"] == 7
+
+
+def test_the_ambient_switch_is_read_from_the_map_folder(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import create_map, store_brief
+    from onward_generator.signs.place import _ambient
+
+    assert _ambient(tmp_path / "nowhere") == ("", False)
+    root = tmp_path / "mapa"
+    create_map(root, map_id="mapa", name="Mapa", latitude=37.98407, longitude=-1.12863, radius_m=150)
+    stage = root / "data" / "processed" / "scene_materials"
+    stage.mkdir(parents=True)
+    assert _ambient(stage) == ("", False)
+    store_brief(root, "Un barrio quemado", ambient_ai=True)
+    assert _ambient(stage) == ("Un barrio quemado", True)
+    (root / "map.json").write_text("{", encoding="utf-8")
+    assert _ambient(stage) == ("", False)
+
+
+GOLDEN_DECALS = [
+    ["gen_paint_scribble", "osm-way-short", [-1.99, 17.207, 0.9]], ["gen_torn_poster", "osm-way-short", [-8.01, 17.149, 0.9]],
+    ["gen_soot_streak", "osm-way-north", [-0.01, 15.179, 1.4]], ["gen_plaster_crack", "osm-way-north", [14.828, 11.99, 1.4]],
+    ["gen_splash_grime", "osm-way-east", [30.01, 5.263, 1.4]], ["gen_rust_drip", "osm-way-east", [13.99, -2.779, 1.4]],
+    ["gen_damp_stain", "osm-way-north", [10.965, 28.01, 1.4]], ["gen_paint_scribble", "osm-way-east", [25.075, -4.01, 1.4]],
+    ["gen_torn_poster", "osm-way-north", [20.01, 22.896, 1.4]], ["gen_soot_streak", "osm-way-east", [29.108, 18.01, 1.4]],
+    ["gen_plaster_crack", "osm-way-north", [-0.01, 13.769, 1.4]], ["gen_splash_grime", "osm-way-north", [11.241, 11.99, 1.4]],
+    ["gen_rust_drip", "osm-way-east", [30.01, 16.779, 1.4]], ["gen_damp_stain", "osm-way-east", [13.99, 12.904, 1.4]],
+    ["gen_paint_scribble", "osm-way-north", [7.619, 28.01, 1.4]],
+]
+
+
+def test_the_wall_decals_of_the_shop_street_are_pinned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.decals import decal_count
+    from onward_generator.signs.place import _seed, place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    report = place_signs(base, scene, tmp_path / "out")
+    decals = report["wall_decals"]
+    assert [[d["decal"], d["wall_feature"], d["position_m"]] for d in decals["decals"]] == GOLDEN_DECALS
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    assert (decals["count"], decals["wanted"], decals["distinct"], decals["pick"]) == (15, decal_count(_seed(manifest)), 7, None)
+    assert json.loads((tmp_path / "out" / "detail_report.json").read_text(encoding="utf-8"))["wall_decals"] == {
+        "count": 15, "kinds": ["crack", "graffiti", "grime", "poster", "rust", "soot", "stain"]}
+    written = json.loads((tmp_path / "out" / "scene_detail.json").read_text(encoding="utf-8"))
+    assert [o["decal"] for o in written["objects"] if o.get("type") == "wall_decal"] == [d[0] for d in GOLDEN_DECALS]
+
+
+def test_the_local_decal_catalogues_join_the_pool_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PIL import Image
+
+    from onward_generator.assetstore.decals import DECALS_SCHEMA
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.place import place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    folder = tmp_path / "repo" / "assets" / "asset_store_bricks"
+    folder.mkdir(parents=True)
+    Image.new("RGBA", (8, 4), (100, 50, 30, 0)).save(folder / "b.png")
+    (folder / "manifest.json").write_text(json.dumps({"schema": DECALS_SCHEMA, "assets": [
+        {"id": "as_bricks_b", "file": "b.png", "kind": "brick_patch", "width_m": 1.0, "height_m": 0.5}]}), encoding="utf-8")
+    monkeypatch.setattr(place_module, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: True)
+    assert "as_bricks_b" in {d["decal"] for d in place_signs(base, scene, tmp_path / "on")["wall_decals"]["decals"]}
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    assert "as_bricks_b" not in {d["decal"] for d in place_signs(base, scene, tmp_path / "off")["wall_decals"]["decals"]}
+
+
+def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_signs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from shapely.geometry import box
+
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.place import _seed, place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    seeds: list[int] = []
+    seen: dict[str, object] = {}
+    real_drawn, real_place = place_module.procedural_decals, place_module.place_decals
+
+    def drawn(seed: int):
+        seeds.append(seed)
+        return real_drawn(seed)
+
+    def place(walls, footprints, blocked, decals, seed, count):
+        seen.update(footprints=footprints, blocked=blocked)
+        return real_place(walls, footprints, blocked, decals, seed, count)
+
+    monkeypatch.setattr(place_module, "procedural_decals", drawn)
+    monkeypatch.setattr(place_module, "sign_footprints", lambda manifest: [(box(700, 700, 701, 701), 0.0, 5.0)])
+    monkeypatch.setattr(place_module, "place_decals", place)
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    place_signs(base, scene, tmp_path / "out")
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    assert seeds == [_seed(manifest)]
+    geo = json.loads(scene.read_text(encoding="utf-8"))
+    buildings = [f for f in geo["features"] if f.get("kind") == "building"]
+    assert len(seen["footprints"].geometries) == len(buildings) > 0  # type: ignore[attr-defined]
+    assert seen["blocked"](box(700.5, 700.5, 702, 702), 1.0, 2.0)  # type: ignore[operator]  # the signs' footprints block a decal
+    assert not seen["blocked"](box(900, 900, 901, 901), 0.0, 1.0)  # type: ignore[operator]
