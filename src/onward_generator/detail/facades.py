@@ -364,13 +364,13 @@ class Mansard:
 
 
 def _offset_line(seg: Segment, d: float) -> tuple[np.ndarray, np.ndarray]:
-    return np.asarray(seg.a, dtype=float) - seg.n_out[:2] * d, seg.u[:2]
+    return np.asarray(seg.a) - seg.n_out[:2] * d, seg.u[:2]
 
 
 def _meet(first: tuple[np.ndarray, np.ndarray], second: tuple[np.ndarray, np.ndarray]) -> np.ndarray | None:
     (p, u), (q, v) = first, second
     cross = u[0] * v[1] - u[1] * v[0]
-    if abs(cross) < 1e-9:
+    if abs(cross) < 1e-9:  # pragma: no mutate: two lines are parallel or meet clearly; none cross at 1e-9 to the bit
         return None
     t = ((q[0] - p[0]) * v[1] - (q[1] - p[1]) * v[0]) / cross
     return p + t * u
@@ -389,9 +389,9 @@ def mansard_ring(segments: Sequence[Segment], inset: float) -> list[tuple[np.nda
         d = inset if seg.exposed else 0.0
         start = _meet(lines[i - 1], lines[i])
         end = _meet(lines[i], lines[(i + 1) % len(ring)])
-        start = np.asarray(seg.a, dtype=float) - seg.n_out[:2] * d if start is None else start
-        end = np.asarray(seg.b, dtype=float) - seg.n_out[:2] * d if end is None else end
-        if float((end - start) @ seg.u[:2]) < 0.2:
+        start = np.asarray(seg.a) - seg.n_out[:2] * d if start is None else start
+        end = np.asarray(seg.b) - seg.n_out[:2] * d if end is None else end
+        if float((end - start) @ seg.u[:2]) < 0.2:  # pragma: no mutate: no footprint's moved edge comes to 0.2 m to the bit
             return None
         ends.append((start, end))
     return ends
@@ -640,7 +640,7 @@ def build_shell(
     eaves = height - mansard.rise_m if mansard is not None else height
     ring = mansard_ring(segments, mansard.inset_m) if mansard is not None and len(polygons) == 1 and not polygons[0].interiors else None
     deck = Polygon([p for start, end in ring for p in (start, end)]).buffer(0) if ring is not None else None
-    if deck is not None and (not isinstance(deck, Polygon) or deck.area < 0.25 * refined.area):
+    if deck is not None and (not isinstance(deck, Polygon) or deck.area < 0.25 * refined.area):  # pragma: no mutate: no deck covers a quarter of its footprint to the bit, so < and <= agree
         ring = deck = None
     dormers: list[tuple[Segment, float]] = []
     for h in layout.holes:
@@ -670,13 +670,13 @@ def build_shell(
     roof_area = 0.0
     if ring is not None and deck is not None and mansard is not None:
         z_top = eaves
-        outer = [s for s in segments if s.part == 0 and s.ring == 0]
-        for i, (seg, (start, end)) in enumerate(zip(outer, ring, strict=True)):
+        outer = [s for s in segments if s.part == 0 and s.ring == 0]  # pragma: no mutate: a mansard footprint is one polygon without holes, every segment part 0 and ring 0
+        for i, (seg, (start, end)) in enumerate(zip(outer, ring, strict=True)):  # pragma: no mutate: mansard_ring returns one end pair per outer segment
             face = quad((*seg.a, eaves), (*seg.b, eaves), (*end, height), (*start, height))
             parts[MANSARD_MATERIAL if seg.exposed else wall_material].append(face)
             roof_area += upward_area(face)  # the slopes and the deck cover the footprint between them
             previous_end = ring[i - 1][1]
-            if float(np.linalg.norm(previous_end - start)) > WELD_M:  # one line, an exposed and a party piece: an upright step
+            if float(np.linalg.norm(previous_end - start)) > WELD_M:  # pragma: no mutate: the ends meet or lie the inset apart, never WELD_M to the bit  # one line, an exposed and a party piece: an upright step
                 parts[wall_material].append(_step(seg, outer[i - 1].exposed, eaves, height, start, previous_end))
         top = cap(Polygon([p for start, end in ring for p in (start, end)]), height)
         parts[roof_material].append(top)

@@ -87,3 +87,93 @@ def test_the_wall_bands_and_their_cornice_end_under_the_mansard() -> None:
     record = {"facade": {"storeys": {"count": 6, "height_m": 3.0}}, "roof": {"type": "mansard"}}
     assert building_bands(record, 18.0, 0.9, 4.5) == Bands(0.9, 3.0, 5, 15.0)
     assert building_bands({**record, "roof": {"type": "flat"}}, 18.0, 0.9, 4.5) == Bands(0.9, 3.0, 6, 18.0)
+
+
+def _hash(meshes) -> str:
+    import hashlib
+
+    return hashlib.sha256(b"".join(np.round(m.vertices, 4).tobytes() + np.asarray(m.triangles, np.int64).tobytes() for m in meshes)).hexdigest()[:12]
+
+
+def test_a_neighbour_in_the_middle_of_the_street_wall_gives_two_steps_and_the_dormers_are_pinned() -> None:
+    refined, segments = refine_exposure(box(0, 0, 12, 10), box(4, -5, 8, 0), CFG)
+    south = [s for s in segments if abs(s.a[1]) < 1e-9 and abs(s.b[1]) < 1e-9 and s.exposed]
+    east = next(s for s in segments if abs(s.a[0] - 12) < 1e-9 and abs(s.b[0] - 12) < 1e-9)
+    holes = [Hole("window", south[0].index, 1.0, 15.4, 1.2, 1.4, CFG.recess_depth_m, "glass_dark", 0, 5),
+             Hole("window", east.index, 4.0, 15.4, 1.2, 1.4, CFG.recess_depth_m, "glass_dark", 1, 5)]
+    shell = build_shell(refined, segments, Layout(holes=holes), 17.2, TEMPLATE, "plaster_ochre", "roof_flat_grey", "b1", CFG, Mansard(2.2))
+    assert shell.defects == 0 and shell.roof_area_error == 0.0
+    assert shell.roof == {"type": "mansard", "rise_m": 2.2, "inset_m": 1.0, "slope_material": "roof_zinc", "material": "roof_flat_grey"}
+    assert dict(shell.counts) == {"dormer": 2}
+    assert {k: (len(v), _hash(v)) for k, v in sorted(shell.parts.items())} == {
+        "frame_stone": (2, "6ee133291949"), "glass_dark": (2, "a808fa43e75b"), "plaster_ochre": (9, "6f9f3e0c1fc8"),
+        "roof_flat_grey": (1, "70e7753298cb"), "roof_zinc": (5, "5625ae023c4d")}
+    assert [[np.round(a, 4).tolist(), np.round(b, 4).tolist()] for a, b in mansard_ring(segments, 1.0)] == [
+        [[11.0, 1.0], [11.0, 9.0]], [[11.0, 9.0], [1.0, 9.0]], [[1.0, 9.0], [1.0, 1.0]], [[1.0, 1.0], [4.0, 1.0]],
+        [[4.0, 0.0], [8.0, 0.0]], [[8.0, 1.0], [11.0, 1.0]]]
+
+
+def test_each_step_faces_the_exposed_piece_below_it() -> None:
+    from onward_generator.detail.facades import _step
+
+    refined, segments = refine_exposure(box(0, 0, 12, 10), box(4, -5, 8, 0), CFG)
+    party = next(s for s in segments if not s.exposed)
+    after = next(s for s in segments if s.a == party.b)
+    for seg, before_exposed, start, previous_end, side in (
+        (party, True, np.array([4.0, 0.0]), np.array([4.0, 1.0]), -1.0),  # the exposed piece lies west, toward -x
+        (after, False, np.array([8.0, 1.0]), np.array([8.0, 0.0]), 1.0),  # the exposed piece lies east
+    ):
+        step = _step(seg, before_exposed, 15.0, 18.0, start, previous_end)
+        v = step.vertices
+        normal = np.cross(v[step.triangles[0][1]] - v[step.triangles[0][0]], v[step.triangles[0][2]] - v[step.triangles[0][0]])
+        assert np.sign(normal[0]) == side and abs(normal[1]) < 1e-9 and abs(normal[2]) < 1e-9
+        assert sorted(map(tuple, v.round(6).tolist())) == sorted([(*seg.a, 15.0), (*start, 18.0), (*previous_end, 18.0)])
+
+
+def test_a_triangle_and_a_courtyard_ring_and_a_rise_to_the_millimetre() -> None:
+    from shapely.geometry import Polygon as P
+
+    _, tri = refine_exposure(P([(0, 0), (20, 0), (10, 15)]), Polygon(), CFG)
+    assert mansard_ring(tri, 1.0) is not None and len(mansard_ring(tri, 1.0)) == 3
+    court = Polygon([(0, 0), (20, 0), (20, 20), (0, 20)], [[(5, 5), (15, 5), (15, 15), (5, 15)]])
+    _, segments = refine_exposure(court, Polygon(), CFG)
+    ring = mansard_ring(segments, 1.0)
+    assert ring is not None and [[a.tolist(), b.tolist()] for a, b in ring] == [
+        [[1.0, 1.0], [19.0, 1.0]], [[19.0, 1.0], [19.0, 19.0]], [[19.0, 19.0], [1.0, 19.0]], [[1.0, 19.0], [1.0, 1.0]]]  # the outer ring only
+    shell, _ = _shell(Polygon(), mansard=Mansard(3.12345))
+    assert shell.roof["rise_m"] == 3.123
+
+
+def test_only_a_tall_flat_haussmann_building_without_interior_or_landmark_gets_a_mansard() -> None:
+    from types import SimpleNamespace
+
+    from onward_generator.detail.scene import mansard_for
+
+    five = SimpleNamespace(count=5, height_m=3.1)
+    flat = SimpleNamespace(pitched=None, hip=None)
+    assert mansard_for(True, False, False, five, flat) == Mansard(3.1)
+    assert mansard_for(True, False, False, SimpleNamespace(count=4, height_m=3.1), flat) is None
+    assert mansard_for(False, False, False, five, flat) is None
+    assert mansard_for(True, True, False, five, flat) is None
+    assert mansard_for(True, False, True, five, flat) is None
+    assert mansard_for(True, False, False, five, SimpleNamespace(pitched=object(), hip=None)) is None
+    assert mansard_for(True, False, False, five, SimpleNamespace(pitched=None, hip=object())) is None
+
+
+def test_a_deck_under_a_quarter_of_the_footprint_keeps_the_roof() -> None:
+    for width, kind in ((2.6, "flat"), (3.0, "mansard")):  # decks of 0.6 and 1 m: 21 % and 31 % of the footprint
+        refined, segments = refine_exposure(box(0, 0, width, 30), Polygon(), CFG)
+        shell = build_shell(refined, segments, Layout(), 18.0, TEMPLATE, "plaster_ochre", "roof_flat_grey", "b1", CFG, STOREY)
+        assert (shell.roof["type"] == "mansard") == (kind == "mansard")
+
+
+def test_a_window_is_a_dormer_only_when_it_rises_past_the_eaves() -> None:
+    _, segments = _shell(Polygon())
+    south = next(s for s in segments if abs(s.a[1]) < 1e-9 and abs(s.b[1]) < 1e-9)
+
+    def dormers(v0: float) -> int:
+        hole = Hole("window", south.index, 3.0, v0, 1.2, 1.4, CFG.recess_depth_m, "glass_dark", 0, 4)
+        return _shell(Polygon(), Layout(holes=[hole]))[0].counts.get("dormer", 0)
+
+    assert dormers(13.6) == 0  # its top exactly at the eaves, 15 m
+    assert dormers(13.6001) == 1 and dormers(14.0) == 1
