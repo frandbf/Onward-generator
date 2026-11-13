@@ -740,3 +740,14 @@ def test_the_probe_grid_is_dense_enough_to_meet_a_thin_pane() -> None:
 
 def _facade_at(x0: float, x1: float, *extra: Primitive) -> Node:
     return Node("b", (_quad((x1, 0), (x0, 0), 0.0, 12.0, "plaster_white"), *extra), {})
+
+
+def test_the_probe_grid_reaches_the_left_edge_and_stays_as_sparse_as_its_step() -> None:
+    from onward_generator.signs.decals import wall_surface
+
+    wall = _wall(20, 30, height=4.0)
+    assert wall_surface([_tiled(20, 30, 4.0)])(wall, 0.75, 2.0, 1.6, 1.2) is None  # 5 cm before the wall's start
+    between = wall_surface([_facade_at(20, 30, _quad((30, -0.001), (20, -0.001), 1.55, 1.57, "glass_dark"))])
+    assert between(_wall(20, 30), 5.0, 2.0, 1.6, 1.2) is not None  # a 2 cm band between the rows at 1.42 and 1.71 m
+    middle = wall_surface([_facade_at(20, 30, _quad((30, -0.001), (20, -0.001), 1.99, 2.01, "glass_dark"))])
+    assert middle(_wall(20, 30), 5.0, 2.0, 1.6, 0.2) is not None  # two rows under a 20 cm decal straddle a band at its middle
