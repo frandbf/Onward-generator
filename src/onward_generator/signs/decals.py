@@ -26,8 +26,8 @@ from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh
 
-MIN_DECALS = 10
-MAX_DECALS = 20
+MIN_DECALS = 30
+MAX_DECALS = 50
 DECAL_MATERIAL = "wall_decal_atlas_{}"
 ATLAS_PX = 2048
 CELL_PX = 400
@@ -183,6 +183,83 @@ def _grime(rng: np.random.Generator, n: int) -> np.ndarray:
     return _rgba((60, 54, 46), _blur(Image.fromarray(field.astype(np.uint8)), 3.0))
 
 
+def _bullets(rng: np.random.Generator, n: int) -> np.ndarray:
+    pixels = np.zeros((n, n, 4), dtype=np.uint8)
+    chips = Image.new("L", (n, n))
+    holes = Image.new("L", (n, n))
+    chip_draw, hole_draw = ImageDraw.Draw(chips), ImageDraw.Draw(holes)
+    for _ in range(int(rng.integers(7, 14))):
+        x, y = rng.normal(0.5, 0.17, 2).clip(0.08, 0.92) * n
+        r = rng.uniform(0.012, 0.025) * n
+        chip_draw.ellipse((x - r * 2.6, y - r * 2.6, x + r * 2.6, y + r * 2.6), fill=int(rng.uniform(120, 190)))
+        hole_draw.ellipse((x - r, y - r, x + r, y + r), fill=245)
+    chipped, hole = np.asarray(_blur(chips, 1.5)), np.asarray(_blur(holes, 0.7))
+    pixels[..., :3] = np.where(hole[..., None] > 40, np.array([22, 20, 19]), np.array([205, 196, 182]))
+    pixels[..., 3] = np.maximum(chipped, hole)
+    return pixels
+
+
+def _moss(rng: np.random.Generator, n: int) -> np.ndarray:
+    alpha = Image.new("L", (n, n))
+    draw = ImageDraw.Draw(alpha)
+    for _ in range(60):
+        x, r = rng.uniform(0.05, 0.95) * n, rng.uniform(0.03, 0.1) * n
+        y = n - abs(rng.normal(0.0, 0.25)) * n
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=int(rng.uniform(90, 200)))
+    return _rgba((70, 92, 44), _blur(alpha, n * 0.02))
+
+
+def _peeling(rng: np.random.Generator, n: int) -> np.ndarray:
+    pixels = np.zeros((n, n, 4), dtype=np.uint8)
+    flakes = Image.new("L", (n, n))
+    draw = ImageDraw.Draw(flakes)
+    for _ in range(int(rng.integers(5, 9))):
+        cx, cy, r = rng.uniform(0.25, 0.75) * n, rng.uniform(0.25, 0.75) * n, rng.uniform(0.08, 0.2) * n
+        corners = [(cx + r * rng.uniform(0.6, 1.3) * np.cos(a), cy + r * rng.uniform(0.6, 1.3) * np.sin(a))
+                   for a in np.linspace(0.0, 2 * np.pi, 9, endpoint=False)]
+        draw.polygon(corners, fill=230)
+    inside = np.asarray(_blur(flakes, 0.8))
+    rim = np.asarray(_blur(flakes, 3.0)).astype(np.int16) - inside.astype(np.int16)
+    pixels[..., :3] = np.where(inside[..., None] > 120, np.array([170, 160, 146]), np.array([60, 52, 44]))
+    pixels[..., 3] = np.clip(np.maximum(inside.astype(np.int16), np.abs(rim) * 3), 0, 255).astype(np.uint8)
+    return pixels
+
+
+def _water(rng: np.random.Generator, n: int) -> np.ndarray:
+    alpha = Image.new("L", (n, n))
+    draw = ImageDraw.Draw(alpha)
+    for _ in range(18):
+        x, w = rng.uniform(0.1, 0.9) * n, rng.uniform(0.01, 0.04) * n
+        draw.rectangle((x - w, 0, x + w, rng.uniform(0.5) * n), fill=int(rng.uniform(25, 70)))
+    return _rgba((52, 56, 58), _blur(alpha, n * 0.015))
+
+
+def _chalk(rng: np.random.Generator, n: int) -> np.ndarray:
+    alpha = Image.new("L", (n, n))
+    draw = ImageDraw.Draw(alpha)
+    x0, y0 = rng.uniform(0.1, 0.3) * n, rng.uniform(0.25, 0.4) * n
+    for k in range(int(rng.integers(4, 9))):  # tally strokes, every fifth across the four before it
+        x = x0 + (k % 5) * 0.08 * n + (k // 5) * 0.5 * n
+        if k % 5 == 4:
+            draw.line((x - 0.34 * n, y0 + 0.28 * n, x + 0.02 * n, y0 + 0.02 * n), fill=220, width=int(n * 0.02))
+        else:
+            draw.line((x, y0, x + rng.uniform(-3, 3), y0 + 0.3 * n), fill=220, width=int(n * 0.02))
+    return _rgba((236, 234, 226), _blur(alpha, 0.8))
+
+
+def _ghost(rng: np.random.Generator, n: int) -> np.ndarray:
+    paint = Image.new("RGBA", (n, n))
+    draw = ImageDraw.Draw(paint)
+    base = tuple(int(v) for v in rng.integers(90, 200, 3))
+    draw.rectangle((0.04 * n, 0.12 * n, 0.96 * n, 0.88 * n), fill=(*base, 120))
+    for _ in range(3):  # bands where lettering was, worn past reading
+        y0 = rng.uniform(0.2, 0.7) * n
+        draw.rectangle((0.1 * n, y0, rng.uniform(0.5, 0.9) * n, y0 + 0.08 * n), fill=(*(int(v) for v in rng.integers(200, 245, 3)), 110))
+    pixels = np.asarray(paint).copy()
+    pixels[..., 3] = (pixels[..., 3] * rng.uniform(0.35, 1.0, (n, n))).astype(np.uint8)  # the paint weathered off in spots
+    return pixels
+
+
 PROCEDURAL: Mapping[str, tuple[str, Callable[[np.random.Generator, int], np.ndarray], float, float, str]] = {
     "damp_stain": ("stain", _damp, 1.4, 1.4, "A brown damp stain spreading on a wall."),
     "soot_streak": ("soot", _soot, 1.0, 2.0, "Black soot streaks running down from above, as after a fire."),
@@ -191,6 +268,12 @@ PROCEDURAL: Mapping[str, tuple[str, Callable[[np.random.Generator, int], np.ndar
     "torn_poster": ("poster", _poster, 0.7, 1.0, "A faded, torn paper poster without text."),
     "paint_scribble": ("graffiti", _scribble, 1.6, 0.9, "A single spray-paint scribble, abstract, no letters."),
     "splash_grime": ("grime", _grime, 2.4, 0.8, "Grime and splashes along the foot of a wall."),
+    "bullet_holes": ("bullets", _bullets, 1.2, 1.0, "A cluster of bullet holes with chipped plaster round them."),
+    "moss_patch": ("moss", _moss, 1.6, 0.7, "Green moss creeping up from the foot of a damp wall."),
+    "peeling_paint": ("peeling", _peeling, 1.2, 1.2, "Flakes of paint peeling off, the bare render showing."),
+    "water_streaks": ("water", _water, 1.2, 2.2, "Faint grey streaks left by rainwater running down a wall."),
+    "chalk_marks": ("chalk", _chalk, 0.8, 0.6, "White chalk tally marks, no letters or numbers."),
+    "ghost_sign": ("ghost_sign", _ghost, 2.4, 1.2, "A faded painted advert, its lettering long worn away."),
 }
 
 

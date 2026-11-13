@@ -118,7 +118,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Textures | `materials apply` | geometry and OSM footprints |
 | Street photos | `panoramax apply`, under development, only when `map.json` has `"panoramax": true` | collision, roofs, interiors, and buildings without a photo |
 | Street name, shop signs | `signs place` on the dressed copy (where a sign goes and its name come from `detail`) | the carriageway and the facades |
-| Wall decals (10 to 20: stains, soot, rust, cracks, posters, brick patches; the model picks which with `ambient_ai`) | `signs place` ([ADR-038](decisions/ADR-038-wall-decals.md)) | the facades |
+| Wall decals (30 to 50: stains, soot, rust, cracks, posters, bullet holes, moss, peeling paint, rain streaks, chalk, faded adverts, brick patches; the model picks which with `ambient_ai`) | `signs place` ([ADR-038](decisions/ADR-038-wall-decals.md)) | the facades |
 | Abandoned city | `overgrow place`, then `overgrow fit` | building footprints and the drive lane |
 | Perimeter wall | `bounds` on the dressed copy, then layout and export | `generate` and `detail` |
 | Spawns, routes, modes | `perf layout --playable` and a new package | the geometry |

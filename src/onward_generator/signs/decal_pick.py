@@ -1,7 +1,7 @@
 """The model picks which wall decals suit the map; the rules place them (ADR-038).
 
 With ``ambient_ai`` in ``map.json`` the local model sees each decal's id, kind and description and the map's brief,
-and names 6 to 12 of them of at least 3 kinds (all of them, or all their kinds, when fewer are offered). Ollama's
+and names 12 to 24 of them of at least 5 kinds (all of them, or all their kinds, when fewer are offered). Ollama's
 structured output enumerates the offered ids. A reply that does not validate is tried once more, quoting the
 failure; then every decal is used. A later run with the same instruction replays the stored pick.
 """
@@ -17,13 +17,13 @@ from typing import Any
 from onward_generator.signs.decals import Decal
 
 PICK_VERSION = "0.1.0"
-MIN_PICK = 6
-MAX_PICK = 12
-MIN_KINDS = 3
+MIN_PICK = 12
+MAX_PICK = 24
+MIN_KINDS = 5
 ATTEMPTS = 2
 TIMEOUT_S = 180.0
 
-SYSTEM_PROMPT = f"""You choose the wall decals of a 3D city map: stains, soot, rust, cracks, torn posters, scribbles, brick patches. Reply with one JSON object and nothing else.
+SYSTEM_PROMPT = f"""You choose the wall decals of a 3D city map: stains, soot, rust, cracks, torn posters, scribbles, bullet holes, moss, peeling paint, rain streaks, chalk marks, faded painted adverts, brick patches. Reply with one JSON object and nothing else.
 
 The user message has a brief in quotes and the decals offered. Choose from {MIN_PICK} to {MAX_PICK} different decal ids, of at least {MIN_KINDS} different kinds, that suit the brief. When the brief is empty, choose what the walls of a worn street of any city show. You do not place anything: the code puts the decals on the walls.
 
