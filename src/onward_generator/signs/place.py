@@ -35,7 +35,15 @@ from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.signs.decal_pick import pick_decals
 from onward_generator.signs.decals import Wall as DecalWall
-from onward_generator.signs.decals import decal_blocker, decal_count, decal_nodes, library_decals, place_decals, procedural_decals
+from onward_generator.signs.decals import (
+    decal_blocker,
+    decal_count,
+    decal_nodes,
+    library_decals,
+    place_decals,
+    procedural_decals,
+    wall_surface,
+)
 from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
 from onward_generator.signs.shop import ATLAS_PX, PAD_PX, pack, page_height, shop_signs
 from onward_generator.tiers import core_of
@@ -212,6 +220,7 @@ def place_signs(
     images.update(shops.images)
     # Wall decals (ADR-038): from 10 to 20 on the exposed core walls, clear of glass, doors, signs and the plates.
     # With the map's ambient_ai the model picks which decals (decal_pick); the rules place them either way.
+    built = untrimmed(base, nodes)
     pool = [*procedural_decals(_seed(manifest)), *(library_decals(REPO_ROOT / "assets") if local.enabled() else [])]
     brief, use_ai = _ambient(base)
     picked = None
@@ -222,7 +231,8 @@ def place_signs(
         pool = [d for d in pool if d.id in set(picked.decal_ids)]
     decals = place_decals(
         [DecalWall(w.feature_id, w.a, w.b, w.outward, w.height_m) for w in walls], STRtree(_footprints(geo.get("features") or [])),
-        decal_blocker([*nodes, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, _seed(manifest), decal_count(_seed(manifest)),
+        decal_blocker([*built, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, _seed(manifest), decal_count(_seed(manifest)),
+        wall_surface([*built, *sign_nodes, *shops.nodes]),
     )
     decal_meshes, decal_materials, decal_images, decal_rows = decal_nodes(decals)
     materials.update(decal_materials)
@@ -405,6 +415,21 @@ class _Glass:
     def meets(self, plan: BaseGeometry, bottom: float, top: float) -> bool:
         hits = self.tree.query(plan, predicate="intersects")
         return bool(((self.low[hits] < top) & (self.high[hits] > bottom)).any())
+
+
+def untrimmed(base: Path, nodes: list[Node]) -> list[Node]:
+    """The scene the materials stage in ``base`` was baked from, whose openings still carry their own materials (glass,
+    door, stone frame); ``nodes`` when ``base`` is no materials stage or that scene is gone. A trim sheet only re-skins
+    the openings into one facade material, so the geometry is the same and wall decals read it to keep off them."""
+    report = base / "materials_report.json"
+    if not report.is_file():
+        return nodes
+    recorded = Path(str(json.loads(report.read_text(encoding="utf-8")).get("base_dir") or "-"))  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
+    # A stage run in the container records /work paths; on the host the same scene lies under the repository.
+    for candidate in (recorded, REPO_ROOT / recorded.relative_to("/work") if recorded.is_relative_to("/work") else recorded):
+        if (candidate / "scene_visual.glb").is_file():
+            return nodes_from_glb((candidate / "scene_visual.glb").read_bytes())[0]
+    return nodes
 
 
 def _glass(nodes: Sequence[Node], signs: Sequence[tuple[BaseGeometry, float, float]] = ()) -> _Glass | None:

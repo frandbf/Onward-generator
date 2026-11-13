@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,14 @@ GAP_M = 0.4
 HEIGHTS_M = (1.4, 0.9, 2.4, 3.6, 5.2)
 """Centre heights tried on a wall, the eye line first."""
 OBSTACLES = ("glass", "door", "railing", "frame_stone", "shop_sign", "street_sign", "balcony")
+PROBE_OUT_M = 0.6
+"""Surface probe rays start this far outside the wall line and look straight in."""
+PROBE_REACH_M = 0.5
+"""The built facade may stand this far either side of the footprint's wall line."""
+PROBE_STEP_M = 0.3
+"""At most this far between two probe rays across a decal, so no window or door fits between them."""
+FLAT_M = 0.02
+"""Every probe ray must meet the facade within this depth: a recess, a frame or an edge breaks it."""
 PROCEDURAL_SIZE = 256
 UV = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
 
@@ -75,6 +84,13 @@ class Placed:
     wall: Wall
     s_m: float
     z_m: float
+    depth_m: float = 0.0
+    """How far outward of the wall line the built facade stands under the decal (negative: inward)."""
+
+
+Surface = Callable[[Wall, float, float, float, float], float | None]
+"""The facade under a decal of a wall, centre along it, centre height, width and height: its depth outward of the
+wall line when it is one flat clear face, else ``None``."""
 
 
 def _unit(*key: object) -> float:
@@ -225,10 +241,11 @@ def exposed(wall: Wall, footprints: STRtree) -> bool:
 
 
 def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[Polygon, float, float], bool],
-                 decals: Sequence[Decal], seed: int, count: int) -> list[Placed]:
+                 decals: Sequence[Decal], seed: int, count: int, surface: Surface | None = None) -> list[Placed]:
     """Up to ``count`` decals from ``decals`` (in their turn) on the exposed ``walls`` of at least ``MIN_WALL_M``, walls
     taken in a seeded order from the one after the last decal's, each decal at the first height and position it fits:
-    clear of ``blocked`` (a plan, bottom and top) and of the decals already on the wall. A decal that fits no wall is
+    clear of ``blocked`` (a plan, bottom and top) and of the decals already on the wall, and on one flat clear face of
+    the built facade when ``surface`` is given (``wall_surface``), laid on that face. A decal that fits no wall is
     skipped."""
     candidates = sorted((w for w in walls if float(np.linalg.norm(w.b - w.a)) >= MIN_WALL_M and exposed(w, footprints)),
                         key=lambda w: _unit(seed, "wall", w.feature_id, float(w.a[0]), float(w.a[1])))
@@ -238,10 +255,10 @@ def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[
     for decal in turn_order(decals, count, seed):
         for k in range(len(candidates)):
             wall = candidates[(start + k) % len(candidates)]
-            spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed)
+            spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed, surface)
             if spot is not None:
-                s, z = spot
-                placed.append(Placed(decal, wall, s, z))
+                s, z, depth = spot
+                placed.append(Placed(decal, wall, s, z, depth))
                 taken.setdefault(id(wall), []).append((s - decal.width_m / 2, s + decal.width_m / 2, z - decal.height_m / 2, z + decal.height_m / 2))
                 start = (start + k + 1) % len(candidates)  # the next decal starts on the next wall
                 break
@@ -249,7 +266,7 @@ def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[
 
 
 def _fit(wall: Wall, decal: Decal, blocked: Callable[[Polygon, float, float], bool], taken: Sequence[tuple[float, float, float, float]],
-         seed: int) -> tuple[float, float] | None:
+         seed: int, surface: Surface | None = None) -> tuple[float, float, float] | None:
     length = float(np.linalg.norm(wall.b - wall.a))
     top = (wall.height_m or DEFAULT_WALL_M) - WALL_TOP_CLEAR_M
     half_w, half_h = decal.width_m / 2, decal.height_m / 2
@@ -265,8 +282,11 @@ def _fit(wall: Wall, decal: Decal, blocked: Callable[[Polygon, float, float], bo
             if any(s - half_w - GAP_M < s1 and s + half_w + GAP_M > s0 and z - half_h - GAP_M < z1 and z + half_h + GAP_M > z0  # pragma: no mutate: positions are sampled in steps from a seeded start, never exactly a gap apart, so a bound's < and <= agree
                    for s0, s1, z0, z1 in taken):
                 continue
-            if not blocked(_plan(wall, s - half_w - GAP_M, s + half_w + GAP_M, 0.3), z - half_h - GAP_M, z + half_h + GAP_M):
-                return s, z
+            if blocked(_plan(wall, s - half_w - GAP_M, s + half_w + GAP_M, 0.3), z - half_h - GAP_M, z + half_h + GAP_M):
+                continue
+            depth = 0.0 if surface is None else surface(wall, s, z, decal.width_m, decal.height_m)
+            if depth is not None:
+                return s, z, depth
     return None
 
 
@@ -300,7 +320,7 @@ def decal_nodes(placed: Sequence[Placed]) -> tuple[list[Node], dict[str, Materia
     for n, item in enumerate(placed):
         wall, decal = item.wall, item.decal
         along = (wall.b - wall.a) / float(np.linalg.norm(wall.b - wall.a))
-        centre = wall.a + along * item.s_m + wall.outward * WALL_GAP_M
+        centre = wall.a + along * item.s_m + wall.outward * (item.depth_m + WALL_GAP_M)
         lo, hi = centre - along * decal.width_m / 2, centre + along * decal.width_m / 2
         z0, z1 = item.z_m - decal.height_m / 2, item.z_m + decal.height_m / 2
         vertices = np.array([[lo[0], lo[1], z0], [hi[0], hi[1], z0], [hi[0], hi[1], z1], [lo[0], lo[1], z1]])
@@ -317,6 +337,64 @@ def decal_nodes(placed: Sequence[Placed]) -> tuple[list[Node], dict[str, Materia
         Image.fromarray(pixels).save(out, format="PNG")
         images[name] = out.getvalue()
     return nodes, materials, images, rows
+
+
+def wall_surface(nodes: Sequence[Node]) -> Surface:
+    """The ``Surface`` of the built scene ``nodes``: a grid of rays at most ``PROBE_STEP_M`` apart across the decal,
+    each from ``PROBE_OUT_M`` outside the wall line straight in, must all first meet a face that is not an obstacle
+    (``OBSTACLES``) within ``FLAT_M`` of one depth, and that depth must lie within ``PROBE_REACH_M`` of the wall line.
+    A window or door recess, a frame, a sign, a prop in front of the wall or the wall's end all break it."""
+    triangles: list[np.ndarray] = []
+    obstacle: list[np.ndarray] = []
+    for node in nodes:
+        for prim in node.world_primitives():
+            tri = prim.mesh.vertices[prim.mesh.triangles]
+            triangles.append(tri)
+            obstacle.append(np.full(len(tri), any(word in prim.material for word in OBSTACLES)))
+    tris = np.concatenate(triangles) if triangles else np.zeros((0, 3, 3))
+    blocking = np.concatenate(obstacle) if obstacle else np.zeros(0, dtype=bool)
+    lows, highs = tris.min(axis=1), tris.max(axis=1)
+    tree = STRtree([box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in zip(lows, highs, strict=True)])  # pragma: no mutate: the micrometre only gives a flat face an area; box() orders its corners
+
+    def surface(wall: Wall, s: float, z: float, width: float, height: float) -> float | None:
+        z0, z1 = z - height / 2, z + height / 2
+        near = tree.query(_plan(wall, s - width / 2, s + width / 2, PROBE_OUT_M), predicate="intersects")
+        near = near[(lows[near, 2] < z1) & (highs[near, 2] > z0)]
+        if not len(near):
+            return None
+        along = (wall.b - wall.a) / float(np.linalg.norm(wall.b - wall.a))
+        ss = np.linspace(s - width / 2 + 0.02, s + width / 2 - 0.02, max(2, math.ceil(width / PROBE_STEP_M) + 1))
+        zs = np.linspace(z0 + 0.02, z1 - 0.02, max(2, math.ceil(height / PROBE_STEP_M) + 1))
+        plan = wall.a[None, :] + along[None, :] * ss[:, None] + wall.outward[None, :] * PROBE_OUT_M
+        origins = np.array([[*p, h] for p in plan for h in zs])
+        t, first = _first_hits(origins, np.array([-wall.outward[0], -wall.outward[1], 0.0]), tris[near])
+        if not np.isfinite(t).all() or blocking[near[first]].any():
+            return None
+        depths = PROBE_OUT_M - t
+        if float(depths.max() - depths.min()) > FLAT_M or abs(float(np.median(depths))) > PROBE_REACH_M:
+            return None
+        return float(np.median(depths))
+
+    return surface
+
+
+def _first_hits(origins: np.ndarray, direction: np.ndarray, tris: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """For each ray from ``origins`` along ``direction``, the distance to the first of ``tris`` it meets (``inf`` for
+    none, beyond ``PROBE_OUT_M`` + ``PROBE_REACH_M`` counting as none) and that triangle's index (Möller–Trumbore)."""
+    e1, e2 = tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0]
+    h = np.cross(direction, e2)
+    a = np.einsum("ij,ij->i", e1, h)
+    ok = np.abs(a) > 1e-12
+    f = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)
+    rel = origins[:, None, :] - tris[None, :, 0]
+    u = f[None, :] * np.einsum("rtj,tj->rt", rel, h)
+    q = np.cross(rel, e1[None, :, :])
+    v = f[None, :] * (q @ direction)
+    t = f[None, :] * np.einsum("tj,rtj->rt", e2, q)
+    hit = ok[None, :] & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0) & (t <= PROBE_OUT_M + PROBE_REACH_M)
+    t = np.where(hit, t, np.inf)
+    first = np.argmin(t, axis=1)
+    return t[np.arange(len(origins)), first], first
 
 
 def decal_blocker(nodes: Sequence[Node], extra: Sequence[tuple[Polygon, float, float]] = ()) -> Callable[[Polygon, float, float], bool]:

@@ -633,3 +633,71 @@ def test_the_posters_of_twelve_maps_are_pinned_to_the_pixel() -> None:
     # One seed can draw the same paper colour from a slightly different range; twelve cannot.
     posters = b"".join(d.rgba.tobytes() for s in range(1, 13) for d in procedural_decals(s) if d.id == "gen_torn_poster")
     assert hashlib.sha256(posters).hexdigest()[:16] == "ab0133642b15675f"
+
+
+def _facade(*extra: Primitive, y: float = 0.0) -> Node:
+    """A south wall from x 0 to 10 at ``y``, 12 m high, facing -y, and ``extra``."""
+    return Node("b", (_quad((10, y), (0, y), 0.0, 12.0, "plaster_white"), *extra), {})
+
+
+def test_the_surface_lays_a_decal_on_the_facade_where_it_stands() -> None:
+    from onward_generator.signs.decals import FLAT_M, PROBE_OUT_M, PROBE_REACH_M, PROBE_STEP_M, wall_surface
+
+    assert (PROBE_OUT_M, PROBE_REACH_M, PROBE_STEP_M, FLAT_M) == (0.6, 0.5, 0.3, 0.02)
+    assert wall_surface([_facade()])(_wall(0, 10), 5.0, 2.0, 1.6, 1.2) == pytest.approx(0.0)
+    assert wall_surface([_facade(y=0.3)])(_wall(0, 10), 5.0, 2.0, 1.6, 1.2) == pytest.approx(-0.3)  # built 0.3 m inside the line
+    assert wall_surface([_facade(y=-0.2)])(_wall(0, 10), 5.0, 2.0, 1.6, 1.2) == pytest.approx(0.2)
+    assert wall_surface([_facade(y=0.6)])(_wall(0, 10), 5.0, 2.0, 1.6, 1.2) is None  # beyond the reach: not this wall
+    assert wall_surface([])(_wall(0, 10), 5.0, 2.0, 1.6, 1.2) is None
+
+
+def test_the_surface_refuses_a_recess_flush_glass_an_edge_and_a_prop_in_front() -> None:
+    from onward_generator.signs.decals import wall_surface
+
+    wall = _wall(0, 10)
+    recess = _quad((5.6, 0.15), (4.4, 0.15), 1.6, 2.6, "facade_trim_haussmann")  # one material, 0.15 m deep: a window back
+    hole = Node("b", (_quad((10, 0), (5.6, 0), 0.0, 12.0, "plaster_white"), _quad((4.4, 0), (0, 0), 0.0, 12.0, "plaster_white"),
+                      _quad((5.6, 0), (4.4, 0), 0.0, 1.6, "plaster_white"), _quad((5.6, 0), (4.4, 0), 2.6, 12.0, "plaster_white"),
+                      recess), {})
+    assert wall_surface([hole])(wall, 5.0, 2.0, 1.6, 1.2) is None
+    assert wall_surface([hole])(wall, 2.0, 2.0, 1.6, 1.2) == pytest.approx(0.0)  # beside it, plain wall
+    flush = _facade(_quad((5.6, -0.001), (4.4, -0.001), 1.6, 2.6, "glass_dark"))  # a pane on the face itself
+    assert wall_surface([flush])(wall, 5.0, 2.0, 1.6, 1.2) is None
+    assert wall_surface([_facade()])(wall, 9.5, 2.0, 1.6, 1.2) is None  # past the wall's end: half in the air
+    lamp = _facade(_quad((5.1, -0.4), (4.9, -0.4), 0.0, 3.0, "lamp_metal"))
+    assert wall_surface([lamp])(wall, 5.0, 2.0, 1.6, 1.2) is None
+    narrow = _facade(_quad((5.15, -0.001), (4.85, -0.001), 1.5, 2.5, "glass_dark"))  # 0.3 m wide: still met by a ray
+    assert wall_surface([narrow])(wall, 5.0, 2.0, 1.6, 1.2) is None
+
+
+def test_a_decal_is_laid_on_the_facade_depth_the_surface_gives() -> None:
+    placed = place_decals([_wall(0, 10)], NOTHING, never, [_decal("a")], 3, 1, lambda w, s, z, width, height: -0.25)
+    assert len(placed) == 1 and placed[0].depth_m == -0.25
+    nodes, _, _, rows = decal_nodes(placed)
+    assert np.allclose(nodes[0].primitives[0].mesh.vertices[:, 1], 0.24)  # 0.25 m in, 1 cm proud of the face; outward is -y
+    assert rows[0]["position_m"][1] == 0.24
+    assert place_decals([_wall(0, 10)], NOTHING, never, [_decal("a")], 3, 1, lambda w, s, z, width, height: None) == []
+
+
+def test_the_decals_read_the_openings_of_the_scene_the_trim_sheet_was_baked_from(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.generation.config import Material
+    from onward_generator.generation.gltf import build_glb
+    from onward_generator.signs import place as place_module
+
+    trimmed = [Node("t", (_quad((0, 0), (1, 0), 0, 1, "facade_trim_x"),), {})]
+    base = tmp_path / "scene_materials"
+    base.mkdir()
+    assert place_module.untrimmed(base, trimmed) is trimmed  # no materials stage
+    dress = tmp_path / "scene_dress"
+    dress.mkdir()
+    (dress / "scene_visual.glb").write_bytes(build_glb([Node("d", (_quad((0, 0), (1, 0), 0, 1, "glass_dark"),), {})],
+                                                       {"glass_dark": Material((0.1, 0.1, 0.1, 1.0), 0.2)}))
+    (base / "materials_report.json").write_text(json.dumps({"base_dir": str(dress)}), encoding="utf-8")
+    assert [p.material for n in place_module.untrimmed(base, trimmed) for p in n.primitives] == ["glass_dark"]
+    monkeypatch.setattr(place_module, "REPO_ROOT", tmp_path)
+    (base / "materials_report.json").write_text(json.dumps({"base_dir": "/work/scene_dress"}), encoding="utf-8")
+    assert [p.material for n in place_module.untrimmed(base, trimmed) for p in n.primitives] == ["glass_dark"]  # a container path
+    (base / "materials_report.json").write_text(json.dumps({"base_dir": "/work/gone"}), encoding="utf-8")
+    assert place_module.untrimmed(base, trimmed) is trimmed
+    (base / "materials_report.json").write_text(json.dumps({}), encoding="utf-8")
+    assert place_module.untrimmed(base, trimmed) is trimmed

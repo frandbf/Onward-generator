@@ -19,7 +19,7 @@ from onward_generator.detail.facades import Hole, Segment
 from onward_generator.detail.shops import plan_shops
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
-from onward_generator.generation.mesh import Mesh
+from onward_generator.generation.mesh import Mesh, prism
 from onward_generator.signs.place import (
     SIGN_ATLAS_PX,
     _choose,
@@ -75,9 +75,13 @@ def _base(path: Path) -> None:
         np.array([[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [0.0, 4.0, 0.0]], dtype=np.float64),
         np.array([[0, 1, 2]]),
     )
+    # The three buildings of ``_scene`` built: wall decals need a facade to lie on.
+    built = [Node(f"building/{fid}", (Primitive(prism(box(*bounds), 0.0, height, bottom=False), "plaster_white"),))
+             for fid, bounds, height in (("osm-way-north", (0, 12, 20, 28), 12.0), ("osm-way-east", (14, -4, 30, 18), 9.0),
+                                         ("osm-way-short", (-8, 14, -2, 20), 2.0))]
     (path / "scene_visual.glb").write_bytes(build_glb(
-        [Node("ground", (Primitive(ground, "ground"),))],
-        {"ground": Material((0.4, 0.4, 0.4, 1.0), 1.0)},
+        [Node("ground", (Primitive(ground, "ground"),)), *built],
+        {"ground": Material((0.4, 0.4, 0.4, 1.0), 1.0), "plaster_white": Material((0.9, 0.9, 0.9, 1.0), 0.9)},
     ))
     (path / "scene_collision.glb").write_bytes(b"collision-bytes")
     (path / "scene_detail.json").write_text(json.dumps({
@@ -904,9 +908,9 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
         seeds.append(seed)
         return real_drawn(seed)
 
-    def place(walls, footprints, blocked, decals, seed, count):
-        seen.update(footprints=footprints, blocked=blocked)
-        return real_place(walls, footprints, blocked, decals, seed, count)
+    def place(walls, footprints, blocked, decals, seed, count, surface):
+        seen.update(footprints=footprints, blocked=blocked, surface=surface)
+        return real_place(walls, footprints, blocked, decals, seed, count, surface)
 
     monkeypatch.setattr(place_module, "procedural_decals", drawn)
     monkeypatch.setattr(place_module, "sign_footprints", lambda manifest: [(box(700, 700, 701, 701), 0.0, 5.0)])
