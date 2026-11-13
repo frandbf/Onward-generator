@@ -795,6 +795,7 @@ def test_the_model_picks_the_wall_decals_of_an_ai_map(tmp_path: Path, monkeypatc
 
         def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
             self.calls += 1
+            assert '"A burnt street"' in instruction  # the map's brief reaches the model
             return ProviderResult(json.dumps({"pick_version": "0.1.0", "decal_ids": chosen}), {})
 
     monkeypatch.setattr(place_module, "_ambient", lambda base: ("A burnt street", True))
@@ -825,3 +826,61 @@ def test_the_ambient_switch_is_read_from_the_map_folder(tmp_path: Path) -> None:
     assert _ambient(stage) == ("Un barrio quemado", True)
     (root / "map.json").write_text("{", encoding="utf-8")
     assert _ambient(stage) == ("", False)
+
+
+GOLDEN_DECALS = [
+    ["gen_paint_scribble", "osm-way-short", [-1.99, 17.207, 0.9]], ["gen_torn_poster", "osm-way-short", [-8.01, 17.149, 0.9]],
+    ["gen_soot_streak", "osm-way-north", [-0.01, 15.179, 1.4]], ["gen_plaster_crack", "osm-way-north", [14.828, 11.99, 1.4]],
+    ["gen_splash_grime", "osm-way-east", [30.01, 5.263, 1.4]], ["gen_rust_drip", "osm-way-east", [13.99, -2.779, 1.4]],
+    ["gen_damp_stain", "osm-way-north", [10.965, 28.01, 1.4]], ["gen_paint_scribble", "osm-way-east", [25.075, -4.01, 1.4]],
+    ["gen_torn_poster", "osm-way-north", [20.01, 22.896, 1.4]], ["gen_soot_streak", "osm-way-east", [29.108, 18.01, 1.4]],
+    ["gen_plaster_crack", "osm-way-north", [-0.01, 13.769, 1.4]], ["gen_splash_grime", "osm-way-north", [11.241, 11.99, 1.4]],
+    ["gen_rust_drip", "osm-way-east", [30.01, 16.779, 1.4]], ["gen_damp_stain", "osm-way-east", [13.99, 12.904, 1.4]],
+    ["gen_paint_scribble", "osm-way-north", [7.619, 28.01, 1.4]],
+]
+
+
+def test_the_wall_decals_of_the_shop_street_are_pinned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.decals import decal_count
+    from onward_generator.signs.place import _seed, place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    report = place_signs(base, scene, tmp_path / "out")
+    decals = report["wall_decals"]
+    assert [[d["decal"], d["wall_feature"], d["position_m"]] for d in decals["decals"]] == GOLDEN_DECALS
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    assert (decals["count"], decals["wanted"], decals["distinct"], decals["pick"]) == (15, decal_count(_seed(manifest)), 7, None)
+    assert json.loads((tmp_path / "out" / "detail_report.json").read_text(encoding="utf-8"))["wall_decals"] == {
+        "count": 15, "kinds": ["crack", "graffiti", "grime", "poster", "rust", "soot", "stain"]}
+    written = json.loads((tmp_path / "out" / "scene_detail.json").read_text(encoding="utf-8"))
+    assert [o["decal"] for o in written["objects"] if o.get("type") == "wall_decal"] == [d[0] for d in GOLDEN_DECALS]
+
+
+def test_the_local_decal_catalogues_join_the_pool_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PIL import Image
+
+    from onward_generator.assetstore.decals import DECALS_SCHEMA
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.place import place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    folder = tmp_path / "repo" / "assets" / "asset_store_bricks"
+    folder.mkdir(parents=True)
+    Image.new("RGBA", (8, 4), (100, 50, 30, 0)).save(folder / "b.png")
+    (folder / "manifest.json").write_text(json.dumps({"schema": DECALS_SCHEMA, "assets": [
+        {"id": "as_bricks_b", "file": "b.png", "kind": "brick_patch", "width_m": 1.0, "height_m": 0.5}]}), encoding="utf-8")
+    monkeypatch.setattr(place_module, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: True)
+    assert "as_bricks_b" in {d["decal"] for d in place_signs(base, scene, tmp_path / "on")["wall_decals"]["decals"]}
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    assert "as_bricks_b" not in {d["decal"] for d in place_signs(base, scene, tmp_path / "off")["wall_decals"]["decals"]}

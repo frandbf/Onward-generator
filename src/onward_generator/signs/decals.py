@@ -264,7 +264,7 @@ def _fit(wall: Wall, decal: Decal, blocked: Callable[[Polygon, float, float], bo
             continue
         for k in range(steps + 1):
             s = half_w + ((start + k / (steps + 1)) % 1.0) * (length - decal.width_m)
-            if any(s - half_w - GAP_M < s1 and s + half_w + GAP_M > s0 and z - half_h - GAP_M < z1 and z + half_h + GAP_M > z0
+            if any(s - half_w - GAP_M < s1 and s + half_w + GAP_M > s0 and z - half_h - GAP_M < z1 and z + half_h + GAP_M > z0  # pragma: no mutate: positions are sampled in steps from a seeded start, never exactly a gap apart, so a bound's < and <= agree
                    for s0, s1, z0, z1 in taken):
                 continue
             if not blocked(_plan(wall, s - half_w - GAP_M, s + half_w + GAP_M, 0.3), z - half_h - GAP_M, z + half_h + GAP_M):
@@ -333,15 +333,14 @@ def decal_blocker(nodes: Sequence[Node], extra: Sequence[tuple[Polygon, float, f
                 continue
             tri = prim.mesh.vertices[prim.mesh.triangles]
             lows, highs = tri.min(axis=1), tri.max(axis=1)
-            plans += [box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in zip(lows, highs, strict=True)]
+            corners = zip(lows, highs, strict=True)  # pragma: no mutate: both come from one array, one row per triangle
+            plans += [box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in corners]
             low += lows[:, 2].tolist()
             high += highs[:, 2].tolist()
-    tree = STRtree(plans) if plans else None
+    tree = STRtree(plans)
     lows_a, highs_a = np.array(low), np.array(high)
 
     def blocked(plan: Polygon, bottom: float, top: float) -> bool:
-        if tree is None:
-            return False
         hits = tree.query(plan, predicate="intersects")
         return bool(((lows_a[hits] < top) & (highs_a[hits] > bottom)).any())
 

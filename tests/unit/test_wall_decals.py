@@ -316,3 +316,208 @@ def test_the_decal_schema_and_records_are_whole() -> None:
     assert (picked.record["pick_version"], picked.record["origin"], picked.record["reason"], picked.record["attempts"]) == ("0.1.0", "ai_generated", None, 1)
     assert picked.record["raw"] == _reply(*ids[:6]) and len(picked.record["instruction_sha256"]) == 64
     assert picked.record["decal_ids"] == ids[:6]
+
+
+def _png_bytes(size: tuple[int, int], alpha_left: int, mode: str = "RGBA", colour: tuple[int, int, int] = (120, 60, 40)) -> bytes:
+    image = Image.new("RGBA", size, (*colour, 255))
+    image.paste((0, 0, 0, alpha_left), (0, 0, size[0] // 2, size[1]))
+    out = io.BytesIO()
+    image.convert(mode).save(out, format="PNG")
+    return out.getvalue()
+
+
+def _tar(path: Path, members: dict[str, tuple[bytes, bytes]], prefix: str = "") -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(path, "w:gz") as archive:
+        for guid, (pathname, data) in members.items():
+            for name, payload in (("pathname", pathname), ("asset", data)):
+                info = tarfile.TarInfo(f"{prefix}{guid}/{name}")
+                info.size = len(payload)
+                archive.addfile(info, io.BytesIO(payload))
+    return path
+
+
+def _decal_folder_package(tmp_path: Path, members: dict[str, tuple[bytes, bytes]], name: str = "Bricks Decals FREE", prefix: str = ""):
+    path = _tar(tmp_path / "cache" / "Pub" / "Textures MaterialsBricks" / f"{name}.unitypackage", members, prefix)
+    return next(p for p in find_packages(tmp_path / "cache") if p.path == path)
+
+
+def test_the_decal_import_keeps_going_past_a_bad_image_and_names_each_file(tmp_path: Path) -> None:
+    long_stem = "Decal-Wall " + "x" * 90
+    package = _decal_folder_package(tmp_path, {
+        "a" * 32: (b"Assets/Decals/Decals_A.png", b"broken"),
+        "b" * 32: (b"Assets/Decals/Decals_B.png", _png_bytes((64, 64), 255)),  # opaque: a texture, not a decal
+        "c" * 32: (b"Assets/Decals/Decals C-1.png", _png_bytes((800, 100), 0)),  # 8:1, half transparent
+        "d" * 32: (f"Assets/Decals/{long_stem}.png".encode(), _png_bytes((100, 800), 0)),
+        "e" * 32: (b"Assets/Decals/Decals_E.png", _png_bytes((100, 100), 0, mode="RGB")),  # no alpha at all
+    }, prefix="./")
+    rows = decal_rows(package, tmp_path / "assets")
+    by_file = {row["file"]: row for row in rows}
+    assert sorted(by_file) == ["Decal_Wall_" + "x" * 90 + ".png", "Decals_C_1.png"]
+    wide, tall = by_file["Decals_C_1.png"], by_file["Decal_Wall_" + "x" * 90 + ".png"]
+    assert (wide["width_m"], wide["height_m"]) == (3.2, 0.566) and (tall["width_m"], tall["height_m"]) == (0.566, 3.2)
+    assert wide["id"] == "as_bricks_decals_free_Decals_C_1" and len(tall["id"]) == 80 and tall["id"].startswith("as_bricks_decals_free_Decal_Wall_x")
+    with Image.open(tmp_path / "assets" / "asset_store_bricks_decals_free" / "Decals_C_1.png") as image:
+        assert image.size == (512, 64)
+        expected = Image.open(io.BytesIO(_png_bytes((800, 100), 0))).convert("RGBA")
+        expected.thumbnail((512, 512), Image.Resampling.LANCZOS)
+        assert list(image.getdata()) == list(expected.getdata())
+    folder = tmp_path / "assets" / "asset_store_bricks_decals_free"
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["source"] == ("Unity Asset Store EULA (Extension Asset), local only: Pub / Bricks Decals FREE. Converted on this machine; "
+                                  "never committed or redistributed outside a built map.")
+    assert (folder / "License.txt").read_text(encoding="utf-8") == (
+        "Bricks Decals FREE by Pub, from the Unity Asset Store, under the Standard Unity Asset Store EULA.\n"
+        "Local copy for this user's maps only. Do not commit, share or publish these files.\n")
+
+
+def test_a_decal_is_judged_by_its_share_of_transparent_pixels(tmp_path: Path) -> None:
+    def share(alpha: int, transparent_columns: int) -> list[dict]:
+        image = Image.new("RGBA", (100, 50), (120, 60, 40, 255))
+        image.paste((0, 0, 0, alpha), (0, 0, transparent_columns, 50))
+        out = io.BytesIO()
+        image.save(out, format="PNG")
+        package = _decal_folder_package(tmp_path / f"{alpha}_{transparent_columns}", {"a" * 32: (b"Assets/Decals/Decals_A.png", out.getvalue())})
+        return decal_rows(package, tmp_path / f"{alpha}_{transparent_columns}" / "assets")
+
+    assert share(0, 5) != [] and share(0, 4) == []  # 5 % of the pixels transparent is a decal, 4 % is not
+    assert share(249, 50) != [] and share(250, 50) == []  # alpha 250 and over is opaque
+
+
+def test_the_decal_catalogues_are_read_past_broken_ones_and_sorted_by_id(tmp_path: Path) -> None:
+    def catalogue(name: str, rows: list[dict], images: tuple[str, ...]) -> None:
+        folder = tmp_path / name
+        folder.mkdir()
+        (folder / "manifest.json").write_text(json.dumps({"schema": DECALS_SCHEMA, "assets": rows}), encoding="utf-8")
+        for image in images:
+            Image.new("RGB", (4, 2), (1, 2, 3)).save(folder / image)
+
+    (tmp_path / "asset_store_a_broken").mkdir()
+    (tmp_path / "asset_store_a_broken" / "manifest.json").write_text("{", encoding="utf-8")
+    catalogue("asset_store_b", [{"id": "z", "file": "z.png", "width_m": 1.0, "height_m": 0.5}, {"id": "missing", "file": "none.png"},
+                                {"id": "nofile"}], ("z.png",))
+    catalogue("asset_store_c", [{"id": "a", "file": "a.png", "kind": "brick_patch", "description": "d", "width_m": 2.0, "height_m": 1.0}], ("a.png",))
+    assert [row["id"] for _, row in read_decal_catalogues(tmp_path)] == ["a", "z"]
+    loaded = library_decals(tmp_path)
+    assert [(d.id, d.kind, d.width_m, d.height_m, d.description, d.origin) for d in loaded] == [
+        ("a", "brick_patch", 2.0, 1.0, "d", "library"), ("z", "decal", 1.0, 0.5, "", "library")]
+    assert loaded[0].rgba.dtype == np.uint8 and loaded[0].rgba.shape == (2, 4, 4) and loaded[0].rgba[0, 0].tolist() == [1, 2, 3, 255]
+
+
+def _oblique(fid: str, a: tuple[float, float], b: tuple[float, float], height: float | None) -> Wall:
+    start, end = np.array(a, float), np.array(b, float)
+    d = (end - start) / np.linalg.norm(end - start)
+    return Wall(fid, start, end, np.array([d[1], -d[0]]), height)
+
+
+def _quad(p0, p1, z0: float, z1: float, material: str) -> Primitive:
+    v = np.array([[*p0, z0], [*p1, z0], [*p1, z1], [*p0, z1]], float)
+    return Primitive(Mesh(v, np.array([[0, 1, 2], [0, 2, 3]])), material)
+
+
+def test_a_street_of_slanted_and_short_walls_is_pinned() -> None:
+    walls = [_oblique("w1", (3.3, 1.7), (17.9, 4.2), 8.4), _oblique("w2", (25.0, -2.0), (25.0, 9.5), None),
+             _oblique("w3", (40.0, 0.0), (42.6, 0.0), 9.0), _oblique("w4", (50.0, 0.0), (52.4, 0.0), 9.0)]
+    d1 = (np.array([17.9, 4.2]) - np.array([3.3, 1.7])) / np.linalg.norm(np.array([17.9, 4.2]) - np.array([3.3, 1.7]))
+    p0, p1 = np.array([3.3, 1.7]) + d1 * 4, np.array([3.3, 1.7]) + d1 * 8
+    nodes = [Node("b", (_quad(p0, p1, 1.0, 2.6, "glass_dark"), _quad((25.05, 1.0), (25.05, 3.0), 0.0, 2.2, "door_wood"),
+                        _quad((25.05, 6), (25.05, 7), 3, 4, "brick")), {})]
+    pool = [*procedural_decals(7), Decal("long", "banner", 4.0, 0.4, np.zeros((4, 40, 4), np.uint8), "generated", "x")]
+    placed = place_decals(walls, NOTHING, decal_blocker(nodes, [(box(24.5, 3.0, 25.5, 5.0), 2.0, 3.0)]), pool, 23, 14)
+    assert [(p.decal.id, p.wall.feature_id, round(p.s_m, 4), round(p.z_m, 4)) for p in placed] == [
+        ("gen_damp_stain", "w2", 8.5577, 1.4), ("gen_splash_grime", "w1", 9.854, 1.4), ("gen_torn_poster", "w3", 1.6287, 1.4),
+        ("gen_soot_streak", "w2", 10.6075, 1.4), ("long", "w1", 10.6266, 2.4), ("gen_plaster_crack", "w3", 1.8392, 3.6),
+        ("gen_paint_scribble", "w2", 0.9445, 1.4), ("gen_rust_drip", "w1", 13.7846, 1.4), ("gen_damp_stain", "w2", 6.1529, 0.9),
+        ("gen_splash_grime", "w1", 1.4135, 1.4), ("gen_torn_poster", "w2", 10.7201, 3.6), ("gen_soot_streak", "w1", 13.779, 3.6),
+        ("long", "w2", 4.2601, 3.6), ("gen_plaster_crack", "w1", 0.7823, 3.6)]
+    nodes_out, materials, images, _ = decal_nodes(placed)
+    assert [n.primitives[0].mesh.vertices.round(3).tolist() for n in nodes_out[:4]] == [
+        [[25.01, 5.858, 0.7], [25.01, 7.258, 0.7], [25.01, 7.258, 2.1], [25.01, 5.858, 2.1]],
+        [[11.832, 3.151, 1.0], [14.197, 3.556, 1.0], [14.197, 3.556, 1.8], [11.832, 3.151, 1.8]],
+        [[41.279, -0.01, 0.9], [41.979, -0.01, 0.9], [41.979, -0.01, 1.9], [41.279, -0.01, 1.9]],
+        [[25.01, 8.108, 0.4], [25.01, 9.108, 0.4], [25.01, 9.108, 2.4], [25.01, 8.108, 2.4]]]
+    assert [n.primitives[0].mesh.triangles.tolist() for n in nodes_out[:1]] == [[[0, 1, 2], [0, 2, 3]]]
+    assert [n.primitives[0].uvs.round(5).tolist() for n in nodes_out[:2]] == [
+        [[0.00195, 0.87305], [0.12695, 0.87305], [0.12695, 0.99805], [0.00195, 0.99805]],
+        [[0.19727, 0.87305], [0.32227, 0.87305], [0.32227, 0.99805], [0.19727, 0.99805]]]
+    assert {k: hashlib.sha256(v).hexdigest()[:16] for k, v in images.items()} == {"wall_decal_atlas_0": "bfba4218f58523f4"}
+    assert {k: (m.color, m.roughness) for k, m in materials.items()} == {"wall_decal_atlas_0": ((1.0, 1.0, 1.0, 1.0), 0.8)}
+
+
+def test_a_decal_fits_its_wall_and_its_band_to_the_centimetre() -> None:
+    from onward_generator.signs.decals import _fit
+
+    one = _decal("one", 1.0, 1.0)
+    assert _fit(_wall(0, 1.8), one, never, [], 1) is not None  # exactly its width and a gap each side
+    assert _fit(_wall(0, 1.79), one, never, [], 1) is None
+    tall = _decal("tall", 1.0, 1.5)
+    assert _fit(_wall(0, 10, height=2.65), tall, never, [], 1)[1] == 1.4  # its top exactly at the wall top less 0.5 m
+    assert _fit(_wall(0, 10, height=2.6), tall, never, [], 1)[1] == 0.9  # its foot exactly 0.15 m off the ground
+    assert _fit(_wall(0, 10, height=1.0), tall, never, [], 1) is None
+
+
+def test_the_blocker_reads_only_what_a_decal_must_not_cover_and_open_bands() -> None:
+    brick_first = Node("b", (_quad((0, 0.05), (10, 0.05), 0.0, 9.0, "brick"), _quad((0, 0.05), (10, 0.05), 2.0, 3.0, "glass_dark")), {})
+    blocked = decal_blocker([brick_first])
+    plan = box(4, -0.5, 6, 0.5)
+    assert blocked(plan, 1.0, 2.0001) and blocked(plan, 2.9999, 4.0)
+    assert not blocked(plan, 1.0, 2.0) and not blocked(plan, 3.0, 4.0)  # touching the glass is not covering it
+    assert not decal_blocker([Node("b", (_quad((0, 0.05), (10, 0.05), 0.0, 9.0, "brick"),), {})])(plan, 0.0, 9.0)
+    assert not blocked(box(20, -0.5, 22, 0.5), 0.0, 9.0)
+    assert decal_blocker([], [(box(0, 0, 1, 1), 0.0, 1.0)])(box(0.5, 0.5, 2, 2), 0.5, 0.6)
+
+
+def test_the_pick_sends_its_prompt_and_schema_and_keeps_whole_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.signs import decal_pick as pick_module
+
+    pool = procedural_decals(1)
+    ids = [d.id for d in pool]
+    asked = _Replies(_reply(*ids[:6]))
+    picked = pick_decals(pool, brief="Muros quemados", provider=asked)
+    system, message, sent = asked.calls[0]
+    assert system == pick_module.SYSTEM_PROMPT and sent == schema(pool) and message == pick_module.instruction("Muros quemados", pool)
+    assert picked.ok is True
+    rows = json.loads(message.split("Decals:\n", 1)[1])
+    assert rows[0] == {"id": "gen_damp_stain", "kind": "stain", "description": "A brown damp stain spreading on a wall."}
+    replayed = pick_decals(pool, brief="Muros quemados", provider=_Replies(), replay=picked.record)
+    assert replayed.ok is True and replayed.record == {**picked.record, "origin": "replay", "attempts": 0}
+    again = pick_decals(pool, brief="Muros quemados", provider=_Replies(), replay=replayed.record)  # a replay replays too
+    assert again.decal_ids == picked.decal_ids
+    failed = pick_decals(pool, brief="Muros quemados", provider=_Replies(ProviderError("a"), ProviderError("b")))
+    assert failed.ok is False and failed.record == {**picked.record, "origin": "rules_fallback", "raw": "", "decal_ids": sorted(ids),
+                                                    "reason": "b", "attempts": 2}
+    made: list[float] = []
+
+    class _Fake:
+        name = "fake"
+
+        def __init__(self, *, timeout_s: float) -> None:
+            made.append(timeout_s)
+
+        def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
+            raise ProviderError("offline")
+
+    import onward_generator.ai.providers as providers
+
+    monkeypatch.setattr(providers, "OllamaProvider", _Fake)
+    assert not pick_decals(pool, brief="").ok and made == [180.0]
+
+
+def test_the_pick_bounds_and_messages() -> None:
+    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(8)]
+    ids = [d.id for d in pool]
+    assert len(parse(_reply(*ids[:12]), pool)) == 12
+    with pytest.raises(DecalPickError) as error:
+        parse(_reply(*ids[:13]), pool)
+    assert str(error.value) == "choose from 6 to 12 ids, not 13"
+    three_kinds = ["gen_damp_stain", "gen_soot_streak", "gen_rust_drip", "x0", "x1", "x2"]
+    assert parse(_reply(*three_kinds), pool) == tuple(three_kinds)
+    for text, message in (
+        (json.dumps({"pick_version": "0.1.0", "decal_ids": "x"}), "decal_ids must be a list of ids"),
+        (_reply(*ids[:4], "zz", "aa"), "ids that are not offered: aa, zz"),
+        (_reply(*ids[:5], ids[0]), "each id may be chosen once"),
+        (_reply("x0", "x1", "x2", "x3", "x4", "gen_damp_stain"), "choose ids of at least 3 kinds"),
+    ):
+        with pytest.raises(DecalPickError) as error:
+            parse(text, pool)
+        assert str(error.value) == message

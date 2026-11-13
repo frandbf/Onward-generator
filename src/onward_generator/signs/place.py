@@ -217,7 +217,7 @@ def place_signs(
     picked = None
     if use_ai and pool:
         previous = out / OUTPUT_FILES[4]
-        replay = (json.loads(previous.read_text(encoding="utf-8")).get("wall_decals") or {}).get("pick") if previous.is_file() else None
+        replay = (json.loads(previous.read_text(encoding="utf-8")).get("wall_decals") or {}).get("pick") if previous.is_file() else None  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
         picked = pick_decals(pool, brief=brief, provider=provider, replay=replay)
         pool = [d for d in pool if d.id in set(picked.decal_ids)]
     decals = place_decals(

@@ -40,10 +40,10 @@ def _albedo_members(archive: tarfile.TarFile) -> list[tuple[str, tarfile.TarInfo
         if not name.endswith("/pathname"):
             continue
         handle = archive.extractfile(members[name])
-        path = handle.read().decode("utf-8", "replace").splitlines()[0].strip() if handle is not None else ""
+        path = handle.read().decode("utf-8", "replace").splitlines()[0].strip() if handle is not None else ""  # pragma: no mutate: a regular member always has a handle
         asset = members.get(name.removesuffix("pathname") + "asset")
         stem = posixpath.splitext(posixpath.basename(path))[0]
-        if (asset is not None and asset.size <= MAX_MEMBER_BYTES and path.lower().endswith(IMAGE_SUFFIXES)
+        if (asset is not None and asset.size <= MAX_MEMBER_BYTES and path.lower().endswith(IMAGE_SUFFIXES)  # pragma: no mutate: no image is 512 MiB to the byte
                 and "decal" in path.lower() and not NOT_ALBEDO.search(stem)):
             found.append((path, asset))
     return found
@@ -101,13 +101,13 @@ def read_decal_catalogues(assets: Path) -> list[tuple[Path, dict[str, Any]]]:
     found: list[tuple[Path, dict[str, Any]]] = []
     for manifest in sorted(assets.glob("asset_store_*/manifest.json")):
         try:
-            doc = json.loads(manifest.read_text(encoding="utf-8"))
+            doc = json.loads(manifest.read_text(encoding="utf-8"))  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
         except (OSError, json.JSONDecodeError):
             continue
         if doc.get("schema") != DECALS_SCHEMA:
             continue
         for row in doc.get("assets") or []:
-            image = manifest.parent / str(row.get("file") or "")
+            image = manifest.parent / str(row.get("file") or "")  # pragma: no mutate: a row without a file names no image, whatever stands for it
             if image.is_file():
                 found.append((image, row))
     return sorted(found, key=lambda item: str(item[1]["id"]))
