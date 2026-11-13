@@ -122,9 +122,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     imp.add_argument("--refresh", action="store_true", help="import again packages that already have a local catalogue")
     imp.add_argument("--max-triangles", type=int, default=DEFAULT_MAX_TRIANGLES, help="skip models with more LOD0 triangles")
     imp.add_argument("--unity", help="the Unity editor executable (default: the host profile's)")
-    tex = sub.add_parser("textures", help="texture sets named in config/dress/asset_store_textures.json, without the editor")
-    tex.add_argument("--cache", help="the Unity Asset Store cache (default: the host profile's asset_store_cache)")
-    tex.add_argument("--only", nargs="+", help="package ids of the table")
+    tex = sub.add_parser(
+        "textures",
+        help="texture sets named in config/dress/asset_store_textures.json, without the editor",  # pragma: no mutate: help text only
+    )
+    tex.add_argument(
+        "--cache",
+        help="the Unity Asset Store cache (default: the host profile's asset_store_cache)",  # pragma: no mutate: help text only
+    )
+    tex.add_argument(
+        "--only", nargs="+",
+        help="package ids of the table",  # pragma: no mutate: help text only
+    )
     args = parser.parse_args(argv)
     if args.command == "textures":
         return _textures(args)

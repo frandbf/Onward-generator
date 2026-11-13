@@ -120,3 +120,112 @@ def test_the_local_textures_join_the_catalogue_only_while_local_catalogues_are_o
     assert row in library_plan.catalogue_rows()
     monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "0")
     assert row not in library_plan.catalogue_rows()
+
+
+def _reference_jpeg(png: bytes) -> bytes:
+    with Image.open(io.BytesIO(png)) as picture:
+        image = picture.convert("RGB")
+    image.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    image.save(out, format="JPEG", quality=92)
+    return out.getvalue()
+
+
+def test_a_row_and_its_manifest_are_whole_and_the_files_are_the_reference_encoding(tmp_path: Path) -> None:
+    rng = np.random.default_rng(1)
+    albedo = Image.fromarray(rng.integers(0, 256, (600, 1400, 3), dtype=np.uint8))
+    raw = io.BytesIO()
+    albedo.convert("RGBA").save(raw, format="PNG")
+    normal = _png((120, 130, 250), (32, 32))
+    path = _package(tmp_path, {"Assets/W/aa_Diffuse.png": _png((1, 2, 3)), "Assets/W/Brick Wall 2_Diffuse.png": raw.getvalue(),
+                               "Assets/W/Brick Wall 2_Normal.png": normal, "Assets/W/zz_Diffuse.png": _png((4, 5, 6))})
+    package = next(p for p in find_packages(tmp_path / "cache") if p.path == path)
+    assets = tmp_path / "repo" / "assets"
+    rows = texture_rows(package, assets, {"Brick Wall 2": {"family": "concrete", "note": "Wall."},
+                                          "missing": {"family": "rock", "note": "Not in the package."},
+                                          "zz": {"family": "asphalt", "note": "Dark."}})
+    folder = assets / package.catalogue
+    data = (folder / "Brick_Wall_2_albedo.jpg").read_bytes()
+    normal_data = (folder / "Brick_Wall_2_nor_gl.jpg").read_bytes()
+    assert data == _reference_jpeg(raw.getvalue()) and normal_data == _reference_jpeg(normal)
+    assert rows[0] == {
+        "id": "as_wall_pack_Brick_Wall_2", "name": "Brick Wall 2", "family": "concrete", "provider": "asset_store",
+        "license": "LicenseRef-Unity-Asset-Store-EULA", "license_url": "https://unity.com/legal/as-terms",
+        "credit": "Brick Wall 2 from Wall Pack by Pub, Unity Asset Store EULA; local copy, never committed.", "source_url": "",
+        "surface": "ground", "bound": False, "path": f"assets/{package.catalogue}/Brick_Wall_2_albedo.jpg",
+        "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "note": "Albedo 1024 px. Wall.",
+        "normal": {"map": "nor_gl", "path": f"assets/{package.catalogue}/Brick_Wall_2_nor_gl.jpg",
+                   "sha256": hashlib.sha256(normal_data).hexdigest(), "bytes": len(normal_data)}}
+    assert [row["name"] for row in rows] == ["Brick Wall 2", "zz"] and rows[1]["surface"] == "ground"  # read past a missing set
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest == {"schema": LIBRARY_SCHEMA, "schema_version": "0.1.0",
+                        "source": "Unity Asset Store EULA (Extension Asset), local only: Pub / Wall Pack. Converted on this "
+                                  "machine; never committed or redistributed outside a built map.",
+                        "package": {"publisher": "Pub", "category": "Textures MaterialsWall", "name": "Wall Pack"}, "textures": rows}
+    assert (folder / "License.txt").read_text(encoding="utf-8") == (
+        "Wall Pack by Pub, from the Unity Asset Store, under the Standard Unity Asset Store EULA.\n"
+        "Local copy for this user's maps only. Do not commit, share or publish these files.\n")
+
+
+def test_a_long_package_name_and_a_wall_family_shape_the_row(tmp_path: Path) -> None:
+    path = tmp_path / "cache" / "Pub" / "Textures" / "Very Long Package Name For Walls.unitypackage"
+    path.parent.mkdir(parents=True)
+    with tarfile.open(path, "w:gz") as archive:
+        for k, (p, data) in enumerate({"A/x_Diffuse.png": _png((1, 1, 1))}.items()):
+            for name, payload in (("pathname", p.encode()), ("asset", data)):
+                info = tarfile.TarInfo(f"./{k:032x}/{name}")  # a "./" prefix, as some exporters write
+                info.size = len(payload)
+                archive.addfile(info, io.BytesIO(payload))
+    package = next(iter(find_packages(tmp_path / "cache")))
+    for family, surface in (("plaster", "wall"), ("brick", "wall"), ("paving", "ground"), ("concrete", "ground"), ("asphalt", "ground")):
+        row = texture_rows(package, tmp_path / family, {"x": {"family": family, "note": "n"}})[0]
+        assert row["surface"] == surface and row["id"] == "as_very_long_package_na_x"
+
+
+def test_only_small_images_join_a_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.assetstore.textures as textures
+
+    path = _package(tmp_path, {"A/big_Diffuse.png": _png((1, 1, 1), (64, 64)), "A/edge_Diffuse.png": _png((1, 1, 1), (8, 8)),
+                               "A/notes_Diffuse.txt": b"hello"})
+    size = len(_png((1, 1, 1), (8, 8)))
+    monkeypatch.setattr(textures, "MAX_MEMBER_BYTES", size)
+    with tarfile.open(path) as archive:
+        assert sorted(texture_sets(archive)) == ["edge"]  # exactly the limit is kept; a text file is not an image
+
+
+def test_a_row_without_an_id_is_not_read_back(tmp_path: Path) -> None:
+    folder = tmp_path / "asset_store_x"
+    folder.mkdir()
+    (folder / "manifest.json").write_text(json.dumps({"schema": LIBRARY_SCHEMA, "textures": [{"id": "a"}, {"name": "no id"}, "x"]}),
+                                          encoding="utf-8")
+    assert local_texture_rows(tmp_path) == [{"id": "a"}]
+
+
+def test_the_catalogue_reads_this_repository_s_local_textures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.materials import library_plan
+
+    folder = tmp_path / "assets" / "asset_store_x"
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(json.dumps({"schema": LIBRARY_SCHEMA, "textures": [{"id": "as_x_local"}]}), encoding="utf-8")
+    monkeypatch.setattr(library_plan, "REPO_ROOT", tmp_path)
+    monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "1")
+    assert {"id": "as_x_local"} in library_plan.catalogue_rows()
+
+
+def test_the_textures_command_imports_the_table_s_packages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                           capsys: pytest.CaptureFixture[str]) -> None:
+    import onward_generator.assetstore.__main__ as cli
+
+    _package(tmp_path, {"A/w1_Diffuse.png": _png((1, 1, 1)), "A/w1_Normal.png": _png((128, 128, 255)), "A/w2_Diffuse.png": _png((2, 2, 2))})
+    monkeypatch.setattr("onward_generator.assetstore.textures.read_table",
+                        lambda: {"wall_pack": {"w1": {"family": "plaster", "note": "a"}, "w2": {"family": "rock", "note": "b"}},
+                                 "absent_pack": {"x": {"family": "rock", "note": "c"}}})
+    monkeypatch.setattr(cli, "ASSETS", tmp_path / "assets")
+    assert cli.main(["textures", "--cache", str(tmp_path / "cache")]) == 0
+    out = capsys.readouterr().out
+    assert "absent_pack: not downloaded\n" in out and "wall_pack: 2 textures of 2 named, 1 with a normal map\n" in out
+    assert f"2 textures under {tmp_path / 'assets'}/asset_store_*\n" in out
+    assert cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "wall_pack", "absent_pack"]) == 0
+    assert "wall_pack: 2 textures" in capsys.readouterr().out
+    with pytest.raises(SystemExit, match="asset-store: other has no texture sets in config/dress/asset_store_textures.json"):
+        cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "other"])

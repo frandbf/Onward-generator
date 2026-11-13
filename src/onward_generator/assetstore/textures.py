@@ -37,7 +37,7 @@ NORMAL = re.compile(r"(?:_normal_directx|_normal_opengl|_normal|_n)$", re.IGNORE
 
 def read_table(path: Path = TABLE_PATH) -> dict[str, dict[str, dict[str, str]]]:
     """``{package id: {set stem: {"family", "note"}}}``."""
-    return dict(json.loads(path.read_text(encoding="utf-8"))["packages"])
+    return dict(json.loads(path.read_text(encoding="utf-8"))["packages"])  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
 
 
 def texture_sets(archive: tarfile.TarFile) -> dict[str, dict[str, tuple[tarfile.TarInfo, bool]]]:
@@ -64,7 +64,7 @@ def texture_sets(archive: tarfile.TarFile) -> dict[str, dict[str, tuple[tarfile.
 def _image(archive: tarfile.TarFile, member: tarfile.TarInfo) -> Image.Image:
     handle = archive.extractfile(member)
     if handle is None:  # pragma: no mutate: a regular member always has a handle
-        raise ValueError(f"{member.name}: no data")
+        raise ValueError(f"{member.name}: no data")  # pragma: no mutate: a regular member always has a handle
     with Image.open(io.BytesIO(handle.read())) as picture:
         image = picture.convert("RGB")
     image.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)
