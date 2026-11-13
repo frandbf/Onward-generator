@@ -137,11 +137,12 @@ def test_a_row_and_its_manifest_are_whole_and_the_files_are_the_reference_encodi
     raw = io.BytesIO()
     albedo.convert("RGBA").save(raw, format="PNG")
     normal = _png((120, 130, 250), (32, 32))
-    path = _package(tmp_path, {"Assets/W/aa_Diffuse.png": _png((1, 2, 3)), "Assets/W/Brick Wall 2_Diffuse.png": raw.getvalue(),
+    path = _package(tmp_path, {"Assets/W/Aa_Diffuse.png": b"broken", "Assets/W/Brick Wall 2_Diffuse.png": raw.getvalue(),
                                "Assets/W/Brick Wall 2_Normal.png": normal, "Assets/W/zz_Diffuse.png": _png((4, 5, 6))})
     package = next(p for p in find_packages(tmp_path / "cache") if p.path == path)
     assets = tmp_path / "repo" / "assets"
-    rows = texture_rows(package, assets, {"Brick Wall 2": {"family": "concrete", "note": "Wall."},
+    rows = texture_rows(package, assets, {"Aa": {"family": "rock", "note": "Unreadable, read first."},
+                                          "Brick Wall 2": {"family": "concrete", "note": "Wall."},
                                           "missing": {"family": "rock", "note": "Not in the package."},
                                           "zz": {"family": "asphalt", "note": "Dark."}})
     folder = assets / package.catalogue
@@ -180,6 +181,14 @@ def test_a_long_package_name_and_a_wall_family_shape_the_row(tmp_path: Path) -> 
     for family, surface in (("plaster", "wall"), ("brick", "wall"), ("paving", "ground"), ("concrete", "ground"), ("asphalt", "ground")):
         row = texture_rows(package, tmp_path / family, {"x": {"family": family, "note": "n"}})[0]
         assert row["surface"] == surface and row["id"] == "as_very_long_package_na_x"
+    long_stem = "x" * 120
+    with tarfile.open(path, "w:gz") as archive:
+        for name, payload in (("pathname", f"A/{long_stem}_Diffuse.png".encode()), ("asset", _png((1, 1, 1)))):
+            info = tarfile.TarInfo(f"{0:032x}/{name}")
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+    row = texture_rows(package, tmp_path / "long", {long_stem: {"family": "rock", "note": "n"}})[0]
+    assert len(row["id"]) == 80 and row["id"].startswith("as_very_long_package_na_xxx")
 
 
 def test_only_small_images_join_a_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -217,15 +226,20 @@ def test_the_textures_command_imports_the_table_s_packages(tmp_path: Path, monke
     import onward_generator.assetstore.__main__ as cli
 
     _package(tmp_path, {"A/w1_Diffuse.png": _png((1, 1, 1)), "A/w1_Normal.png": _png((128, 128, 255)), "A/w2_Diffuse.png": _png((2, 2, 2))})
+    second = tmp_path / "cache" / "Pub" / "Textures MaterialsGround" / "Ground Pack.unitypackage"
+    second.parent.mkdir(parents=True)
+    second.write_bytes(_package(tmp_path / "g", {"B/g1_Diffuse.png": _png((3, 3, 3))}).read_bytes())
     monkeypatch.setattr("onward_generator.assetstore.textures.read_table",
                         lambda: {"wall_pack": {"w1": {"family": "plaster", "note": "a"}, "w2": {"family": "rock", "note": "b"}},
-                                 "absent_pack": {"x": {"family": "rock", "note": "c"}}})
+                                 "absent_pack": {"x": {"family": "rock", "note": "c"}},
+                                 "ground_pack": {"g1": {"family": "paving", "note": "d"}}})
     monkeypatch.setattr(cli, "ASSETS", tmp_path / "assets")
     assert cli.main(["textures", "--cache", str(tmp_path / "cache")]) == 0
     out = capsys.readouterr().out
     assert "absent_pack: not downloaded\n" in out and "wall_pack: 2 textures of 2 named, 1 with a normal map\n" in out
-    assert f"2 textures under {tmp_path / 'assets'}/asset_store_*\n" in out
+    assert "ground_pack: 1 textures of 1 named, 0 with a normal map\n" in out
+    assert f"3 textures under {tmp_path / 'assets'}/asset_store_*\n" in out  # both packages counted
     assert cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "wall_pack", "absent_pack"]) == 0
     assert "wall_pack: 2 textures" in capsys.readouterr().out
-    with pytest.raises(SystemExit, match="asset-store: other has no texture sets in config/dress/asset_store_textures.json"):
-        cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "other"])
+    with pytest.raises(SystemExit, match="asset-store: other, zzz has no texture sets in config/dress/asset_store_textures.json"):
+        cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "zzz", "other"])

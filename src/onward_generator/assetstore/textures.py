@@ -43,7 +43,7 @@ def read_table(path: Path = TABLE_PATH) -> dict[str, dict[str, dict[str, str]]]:
 def texture_sets(archive: tarfile.TarFile) -> dict[str, dict[str, tuple[tarfile.TarInfo, bool]]]:
     """``{set stem: {"albedo": (member, False), "normal": (member, directx)}}`` of the images in ``archive``. A set is
     the image's file name without its map suffix (``wall05_Diffuse.tga`` -> ``wall05``)."""
-    members = {m.name.removeprefix("./"): m for m in archive.getmembers() if m.isfile()}
+    members = {m.name: m for m in archive.getmembers() if m.isfile()}
     sets: dict[str, dict[str, tuple[tarfile.TarInfo, bool]]] = {}
     for name in sorted(members):
         if not name.endswith("/pathname"):
