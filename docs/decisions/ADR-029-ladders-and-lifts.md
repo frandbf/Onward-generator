@@ -86,7 +86,7 @@ On the headset neither Rue Mouffetard (r 150 m, core 95 m) nor Madrid Sol arena 
 3. **The rules left no building in a dense centre.** With both fixes Rue Mouffetard got one lift: all its candidate roofs had 3 to 6 storeys and an interior, so none could take a ladder, and the ladders, choosing first, would have taken the one roof a lift fitted. Madrid Sol still got nothing: 99 of its 192 core buildings have more than 6 storeys, and 67 have exactly 7.
    - Ladders: at most **4** storeys (`LADDER_MAX_STOREYS`), and an interior no longer keeps one away. An interior whose stair reaches the roof still keeps both kinds away. The 3 storeys and the interior rule came from the original request; on these maps they left no ladder at all. A ladder on a facade with an interior keeps 3 m from its doors, as any other.
    - Lifts: up to **7** storeys (`LIFT_MAX_STOREYS`). Where most roofs have 7 storeys, a 7-storey roof stands among its neighbours rather than over them. The 22.9 m roof of rule 2 (8 storeys by height) still gets neither.
-   - **Lifts choose first.** A cabin and its 3 m apron need far more street than a ladder's foot, so their sites are the scarce ones.
+   - **Lifts choose first.** A cabin and its apron (3 m, 1.5 m since 12 November 2026) need far more street than a ladder's foot, so their sites are the scarce ones.
 
 Measured with the same inputs, before and after (ladders / lifts): Rue Mouffetard 0/0 to 2/3, Madrid Sol arena 0/0 to 0/1 (a 21.3 m roof), Madrid Sol workshop 1/1 to 1/3, Barcelona Sarria night 0/1 to 3/1, B1 Madrid r500 1/3 to 2/3. The caps of 3 and 3, the spacing and the fairness order do not change.
 
@@ -105,3 +105,7 @@ To check on the headset: a ladder of 4 storeys (about 12 m), and a lift to a 7-s
 ## Amendment (12 November 2026): no ladder through a column of balconies
 
 On Rue Mouffetard (pkg_05, on the headset) a ladder climbed a five-storey wall straight through a column of four balconies: the keep-out looked only at the ground (doors, routes, signs, props), and the balconies stand on the wall above. `detail` now records each column of balconies in `facade.balconies_m`, its span on the wall line (docs/07-detail.md), and `climb_keep_out` adds every span widened by `CLIMB_BALCONY_CLEAR_M` = 0.5 m. A ladder's foot and a street cabin both start at the wall, so neither can stand under a column of balconies or within 0.5 m of one. A manifest from before has no `balconies_m` and keeps the earlier rule.
+
+## Amendment (12 November 2026): a 1.5 m apron
+
+Rue Mouffetard had no lift in any run: its sidewalks, without the carriageway (`lift_free`), are too narrow for a 3.2 m cabin and its 3 m apron. Run on the map's layout inputs, an apron of 1.5 m gave one lift, 1 m gave two; a smaller sign clearance, door keep-out or roof apron added none on their own. At the maintainer's request to relax the rule a little, `CABIN_APRON_M` is 1.5 m: a player still steps out of the cabin and turns, and the cabin stays off the carriageway and keeps every other clearance.

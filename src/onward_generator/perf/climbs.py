@@ -55,7 +55,9 @@ CABIN_WIDTH_M = 3.2
 CABIN_DEPTH_M = 3.2
 """The SDK cabin is about 3.01 x 3.13 m."""
 CABIN_WALL_GAP_M = 0.05
-CABIN_APRON_M = 3.0
+CABIN_APRON_M = 1.5
+"""The clear street in front of a cabin's door: 3 m until 12 November 2026, when no cabin fitted Rue Mouffetard's narrow
+sidewalks (one does at 1.5 m, two at 1 m); 1.5 m is still a step out and a turn for a player."""
 """Clear in front of the door (the cabin's local +Z), so the queue does not close the street."""
 ROOF_EDGE_M = 0.6
 """A cabin stands behind the parapet (0.3 m at most) and leaves a step of roof."""
