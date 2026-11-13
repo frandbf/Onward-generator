@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "rectangular_paving",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/rectangular_paving",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rectangular_paving/rectangular_paving_diff_1k.jpg",
+  "md5": "bed8a330f7a03e21be9c719a25bb6a89",
+  "sha256": "23f3da5644a95fbcc1916165c8b03ac74d0836ce4b6f5bf2a28b0266dcdf84c5",
+  "size_bytes": 649580,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/rectangular_paving/rectangular_paving_diff_1k.jpg",
+  "retrieved_at": "2026-11-13T15:35:58+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

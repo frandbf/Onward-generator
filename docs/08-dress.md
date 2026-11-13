@@ -161,6 +161,32 @@ With the switch on, `materials_report.json` gets a `repetition` block (written o
 
 Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m, an identical grid smaller than a lane), `sidewalk_concrete` stays 2 m. A `tile_m` change reaches an existing map the next time `dress style` or `materials apply` runs.
 
+#### More photographs: the `"wide_library"` switch (plan T1)
+
+`map.json` key `"wide_library"` (a bool, default `false`; any other value is refused with `MapError`) adds the wide library, [config/dress/wide_library.json](../config/dress/wide_library.json), to every texture pool. It holds 25 CC0 Poly Haven albedos at 1k. With the switch off, the pools, the picks and every output are as before, because the imported library is read alone.
+
+- **Turning it on.** On a new map, pass `map create --wide-library`. On an existing map, set the key, then run `map create --name <map> --textures` to choose the textures again, then `run --from materials`.
+- **What a row records.** Each row names its family (`family`), so the file name is not used to guess it. A plan that names a wide id resolves and is checked even after the switch is turned off: `texture_record` and `assert_library_entries` read both libraries.
+- **How the rows were chosen.** Every row passes its family's calm limit, the extended one for roofs and paving. The rows were also chosen by eye from a contact sheet. Some images were calm by the measure but left out: moss-covered, flat-colour, striped, or with large cracks that would read as a grid.
+- **Adding a texture.**
+  1. Fetch it with `materials.polyhaven.ensure_diffuse_1k(url, download=True)`, which accepts CC0 only and writes the `.source.json`.
+  2. Add a line to `ROWS` in `tools/build_wide_library.py`.
+  3. Run `uv run python tools/build_wide_library.py`.
+
+  `tests/unit/test_wide_library.py` checks the hashes, the licence, the family and the calm limit.
+- **Cost.** It is the same as without the switch. A slot still binds one photograph, resized to at most 1024 px (`MAX_PHOTO_PX`), so no material, draw or texture is added. Only the choice of image changes.
+
+| Texture | Family | Coarse contrast | Limit |
+| --- | --- | --- | --- |
+| `ph_yellow_plaster`, `ph_clay_plaster`, `ph_white_plaster_02` | plaster | 0.0119, 0.0048, 0.0220 | 0.025 |
+| `ph_brick_wall_02`, `ph_factory_brick`, `ph_red_bricks_04` | brick | 0.0186, 0.0214, 0.0160 | 0.025 |
+| `ph_old_stone_wall`, `ph_stone_brick_wall_001` | rock | 0.0160, 0.0074 | 0.025 |
+| `ph_rock_wall_11` (flagstones seen from above), `ph_rectangular_paving`, `ph_patterned_paving` | paving | 0.0064, 0.0109, 0.0132 | 0.016 |
+| `ph_concrete_floor_01`, `ph_concrete_pavement`, `ph_concrete_pavement_02`, `ph_brushed_concrete`, `ph_concrete_floor_worn_001` | concrete | 0.0115, 0.0030, 0.0109, 0.0072, 0.0013 | 0.012 |
+| `ph_asphalt_01`, `ph_asphalt_03`, `ph_clean_asphalt`, `ph_worn_asphalt` | asphalt | 0.0055, 0.0019, 0.0018, 0.0046 | 0.012 |
+| `ph_clay_roof_tiles`, `ph_clay_roof_tiles_02`, `ph_clay_roof_tiles_03`, `ph_grey_roof_tiles` | roof | 0.0144, 0.0181, 0.0113, 0.0168 | 0.019 |
+| `ph_bark_brown_02` | bark | 0.0537 | none |
+
 ## Texture coordinates
 
 `dress style` and `materials apply` write `TEXCOORD_0` the same way for every material with a repeating image:

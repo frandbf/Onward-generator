@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "patterned_paving",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Charlotte Baglioni"
+  ],
+  "page_url": "https://polyhaven.com/a/patterned_paving",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/patterned_paving/patterned_paving_diff_1k.jpg",
+  "md5": "77b0380803171d6f6812d922a3ef8963",
+  "sha256": "c0c72a8b6223356fb9988ae0dcf35caeefa618b76abc792e647a37312faa3498",
+  "size_bytes": 883570,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/patterned_paving/patterned_paving_diff_1k.jpg",
+  "retrieved_at": "2026-11-13T15:36:00+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

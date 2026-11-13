@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "clay_plaster",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/clay_plaster",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_plaster/clay_plaster_diff_1k.jpg",
+  "md5": "aab6ac83dcf134a370279825de143c26",
+  "sha256": "82e43c68bddebb55a18577ae3cb0d01c02c23f086d342a854ff8a174d9f4fd73",
+  "size_bytes": 354209,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/clay_plaster/clay_plaster_diff_1k.jpg",
+  "retrieved_at": "2026-11-13T15:35:04+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}
