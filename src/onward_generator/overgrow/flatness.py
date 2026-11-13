@@ -113,8 +113,9 @@ def _albedo_size(data: bytes) -> tuple[int, int] | None:
 def prop_flat(prop: Prop) -> bool:
     """Whether a loaded library prop is drawn in flat colours: each albedo part read like ``flat_colour`` reads a GLB."""
     parts = prop._parts()
-    shares = [flat_share(prop.mesh.vertices, prop.mesh.triangles[lo:hi], prop.uvs, _albedo_size(part.albedo))
-              for (lo, hi), part in zip(pairwise([0, *(part.end for part in parts)]), parts, strict=True)]
+    bounds = list(pairwise([0, *(part.end for part in parts)]))
+    pairs = zip(bounds, parts, strict=True)  # pragma: no mutate: the bounds come from the parts, so both sides always have one entry per part
+    shares = [flat_share(prop.mesh.vertices, prop.mesh.triangles[lo:hi], prop.uvs, _albedo_size(part.albedo)) for (lo, hi), part in pairs]
     return is_flat(sum(swatch for swatch, _ in shares), sum(total for _, total in shares))
 
 
