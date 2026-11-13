@@ -331,7 +331,7 @@ def _help(argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.Captu
 def test_top_help_names_the_program_and_its_summary(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     text = _help([], monkeypatch, capsys)
     assert text.startswith("usage: onward-generator asset-store ")
-    assert "\n``onward-generator asset-store scan | import`` (ADR-035).\n" in text
+    assert "\n``onward-generator asset-store scan | import | textures`` (ADR-035).\n" in text
 
 
 @pytest.mark.parametrize("command", ["scan", "import"])
