@@ -130,6 +130,9 @@ namespace OnwardGenerator
             // lit_normal.png. Empty (absent in older packages and in every card without the key) keeps PP_Opaque_Simple_Lit.
             // lit_normal_strength is baked into the PNG by export package; the adapter does not read it.
             public string lit_normal_material = "";
+            // Plan T3 (ADR-039): the materials drawn with PP_Opaque_Lit and a real library normal map, each with its
+            // normal_<id>.png. Empty (absent in older packages) keeps every other material on PP_Opaque_Simple_Lit.
+            public NormalMapRef[] normal_maps = new NormalMapRef[0];
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -170,6 +173,8 @@ namespace OnwardGenerator
         [Serializable] private class ExperimentalEnvironment { public string time_of_day = ""; public string profile = ""; public string sky_color = ""; }
 
         [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
+        [Serializable] private class NormalMapRef { public string material; public string path; }
+        private const string NormalMapRole = "normal_map";
         [Serializable] private class LightmapCore { public float half_side_m; public float scale; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
         [Serializable] private class Block { public float[] centre_m; public XY[] points_m; }
@@ -273,6 +278,13 @@ namespace OnwardGenerator
                 throw new InvalidDataException($"lit_normal_material {pkg.Options.lit_normal_material} needs exactly one '{LitNormalRole}' file, found {litNormalFiles}");
             if (string.IsNullOrEmpty(pkg.Options.lit_normal_material) && litNormalFiles != 0)
                 throw new InvalidDataException($"package lists a '{LitNormalRole}' file but adapter_options.json has no lit_normal_material");
+            // Plan T3: every normal map the options name is a listed (and so verified) normal_map file, and no other is.
+            var normalFiles = new HashSet<string>(m.files.Where(f => f.role == NormalMapRole).Select(f => f.path), StringComparer.Ordinal);
+            var namedNormals = new HashSet<string>((pkg.Options.normal_maps ?? new NormalMapRef[0]).Select(r => r.path), StringComparer.Ordinal);
+            if (!normalFiles.SetEquals(namedNormals))
+                throw new InvalidDataException($"adapter_options.json normal_maps name {namedNormals.Count} files, the package lists {normalFiles.Count} '{NormalMapRole}' files");
+            if ((pkg.Options.normal_maps ?? new NormalMapRef[0]).Any(r => r.material == pkg.Options.lit_normal_material))
+                throw new InvalidDataException("a material is both the lit_normal_material and a library normal-map material");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -630,7 +642,7 @@ namespace OnwardGenerator
         // centre on glTF (x, z), as onward_generator.perf.measure.combine_groups. Collision
         // is not touched. Measured on the Quest in phase 05 (ADR-005).
         private static int BuildCombinedVisual(Glb visual, Mesh[] meshes, int[][] meshMaterials, Material[] materials,
-            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt, int litNormal = -1)
+            Transform parent, string root, float cellM, StaticEditorFlags flags, Options opt, HashSet<int> litSet = null)
         {
             int[] canonical = CanonicalMaterials(visual.Doc.materials, materials, opt);
             var groups = new SortedDictionary<(int, int, int), List<CombineInstance>>();
@@ -699,7 +711,7 @@ namespace OnwardGenerator
                     if (mat >= 0 && mat < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[mat]))
                         SetWhiteVertexColors(combined);
                     // Plan D5: only the promoted material's groups get tangents, after the unwrap.
-                    if (litNormal >= 0 && mat == litNormal)
+                    if (litSet != null && litSet.Contains(mat))
                     {
                         AddTangents(combined);
                         tangentMeshes++;
@@ -745,8 +757,8 @@ namespace OnwardGenerator
             if (coreMeshes.Count > 0)
                 Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} Core lightmap (ADR-037): {1} combined meshes inside {2:0.#} m at x{3:0.####}.",
                     LogPrefix, coreMeshes.Count, opt.lightmap_core.half_side_m, opt.lightmap_core.scale));
-            if (litNormal >= 0)
-                Debug.Log($"{LogPrefix} Lit normal: {tangentMeshes} combined meshes of {visual.Doc.materials[litNormal].name} got tangents.");
+            if (litSet != null && litSet.Count > 0)
+                Debug.Log($"{LogPrefix} Lit normal: {tangentMeshes} combined meshes of {litSet.Count} materials got tangents.");
             Debug.Log($"{LogPrefix} scaleInLightmap (scale x renderers): "
                 + string.Join(", ", byScale.Select(kv => string.Format(CultureInfo.InvariantCulture, "{0:0.###} x {1}", kv.Key, kv.Value))));
             return built.Count;
@@ -817,12 +829,36 @@ namespace OnwardGenerator
                     EnsureFolder(root + "/Textures");
                     litNormalMap = LoadNormalPng(pkg.Path(LitNormalRole), $"{root}/Textures/N_{LitNormalRole}", repeatTextures, opt.albedo_compression);
                 }
+                // Plan T3: each library normal map once, then the materials it serves.
+                var normalByMaterial = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+                var normalByPath = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+                foreach (NormalMapRef entry in opt.normal_maps ?? new NormalMapRef[0])
+                {
+                    if (!normalByPath.TryGetValue(entry.path, out Texture2D map))
+                    {
+                        EnsureFolder(root + "/Textures");
+                        map = LoadNormalPng(System.IO.Path.Combine(pkg.Dir, entry.path),
+                            $"{root}/Textures/N_{System.IO.Path.GetFileNameWithoutExtension(entry.path)}", repeatTextures, opt.albedo_compression);
+                        normalByPath[entry.path] = map;
+                    }
+                    normalByMaterial[entry.material] = map;
+                }
+                var litSet = new HashSet<int>();
+                if (litNormal >= 0) litSet.Add(litNormal);
+                for (int k = 0; k < visual.Doc.materials.Length; k++)
+                    if (normalByMaterial.ContainsKey(visual.Doc.materials[k].name)) litSet.Add(k);
+                if (normalByMaterial.Count > 0)
+                    Debug.Log($"{LogPrefix} Normal maps: {normalByPath.Count} library maps for {litSet.Count - (litNormal >= 0 ? 1 : 0)} of {normalByMaterial.Count} named materials.");
+                if (litSet.Count - (litNormal >= 0 ? 1 : 0) != normalByMaterial.Count)
+                    throw new InvalidDataException("a normal_maps material is not a material of the visual GLB");
                 Material[] materials = visual.Doc.materials.Select(g =>
                 {
                     int index = g.pbrMetallicRoughness != null && g.pbrMetallicRoughness.baseColorTexture != null
                         ? g.pbrMetallicRoughness.baseColorTexture.index : -1;
                     Texture2D tex = index >= 0 && index < images.Length ? images[index]
                         : (!repeatTextures && images.Length == 1 ? images[0] : null);
+                    if (normalByMaterial.TryGetValue(g.name, out Texture2D libraryNormal))
+                        return GetOrCreateMaterial(g, root + "/Materials", tex, libraryNormal, SafeName(g.name));
                     return GetOrCreateMaterial(g, root + "/Materials", tex, litNormalMap, opt.lit_normal_material);
                 }).ToArray();
                 var visualMeshes = new Mesh[visual.Doc.meshes.Length];
@@ -839,7 +875,7 @@ namespace OnwardGenerator
                         if (visualMaterials[i].Any(k => k >= 0 && k < visual.Doc.materials.Length && IsViewGlass(visual.Doc.materials[k])))
                             SetWhiteVertexColors(mesh);
                         // Plan D5: only the meshes that draw the promoted material get tangents.
-                        if (litNormal >= 0 && visualMaterials[i].Contains(litNormal))
+                        if (visualMaterials[i].Any(litSet.Contains))
                             AddTangents(mesh);
                         AssetDatabase.CreateAsset(mesh, $"{root}/Meshes/V{i:D4}.asset");
                     }
@@ -853,7 +889,7 @@ namespace OnwardGenerator
                 int visualObjects;
                 if (opt.combine_cell_m > 0)
                 {
-                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt, litNormal);
+                    visualObjects = BuildCombinedVisual(visual, visualMeshes, visualMaterials, materials, visualRoot.transform, root, opt.combine_cell_m, flags, opt, litSet);
                 }
                 else
                 {
@@ -3432,9 +3468,11 @@ namespace OnwardGenerator
             return flags;
         }
 
+        private static string SafeName(string name) => new string(name.Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_').ToArray());
+
         private static Material GetOrCreateMaterial(GMaterial g, string folder, Texture2D atlas = null, Texture2D normal = null, string litNormal = "")
         {
-            string safe = new string(g.name.Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_').ToArray());
+            string safe = SafeName(g.name);
             string path = $"{folder}/M_{safe}.mat";
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null) return existing;

@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="replace facade-atlas photographs over their calm limit with wide-library ones (plan T2)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--normal-maps", action="store_true",
+        help="list the materials drawing a library photograph with a real normal map, for export package (plan T3)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--repetition", action="store_true",
         help="measure roof and paving tiles and phase the ground UVs per combine cell (plan C1)",  # pragma: no mutate: help text only
     )
@@ -109,6 +113,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         palette=palette,
         facade_weathering=args.facade_weathering,
         wide_library=args.wide_library,
+        normal_maps=args.normal_maps,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -132,6 +137,10 @@ def _run_apply(args: argparse.Namespace) -> int:
         if tone:
             print(f"facades: atmosphere {tone['preset']} (ADR-037): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
                   f"desaturated, value at most {tone['wall_value_max']:g}; mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}")
+    normals = report.get("normal_maps")
+    if normals:
+        print(f"normal maps: {len(normals['materials'])} materials ({', '.join(normals['materials']) or 'none'}); "
+              f"without one: {', '.join(normals['without']) or 'none'}")
     repetition = report.get("repetition")
     if repetition:
         over = ", ".join(repetition["over_limit"]) or "none"

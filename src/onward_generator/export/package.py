@@ -38,6 +38,7 @@ from onward_generator.export.atmosphere import (
     load_presets,
 )
 from onward_generator.export.info3 import fit_listing_description
+from onward_generator.export.library_normals import NORMAL_MAP_ROLE, LibraryNormalError, normal_map_files, scene_normal_maps
 from onward_generator.export.lightmap import (
     DEFAULT_CLASS_SCALES,
     LightmapBudgetError,
@@ -400,6 +401,21 @@ def _lit_normal(options: Mapping[str, Any], visual: bytes, warnings: list[str]) 
     return encode_png(pixels), block
 
 
+def _library_normals(options: dict[str, Any], visual: bytes) -> tuple[dict[str, bytes], dict[str, Any]] | None:
+    """Plan T3: the library normal maps the visual GLB lists, and ``options["normal_maps"]`` (material and file) for the
+    adapter; None, and no option, for a scene without the list."""
+    bindings = scene_normal_maps(visual)
+    if not bindings:
+        return None
+    lit = options.get("lit_normal_material")
+    try:
+        pngs, block = normal_map_files(bindings, lit_normal_material=None if lit is None else str(lit))
+    except LibraryNormalError as exc:
+        raise ExportError([f"normal maps: {exc}"]) from exc
+    options["normal_maps"] = [{"material": name, "path": path} for name, path in sorted(block["materials"].items())]
+    return pngs, block
+
+
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
     return fit_listing_description(f"{config['map']['description']} Data: {credits}.")
@@ -479,6 +495,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                        if "lightmap_pages_max" in options else None)
     # Plan D5 (ADR-033, proposed): read, never written or normalised, so a card without the key keeps its package_id.
     lit_normal = _lit_normal(options, visual_bytes, warnings) if "lit_normal_material" in options else None
+    # Plan T3 (ADR-039): only a scene that lists library normal maps adds files and an option, so others keep their package_id.
+    library_normals = _library_normals(options, visual_bytes)
     if experimental is not None:
         warnings.append("build.experimental_environment: a test package for the headset (plan E2, ADR-037); do not publish it")
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
@@ -533,6 +551,11 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         atomic_write_json(out / OPTIONS_FILE, options)
         files.append({"role": "options", "path": OPTIONS_FILE, "sha256": sha256_file(out / OPTIONS_FILE),
                       "bytes": (out / OPTIONS_FILE).stat().st_size, "source": str(cfg_path)})
+        if library_normals is not None:
+            for path, png in library_normals[0].items():
+                atomic_write_bytes(out / path, png)
+                files.append({"role": NORMAL_MAP_ROLE, "path": path, "sha256": sha256_file(out / path),
+                              "bytes": (out / path).stat().st_size, "source": "library"})
         if lit_normal is not None:
             png, _block = lit_normal
             atomic_write_bytes(out / LIT_NORMAL_FILE, png)
@@ -573,6 +596,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         }
         if lit_normal is not None:
             manifest["lit_normal"] = lit_normal[1]
+        if library_normals is not None:
+            manifest["normal_maps"] = library_normals[1]
         if experimental is not None:
             # Plan E2: what the client shows for each profile is unknown until a headset session (ADR-037).
             manifest["experimental_environment"] = {**experimental, "status": "untested"}

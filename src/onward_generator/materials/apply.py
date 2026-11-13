@@ -126,6 +126,28 @@ def share_facade_photos(
     return shared
 
 
+def normal_map_bindings(applied: Sequence[Mapping[str, Any]], used: Collection[str], trim_materials: Collection[str]) -> dict[str, Any]:
+    """Plan T3: the materials of the scene that draw a library photograph with a real normal map, each with that map.
+
+    A material takes its base's map (``material_base``: a party wall or a tint shows its base's photograph, so it shows
+    its relief too). Trim facades keep their own path (ADR-033). ``without`` lists the applied photographs that have
+    no normal map, which stay albedo-only."""
+    from onward_generator.materials.library_plan import catalogue_rows
+
+    rows = {str(row["id"]): row for row in catalogue_rows()}
+    by_base: dict[str, dict[str, Any]] = {}
+    without: set[str] = set()
+    for row in applied:
+        normal = rows.get(str(row["asset_id"]), {}).get("normal")
+        if normal is None:
+            without.add(str(row["asset_id"]))
+            continue
+        by_base[str(row["color_id"])] = {"library_id": str(row["asset_id"]), "path": normal["path"], "sha256": normal["sha256"]}
+    chosen = {name: by_base[material_base(name)] for name in sorted(used)
+              if material_base(name) in by_base and name not in trim_materials}
+    return {"enabled": True, "materials": chosen, "without": sorted(without)}
+
+
 def share_tint_photos(used: Collection[str], photo_tiles: dict[str, tuple[Any, str]]) -> list[dict[str, Any]]:
     """Give each used tint (``building:colour``, ``roof:colour``; ADR-023) its base's photograph, in greyscale.
 
@@ -404,6 +426,7 @@ def apply_materials(
     palette: WallPalette | None = None,
     facade_weathering: str | None = None,
     wide_library: bool = False,
+    normal_maps: bool = False,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
 
@@ -581,6 +604,9 @@ def apply_materials(
     }
     if cell_phase is not None:
         extras["materials"]["repetition"] = {"cell_m": cell_phase.cell_m}
+    normal_block = normal_map_bindings(applied, used_ids, trim.materials) if normal_maps else None
+    if normal_block is not None:
+        extras["materials"]["normal_maps"] = normal_block["materials"]
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
     for row in interior_shared:
         tile_m[str(row["color_id"])] = float(row["tile_m"])
@@ -691,6 +717,8 @@ def apply_materials(
     }
     if repetition_block is not None:
         materials_report["repetition"] = repetition_block
+    if normal_block is not None:
+        materials_report["normal_maps"] = normal_block
     if street_profile is not None:
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         materials_report["street_profile"] = dict(street_profile)

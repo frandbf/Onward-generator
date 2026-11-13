@@ -215,6 +215,7 @@ def materials_command(base: Path) -> StageCommand:
     from onward_generator.maps.workspace import (
         combine_cell_m,
         facade_options,
+        normal_maps_enabled,
         regional_facades_enabled,
         repetition_enabled,
         wide_library_enabled,
@@ -232,6 +233,7 @@ def materials_command(base: Path) -> StageCommand:
         *(facade_options(root) if root is not None else []),
         *regional,
         *(["--wide-library"] if root is not None and wide_library_enabled(root) else []),
+        *(["--normal-maps"] if root is not None and normal_maps_enabled(root) else []),
         *repetition,
         *profile_flags(root).get("materials", []),
         *(("--atmosphere", atmosphere) if (atmosphere := _atmosphere(root) if root is not None else None) else ()),

@@ -854,13 +854,15 @@ def test_unity_adapter_promotes_only_the_lit_normal_material() -> None:
     package_check = source[source.index("private static Package LoadPackage"):source.index("// ---- glTF subset")]
     assert "m.files.Count(f => f.role == LitNormalRole)" in package_check
     assert "has no lit_normal_material" in package_check and "needs exactly one" in package_check
-    # Tangents only on the promoted material's meshes, after the lightmap unwrap.
+    # Tangents only on the meshes of the lit materials (the promoted one and the library normal maps, ADR-039), after
+    # the lightmap unwrap.
     combined = source[source.index("private static int BuildCombinedVisual"):source.index("// ---- Entry points")]
     assert combined.index("Unwrapping.GenerateSecondaryUVSet(combined") < combined.index("AddTangents(combined);")
-    assert "if (litNormal >= 0 && mat == litNormal)" in combined
-    assert "if (litNormal >= 0 && visualMaterials[i].Contains(litNormal))\n                            AddTangents(mesh);" in source
+    assert "if (litSet != null && litSet.Contains(mat))" in combined
+    assert "if (visualMaterials[i].Any(litSet.Contains))\n                            AddTangents(mesh);" in source
+    assert "if (litNormal >= 0) litSet.Add(litNormal);" in source
     assert source.count("RecalculateTangents") == 1 and source.count("AddTangents(") == 3
-    assert "opt.combine_cell_m, flags, opt, litNormal);" in source
+    assert "opt.combine_cell_m, flags, opt, litSet);" in source
 
 
 def test_default_fog_colour_is_the_backdrop_haze() -> None:
@@ -885,3 +887,77 @@ def test_unity_adapter_draws_a_crossbar_only_where_the_sdk_grips_it() -> None:
     check = source[source.index("internal static void CheckLadderGrips"):]
     assert "has no grip on it." in check and "has nothing drawn under the hand." in check
     assert "Math.Abs(Math.Abs(g.x) - LadderRailWidthM / 2f) <= 0.03f && g.y <= top + GripReachM" in check
+
+
+def test_unity_adapter_draws_the_library_normal_maps_it_is_given() -> None:
+    """Plan T3 (ADR-039): each material of adapter_options normal_maps on the lit graph with its map, each map imported
+    once, and a package whose options and files disagree refused."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert "public NormalMapRef[] normal_maps = new NormalMapRef[0];" in source
+    assert "[Serializable] private class NormalMapRef { public string material; public string path; }" in source
+    assert 'private const string NormalMapRole = "normal_map";' in source
+    package_check = source[source.index("private static Package LoadPackage"):source.index("// ---- glTF subset")]
+    assert "if (!normalFiles.SetEquals(namedNormals))" in package_check
+    assert "a material is both the lit_normal_material and a library normal-map material" in package_check
+    scene = source[source.index("var normalByMaterial = new Dictionary<string, Texture2D>"):source.index("var visualMeshes = new Mesh[")]
+    assert "if (!normalByPath.TryGetValue(entry.path, out Texture2D map))" in scene  # one import per map
+    assert "map = LoadNormalPng(System.IO.Path.Combine(pkg.Dir, entry.path)," in scene
+    assert "a normal_maps material is not a material of the visual GLB" in scene
+    assert "return GetOrCreateMaterial(g, root + \"/Materials\", tex, libraryNormal, SafeName(g.name));" in scene
+    assert "string safe = SafeName(g.name);" in source
+
+
+@pytest.fixture(scope="module")
+def normal_inputs(inputs: tuple[Path, Path], tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """The fixture scene whose visual GLB lists two of its materials with the wide library's ph_clean_asphalt normal map."""
+    from onward_generator.materials.library_plan import WIDE_LIBRARY_PATH, library_rows
+
+    detail = tmp_path_factory.mktemp("normals") / "detail"
+    shutil.copytree(inputs[0], detail)
+    doc, blob = read_glb((detail / "scene_visual.glb").read_bytes())
+    row = next(r for r in library_rows(WIDE_LIBRARY_PATH) if r["id"] == "ph_clean_asphalt")
+    names = [m["name"] for m in doc["materials"]][:2]
+    binding = {"library_id": row["id"], "path": row["normal"]["path"], "sha256": row["normal"]["sha256"]}
+    doc.setdefault("extras", {}).setdefault("materials", {})["normal_maps"] = {name: binding for name in names}
+    (detail / "scene_visual.glb").write_bytes(pack_glb(doc, blob))
+    return detail, inputs[1]
+
+
+def test_library_normal_maps_go_into_the_package_once_each(normal_inputs: tuple[Path, Path], inputs: tuple[Path, Path],
+                                                          tmp_path: Path) -> None:
+    from onward_generator.export.library_normals import NORMAL_MAPS_MAX_BYTES
+    from onward_generator.export.normal_map import astc6x6_bytes
+
+    on = package(normal_inputs, tmp_path / "on")
+    out = on.directory
+    assert verify_package(out) == []
+    names = sorted(read_glb((normal_inputs[0] / "scene_visual.glb").read_bytes())[0]["extras"]["materials"]["normal_maps"])
+    entries = [f for f in on.manifest["files"] if f["role"] == "normal_map"]
+    assert entries == [{"role": "normal_map", "path": "normal_ph_clean_asphalt.png", "sha256": sha256_file(out / entries[0]["path"]),
+                        "bytes": (out / entries[0]["path"]).stat().st_size, "source": "library"}]
+    block = on.manifest["normal_maps"]
+    source = "assets/textures/clean_asphalt/clean_asphalt_nor_gl_1k.jpg"
+    assert block == {"materials": {name: "normal_ph_clean_asphalt.png" for name in names},
+                     "files": [{"path": "normal_ph_clean_asphalt.png", "library_id": "ph_clean_asphalt", "width": 1024, "height": 1024,
+                                "astc6x6_bytes": astc6x6_bytes(1024, 1024), "source": source,
+                                "source_sha256": hashlib.sha256((REPO_ROOT / source).read_bytes()).hexdigest()}],
+                     "astc6x6_bytes": astc6x6_bytes(1024, 1024), "limit_bytes": NORMAL_MAPS_MAX_BYTES, "origin": "observed",
+                     "license": "CC0-1.0"}
+    with Image.open(out / "normal_ph_clean_asphalt.png") as written, Image.open(REPO_ROOT / source) as original:
+        assert written.size == (1024, 1024) and (np.asarray(written) == np.asarray(original.convert("RGB"))).all()
+    options = load(out / "adapter_options.json")
+    assert options["normal_maps"] == [{"material": name, "path": "normal_ph_clean_asphalt.png"} for name in names]
+    plain = package(inputs, tmp_path / "plain")
+    assert "normal_maps" not in plain.manifest and "normal_maps" not in load(plain.directory / "adapter_options.json")
+    assert on.manifest["package_id"] != plain.manifest["package_id"] == GOLDEN_PACKAGE_ID
+
+
+def test_library_normal_maps_over_the_limit_are_refused_and_nothing_is_left(normal_inputs: tuple[Path, Path], tmp_path: Path,
+                                                                           monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.export import library_normals
+    from onward_generator.export.normal_map import astc6x6_bytes
+
+    monkeypatch.setattr(library_normals, "NORMAL_MAPS_MAX_BYTES", 1000)
+    with pytest.raises(ExportError, match=f"normal maps: 1 normal maps take {astc6x6_bytes(1024, 1024)} bytes in ASTC 6x6, over the 1000 limit"):
+        package(normal_inputs, tmp_path / "over")
+    assert not (tmp_path / "over").exists()
