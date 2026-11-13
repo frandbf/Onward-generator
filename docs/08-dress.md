@@ -193,6 +193,7 @@ Catalogue repeats for the ground: `asphalt_road` uses `tile_m` 10 m (it was 4 m,
 
   `tests/unit/test_wide_library.py` checks the hashes, the licence, the family and the calm limit.
 - **Normal maps (plan T3).** Each row also records `normal`: the texture's OpenGL normal map (`nor_gl`, 1k JPEG, CC0, fetched with `materials.polyhaven.ensure_map_1k(url, "nor_gl")`) beside its albedo, with its own `.source.json`. It is the real normal map of the PBR set, not one derived from the albedo. It is read only by the opt-in normal-map path (`map.json` `"normal_maps": true`, [12-export.md](12-export.md#library-normal-maps-plan-t3), ADR-039); without the switch it changes no scene and no package. The 25 maps add 22 MB to the repository.
+- **Local Asset Store textures.** While local catalogues are on, the pools also hold the texture sets of the maintainer's Asset Store texture packages (`asset-store textures`, ADR-035 amendment of 13 November 2026). They are local-only rows under the same calm limits, each with its normal map.
 - **Cost.** It is the same as without the switch. A slot still binds one photograph, resized to at most 1024 px (`MAX_PHOTO_PX`), so no material, draw or texture is added. Only the choice of image changes.
 
 | Texture | Family | Coarse contrast | Limit |

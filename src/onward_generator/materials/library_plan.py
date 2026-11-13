@@ -122,9 +122,14 @@ def library_rows(path: Path | None = None) -> list[dict[str, Any]]:
 
 
 def catalogue_rows() -> list[dict[str, Any]]:
-    """Every texture a plan may name: the imported library and the wide one (plan T1). Only the pools decide which
-    a map draws on, so a plan written with ``wide`` still resolves later without the switch."""
-    return library_rows() + library_rows(WIDE_LIBRARY_PATH)
+    """Every texture a plan may name: the imported library, the wide one (plan T1) and, while local catalogues are on,
+    the Asset Store texture catalogues of this machine (ADR-035). Only the pools decide which a map draws on, so a plan
+    written with ``wide`` still resolves later without the switch."""
+    from onward_generator.assetstore import local
+    from onward_generator.assetstore.textures import local_texture_rows
+
+    rows = library_rows() + library_rows(WIDE_LIBRARY_PATH)
+    return rows + local_texture_rows(REPO_ROOT / "assets") if local.enabled() else rows
 
 
 def texture_family(row: Mapping[str, Any]) -> str | None:
