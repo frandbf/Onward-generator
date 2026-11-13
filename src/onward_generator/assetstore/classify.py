@@ -56,11 +56,24 @@ LARGE_STORAGE_M = 2.5
 CONTAINER_WORDS = frozenset({"container", "tank"})
 UTILITY_WORDS = frozenset({"electric", "electrical", "transformer", "fusebox"})
 INDOOR_ONLY_WORDS = frozenset({"giftbox", "gift"})
+# Reviewed 13 November 2026 (ADR-035 amendment, the wide import): rocks are open-ground vegetation; a light on a pole
+# is a lamp post; a model named only "Object1" takes the words of its package (Street Lights Pack: lamp posts).
+ROCK_WORDS = frozenset({"rock", "rocks", "boulder", "stone", "stones", "pebble"})
+LIGHT_WORDS = frozenset({"light", "lights", "lamp", "lantern"})
+POLE_WORDS = frozenset({"street", "post", "pole", "road"})
+AIR_SEA_WORDS = frozenset({"helicopter", "plane", "airplane", "aircraft", "jet", "boat", "ship", "yacht"})
+"""Craft no street holds: refused even when the package's name calls its models vehicles."""
+POLE_LIKE_WORDS = frozenset({"lamppost", "streetlight", "post", "bollard", "trafficlight", "meter", "hydrant"})
+"""Street furniture that is thin and tall by nature: never mistaken for a wall panel."""
 # A piece thinner than this across its footprint and taller than a metre is a loose door or panel of a kit, unless an
 # interior word names it (a painting, a mirror, a television hang flat on a wall).
 PANEL_M = 0.15
 MAX_WALL_DEPTH_M = 0.8
 MAX_COUNTER_DEPTH_M = 1.0
+
+
+KNOWN_WORDS = (KIT_WORDS | VEHICLE_WORDS | STREET_WORDS | STORAGE_WORDS | INTERIOR_WORDS | ROCK_WORDS | LIGHT_WORDS | CONTAINER_WORDS
+               | UTILITY_WORDS | INDOOR_ONLY_WORDS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,16 +110,21 @@ def classify(name: str, size: tuple[float, float, float], package: str, category
     and its Asset Store category folder, which decide an ambiguous word such as ``barrel`` or ``bin``.
     """
     words = _with_singulars(words_of(name))
-    if "lamp" in words and words & {"post", "street"}:
-        words = (words - {"lamp"}) | {"lamppost"}  # a lamp post or a street lamp is street furniture, not a room's lamp
+    if words & AIR_SEA_WORDS:
+        return Decision(None, "aircraft_or_boat")
+    # "Object1": the package's name says what its models are, but not as a kit piece ("Shop Props" is no shop).
+    from_package = _with_singulars(words_of(package)) if not words & KNOWN_WORDS else set()
+    words |= from_package - KIT_WORDS
+    if words & LIGHT_WORDS and (words | from_package) & POLE_WORDS:
+        words = (words - LIGHT_WORDS) | {"lamppost"}  # a lamp post or a street light is street furniture, not a room's lamp
     length, depth, height = size
     longest = max(size)
     if words & KIT_WORDS and not words & (INTERIOR_WORDS | VEHICLE_WORDS | STREET_WORDS | STORAGE_WORDS):
         return Decision(None, "kit_piece")
     if longest < 0.03 or longest > 12.0 or height <= 0.0:
         return Decision(None, "size")
-    if min(length, depth) < PANEL_M and height > 1.0 and ("door" in words or not words & INTERIOR_WORDS):
-        return Decision(None, "kit_piece")
+    if min(length, depth) < PANEL_M and height > 1.0 and ("door" in words or not words & (INTERIOR_WORDS | POLE_LIKE_WORDS)):
+        return Decision(None, "kit_piece")  # a lamp post or a bollard is thin and tall too, and stays
     context = f"{package} {category}"
     exterior = _hint(context, EXTERIOR_HINTS) and not _hint(context, INTERIOR_HINTS)
     if words & INDOOR_ONLY_WORDS:
@@ -137,6 +155,9 @@ def classify(name: str, size: tuple[float, float, float], package: str, category
                              "cluster", f"Storage or waste item ({_label(name)}) from {package}, about {longest:.2f} m.", words), "storage_outdoor")
     if words & (INTERIOR_WORDS | STORAGE_WORDS):
         return _interior(name, words, length, depth, height, package, context)
+    if words & ROCK_WORDS:
+        return Decision(_row("vegetation", "rock", "open_ground", "ground", ["yard", "empty_lot", "plaza", "courtyard"],
+                             "cluster", f"Rock ({_label(name)}) from {package}, about {longest:.2f} m.", words), "rock")
     return Decision(None, "unclassified")
 
 
