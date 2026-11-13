@@ -910,7 +910,7 @@ def test_create_writes_only_the_switches_it_is_given_after_the_paths(tmp_path: P
     assert repetition_enabled(tmp_path / "on") and gameplay_report_enabled(tmp_path / "on")
     assert list(MAP_SWITCHES) == ["street_profile", "repetition", "overture_tints", "lidar_roofs", "regional_facades",
                                   "gameplay_report", "balanced_spawns", "sightline_cover", "panoramax_atlas", "wide_library",
-                                  "normal_maps"]
+                                  "normal_maps", "texture_variants"]
 
 
 def test_create_with_repetition_writes_the_plan_a_texture_refresh_would(tmp_path: Path) -> None:

@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="replace facade-atlas photographs over their calm limit with wide-library ones (plan T2)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--texture-variants", action="store_true",
+        help="give building roofs and plaster walls two more calm photographs, one per building by hash (plan T4)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--normal-maps", action="store_true",
         help="list the materials drawing a library photograph with a real normal map, for export package (plan T3)",  # pragma: no mutate: help text only
     )
@@ -114,6 +118,7 @@ def _run_apply(args: argparse.Namespace) -> int:
         facade_weathering=args.facade_weathering,
         wide_library=args.wide_library,
         normal_maps=args.normal_maps,
+        texture_variants=args.texture_variants,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -137,6 +142,9 @@ def _run_apply(args: argparse.Namespace) -> int:
         if tone:
             print(f"facades: atmosphere {tone['preset']} (ADR-037): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
                   f"desaturated, value at most {tone['wall_value_max']:g}; mean wall luminance {tone['wall_luminance_before']:g} -> {tone['wall_luminance_after']:g}")
+    variants = report.get("texture_variants")
+    if variants:
+        print(f"texture variants: {variants['added_materials']} materials added ({', '.join(variants['materials']) or 'none'})")
     normals = report.get("normal_maps")
     if normals:
         print(f"normal maps: {len(normals['materials'])} materials ({', '.join(normals['materials']) or 'none'}); "
