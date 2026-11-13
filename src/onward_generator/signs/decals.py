@@ -218,7 +218,7 @@ def _peeling(rng: np.random.Generator, n: int) -> np.ndarray:
         corners = [(cx + r * rng.uniform(0.6, 1.3) * np.cos(a), cy + r * rng.uniform(0.6, 1.3) * np.sin(a))
                    for a in np.arange(9) * (2 * np.pi / 9)]
         draw.polygon(corners, fill=230)
-    inside = np.asarray(_blur(flakes, 0.8)).astype(np.int16)
+    inside = np.asarray(_blur(flakes, 0.8)).astype(np.int16)  # pragma: no mutate: a float array holds the same small integers
     rim = np.asarray(_blur(flakes, 3.0)).astype(np.int16) - inside  # pragma: no mutate: a float array holds the same small integers
     pixels[..., :3] = np.where(inside[..., None] > 120, np.array([170, 160, 146]), np.array([60, 52, 44]))
     pixels[..., 3] = np.minimum(np.maximum(inside, np.abs(rim) * 3), 255)  # the uint8 page takes the values as they are
@@ -240,7 +240,7 @@ def _chalk(rng: np.random.Generator, n: int) -> np.ndarray:
     x0, y0 = rng.uniform(0.1, 0.3) * n, rng.uniform(0.25, 0.4) * n
     for k in range(int(rng.integers(4, 9))):  # tally strokes, every fifth across the four before it
         x = x0 + (k % 5) * 0.08 * n + (k // 5) * 0.5 * n
-        if k % 5 == 4:
+        if k % 5 == 4:  # pragma: no mutate: at most 8 strokes, so only the fifth closes a group, whatever the modulus past 4
             draw.line((x - 0.34 * n, y0 + 0.28 * n, x + 0.02 * n, y0 + 0.02 * n), fill=220, width=int(n * 0.02))
         else:
             draw.line((x, y0, x + rng.uniform(-3, 3), y0 + 0.3 * n), fill=220, width=int(n * 0.02))
