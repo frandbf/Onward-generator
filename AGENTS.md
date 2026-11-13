@@ -38,7 +38,7 @@ Phases 00 through 06 are done. Phase 07, the final export, stays open. `device_v
 - Track the provenance of generated objects.
 - Distinguish observed, estimated, and AI-generated attributes.
 - Keep AI optional and validate every model output. The model host is loopback Ollama only. Inside a container, `host.docker.internal` counts as the machine's loopback when it resolves to a private address (ADR-006 amendment of 12 November 2026); no other name or address does.
-- Prefer reusable geometry and materials. Exported materials use `PP_Opaque_Simple_Lit` and an albedo only.
+- Prefer reusable geometry and materials. Exported materials use `PP_Opaque_Simple_Lit` and an albedo only by default. A map may opt in (`map.json` `"normal_maps": true`, ADR-039) to `PP_Opaque_Lit` with the real CC0 normal map of a library photograph, for the materials that draw one; the ADR-033 trim spike is the other exception.
 - Keep collision meshes separate from visual meshes.
 - Do not rewrite historical scenes under `maps/*/data/`.
 

@@ -77,6 +77,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if lit is not None:
         print(f"  lit normal (plan D5 spike, ADR-033 proposed): {lit['material']} on PP_Opaque_Lit, {lit['path']} "
               f"{lit['width']} x {lit['height']} px at strength {lit['strength']:g}, about {lit['astc6x6_bytes']:,} bytes in ASTC 6x6")
+    normals = m.get("normal_maps")
+    if normals is not None:
+        print(f"  normal maps (plan T3, ADR-039): {len(normals['materials'])} materials on PP_Opaque_Lit, {len(normals['files'])} maps, "
+              f"about {normals['astc6x6_bytes']:,} bytes in ASTC 6x6 of {normals['limit_bytes']:,}")
     atmosphere = m.get("atmosphere")
     if atmosphere is not None:
         sun = atmosphere["sun"]

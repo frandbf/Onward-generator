@@ -75,6 +75,7 @@ MAP_SWITCHES: Mapping[str, str] = {
     "sightline_cover": "cover props on long open sightlines (plan C7)",
     "panoramax_atlas": "pack the street-photo decals per combine cell; acts only with --panoramax (ADR-020 amendment)",
     "wide_library": "the texture plan also draws on the wide CC0 library of config/dress/wide_library.json (plan T1)",
+    "normal_maps": "draw the library photographs that have one with their real normal map (PP_Opaque_Lit, plan T3)",
 }
 
 
@@ -322,6 +323,15 @@ def wide_library_enabled(directory: str | Path) -> bool:
     value = load_map(directory).get("wide_library", False)
     if not isinstance(value, bool):
         raise MapError(f'map.json "wide_library" must be true or false, got {value!r}')
+    return value
+
+
+def normal_maps_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"normal_maps": true`` (plan T3, off by default). A value that is not a bool is
+    refused."""
+    value = load_map(directory).get("normal_maps", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "normal_maps" must be true or false, got {value!r}')
     return value
 
 

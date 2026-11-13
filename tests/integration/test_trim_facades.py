@@ -163,3 +163,34 @@ def test_the_cli_weathers_the_atlas_and_reports_its_calm_sources(runs: dict[str,
     assert "facades: brick a (0.03) -> b (0.02), calm limit 0.025\n" in capsys.readouterr().out
     assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "x"),
                  "--facade-weathering", "rusty"]) == 2
+
+
+def test_normal_maps_list_the_photographs_that_have_one_and_the_cli_prints_them(runs: dict[str, Path], tmp_path: Path,
+                                                                               capsys: pytest.CaptureFixture[str]) -> None:
+    """Plan T3: --normal-maps lists, in the GLB and the report, each material whose library photograph has a normal map."""
+    from onward_generator.export.library_normals import scene_normal_maps
+    from onward_generator.materials.library_plan import catalogue_rows
+
+    lon, lat = MURCIA_CENTER
+    plan = tmp_path / "wide_plan.json"
+    plan.write_text(json.dumps(select_texture_plan(name="Murcia", map_id="murcia", latitude=lat, longitude=lon, brief=None, seed=1, wide=True)))
+    detail = runs["detail"]
+    assert main(["materials", "apply", "--base", str(detail), "--scene", str(runs["scene"]), "--plan", str(plan),
+                 "--out", str(tmp_path / "n"), "--normal-maps"]) == 0
+    out = capsys.readouterr().out
+    report = json.loads((tmp_path / "n" / "materials_report.json").read_bytes())
+    block = report["normal_maps"]
+    rows = {row["id"]: row for row in catalogue_rows()}
+    applied = {row["color_id"]: row["asset_id"] for row in report["applied"]}
+    assert block["enabled"] is True and block["materials"]
+    for name, binding in block["materials"].items():
+        library_id = binding["library_id"]
+        assert binding == {"library_id": library_id, "path": rows[library_id]["normal"]["path"], "sha256": rows[library_id]["normal"]["sha256"]}
+        assert applied[name.removeprefix("party_").split("__tint_")[0]] == library_id
+    assert block["without"] == sorted({a for a in applied.values() if "normal" not in rows.get(a, {})})
+    assert scene_normal_maps((tmp_path / "n" / "scene_visual.glb").read_bytes()) == block["materials"]
+    assert (f"normal maps: {len(block['materials'])} materials ({', '.join(block['materials'])}); "
+            f"without one: {', '.join(block['without']) or 'none'}\n") in out
+    plain = apply_materials(detail, tmp_path / "p", plan_path=plan, scene_path=runs["scene"])
+    assert "normal_maps" not in plain and "normal maps" not in capsys.readouterr().out
+    assert scene_normal_maps((tmp_path / "p" / "scene_visual.glb").read_bytes()) == {}

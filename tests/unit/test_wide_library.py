@@ -120,3 +120,21 @@ def test_every_wide_row_carries_its_cc0_opengl_normal_map() -> None:
             mean = np.asarray(image.convert("RGB"), dtype=float).mean(axis=(0, 1)) / 255
         # A tangent-space normal map: mostly facing out (blue), tilted evenly around the middle (red, green).
         assert mean[2] > 0.85 and 0.4 < mean[0] < 0.6 and 0.4 < mean[1] < 0.6, (row["id"], mean.round(3).tolist())
+
+
+def test_the_normal_maps_switch_is_read_from_map_json_and_reaches_materials_apply(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import normal_maps_enabled
+    from onward_generator.next_step import materials_command
+
+    lon, lat = MURCIA_CENTER
+    on = tmp_path / "on"
+    create_map(on, map_id="on", name="On", latitude=lat, longitude=lon, switches=["normal_maps"])
+    assert normal_maps_enabled(on)
+    assert "--normal-maps" in materials_command(on / "data" / "processed" / "scene_dress").argv
+    off = tmp_path / "off"
+    create_map(off, map_id="off", name="Off", latitude=lat, longitude=lon)
+    assert not normal_maps_enabled(off) and "--normal-maps" not in materials_command(off / "data" / "processed" / "scene_dress").argv
+    document = json.loads((off / "map.json").read_text(encoding="utf-8"))
+    (off / "map.json").write_text(json.dumps({**document, "normal_maps": 1}), encoding="utf-8")
+    with pytest.raises(MapError, match='"normal_maps" must be true or false, got 1'):
+        normal_maps_enabled(off)

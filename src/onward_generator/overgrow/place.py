@@ -25,6 +25,7 @@ from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import yaw_matrix
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
+from onward_generator.export.library_normals import carried_normal_maps
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, box, merge, transform
@@ -351,7 +352,8 @@ def overgrow(
     visual = build_glb(
         [*nodes, *extra_nodes], materials,
         extras={"manifest": "scene_detail.json", "overgrow": len(records),
-                **({PROP_ATLAS_EXTRA: {name: cell.to_list() for name, cell in sorted(cells.items())}} if cells else {})},
+                **({PROP_ATLAS_EXTRA: {name: cell.to_list() for name, cell in sorted(cells.items())}} if cells else {}),
+                **carried_normal_maps((base / "scene_visual.glb").read_bytes())},
         repeat_images=images, preserve_uvs=True,
         unit_uv_materials={"glass_dark", "glass_boarded", "glass_view", "door_wood"},
     )
