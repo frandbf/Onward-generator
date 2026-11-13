@@ -12,12 +12,17 @@ import io
 import json
 import struct
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PIL import Image
 
 from onward_generator.generation.mesh import Mesh
+
+if TYPE_CHECKING:
+    from onward_generator.overgrow.library import Prop
 
 # A face whose UVs span less than this many texels of its image samples one swatch.
 SWATCH_TEXELS = 2.0
@@ -97,6 +102,23 @@ def _image_size(image: dict, binary: bytes, doc: dict, folder: Path) -> tuple[in
         return picture.size
 
 
+def _albedo_size(data: bytes) -> tuple[int, int] | None:
+    try:
+        with Image.open(io.BytesIO(data)) as picture:  # the header only
+            return picture.size
+    except (OSError, ValueError):
+        return None
+
+
+def prop_flat(prop: Prop) -> bool:
+    """Whether a loaded library prop is drawn in flat colours: each albedo part read like ``flat_colour`` reads a GLB."""
+    parts = prop._parts()
+    bounds = list(pairwise([0, *(part.end for part in parts)]))
+    pairs = zip(bounds, parts, strict=True)  # pragma: no mutate: the bounds come from the parts, so both sides always have one entry per part
+    shares = [flat_share(prop.mesh.vertices, prop.mesh.triangles[lo:hi], prop.uvs, _albedo_size(part.albedo)) for (lo, hi), part in pairs]
+    return is_flat(sum(swatch for swatch, _ in shares), sum(total for _, total in shares))
+
+
 def flat_colour(path: Path) -> bool:
     """Whether the GLB at ``path`` is drawn in flat colours; a file that cannot be read is not."""
     try:
@@ -106,4 +128,4 @@ def flat_colour(path: Path) -> bool:
         return False
 
 
-__all__ = ["FLAT_SHARE", "SOLID_IMAGE_PX", "SWATCH_TEXELS", "flat_colour", "flat_share", "is_flat"]
+__all__ = ["FLAT_SHARE", "SOLID_IMAGE_PX", "SWATCH_TEXELS", "flat_colour", "flat_share", "is_flat", "prop_flat"]

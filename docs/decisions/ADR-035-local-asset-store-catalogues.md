@@ -64,3 +64,7 @@ Status: accepted. The import keeps a model at the size its author gave it (`unit
 ## Amendment (12 November 2026): the rules read the placement
 
 On Rue Mouffetard (pkg_06, on the headset) cardboard boxes and a gift box stood in the middle of the sidewalk by the kerb. The rows said `wall_foot`, but only the model's prompt read `placement`; the rules took any spot of the row's surfaces. `dressing.placement_reason` now refuses a `wall_foot` copy farther than `WALL_FOOT_M` = 1.5 m from a building (`not_wall_foot`), an `open_ground` copy on the carriageway, a sidewalk or a kerb (`not_open_ground`), and any copy of a role in `INDOOR_ROLES` (the gift box, `indoor_only`). Rows without a `placement` keep the earlier rule.
+
+## Amendment (12 November 2026): more street props, textured first
+
+The maintainer asked for more props on Rue Mouffetard (16 with the AI pick). The caps of the shared placement rules double for vehicles (12), waste (24), furniture (12), structures (8), facade props (16), barriers (8) and plants (16); `MAX_LIBRARY_TRIS` still bounds the library copies, under the 300 000 Unity triangle limit (ADR-005 amendment). Street props follow the furniture rule of ADR-036: `flatness.prop_flat` tells a loaded prop drawn in flat colours, the rules try the textured props first (a rule's cap is shared by its props), and the AI pick is not offered a flat prop where its spot has `TEXTURED_PER_SPOT` = 3 textured ones.

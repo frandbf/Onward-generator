@@ -111,17 +111,20 @@ VEGETATION_ASSETS: tuple[AssetSpec, ...] = (
 ALL_ASSETS: tuple[AssetSpec, ...] = NAMED_ASSETS + VEGETATION_ASSETS
 ASSETS_BY_ID = {spec.id: spec for spec in ALL_ASSETS}
 
+# The caps of the street props, vehicles, structures, facade props, barriers and plants doubled on 12 November 2026:
+# Rue Mouffetard had 16 props with the AI pick and 34 with the rules, and the maintainer asked for more on the
+# headset (the 300 000 Unity triangle limit leaves room; ``MAX_LIBRARY_TRIS`` still bounds the library copies).
 PLACEMENT_RULES: tuple[PlacementRule, ...] = (
-    PlacementRule("vehicles_curb", "vehicles", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"), "forbid", 6),
-    PlacementRule("waste_ground", "waste", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza"), "forbid", 12),
-    PlacementRule("furniture_off_lane", "furniture", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"), "forbid", 6),
-    PlacementRule("structures_edge", "structures", ("block_edge", "curb", "carriageway", "yard", "empty_lot", "plaza", "park"), "forbid", 4),
-    PlacementRule("facade_wall", "facade", ("facade",), "forbid", 8),
-    PlacementRule("barriers_curb", "barriers", ("curb", "carriageway", "sidewalk", "plaza"), "forbid", 4, ("barrier",)),
+    PlacementRule("vehicles_curb", "vehicles", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"), "forbid", 12),
+    PlacementRule("waste_ground", "waste", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza"), "forbid", 24),
+    PlacementRule("furniture_off_lane", "furniture", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"), "forbid", 12),
+    PlacementRule("structures_edge", "structures", ("block_edge", "curb", "carriageway", "yard", "empty_lot", "plaza", "park"), "forbid", 8),
+    PlacementRule("facade_wall", "facade", ("facade",), "forbid", 16),
+    PlacementRule("barriers_curb", "barriers", ("curb", "carriageway", "sidewalk", "plaza"), "forbid", 8, ("barrier",)),
     PlacementRule("manhole_lane", "barriers", ("carriageway",), "allow", 2, ("manhole",)),
     # Placed by ``dressing.sidewalk_covers`` at seeded spacing, not on the shared spot grid.
     PlacementRule(SIDEWALK_COVER_RULE, "barriers", ("sidewalk",), "forbid", 6, ("manhole",)),
-    PlacementRule("plants", "vegetation", ("sidewalk", "yard", "empty_lot"), "forbid", 8, ("plant",)),
+    PlacementRule("plants", "vegetation", ("sidewalk", "yard", "empty_lot"), "forbid", 16, ("plant",)),
     PlacementRule("bushes", "vegetation", ("courtyard", "yard", "plaza", "park"), "forbid", 4, ("bush",)),
     PlacementRule("trees", "vegetation", ("park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"), "forbid", 2, ("tree",), 3.5),
 )
