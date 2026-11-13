@@ -703,9 +703,9 @@ def apply_trim(
     if mode == "legacy" or atlas is None:
         reason = "config" if mode == "legacy" else "style_has_no_atlas"
         return TrimResult("legacy", name, list(nodes), report={**head, "mode": "legacy", "reason": reason})
-    swaps: list[dict[str, Any]] = []
+    extra: dict[str, Any] = {}
     if wide:
-        atlas, swaps = calm_sources(atlas, library_rows(WIDE_LIBRARY_PATH))
+        atlas, extra["calm_sources"] = calm_sources(atlas, library_rows(WIDE_LIBRARY_PATH))
     if weathering is not None:
         atlas = weathered_atlas(atlas, weathering)
     records = {key: texture_record(str(library_id)) for key, library_id in atlas["sources"].items()}
@@ -739,17 +739,14 @@ def apply_trim(
     out, stats = trim_nodes(nodes, records_by_id, name, atlas, layout, frozenset(observed_walls))
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
-    extra: dict[str, Any] = {}
     if regional_table is not None:
-        extra = {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
+        extra |= {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
         if "eras" in atlas:
             extra["era_bands"] = {"era_origin": "observed", "band_origin": "estimated", "buildings": dict(sorted(stats.eras.items()))}
     if atmosphere is not None:
         extra["atmosphere"] = atmosphere
     if weathering is not None:
         extra["weathering"] = weathering
-    if wide:
-        extra["calm_sources"] = swaps
     report = {
         **head,
         **extra,

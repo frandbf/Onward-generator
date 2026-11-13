@@ -1321,3 +1321,55 @@ def test_apply_trim_reports_its_calm_sources_when_wide(small_table: Path) -> Non
     wide = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, wide=True)
     plain = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
     assert wide.report["calm_sources"] == [] and wide.png == plain.png  # every mediterranean photograph is calm already
+
+
+def test_the_patina_is_pinned_and_spans_its_strip() -> None:
+    import numpy as np
+
+    from onward_generator.materials.trim_atlas import _patina
+
+    x = np.array([[0.0, 1.7, 4.2, 6.0, 9.3]])
+    assert _patina(np.random.default_rng(3), x, (12.0, 3.0), 0.16).round(6).tolist() == [
+        [0.905052, 0.870599, 0.941268, 0.881798, 0.947428]]
+    assert _patina(np.random.default_rng(3), x, (6.0, 3.0), 0.16).round(6).tolist() == [
+        [0.905052, 0.947319, 0.981704, 0.905052, 0.90924]]  # the strip's width sets the period: 0 and 6 m agree
+
+
+def test_a_worn_wall_takes_the_patina(small_table: Path) -> None:
+    import numpy as np
+
+    from onward_generator.materials.trim import weathered_atlas
+    from onward_generator.materials.trim_atlas import wall_pixels
+
+    atlas = json.loads(small_table.read_text(encoding="utf-8"))["styles"]["mediterranean"]["atlas"]
+    sources = {k: np.full((8, 8, 3), 128, dtype=np.uint8) for k in ("plaster", "stone", "brick")}
+    worn = weathered_atlas(atlas, "worn")
+    without = {**worn, "grime": {k: v for k, v in worn["grime"].items() if k != "patina_dark"}}
+    with_patina = wall_pixels("plaster", (0.8, 0.7, 0.6), 64, 16, worn, sources, np.random.default_rng(1))
+    plain = wall_pixels("plaster", (0.8, 0.7, 0.6), 64, 16, without, sources, np.random.default_rng(1))
+    ratio = with_patina[..., 0] / plain[..., 0]
+    assert ratio.max() <= 1.0 + 1e-9 and ratio.min() >= 1.0 - 0.08 - 1e-9 and np.ptp(ratio) > 0.02
+    assert np.allclose(ratio, ratio[:1, :])  # even up the storey
+
+
+def test_a_busy_source_is_traded_and_reported_by_apply_trim(small_table: Path) -> None:
+    doc = json.loads(small_table.read_text(encoding="utf-8"))
+    doc["styles"]["mediterranean"]["atlas"]["sources"]["brick"] = "acg_bricks023"
+    small_table.write_text(json.dumps(doc), encoding="utf-8")
+    busy = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
+    wide = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, wide=True)
+    assert wide.report["calm_sources"] == [{"key": "brick", "from": "acg_bricks023", "to": "ph_factory_brick", "family": "brick",
+                                            "limit": 0.025, "from_contrast": 0.0291, "to_contrast": 0.0214}]
+    assert [s["asset_id"] for s in wide.report["atlas"]["sources"]] == ["ph_factory_brick", "ph_plastered_wall", "acg_rock030"]
+    assert wide.png != busy.png and "calm_sources" not in busy.report
+
+
+def test_the_facade_block_may_hold_all_three_keys(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import create_map, facade_options
+
+    root = tmp_path / "m"
+    create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER[1], longitude=MURCIA_CENTER[0])
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["facades"] = {"mode": "trim", "style": "auto", "weathering": "heavy"}
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert facade_options(root) == ["--facades", "trim", "--facade-style", "auto", "--facade-weathering", "heavy"]
