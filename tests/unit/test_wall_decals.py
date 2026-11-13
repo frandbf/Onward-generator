@@ -757,3 +757,19 @@ def test_the_probe_grid_reaches_the_left_edge_and_stays_as_sparse_as_its_step() 
     assert between(_wall(20, 30), 5.0, 2.0, 1.6, 1.2) is not None  # a 2 cm band between the rows at 1.42 and 1.71 m
     middle = wall_surface([_facade_at(20, 30, _quad((30, -0.001), (20, -0.001), 1.99, 2.01, "glass_dark"))])
     assert middle(_wall(20, 30), 5.0, 2.0, 1.6, 0.2) is not None  # two rows under a 20 cm decal straddle a band at its middle
+
+
+TWELVE_SEEDS = {"gen_damp_stain": "47ef8f2d2915", "gen_soot_streak": "bcc498df6231", "gen_rust_drip": "caad9f8c1ebf",
+                "gen_plaster_crack": "ab3fede9492c", "gen_torn_poster": "ab0133642b15", "gen_paint_scribble": "ee6ac62dd1f0",
+                "gen_splash_grime": "7c51e0ff1add", "gen_bullet_holes": "18a4e10a0820", "gen_moss_patch": "faa7622f0c5a",
+                "gen_peeling_paint": "2a984e181a37", "gen_water_streaks": "d0cdf0e03247", "gen_chalk_marks": "f82231e35628",
+                "gen_ghost_sign": "cb08b31b5a00"}
+
+
+def test_every_drawn_kind_is_pinned_over_twelve_maps() -> None:
+    # One seed leaves a drawer's rarer branches unseen (a second group of chalk tallies, a hole clipped at the edge).
+    drawn = {f"gen_{name}": b"" for name in PROCEDURAL}
+    for seed in range(1, 13):
+        for decal in procedural_decals(seed):
+            drawn[decal.id] += decal.rgba.tobytes()
+    assert {k: hashlib.sha256(v).hexdigest()[:12] for k, v in drawn.items()} == TWELVE_SEEDS

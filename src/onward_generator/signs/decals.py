@@ -216,12 +216,12 @@ def _peeling(rng: np.random.Generator, n: int) -> np.ndarray:
     for _ in range(int(rng.integers(5, 9))):
         cx, cy, r = rng.uniform(0.25, 0.75) * n, rng.uniform(0.25, 0.75) * n, rng.uniform(0.08, 0.2) * n
         corners = [(cx + r * rng.uniform(0.6, 1.3) * np.cos(a), cy + r * rng.uniform(0.6, 1.3) * np.sin(a))
-                   for a in np.linspace(0.0, 2 * np.pi, 9, endpoint=False)]
+                   for a in np.arange(9) * (2 * np.pi / 9)]
         draw.polygon(corners, fill=230)
-    inside = np.asarray(_blur(flakes, 0.8))
-    rim = np.asarray(_blur(flakes, 3.0)).astype(np.int16) - inside.astype(np.int16)
+    inside = np.asarray(_blur(flakes, 0.8)).astype(np.int16)
+    rim = np.asarray(_blur(flakes, 3.0)).astype(np.int16) - inside  # pragma: no mutate: a float array holds the same small integers
     pixels[..., :3] = np.where(inside[..., None] > 120, np.array([170, 160, 146]), np.array([60, 52, 44]))
-    pixels[..., 3] = np.clip(np.maximum(inside.astype(np.int16), np.abs(rim) * 3), 0, 255).astype(np.uint8)
+    pixels[..., 3] = np.minimum(np.maximum(inside, np.abs(rim) * 3), 255)  # the uint8 page takes the values as they are
     return pixels
 
 
@@ -256,7 +256,7 @@ def _ghost(rng: np.random.Generator, n: int) -> np.ndarray:
         y0 = rng.uniform(0.2, 0.7) * n
         draw.rectangle((0.1 * n, y0, rng.uniform(0.5, 0.9) * n, y0 + 0.08 * n), fill=(*(int(v) for v in rng.integers(200, 245, 3)), 110))
     pixels = np.asarray(paint).copy()
-    pixels[..., 3] = (pixels[..., 3] * rng.uniform(0.35, 1.0, (n, n))).astype(np.uint8)  # the paint weathered off in spots
+    pixels[..., 3] = pixels[..., 3] * rng.uniform(0.35, 1.0, (n, n))  # the paint weathered off in spots; the uint8 page truncates
     return pixels
 
 
