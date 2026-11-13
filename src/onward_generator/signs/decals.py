@@ -258,7 +258,7 @@ def _fit(wall: Wall, decal: Decal, blocked: Callable[[Polygon, float, float], bo
     start = _unit(seed, "along", decal.id, wall.feature_id)
     steps = max(1, int((length - decal.width_m) / 0.5))
     for z in HEIGHTS_M:
-        if z - half_h < GROUND_CLEAR_M or z + half_h > top:
+        if z - half_h < GROUND_CLEAR_M or z + half_h > top:  # pragma: no mutate: no height less half a decal's lands on 0.15 m in floating point, so < and <= agree
             continue
         for k in range(steps + 1):
             s = half_w + ((start + k / (steps + 1)) % 1.0) * (length - decal.width_m)
@@ -332,7 +332,7 @@ def decal_blocker(nodes: Sequence[Node], extra: Sequence[tuple[Polygon, float, f
             tri = prim.mesh.vertices[prim.mesh.triangles]
             lows, highs = tri.min(axis=1), tri.max(axis=1)
             corners = zip(lows, highs, strict=True)  # pragma: no mutate: both come from one array, one row per triangle
-            plans += [box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in corners]
+            plans += [box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in corners]  # pragma: no mutate: the micrometre only gives a flat pane an area; box() orders its corners, so minus is the same pane
             low += lows[:, 2].tolist()
             high += highs[:, 2].tolist()
     tree = STRtree(plans)

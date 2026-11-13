@@ -59,7 +59,7 @@ def decal_rows(package: Package, assets: Path) -> list[dict[str, Any]]:
             stem = posixpath.splitext(posixpath.basename(path))[0]
             handle = archive.extractfile(member)
             if handle is None:  # pragma: no mutate: a regular member always has a handle
-                continue
+                continue  # pragma: no mutate: a regular member always has a handle
             try:
                 with Image.open(io.BytesIO(handle.read())) as picture:
                     image = picture.convert("RGBA")

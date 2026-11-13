@@ -296,6 +296,9 @@ def test_the_placement_quads_and_page_of_a_known_street_are_pinned() -> None:
 SEED_MOUFFETARD = 1043396788
 SEED_NULL_ISLAND = 1382503250
 SEED_ROUNDED = 396029759
+DRAWN_HASHES = {"gen_damp_stain": "f3501cfe3d42", "gen_soot_streak": "f862dbd66ee9", "gen_rust_drip": "bb56a372c739",
+                "gen_plaster_crack": "15117665b2f2", "gen_torn_poster": "06711467ae46", "gen_paint_scribble": "811451e3d45b",
+                "gen_splash_grime": "1bb0d559c78a"}
 
 
 def test_the_map_seed_is_its_centre() -> None:
@@ -564,3 +567,63 @@ def test_a_catalogue_of_another_schema_does_not_stop_the_reading(tmp_path: Path)
     (tmp_path / "asset_store_b" / "manifest.json").write_text(json.dumps({"schema": DECALS_SCHEMA, "assets": [
         {"id": "a", "file": "a.png", "width_m": 1, "height_m": 1}]}), encoding="utf-8")
     assert [r["id"] for _, r in read_decal_catalogues(tmp_path)] == ["a"]
+
+
+def test_a_decal_on_a_cramped_wall_tries_two_positions_at_each_height() -> None:
+    from onward_generator.signs.decals import HEIGHTS_M, _fit
+
+    asked: list[float] = []
+
+    def always(plan: Polygon, bottom: float, top: float) -> bool:
+        asked.append(round(bottom, 3))
+        return True
+
+    assert _fit(_wall(0, 2.5), _decal("a", 1.6, 0.4), always, [], 1) is None  # 0.9 m to spare: one step of 0.5 m
+    assert len(asked) == 2 * len(HEIGHTS_M)
+
+
+def test_what_stands_in_front_of_a_wall_beyond_a_hand_does_not_block_a_decal() -> None:
+    from onward_generator.signs.decals import _fit
+
+    a_metre_out = Node("p", (_quad((0, -1.0), (10, -1.0), 0.0, 9.0, "glass_dark"),), {})  # outward is -y
+    assert _fit(_wall(0, 10), _decal("a"), decal_blocker([a_metre_out]), [], 1) is not None
+    a_hand_out = Node("p", (_quad((0, -0.2), (10, -0.2), 0.0, 9.0, "glass_dark"),), {})
+    assert _fit(_wall(0, 10), _decal("a"), decal_blocker([a_hand_out]), [], 1) is None
+
+
+def test_the_blocker_tests_the_plan_itself_not_its_bounding_box() -> None:
+    pane = Node("p", (_quad((1.4, 0.05), (1.6, 0.05), 0.0, 9.0, "glass_dark"),), {})
+    slanted = Polygon([(1, 0), (2, 1), (1.9, 1.1), (0.9, 0.1)])  # its box holds the pane, the strip does not
+    assert not decal_blocker([pane])(slanted, 0.0, 9.0)
+    assert decal_blocker([pane])(box(1.3, 0.0, 1.7, 0.1), 0.0, 9.0)
+
+
+def test_a_decal_taken_on_a_wall_keeps_its_whole_height_clear() -> None:
+    wall = _wall(0, 2.8)
+    first, second = _decal("first", 2.0, 0.1), _decal("second", 2.0, 0.08)
+    assert [p.decal.id for p in place_decals([wall], NOTHING, never, [first, second], 4, 2)] == ["first", "second"]
+    placed = place_decals([wall], NOTHING, never, [first, second], 4, 2)
+    assert [(p.decal.id, p.z_m) for p in placed] == [("first", 1.4), ("second", 0.9)]  # just below it, a gap clear
+
+    def low(plan: Polygon, bottom: float, top: float) -> bool:
+        return bottom < 0.5 and top > 0.3
+
+    tall, short = _decal("first", 2.0, 1.5), _decal("second", 2.0, 0.12)
+    stacked = place_decals([_wall(0, 2.8, height=5.2)], NOTHING, low, [tall, short], 4, 2)
+    assert [(p.decal.id, p.z_m) for p in stacked] == [("first", 2.4)]  # the short one would touch its foot at 1.4 m
+
+
+def test_a_large_library_image_is_scaled_into_its_cell_smoothly() -> None:
+    from onward_generator.signs.decals import INNER_PX, _atlas
+
+    rng = np.random.default_rng(5)
+    big = Decal("big", "x", 1.0, 0.5, rng.integers(0, 256, (600, 1200, 4), dtype=np.uint8), "library")
+    pages, _ = _atlas([big])
+    cell = pages["wall_decal_atlas_0"][4:4 + INNER_PX // 2, 4:4 + INNER_PX]
+    expected = Image.fromarray(big.rgba)
+    expected.thumbnail((INNER_PX, INNER_PX), Image.Resampling.LANCZOS)
+    assert INNER_PX == 392 and cell.shape == (196, 392, 4) and np.array_equal(cell, np.asarray(expected))
+
+
+def test_the_drawn_decals_are_pinned_to_the_pixel() -> None:
+    assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in procedural_decals(7)} == DRAWN_HASHES

@@ -909,6 +909,7 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
         return real_place(walls, footprints, blocked, decals, seed, count)
 
     monkeypatch.setattr(place_module, "procedural_decals", drawn)
+    monkeypatch.setattr(place_module, "sign_footprints", lambda manifest: [(box(700, 700, 701, 701), 0.0, 5.0)])
     monkeypatch.setattr(place_module, "place_decals", place)
     monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
     monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
@@ -918,8 +919,5 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
     geo = json.loads(scene.read_text(encoding="utf-8"))
     buildings = [f for f in geo["features"] if f.get("kind") == "building"]
     assert len(seen["footprints"].geometries) == len(buildings) > 0  # type: ignore[attr-defined]
-    from onward_generator.detail.shops import sign_footprints
-
-    plan, bottom, top = sign_footprints(manifest)[0]
-    assert seen["blocked"](plan, bottom, top)  # type: ignore[operator]  # a shop sign blocks a decal
+    assert seen["blocked"](box(700.5, 700.5, 702, 702), 1.0, 2.0)  # type: ignore[operator]  # the signs' footprints block a decal
     assert not seen["blocked"](box(900, 900, 901, 901), 0.0, 1.0)  # type: ignore[operator]
