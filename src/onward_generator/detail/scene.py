@@ -25,7 +25,6 @@ from onward_generator import __version__
 from onward_generator.detail.config import REPO_ROOT, DetailConfig, Template
 from onward_generator.detail.facades import (
     DOOR_KINDS,
-    FILANT_SLAB_M,
     HIDDEN_GAP_M,
     Hole,
     Layout,
@@ -872,6 +871,13 @@ def regional_style(base: GeneratedScene) -> str:
     return select_style(load_style_table(), float(origin[1]), float(origin[0]))
 
 
+def _balcony_columns(layout: Layout, spec: Any) -> list[tuple[int, float, float]]:
+    """Each bay balcony of ``layout`` as ``(segment, s0, s1)`` on its wall."""
+    if spec is None:  # pragma: no mutate: a template without a balcony lays out none
+        return []
+    return [(seg, bs0, bs0 + spec.width_m) for seg, bs0, _ in layout.balconies]
+
+
 def _balcony_spans(balconies: Sequence[tuple[int, float, float]], segments: Sequence[Segment],
                    filants: Sequence[tuple[int, float, float]] = ()) -> list[list[list[float]]]:
     """``facade.balconies_m``: each column of balconies (``(segment, s0, s1)``) and each balcon filant as its span on the
@@ -1695,7 +1701,6 @@ def _detail_buildings(
         visual = [Primitive(merge(ms), mat) for mat, ms in sorted(shell.parts.items()) if any(m.triangle_count for m in ms)]
         spec = shell_template.balcony
         balcony_slabs = [(seg, bs0, bs0 + spec.width_m, v0 - spec.slab_m) for seg, bs0, v0 in layout.balconies] if spec is not None else []  # pragma: no mutate: a template without a balcony lays out none; the guard only tells mypy spec is set
-        balcony_slabs += [(seg, fs0, fs1, v0 - FILANT_SLAB_M) for seg, fs0, fs1, v0 in layout.filants]
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
                            interior.shop_doors if interior is not None else (), balcony_slabs, every_footprint) if shop else []
         door_fronts.extend(_door_fronts(layout.holes, segments))
@@ -1737,9 +1742,7 @@ def _detail_buildings(
                 "use": use.to_record(),
                 "door": door_rule,
                 "doors_m": _door_centres(layout.holes, segments),
-                "balconies_m": _balcony_spans(
-                    [(seg, bs0, bs0 + spec.width_m) for seg, bs0, _ in layout.balconies] if spec is not None else [], segments,
-                    [(seg, fs0, fs1) for seg, fs0, fs1, _ in layout.filants]),
+                "balconies_m": _balcony_spans(_balcony_columns(layout, spec), segments, [(seg, fs0, fs1) for seg, fs0, fs1, _ in layout.filants]),
             },
             "roof": shell.roof,
             "interior": interior_record is not None,
