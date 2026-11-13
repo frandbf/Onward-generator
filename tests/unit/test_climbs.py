@@ -539,3 +539,20 @@ def test_a_star_of_neighbours_takes_six_links_at_most() -> None:
     around = [_roofed(f"n{k}", 9.0, box(-20, 5 * k, 0, 5 * k + 4.5)) for k in range(8)]
     assert len(roof_links([centre, *around], ["c"])) == ROOF_LINKS_MAX
     assert len(roof_links([centre, *around[:4]], ["c"])) == 4
+
+
+def test_a_clockwise_footprint_and_a_roof_without_a_parapet_link_alike() -> None:
+    from shapely import affinity
+    from shapely.geometry.polygon import orient
+
+    from onward_generator.perf.climbs import link_ladder
+
+    low = affinity.rotate(box(0, 0, 12.3456, 10.1234), 30, origin=(0, 0))
+    high = affinity.rotate(box(12.3456, 0, 30.789, 10.1234), 30, origin=(0, 0))
+    ccw = link_ladder(_roofed("low", 9.0, low), _roofed("high", 12.0, high))
+    cw = link_ladder(_roofed("low", 9.0, low), _roofed("high", 12.0, orient(high, sign=-1.0)))  # the outline drawn the other way
+    assert ccw is not None and cw is not None
+    assert (cw["x"], cw["y"], cw["yaw"], cw["roof_x"], cw["roof_y"]) == (ccw["x"], ccw["y"], ccw["yaw"], ccw["roof_x"], ccw["roof_y"])
+    bare = {"id": "building/h", "type": "building", "source_ids": ["h"], "height": {"height_m": 12.0}, "roof": {"type": "flat"}}
+    site = link_ladder(_roofed("low", 9.0, low), ("h", bare, high))
+    assert site is not None and site["parapet_m"] == 0.0
