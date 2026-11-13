@@ -961,3 +961,31 @@ def test_library_normal_maps_over_the_limit_are_refused_and_nothing_is_left(norm
     with pytest.raises(ExportError, match=f"normal maps: 1 normal maps take {astc6x6_bytes(1024, 1024)} bytes in ASTC 6x6, over the 1000 limit"):
         package(normal_inputs, tmp_path / "over")
     assert not (tmp_path / "over").exists()
+
+
+def test_a_trim_material_cannot_be_both_the_spike_and_a_library_normal_material(trim_inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    from onward_generator.materials.library_plan import WIDE_LIBRARY_PATH, library_rows
+
+    detail = tmp_path / "both"
+    shutil.copytree(trim_inputs[0], detail)
+    doc, blob = read_glb((detail / "scene_visual.glb").read_bytes())
+    row = next(r for r in library_rows(WIDE_LIBRARY_PATH) if r["id"] == "ph_clean_asphalt")
+    doc.setdefault("extras", {}).setdefault("materials", {})["normal_maps"] = {
+        "facade_trim_test": {"library_id": row["id"], "path": row["normal"]["path"], "sha256": row["normal"]["sha256"]}}
+    (detail / "scene_visual.glb").write_bytes(pack_glb(doc, blob))
+    card = _lit_card(tmp_path, "both", lit_normal_material="facade_trim_test")
+    with pytest.raises(ExportError, match="normal maps: facade_trim_test is both the lit_normal_material and a library normal-map material"):
+        package((detail, trim_inputs[1]), tmp_path / "pkg", export_config=card)
+    assert not (tmp_path / "pkg").exists()
+
+
+def test_cli_package_prints_the_library_normal_maps(normal_inputs: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from onward_generator.export.library_normals import NORMAL_MAPS_MAX_BYTES
+    from onward_generator.export.normal_map import astc6x6_bytes
+
+    detail, layout = normal_inputs
+    assert main(["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout),
+                 "--out", str(tmp_path / "pkg")]) == 0
+    out = capsys.readouterr().out
+    assert (f"  normal maps (plan T3, ADR-039): 2 materials on PP_Opaque_Lit, 1 maps, about {astc6x6_bytes(1024, 1024):,} bytes in ASTC 6x6 "
+            f"of {NORMAL_MAPS_MAX_BYTES:,}\n") in out

@@ -93,3 +93,28 @@ def test_a_rebuilt_glb_carries_the_list_and_only_the_list() -> None:
     listed = build_glb(nodes, {"carriageway": Material((1, 1, 1, 1), 0.9)},
                        extras={"materials": {"applied": ["x"], "normal_maps": {"carriageway": _binding("ph_clean_asphalt")}}})
     assert carried_normal_maps(listed) == {"materials": {"normal_maps": {"carriageway": _binding("ph_clean_asphalt")}}}
+
+
+def test_a_photograph_missing_from_the_catalogue_has_no_normal_map() -> None:
+    block = normal_map_bindings([{"asset_id": "polyhaven_old_id", "color_id": "sidewalk"}], ["sidewalk"], [])
+    assert block == {"enabled": True, "materials": {}, "without": ["polyhaven_old_id"]}
+
+
+def test_a_grey_or_large_map_is_written_as_rgb_scaled_smoothly_and_the_limit_is_inclusive(tmp_path: Path,
+                                                                                          monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.export import library_normals
+    from onward_generator.export.normal_map import astc6x6_bytes
+
+    folder = tmp_path / "assets"
+    folder.mkdir()
+    rng = np.random.default_rng(3)
+    Image.fromarray(rng.integers(0, 256, (600, 1400), dtype=np.uint8), "L").save(folder / "grey.png")
+    data = (folder / "grey.png").read_bytes()
+    binding = {"library_id": "grey", "path": "assets/grey.png", "sha256": hashlib.sha256(data).hexdigest()}
+    pngs, block = normal_map_files({"x": binding}, repo=tmp_path)
+    expected = Image.open(folder / "grey.png").convert("RGB")
+    expected.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+    with Image.open(io.BytesIO(pngs["normal_grey.png"])) as image:
+        assert image.mode == "RGB" and image.size == (1024, 439) and np.array_equal(np.asarray(image), np.asarray(expected))
+    monkeypatch.setattr(library_normals, "NORMAL_MAPS_MAX_BYTES", astc6x6_bytes(1024, 439))
+    assert library_normals.normal_map_files({"x": binding}, repo=tmp_path)[1]["limit_bytes"] == astc6x6_bytes(1024, 439)
