@@ -56,3 +56,7 @@ Then this ADR goes from proposed to accepted, or is corrected.
 - **Charging the furniture to `interiors.max_triangles`.** It would turn down stair interiors to pay for furniture.
 - **One probe union for all floors (the shop path).** The floors share one polygon, so a piece on one floor would take probe columns off every other floor.
 - **Beds and sofas now.** They are deeper than the 0.8 m wall limit; a middle-of-the-room slot needs its own path rules.
+
+## Amendment, 13 November 2026: rugs lie flat
+
+On the headset, with pkg_10 of Rue Mouffetard, the living-room rug (a 5 cm block from a furniture pack) looked raised off the floor. `overgrow/furnish.py` now presses any `rug` piece thicker than `RUG_THICK_M` (1 cm) flat through its node's matrix, a scale on the model's height. The catalogue puts every model's underside at 0, so the rug still rests on the floor. The shared mesh, the plan's `size_m` and the triangle count do not change. The Unity adapter reads the node's scale from its matrix.

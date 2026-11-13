@@ -34,6 +34,9 @@ from onward_generator.overgrow.library import read_interior_catalogue
 
 NODE_PREFIX = "furnish/"
 COLLIDER_PREFIX = "furnish/collider/"
+RUG_THICK_M = 0.01
+"""A rug lies at most this thick. A model drawn thicker (a 5 cm block looked raised off the floor on the headset) is
+pressed flat by its node's matrix, its underside kept on the floor; the shared mesh is not touched."""
 
 
 class FurnishBuildError(ValueError):
@@ -98,6 +101,9 @@ def build_furniture(manifest: Mapping[str, Any], library: str | Path | None) -> 
         low, high = prop.mesh.vertices.min(axis=0), prop.mesh.vertices.max(axis=0)
         centre = np.eye(4)
         centre[:2, 3] = -(low[:2] + high[:2]) / 2  # the plan places the middle of the model's box
+        # The catalogue sets every model's underside at 0, so its top is its thickness and a pressed rug stays on the floor.
+        if piece["slot"] == "rug" and high[2] > RUG_THICK_M:  # pragma: no mutate: a rug exactly RUG_THICK_M thick is scaled by 1
+            centre[2, 2] = RUG_THICK_M / high[2]
         x, y, z = (float(v) for v in piece["position_m"])
         matrix = yaw_matrix(x, y, z, math.radians(float(piece["yaw_deg"]))) @ centre
         first = asset_id not in seen
