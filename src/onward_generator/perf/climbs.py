@@ -311,12 +311,13 @@ def link_ladder(low: tuple[str, Mapping[str, Any], Polygon], high: tuple[str, Ma
     line = _shared(high_fp, low_fp)
     if line is None:
         return None
-    (ax, ay), (bx, by) = line.coords[0], line.coords[-1]
+    (ax, ay), (bx, by) = line.coords
     length = math.hypot(bx - ax, by - ay)
     ux, uy = (bx - ax) / length, (by - ay) / length
     mid = line.interpolate(0.5, normalized=True)
     nx, ny = uy, -ux
-    if not low_fp.buffer(COVER_TOLERANCE_M).contains(Point(mid.x + nx * 0.5, mid.y + ny * 0.5)):
+    probe = Point(mid.x + nx * 0.5, mid.y + ny * 0.5)  # pragma: no mutate: any point a little way in lies in the low footprint alike; its deck must hold a 2 m foot
+    if not low_fp.buffer(COVER_TOLERANCE_M).contains(probe):
         nx, ny = -nx, -ny  # toward the low roof
     wall = (mid.x, mid.y, nx, ny, length)
     low_t, high_t = _parapet_thickness(low_b), _parapet_thickness(high_b)
@@ -342,16 +343,18 @@ def roof_links(candidates: Sequence[tuple[str, dict[str, Any], Polygon]], climbe
     seen = set(reached)
     links: list[dict[str, Any]] = []
     queue = list(reached)
-    while queue and len(links) < ROOF_LINKS_MAX:
+    while queue:
         here = by_id[queue.pop(0)]
         for other_id in sorted(by_id):
-            if other_id in seen or len(links) >= ROOF_LINKS_MAX:
+            if other_id in seen:
                 continue
             other = by_id[other_id]
             low, high = sorted((here, other), key=lambda row: (float(row[1]["height"]["height_m"]), row[0]))
             site = link_ladder(low, high)
             if site is not None:
                 links.append(site)
+                if len(links) == ROOF_LINKS_MAX:
+                    return links
                 seen.add(other_id)
                 queue.append(other_id)
     return links

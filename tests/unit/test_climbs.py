@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from shapely.geometry import MultiPolygon, Point, box
 from shapely.geometry.polygon import Polygon
@@ -481,3 +483,59 @@ def test_a_link_s_model_spans_only_its_rise() -> None:
     link = {"height_m": 12.0, "parapet_m": 0.7, "base_m": 9.0}
     assert climb_triangles({"ladders": [link]}) == ladder_triangles(3.0, 0.7)
     assert climb_triangles({"ladders": [{"height_m": 12.0, "parapet_m": 0.7}]}) == ladder_triangles(12.0, 0.7)
+
+
+def _roofed(source: str, height: float, footprint: Polygon, parapet: float = 0.0, thickness: float = 0.0) -> tuple[str, dict, Polygon]:
+    building = {"id": f"building/{source}", "type": "building", "source_ids": [source], "height": {"height_m": height},
+                "roof": {"type": "flat_parapet", "parapet_m": parapet, "parapet_thickness_m": thickness}}
+    return source, building, footprint
+
+
+def test_a_link_on_a_slanted_wall_is_written_whole() -> None:
+    from shapely import affinity
+
+    from onward_generator.perf.climbs import link_ladder
+
+    low = affinity.rotate(box(0, 0, 12.3456, 10.1234), 30, origin=(0, 0))
+    high = affinity.rotate(box(12.3456, 0, 30.789, 10.1234), 30, origin=(0, 0))
+    site = link_ladder(_roofed("low", 9.1234, low, 0.6, 0.25), _roofed("high", 12.5678, high, 0.7, 0.25))
+    assert site is not None
+    c, s = math.cos(math.radians(30)), math.sin(math.radians(30))
+    mid = (12.3456 * c - 5.0617 * s, 12.3456 * s + 5.0617 * c)
+    east = (c, s)  # the low roof lies west of the shared wall, toward -east; the ladder faces east, the wall
+
+    def at(d: float) -> tuple[float, float]:
+        return round(mid[0] - east[0] * d, 2), round(mid[1] - east[1] * d, 2)
+
+    assert (site["x"], site["y"]) == at(0.15)
+    assert (site["roof_x"], site["roof_y"]) == at(-(0.25 + 0.75))
+    assert site == {"x": site["x"], "y": site["y"], "yaw": 60.0, "height_m": 12.57, "parapet_m": 0.7, "roof_x": site["roof_x"],
+                    "roof_y": site["roof_y"], "base_m": 9.12, "link": ["low", "high"]}
+    # The same pair the other way round: the low roof east of the wall, so the normal flips.
+    flipped = link_ladder(_roofed("low", 9.0, high), _roofed("high", 12.0, low))
+    assert flipped is not None and flipped["yaw"] == -120.0
+    # A deck too small for the landing behind a thick parapet: no link even though the foot fits.
+    thin_high = affinity.rotate(box(12.3456, 0, 13.6, 10.1234), 30, origin=(0, 0))
+    assert link_ladder(_roofed("low", 9.0, low), _roofed("high", 12.0, thin_high, 0.7, 0.25)) is None
+    assert link_ladder(_roofed("low", 9.0, thin_high, 0.6, 0.25), _roofed("high", 12.0, low)) is None
+
+
+def test_a_link_s_limits_are_inclusive() -> None:
+    from onward_generator.perf.climbs import _shared, link_ladder
+
+    low = box(0, 0, 20, 10)
+    assert link_ladder(_roofed("a", 9.0, low), _roofed("b", 15.0, box(20, 0, 40, 10))) is not None  # exactly 6 m higher
+    assert link_ladder(_roofed("a", 9.0, low), _roofed("b", 15.01, box(20, 0, 40, 10))) is None
+    two = _shared(box(20, 8.3, 40, 30), low)  # 1.7 m along the low wall and 0.3 m of touching tolerance past its corner
+    assert two is not None and two.length == pytest.approx(2.0)  # just enough
+    assert _shared(box(20, 8.31, 40, 30), low) is None
+    assert _shared(box(30, 0, 40, 10), low) is None  # apart
+
+
+def test_a_star_of_neighbours_takes_six_links_at_most() -> None:
+    from onward_generator.perf.climbs import ROOF_LINKS_MAX, roof_links
+
+    centre = _roofed("c", 9.0, box(0, 0, 40, 40))
+    around = [_roofed(f"n{k}", 9.0, box(-20, 5 * k, 0, 5 * k + 4.5)) for k in range(8)]
+    assert len(roof_links([centre, *around], ["c"])) == ROOF_LINKS_MAX
+    assert len(roof_links([centre, *around[:4]], ["c"])) == 4
