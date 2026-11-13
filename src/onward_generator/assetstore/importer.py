@@ -163,7 +163,8 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
             obj = (exported / item["file"]).read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
             mtl = (exported / f"{stem}.mtl").read_text(encoding="utf-8", errors="replace")  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
             # A raw model whose dressing prefab was refused keeps its own untextured materials: read the prefab's albedos.
-            mtl, _recovered = recover_albedos(package.path, str(item.get("prefab", "")), mtl, exported, stem)
+            prefab = str(item.get("prefab", ""))  # pragma: no mutate: an item without a prefab names no model of the package, whatever stands for it
+            mtl, _recovered = recover_albedos(package.path, prefab, mtl, exported, stem)
             data = obj_to_glb(obj, mtl, stem, exported, factor)
         except (OSError, ObjError, ValueError) as exc:
             result.skipped[f"convert: {type(exc).__name__}"] += 1

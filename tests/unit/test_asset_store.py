@@ -330,3 +330,9 @@ def test_the_reviewed_rows_are_whole() -> None:
     assert display is not None and display["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": False}
     lamp = classify("Bench_Lamp", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
     assert lamp is not None and lamp["description"].startswith("Interior item (bench lamp) from Coffee Shop Kit")
+
+
+def test_a_gift_shelf_is_indoors_and_furnished_by_its_package() -> None:
+    row = classify("Gift_Shelf", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert row is not None and row["placement"] == "interior"
+    assert row["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": True}  # a shelf also furnishes a home
