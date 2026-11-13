@@ -43,6 +43,13 @@ def scene_normal_maps(visual: bytes) -> dict[str, dict[str, str]]:
     return {str(name): {key: str(value) for key, value in binding.items()} for name, binding in found.items()}
 
 
+def carried_normal_maps(visual: bytes) -> dict[str, Any]:
+    """The scene extras a stage that rebuilds the visual GLB carries forward, so ``export package`` still finds the list:
+    ``{"materials": {"normal_maps": ...}}`` when the input lists normal maps, else nothing (the GLB is as before)."""
+    bindings = scene_normal_maps(visual)
+    return {"materials": {"normal_maps": bindings}} if bindings else {}
+
+
 def normal_map_files(bindings: Mapping[str, Mapping[str, str]], *, lit_normal_material: str | None = None,
                      repo: Path = REPO_ROOT) -> tuple[dict[str, bytes], dict[str, Any]]:
     """The PNG of each library normal map the ``bindings`` name, once per map (several materials may share one), and
@@ -80,5 +87,5 @@ def normal_map_files(bindings: Mapping[str, Mapping[str, str]], *, lit_normal_ma
     return pngs, block
 
 
-__all__ = ["MAX_PX", "NORMAL_MAPS_MAX_BYTES", "NORMAL_MAP_PREFIX", "NORMAL_MAP_ROLE", "LibraryNormalError", "normal_map_files",
+__all__ = ["MAX_PX", "carried_normal_maps", "NORMAL_MAPS_MAX_BYTES", "NORMAL_MAP_PREFIX", "NORMAL_MAP_ROLE", "LibraryNormalError", "normal_map_files",
            "scene_normal_maps"]

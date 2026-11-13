@@ -944,3 +944,25 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
 
     far = DecalWall("x", np.array([900.0, 900.0]), np.array([910.0, 900.0]), np.array([0.0, -1.0]), 9.0)
     assert seen["surface"] is not None and seen["surface"](far, 905.0, 2.0, 1.0, 1.0) is None  # type: ignore[operator]  # the built scene, nothing out there
+
+
+def test_the_signs_stage_carries_the_normal_map_list_of_its_base(tmp_path: Path) -> None:
+    """Plan T3: signs rebuilds the visual GLB; the library normal-map list must reach export package."""
+    from onward_generator.export.library_normals import scene_normal_maps
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _base(base)
+    doc, blob = read_glb((base / "scene_visual.glb").read_bytes())
+    binding = {"carriageway": {"library_id": "ph_clean_asphalt", "path": "p", "sha256": "s"}}
+    doc["extras"] = {**(doc.get("extras") or {}), "materials": {"applied": ["x"], "normal_maps": binding}}
+    from onward_generator.generation.gltf import pack_glb
+
+    (base / "scene_visual.glb").write_bytes(pack_glb(doc, blob))
+    place_signs(base, scene, tmp_path / "out")
+    assert scene_normal_maps((tmp_path / "out" / "scene_visual.glb").read_bytes()) == binding
+    assert read_glb((tmp_path / "out" / "scene_visual.glb").read_bytes())[0]["extras"]["materials"] == {"normal_maps": binding}
+    _base(tmp_path / "plain")
+    place_signs(tmp_path / "plain", scene, tmp_path / "plain_out")
+    assert "materials" not in read_glb((tmp_path / "plain_out" / "scene_visual.glb").read_bytes())[0]["extras"]

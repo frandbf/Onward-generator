@@ -81,3 +81,15 @@ def test_the_list_is_read_from_the_visual_glb() -> None:
     listed = build_glb(nodes, {"carriageway": Material((1, 1, 1, 1), 0.9)},
                        extras={"materials": {"normal_maps": {"carriageway": _binding("ph_clean_asphalt")}}})
     assert scene_normal_maps(listed) == {"carriageway": _binding("ph_clean_asphalt")}
+
+
+def test_a_rebuilt_glb_carries_the_list_and_only_the_list() -> None:
+    from onward_generator.export.library_normals import carried_normal_maps
+
+    quad = Mesh(np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0]], float), np.array([[0, 1, 2]]))
+    nodes = [Node("n", (Primitive(quad, "carriageway"),))]
+    plain = build_glb(nodes, {"carriageway": Material((1, 1, 1, 1), 0.9)}, extras={"materials": {"applied": ["x"]}})
+    assert carried_normal_maps(plain) == {}
+    listed = build_glb(nodes, {"carriageway": Material((1, 1, 1, 1), 0.9)},
+                       extras={"materials": {"applied": ["x"], "normal_maps": {"carriageway": _binding("ph_clean_asphalt")}}})
+    assert carried_normal_maps(listed) == {"materials": {"normal_maps": {"carriageway": _binding("ph_clean_asphalt")}}}
