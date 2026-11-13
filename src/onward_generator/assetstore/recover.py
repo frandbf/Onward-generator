@@ -40,6 +40,24 @@ class _Package:
                         for guid in {name.split("/")[0] for name in self.members if name.endswith("/pathname")}
                         if self.text(f"{guid}/pathname").strip()}
 
+        self._overrides: dict[str, dict[int, str]] | None = None
+
+    def overrides(self) -> dict[str, dict[int, str]]:
+        """``{model GUID: {submesh index: .mat GUID}}`` of every prefab, the first prefab to override a model winning;
+        read once per package (a catalogue asks for each of its models)."""
+        if self._overrides is None:
+            found: dict[str, dict[int, str]] = {}
+            for path, guid in sorted(self.guid_of.items()):
+                if not path.endswith(".prefab"):
+                    continue
+                here: dict[str, dict[int, str]] = {}
+                for m in _OVERRIDE.finditer(self.text(f"{guid}/asset")):
+                    here.setdefault(m["model"], {})[int(m["index"])] = m["material"]
+                for model, materials in here.items():
+                    found.setdefault(model, materials)
+            self._overrides = found
+        return self._overrides
+
     def data(self, name: str) -> bytes:
         member = self.members.get(name)
         if member is None or member.size > MAX_MEMBER_BYTES:
@@ -54,15 +72,7 @@ class _Package:
 def material_overrides(package: _Package, model_path: str) -> dict[int, str]:
     """``{submesh index: .mat GUID}`` a prefab of the package sets on the model at ``model_path``, or ``{}``."""
     model = package.guid_of.get(model_path)
-    if model is None:
-        return {}
-    for path, guid in sorted(package.guid_of.items()):
-        if not path.endswith(".prefab"):
-            continue
-        found = {int(m["index"]): m["material"] for m in _OVERRIDE.finditer(package.text(f"{guid}/asset")) if m["model"] == model}
-        if found:
-            return found
-    return {}
+    return dict(package.overrides().get(model, {})) if model is not None else {}
 
 
 def albedo_png(package: _Package, material: str) -> bytes | None:
