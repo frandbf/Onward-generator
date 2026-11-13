@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "rock_wall_11",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/rock_wall_11",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_wall_11/rock_wall_11_nor_gl_1k.jpg",
+  "md5": "df4a054175a189bd05c3dd0af7885eca",
+  "sha256": "3860610f296afecef43613aa90dd0fbd244f1ab4d02bd3cdb88aec37818963be",
+  "size_bytes": 1134539,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/rock_wall_11/rock_wall_11_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:45+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

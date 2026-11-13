@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "bark_brown_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/bark_brown_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_02/bark_brown_02_nor_gl_1k.jpg",
+  "md5": "1cad3fe0349a44df2d4d1c2859c79920",
+  "sha256": "0d5e691e8ad8bcd093a3587887fda2a6b4a948b5708a4f256f7919584c6eb857",
+  "size_bytes": 1015623,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/bark_brown_02/bark_brown_02_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:41:55+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

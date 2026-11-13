@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "brushed_concrete",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dario Barresi",
+    "Dimitrios Savva"
+  ],
+  "page_url": "https://polyhaven.com/a/brushed_concrete",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+  "md5": "fc8c03e505d0f2acb932dde6deae557a",
+  "sha256": "f4953a881f34627cefcc22f780d392314635e31bb41f75cf3888a5af55c21820",
+  "size_bytes": 849228,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:41:59+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

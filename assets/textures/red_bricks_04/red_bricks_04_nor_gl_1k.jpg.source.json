@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "red_bricks_04",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/red_bricks_04",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_bricks_04/red_bricks_04_nor_gl_1k.jpg",
+  "md5": "3a0013fd51c1188f69d6bf4b02486814",
+  "sha256": "cb9d3da93ef192ddbe5f649b15bd940fe2631bb8715002ff31a0f19294b354da",
+  "size_bytes": 339216,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/red_bricks_04/red_bricks_04_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:40+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

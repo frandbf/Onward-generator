@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "yellow_plaster",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/yellow_plaster",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/yellow_plaster/yellow_plaster_nor_gl_1k.jpg",
+  "md5": "f8f193b43abd6c25a4781a6340b74409",
+  "sha256": "785d8a69535fbae8c38aa80f086c3963f22fbff014638b122368bd7b0aa491ee",
+  "size_bytes": 522586,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/yellow_plaster/yellow_plaster_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:55+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

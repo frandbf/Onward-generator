@@ -5,7 +5,9 @@ hashes). The family is set here, not guessed from the name, and every row passes
 (``library_plan.is_calm`` with the extended limits): ``tests/unit/test_wide_library.py`` checks the written file.
 
     uv run python tools/build_wide_library.py            # rewrite the manifest from the cached files
-    uv run python -m onward_generator materials ...      # (fetching a new id: materials.polyhaven.ensure_diffuse_1k)
+
+A new id is fetched with ``materials.polyhaven.ensure_diffuse_1k`` and its normal map with
+``materials.polyhaven.ensure_map_1k(url, "nor_gl")`` (plan T3); a row records ``normal`` when that file is cached.
 """
 
 from __future__ import annotations
@@ -62,7 +64,22 @@ def row(asset_id: str, family: str, surface: str, note: str) -> dict[str, object
         "source_url": f"https://polyhaven.com/a/{asset_id}", "surface": surface, "bound": False,
         "path": image.relative_to(REPO).as_posix(), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
         "note": f"Diffuse 1k. {note}",
+        **normal_of(image),
     }
+
+
+def normal_of(image: Path) -> dict[str, object]:
+    """The row's ``normal`` (plan T3): the cached OpenGL normal map beside the albedo, when its CC0 sidecar is there."""
+    normal = image.with_name(image.name.replace("_diff_1k", "_nor_gl_1k"))
+    side = normal.with_name(normal.name + ".source.json")
+    if not side.is_file():
+        return {}
+    doc = json.loads(side.read_text(encoding="utf-8"))
+    if str(doc.get("license", "")).lower() not in {"cc0", "cc0 1.0", "cc0-1.0"} or doc.get("map") != "nor_gl":
+        raise SystemExit(f"{normal.name}: not a CC0 nor_gl sidecar")
+    data = normal.read_bytes()
+    return {"normal": {"map": "nor_gl", "path": normal.relative_to(REPO).as_posix(), "sha256": hashlib.sha256(data).hexdigest(),
+                       "bytes": len(data)}}
 
 
 def main() -> None:

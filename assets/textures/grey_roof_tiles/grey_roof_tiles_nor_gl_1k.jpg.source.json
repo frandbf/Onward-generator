@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "grey_roof_tiles",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/grey_roof_tiles",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+  "md5": "95003919cdb2fcb2f499594bdf0ee827",
+  "sha256": "99546fdc2978d0950a2c61fe94dbd4230bb7825944bb4e4e7ad586839fdc721d",
+  "size_bytes": 522186,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:30+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

@@ -17,7 +17,13 @@
       "path": "assets/textures/asphalt_01/asphalt_01_diff_1k.jpg",
       "sha256": "99b6f6bdfbd09279f3f550ac9593336df541aa2319537566eeb3e737d8512010",
       "bytes": 739513,
-      "note": "Diffuse 1k. Even dark-brown asphalt."
+      "note": "Diffuse 1k. Even dark-brown asphalt.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/asphalt_01/asphalt_01_nor_gl_1k.jpg",
+        "sha256": "b745fd20cfb775ae907786ff0ffe200cedf73f3a6ef4e60c637b85b08e0a4f9a",
+        "bytes": 1237059
+      }
     },
     {
       "id": "ph_asphalt_03",
@@ -33,7 +39,13 @@
       "path": "assets/textures/asphalt_03/asphalt_03_diff_1k.jpg",
       "sha256": "95ad02e2631c41cf9fdd6a37596cf75adb4fb8a8b6880567cc78ed1c41dc5681",
       "bytes": 788840,
-      "note": "Diffuse 1k. Fine brown asphalt."
+      "note": "Diffuse 1k. Fine brown asphalt.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/asphalt_03/asphalt_03_nor_gl_1k.jpg",
+        "sha256": "978de8349ce2e9989325099a6fd1f5ea6b2826528e1264606a5c51296b1e2888",
+        "bytes": 974676
+      }
     },
     {
       "id": "ph_bark_brown_02",
@@ -49,7 +61,13 @@
       "path": "assets/textures/bark_brown_02/bark_brown_02_diff_1k.jpg",
       "sha256": "920fa0bed0c9d78c1d530e99795113afd532d7db746de440f4a85d7c83ed0f1a",
       "bytes": 659592,
-      "note": "Diffuse 1k. Brown bark with moss."
+      "note": "Diffuse 1k. Brown bark with moss.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/bark_brown_02/bark_brown_02_nor_gl_1k.jpg",
+        "sha256": "0d5e691e8ad8bcd093a3587887fda2a6b4a948b5708a4f256f7919584c6eb857",
+        "bytes": 1015623
+      }
     },
     {
       "id": "ph_brick_wall_02",
@@ -65,7 +83,13 @@
       "path": "assets/textures/brick_wall_02/brick_wall_02_diff_1k.jpg",
       "sha256": "e80aad85ff49b70af5e554d28adf1009adca409fe5d89c2647595254f972df9c",
       "bytes": 1032279,
-      "note": "Diffuse 1k. Mixed red and grey brick, dark mortar."
+      "note": "Diffuse 1k. Mixed red and grey brick, dark mortar.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/brick_wall_02/brick_wall_02_nor_gl_1k.jpg",
+        "sha256": "ee1d7b11786a6c26245c02d6041aef0cda03431fc06a7509111575ce12bf422c",
+        "bytes": 1121130
+      }
     },
     {
       "id": "ph_brushed_concrete",
@@ -81,7 +105,13 @@
       "path": "assets/textures/brushed_concrete/brushed_concrete_diff_1k.jpg",
       "sha256": "4054ed6eb65cd063356ffb4a88706b7d7b78c5435051c48bf0ee64290f04bc8c",
       "bytes": 847278,
-      "note": "Diffuse 1k. Brushed concrete with faint swirls."
+      "note": "Diffuse 1k. Brushed concrete with faint swirls.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/brushed_concrete/brushed_concrete_nor_gl_1k.jpg",
+        "sha256": "f4953a881f34627cefcc22f780d392314635e31bb41f75cf3888a5af55c21820",
+        "bytes": 849228
+      }
     },
     {
       "id": "ph_clay_plaster",
@@ -97,7 +127,13 @@
       "path": "assets/textures/clay_plaster/clay_plaster_diff_1k.jpg",
       "sha256": "82e43c68bddebb55a18577ae3cb0d01c02c23f086d342a854ff8a174d9f4fd73",
       "bytes": 354209,
-      "note": "Diffuse 1k. Brown clay render, even."
+      "note": "Diffuse 1k. Brown clay render, even.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/clay_plaster/clay_plaster_nor_gl_1k.jpg",
+        "sha256": "359f814292005ab16be86807678a4a51e8256a87c282ebf5f5333ce18c428fba",
+        "bytes": 784921
+      }
     },
     {
       "id": "ph_clay_roof_tiles",
@@ -113,7 +149,13 @@
       "path": "assets/textures/clay_roof_tiles/clay_roof_tiles_diff_1k.jpg",
       "sha256": "aac0f4e742a2cce21afb5dfb523b47c720c6a8e2782a312b823608fe3f80eae6",
       "bytes": 878367,
-      "note": "Diffuse 1k. Dark terracotta pantiles."
+      "note": "Diffuse 1k. Dark terracotta pantiles.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/clay_roof_tiles/clay_roof_tiles_nor_gl_1k.jpg",
+        "sha256": "e6b364661f6c3045bf5268f684047968fc6550e5fa9b22b4b1266df47b495faa",
+        "bytes": 1101177
+      }
     },
     {
       "id": "ph_clay_roof_tiles_02",
@@ -129,7 +171,13 @@
       "path": "assets/textures/clay_roof_tiles_02/clay_roof_tiles_02_diff_1k.jpg",
       "sha256": "227a062b38b170e02c27eaa513dae45dc8bc893a62cbd8d0c08e2c32b381fc25",
       "bytes": 903929,
-      "note": "Diffuse 1k. Orange terracotta tiles."
+      "note": "Diffuse 1k. Orange terracotta tiles.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/clay_roof_tiles_02/clay_roof_tiles_02_nor_gl_1k.jpg",
+        "sha256": "1548d3ebce335a4590d9e421556c4189a7b63852c793a568c71b9e533f8b62d5",
+        "bytes": 990101
+      }
     },
     {
       "id": "ph_clay_roof_tiles_03",
@@ -145,7 +193,13 @@
       "path": "assets/textures/clay_roof_tiles_03/clay_roof_tiles_03_diff_1k.jpg",
       "sha256": "6719293429932a27c8ed3526b22cd65d1cd1d43194ce30fa5f4590bb3c513844",
       "bytes": 970368,
-      "note": "Diffuse 1k. Bright terracotta plain tiles."
+      "note": "Diffuse 1k. Bright terracotta plain tiles.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/clay_roof_tiles_03/clay_roof_tiles_03_nor_gl_1k.jpg",
+        "sha256": "7db087939613b6b0ef1d0c21a3956eafcf7e9d0f146267290e409448f1adc17b",
+        "bytes": 974757
+      }
     },
     {
       "id": "ph_clean_asphalt",
@@ -161,7 +215,13 @@
       "path": "assets/textures/clean_asphalt/clean_asphalt_diff_1k.jpg",
       "sha256": "ddf9224e9cfa3eb2998d9097e4cd34bd3630c85e0e6798e5a0a000415a684083",
       "bytes": 697630,
-      "note": "Diffuse 1k. Clean blue-grey asphalt."
+      "note": "Diffuse 1k. Clean blue-grey asphalt.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/clean_asphalt/clean_asphalt_nor_gl_1k.jpg",
+        "sha256": "99cdf6b6f0b8a319d206e1d561bf2a5d9933d8d33e1d685f8e25388101d21310",
+        "bytes": 776360
+      }
     },
     {
       "id": "ph_concrete_floor_01",
@@ -177,7 +237,13 @@
       "path": "assets/textures/concrete_floor_01/concrete_floor_01_diff_1k.jpg",
       "sha256": "db7c800f1464359b5f359fc743e82ac51b34e014fdfd53844f4af34bb1949229",
       "bytes": 755740,
-      "note": "Diffuse 1k. Exposed-aggregate concrete."
+      "note": "Diffuse 1k. Exposed-aggregate concrete.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/concrete_floor_01/concrete_floor_01_nor_gl_1k.jpg",
+        "sha256": "28be1f6fa82eeab137c84954bf7ea0f5d8a4434352d01c29f15e20926eb7227e",
+        "bytes": 909898
+      }
     },
     {
       "id": "ph_concrete_floor_worn_001",
@@ -193,7 +259,13 @@
       "path": "assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg",
       "sha256": "6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c",
       "bytes": 118806,
-      "note": "Diffuse 1k. Dark worn concrete."
+      "note": "Diffuse 1k. Dark worn concrete.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+        "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067",
+        "bytes": 110906
+      }
     },
     {
       "id": "ph_concrete_pavement",
@@ -209,7 +281,13 @@
       "path": "assets/textures/concrete_pavement/concrete_pavement_diff_1k.jpg",
       "sha256": "70d3ff969a7421c7ae057b5d16386d11f5e59c6740db643352e1039413f419c4",
       "bytes": 926197,
-      "note": "Diffuse 1k. Square concrete slabs, light."
+      "note": "Diffuse 1k. Square concrete slabs, light.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/concrete_pavement/concrete_pavement_nor_gl_1k.jpg",
+        "sha256": "a5009e409ff0f7b2d19e1316fe5e2b2b4f28e4a6b79990a664be69d4e8a0e690",
+        "bytes": 1184345
+      }
     },
     {
       "id": "ph_concrete_pavement_02",
@@ -225,7 +303,13 @@
       "path": "assets/textures/concrete_pavement_02/concrete_pavement_02_diff_1k.jpg",
       "sha256": "e129ee6b59b6ed7f65b4c4c5ba9eb583d13d040ec26bef5d5d4e0080fe342e7a",
       "bytes": 1052909,
-      "note": "Diffuse 1k. Mixed-shade concrete slabs."
+      "note": "Diffuse 1k. Mixed-shade concrete slabs.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/concrete_pavement_02/concrete_pavement_02_nor_gl_1k.jpg",
+        "sha256": "26c09320b3373da7f55edb8165562f16d36c07161c9c715787a09daf5910450c",
+        "bytes": 1212387
+      }
     },
     {
       "id": "ph_factory_brick",
@@ -241,7 +325,13 @@
       "path": "assets/textures/factory_brick/factory_brick_diff_1k.jpg",
       "sha256": "3de1dbf92a786ce7785bac87447961f496404cb4f76dc80510f6e967e6577e6a",
       "bytes": 1018112,
-      "note": "Diffuse 1k. Even salmon brick, light mortar."
+      "note": "Diffuse 1k. Even salmon brick, light mortar.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/factory_brick/factory_brick_nor_gl_1k.jpg",
+        "sha256": "7bb81d1b359f260094faa6afc31454602a912b3aa7d8c08842680459ed3029fc",
+        "bytes": 1057278
+      }
     },
     {
       "id": "ph_grey_roof_tiles",
@@ -257,7 +347,13 @@
       "path": "assets/textures/grey_roof_tiles/grey_roof_tiles_diff_1k.jpg",
       "sha256": "f61107b70cf56074c9db09384a332620c94c678ed2baabfae78029a8242e49a3",
       "bytes": 596156,
-      "note": "Diffuse 1k. Grey tiles with lichen."
+      "note": "Diffuse 1k. Grey tiles with lichen.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/grey_roof_tiles/grey_roof_tiles_nor_gl_1k.jpg",
+        "sha256": "99546fdc2978d0950a2c61fe94dbd4230bb7825944bb4e4e7ad586839fdc721d",
+        "bytes": 522186
+      }
     },
     {
       "id": "ph_old_stone_wall",
@@ -273,7 +369,13 @@
       "path": "assets/textures/old_stone_wall/old_stone_wall_diff_1k.jpg",
       "sha256": "76210155ce0a17f006664f602305583e145a8a00be77bea8a0e3341df5148710",
       "bytes": 880453,
-      "note": "Diffuse 1k. Rubble stone in light mortar."
+      "note": "Diffuse 1k. Rubble stone in light mortar.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/old_stone_wall/old_stone_wall_nor_gl_1k.jpg",
+        "sha256": "f847656c8f8e62dd78189ca6ff3ee2f42f9127cfa7834ebd3d313df1699e9c28",
+        "bytes": 1186893
+      }
     },
     {
       "id": "ph_patterned_paving",
@@ -289,7 +391,13 @@
       "path": "assets/textures/patterned_paving/patterned_paving_diff_1k.jpg",
       "sha256": "c0c72a8b6223356fb9988ae0dcf35caeefa618b76abc792e647a37312faa3498",
       "bytes": 883570,
-      "note": "Diffuse 1k. Two-tone grey setts in a basket pattern."
+      "note": "Diffuse 1k. Two-tone grey setts in a basket pattern.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/patterned_paving/patterned_paving_nor_gl_1k.jpg",
+        "sha256": "64fbfe2bad1413c1a743ffffdf337ff70ae99ae98ec48ba6d759e5fe2d6b73ad",
+        "bytes": 939844
+      }
     },
     {
       "id": "ph_rectangular_paving",
@@ -305,7 +413,13 @@
       "path": "assets/textures/rectangular_paving/rectangular_paving_diff_1k.jpg",
       "sha256": "23f3da5644a95fbcc1916165c8b03ac74d0836ce4b6f5bf2a28b0266dcdf84c5",
       "bytes": 649580,
-      "note": "Diffuse 1k. Brown rectangular setts in stretcher bond."
+      "note": "Diffuse 1k. Brown rectangular setts in stretcher bond.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/rectangular_paving/rectangular_paving_nor_gl_1k.jpg",
+        "sha256": "0c3a0b827ce1e240ae52f447b773d52d9712730c8b81a6aa323a4df4c84f1108",
+        "bytes": 637525
+      }
     },
     {
       "id": "ph_red_bricks_04",
@@ -321,7 +435,13 @@
       "path": "assets/textures/red_bricks_04/red_bricks_04_diff_1k.jpg",
       "sha256": "c3a51662fd3e859242d949843e88e8ca7ae50dd3bb57c4cad5b544d0a16111cd",
       "bytes": 283965,
-      "note": "Diffuse 1k. Deep red brick, weathered."
+      "note": "Diffuse 1k. Deep red brick, weathered.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/red_bricks_04/red_bricks_04_nor_gl_1k.jpg",
+        "sha256": "cb9d3da93ef192ddbe5f649b15bd940fe2631bb8715002ff31a0f19294b354da",
+        "bytes": 339216
+      }
     },
     {
       "id": "ph_rock_wall_11",
@@ -337,7 +457,13 @@
       "path": "assets/textures/rock_wall_11/rock_wall_11_diff_1k.jpg",
       "sha256": "850f45c4ea8692c4ea990a2bb8b673cb1a94a2240c4a5dedab5d8a3d695256f6",
       "bytes": 762222,
-      "note": "Diffuse 1k. Pale irregular flagstones seen from above."
+      "note": "Diffuse 1k. Pale irregular flagstones seen from above.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/rock_wall_11/rock_wall_11_nor_gl_1k.jpg",
+        "sha256": "3860610f296afecef43613aa90dd0fbd244f1ab4d02bd3cdb88aec37818963be",
+        "bytes": 1134539
+      }
     },
     {
       "id": "ph_stone_brick_wall_001",
@@ -353,7 +479,13 @@
       "path": "assets/textures/stone_brick_wall_001/stone_brick_wall_001_diff_1k.jpg",
       "sha256": "15fb31a178401eda2a2b86da539fa39021a08c7a43e902af785f99e18cba6311",
       "bytes": 259947,
-      "note": "Diffuse 1k. Dark dressed stone blocks."
+      "note": "Diffuse 1k. Dark dressed stone blocks.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/stone_brick_wall_001/stone_brick_wall_001_nor_gl_1k.jpg",
+        "sha256": "7223aa10c71d38f313b63da8493a889208b020824ca691da5066c6c86125cc51",
+        "bytes": 355904
+      }
     },
     {
       "id": "ph_white_plaster_02",
@@ -369,7 +501,13 @@
       "path": "assets/textures/white_plaster_02/white_plaster_02_diff_1k.jpg",
       "sha256": "a1ebbe091bd1ae93d2abd5de8d69f9003a8d0ee6532bcf9a87c2492c97051f23",
       "bytes": 527219,
-      "note": "Diffuse 1k. Pale grey-white render with soft patches."
+      "note": "Diffuse 1k. Pale grey-white render with soft patches.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+        "sha256": "eb572ca3630d5bfde72e2601b1f02412da23ca005cd19384dced8690be4cb783",
+        "bytes": 652310
+      }
     },
     {
       "id": "ph_worn_asphalt",
@@ -385,7 +523,13 @@
       "path": "assets/textures/worn_asphalt/worn_asphalt_diff_1k.jpg",
       "sha256": "3bf71ad290730092ad2aee85e246b2e43318bc1f32261826ba91250e815b5f72",
       "bytes": 914719,
-      "note": "Diffuse 1k. Worn asphalt with exposed grit."
+      "note": "Diffuse 1k. Worn asphalt with exposed grit.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/worn_asphalt/worn_asphalt_nor_gl_1k.jpg",
+        "sha256": "5f835d192dac296674229a763553f356f5e206bb7f6d812bca5b0f38fc5302a4",
+        "bytes": 1503498
+      }
     },
     {
       "id": "ph_yellow_plaster",
@@ -401,7 +545,13 @@
       "path": "assets/textures/yellow_plaster/yellow_plaster_diff_1k.jpg",
       "sha256": "5e67931012314b632569864200881850b67337360059f995e487f94f594c9353",
       "bytes": 376961,
-      "note": "Diffuse 1k. Warm yellow render, fine trowel marks."
+      "note": "Diffuse 1k. Warm yellow render, fine trowel marks.",
+      "normal": {
+        "map": "nor_gl",
+        "path": "assets/textures/yellow_plaster/yellow_plaster_nor_gl_1k.jpg",
+        "sha256": "785d8a69535fbae8c38aa80f086c3963f22fbff014638b122368bd7b0aa491ee",
+        "bytes": 522586
+      }
     }
   ]
 }

@@ -800,3 +800,43 @@ def test_cli_passes_the_regional_facades_switch(tmp_path: Path, monkeypatch: pyt
     assert cli.main(args) == 0
     assert cli.main([*args, "--regional-facades"]) == 0
     assert [row["regional_facades"] for row in seen] == [False, True]
+
+
+def test_the_normal_map_is_fetched_and_cached_beside_the_albedo(tmp_path: Path) -> None:
+    """Plan T3: ensure_map_1k fetches the OpenGL normal map like the albedo, into its own file and sidecar."""
+    from onward_generator.materials.polyhaven import MAP_TAGS, cached_jpeg, ensure_map_1k
+
+    assert MAP_TAGS == {"Diffuse": "diff", "nor_gl": "nor_gl"}
+    payload = _jpeg_bytes()
+    md5 = hashlib.md5(payload, usedforsecurity=False).hexdigest()
+    asked: list[str] = []
+
+    def fetch(url: str) -> bytes:
+        asked.append(url)
+        if "/info/" in url:
+            return json.dumps({"license": "CC0", "authors": {"Rob Tuytel": "All"}}).encode()
+        if "/files/" in url:
+            return json.dumps({"Diffuse": {"1k": {"jpg": {"url": "https://dl.polyhaven.org/file/d.jpg", "md5": "0" * 32, "size": 1}}},
+                               "nor_gl": {"1k": {"jpg": {"url": "https://dl.polyhaven.org/file/n.jpg", "md5": md5, "size": len(payload)}}}}).encode()
+        return payload
+
+    record = ensure_map_1k("https://polyhaven.com/a/clean_asphalt", "nor_gl", cache_dir=tmp_path, download=True, fetch=fetch)
+    path = cached_jpeg(tmp_path, "clean_asphalt", "nor_gl")
+    assert path == tmp_path / "clean_asphalt" / "clean_asphalt_nor_gl_1k.jpg" and path.read_bytes() == payload
+    assert (record.map, record.file_url, record.path, record.license) == ("nor_gl", "https://dl.polyhaven.org/file/n.jpg", str(path), "CC0")
+    assert asked[-1] == "https://dl.polyhaven.org/file/n.jpg"
+    side = json.loads(path.with_name(path.name + ".source.json").read_text(encoding="utf-8"))
+    assert side["map"] == "nor_gl" and side["md5"] == md5
+    cached = ensure_map_1k("https://polyhaven.com/a/clean_asphalt", "nor_gl", cache_dir=tmp_path)  # no network: the cache
+    assert cached.sha256 == record.sha256 and cached.map == "nor_gl"
+    assert cached_jpeg(tmp_path, "clean_asphalt") == tmp_path / "clean_asphalt" / "clean_asphalt_diff_1k.jpg"
+    with pytest.raises(DownloadError, match="pass --download to fetch nor_gl 1k jpg"):
+        ensure_map_1k("https://polyhaven.com/a/other_id", "nor_gl", cache_dir=tmp_path)
+
+    def no_normal(url: str) -> bytes:
+        if "/info/" in url:
+            return json.dumps({"license": "CC0", "authors": {}}).encode()
+        return json.dumps({"Diffuse": {}}).encode()
+
+    with pytest.raises(DownloadError, match="Poly Haven files API has no nor_gl 1k jpg"):
+        ensure_map_1k("https://polyhaven.com/a/other_id", "nor_gl", cache_dir=tmp_path, download=True, fetch=no_normal)

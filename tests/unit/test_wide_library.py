@@ -101,3 +101,22 @@ def test_a_lookup_given_its_rows_reads_only_those() -> None:
     assert_library_entries(plan, [row])
     with pytest.raises(PlanError, match="plain_facades cannot use"):
         assert_library_entries(plan, library_rows())
+
+
+def test_every_wide_row_carries_its_cc0_opengl_normal_map() -> None:
+    import numpy as np
+    from PIL import Image
+
+    for row in WIDE:
+        normal = row["normal"]
+        path = REPO_ROOT / normal["path"]
+        data = path.read_bytes()
+        assert normal["map"] == "nor_gl" and path.name == f"{row['name']}_nor_gl_1k.jpg", row["id"]
+        assert hashlib.sha256(data).hexdigest() == normal["sha256"] and len(data) == normal["bytes"], row["id"]
+        side = json.loads(path.with_name(path.name + ".source.json").read_text(encoding="utf-8"))
+        assert (side["license"], side["map"], side["asset_id"], side["resolution"]) == ("CC0", "nor_gl", row["name"], "1k"), row["id"]
+        with Image.open(path) as image:
+            assert image.size == (1024, 1024), row["id"]
+            mean = np.asarray(image.convert("RGB"), dtype=float).mean(axis=(0, 1)) / 255
+        # A tangent-space normal map: mostly facing out (blue), tilted evenly around the middle (red, green).
+        assert mean[2] > 0.85 and 0.4 < mean[0] < 0.6 and 0.4 < mean[1] < 0.6, (row["id"], mean.round(3).tolist())

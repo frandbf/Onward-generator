@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "stone_brick_wall_001",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva",
+    "Rico Cilliers"
+  ],
+  "page_url": "https://polyhaven.com/a/stone_brick_wall_001",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_brick_wall_001/stone_brick_wall_001_nor_gl_1k.jpg",
+  "md5": "a389d00861e02eef39967dde975a8af4",
+  "sha256": "7223aa10c71d38f313b63da8493a889208b020824ca691da5066c6c86125cc51",
+  "size_bytes": 355904,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/stone_brick_wall_001/stone_brick_wall_001_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:48+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

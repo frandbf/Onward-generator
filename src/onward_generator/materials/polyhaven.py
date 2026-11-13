@@ -77,8 +77,13 @@ def sidecar_path(jpeg: Path) -> Path:
     return jpeg.with_name(jpeg.name + ".source.json")
 
 
-def cached_jpeg(cache_dir: Path, asset_id: str) -> Path:
-    return Path(cache_dir) / asset_id / f"{asset_id}_diff_1k.jpg"
+# The maps this client fetches: the files-API key and the file-name tag. ``nor_gl`` is the OpenGL normal map, the
+# convention glTF expects (plan T3).
+MAP_TAGS: Mapping[str, str] = {"Diffuse": "diff", "nor_gl": "nor_gl"}
+
+
+def cached_jpeg(cache_dir: Path, asset_id: str, map_key: str = "Diffuse") -> Path:
+    return Path(cache_dir) / asset_id / f"{asset_id}_{MAP_TAGS[map_key]}_1k.jpg"
 
 
 def default_fetch(url: str, *, timeout_s: float = TIMEOUT_S) -> bytes:
@@ -132,13 +137,13 @@ def _license_from_info(info: Mapping[str, Any], asset_id: str) -> str:
     raise DownloadError(f"{asset_id}: license {raw!r} is not CC0; refusing to download")
 
 
-def _diffuse_1k_jpg(files: Mapping[str, Any]) -> tuple[str, str, int]:
-    block = ((files.get("Diffuse") or {}).get("1k") or {}).get("jpg") or {}
+def _map_1k_jpg(files: Mapping[str, Any], map_key: str) -> tuple[str, str, int]:
+    block = ((files.get(map_key) or {}).get("1k") or {}).get("jpg") or {}
     url = block.get("url")
     md5 = block.get("md5")
     size = int(block.get("size") or 0)
     if not url or not md5:
-        raise DownloadError("Poly Haven files API has no Diffuse 1k jpg")
+        raise DownloadError(f"Poly Haven files API has no {map_key} 1k jpg")
     return str(url), str(md5), size
 
 
@@ -185,8 +190,21 @@ def ensure_diffuse_1k(
     Without ``download``, a missing cache file is an error. The only network
     path is ``download=True`` (or a test ``fetch``).
     """
+    return ensure_map_1k(url, "Diffuse", cache_dir=cache_dir, download=download, fetch=fetch)
+
+
+def ensure_map_1k(
+    url: str,
+    map_key: str,
+    *,
+    cache_dir: str | Path = DEFAULT_CACHE,
+    download: bool = False,
+    fetch: Fetcher | None = None,
+) -> TextureRecord:
+    """``ensure_diffuse_1k`` for any map of ``MAP_TAGS``: the 1k JPEG of ``map_key`` (``nor_gl``: the OpenGL normal
+    map, plan T3), cached beside the albedo with its own sidecar."""
     asset_id = resolve_polyhaven_id(url)
-    jpeg = cached_jpeg(Path(cache_dir), asset_id)
+    jpeg = cached_jpeg(Path(cache_dir), asset_id, map_key)
     sidecar = _load_sidecar(jpeg)
     if sidecar and jpeg.is_file():
         raw = jpeg.read_bytes()
@@ -202,14 +220,14 @@ def ensure_diffuse_1k(
 
     if not download:
         raise DownloadError(
-            f"texture {asset_id} is not cached at {jpeg}; pass --download to fetch Diffuse 1k jpg"
+            f"texture {asset_id} is not cached at {jpeg}; pass --download to fetch {map_key} 1k jpg"
         )
 
     getter = fetch or default_fetch
     info = _get_json(INFO_URL.format(id=asset_id), getter)
     license_name = _license_from_info(info, asset_id)
     files = _get_json(FILES_URL.format(id=asset_id), getter)
-    file_url, md5, size = _diffuse_1k_jpg(files)
+    file_url, md5, size = _map_1k_jpg(files, map_key)
     payload = getter(file_url)
     digest = hashlib.md5(payload, usedforsecurity=False).hexdigest()
     if digest != md5:
@@ -229,7 +247,7 @@ def ensure_diffuse_1k(
         md5=md5,
         sha256=hashlib.sha256(payload).hexdigest(),
         size_bytes=len(payload),
-        map="Diffuse",
+        map=map_key,
         resolution="1k",
         format="jpg",
         path=str(jpeg),
