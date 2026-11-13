@@ -197,6 +197,19 @@ Off by default; [ADR-033](decisions/ADR-033-lit-normal-spike.md), proposed until
 
 The C# was written without Unity; the first `task unity` build on the macOS host is its compile check.
 
+## Library normal maps (plan T3)
+
+Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (proposed). Opt-in per map with `map.json` `"normal_maps": true` (`map create --normal-maps`).
+
+- **`materials apply --normal-maps`.** Lists, in the visual GLB's `extras.materials.normal_maps` and in `materials_report.json` `normal_maps`, each material that draws a wide-library photograph with its real CC0 normal map (`nor_gl`, [08-dress.md](08-dress.md)). A party wall or a tint takes its base's map, and the trim facades keep the spike above. `signs place` and `overgrow place` rebuild the visual GLB and carry the list forward; `bounds` and `perf cover` keep the extras they read.
+- **`export package`.** Writes each map once, as `normal_<library id>.png` (role `normal_map`), at most 1024 px, after checking its hash against the library. It prices each map in ASTC 6×6 and refuses a set over 24 MiB (`NORMAL_MAPS_MAX_BYTES`), and also a material that is the `lit_normal_material` as well.
+  - The manifest's `normal_maps` block records the material binding, the files with their library ids and sources, the total and the limit.
+  - `adapter_options.json` gets `normal_maps: [{material, path}]`.
+  - A scene without the list gets none of this, and its `package_id` is unchanged.
+- **Adapter.** Draws each listed material with `PP_Opaque_Lit`, its albedo, the map on `_BumpMap` and smoothness 0.1, and adds tangents to its combined meshes. It refuses options and files that disagree.
+
+Rue Mouffetard with the switch on (pkg_15, not yet on the headset): 9 materials with 8 maps, which are asphalt, setts, curb, pavement, sidewalks, two flat roofs, roof tiles and bark. Together they take 5,010,304 bytes in ASTC 6×6. 57 combined meshes of 10 materials got tangents (with the trim spike), and the triangles are unchanged. Frame time and memory on the headset are still to measure before a map turns it on for players.
+
 ## Lighting
 
 Everything is baked. No realtime light reaches the Quest.
