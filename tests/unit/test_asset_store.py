@@ -308,3 +308,25 @@ def test_the_reviewed_classification(name: str, size: tuple, package: str, categ
     assert (None if decision.row is None else (decision.row["category"], decision.row["role"], decision.row["placement"])) == row
     if decision.row is not None and decision.row["category"] == "structures" and decision.row["role"] != "utility_box":
         assert decision.row["surfaces"] == ["yard", "empty_lot", "plaza", "block_edge"] and decision.row["grouping"] == "single"
+
+
+def test_the_reviewed_rows_are_whole() -> None:
+    utility = classify("Electric_Box_01", (1.2, 0.6, 1.4), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+    assert utility is not None
+    assert (utility["anchor"], utility["surfaces"], utility["grouping"]) == ("ground", ["sidewalk", "yard", "empty_lot", "courtyard"], "single")
+    assert utility["description"] == "Utility cabinet (electric box) from Storage Pack, about 1.40 m."
+    for name in ("Container_01_Blue", "Crate_Huge"):
+        row = classify(name, (2.6, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+        assert row is not None and row["anchor"] == "ground", name
+        assert row["description"].startswith("Large structure (") and row["description"].endswith("from Storage Pack, 2.6 m long."), name
+    small = classify("Container_Small", (2.5, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial")
+    assert small.reason == "storage_outdoor" and small.row is not None and small.row["category"] == "waste"
+    assert classify("Mystery_Big", (3.0, 1.0, 1.0), "Storage Pack", "3D ModelsEnvironmentsIndustrial").reason == "unclassified"
+    gift = classify("Giftbox_Long", (0.3, 0.9, 0.4), "Storage Pack", "3D ModelsEnvironmentsIndustrial").row
+    assert gift is not None and gift["description"] == "Interior item (giftbox long) from Storage Pack, about 0.90 m on its longest side."
+    bench = classify("FFK_Bench_01_01", (2.2, 1.1, 1.6), "Fast Food Restaurant Kit", "3D ModelsPropsInterior").row
+    assert bench is not None and bench["description"].endswith("from Fast Food Restaurant Kit, about 2.20 m on its longest side.")
+    display = classify("Display_Bench", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert display is not None and display["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": False}
+    lamp = classify("Bench_Lamp", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
+    assert lamp is not None and lamp["description"].startswith("Interior item (bench lamp) from Coffee Shop Kit")

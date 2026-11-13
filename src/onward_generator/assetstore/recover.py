@@ -100,7 +100,7 @@ def recover_albedos(package_path: Path, model_path: str, mtl_text: str, folder: 
     """``mtl_text`` with a ``map_Kd`` for each untextured material the dressing prefab gives an albedo, written to
     ``folder``; and how many were recovered. An unreadable package changes nothing."""
     blocks = re.split(r"(?m)^(?=newmtl )", mtl_text)
-    if not any(block.startswith("newmtl ") and "map_Kd" not in block for block in blocks):
+    if not any(block.startswith("newmtl ") and "map_Kd" not in block for block in blocks):  # pragma: no mutate: only spares opening the package; a textured material gets no map below either way
         return mtl_text, 0
     package = _open(str(package_path))
     if package is None:
@@ -116,7 +116,7 @@ def recover_albedos(package_path: Path, model_path: str, mtl_text: str, folder: 
             if png is not None:
                 file = f"{stem}_recovered_{index}.png"
                 (folder / file).write_bytes(png)
-                block = block.rstrip("\n") + f"\nmap_Kd {file}\n"
+                block = (block if block.endswith("\n") else block + "\n") + f"map_Kd {file}\n"
                 recovered += 1
         out.append(block)
     return "".join(out), recovered
