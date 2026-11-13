@@ -46,6 +46,7 @@ from onward_generator.materials.polyhaven import (
 from onward_generator.materials.tile_cache import TileCache, photo_tile_key, tile_cache_dir
 from onward_generator.materials.trim import WallPalette, apply_trim
 from onward_generator.materials.trim_style import AUTO
+from onward_generator.materials.variants import VARIANT_SEP, VARIANTS, assign_variants, variant_base, variant_picks, varied_materials
 from onward_generator.tiers import SCENIC_WALLS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -124,6 +125,30 @@ def share_facade_photos(
             shared.append({"color_id": target, "slot": slot, "albedo_mode": "greyscale_modulation",
                            "asset_id": records[slot].asset_id})
     return shared
+
+
+def _apply_variants(nodes: list[Node], plan: TexturePlan, applied: Sequence[Mapping[str, Any]], photo_tiles: dict[str, tuple[Any, str]],
+                    materials: dict[str, Material], trim_materials: Collection[str], *, seed: int, wide: bool,
+                    extended: bool) -> tuple[list[Node], list[dict[str, Any]], dict[str, Any]]:
+    """Plan T4: bind each varied material's variants to their photographs and move each building to its variant."""
+    from onward_generator.materials.library_plan import catalogue_rows, library_rows, texture_record
+
+    rows = catalogue_rows() if wide else library_rows()
+    varied = varied_materials(applied, variant_picks(plan.entries, rows, seed, extended=extended), trim_materials)
+    variant_rows: list[dict[str, Any]] = []
+    for material, library_ids in varied.items():
+        mode = photo_tiles[material][1]
+        for k, library_id in enumerate(library_ids, start=1):
+            name = f"{material}{VARIANT_SEP}{k}"
+            record = texture_record(library_id)
+            photo_tiles[name] = (decode_jpeg_rgb(Path(record.path).read_bytes()), mode)
+            materials[name] = materials[material]
+            variant_rows.append({"color_id": name, "base": material, "asset_id": library_id, "albedo_mode": mode, "license": record.license,
+                                 "authors": list(record.authors), "sha256": record.sha256, "repo_path": _rel(Path(record.path))})
+    out, drawn = assign_variants(nodes, {material: len(ids) for material, ids in varied.items()})
+    block = {"enabled": True, "variants_per_material": VARIANTS, "materials": {row["color_id"]: row["asset_id"] for row in variant_rows},
+             "buildings": drawn, "added_materials": len(variant_rows), "photographs": variant_rows}
+    return out, variant_rows, block
 
 
 def normal_map_bindings(applied: Sequence[Mapping[str, Any]], used: Collection[str], trim_materials: Collection[str]) -> dict[str, Any]:
@@ -427,6 +452,7 @@ def apply_materials(
     facade_weathering: str | None = None,
     wide_library: bool = False,
     normal_maps: bool = False,
+    texture_variants: bool = False,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
 
@@ -562,6 +588,11 @@ def apply_materials(
     tint_shared = share_tint_photos(used, photo_tiles)
     shop_tile_m: dict[str, float] = {}
     shop_shared = share_shop_interior_photos(used, photo_tiles, materials, shop_tile_m)
+    variant_rows: list[dict[str, Any]] = []
+    variants_block: dict[str, Any] | None = None
+    if texture_variants:
+        visual_nodes, variant_rows, variants_block = _apply_variants(
+            visual_nodes, plan, applied, photo_tiles, materials, trim.materials, seed=seed, wide=wide_library, extended=repetition)
 
     repetition_block: dict[str, Any] | None = None
     if cell_phase is not None:
@@ -604,7 +635,7 @@ def apply_materials(
     }
     if cell_phase is not None:
         extras["materials"]["repetition"] = {"cell_m": cell_phase.cell_m}
-    normal_block = normal_map_bindings(applied, used_ids, trim.materials) if normal_maps else None
+    normal_block = normal_map_bindings([*applied, *variant_rows], used_ids, trim.materials) if normal_maps else None
     if normal_block is not None:
         extras["materials"]["normal_maps"] = normal_block["materials"]
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
@@ -644,7 +675,7 @@ def apply_materials(
     for color_id in used_ids:
         base_id = party_base(color_id)
         repeat_images[color_id] = repeat_images[base_id]
-        texture_id = material_base(color_id)  # a tint repeats at its base's scale
+        texture_id = material_base(variant_base(color_id))  # a tint and a variant repeat at their base's scale
         if texture_id in tile_m:
             tile_m[color_id] = tile_m[texture_id]
         if base_id in materials:
@@ -653,7 +684,7 @@ def apply_materials(
     visual = build_glb(
         visual_nodes, materials, extras=extras,
         repeat_images=repeat_images, repeat_tile_m=tile_m, unit_uv_materials=UNIT_UV_MATERIALS,
-        roof_uv_materials={color_id for color_id in used_ids if material_base(color_id) in roof_ids},
+        roof_uv_materials={color_id for color_id in used_ids if material_base(variant_base(color_id)) in roof_ids},
         explicit_uv_materials=trim.materials, cell_phase=cell_phase,
     )
     atomic_write_bytes(targets[0], visual)
@@ -719,6 +750,8 @@ def apply_materials(
         materials_report["repetition"] = repetition_block
     if normal_block is not None:
         materials_report["normal_maps"] = normal_block
+    if variants_block is not None:
+        materials_report["texture_variants"] = variants_block
     if street_profile is not None:
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         materials_report["street_profile"] = dict(street_profile)

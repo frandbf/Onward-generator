@@ -76,6 +76,7 @@ MAP_SWITCHES: Mapping[str, str] = {
     "panoramax_atlas": "pack the street-photo decals per combine cell; acts only with --panoramax (ADR-020 amendment)",
     "wide_library": "the texture plan also draws on the wide CC0 library of config/dress/wide_library.json (plan T1)",
     "normal_maps": "draw the library photographs that have one with their real normal map (PP_Opaque_Lit, plan T3)",
+    "texture_variants": "two more calm photographs for building roofs and plaster walls, one per building (plan T4)",
 }
 
 
@@ -323,6 +324,15 @@ def wide_library_enabled(directory: str | Path) -> bool:
     value = load_map(directory).get("wide_library", False)
     if not isinstance(value, bool):
         raise MapError(f'map.json "wide_library" must be true or false, got {value!r}')
+    return value
+
+
+def texture_variants_enabled(directory: str | Path) -> bool:
+    """True only when ``map.json`` has ``"texture_variants": true`` (plan T4, off by default). A value that is not a bool
+    is refused."""
+    value = load_map(directory).get("texture_variants", False)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "texture_variants" must be true or false, got {value!r}')
     return value
 
 

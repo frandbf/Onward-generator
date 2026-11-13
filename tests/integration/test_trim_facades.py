@@ -194,3 +194,71 @@ def test_normal_maps_list_the_photographs_that_have_one_and_the_cli_prints_them(
     plain = apply_materials(detail, tmp_path / "p", plan_path=plan, scene_path=runs["scene"])
     assert "normal_maps" not in plain and "normal maps" not in capsys.readouterr().out
     assert scene_normal_maps((tmp_path / "p" / "scene_visual.glb").read_bytes()) == {}
+
+
+def test_texture_variants_give_buildings_their_own_roof_photograph(runs: dict[str, Path], tmp_path: Path) -> None:
+    """Plan T4: --texture-variants adds the variants, moves buildings to them and leaves a run without it as it was."""
+    from onward_generator.generation.gltf import nodes_from_glb
+    from onward_generator.materials.variants import variant_index
+
+    detail, plan = runs["detail"], runs["plan"]
+    on = apply_materials(detail, tmp_path / "on", plan_path=plan, scene_path=runs["scene"], texture_variants=True)
+    block = on["texture_variants"]
+    assert block["enabled"] is True and block["variants_per_material"] == 2 and block["added_materials"] == len(block["materials"]) > 0
+    nodes, materials = nodes_from_glb((tmp_path / "on" / "scene_visual.glb").read_bytes())
+    assert set(block["materials"]) | {name.split("__var")[0] for name in block["materials"]} >= set(block["buildings"])
+    for name in block["buildings"]:  # only what some building draws reaches the GLB
+        assert name in materials and name.split("__var")[0] in {row["color_id"] for row in on["applied"]}
+    for node in nodes:
+        if (node.extras or {}).get("type") != "building":
+            continue
+        for prim in node.primitives:
+            base = prim.material.split("__var")[0]
+            count = sum(1 for name in block["materials"] if name.startswith(base + "__var"))
+            if count:
+                k = variant_index(node.name, base, count)
+                assert prim.material == (base if k == 0 else f"{base}__var{k}")
+    from onward_generator.materials.library_plan import catalogue_rows, library_rows
+    from onward_generator.materials.plan import load_texture_plan
+    from onward_generator.materials.variants import variant_picks
+
+    entries = load_texture_plan(plan).entries
+    picks = variant_picks(entries, library_rows(), 48152, extended=False)
+    slot_of = {row["color_id"]: row["id"] for row in on["applied"]}
+    expected = {f"{base}__var{k}": lib for base, slot in slot_of.items() if slot in picks for k, lib in enumerate(picks[slot], 1)
+                if not base.startswith("facade_trim")}
+    assert block["materials"] == expected
+    modes = {row["color_id"]: row["albedo_mode"] for row in on["applied"]}
+    for row in block["photographs"]:
+        assert row["albedo_mode"] == modes[row["base"]] and row["license"] and row["sha256"] and row["repo_path"].startswith("assets/")
+        assert set(row) == {"color_id", "base", "asset_id", "albedo_mode", "license", "authors", "sha256", "repo_path"}
+    wide = apply_materials(detail, tmp_path / "wide", plan_path=plan, scene_path=runs["scene"], texture_variants=True, wide_library=True)
+    wide_picks = variant_picks(entries, catalogue_rows(), 48152, extended=False)
+    assert wide["texture_variants"]["materials"] == {
+        f"{base}__var{k}": lib for base, slot in slot_of.items() if slot in wide_picks for k, lib in enumerate(wide_picks[slot], 1)
+        if not base.startswith("facade_trim")}
+    other = apply_materials(detail, tmp_path / "seed", plan_path=plan, scene_path=runs["scene"], texture_variants=True, seed=7)
+    assert other["texture_variants"]["materials"] != block["materials"] or variant_picks(entries, library_rows(), 7, extended=False) == picks
+    off = apply_materials(detail, tmp_path / "off", plan_path=plan, scene_path=runs["scene"])
+    assert "texture_variants" not in off
+    assert (tmp_path / "off" / "scene_visual.glb").read_bytes() == (runs["trim"] / "scene_visual.glb").read_bytes()
+
+
+def test_repetition_hands_the_variants_the_extended_limits(runs: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.materials.apply as apply_module
+
+    lon, lat = MURCIA_CENTER
+    plan = tmp_path / "calm_plan.json"
+    plan.write_text(json.dumps(select_texture_plan(name="Murcia", map_id="murcia", latitude=lat, longitude=lon, brief=None, seed=1,
+                                                   extended=True)))
+    seen: list[dict] = []
+    real = apply_module._apply_variants
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(apply_module, "_apply_variants", spy)
+    apply_materials(runs["detail"], tmp_path / "r", plan_path=plan, scene_path=runs["scene"], texture_variants=True, repetition=True,
+                    wide_library=True, seed=5)
+    assert seen == [{"seed": 5, "wide": True, "extended": True}]
