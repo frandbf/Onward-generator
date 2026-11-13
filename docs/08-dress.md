@@ -74,6 +74,24 @@ Decision: [ADR-020](decisions/ADR-020-trim-sheet-facades.md). By default (`--fac
 - **Walls** are cut into bands (zocalo to 0.9 m, each storey, the parapet) and each band takes its strip: the stone zocalo, the storey strip of the wall's colour (string course at the foot, shadow and streaks under the next), the cornice. A wall with no opening takes only the zocalo and the parapet cuts and the middle of its strip. U follows the ADR-012 runs in 12 m repeats.
 - **Neighbours differ**: each wall colour has three tones in the atlas (2048 × 4096), and each building draws its tone, and whether it has the stone zocalo, the cornice and a string course at every storey, by sha256 of its id without a Catastro `_part` suffix, so the parts of one parcel share them. `stats.looks` in the report counts them.
 - **Atmosphere palette (plan E8, [ADR-037](decisions/ADR-037-atmosphere-presets.md)).** With `materials apply --atmosphere <preset>` (passed by the pipeline when `map.json` names one) the preset's `grime` scales the streaks (`streak_dark`) and the splash at the foot of the wall (`base_splash_dark`) of the style, each wall colour moves `wall_desaturation` of the way to its own grey, and its brightest sRGB channel is capped at `wall_value_max`, before the bake. Only the palette's wall strips change: an observed colour (`building:colour`, a `__tint_` material) is not on the atlas. `facades.atmosphere` in `materials_report.json` records the values and the mean wall luminance before and after (linear, unweighted). Without a preset, or with `neutral`, the atlas is the one of before, byte for byte. Madrid Sol Arena with `golden_hour`: mean wall luminance 0.7083 → 0.5589; the fixed views of the baked map are 1 to 5 grey levels darker on the sunlit walls and unchanged in the shade.
+- **Weathering (opt-in, plan T2).** The `map.json` `"facades"` block takes `"weathering": "clean" | "worn" | "heavy"` (`materials apply --facade-weathering`), which scales the grime the style bakes in (`trim.weathered_atlas`):
+  - streak count and darkness, the shadow under each string course, the zocalo splash and the mottle, by 0.5, 1.6 or 2.4;
+  - no darkening term passes 0.9;
+  - `worn` and `heavy` add a patina, wide washes of darker render (8 % and 16 % at most). It has whole periods across the strip, so the atlas still tiles, and is even up each storey, so the storeys do not band.
+
+  The level is recorded as `facades.weathering` in `materials_report.json`. It goes after an atmosphere palette's grime, and multiplies it. Without the key the atlas is the one of before, byte for byte: the patina's random numbers are drawn last.
+- **Calm photographs (plan T2).** With the `"wide_library"` switch (`materials apply --wide-library`), each atlas photograph over its family's calm limit is replaced by the wide-library row of that family with the most grain still under the limit (`trim.calm_sources`). Five regional sources were over:
+
+  | Style | Source | Replaced by |
+  | --- | --- | --- |
+  | `haussmann` | brick `acg_bricks023` (0.0291) | `ph_factory_brick` (0.0214) |
+  | `central_european` | brick `acg_bricks023` (0.0291) | `ph_factory_brick` (0.0214) |
+  | `central_european` | stone `acg_rock022` (0.0267) | `ph_old_stone_wall` (0.0160) |
+  | `anglo` | stone `acg_rock051` (0.0346) | `ph_old_stone_wall` (0.0160) |
+  | `latin_american` | stone `acg_rock034` (0.0294) | `ph_old_stone_wall` (0.0160) |
+  | `latin_american` | brick `acg_bricks097` (0.0315) | `ph_factory_brick` (0.0214) |
+
+  The style table is not edited. Each replacement is listed in `facades.calm_sources` (key, from, to, both contrasts, limit), and `materials apply` prints it. The mediterranean sources are all calm, so its atlas does not change.
 - **Openings and trim**: windows (two families, two shutter positions), doors, shop glass and boarded windows fit 0–1 into cells; reveals, sills, slabs and coping take the stone strip.
 - **Materials**: `facade_trim_<style>`, `party_facade_trim_<style>` (party walls) and `scenic_trim_<style>` (scenic shells), one shared image. `glass_view`, railings, roofs, interiors and signs are unchanged. A wall colour the style has no strip for keeps its own material.
 - **Output**: `facade_trim.png` (the atlas, for review) and `facades` in `materials_report.json`. The atlas PNG is cached in the tile cache below.

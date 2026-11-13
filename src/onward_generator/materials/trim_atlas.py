@@ -149,6 +149,16 @@ def _streaks(rng: np.random.Generator, x: np.ndarray, z: np.ndarray, span_m: tup
     return out
 
 
+def _patina(rng: np.random.Generator, x: np.ndarray, span_m: tuple[float, float], dark: float) -> np.ndarray:
+    """Wide washes of darker render (plan T2 weathering): whole periods across the strip, so it still tiles, and even
+    up the storey, so the storeys do not band."""
+    u = x / span_m[0] * 2 * np.pi
+    field = np.zeros_like(u)
+    for period in (1, 2, 3):
+        field = field + np.sin(period * u + rng.uniform(0, 2 * np.pi))
+    return 1.0 - dark * (0.5 + 0.5 * field / 3)
+
+
 def _joints(x: np.ndarray, z: np.ndarray, course_m: float, block_m: float, px_m: float) -> np.ndarray:
     """Ashlar joints: horizontal at every course, vertical every block, staggered by half a block."""
     half = max(JOINT_M, px_m) / 2
@@ -180,6 +190,8 @@ def wall_pixels(kind: str, tint: Sequence[float], width: int, height: int, atlas
     under = np.maximum((z - (span[1] - UNDER_COURSE_M)) / UNDER_COURSE_M, 0.0)
     shade = shade * (1.0 - float(grime["under_course_dark"]) * under**2)
     shade = shade * _streaks(rng, x, z, span, grime, span[1] - COURSE_EDGE_M)
+    if grime.get("patina_dark"):  # drawn last, so an atlas without weathering takes the same random numbers as before
+        shade = shade * _patina(rng, x, span, float(grime["patina_dark"]))
     return base * shade[..., None]
 
 

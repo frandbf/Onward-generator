@@ -139,3 +139,27 @@ def test_the_cli_tones_the_atlas_with_a_preset(runs: dict[str, Path], tmp_path: 
     assert "atmosphere" not in json.loads((tmp_path / "n" / "materials_report.json").read_bytes())["facades"]
     assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "d"), "--atmosphere", "dusk"]) == 1
     assert "materials: atmosphere must be one of neutral, golden_hour, overcast, not 'dusk'" in capsys.readouterr().err
+
+
+def test_the_cli_weathers_the_atlas_and_reports_its_calm_sources(runs: dict[str, Path], tmp_path: Path,
+                                                                  capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan T2: --facade-weathering and --wide-library reach apply_trim through apply_materials, and the CLI prints them."""
+    import onward_generator.materials.trim as trim_module
+
+    detail, plan = runs["detail"], runs["plan"]
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "w"),
+                 "--facade-weathering", "worn", "--wide-library"]) == 0
+    out = capsys.readouterr().out
+    facades = json.loads((tmp_path / "w" / "materials_report.json").read_bytes())["facades"]
+    assert (facades["weathering"], facades["calm_sources"]) == ("worn", [])  # every mediterranean photograph is calm
+    assert "facades: weathering worn (plan T2)\n" in out
+    assert (tmp_path / "w" / "facade_trim.png").read_bytes() != (runs["trim"] / "facade_trim.png").read_bytes()
+    plain = apply_materials(detail, tmp_path / "p", plan_path=plan, scene_path=runs["scene"])
+    assert "weathering" not in plain["facades"] and "calm_sources" not in plain["facades"]
+    swap = {"key": "brick", "from": "a", "to": "b", "family": "brick", "limit": 0.025, "from_contrast": 0.03, "to_contrast": 0.02}
+    real = trim_module.calm_sources
+    monkeypatch.setattr(trim_module, "calm_sources", lambda atlas, wide: (real(atlas, wide)[0], [swap]))
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "s"), "--wide-library"]) == 0
+    assert "facades: brick a (0.03) -> b (0.02), calm limit 0.025\n" in capsys.readouterr().out
+    assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "x"),
+                 "--facade-weathering", "rusty"]) == 2

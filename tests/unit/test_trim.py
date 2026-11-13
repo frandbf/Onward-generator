@@ -1246,3 +1246,148 @@ def test_a_flat_face_of_a_wall_runs_its_strip_in_metres() -> None:
     alone, alone_uvs = wall_uvs(wall, BANDS, strip, LAYOUT.zocalo, LAYOUT.cornice, None, 0.0)
     vertical = np.setdiff1d(np.arange(mesh.vertex_count), flat)
     assert sorted(map(tuple, np.round(uvs[vertical, 1:], 6))) == sorted(map(tuple, np.round(alone_uvs[:, 1:], 6)))
+
+
+# --- plan T2: weathering and calm sources ----------------------------------------------------------------------------
+
+
+def test_weathering_scales_the_baked_grime_and_adds_a_patina_when_worn() -> None:
+    from onward_generator.materials.trim import GRIME_DARK_MAX, WEATHERING, weathered_atlas
+
+    assert WEATHERING == {"clean": (0.5, 0.0), "worn": (1.6, 0.08), "heavy": (2.4, 0.16)} and GRIME_DARK_MAX == 0.9
+    grime = {"streaks_per_strip": 80, "streak_dark": 0.12, "streak_length_m": [0.3, 1.8], "under_course_dark": 0.5,
+             "base_splash_dark": 0.3, "base_splash_m": 0.35, "mottle": 0.05}
+    atlas = {"walls": {}, "grime": grime}
+    clean = weathered_atlas(atlas, "clean")["grime"]
+    assert clean == {**grime, "streaks_per_strip": 40, "streak_dark": 0.06, "under_course_dark": 0.25, "base_splash_dark": 0.15,
+                     "mottle": 0.025}
+    heavy = weathered_atlas(atlas, "heavy")["grime"]
+    assert heavy["streaks_per_strip"] == 192 and heavy["streak_dark"] == pytest.approx(0.288) and heavy["patina_dark"] == 0.16
+    assert heavy["under_course_dark"] == GRIME_DARK_MAX  # 0.5 x 2.4 would pass black
+    assert heavy["base_splash_dark"] == pytest.approx(0.72) and heavy["mottle"] == pytest.approx(0.12)
+    assert weathered_atlas(atlas, "worn")["grime"]["patina_dark"] == 0.08 and atlas["grime"] is grime and "patina_dark" not in grime
+    with pytest.raises(StyleError, match="unknown facade weathering 'rusty'; known: clean, worn, heavy"):
+        weathered_atlas(atlas, "rusty")
+
+
+def test_the_patina_wraps_across_the_strip_and_darkens_by_at_most_its_amount() -> None:
+    import numpy as np
+
+    from onward_generator.materials.trim_atlas import _patina
+
+    x = np.linspace(0.0, 12.0, 241)[None, :]
+    wash = _patina(np.random.default_rng(3), x, (12.0, 3.0), 0.16)
+    assert wash.shape == (1, 241) and wash[0, 0] == pytest.approx(wash[0, -1])  # whole periods: the strip still tiles
+    assert wash.min() >= 1.0 - 0.16 - 1e-9 and wash.max() <= 1.0 and np.ptp(wash) > 0.05
+
+
+def test_a_weathered_atlas_is_darker_and_no_weathering_keeps_the_bytes(small_table: Path) -> None:
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    plain = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
+    assert apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, weathering=None).png == plain.png
+    means = {}
+    for level in ("clean", "worn", "heavy"):
+        result = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, weathering=level)
+        assert result.report["weathering"] == level and result.report["atlas"]["cache_key"] != plain.report["atlas"]["cache_key"]
+        means[level] = float(np.asarray(Image.open(io.BytesIO(result.png)).convert("L"), dtype=float).mean())
+    base = float(np.asarray(Image.open(io.BytesIO(plain.png)).convert("L"), dtype=float).mean())
+    assert means["clean"] > base > means["worn"] > means["heavy"]
+    assert "weathering" not in plain.report and "calm_sources" not in plain.report
+
+
+def test_calm_sources_trade_a_busy_photograph_for_the_grainiest_calm_one_of_its_family() -> None:
+    from onward_generator.materials.library_plan import WIDE_LIBRARY_PATH, library_rows
+    from onward_generator.materials.trim import calm_sources
+    from onward_generator.materials.trim_style import load_regional_table, load_style_table
+
+    regional = load_regional_table(load_style_table(), None)
+    wide = library_rows(WIDE_LIBRARY_PATH)
+    haussmann, swaps = calm_sources(regional.atlases["haussmann"], wide)
+    assert haussmann["sources"] == {"plaster": "ph_painted_plaster_wall", "stone": "acg_concrete012", "brick": "ph_factory_brick"}
+    assert swaps == [{"key": "brick", "from": "acg_bricks023", "to": "ph_factory_brick", "family": "brick", "limit": 0.025,
+                      "from_contrast": 0.0291, "to_contrast": 0.0214}]
+    central, swaps = calm_sources(regional.atlases["central_european"], wide)
+    assert [(s["key"], s["from"], s["to"]) for s in swaps] == [("brick", "acg_bricks023", "ph_factory_brick"),
+                                                              ("stone", "acg_rock022", "ph_old_stone_wall")]
+    assert calm_sources(regional.atlases["haussmann"], [])[1] == []  # no calm row of the family: the source stays
+    assert regional.atlases["haussmann"]["sources"]["brick"] == "acg_bricks023"  # the table itself is not touched
+
+
+def test_apply_trim_reports_its_calm_sources_when_wide(small_table: Path) -> None:
+    wide = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, wide=True)
+    plain = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
+    assert wide.report["calm_sources"] == [] and wide.png == plain.png  # every mediterranean photograph is calm already
+
+
+def test_the_patina_is_pinned_and_spans_its_strip() -> None:
+    import numpy as np
+
+    from onward_generator.materials.trim_atlas import _patina
+
+    x = np.array([[0.0, 1.7, 4.2, 6.0, 9.3]])
+    assert _patina(np.random.default_rng(3), x, (12.0, 3.0), 0.16).round(6).tolist() == [
+        [0.905052, 0.870599, 0.941268, 0.881798, 0.947428]]
+    assert _patina(np.random.default_rng(3), x, (6.0, 3.0), 0.16).round(6).tolist() == [
+        [0.905052, 0.947319, 0.981704, 0.905052, 0.90924]]  # the strip's width sets the period: 0 and 6 m agree
+
+
+def test_a_worn_wall_takes_the_patina(small_table: Path) -> None:
+    import numpy as np
+
+    from onward_generator.materials.trim import weathered_atlas
+    from onward_generator.materials.trim_atlas import wall_pixels
+
+    atlas = json.loads(small_table.read_text(encoding="utf-8"))["styles"]["mediterranean"]["atlas"]
+    sources = {k: np.full((8, 8, 3), 128, dtype=np.uint8) for k in ("plaster", "stone", "brick")}
+    worn = weathered_atlas(atlas, "worn")
+    without = {**worn, "grime": {k: v for k, v in worn["grime"].items() if k != "patina_dark"}}
+    with_patina = wall_pixels("plaster", (0.8, 0.7, 0.6), 64, 16, worn, sources, np.random.default_rng(1))
+    plain = wall_pixels("plaster", (0.8, 0.7, 0.6), 64, 16, without, sources, np.random.default_rng(1))
+    ratio = with_patina[..., 0] / plain[..., 0]
+    assert ratio.max() <= 1.0 + 1e-9 and ratio.min() >= 1.0 - 0.08 - 1e-9 and np.ptp(ratio) > 0.02
+    assert np.allclose(ratio, ratio[:1, :])  # even up the storey
+
+
+def test_a_busy_source_is_traded_and_reported_by_apply_trim(small_table: Path) -> None:
+    doc = json.loads(small_table.read_text(encoding="utf-8"))
+    doc["styles"]["mediterranean"]["atlas"]["sources"]["brick"] = "acg_bricks023"
+    small_table.write_text(json.dumps(doc), encoding="utf-8")
+    busy = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table)
+    wide = apply_trim([_building()], MANIFEST, COLORS, table_path=small_table, wide=True)
+    assert wide.report["calm_sources"] == [{"key": "brick", "from": "acg_bricks023", "to": "ph_factory_brick", "family": "brick",
+                                            "limit": 0.025, "from_contrast": 0.0291, "to_contrast": 0.0214}]
+    assert [s["asset_id"] for s in wide.report["atlas"]["sources"]] == ["ph_factory_brick", "ph_plastered_wall", "acg_rock030"]
+    assert wide.png != busy.png and "calm_sources" not in busy.report
+
+
+def test_the_facade_block_may_hold_all_three_keys(tmp_path: Path) -> None:
+    from onward_generator.maps.workspace import create_map, facade_options
+
+    root = tmp_path / "m"
+    create_map(root, map_id="m", name="M", latitude=MURCIA_CENTER[1], longitude=MURCIA_CENTER[0])
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["facades"] = {"mode": "trim", "style": "auto", "weathering": "heavy"}
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert facade_options(root) == ["--facades", "trim", "--facade-style", "auto", "--facade-weathering", "heavy"]
+
+
+def test_a_source_without_a_calm_match_does_not_stop_the_others() -> None:
+    from onward_generator.materials.library_plan import WIDE_LIBRARY_PATH, library_rows
+    from onward_generator.materials.trim import calm_sources
+    from onward_generator.materials.trim_style import load_regional_table, load_style_table
+
+    central = load_regional_table(load_style_table(), None).atlases["central_european"]
+    rock_only = [row for row in library_rows(WIDE_LIBRARY_PATH) if row["family"] == "rock"]
+    traded, swaps = calm_sources(central, rock_only)  # brick comes first and finds nothing; stone still does
+    assert [(s["key"], s["to"]) for s in swaps] == [("stone", "ph_old_stone_wall")] and traded["sources"]["brick"] == "acg_bricks023"
+
+
+def test_a_regional_atlas_keeps_its_calm_sources_in_the_report() -> None:
+    paris = {"frame": {"origin_wgs84": [2.34981, 48.84045]}, "objects": [{"id": "building/b1", **RECORD}]}
+    result = apply_trim([_building()], paris, COLORS, regional=True, wide=True)
+    assert result.style == "haussmann" and result.report["atlas_origin"] == "regional"
+    assert [(s["key"], s["to"]) for s in result.report["calm_sources"]] == [("brick", "ph_factory_brick")]

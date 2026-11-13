@@ -31,7 +31,17 @@ from onward_generator.detail.facades import party_base, party_material
 from onward_generator.dress.atlas import TILE_PNG_LEVEL, decode_jpeg_rgb, encode_opaque_png
 from onward_generator.generation.gltf import Node, Primitive, _facade_uvs, _triangle_groups, recentre_uvs, surface_uvs
 from onward_generator.generation.mesh import Mesh, merge, polygons_of
-from onward_generator.materials.library_plan import texture_record
+from onward_generator.materials.library_plan import (
+    REPO_ROOT,
+    WIDE_LIBRARY_PATH,
+    catalogue_rows,
+    coarse_contrast,
+    contrast_limit,
+    is_calm,
+    library_rows,
+    texture_family,
+    texture_record,
+)
 from onward_generator.materials.tile_cache import TileCache
 from onward_generator.materials.trim_atlas import INF, bake_trim_atlas, between
 from onward_generator.materials.trim_style import (
@@ -585,6 +595,52 @@ def palette_atlas(atlas: Mapping[str, Any], palette: WallPalette) -> dict[str, A
     return {**atlas, "grime": grime}
 
 
+# Plan T2: how weathered the facades look. Each level scales the grime the style bakes in; worn and heavy add wide
+# washes of darker render (``patina_dark``). No level is the style as it was, byte for byte.
+WEATHERING: Mapping[str, tuple[float, float]] = {"clean": (0.5, 0.0), "worn": (1.6, 0.08), "heavy": (2.4, 0.16)}
+GRIME_DARK_MAX = 0.9
+"""No darkening term reaches black, however heavy the weathering."""
+
+
+def weathered_atlas(atlas: Mapping[str, Any], level: str) -> dict[str, Any]:
+    """``atlas`` with its grime scaled for ``level`` (``WEATHERING``): more and darker streaks, a deeper shadow under
+    each string course, a darker zocalo splash, stronger mottling and, worn or heavy, a patina."""
+    if level not in WEATHERING:
+        raise StyleError(f"unknown facade weathering {level!r}; known: {', '.join(WEATHERING)}")
+    scale, patina = WEATHERING[level]
+    grime = dict(atlas["grime"])
+    grime["streaks_per_strip"] = round(int(grime["streaks_per_strip"]) * scale)
+    for key in ("streak_dark", "under_course_dark", "base_splash_dark"):
+        grime[key] = min(GRIME_DARK_MAX, float(grime[key]) * scale)
+    grime["mottle"] = float(grime["mottle"]) * scale
+    if patina:
+        grime["patina_dark"] = patina
+    return {**atlas, "grime": grime}
+
+
+def calm_sources(atlas: Mapping[str, Any], wide: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """``atlas`` with each photograph over its family's calm limit replaced by a wide-library row of the same family
+    (plan T2, with the ``wide_library`` switch): the one with the most grain still under the limit, so the wall keeps
+    texture. A source with no calm row of its family stays. Returns the atlas and one record per replacement."""
+    catalogue = {str(row["id"]): row for row in catalogue_rows()}
+    sources = dict(atlas["sources"])
+    swaps: list[dict[str, Any]] = []
+    for key, library_id in sorted(atlas["sources"].items()):
+        row = catalogue[str(library_id)]
+        family = texture_family(row)
+        limit = contrast_limit(family)
+        if limit is None or is_calm(row):
+            continue
+        calm = [(coarse_contrast(REPO_ROOT / str(r["path"])), str(r["id"])) for r in wide if texture_family(r) == family and is_calm(r)]
+        if not calm:
+            continue
+        contrast, chosen = max(calm)
+        sources[key] = chosen
+        swaps.append({"key": key, "from": str(library_id), "to": chosen, "family": family, "limit": limit,
+                      "from_contrast": round(coarse_contrast(REPO_ROOT / str(row["path"])), 4), "to_contrast": round(contrast, 4)})
+    return {**atlas, "sources": sources}, swaps
+
+
 @dataclass(frozen=True, slots=True)
 class TrimResult:
     """The facade atlas of one style applied to a scene, or the reason the legacy path stays."""
@@ -620,6 +676,8 @@ def apply_trim(
     regional_table_path: str | Path | None = None,
     palette: WallPalette | None = None,
     observed_walls: Sequence[str] = (),
+    weathering: str | None = None,
+    wide: bool = False,
 ) -> TrimResult:
     """Choose the style, bake (or read from ``cache``) its atlas and remap the building nodes.
 
@@ -629,7 +687,9 @@ def apply_trim(
     takes its recipe from the regional table, when that has one. A ``palette`` (plan E8) changes the wall colours
     and the grime before the bake; without one the atlas is the one of before, byte for byte.
     ``observed_walls`` names the buildings whose wall OSM gives (``building:material=brick``): ``estimated_walls``
-    never redraws them.
+    never redraws them. ``weathering`` (plan T2) scales the baked grime (``weathered_atlas``); ``wide`` (the
+    ``wide_library`` switch) replaces the photographs over their calm limit (``calm_sources``). Without either the
+    atlas is the one of before, byte for byte.
     """
     if mode not in FACADE_MODES:
         raise StyleError(f"unknown facade mode {mode!r}; known: {', '.join(FACADE_MODES)}")
@@ -643,6 +703,11 @@ def apply_trim(
     if mode == "legacy" or atlas is None:
         reason = "config" if mode == "legacy" else "style_has_no_atlas"
         return TrimResult("legacy", name, list(nodes), report={**head, "mode": "legacy", "reason": reason})
+    extra: dict[str, Any] = {}
+    if wide:
+        atlas, extra["calm_sources"] = calm_sources(atlas, library_rows(WIDE_LIBRARY_PATH))
+    if weathering is not None:
+        atlas = weathered_atlas(atlas, weathering)
     records = {key: texture_record(str(library_id)) for key, library_id in atlas["sources"].items()}
     for key, record in records.items():
         if not record.license.upper().startswith("CC0"):
@@ -674,13 +739,14 @@ def apply_trim(
     out, stats = trim_nodes(nodes, records_by_id, name, atlas, layout, frozenset(observed_walls))
     names = {trim_material(name), scenic_trim_material(name), party_material(trim_material(name))}
     used = sorted({p.material for n in out for p in n.primitives} & names)
-    extra: dict[str, Any] = {}
     if regional_table is not None:
-        extra = {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
+        extra |= {"regional_table_sha256": regional_table.sha256, "atlas_origin": atlas_origin}
         if "eras" in atlas:
             extra["era_bands"] = {"era_origin": "observed", "band_origin": "estimated", "buildings": dict(sorted(stats.eras.items()))}
     if atmosphere is not None:
         extra["atmosphere"] = atmosphere
+    if weathering is not None:
+        extra["weathering"] = weathering
     report = {
         **head,
         **extra,

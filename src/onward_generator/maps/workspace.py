@@ -532,9 +532,9 @@ def source_enabled(directory: str | Path, plugin_id: str) -> bool:
 def facade_options(directory: str | Path) -> list[str]:
     """``materials apply`` flags from this map's ``map.json`` ``"facades"`` block (ADR-019).
 
-    ``{"mode": "trim" | "legacy", "style": "<name>" | "auto"}``; either key may be left
-    out. A map without the block, or without a ``map.json``, gets no flags and the stage
-    defaults (``trim``, ``auto``). A block of another shape is refused.
+    ``{"mode": "trim" | "legacy", "style": "<name>" | "auto", "weathering": "clean" | "worn" | "heavy"}``; any key may
+    be left out. A map without the block, or without a ``map.json``, gets no flags and the stage defaults (``trim``,
+    ``auto``, the style's own grime). A block of another shape is refused.
     """
     try:
         document = load_map(directory)
@@ -543,10 +543,12 @@ def facade_options(directory: str | Path) -> list[str]:
     block = document.get("facades")
     if block is None:
         return []
-    if not isinstance(block, dict) or not set(block) <= {"mode", "style"} or not all(isinstance(v, str) for v in block.values()):
-        raise MapError('map.json "facades" must be {"mode": "trim" | "legacy", "style": "<name>" | "auto"}')
+    if not isinstance(block, dict) or not set(block) <= {"mode", "style", "weathering"} or not all(isinstance(v, str) for v in block.values()):
+        raise MapError('map.json "facades" must be {"mode": "trim" | "legacy", "style": "<name>" | "auto", '
+                       '"weathering": "clean" | "worn" | "heavy"}')
     flags = ["--facades", block["mode"]] if "mode" in block else []
-    return flags + (["--facade-style", block["style"]] if "style" in block else [])
+    flags += ["--facade-style", block["style"]] if "style" in block else []
+    return flags + (["--facade-weathering", block["weathering"]] if "weathering" in block else [])
 
 
 def store_sources(directory: str | Path, switches: Mapping[str, bool]) -> None:
