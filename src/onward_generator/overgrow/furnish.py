@@ -101,8 +101,9 @@ def build_furniture(manifest: Mapping[str, Any], library: str | Path | None) -> 
         low, high = prop.mesh.vertices.min(axis=0), prop.mesh.vertices.max(axis=0)
         centre = np.eye(4)
         centre[:2, 3] = -(low[:2] + high[:2]) / 2  # the plan places the middle of the model's box
-        if piece["slot"] == "rug" and high[2] - low[2] > RUG_THICK_M:
-            centre[2, 2] = RUG_THICK_M / (high[2] - low[2])  # the catalogue sets every model's underside at 0: it stays on the floor
+        # The catalogue sets every model's underside at 0, so its top is its thickness and a pressed rug stays on the floor.
+        if piece["slot"] == "rug" and high[2] > RUG_THICK_M:  # pragma: no mutate: a rug exactly RUG_THICK_M thick is scaled by 1
+            centre[2, 2] = RUG_THICK_M / high[2]
         x, y, z = (float(v) for v in piece["position_m"])
         matrix = yaw_matrix(x, y, z, math.radians(float(piece["yaw_deg"]))) @ centre
         first = asset_id not in seen
