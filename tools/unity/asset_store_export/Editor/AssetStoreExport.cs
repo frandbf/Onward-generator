@@ -108,7 +108,11 @@ public static class AssetStoreExport
             int triangles = renderers.Sum(r => r.GetComponent<MeshFilter>().sharedMesh.triangles.Length / 3);
             item.triangles = triangles;
             if (triangles > maxTriangles) { item.status = "too_many_triangles"; return item; }
-            if (renderers.SelectMany(r => r.sharedMaterials).Any(IsTransparent)) { item.status = "transparent_material"; return item; }
+            // Glass (a car's windows, a lamp's lens) is drawn as dark opaque glass; anything else see-through, and every
+            // alpha cut-out (leaves, a fence's mesh), still refuses the model (ADR-035 amendment of 13 November 2026).
+            var seeThrough = renderers.SelectMany(r => r.sharedMaterials).Where(IsTransparent).Distinct().ToList();
+            if (seeThrough.Any(m => IsCutout(m) || !IsGlass(m))) { item.status = "transparent_material"; return item; }
+            currentRoot = PackageRoot(source);
             var bounds = renderers.Select(r => r.bounds).Aggregate((a, b) => { a.Encapsulate(b); return a; });
             item.size = new[] { bounds.size.x, bounds.size.z, bounds.size.y };
             var shift = new Vector3(-bounds.center.x, -bounds.min.y, -bounds.center.z);
@@ -137,6 +141,41 @@ public static class AssetStoreExport
         return go.GetComponentsInChildren<MeshRenderer>(false)
             .Where(r => !skipped.Contains(r) && r.enabled && r.GetComponent<MeshFilter>() != null && r.GetComponent<MeshFilter>().sharedMesh != null)
             .ToList();
+    }
+
+    static readonly string[] GlassWords = { "glass", "window", "windshield", "windscreen", "lens", "headlight", "taillight" };
+    static readonly Color DarkGlass = new Color(0.08f, 0.1f, 0.12f);
+    static string currentRoot = "";
+    static readonly Dictionary<string, Texture> fallbackTexture = new Dictionary<string, Texture>();
+
+    static bool IsCutout(Material m) =>
+        m != null && ((m.HasProperty("_AlphaClip") && m.GetFloat("_AlphaClip") > 0.5f) || m.IsKeywordEnabled("_ALPHATEST_ON"));
+
+    static bool IsGlass(Material m) => m != null && GlassWords.Any(w => m.name.ToLowerInvariant().Contains(w));
+
+    // "Assets/LowpolyStreetPack/Meshes/Bridges.FBX#Bridge_A" -> "Assets/LowpolyStreetPack": the folder the package unpacked to.
+    static string PackageRoot(string source)
+    {
+        var parts = source.Split('#')[0].Split('/');
+        return parts.Length > 2 ? parts[0] + "/" + parts[1] : "Assets";
+    }
+
+    // The package's palette: the texture of a material named like an atlas or a palette, else the albedo most of its
+    // materials share. An FBX child whose prefab no longer finds its mesh (a Unity 4 prefab) keeps the FBX's white
+    // default material; the palette is what the package drew it with. Null when the package has no textured material.
+    static Texture PackagePalette(string root)
+    {
+        if (fallbackTexture.TryGetValue(root, out var known)) return known;
+        var materials = AssetDatabase.FindAssets("t:Material", new[] { root })
+            .Select(g => AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(g))).Where(m => m != null && !IsTransparent(m)).ToList();
+        Texture chosen = materials
+            .Where(m => new[] { "atlas", "palette", "colors", "colours" }.Any(w => m.name.ToLowerInvariant().Contains(w)))
+            .Select(m => SavedAlbedo(m).Item1).FirstOrDefault(t => t != null);
+        if (chosen == null)
+            chosen = materials.Select(m => SavedAlbedo(m).Item1).Where(t => t != null)
+                .GroupBy(t => t).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
+        fallbackTexture[root] = chosen;
+        return chosen;
     }
 
     static bool IsTransparent(Material m)
@@ -198,6 +237,8 @@ public static class AssetStoreExport
         // so HasProperty and GetTexture find nothing, but the .mat still names its textures and colours.
         Color colour = SavedColour(mat);
         var (tex, scale, offset) = SavedAlbedo(mat);
+        if (IsTransparent(mat) && IsGlass(mat)) { colour = DarkGlass; tex = null; }  // glass, drawn opaque and dark
+        else if (tex == null && colour.r > 0.99f && colour.g > 0.99f && colour.b > 0.99f) tex = PackagePalette(currentRoot);
         byte[] png = tex != null ? Readable(tex, colour) : null;
         var lin = colour.linear;
         mtl.AppendFormat(CultureInfo.InvariantCulture, "newmtl {0}\nKd {1} {2} {3}\n", name, lin.r, lin.g, lin.b);

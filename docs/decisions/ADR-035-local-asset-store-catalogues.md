@@ -73,3 +73,21 @@ The maintainer asked for more props on Rue Mouffetard (16 with the AI pick). The
 
 - **Carpets.** The 46 Persian carpets drew one grey: each carpet's prefab variant swaps the raw FBX's embedded materials for the package's `.mat` files, but the variant was refused (its fringe is transparent) and the exporter wrote the raw FBX, whose materials carry a grey colour and no texture. `assetstore/recover.py` reads, from the `.unitypackage` itself, the prefab that overrides the model's materials (`m_Materials.Array.data[N]` on the model's GUID), the albedo of each `.mat` (the exporter's property names, in order; a transparent `_Surface: 1` material is left alone) and its image, and `build_catalogue` gives the model's untextured materials those images before the GLB is written. Nothing runs package code. The opened package is kept for the next model of the catalogue.
 - **Classification** (`assetstore/classify.py`, reviewed against every local row): storage longer than 2.5 m (shipping containers, oil tanks, pallets of sacks) and any container or tank of that size become `structures` on open ground, not boxes at a wall foot, and a cargo container is no longer a vehicle; an electric cabinet is a `utility_box` structure at a wall foot; a gift box, a lamp named like a cone and a bench from an interior package (a restaurant, a flat) are interior rows; a piece thinner than 0.15 m and taller than 1 m is a kit piece when it is a door or no interior word names it (a painting or a mirror keeps its row). On this machine: 18 containers, 6 cargo containers, 5 tanks and 2 pallets of sacks move to structures, 15 gift boxes and 9 street-named indoor pieces move indoors, 5 electric boxes become utility boxes, and 6 door pieces are skipped.
+
+## Amendment, 13 November 2026: the wide import
+
+The maintainer asked for every downloaded package to be imported. Of the 30 packages never imported, 14 small and medium ones were tried first, and all 14 gave no row. The reasons were in the importer, not in the packages. Changes:
+
+- **Classifier** (`assetstore/classify.py`):
+  - A model whose name holds no known word (`Object1`) takes the words of its package's name, except kit words: "Shop Props" makes no shop. *Street Lights Pack* gave 29 lamp posts this way.
+  - A light, lamp or lantern with *street*, *post*, *pole* or *road* is a lamp post.
+  - Thin, tall street furniture (lamp post, bollard, post, traffic light, meter, hydrant) is no longer taken for a wall panel.
+  - Rocks are open-ground vegetation (role `rock`).
+  - Helicopters, planes and boats are refused (`aircraft_or_boat`), even in a package of vehicles.
+- **Importer** (`assetstore/importer.py`): a coarser level of a model exported beside its LOD0 (`_LOD1` to `_LOD9`) is skipped (`lod_copy`).
+- **Exporter** (`tools/unity/asset_store_export`):
+  - Glass (a material named like glass, a window, a windscreen, a lens or a lamp) is drawn as dark opaque glass instead of refusing the model. Any other see-through material, and every alpha cut-out (leaves, ivy), still refuses it.
+  - An FBX child whose material is white and untextured takes the package's palette: the texture of a material named like an atlas or a palette, or else the albedo most of its materials share. These are Unity 4 packages whose prefabs no longer find their meshes.
+- **Triangle limit**: vehicle packages are imported with `--max-triangles 30000` or `80000`. The library reduces them on load (`overgrow.library`), as before.
+
+Results so far: *Low Poly Street Pack* 30 rows, *Street Lights Pack* 29, *Street Lights Pack 01* 10, *ZIL-130* 2, *Mossy Rocks* 3, *Police Car* 1 (the helicopter refused), *Abandoned Rusty Vehicles* 1, *Barrels* 1, and one rock each from the tree and vine packages. Still refused: *Street Assets* (white, no palette), *Retro Kitch* (every material see-through), the rusty set's ivy (cut-out) and its props named `SM_asset_NN` (no words to classify).

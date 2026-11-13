@@ -350,3 +350,72 @@ def test_a_lamp_post_stays_street_furniture(name: str) -> None:
     assert desk.reason == "interior"
     bare = classify("Lamp_01", (0.3, 0.3, 0.5), "Misc Props", "3D ModelsProps")  # a lamp alone, in a package of no setting
     assert bare.reason == "interior"
+
+
+# --- the wide import (ADR-035 amendment of 13 November 2026) -----------------------------------------------------------
+
+
+def test_a_model_named_only_object_takes_its_package_s_words_but_not_its_kit_words() -> None:
+    lamp = classify("Object3", (0.6, 0.45, 5.0), "Street Lights Pack", "3D ModelsPropsExterior")
+    assert lamp.row is not None and (lamp.row["category"], lamp.row["role"], lamp.reason) == ("barriers", "lamppost", "street")
+    assert classify("Object3", (0.6, 0.45, 5.0), "Shop Props", "3D ModelsPropsInterior").reason == "unclassified"  # "shop" is no kit piece
+    named = classify("Bench_Old", (1.6, 0.5, 0.8), "Street Lights Pack", "3D ModelsPropsExterior")
+    assert named.row is not None and named.row["role"] == "bench"  # a model with its own words keeps them
+
+
+def test_a_light_on_a_pole_is_a_lamp_post_and_stays_however_thin() -> None:
+    for name in ("Street_Light_02", "Lamp_Post", "Road_Lamp", "Pole_Light"):
+        decision = classify(name, (0.12, 0.12, 4.5), "City Props", "3D ModelsEnvironmentsUrban")
+        assert decision.row is not None and decision.row["role"] == "lamppost", name
+    assert classify("Thin_Barrier", (1.2, 0.08, 1.4), "City Props", "3D ModelsEnvironmentsUrban").reason == "kit_piece"
+    desk = classify("Desk_Lamp", (0.2, 0.2, 0.5), "Office Pack", "3D ModelsPropsInterior")
+    assert desk.row is not None and desk.row["role"] == "room_furniture"  # a lamp without a pole stays indoors
+
+
+def test_rocks_are_open_ground_vegetation_and_craft_no_street_holds_are_refused() -> None:
+    rock = classify("Rock02", (4.5, 3.3, 1.9), "Horned Holly Tree", "3D ModelsVegetation")
+    assert rock.row is not None and (rock.row["category"], rock.row["role"], rock.row["placement"], rock.reason) == (
+        "vegetation", "rock", "open_ground", "rock")
+    assert rock.row["surfaces"] == ["yard", "empty_lot", "plaza", "courtyard"]
+    for name in ("Helicopter", "Fishing_Boat", "Jet_Plane"):
+        assert classify(name, (8.0, 3.0, 3.0), "Police Car Helicopter", "3D ModelsVehicles").reason == "aircraft_or_boat", name
+    car = classify("Interceptor", (2.5, 5.8, 1.7), "Police Car Helicopter", "3D ModelsVehicles")
+    assert car.row is not None and car.row["category"] == "vehicles"
+
+
+def test_a_coarser_level_of_detail_is_not_a_model_of_its_own(tmp_path: Path) -> None:
+    from onward_generator.assetstore.importer import LOD_COPY
+
+    assert LOD_COPY.search("Rock17_LOD1") and LOD_COPY.search("rock_lod3") and not LOD_COPY.search("Rock17_LOD0")
+    assert not LOD_COPY.search("Rock17_LOD10x") and not LOD_COPY.search("LOD1_Rock")
+    package, exported = _export(tmp_path)
+    report = json.loads((exported / "report.json").read_text(encoding="utf-8"))
+    quad = (exported / "Shelf_Tall.obj").read_text(encoding="utf-8")
+    for stem in ("Shelf_Short_LOD0", "Shelf_Short_LOD1"):
+        (exported / f"{stem}.obj").write_text(quad, encoding="utf-8")
+        (exported / f"{stem}.mtl").write_text("newmtl m\nKd 0.5 0.5 0.5\n", encoding="utf-8")
+        report["items"].append({"prefab": f"Assets/P/{stem}.prefab", "file": f"{stem}.obj", "status": "exported", "size": [1, 0.4, 1.6]})
+    (exported / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    result = build_catalogue(package, exported, tmp_path / "assets")
+    assert result.skipped["lod_copy"] == 1
+    files = [row["file"] for row in json.loads((tmp_path / "assets" / package.catalogue / "manifest.json").read_text(encoding="utf-8"))["assets"]]
+    assert "Shelf_Short_LOD0.glb" in files and "Shelf_Short_LOD1.glb" not in files
+
+
+def test_the_exporter_draws_glass_opaque_refuses_cut_outs_and_lends_white_pieces_the_package_palette() -> None:
+    """C# cannot run here: the rules the wide import needs are pinned in the exporter's source."""
+    from onward_generator.assetstore.importer import EXPORTER
+
+    source = EXPORTER.read_text(encoding="utf-8")
+    item = source[source.index("static Item ExportObject"):source.index("static List<MeshRenderer> Lod0")]
+    assert "var seeThrough = renderers.SelectMany(r => r.sharedMaterials).Where(IsTransparent).Distinct().ToList();" in item
+    assert 'if (seeThrough.Any(m => IsCutout(m) || !IsGlass(m))) { item.status = "transparent_material"; return item; }' in item
+    assert item.index("too_many_triangles") < item.index("transparent_material")
+    assert 'static readonly string[] GlassWords = { "glass", "window", "windshield", "windscreen", "lens", "headlight", "taillight" };' in source
+    assert "static readonly Color DarkGlass = new Color(0.08f, 0.1f, 0.12f);" in source
+    material = source[source.index("static string MaterialName"):source.index("static readonly string[] NotAlbedo")]
+    assert "if (IsTransparent(mat) && IsGlass(mat)) { colour = DarkGlass; tex = null; }" in material
+    assert "else if (tex == null && colour.r > 0.99f && colour.g > 0.99f && colour.b > 0.99f) tex = PackagePalette(currentRoot);" in material
+    palette = source[source.index("static Texture PackagePalette"):source.index("static bool IsTransparent")]
+    assert 'new[] { "atlas", "palette", "colors", "colours" }' in palette and ".GroupBy(t => t).OrderByDescending(g => g.Count())" in palette
+    assert "fallbackTexture[root] = chosen;" in palette  # one look-up per package

@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime
 import io
 import json
+import re
 import shutil
 import subprocess
 from collections import Counter
@@ -37,6 +38,8 @@ EXPORTER = REPO_ROOT / "tools" / "unity" / "asset_store_export" / "Editor" / "As
 DEFAULT_PROJECT = REPO_ROOT / "cache" / "asset_store" / "project"
 DEFAULT_EXPORT = REPO_ROOT / "cache" / "asset_store" / "export"
 DEFAULT_MAX_TRIANGLES = 8000
+LOD_COPY = re.compile(r"_LOD[1-9]$", re.IGNORECASE)
+"""A model's coarser levels, which an FBX exports beside its LOD0 (Mossy Rocks: LOD0 to LOD3 of each rock)."""
 DEFAULT_MAX_MB = 400.0
 CENTIMETRE_SUSPECT_M = 0.05
 FLAT_STD = 2.0
@@ -155,6 +158,9 @@ def build_catalogue(package: Package, exported: Path, assets: Path) -> PackageRe
             result.skipped[str(item.get("status", "unknown")).split(":")[0]] += 1
             continue
         stem = Path(str(item["file"])).stem
+        if LOD_COPY.search(stem):  # a coarser level of a model the package also exports as LOD0
+            result.skipped["lod_copy"] += 1
+            continue
         asset_id = f"as_{package.id[:20]}_{stem}"[:80]
         if asset_id in seen:
             result.skipped["duplicate_name"] += 1
