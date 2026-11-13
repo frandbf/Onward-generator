@@ -627,3 +627,9 @@ def test_a_large_library_image_is_scaled_into_its_cell_smoothly() -> None:
 
 def test_the_drawn_decals_are_pinned_to_the_pixel() -> None:
     assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in procedural_decals(7)} == DRAWN_HASHES
+
+
+def test_the_posters_of_twelve_maps_are_pinned_to_the_pixel() -> None:
+    # One seed can draw the same paper colour from a slightly different range; twelve cannot.
+    posters = b"".join(d.rgba.tobytes() for s in range(1, 13) for d in procedural_decals(s) if d.id == "gen_torn_poster")
+    assert hashlib.sha256(posters).hexdigest()[:16] == "ab0133642b15675f"
