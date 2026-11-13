@@ -645,7 +645,7 @@ def _write_texture_plan(
     seed: int,
     provider: Provider | None,
     extended: bool = False,
-    wide: bool = False,
+    wide: bool,
 ) -> Path:
     document = select_texture_plan(
         name=name,

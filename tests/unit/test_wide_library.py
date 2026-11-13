@@ -88,3 +88,16 @@ def test_the_switch_is_read_from_map_json_and_refreshes_the_plan(tmp_path: Path)
     (off / "map.json").write_text(json.dumps({**document, "wide_library": "yes"}), encoding="utf-8")
     with pytest.raises(MapError, match='"wide_library" must be true or false'):
         wide_library_enabled(off)
+
+
+def test_a_lookup_given_its_rows_reads_only_those() -> None:
+    from onward_generator.materials.plan import PlanError
+
+    row = next(r for r in WIDE if r["family"] == "plaster")
+    assert texture_record(row["id"], [row]).sha256 == row["sha256"]
+    with pytest.raises(PlanError, match="is not in the imported library"):
+        texture_record(row["id"], library_rows())
+    plan = {"entries": [{"id": "plain_facades", "library_id": row["id"]}]}
+    assert_library_entries(plan, [row])
+    with pytest.raises(PlanError, match="plain_facades cannot use"):
+        assert_library_entries(plan, library_rows())
