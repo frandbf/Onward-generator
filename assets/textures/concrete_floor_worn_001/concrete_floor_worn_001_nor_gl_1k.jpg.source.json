@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "concrete_floor_worn_001",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva",
+    "Rico Cilliers"
+  ],
+  "page_url": "https://polyhaven.com/a/concrete_floor_worn_001",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+  "md5": "9de6626758f8793b71182b892c110827",
+  "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067",
+  "size_bytes": 110906,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:19+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

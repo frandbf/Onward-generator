@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "asphalt_03",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dario Barresi",
+    "Charlotte Baglioni"
+  ],
+  "page_url": "https://polyhaven.com/a/asphalt_03",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_03/asphalt_03_nor_gl_1k.jpg",
+  "md5": "e24cfa2b2c30c16374424eecbebfc201",
+  "sha256": "978de8349ce2e9989325099a6fd1f5ea6b2826528e1264606a5c51296b1e2888",
+  "size_bytes": 974676,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/asphalt_03/asphalt_03_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:41:52+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

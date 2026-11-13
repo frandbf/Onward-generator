@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "clay_roof_tiles_03",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/clay_roof_tiles_03",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_roof_tiles_03/clay_roof_tiles_03_nor_gl_1k.jpg",
+  "md5": "61b471769ef1f72674d1647ff08cc87b",
+  "sha256": "7db087939613b6b0ef1d0c21a3956eafcf7e9d0f146267290e409448f1adc17b",
+  "size_bytes": 974757,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/clay_roof_tiles_03/clay_roof_tiles_03_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:12+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "factory_brick",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/factory_brick",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/factory_brick/factory_brick_nor_gl_1k.jpg",
+  "md5": "fba45dbffac876040ceadfcf82207f68",
+  "sha256": "7bb81d1b359f260094faa6afc31454602a912b3aa7d8c08842680459ed3029fc",
+  "size_bytes": 1057278,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/factory_brick/factory_brick_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:27+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

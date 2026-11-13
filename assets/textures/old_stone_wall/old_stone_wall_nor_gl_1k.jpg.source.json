@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "old_stone_wall",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Charlotte Baglioni"
+  ],
+  "page_url": "https://polyhaven.com/a/old_stone_wall",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/old_stone_wall/old_stone_wall_nor_gl_1k.jpg",
+  "md5": "e4f02b4c5956e69719d2dafa002085e5",
+  "sha256": "f847656c8f8e62dd78189ca6ff3ee2f42f9127cfa7834ebd3d313df1699e9c28",
+  "size_bytes": 1186893,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/old_stone_wall/old_stone_wall_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:32+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

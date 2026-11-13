@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "worn_asphalt",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/worn_asphalt",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/worn_asphalt/worn_asphalt_nor_gl_1k.jpg",
+  "md5": "706a5c4e817c4d927029920578c01312",
+  "sha256": "5f835d192dac296674229a763553f356f5e206bb7f6d812bca5b0f38fc5302a4",
+  "size_bytes": 1503498,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-tex/assets/textures/worn_asphalt/worn_asphalt_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-13T18:42:53+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}
