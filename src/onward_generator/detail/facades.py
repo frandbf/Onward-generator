@@ -320,10 +320,28 @@ def entrance(landmark: bool, shop: bool, cfg: DetailConfig) -> tuple[str, Openin
     return "door", cfg.main_door
 
 
+# Haussmann's balcons filants (plan Q3b, ADR-020 amendment of 12 November 2026): one balcony along the whole street wall
+# of the second and the fifth storey (the French 2e and 5e étage), shallower than a bay balcony.
+FILANT_DEPTH_M = 0.5
+FILANT_SLAB_M = 0.15
+FILANT_RAILING_M = 1.0
+FILANT_MIN_M = 3.0
+FILANT_STOREYS = (2, 5)
+
+
+def filant_storeys(count: int) -> frozenset[int]:
+    """The storeys (0 the ground floor) that carry a balcon filant on a building of ``count`` storeys: the second and
+    the fifth, the fifth falling to the top storey on a lower building; none below four storeys."""
+    if count < 4:
+        return frozenset()
+    return frozenset(min(storey, count - 1) for storey in FILANT_STOREYS)
+
+
 @dataclass(slots=True)
 class Layout:
     holes: list[Hole] = field(default_factory=list)
     balconies: list[tuple[int, float, float]] = field(default_factory=list)  # (segment, s0, v0)
+    filants: list[tuple[int, float, float, float]] = field(default_factory=list)  # (segment, s0, s1, v0)
     skipped: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
 
@@ -342,9 +360,14 @@ def layout_segment(
     layout: Layout,
     floor_m: float = 0.0,
     hidden: bool = False,
+    filants: frozenset[int] = frozenset(),
 ) -> None:
     """Lay the template's bays on one wall. With ``floor_m`` (a setback wall, ``setback_floor``),
     a storey whose top is not above it is skipped and no opening starts below it.
+
+    Each storey of ``filants`` (``filant_storeys``) gets one balcony along the wall, from edge margin to edge margin,
+    instead of bay balconies, when the wall is not hidden, is at least ``FILANT_MIN_M`` long and its slab meets no
+    other footprint.
 
     A ``hidden`` wall faces no ground a player reaches (a closed courtyard, plan P0): its bays are flat windows only,
     with no balcony and no shopfront; the main door, when the wall carries it, stays."""
@@ -394,7 +417,7 @@ def layout_segment(
                 elif ground != "main_door_only":
                     window(c, z0, j, i)
                 continue
-            b = None if hidden else template.balcony
+            b = None if hidden or i in filants else template.balcony
             if b is not None and stable_unit(cfg.seed, building_id, "balcony", seg.index, j) < b.share:
                 door = b.door
                 fits = door.width_m + cfg.min_pier_m <= bay_w and door.height_m + cfg.head_clearance_m <= storeys.height_m
@@ -408,6 +431,13 @@ def layout_segment(
                 else:
                     layout.skipped["balcony_not_placed"] += 1
             window(c, z0, j, i)
+    s0, s1 = cfg.edge_margin_m, length - cfg.edge_margin_m
+    if hidden or s1 - s0 < FILANT_MIN_M:
+        return
+    for i in sorted(filants):
+        z0 = i * storeys.height_m
+        if 0 < i < storeys.count and z0 >= floor_m and not others.intersects(seg.plan_rect(s0, s1, 0.0, FILANT_DEPTH_M).buffer(-0.01)):
+            layout.filants.append((seg.index, s0, s1, z0))
 
 
 def face_with_openings(length: float, z0: float, z1: float, rects: list[tuple[float, float, float, float]]) -> Polygon:
@@ -625,6 +655,13 @@ def build_shell(
         if proto.collider is not None:
             balcony_colliders.append(transform(proto.collider, m))
         counts["balcony"] += 1
+    for seg_index, fs0, fs1, v0 in layout.filants:
+        proto = balcony(fs1 - fs0, FILANT_DEPTH_M, FILANT_SLAB_M, FILANT_RAILING_M)
+        m = segments[seg_index].module_matrix(fs0, v0)
+        _bake(parts, proto, m)
+        if proto.collider is not None:
+            balcony_colliders.append(transform(proto.collider, m))
+        counts["balcony_filant"] += 1
 
     footprint_area = sum(p.area for p in polygons)
     return Shell(
