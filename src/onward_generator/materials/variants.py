@@ -11,7 +11,6 @@ per varied slot in each combine cell that holds it.
 from __future__ import annotations
 
 import hashlib
-import zlib
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
@@ -29,12 +28,13 @@ BUILDING_TYPES = frozenset({"building", "building_part"})
 
 def variant_base(material: str) -> str:
     """The material a variant shows the scale and UV rules of: ``roof_tile__var1`` is ``roof_tile``."""
-    return material.split(VARIANT_SEP, 1)[0]
+    return material.split(VARIANT_SEP)[0]
 
 
 def variant_picks(entries: Sequence[Any], rows: Sequence[Mapping[str, Any]], seed: int, *, extended: bool) -> dict[str, list[str]]:
     """For each varied slot of the plan, ``VARIANTS`` calm library ids of its family that no plan entry uses, in the
-    order of ``crc32(seed:slot:id)``; fewer when the family has fewer."""
+    order of ``sha256(seed:slot:id)``; fewer when the family has fewer. (Not crc32: it is affine, so changing the seed
+    barely reorders ids of one length.)"""
     used = {str(entry.library_id) for entry in entries}
     picks: dict[str, list[str]] = {}
     for entry in entries:
@@ -44,7 +44,7 @@ def variant_picks(entries: Sequence[Any], rows: Sequence[Mapping[str, Any]], see
         family = SLOT_FAMILY[slot]
         pool = sorted((str(row["id"]) for row in rows
                        if texture_family(row) == family and str(row["id"]) not in used and is_calm(row, extended=extended)),
-                      key=lambda library_id: (zlib.crc32(f"{seed}:{slot}:{library_id}".encode()), library_id))
+                      key=lambda library_id: hashlib.sha256(f"{seed}:{slot}:{library_id}".encode()).digest())
         picks[slot] = pool[:VARIANTS]
         used.update(picks[slot])
     return picks
@@ -67,7 +67,7 @@ def assign_variants(nodes: Sequence[Node], counts: Mapping[str, int]) -> tuple[l
         prims: list[Primitive] = []
         seen: set[str] = set()
         for prim in node.primitives:
-            count = counts.get(prim.material, 0)
+            count = counts.get(prim.material)
             if not count:
                 prims.append(prim)
                 continue

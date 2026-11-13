@@ -99,3 +99,49 @@ def test_the_wide_library_widens_the_variant_pool() -> None:
     narrow = variant_picks(entries, library_rows(), 3, extended=True)["roofs"]
     wide = variant_picks(entries, library_rows() + library_rows(WIDE_LIBRARY_PATH), 3, extended=True)["roofs"]
     assert len(narrow) <= VARIANTS and len(wide) == VARIANTS
+
+
+def test_the_variant_index_is_pinned() -> None:
+    assert [variant_index(f"building/b{i}", "roof_tile", 2) for i in range(8)] == [1, 2, 1, 2, 2, 2, 1, 2]
+
+
+def test_a_building_keeps_its_uvs_and_every_primitive_and_node_is_seen() -> None:
+    uvs = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]])
+    nodes = [Node("surface/a", (Primitive(QUAD, "roof_tile"),), {"type": "surface"}),
+             Node("building/b0", (Primitive(QUAD, "plaster_white", uvs), Primitive(QUAD, "roof_tile", uvs)), {"type": "building_part"})]
+    out, drawn = assign_variants(nodes, {"roof_tile": 2})
+    k = variant_index("building/b0", "roof_tile", 2)
+    assert out[0] is nodes[0] and [p.material for p in out[1].primitives] == ["plaster_white", "roof_tile" if k == 0 else f"roof_tile__var{k}"]
+    assert all(np.array_equal(p.uvs, uvs) for p in out[1].primitives) and sum(drawn.values()) == 1
+
+
+def test_the_extended_limits_keep_a_busy_roof_out_of_the_variants() -> None:
+    from onward_generator.materials.library_plan import library_rows
+
+    entries = [SimpleNamespace(id="roofs", library_id="acg_roofingtiles014b")]
+    for seed in range(30):
+        assert "acg_roofingtiles012c" not in variant_picks(entries, library_rows(), seed, extended=True)["roofs"]  # 0.0211 over 0.019
+    assert any("acg_roofingtiles012c" in variant_picks(entries, library_rows(), seed, extended=False)["roofs"] for seed in range(30))
+
+
+def test_the_cli_takes_the_flag_and_prints_the_variants(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+                                                        tmp_path: Path) -> None:
+    import onward_generator.materials.__main__ as cli
+
+    seen: dict[str, object] = {}
+
+    def fake(*args, **kwargs):
+        seen.update(kwargs)
+        return {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False,
+                "texture_variants": {"added_materials": 2, "materials": {"roof_tile__var1": "a", "roof_tile__var2": "b"}}}
+
+    monkeypatch.setattr(cli, "apply_materials", fake)
+    monkeypatch.setattr(cli, "emit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cli, "after_materials", lambda out: None)
+    assert cli.main(["apply", "--base", str(tmp_path), "--out", str(tmp_path / "o"), "--texture-variants"]) == 0
+    assert seen["texture_variants"] is True
+    assert "texture variants: 2 materials added (roof_tile__var1, roof_tile__var2)\n" in capsys.readouterr().out
+    monkeypatch.setattr(cli, "apply_materials", lambda *args, **kwargs: {"applied": [], "skipped": [], "brick_nodes": [], "cobble_applied": False,
+                                                                         "texture_variants": {"added_materials": 0, "materials": {}}})
+    assert cli.main(["apply", "--base", str(tmp_path), "--out", str(tmp_path / "o")]) == 0
+    assert "texture variants: 0 materials added (none)\n" in capsys.readouterr().out

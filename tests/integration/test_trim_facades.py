@@ -218,6 +218,27 @@ def test_texture_variants_give_buildings_their_own_roof_photograph(runs: dict[st
             if count:
                 k = variant_index(node.name, base, count)
                 assert prim.material == (base if k == 0 else f"{base}__var{k}")
+    from onward_generator.materials.library_plan import catalogue_rows, library_rows
+    from onward_generator.materials.plan import load_texture_plan
+    from onward_generator.materials.variants import variant_picks
+
+    entries = load_texture_plan(plan).entries
+    picks = variant_picks(entries, library_rows(), 48152, extended=False)
+    slot_of = {row["color_id"]: row["id"] for row in on["applied"]}
+    expected = {f"{base}__var{k}": lib for base, slot in slot_of.items() if slot in picks for k, lib in enumerate(picks[slot], 1)
+                if not base.startswith("facade_trim")}
+    assert block["materials"] == expected
+    modes = {row["color_id"]: row["albedo_mode"] for row in on["applied"]}
+    for row in block["photographs"]:
+        assert row["albedo_mode"] == modes[row["base"]] and row["license"] and row["sha256"] and row["repo_path"].startswith("assets/")
+        assert set(row) == {"color_id", "base", "asset_id", "albedo_mode", "license", "authors", "sha256", "repo_path"}
+    wide = apply_materials(detail, tmp_path / "wide", plan_path=plan, scene_path=runs["scene"], texture_variants=True, wide_library=True)
+    wide_picks = variant_picks(entries, catalogue_rows(), 48152, extended=False)
+    assert wide["texture_variants"]["materials"] == {
+        f"{base}__var{k}": lib for base, slot in slot_of.items() if slot in wide_picks for k, lib in enumerate(wide_picks[slot], 1)
+        if not base.startswith("facade_trim")}
+    other = apply_materials(detail, tmp_path / "seed", plan_path=plan, scene_path=runs["scene"], texture_variants=True, seed=7)
+    assert other["texture_variants"]["materials"] != block["materials"] or variant_picks(entries, library_rows(), 7, extended=False) == picks
     off = apply_materials(detail, tmp_path / "off", plan_path=plan, scene_path=runs["scene"])
     assert "texture_variants" not in off
     assert (tmp_path / "off" / "scene_visual.glb").read_bytes() == (runs["trim"] / "scene_visual.glb").read_bytes()

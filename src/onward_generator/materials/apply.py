@@ -142,12 +142,12 @@ def _apply_variants(nodes: list[Node], plan: TexturePlan, applied: Sequence[Mapp
             name = f"{material}{VARIANT_SEP}{k}"
             record = texture_record(library_id)
             photo_tiles[name] = (decode_jpeg_rgb(Path(record.path).read_bytes()), mode)
-            materials[name] = materials.get(material) or Material(WHITE, 0.9)
-            variant_rows.append({"color_id": name, "base": material, "asset_id": library_id, "license": record.license,
+            materials[name] = materials[material]
+            variant_rows.append({"color_id": name, "base": material, "asset_id": library_id, "albedo_mode": mode, "license": record.license,
                                  "authors": list(record.authors), "sha256": record.sha256, "repo_path": _rel(Path(record.path))})
     out, drawn = assign_variants(nodes, {material: len(ids) for material, ids in varied.items()})
     block = {"enabled": True, "variants_per_material": VARIANTS, "materials": {row["color_id"]: row["asset_id"] for row in variant_rows},
-             "buildings": drawn, "added_materials": len(variant_rows)}
+             "buildings": drawn, "added_materials": len(variant_rows), "photographs": variant_rows}
     return out, variant_rows, block
 
 
@@ -641,8 +641,6 @@ def apply_materials(
     tile_m = {e.color_id: float(e.technical["tile_m"]) for e in catalog.entries}
     for row in interior_shared:
         tile_m[str(row["color_id"])] = float(row["tile_m"])
-    for row in variant_rows:  # a variant repeats at its base's scale
-        tile_m[str(row["color_id"])] = tile_m[variant_base(str(row["color_id"]))]
     tile_m.update(shop_tile_m)
     cobble_entry = catalog.get("cobblestone_paving")
     if cobble_entry is not None:
@@ -677,7 +675,7 @@ def apply_materials(
     for color_id in used_ids:
         base_id = party_base(color_id)
         repeat_images[color_id] = repeat_images[base_id]
-        texture_id = material_base(color_id)  # a tint repeats at its base's scale
+        texture_id = material_base(variant_base(color_id))  # a tint and a variant repeat at their base's scale
         if texture_id in tile_m:
             tile_m[color_id] = tile_m[texture_id]
         if base_id in materials:
