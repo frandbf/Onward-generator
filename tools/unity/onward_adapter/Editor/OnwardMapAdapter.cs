@@ -77,6 +77,8 @@ namespace OnwardGenerator
         private static readonly string[] SdkGlassNames = { "GlassVfx", "Glass" };
         // Black shop names on shop glass: RGBA atlas pages, transparent background, PP_Sprite_Lit.
         private const string ShopDecalPrefix = "shop_decal_atlas_";
+        // Wall decals (ADR-038): transparent atlas pages 1 cm in front of a wall, drawn like the shop decals.
+        private const string WallDecalPrefix = "wall_decal_atlas_";
         private const string WorkRoot = "Assets/OnwardAdapter";
         private const string LauncherBinPathPref = "_ONWARD_BIN_PATH_";
         private const string LauncherPlatformPref = "_ONWARD_PLATFORM_";
@@ -577,6 +579,7 @@ namespace OnwardGenerator
                 if (g == null || materials[i] == null) continue;
                 string n = g.name ?? "";
                 if (n == ViewGlassMaterial || n == ShopGlassMaterial || n.StartsWith(ShopDecalPrefix, StringComparison.Ordinal)
+                    || n.StartsWith(WallDecalPrefix, StringComparison.Ordinal)
                     || n.IndexOf("envelope", StringComparison.OrdinalIgnoreCase) >= 0)
                     continue;
                 int texture = g.pbrMetallicRoughness != null && g.pbrMetallicRoughness.baseColorTexture != null
@@ -602,7 +605,8 @@ namespace OnwardGenerator
             nodeName != null && nodeName.StartsWith("furnish/", StringComparison.Ordinal) && nodeName.Split('/').Length == 3;
 
         private static bool IsShopOverlay(GMaterial material) =>
-            material != null && (material.name == ShopGlassMaterial || material.name.StartsWith(ShopDecalPrefix, StringComparison.Ordinal));
+            material != null && (material.name == ShopGlassMaterial || material.name.StartsWith(ShopDecalPrefix, StringComparison.Ordinal)
+                                 || material.name.StartsWith(WallDecalPrefix, StringComparison.Ordinal));
 
         private static void ApplyMatrix(Transform t, float[] m)
         {
@@ -3421,7 +3425,8 @@ namespace OnwardGenerator
                 }
                 Debug.Log($"{LogPrefix} shop_glass: no SDK material named {string.Join(" or ", SdkGlassNames)} under {SdkRoot}; PP_Sprite_Lit with the generated tint");
             }
-            if (safe == ViewGlassMaterial || safe == ShopGlassMaterial || safe.StartsWith(ShopDecalPrefix, StringComparison.Ordinal))
+            if (safe == ViewGlassMaterial || safe == ShopGlassMaterial || safe.StartsWith(ShopDecalPrefix, StringComparison.Ordinal)
+                || safe.StartsWith(WallDecalPrefix, StringComparison.Ordinal))
             {
                 // Compiled shader already blends and draws both faces. Do not set
                 // Surface, Cull, or _BaseColor: this graph does not expose them.
