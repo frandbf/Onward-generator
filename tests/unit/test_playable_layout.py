@@ -650,7 +650,8 @@ def test_the_package_checks_the_ladders_and_lifts() -> None:
     ladder = {"x": 1.0, "y": 2.0, "yaw": 0.0, "height_m": 9.0, "parapet_m": 0.7, "roof_x": 1.0, "roof_y": 3.0}
     lift = {**ladder, "roof_yaw": 180.0}
     assert _layout_with() == [] and _layout_with(ladders=[ladder] * 3, lifts=[lift] * 3) == []
-    assert _layout_with(ladders=[ladder] * 4) == ["layout: ladders must be a list of at most 3"]
+    assert _layout_with(ladders=[ladder] * 9) == []  # 3 street ladders and 6 roof links
+    assert _layout_with(ladders=[ladder] * 10) == ["layout: ladders must be a list of at most 9"]
     assert _layout_with(lifts=[lift] * 4) == ["layout: lifts must be a list of at most 3"]
     assert _layout_with(lifts="x") == ["layout: lifts must be a list of at most 3"]
     needs_ladder = "layout: each of ladders needs x, y, yaw, height_m, parapet_m, roof_x, roof_y and a positive height"
@@ -658,9 +659,12 @@ def test_the_package_checks_the_ladders_and_lifts() -> None:
     assert _layout_with(lifts=[ladder]) == [needs_lift]
     assert _layout_with(ladders=[ladder, {**ladder, "x": True}, "x"]) == [needs_ladder]
     assert _layout_with(ladders=["x"]) == [needs_ladder]
-    assert _layout_with(ladders="x", lifts="x") == ["layout: ladders must be a list of at most 3", "layout: lifts must be a list of at most 3"]
+    assert _layout_with(ladders="x", lifts="x") == ["layout: ladders must be a list of at most 9", "layout: lifts must be a list of at most 3"]
     assert _layout_with(ladders=[{**ladder, "height_m": 0}]) == [needs_ladder]
     assert _layout_with(ladders=[{**ladder, "height_m": 0.1}]) == []
+    # A roof link stands on a lower roof: base_m from 0 to its height.
+    for base, ok in ((0.0, True), (9.0, True), (6.0, True), (9.01, False), (-0.01, False), (True, False), ("6", False)):
+        assert (_layout_with(ladders=[{**ladder, "base_m": base}]) == []) is ok, base
 
 
 def test_the_climb_keep_out_covers_points_street_doors_and_routes() -> None:
