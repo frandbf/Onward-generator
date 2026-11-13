@@ -351,15 +351,16 @@ def wall_surface(nodes: Sequence[Node]) -> Surface:
             tri = prim.mesh.vertices[prim.mesh.triangles]
             triangles.append(tri)
             obstacle.append(np.full(len(tri), any(word in prim.material for word in OBSTACLES)))
-    tris = np.concatenate(triangles) if triangles else np.zeros((0, 3, 3))
-    blocking = np.concatenate(obstacle) if obstacle else np.zeros(0, dtype=bool)
+    if not triangles:
+        return lambda wall, s, z, width, height: None
+    tris, blocking = np.concatenate(triangles), np.concatenate(obstacle)
     lows, highs = tris.min(axis=1), tris.max(axis=1)
     tree = STRtree([box(float(a[0]), float(a[1]), float(b[0]) + 1e-6, float(b[1]) + 1e-6) for a, b in zip(lows, highs, strict=True)])  # pragma: no mutate: the micrometre only gives a flat face an area; box() orders its corners
 
     def surface(wall: Wall, s: float, z: float, width: float, height: float) -> float | None:
         z0, z1 = z - height / 2, z + height / 2
-        near = tree.query(_plan(wall, s - width / 2, s + width / 2, PROBE_OUT_M), predicate="intersects")
-        near = near[(lows[near, 2] < z1) & (highs[near, 2] > z0)]
+        near = tree.query(_plan(wall, s - width / 2, s + width / 2, PROBE_OUT_M), predicate="intersects")  # pragma: no mutate: a box query only adds faces the rays then miss
+        near = near[(lows[near, 2] < z1) & (highs[near, 2] > z0)]  # pragma: no mutate: keeping more faces, or faces touching the band, adds only faces the rays miss
         if not len(near):
             return None
         along = (wall.b - wall.a) / float(np.linalg.norm(wall.b - wall.a))
@@ -371,7 +372,7 @@ def wall_surface(nodes: Sequence[Node]) -> Surface:
         if not np.isfinite(t).all() or blocking[near[first]].any():
             return None
         depths = PROBE_OUT_M - t
-        if float(depths.max() - depths.min()) > FLAT_M or abs(float(np.median(depths))) > PROBE_REACH_M:
+        if float(depths.max() - depths.min()) > FLAT_M or abs(float(np.median(depths))) > PROBE_REACH_M:  # pragma: no mutate: no facade lies FLAT_M or PROBE_REACH_M off to the bit
             return None
         return float(np.median(depths))
 
@@ -384,14 +385,14 @@ def _first_hits(origins: np.ndarray, direction: np.ndarray, tris: np.ndarray) ->
     e1, e2 = tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0]
     h = np.cross(direction, e2)
     a = np.einsum("ij,ij->i", e1, h)
-    ok = np.abs(a) > 1e-12
-    f = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)
+    ok = np.abs(a) > 1e-12  # pragma: no mutate: a face edge-on to the rays is masked out; what f holds there is never read
+    f = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)  # pragma: no mutate: a face edge-on to the rays is masked out; what f holds there is never read
     rel = origins[:, None, :] - tris[None, :, 0]
     u = f[None, :] * np.einsum("rtj,tj->rt", rel, h)
     q = np.cross(rel, e1[None, :, :])
     v = f[None, :] * (q @ direction)
     t = f[None, :] * np.einsum("tj,rtj->rt", e2, q)
-    hit = ok[None, :] & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0) & (t <= PROBE_OUT_M + PROBE_REACH_M)
+    hit = ok[None, :] & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0) & (t <= PROBE_OUT_M + PROBE_REACH_M)  # pragma: no mutate: a ray on a shared edge is met by the neighbouring face; none lands at 0 or the reach to the bit
     t = np.where(hit, t, np.inf)
     first = np.argmin(t, axis=1)
     return t[np.arange(len(origins)), first], first

@@ -925,3 +925,7 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
     assert len(seen["footprints"].geometries) == len(buildings) > 0  # type: ignore[attr-defined]
     assert seen["blocked"](box(700.5, 700.5, 702, 702), 1.0, 2.0)  # type: ignore[operator]  # the signs' footprints block a decal
     assert not seen["blocked"](box(900, 900, 901, 901), 0.0, 1.0)  # type: ignore[operator]
+    from onward_generator.signs.decals import Wall as DecalWall
+
+    far = DecalWall("x", np.array([900.0, 900.0]), np.array([910.0, 900.0]), np.array([0.0, -1.0]), 9.0)
+    assert seen["surface"] is not None and seen["surface"](far, 905.0, 2.0, 1.0, 1.0) is None  # type: ignore[operator]  # the built scene, nothing out there

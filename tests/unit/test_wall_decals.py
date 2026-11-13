@@ -701,3 +701,42 @@ def test_the_decals_read_the_openings_of_the_scene_the_trim_sheet_was_baked_from
     assert place_module.untrimmed(base, trimmed) is trimmed
     (base / "materials_report.json").write_text(json.dumps({}), encoding="utf-8")
     assert place_module.untrimmed(base, trimmed) is trimmed
+
+
+def _tiled(x0: float, x1: float, top: float, tile: float = 0.5) -> Node:
+    """A south wall at y 0 from ``x0`` to ``x1`` and up to ``top``, built of ``tile`` squares facing -y."""
+    prims = []
+    for i in range(round((x1 - x0) / tile)):
+        for j in range(round(top / tile)):
+            a = x0 + i * tile
+            prims.append(_quad((a + tile, 0), (a, 0), j * tile, (j + 1) * tile, "plaster_white"))
+    return Node("tiles", tuple(prims), {})
+
+
+def test_the_probe_reads_a_wall_of_small_faces_away_from_the_origin_to_its_edges() -> None:
+    from onward_generator.signs.decals import wall_surface
+
+    wall = _wall(20, 30, height=4.0)
+    surface = wall_surface([_tiled(20, 30, 4.0)])
+    assert surface(wall, 5.0, 2.0, 1.6, 1.2) == pytest.approx(0.0)
+    assert surface(wall, 9.2, 2.0, 1.6, 1.2) == pytest.approx(0.0)  # up to the wall's end
+    assert surface(wall, 9.25, 2.0, 1.6, 1.2) is None  # 5 cm past it
+    assert surface(wall, 5.0, 3.4, 1.6, 1.2) == pytest.approx(0.0)  # up to the wall's top
+    assert surface(wall, 5.0, 3.45, 1.6, 1.2) is None
+    assert surface(wall, 0.8, 0.6, 1.6, 1.2) == pytest.approx(0.0)  # from its start and its foot
+
+
+def test_the_probe_grid_is_dense_enough_to_meet_a_thin_pane() -> None:
+    from onward_generator.signs.decals import wall_surface
+
+    wall = _wall(20, 30)
+    strip = wall_surface([_facade_at(20, 30, _quad((24.50, -0.001), (24.46, -0.001), 0.0, 12.0, "glass_dark"))])
+    assert strip(wall, 5.0, 2.0, 1.6, 1.2) is None  # seven rays across 1.6 m, 0.26 m apart, meet a 4 cm pane 0.52 m left of centre
+    centre = wall_surface([_facade_at(20, 30, _quad((25.025, -0.001), (24.975, -0.001), 0.0, 12.0, "glass_dark"))])
+    assert centre(wall, 5.0, 2.0, 0.2, 0.2) is not None  # two rays across a 20 cm decal straddle a 5 cm pane
+    row = wall_surface([_facade_at(20, 30, _quad((30, -0.001), (20, -0.001), 1.68, 1.75, "glass_dark"))])
+    assert row(wall, 5.0, 2.0, 1.6, 1.2) is None  # five rows up 1.2 m, 0.29 m apart, meet a 7 cm band at the second row
+
+
+def _facade_at(x0: float, x1: float, *extra: Primitive) -> Node:
+    return Node("b", (_quad((x1, 0), (x0, 0), 0.0, 12.0, "plaster_white"), *extra), {})
