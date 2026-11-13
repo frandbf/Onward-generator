@@ -49,7 +49,9 @@ def ladder_triangles(height_m: float, parapet_m: float) -> int:
 
 def climb_triangles(layout: Mapping[str, Any]) -> int:
     """The adapter's models of the layout's ladders and lifts (ADR-029)."""
-    ladders = sum(ladder_triangles(float(s["height_m"]), float(s.get("parapet_m", 0.0))) for s in layout.get("ladders") or [])
+    # A roof link stands on a lower roof (``base_m``): its model spans only the rise above it.
+    ladders = sum(ladder_triangles(float(s["height_m"]) - float(s.get("base_m", 0.0)), float(s.get("parapet_m", 0.0)))
+                  for s in layout.get("ladders") or [])
     return ladders + LIFT_TRIANGLES * len(layout.get("lifts") or [])
 
 

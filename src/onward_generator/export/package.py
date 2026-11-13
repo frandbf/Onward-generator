@@ -63,7 +63,7 @@ from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.export.triangle_budget import budget_warning, triangle_budget
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
-from onward_generator.perf.climbs import LADDERS_MAX, LIFTS_MAX
+from onward_generator.perf.climbs import LADDERS_MAX, LIFTS_MAX, ROOF_LINKS_MAX
 from onward_generator.perf.layout import (
     GAMEPLAY_VERSION,
     MIN_SPAWN_SEPARATION_M,
@@ -230,11 +230,18 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
     return problems
 
 
+def _base_below(site: Mapping[str, Any]) -> bool:
+    """A roof link's ``base_m`` (the lower roof it stands on) is a number from 0 up to its height; a street climb has none."""
+    base = site.get("base_m", 0.0)
+    return not isinstance(base, bool) and isinstance(base, (int, float)) and 0.0 <= base <= site["height_m"]
+
+
 def _check_climbs(doc: Mapping[str, Any]) -> list[str]:
     """Ladders and lifts (ADR-029). A layout from before them has neither."""
     problems = []
     for key, limit, fields in (
-        ("ladders", LADDERS_MAX, ("x", "y", "yaw", "height_m", "parapet_m", "roof_x", "roof_y")),
+        # The street ladders and the roof links (ADR-029 amendment of 12 November 2026).
+        ("ladders", LADDERS_MAX + ROOF_LINKS_MAX, ("x", "y", "yaw", "height_m", "parapet_m", "roof_x", "roof_y")),
         ("lifts", LIFTS_MAX, ("x", "y", "yaw", "height_m", "roof_x", "roof_y", "roof_yaw")),
     ):
         sites = doc.get(key, [])
@@ -246,6 +253,7 @@ def _check_climbs(doc: Mapping[str, Any]) -> list[str]:
                 not isinstance(site, dict)
                 or any(isinstance(site.get(f), bool) or not isinstance(site.get(f), (int, float)) for f in fields)
                 or site["height_m"] <= 0
+                or not _base_below(site)
             ):
                 problems.append(f"layout: each of {key} needs {', '.join(fields)} and a positive height")
                 break
