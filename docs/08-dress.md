@@ -87,9 +87,9 @@ Decision: [ADR-020](decisions/ADR-020-trim-sheet-facades.md). By default (`--fac
   | `haussmann` | brick `acg_bricks023` (0.0291) | `ph_factory_brick` (0.0214) |
   | `central_european` | brick `acg_bricks023` (0.0291) | `ph_factory_brick` (0.0214) |
   | `central_european` | stone `acg_rock022` (0.0267) | `ph_old_stone_wall` (0.0160) |
-  | `anglo` | stone `acg_rock051` | `ph_old_stone_wall` |
-  | `latin_american` | stone `acg_rock034` | `ph_old_stone_wall` |
-  | `latin_american` | brick `acg_bricks097` | `ph_factory_brick` |
+  | `anglo` | stone `acg_rock051` (0.0346) | `ph_old_stone_wall` (0.0160) |
+  | `latin_american` | stone `acg_rock034` (0.0294) | `ph_old_stone_wall` (0.0160) |
+  | `latin_american` | brick `acg_bricks097` (0.0315) | `ph_factory_brick` (0.0214) |
 
   The style table is not edited. Each replacement is listed in `facades.calm_sources` (key, from, to, both contrasts, limit), and `materials apply` prints it. The mediterranean sources are all calm, so its atlas does not change.
 - **Openings and trim**: windows (two families, two shutter positions), doors, shop glass and boarded windows fit 0–1 into cells; reveals, sills, slabs and coping take the stone strip.

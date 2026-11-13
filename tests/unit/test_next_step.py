@@ -208,6 +208,7 @@ def test_materials_command_carries_the_maps_facade_block(tmp_path: Path) -> None
             facade_options(root)
     assert facade_options(tmp_path / "elsewhere") == []
     assert "--facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+    _facades(root, {})
     assert "--wide-library" not in materials_command(root / "data" / "processed" / "scene_dress").argv
     document = json.loads((root / "map.json").read_text(encoding="utf-8"))
     (root / "map.json").write_text(json.dumps({**document, "wide_library": True}), encoding="utf-8")
