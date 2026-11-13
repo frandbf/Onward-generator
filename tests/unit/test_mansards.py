@@ -36,6 +36,7 @@ def test_the_constants() -> None:
 def test_a_free_standing_building_gets_four_sloped_zinc_faces_and_a_deck_at_its_height() -> None:
     shell, _ = _shell(Polygon())
     assert shell.defects == 0  # watertight: walls to the eaves, the slopes, the deck
+    assert abs(shell.roof_area_error) < 1e-6  # the slopes and the deck cover the footprint
     assert shell.roof["type"] == "mansard" and shell.roof["rise_m"] == 3.0 and shell.roof["inset_m"] == 1.0
     zinc = np.vstack([m.vertices for m in shell.parts[MANSARD_MATERIAL]])
     assert zinc[:, 2].min() == 15.0 and zinc[:, 2].max() == 18.0

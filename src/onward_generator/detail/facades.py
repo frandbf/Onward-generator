@@ -672,13 +672,15 @@ def build_shell(
         z_top = eaves
         outer = [s for s in segments if s.part == 0 and s.ring == 0]
         for i, (seg, (start, end)) in enumerate(zip(outer, ring, strict=True)):
-            parts[MANSARD_MATERIAL if seg.exposed else wall_material].append(quad((*seg.a, eaves), (*seg.b, eaves), (*end, height), (*start, height)))
+            face = quad((*seg.a, eaves), (*seg.b, eaves), (*end, height), (*start, height))
+            parts[MANSARD_MATERIAL if seg.exposed else wall_material].append(face)
+            roof_area += upward_area(face)  # the slopes and the deck cover the footprint between them
             previous_end = ring[i - 1][1]
             if float(np.linalg.norm(previous_end - start)) > WELD_M:  # one line, an exposed and a party piece: an upright step
                 parts[wall_material].append(_step(seg, outer[i - 1].exposed, eaves, height, start, previous_end))
         top = cap(Polygon([p for start, end in ring for p in (start, end)]), height)
         parts[roof_material].append(top)
-        roof_area = upward_area(top)
+        roof_area += upward_area(top)
         roof_deck = deck
         roof_info = {"type": "mansard", "rise_m": round(mansard.rise_m, 3), "inset_m": mansard.inset_m, "slope_material": MANSARD_MATERIAL}
     elif inner is not None:
