@@ -1,6 +1,6 @@
 # Optional container for the Python pipeline and its checks. Unity and adb stay on the host.
 # Build and run through tools/docker/run.sh; the repository is mounted at /work.
-FROM python:3.15-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends shellcheck git \
