@@ -136,3 +136,20 @@ def test_a_glb_or_a_count_other_than_the_plan_stops_the_build() -> None:
     with pytest.raises(FurnishBuildError) as caught:
         build_furniture(_manifest({**P0, "triangles": 7}), ASSETS)
     assert str(caught.value) == f"interior furniture Shelf_01: {PROPS['Shelf_01'].prop.triangles} triangles, detail priced 7"
+
+
+def test_a_thick_rug_is_pressed_flat_on_the_floor_and_a_thin_one_is_left() -> None:
+    from onward_generator.overgrow.furnish import RUG_THICK_M
+
+    assert RUG_THICK_M == 0.01
+    rug = _piece(0, "kenney_food_loaf", [3.0, 3.0, 0.25], 30.0, False, slot="rug", building="")
+    loaf = _piece(1, "kenney_food_loaf", [5.0, 3.0, 0.25], 30.0, False, slot="decor", building="")
+    built = build_furniture({"objects": [{"type": "interior", "rooms": [{"furnishing": {"pieces": [rug, loaf]}}]}]}, ASSETS)
+    mesh = PROPS["kenney_food_loaf"].prop.mesh
+    pressed, kept = (transform(mesh, node.matrix).vertices for node in built.nodes)
+    model = mesh.vertices
+    assert np.ptp(model[:, 2]) > RUG_THICK_M  # a loaf is thicker than a rug may be
+    assert pressed[:, 2].min() == pytest.approx(0.25, abs=1e-9) and np.ptp(pressed[:, 2]) == pytest.approx(RUG_THICK_M, abs=1e-9)
+    assert np.ptp(pressed[:, 0]) == pytest.approx(np.ptp(kept[:, 0]), abs=1e-9)  # its plan is the same
+    assert (pressed[:, :2].min(axis=0) + pressed[:, :2].max(axis=0)) / 2 == pytest.approx([3.0, 3.0], abs=1e-6)
+    assert np.ptp(kept[:, 2]) == pytest.approx(np.ptp(model[:, 2]), abs=1e-9) and kept[:, 2].min() == pytest.approx(0.25, abs=1e-9)
