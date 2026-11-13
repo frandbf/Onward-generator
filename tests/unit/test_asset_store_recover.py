@@ -97,6 +97,7 @@ def test_the_overrides_and_the_albedo_are_read_by_name(tmp_path: Path) -> None:
         package = _Package(archive)
         assert material_overrides(package, "Assets/C/Models/Rug_004.FBX") == {0: RUG, 1: FRINGE}
         assert material_overrides(package, "Assets/C/Missing.FBX") == {}
+        assert material_overrides(package, "Assets/C/Textures/Normal.PNG") == {}  # in the package, but no prefab dresses it
         rug = albedo_png(package, RUG)
         assert rug is not None
         with Image.open(io.BytesIO(rug)) as picture:  # _BaseColorMap comes before _MainTex

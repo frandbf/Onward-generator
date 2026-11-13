@@ -71,8 +71,7 @@ class _Package:
 
 def material_overrides(package: _Package, model_path: str) -> dict[int, str]:
     """``{submesh index: .mat GUID}`` a prefab of the package sets on the model at ``model_path``, or ``{}``."""
-    model = package.guid_of.get(model_path)
-    return dict(package.overrides().get(model, {})) if model is not None else {}
+    return dict(package.overrides().get(package.guid_of.get(model_path) or "", {}))
 
 
 def albedo_png(package: _Package, material: str) -> bytes | None:
