@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from itertools import pairwise
 from typing import Any
 
-from shapely.geometry import Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
@@ -277,7 +277,84 @@ def place_climbs(
                              _parapet_thickness(building))
             if site is not None and spaced(site):
                 ladders.append(site)
-    return {"ladders": ladders, "lifts": lifts}
+                used.add(source)
+    # Roof links: from the climbed roofs on to their flat neighbours, so the roofs play as a run (each link climbed both ways).
+    return {"ladders": ladders + roof_links(ranked, used), "lifts": lifts}
+
+
+# Roof links (12 November 2026): from the roofs a street climb reaches, ladders lead on to flat roofs next door, so a
+# squad can play along a run of roofs. Each link is a ladder against the higher building's wall with its foot on the
+# lower roof: climbed both ways, so every linked roof leads back to the street.
+ROOF_LINKS_MAX = 6
+LINK_MAX_RISE_M = 6.0
+LINK_TOUCH_M = 0.3
+LINK_MIN_SHARED_M = LADDER_WIDTH_M + 0.4
+
+
+def _shared(first: BaseGeometry, second: BaseGeometry) -> LineString | None:
+    """The longest straight piece of ``first``'s outline within ``LINK_TOUCH_M`` of ``second`` (a touching run may turn a
+    corner), or ``None`` under ``LINK_MIN_SHARED_M``."""
+    touching = first.boundary.intersection(second.buffer(LINK_TOUCH_M))
+    straight = [LineString([a, b]) for g in getattr(touching, "geoms", [touching]) if isinstance(g, LineString) for a, b in pairwise(g.coords)]
+    longest = max(straight, key=lambda g: g.length, default=None)
+    return longest if longest is not None and longest.length >= LINK_MIN_SHARED_M else None
+
+
+def link_ladder(low: tuple[str, Mapping[str, Any], Polygon], high: tuple[str, Mapping[str, Any], Polygon]) -> dict[str, Any] | None:
+    """A ladder from the ``low`` roof up the ``high`` building's wall where the two footprints touch: its foot on the low
+    deck clear of the low parapet, its landing on the high deck. ``None`` when the shared wall is too short, the rise is
+    over ``LINK_MAX_RISE_M`` or either deck has no room."""
+    (low_id, low_b, low_fp), (high_id, high_b, high_fp) = low, high
+    rise = float(high_b["height"]["height_m"]) - float(low_b["height"]["height_m"])
+    if not 0.0 <= rise <= LINK_MAX_RISE_M:
+        return None
+    line = _shared(high_fp, low_fp)
+    if line is None:
+        return None
+    (ax, ay), (bx, by) = line.coords[0], line.coords[-1]
+    length = math.hypot(bx - ax, by - ay)
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    mid = line.interpolate(0.5, normalized=True)
+    nx, ny = uy, -ux
+    if not low_fp.buffer(COVER_TOLERANCE_M).contains(Point(mid.x + nx * 0.5, mid.y + ny * 0.5)):
+        nx, ny = -nx, -ny  # toward the low roof
+    wall = (mid.x, mid.y, nx, ny, length)
+    low_t, high_t = _parapet_thickness(low_b), _parapet_thickness(high_b)
+    foot = _strip(wall, LADDER_WIDTH_M, low_t, low_t + LADDER_FOOT_M)
+    landing = _strip(wall, LADDER_WIDTH_M, -(high_t + LANDING_DEPTH_M), -high_t)
+    if not deck(low_fp, low_t).buffer(COVER_TOLERANCE_M).covers(foot) or not deck(high_fp, high_t).buffer(COVER_TOLERANCE_M).covers(landing):
+        return None
+    x, y = _along(wall, LADDER_WALL_GAP_M)
+    roof_x, roof_y = _along(wall, -(high_t + LANDING_DEPTH_M / 2))
+    return {
+        "x": round(x, CENTRE_DIGITS), "y": round(y, CENTRE_DIGITS), "yaw": _yaw(-nx, -ny),
+        "height_m": round(float(high_b["height"]["height_m"]), CENTRE_DIGITS), "parapet_m": float(high_b["roof"].get("parapet_m", 0.0)),
+        "roof_x": round(roof_x, CENTRE_DIGITS), "roof_y": round(roof_y, CENTRE_DIGITS),
+        "base_m": round(float(low_b["height"]["height_m"]), CENTRE_DIGITS), "link": [low_id, high_id],
+    }
+
+
+def roof_links(candidates: Sequence[tuple[str, dict[str, Any], Polygon]], climbed: Iterable[str]) -> list[dict[str, Any]]:
+    """Ladders from the ``climbed`` roofs on to touching ``candidates``, breadth first, each roof reached once, at most
+    ``ROOF_LINKS_MAX``. A link joins two roofs both ways; a roof is linked only from one already reached."""
+    by_id = {source: (source, building, footprint) for source, building, footprint in candidates}
+    reached = [source for source in sorted(set(climbed)) if source in by_id]
+    seen = set(reached)
+    links: list[dict[str, Any]] = []
+    queue = list(reached)
+    while queue and len(links) < ROOF_LINKS_MAX:
+        here = by_id[queue.pop(0)]
+        for other_id in sorted(by_id):
+            if other_id in seen or len(links) >= ROOF_LINKS_MAX:
+                continue
+            other = by_id[other_id]
+            low, high = sorted((here, other), key=lambda row: (float(row[1]["height"]["height_m"]), row[0]))
+            site = link_ladder(low, high)
+            if site is not None:
+                links.append(site)
+                seen.add(other_id)
+                queue.append(other_id)
+    return links
 
 
 def climbed_roofs(climbs: Mapping[str, Iterable[Mapping[str, float]]]) -> list[tuple[float, float, float]]:

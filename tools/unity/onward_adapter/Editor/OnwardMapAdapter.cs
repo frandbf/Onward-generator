@@ -174,7 +174,7 @@ namespace OnwardGenerator
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
         [Serializable] private class Route { public XY[] points; }
         // ADR-029. roof_yaw is read only for a lift.
-        [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float parapet_m; public float roof_x; public float roof_y; public float roof_yaw; }
+        [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float parapet_m; public float roof_x; public float roof_y; public float roof_yaw; public float base_m; }
 
         [Serializable]
         private class Layout
@@ -2720,7 +2720,8 @@ namespace OnwardGenerator
             Vector3 landing = ladder.VaultTargetUpper.position;
             ladder.VaultTargetUpper.position = new Vector3(landing.x, site.height_m, landing.z);
             PrefabUtility.RecordPrefabInstancePropertyModifications(ladder.VaultTargetUpper);
-            FillRungsToGround(ladder);
+            // A roof link (perf/climbs.roof_links) stands on a lower roof: its rungs stop at that roof, base_m (0 on the street).
+            FillRungsToGround(ladder, site.base_m);
             PrefabUtility.RecordPrefabInstancePropertyModifications(ladder);
 
             GameObject perch = InstantiatePrefab("AreaLadderPerch.prefab");
@@ -2729,20 +2730,21 @@ namespace OnwardGenerator
 
             // The prefab has no mesh, so this is what the player sees. No collider: the SDK's rungs do the climbing.
             float top = ladder.Rungs.Max(r => r.Transform.position.y);
+            float foot = site.base_m;
             var boxes = new List<CombineInstance>
             {
-                Box(new Vector3(-LadderRailWidthM / 2f, top / 2f, 0f), new Vector3(0.05f, top, 0.08f)),
-                Box(new Vector3(LadderRailWidthM / 2f, top / 2f, 0f), new Vector3(0.05f, top, 0.08f)),
+                Box(new Vector3(-LadderRailWidthM / 2f, (foot + top) / 2f, 0f), new Vector3(0.05f, top - foot, 0.08f)),
+                Box(new Vector3(LadderRailWidthM / 2f, (foot + top) / 2f, 0f), new Vector3(0.05f, top - foot, 0.08f)),
             };
-            foreach (float y in ladder.Rungs.Where(r => r.Transform.position.y > 0f).Select(r => (float)Math.Round(r.Transform.position.y, 2)).Distinct())
+            foreach (float y in ladder.Rungs.Where(r => r.Transform.position.y > foot).Select(r => (float)Math.Round(r.Transform.position.y, 2)).Distinct())
                 boxes.Add(Box(new Vector3(0f, y, 0f), new Vector3(LadderRailWidthM, 0.04f, 0.04f)));
             AddClimbLook(go.name + "_Look", Local(site.x, site.y, 0f), go.transform.rotation, boxes, material, root);
         }
 
-        private static void FillRungsToGround(Ladder ladder)
+        private static void FillRungsToGround(Ladder ladder, float baseM)
         {
             const float sameRungM = 0.01f;
-            const float lowestRungM = 0.15f;
+            float lowestRungM = baseM + 0.15f;
             float[] heights = ladder.Rungs.Select(r => r.Transform.position.y).OrderBy(y => y).ToArray();
             float bottom = heights[0];
             float[] levels = heights.Where((y, k) => k == 0 || y - heights[k - 1] > sameRungM).ToArray();
