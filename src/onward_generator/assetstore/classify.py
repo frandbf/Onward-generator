@@ -97,6 +97,8 @@ def classify(name: str, size: tuple[float, float, float], package: str, category
     and its Asset Store category folder, which decide an ambiguous word such as ``barrel`` or ``bin``.
     """
     words = _with_singulars(words_of(name))
+    if "lamp" in words and words & {"post", "street"}:
+        words = (words - {"lamp", "street"}) | {"lamppost"}  # a lamp post or a street lamp is street furniture, not a room's lamp
     length, depth, height = size
     longest = max(size)
     if words & KIT_WORDS and not words & (INTERIOR_WORDS | VEHICLE_WORDS | STREET_WORDS | STORAGE_WORDS):

@@ -336,3 +336,11 @@ def test_a_gift_shelf_is_indoors_and_furnished_by_its_package() -> None:
     row = classify("Gift_Shelf", (1.0, 0.4, 1.2), "Coffee Shop Kit", "3D ModelsPropsInterior").row
     assert row is not None and row["placement"] == "interior"
     assert row["furnish"] == {"slot": "wall", "shop_sets": ["bar", "generic"], "floors": True}  # a shelf also furnishes a home
+
+
+@pytest.mark.parametrize("name", ["LampPost_A", "StreetProps_LampPost_B", "street_lamp_2"])
+def test_a_lamp_post_stays_street_furniture(name: str) -> None:
+    decision = classify(name, (0.4, 0.4, 4.0), "Low Poly Street Pack", "3D ModelsEnvironmentsUrban")
+    assert decision.reason == "street" and decision.row is not None and decision.row["role"] == "lamppost"
+    assert classify("coneLamps", (1.1, 0.4, 1.1), "POLYGON Dining Room", "3D ModelsEnvironments").reason == "interior"
+    assert classify("Floor_Lamp", (0.4, 0.4, 1.6), "Bedroom", "3D ModelsPropsFurniture").reason == "interior"
