@@ -26,8 +26,10 @@ from onward_generator.detail.config import REPO_ROOT, DetailConfig, Template
 from onward_generator.detail.facades import (
     DOOR_KINDS,
     HIDDEN_GAP_M,
+    MANSARD_MIN_STOREYS,
     Hole,
     Layout,
+    Mansard,
     Segment,
     Shell,
     Storeys,
@@ -871,6 +873,16 @@ def regional_style(base: GeneratedScene) -> str:
     return select_style(load_style_table(), float(origin[1]), float(origin[0]))
 
 
+def mansard_for(haussmann: bool, landmark: bool, storeys: Any, template: Template) -> Mansard | None:
+    """Plan Q3b: on a Haussmann map a building of at least ``MANSARD_MIN_STOREYS`` storeys (``count`` and ``height_m``)
+    with a flat roof and no landmark keeps its height and turns its top storey into a zinc mansard. A building with an
+    interior never asks: its shell is built with the interior."""
+    if (haussmann and not landmark and storeys.count >= MANSARD_MIN_STOREYS
+            and template.pitched is None and template.hip is None):
+        return Mansard(storeys.height_m)
+    return None
+
+
 def _balcony_columns(layout: Layout, spec: Any) -> list[tuple[int, float, float]]:
     """Each bay balcony of ``layout`` as ``(segment, s0, s1)`` on its wall."""
     if spec is None:  # pragma: no mutate: a template without a balcony lays out none
@@ -1615,7 +1627,8 @@ def _detail_buildings(
                 pending_furnish.append(_PendingFurnish(shop, bid, interior, built, glass_penetrations(layout, segments), o.id,
                                                        float(geom.distance(Point(0.0, 0.0)))))
         if shell is None:
-            shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
+            mansard = mansard_for(haussmann, landmark, storeys, shell_template)  # a building with an interior has its shell
+            shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg, mansard)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape
         if bid in lidar_evidence:
