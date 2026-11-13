@@ -30,6 +30,8 @@ MAX_DECALS = 20
 DECAL_MATERIAL = "wall_decal_atlas_{}"
 ATLAS_PX = 2048
 CELL_PX = 400
+INNER_PX = CELL_PX - 8
+"""A decal's room in its cell, 4 px of clear border on each side so mipmaps do not bleed into the next cell."""
 WALL_GAP_M = 0.01
 MIN_WALL_M = 2.5
 PARTY_PROBE_M = 0.3
@@ -77,11 +79,11 @@ class Placed:
 
 def _unit(*key: object) -> float:
     digest = hashlib.sha256("|".join(map(str, key)).encode()).digest()
-    return int.from_bytes(digest[:8], "big") / 2**64
+    return int.from_bytes(digest[:8]) / 2**64
 
 
 def _rng(seed: int, name: str) -> np.random.Generator:
-    return np.random.default_rng(int.from_bytes(hashlib.sha256(f"{seed}|{name}".encode()).digest()[:8], "big"))
+    return np.random.default_rng(int.from_bytes(hashlib.sha256(f"{seed}|{name}".encode()).digest()[:8]))
 
 
 def _blur(image: Image.Image, radius: float) -> Image.Image:
@@ -91,12 +93,12 @@ def _blur(image: Image.Image, radius: float) -> Image.Image:
 def _rgba(colour: tuple[int, int, int], alpha: Image.Image) -> np.ndarray:
     pixels = np.zeros((alpha.height, alpha.width, 4), dtype=np.uint8)
     pixels[..., :3] = colour
-    pixels[..., 3] = np.asarray(alpha, dtype=np.uint8)
+    pixels[..., 3] = np.asarray(alpha)
     return pixels
 
 
 def _damp(rng: np.random.Generator, n: int) -> np.ndarray:
-    alpha = Image.new("L", (n, n), 0)
+    alpha = Image.new("L", (n, n))
     draw = ImageDraw.Draw(alpha)
     for _ in range(14):
         x, y, r = rng.uniform(0.3, 0.7) * n, rng.uniform(0.35, 0.75) * n, rng.uniform(0.08, 0.22) * n
@@ -105,25 +107,25 @@ def _damp(rng: np.random.Generator, n: int) -> np.ndarray:
 
 
 def _soot(rng: np.random.Generator, n: int) -> np.ndarray:
-    alpha = Image.new("L", (n, n), 0)
+    alpha = Image.new("L", (n, n))
     draw = ImageDraw.Draw(alpha)
     for _ in range(40):
         x, w = rng.uniform(0.15, 0.85) * n, rng.uniform(0.02, 0.06) * n
-        draw.rectangle((x - w, 0, x + w, rng.uniform(0.4, 1.0) * n), fill=int(rng.uniform(30, 90)))
+        draw.rectangle((x - w, 0, x + w, rng.uniform(0.4) * n), fill=int(rng.uniform(30, 90)))
     return _rgba((28, 26, 25), _blur(alpha, n * 0.03))
 
 
 def _rust(rng: np.random.Generator, n: int) -> np.ndarray:
-    alpha = Image.new("L", (n, n), 0)
+    alpha = Image.new("L", (n, n))
     draw = ImageDraw.Draw(alpha)
     for _ in range(9):
         x = rng.uniform(0.2, 0.8) * n
-        draw.line((x, 0, x + rng.uniform(-4, 4), rng.uniform(0.5, 1.0) * n), fill=int(rng.uniform(110, 190)), width=int(rng.uniform(2, 6)))
+        draw.line((x, 0, x + rng.uniform(-4, 4), rng.uniform(0.5) * n), fill=int(rng.uniform(110, 190)), width=int(rng.uniform(2, 6)))
     return _rgba((126, 66, 30), _blur(alpha, 2.0))
 
 
 def _crack(rng: np.random.Generator, n: int) -> np.ndarray:
-    alpha = Image.new("L", (n, n), 0)
+    alpha = Image.new("L", (n, n))
     draw = ImageDraw.Draw(alpha)
     for _ in range(3):
         x, y = rng.uniform(0.3, 0.7) * n, rng.uniform(0.1, 0.3) * n
@@ -135,7 +137,7 @@ def _crack(rng: np.random.Generator, n: int) -> np.ndarray:
 
 
 def _poster(rng: np.random.Generator, n: int) -> np.ndarray:
-    paper = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    paper = Image.new("RGBA", (n, n))
     draw = ImageDraw.Draw(paper)
     corners = [(0.12, 0.08), (0.88, 0.1), (0.86, 0.9), (0.14, 0.92)]
     torn = [(x * n + rng.uniform(-6, 6), y * n + rng.uniform(-6, 6)) for x, y in corners]
@@ -147,11 +149,11 @@ def _poster(rng: np.random.Generator, n: int) -> np.ndarray:
     for _ in range(6):  # torn and weathered patches
         x, y, r = rng.uniform(0.1, 0.9) * n, rng.uniform(0.1, 0.9) * n, rng.uniform(0.03, 0.1) * n
         draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 0, 0, 0))
-    return np.asarray(paper, dtype=np.uint8).copy()
+    return np.asarray(paper).copy()
 
 
 def _scribble(rng: np.random.Generator, n: int) -> np.ndarray:
-    alpha = Image.new("L", (n, n), 0)
+    alpha = Image.new("L", (n, n))
     draw = ImageDraw.Draw(alpha)
     points = [(rng.uniform(0.1, 0.9) * n, rng.uniform(0.3, 0.7) * n) for _ in range(9)]
     draw.line(points, fill=235, width=int(n * 0.04), joint="curve")
@@ -189,7 +191,7 @@ def library_decals(assets: Path) -> list[Decal]:
     found = []
     for image_path, row in read_decal_catalogues(assets):
         with Image.open(image_path) as picture:
-            rgba = np.asarray(picture.convert("RGBA"), dtype=np.uint8).copy()
+            rgba = np.asarray(picture.convert("RGBA")).copy()
         found.append(Decal(str(row["id"]), str(row.get("kind") or "decal"), float(row["width_m"]), float(row["height_m"]), rgba, "library",
                            str(row.get("description") or "")))
     return found
@@ -224,29 +226,25 @@ def exposed(wall: Wall, footprints: STRtree) -> bool:
 
 def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[Polygon, float, float], bool],
                  decals: Sequence[Decal], seed: int, count: int) -> list[Placed]:
-    """Up to ``count`` decals from ``decals`` (in their turn) on the exposed ``walls``, walls taken in a seeded order
-    and each decal at the first height and position it fits: clear of ``blocked`` (a plan, bottom and top) and of the
-    decals already on the wall."""
+    """Up to ``count`` decals from ``decals`` (in their turn) on the exposed ``walls`` of at least ``MIN_WALL_M``, walls
+    taken in a seeded order from the one after the last decal's, each decal at the first height and position it fits:
+    clear of ``blocked`` (a plan, bottom and top) and of the decals already on the wall. A decal that fits no wall is
+    skipped."""
     candidates = sorted((w for w in walls if float(np.linalg.norm(w.b - w.a)) >= MIN_WALL_M and exposed(w, footprints)),
-                        key=lambda w: _unit(seed, "wall", w.feature_id, *np.round(w.a, 2)))
+                        key=lambda w: _unit(seed, "wall", w.feature_id, float(w.a[0]), float(w.a[1])))
     placed: list[Placed] = []
     taken: dict[int, list[tuple[float, float, float, float]]] = {}
-    queue = list(turn_order(decals, count, seed))
-    wall_index = 0
-    tries = 0
-    while queue and candidates and tries < len(candidates) * 2:
-        decal = queue[0]
-        wall = candidates[wall_index % len(candidates)]
-        wall_index += 1
-        tries += 1
-        spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed)
-        if spot is None:
-            continue
-        queue.pop(0)
-        tries = 0
-        s, z = spot
-        placed.append(Placed(decal, wall, s, z))
-        taken.setdefault(id(wall), []).append((s - decal.width_m / 2, s + decal.width_m / 2, z - decal.height_m / 2, z + decal.height_m / 2))
+    start = 0
+    for decal in turn_order(decals, count, seed):
+        for k in range(len(candidates)):
+            wall = candidates[(start + k) % len(candidates)]
+            spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed)
+            if spot is not None:
+                s, z = spot
+                placed.append(Placed(decal, wall, s, z))
+                taken.setdefault(id(wall), []).append((s - decal.width_m / 2, s + decal.width_m / 2, z - decal.height_m / 2, z + decal.height_m / 2))
+                start = (start + k + 1) % len(candidates)  # the next decal starts on the next wall
+                break
     return placed
 
 
@@ -284,9 +282,9 @@ def _atlas(decals: Sequence[Decal]) -> tuple[dict[str, np.ndarray], dict[str, tu
         cell = index % per_page
         x0, y0 = (cell % per_row) * CELL_PX, (cell // per_row) * CELL_PX
         image = Image.fromarray(decal.rgba)
-        image.thumbnail((CELL_PX - 8, CELL_PX - 8), Image.Resampling.LANCZOS)
+        image.thumbnail((INNER_PX, INNER_PX), Image.Resampling.LANCZOS)
         w, h = image.size
-        page[y0 + 4:y0 + 4 + h, x0 + 4:x0 + 4 + w] = np.asarray(image, dtype=np.uint8)
+        page[y0 + 4:y0 + 4 + h, x0 + 4:x0 + 4 + w] = np.asarray(image)
         u0, u1 = (x0 + 4) / ATLAS_PX, (x0 + 4 + w) / ATLAS_PX
         v1, v0 = 1 - (y0 + 4) / ATLAS_PX, 1 - (y0 + 4 + h) / ATLAS_PX
         slots[decal.id] = (name, np.array([[u0, v0], [u1, v0], [u1, v1], [u0, v1]]))

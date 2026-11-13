@@ -295,6 +295,7 @@ def test_the_placement_quads_and_page_of_a_known_street_are_pinned() -> None:
 
 SEED_MOUFFETARD = 1043396788
 SEED_NULL_ISLAND = 1382503250
+SEED_ROUNDED = 396029759
 
 
 def test_the_map_seed_is_its_centre() -> None:
@@ -521,3 +522,45 @@ def test_the_pick_bounds_and_messages() -> None:
         with pytest.raises(DecalPickError) as error:
             parse(text, pool)
         assert str(error.value) == message
+
+
+def test_the_seed_rounds_the_centre_to_the_micro_degree_and_kinds_count_exactly() -> None:
+    from onward_generator.signs.place import _seed
+
+    assert _seed({"frame": {"origin_wgs84": [2.3498149, 48.8404549]}}) == SEED_ROUNDED
+    pool = procedural_decals(1) + [Decal(f"x{k}", "extra", 1, 1, np.zeros((2, 2, 4), np.uint8), "generated") for k in range(4)]
+    exactly_three = ["gen_damp_stain", "gen_soot_streak", "x0", "x1", "x2", "x3"]
+    assert parse(_reply(*exactly_three), pool) == tuple(exactly_three)
+
+
+def test_a_decal_that_fits_nowhere_is_skipped_and_the_others_still_go() -> None:
+    huge = _decal("huge", 50.0, 1.0)
+    placed = place_decals([_wall(0, 2.5, fid="exact"), _wall(10, 20, fid="long")], NOTHING, never, [huge, _decal("a"), _decal("b")], 3, 3)
+    assert {p.decal.id for p in placed} == {"a", "b"} and len(placed) == 2
+    assert place_decals([_wall(0, 2.49)], NOTHING, never, [_decal("a")], 3, 1) == []
+    assert len(place_decals([_wall(0, 2.5)], NOTHING, never, [_decal("a")], 3, 1)) == 1  # 2.5 m is long enough
+
+
+def test_glass_well_behind_the_wall_does_not_block_a_decal() -> None:
+    from onward_generator.signs.decals import _fit
+
+    inside = Node("b", (_quad((0, 1.0), (10, 1.0), 0.0, 9.0, "glass_view"),), {})  # a room's pane 1 m behind the wall
+    assert _fit(_wall(0, 10), _decal("a"), decal_blocker([inside]), [], 1) is not None
+    just_behind = Node("b", (_quad((0, 0.2), (10, 0.2), 0.0, 9.0, "glass_dark"),), {})  # the window in the wall
+    assert _fit(_wall(0, 10), _decal("a"), decal_blocker([just_behind]), [], 1) is None
+
+
+def test_a_long_package_name_is_cut_in_the_decal_id(tmp_path: Path) -> None:
+    package = _decal_folder_package(tmp_path, {"a" * 32: (b"Assets/Decals/Decals_A.png", _png_bytes((64, 64), 0))},
+                                    name="Bricks Decals FREE Extended Collection")
+    assert [row["id"] for row in decal_rows(package, tmp_path / "assets")] == ["as_bricks_decals_free_e_Decals_A"]  # the package id cut to 20 characters
+
+
+def test_a_catalogue_of_another_schema_does_not_stop_the_reading(tmp_path: Path) -> None:
+    (tmp_path / "asset_store_a_models").mkdir()
+    (tmp_path / "asset_store_a_models" / "manifest.json").write_text(json.dumps({"schema": "x", "assets": []}), encoding="utf-8")
+    (tmp_path / "asset_store_b").mkdir()
+    Image.new("RGBA", (2, 2)).save(tmp_path / "asset_store_b" / "a.png")
+    (tmp_path / "asset_store_b" / "manifest.json").write_text(json.dumps({"schema": DECALS_SCHEMA, "assets": [
+        {"id": "a", "file": "a.png", "width_m": 1, "height_m": 1}]}), encoding="utf-8")
+    assert [r["id"] for _, r in read_decal_catalogues(tmp_path)] == ["a"]

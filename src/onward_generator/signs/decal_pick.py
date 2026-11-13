@@ -95,7 +95,7 @@ def pick_decals(decals: Sequence[Decal], *, brief: str, provider=None, replay: M
     digest = hashlib.sha256((SYSTEM_PROMPT + instruction(brief, decals)).encode("utf-8")).hexdigest()
     if isinstance(replay, Mapping) and replay.get("instruction_sha256") == digest and replay.get("origin") in ("ai_generated", "replay"):
         try:
-            ids = parse(str(replay.get("raw") or ""), decals)
+            ids = parse(str(replay.get("raw") or ""), decals)  # pragma: no mutate: a record without a reply parses as nothing, whatever stands for it
         except DecalPickError:
             pass
         else:

@@ -884,3 +884,42 @@ def test_the_local_decal_catalogues_join_the_pool_when_enabled(tmp_path: Path, m
     assert "as_bricks_b" in {d["decal"] for d in place_signs(base, scene, tmp_path / "on")["wall_decals"]["decals"]}
     monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
     assert "as_bricks_b" not in {d["decal"] for d in place_signs(base, scene, tmp_path / "off")["wall_decals"]["decals"]}
+
+
+def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_signs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from shapely.geometry import box
+
+    from onward_generator.signs import place as place_module
+    from onward_generator.signs.place import _seed, place_signs
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _shop_base(base)
+    seeds: list[int] = []
+    seen: dict[str, object] = {}
+    real_drawn, real_place = place_module.procedural_decals, place_module.place_decals
+
+    def drawn(seed: int):
+        seeds.append(seed)
+        return real_drawn(seed)
+
+    def place(walls, footprints, blocked, decals, seed, count):
+        seen.update(footprints=footprints, blocked=blocked)
+        return real_place(walls, footprints, blocked, decals, seed, count)
+
+    monkeypatch.setattr(place_module, "procedural_decals", drawn)
+    monkeypatch.setattr(place_module, "place_decals", place)
+    monkeypatch.setattr(place_module, "_ambient", lambda base: ("", False))
+    monkeypatch.setattr(place_module.local, "enabled", lambda env=None: False)
+    place_signs(base, scene, tmp_path / "out")
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    assert seeds == [_seed(manifest)]
+    geo = json.loads(scene.read_text(encoding="utf-8"))
+    buildings = [f for f in geo["features"] if f.get("kind") == "building"]
+    assert len(seen["footprints"].geometries) == len(buildings) > 0  # type: ignore[attr-defined]
+    from onward_generator.detail.shops import sign_footprints
+
+    plan, bottom, top = sign_footprints(manifest)[0]
+    assert seen["blocked"](plan, bottom, top)  # type: ignore[operator]  # a shop sign blocks a decal
+    assert not seen["blocked"](box(900, 900, 901, 901), 0.0, 1.0)  # type: ignore[operator]

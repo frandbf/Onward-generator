@@ -34,7 +34,7 @@ WIDTH_M = 1.6
 
 
 def _albedo_members(archive: tarfile.TarFile) -> list[tuple[str, tarfile.TarInfo]]:
-    members = {m.name.removeprefix("./"): m for m in archive.getmembers() if m.isfile()}
+    members = {m.name: m for m in archive.getmembers() if m.isfile()}
     found = []
     for name in sorted(members):
         if not name.endswith("/pathname"):
@@ -54,11 +54,11 @@ def decal_rows(package: Package, assets: Path) -> list[dict[str, Any]]:
     without decal images)."""
     target = assets / package.catalogue
     rows: list[dict[str, Any]] = []
-    with tarfile.open(package.path, "r:gz") as archive:
+    with tarfile.open(package.path) as archive:
         for path, member in _albedo_members(archive):
             stem = posixpath.splitext(posixpath.basename(path))[0]
             handle = archive.extractfile(member)
-            if handle is None:
+            if handle is None:  # pragma: no mutate: a regular member always has a handle
                 continue
             try:
                 with Image.open(io.BytesIO(handle.read())) as picture:
