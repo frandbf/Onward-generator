@@ -402,6 +402,8 @@ def apply_materials(
     cell_m: float = 100.0,
     street_profile: Mapping[str, Any] | None = None,
     palette: WallPalette | None = None,
+    facade_weathering: str | None = None,
+    wide_library: bool = False,
 ) -> dict[str, Any]:
     """``tile_cache`` reuses baked photo tiles from ``tile_cache_dir()``; the bytes are the same without it.
 
@@ -470,7 +472,7 @@ def apply_materials(
     trim = apply_trim(visual_nodes, manifest, colors, mode=facades, style=facade_style, table_path=style_table,
                       cache=None if trim_root is None else TileCache(trim_root),
                       regional=regional_facades, regional_table_path=regional_table, palette=palette,
-                      observed_walls=brick_nodes)
+                      observed_walls=brick_nodes, weathering=facade_weathering, wide=wide_library)
     visual_nodes = trim.nodes
     # A party wall (``party_<wall>``) takes its wall's albedo: the plan binds the wall. A tint
     # (``<base>__tint_<key>``) shows its base's photograph, so the plan binds the base as well.

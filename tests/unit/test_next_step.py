@@ -197,14 +197,21 @@ def test_materials_command_carries_the_maps_facade_block(tmp_path: Path) -> None
     assert facade_options(root) == ["--facade-style", "mediterranean"]
     _facades(root, {"mode": "trim", "style": "auto"})
     assert facade_options(root) == ["--facades", "trim", "--facade-style", "auto"]
+    _facades(root, {"weathering": "worn", "mode": "trim"})
+    assert facade_options(root) == ["--facades", "trim", "--facade-weathering", "worn"]
     _facades(root, {})
     assert facade_options(root) == []
     for bad in ("trim", {"mode": 1}, {"mode": "trim", "colour": "red"}, ["trim"]):
         _facades(root, bad)
-        with pytest.raises(MapError, match=r'^map\.json "facades" must be \{"mode": "trim" \| "legacy", "style": "<name>" \| "auto"\}$'):
+        with pytest.raises(MapError, match=r'^map\.json "facades" must be \{"mode": "trim" \| "legacy", "style": "<name>" \| "auto", '
+                                           r'"weathering": "clean" \| "worn" \| "heavy"\}$'):
             facade_options(root)
     assert facade_options(tmp_path / "elsewhere") == []
     assert "--facades" not in materials_command(tmp_path / "loose" / "scene_dress").argv
+    assert "--wide-library" not in materials_command(root / "data" / "processed" / "scene_dress").argv
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps({**document, "wide_library": True}), encoding="utf-8")
+    assert "--wide-library" in materials_command(root / "data" / "processed" / "scene_dress").argv
 
 
 @pytest.mark.parametrize("command", [signs_command, overgrow_command])

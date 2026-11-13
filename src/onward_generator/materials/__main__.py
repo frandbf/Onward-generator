@@ -12,7 +12,7 @@ from onward_generator.dress.catalog import CatalogError
 from onward_generator.materials.apply import MaterialsError, apply_materials
 from onward_generator.materials.plan import PlanError
 from onward_generator.materials.polyhaven import DEFAULT_CACHE, DownloadError
-from onward_generator.materials.trim import WallPalette
+from onward_generator.materials.trim import WEATHERING, WallPalette
 from onward_generator.materials.trim_style import AUTO, FACADE_MODES
 from onward_generator.next_step import after_materials, emit
 
@@ -58,6 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="give central_european, anglo and latin_american their atlas from config/facade_styles.regional.json (plan D1)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
+        "--facade-weathering", choices=tuple(WEATHERING), default=None,
+        help="scale the grime baked into the facade atlas: clean, worn or heavy (plan T2); absent keeps the style's",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
+        "--wide-library", action="store_true",
+        help="replace facade-atlas photographs over their calm limit with wide-library ones (plan T2)",  # pragma: no mutate: help text only
+    )
+    apply_p.add_argument(
         "--repetition", action="store_true",
         help="measure roof and paving tiles and phase the ground UVs per combine cell (plan C1)",  # pragma: no mutate: help text only
     )
@@ -99,6 +107,8 @@ def _run_apply(args: argparse.Namespace) -> int:
         cell_m=args.cell_m,
         street_profile=block,
         palette=palette,
+        facade_weathering=args.facade_weathering,
+        wide_library=args.wide_library,
     )
     applied = report["applied"]
     skipped = report["skipped"]
@@ -114,6 +124,10 @@ def _run_apply(args: argparse.Namespace) -> int:
     if facades:
         detail = f"materials={','.join(facades['materials'])}" if facades["mode"] == "trim" else f"reason={facades['reason']}"
         print(f"facades: {facades['mode']} style={facades['style']} ({facades['style_origin']}) {detail}")
+        if facades.get("weathering"):
+            print(f"facades: weathering {facades['weathering']} (plan T2)")
+        for swap in facades.get("calm_sources") or ():
+            print(f"facades: {swap['key']} {swap['from']} ({swap['from_contrast']}) -> {swap['to']} ({swap['to_contrast']}), calm limit {swap['limit']}")
         tone = facades.get("atmosphere")
         if tone:
             print(f"facades: atmosphere {tone['preset']} (ADR-037): grime x{tone['grime']:g}, walls {tone['wall_desaturation']:.0%} "
