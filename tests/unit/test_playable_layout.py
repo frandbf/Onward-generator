@@ -46,6 +46,7 @@ from onward_generator.perf.layout import (
     fit_spawn_separation,
     free_ground,
     hunt_routes,
+    map_quad,
     nav_islands,
     navigation_estimate,
     patrol_seeds,
@@ -1305,3 +1306,12 @@ def test_the_playable_layout_of_a_core_measures_the_core_navmesh_with_or_without
         assert all(inside.covers(Point(p["x"], p["y"])) for p in doc[block]["points_m"])
     assert inside.covers(Point(doc["uplink_m"]))
     assert _check_layout(doc) == []
+
+
+def test_the_map_quad_stands_at_the_centre_of_the_site() -> None:
+    """The SDK centres the minimap on the MapQuad: beside the attackers it drew the map in one corner of the tablet."""
+    assert map_quad((10.0, -40.0, 110.0, 60.0)) == [60.0, 10.0]
+    assert map_quad((0.0, 0.0, 0.123, 0.4567)) == [0.06, 0.23]
+    centre = map_quad((-180.0, -180.01, 180.0, 180.0))
+    assert centre == [0.0, 0.0] and all(math.copysign(1.0, value) == 1.0 for value in centre)
+    assert all(isinstance(value, float) for value in map_quad((0.0, 0.0, 1.0, 1.0)))
