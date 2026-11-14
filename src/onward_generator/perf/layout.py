@@ -239,7 +239,9 @@ def gameplay_layout(
         a, b, uplink = placement.attack, placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
-    quad = (a[0], a[1] - SPAWN_SPACING_M * 2)
+    # The SDK's MapQuad is the minimap's frame: a LevelSize square centred on its position (its gizmo is that cube). Beside
+    # the attackers' block it drew Murcia Catedral's map in one corner of the tablet, black down two sides (13 November 2026).
+    quad = ((sx0 + sx1) / 2, (sy0 + sy1) / 2)
     return {
         "schema": LAYOUT_SCHEMA,
         "schema_version": LAYOUT_VERSION,
@@ -251,7 +253,7 @@ def gameplay_layout(
         "attackers": {"centre_m": list(a), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*a)]},
         "defenders": {"centre_m": list(b), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*b)]},
         "uplink_m": [uplink[0], uplink[1]],
-        "map_quad_m": [round(quad[0], 2), round(quad[1], 2)],
+        "map_quad_m": [round(quad[0], 2) + 0.0, round(quad[1], 2) + 0.0],  # + 0.0 writes a centre of -0.004 m as 0.0, not -0.0
         "level_size_m": round(max(sx1 - sx0, sy1 - sy0), 1),
         "site_bounds_m": [round(v, 2) for v in (sx0, sy0, sx1, sy1)],
         "tent_z_m": TENT_DEPTH_M,

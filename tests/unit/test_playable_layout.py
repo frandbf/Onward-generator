@@ -938,10 +938,12 @@ def test_a_placement_sets_the_defenders_and_the_uplink() -> None:
     assert {k: v for k, v in moved.items() if k not in ("defenders", "uplink_m")} == {k: v for k, v in today.items() if k not in ("defenders", "uplink_m")}
     # Exactly 30 m apart is enough.
     assert gameplay_layout(base, manifest, placement=Placement(a, (30.0, 0.0), (15.0, 0.0), a, a))["defenders"]["centre_m"] == [30.0, 0.0]  # type: ignore[arg-type]
-    # Since the C6 amendment of 11 November 2026 the attackers may move too, and the map quad follows them.
+    # Since the C6 amendment of 11 November 2026 the attackers may move too. The map quad stays at the centre of the site:
+    # it frames the minimap, a level_size_m square centred on it.
     shifted = gameplay_layout(base, manifest, placement=Placement((-40.0, 40.0), (40.0, -40.0), (10.0, -10.0), a, a))  # type: ignore[arg-type]
     assert shifted["attackers"]["centre_m"] == [-40.0, 40.0] and shifted["attackers"]["points_m"][0] == {"x": -41.8, "y": 39.4}
-    assert shifted["map_quad_m"] == [-40.0, 37.6]
+    sx0, sy0, sx1, sy1 = shifted["site_bounds_m"]
+    assert shifted["map_quad_m"] == today["map_quad_m"] == [round((sx0 + sx1) / 2, 2), round((sy0 + sy1) / 2, 2)]
     for placement, message in (
         (Placement((57.0, 0.0), (-40.0, 0.0), (10.0, 0.0), a, a), r"^the placed attackers' block does not fit the free area$"),
         (Placement((-29.9, 0.0), (0.0, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
