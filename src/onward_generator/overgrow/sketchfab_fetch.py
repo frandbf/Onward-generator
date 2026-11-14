@@ -22,7 +22,14 @@ from onward_generator.net import fetch_bytes
 from onward_generator.overgrow.constants import TARGET_ASSET_TRIS
 from onward_generator.overgrow.library_catalog import REVIEW_FILE
 from onward_generator.overgrow.manifest import keep_semantics
-from onward_generator.overgrow.normalize import gltf_to_local, materialize_images, normalize_arrays, write_normalized_glb
+from onward_generator.overgrow.normalize import (
+    gltf_to_local,
+    gltf_to_local_parts,
+    materialize_images,
+    normalize_arrays,
+    normalize_parts,
+    write_normalized_glb,
+)
 
 MAX_BYTES = 260 * 1024 * 1024
 MAX_JSON_BYTES = 8 * 1024 * 1024
@@ -40,7 +47,9 @@ SPECS: dict[str, dict] = {
     "66ef51a84c9843dda53bf0b4b9020011": {"id": "crashed_abandoned_car", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "crashed car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
     "6a2169dafc254f399387a679305bb1bf": {"id": "abandoned_sedan_1", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
     "36380c606bae46848237e9bbe073fa3b": {"id": "building_container_metal", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "metal container building at a block edge, plaza, lot or curb"},
-    "1ad46b04f23d43dbb2730c9435c1a7cc": {"id": "crashed_helicopter", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "courtyard", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "crashed helicopter in a street, plaza, park, yard or lot"},
+    # Re-imported on 14 November 2026 with its three materials and 60 000 of its 120 921 triangles: clustered to 1 800
+    # with one texture, it read as grey scrap.
+    "1ad46b04f23d43dbb2730c9435c1a7cc": {"id": "crashed_helicopter", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "courtyard", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "crashed helicopter in a street, plaza, park, yard or lot", "max_triangles": 60000, "keep_materials": True},
     "642f7e533f3242bb9f43addea71efbc4": {"id": "forest_hut", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "forest hut at a block edge, plaza, lot or curb"},
     "240baad0fd7b4924a5705950be7adee6": {"id": "gas_tanker", "category": "structures", "role": "tank", "surfaces": ["block_edge", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "bulk gas tank in a yard, lot or plaza"},
     "a624f8c74f2b4774b4436aaf093c1e01": {"id": "fire_escape_sf", "category": "facade", "role": "fire_escape", "surfaces": ["facade"], "anchor": "facade", "use": "fire escape against a wall"},
@@ -56,7 +65,7 @@ SPECS: dict[str, dict] = {
     "1ce5fa26a4ce49d6b170988dd4bc5ee2": {"id": "jungle_ground_tile", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "tileable jungle ground in a yard"},
     # A story prop pinned to its place (overgrow/pinned.py), kept near its file's 12 606 triangles: decimated to the
     # 1 800 of the others, the crashed helicopter above lost every recognisable part (14 November 2026).
-    "854bf0feee5b42dc92ac5329976f7942": {"id": "uh60_black_hawk", "category": "vehicles", "role": "wreck", "surfaces": ["carriageway", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "UH-60 Black Hawk helicopter, pinned to a crash site", "max_triangles": 13000},
+    "854bf0feee5b42dc92ac5329976f7942": {"id": "uh60_black_hawk", "category": "vehicles", "role": "wreck", "surfaces": ["carriageway", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "UH-60 Black Hawk helicopter, pinned to a crash site", "max_triangles": 13000, "keep_materials": True},
     "73201f05280d48dcb10ed4ca362d69f8": {"id": "tree_low_poly", "category": "vegetation", "role": "tree", "surfaces": ["park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"], "anchor": "ground", "use": "low poly tree in a park, plaza, sidewalk, yard or lot", "clearance_m": 3.5},
 }
 
@@ -128,9 +137,14 @@ def _one(uid: str, spec: dict, row: dict, raw_root: Path, library: Path, token: 
     if "KHR_draco_mesh_compression" in json.loads(next(gltf_dir.glob("*.gltf")).read_text(encoding="utf-8")).get("extensionsRequired", []):
         raise SketchfabError("glTF requires Draco; not imported")
     materialize_images(gltf_dir)
-    vertices, triangles, uvs, albedo = gltf_to_local(gltf_dir)
-    normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None,
-                                  target_tris=int(spec.get("max_triangles", TARGET_ASSET_TRIS)))
+    target = int(spec.get("max_triangles", TARGET_ASSET_TRIS))
+    if spec.get("keep_materials"):
+        # One albedo per material: with a single one, the parts mapped to the others showed the wrong image.
+        vertices, triangles, uvs, owners, albedos = gltf_to_local_parts(gltf_dir)
+        normalized = normalize_parts(vertices, triangles, uvs, owners, albedos, anchor=spec["anchor"], target_tris=target)
+    else:
+        vertices, triangles, uvs, albedo = gltf_to_local(gltf_dir)
+        normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None, target_tris=target)
     if normalized.mesh.triangle_count == 0:
         raise SketchfabError("normalized mesh has no triangles")
     write_normalized_glb(library / f"{spec['id']}.glb", spec["id"], normalized)

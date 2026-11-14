@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from PIL import Image
 
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import _TO_GLTF, Node, Primitive, build_glb
-from onward_generator.generation.mesh import Mesh
+from onward_generator.generation.mesh import Mesh, merge
 from onward_generator.overgrow.constants import ALBEDO_PX, TARGET_ASSET_TRIS
 
 
@@ -32,6 +33,8 @@ class NormalizedMesh:
     length_m: float
     depth_m: float
     height_m: float
+    parts: tuple[tuple[int, bytes], ...] = ()
+    """With ``keep_materials``: each part's last triangle index (exclusive) and its albedo PNG, in triangle order."""
 
 
 def cluster_decimate(
@@ -114,6 +117,13 @@ def flatten_albedo(data: bytes, size: int = ALBEDO_PX) -> bytes:
 
 def gltf_to_local(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, bytes | None]:
     """World-space glTF vertices → local Z-up, plus the diffuse image bytes."""
+    local, triangles, uvs, _materials, _albedos = gltf_to_local_parts(folder)
+    return local, triangles, uvs, _diffuse_bytes(folder, json.loads(next(folder.glob("*.gltf")).read_text(encoding="utf-8")))
+
+
+def gltf_to_local_parts(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[bytes | None]]:
+    """``gltf_to_local`` with each triangle's material index and each material's diffuse image (None without one),
+    for a model whose parts use different textures (14 November 2026)."""
     gltf_path = next(folder.glob("*.gltf"))
     doc = json.loads(gltf_path.read_text(encoding="utf-8"))
     blobs = _blobs(folder, doc)
@@ -122,6 +132,7 @@ def gltf_to_local(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, byt
     positions: list[np.ndarray] = []
     indices: list[np.ndarray] = []
     uvs: list[np.ndarray] = []
+    owners: list[np.ndarray] = []
     offset = 0
     for index, node in enumerate(nodes):
         if "mesh" not in node:
@@ -146,11 +157,23 @@ def gltf_to_local(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, byt
             positions.append(pos)
             uvs.append(uv[:, :2])
             indices.append(idx + offset)
+            owners.append(np.full(len(idx), int(prim.get("material", -1)), dtype=np.int64))
             offset += len(pos)
     if not positions:
         raise ValueError(f"{folder}: glTF has no triangles")
     local = np.vstack(positions) @ _TO_GLTF
-    return local, np.vstack(indices), np.vstack(uvs), _diffuse_bytes(folder, doc)
+    return local, np.vstack(indices), np.vstack(uvs), np.concatenate(owners), _material_albedos(folder, doc)
+
+
+def _material_albedos(folder: Path, doc: dict) -> list[bytes | None]:
+    """The base colour image of each material, in the document's order; None for a material without one."""
+    textures, images = doc.get("textures") or [], doc.get("images") or []
+    found: list[bytes | None] = []
+    for material in doc.get("materials") or []:
+        texture = (material.get("pbrMetallicRoughness") or {}).get("baseColorTexture")
+        uri = images[int(textures[int(texture["index"])].get("source"))].get("uri") if texture else None
+        found.append((folder / uri).read_bytes() if uri and (folder / uri).is_file() else None)
+    return found
 
 
 def normalize_arrays(
@@ -186,21 +209,74 @@ def normalize_arrays(
     )
 
 
+def normalize_parts(
+    vertices: np.ndarray,
+    triangles: np.ndarray,
+    uvs: np.ndarray,
+    owners: np.ndarray,
+    albedos: Sequence[bytes | None],
+    *,
+    anchor: str,
+    target_tris: int,
+) -> NormalizedMesh:
+    """``normalize_arrays`` that keeps each material apart (a Sketchfab spec's ``keep_materials``): one scale,
+    orientation and ground for the whole model, then each material's triangles clustered on their own to its share
+    of ``target_tris``, so no vertex is shared across two textures. A material without an image takes a grey one."""
+    before = int(len(triangles))
+    scale_note = _apply_scale(vertices, None)
+    vertices, orientation = _align(vertices, anchor)
+    vertices = _ground(vertices)
+    grey = flatten_albedo(_grey_png())
+    meshes: list[Mesh] = []
+    part_uvs: list[np.ndarray] = []
+    parts: list[tuple[int, bytes]] = []
+    end = 0
+    for owner in sorted(set(owners.tolist())):
+        own = triangles[owners == owner]
+        used = np.unique(own)
+        local_v, local_t, local_u = vertices[used], np.searchsorted(used, own), uvs[used]
+        share = max(1, round(target_tris * len(own) / before))
+        local_v, local_t, local_u = cluster_decimate(local_v, local_t, local_u, share)
+        mesh, _dropped = Mesh(np.ascontiguousarray(local_v, dtype=np.float64), np.ascontiguousarray(local_t, dtype=np.int64)).drop_degenerate()
+        if mesh.triangle_count == 0:
+            continue
+        meshes.append(mesh)
+        part_uvs.append(np.asarray(local_u, dtype=np.float32)[: mesh.vertex_count])
+        end += mesh.triangle_count
+        image = albedos[owner] if 0 <= owner < len(albedos) else None
+        parts.append((end, flatten_albedo(image) if image is not None else grey))
+    if not meshes:
+        raise ValueError("no material kept a triangle")
+    mesh = rest_on_ground(merge(meshes))
+    extent = mesh.vertices.max(axis=0) - mesh.vertices.min(axis=0)
+    return NormalizedMesh(mesh, np.concatenate(part_uvs), parts[0][1], before, mesh.triangle_count, scale_note, orientation,
+                          float(extent[0]), float(extent[1]), float(extent[2]), tuple(parts))
+
+
+def _grey_png() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (90, 90, 90)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def write_normalized_glb(path: Path, asset_id: str, normalized: NormalizedMesh) -> None:
-    material = f"prop_{asset_id}"
-    node = Node(
-        asset_id,
-        (Primitive(normalized.mesh, material, normalized.uvs),),
-        {"type": "prop", "asset_id": asset_id, "anchor": normalized.orientation},
-        mesh_key=f"prop:{asset_id}",
-    )
+    """One primitive and material, or with ``parts`` one per part (``prop_<id>_<k>``), each with its own albedo."""
+    ranges = [(start, end, png) for (start, (end, png)) in zip([0] + [e for e, _ in normalized.parts[:-1]], normalized.parts)] \
+        if normalized.parts else [(0, normalized.mesh.triangle_count, normalized.albedo_png)]
+    primitives: list[Primitive] = []
+    materials: dict[str, Material] = {}
+    images: dict[str, bytes] = {}
+    for k, (start, end, png) in enumerate(ranges):
+        material = f"prop_{asset_id}" if not normalized.parts else f"prop_{asset_id}_{k}"
+        tris = normalized.mesh.triangles[start:end]
+        used = np.unique(tris)
+        primitives.append(Primitive(Mesh(normalized.mesh.vertices[used], np.searchsorted(used, tris)), material, normalized.uvs[used]))
+        materials[material] = Material((1.0, 1.0, 1.0, 1.0), 0.9)
+        images[material] = png
+    node = Node(asset_id, tuple(primitives), {"type": "prop", "asset_id": asset_id, "anchor": normalized.orientation},
+                mesh_key=f"prop:{asset_id}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(build_glb(
-        [node],
-        {material: Material((1.0, 1.0, 1.0, 1.0), 0.9)},
-        repeat_images={material: normalized.albedo_png},
-        preserve_uvs=True,
-    ))
+    path.write_bytes(build_glb([node], materials, repeat_images=images, preserve_uvs=True))
 
 
 UNIFORM_RATIO_TOLERANCE = 1.05
