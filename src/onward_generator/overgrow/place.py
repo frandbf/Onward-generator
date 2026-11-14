@@ -175,7 +175,7 @@ def overgrow(
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
     headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles)
-    budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
+    budget = _Budget(min(MAX_ADDED_TRIS, headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
     reject_counts: dict[str, int] = {}
@@ -303,7 +303,8 @@ def overgrow(
     planted = dress(
         props,
         edges, features, buildings, lanes, lane_tree, area, years, seed, spawns,
-        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)), triangle_budget=min(MAX_LIBRARY_TRIS, headroom - budget.used),
+        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)),
+        triangle_budget=min(MAX_LIBRARY_TRIS, headroom - budget.used),
         preferred=preferred,
         block_streets=plan.street_blocking,
         placed_roles={"wreck": wreck_count},
