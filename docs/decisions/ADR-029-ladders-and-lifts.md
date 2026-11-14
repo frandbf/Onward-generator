@@ -121,3 +121,11 @@ On the headset, with pkg_11 of Rue Mouffetard, the top 2 or 3 rungs of every lad
 - `AddLadder` draws a crossbar only at a level whose grips all sit on it (`|x| <= CrossbarGripHalfM`, 0.20 m). Above the roof edge the player holds the rails, which already rise to the top grip.
 - `CheckLadderGrips` fails the export if a crossbar has no grip within 2 cm, or if a grip has neither a crossbar nor a rail under it. It logs each ladder's grips on crossbars and on rails.
 - `triangle_budget.ladder_triangles` counts crossbars up to the vault rung, so it no longer counts the three over the roof.
+
+## Amendment, 13 November 2026: a cabin keeps off the whole prop
+
+On the headset, Murcia Catedral pkg_01 showed part of a covered car inside a street lift cabin. Overgrow places its props before the layout picks the cabins, and the keep-out gave every prop the same 1 m circle round its spot. The car stood 2.84 m from the cabin's centre, so most of its 4.5 m body lay outside the keep-out.
+
+- Overgrow records `size_m` (length, width and height of the placed mesh) on each library prop and each procedural wreck in `scene_detail.json`. The field is added; nothing else changes.
+- `perf/layout.prop_clearance` gives each prop half its plan diagonal, which covers it at any heading, and never less than `CLIMB_PROP_CLEAR_M` (1 m). A tree keeps its crown's 2 m.
+- A manifest from before this amendment has no `size_m`. A vehicle or a wreck there keeps `CLIMB_VEHICLE_CLEAR_M` (2.5 m, half the diagonal of a 4.5 by 1.8 m car); any other prop keeps 1 m.
