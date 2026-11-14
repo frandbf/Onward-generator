@@ -46,6 +46,7 @@ Edit `maps/<id>/map.json`, show the change first, then rerun from the stage name
 | Key | Values | Rerun from | What it does |
 | --- | --- | --- | --- |
 | `"triangle_limit"` | integer, 100 000 to 300 000 (default 300 000) | `overgrow` | The Unity triangle limit props and library trees fill up to, and what the package is checked against. 250 000 for a Workshop map. |
+| `"project_decals"` | `true` (default) / `false` | `signs` | `false` leaves out the project's nine wall decals of `assets/decals/` (text and symbols, safe for the Workshop). |
 | `"user_decals"` | `true` (default) / `false` | `signs` | `false` leaves out the user's own decals of `assets/user_decals/` on this map (a Workshop map must not show real people). |
 | `"facades"` | `{"mode": "trim" \| "legacy", "style": "<name>" \| "auto", "weathering": "clean" \| "worn" \| "heavy"}` (each key optional) | `materials` | Facade look. `weathering: "worn"` or `"heavy"` ages the walls. |
 | `"brief"`, `"ambient_ai"` | text / `true`, `false` | `overgrow` | Set by `--brief` and `--ai`; edit them to change the mood or the AI choice later. |

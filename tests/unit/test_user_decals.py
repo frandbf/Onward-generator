@@ -142,7 +142,7 @@ def test_signs_place_puts_every_user_decal_on_the_map_or_stops(tmp_path: Path, m
     assert [row["decal"] for row in users] == ["user_mural", "user_badge"] and users[0]["size_m"] == [0.8, 0.4]
     real = signs_place.place_decals
     monkeypatch.setattr(signs_place, "place_decals", lambda *a, required=(), **k: real(*a, **k))  # no wall takes it
-    with pytest.raises(SignsError, match=r"^user decals that fit no exposed wall of the playable core: user_mural, user_badge \(make them smaller"):
+    with pytest.raises(SignsError, match=r"^required decals that fit no exposed wall of the playable core: user_mural, user_badge \(make them smaller in their decals.json\)$"):
         place_signs(base, scene, tmp_path / "big")
     monkeypatch.setattr(signs_place, "place_decals", real)
     _folder(assets, {"decals": [{"file": "missing.png", "width_m": 1.0}]})
@@ -228,3 +228,55 @@ def test_a_map_can_leave_the_user_decals_out(tmp_path: Path, monkeypatch: pytest
         place_signs(base, scene, tmp_path / "bad")
     monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
     assert users("unreadable") == ["user_mural"]  # an unreadable map.json reads as no switch
+
+
+def test_the_project_decals_ship_with_the_repository_and_read_whole() -> None:
+    """assets/decals/: committed, MIT, text and symbols only (ADR-038 amendment of 14 November 2026)."""
+    from onward_generator.config.validation import REPO_ROOT
+    from onward_generator.signs.user_decals import PROJECT_DECALS_DIR, PROJECT_DECALS_ENV, PROJECT_ORIGIN, read_project_decals
+
+    assert (PROJECT_DECALS_DIR, PROJECT_ORIGIN, PROJECT_DECALS_ENV) == ("decals", "project", "ONWARD_PROJECT_DECALS")
+    decals = read_project_decals(REPO_ROOT / "assets")
+    assert [d.id for d in decals] == [
+        "project_ai_code_it_you_own_it", "project_written_by_ai_tested_by_bullets", "project_your_neighborhood_our_battlefield",
+        "project_from_openstreetmap_to_open_warfare", "project_if_its_on_the_map_we_fight_on_it",
+        "project_no_mapper_needed_just_coordinates", "project_open_source_open_fire", "project_los_ohculos_team_plate",
+        "project_los_ohculos_team_shield"]
+    assert all(d.origin == d.kind == "project" and max(d.rgba.shape[:2]) == MAX_PX and d.description for d in decals)
+    assert all(MIN_SIZE_M <= d.width_m <= MAX_SIZE_M and MIN_SIZE_M <= d.height_m <= MAX_SIZE_M for d in decals)
+    assert "MIT" in (REPO_ROOT / "assets" / PROJECT_DECALS_DIR / "README.md").read_text(encoding="utf-8")
+
+
+def test_the_project_decals_switch() -> None:
+    from onward_generator.signs.user_decals import project_decals_enabled
+
+    assert project_decals_enabled({}) is True and project_decals_enabled({"ONWARD_PROJECT_DECALS": "1"}) is True
+    assert project_decals_enabled({"ONWARD_PROJECT_DECALS": "0"}) is False
+    assert project_decals_enabled() is False  # tests/conftest.py turns them off
+
+
+def test_signs_place_puts_the_project_decals_first_then_the_users(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    base = tmp_path / "base"
+    _base(base)
+    assets = tmp_path / "repo" / "assets"
+    _folder(assets, {"decals": [{"file": "mural.png", "width_m": 0.8}]}, {"mural.png": (200, 100, "RGBA")})
+    project = assets / "decals"
+    project.mkdir()
+    Image.new("RGBA", (100, 100), (10, 120, 40, 255)).save(project / "sign.png")
+    (project / MANIFEST).write_text(json.dumps({"decals": [{"file": "sign.png", "width_m": 0.6}]}), encoding="utf-8")
+    monkeypatch.setattr(signs_place, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.setattr(signs_place, "_ambient", lambda base: ("", False))
+
+    def required(out: str) -> list[str]:
+        report = place_signs(base, scene, tmp_path / out)
+        return [row["decal"] for row in report["wall_decals"]["decals"] if row["origin"] in ("project", "user")]
+
+    assert required("off") == []  # both off in the tests
+    monkeypatch.setenv("ONWARD_PROJECT_DECALS", "1")
+    assert required("project") == ["project_sign"]
+    monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "1")
+    assert required("both") == ["project_sign", "user_mural"]
+    monkeypatch.setattr(signs_place, "_map_switch", lambda base, key: key != "project_decals")
+    assert required("no_project") == ["user_mural"]

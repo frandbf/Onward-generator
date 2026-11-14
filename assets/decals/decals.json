@@ -1,0 +1,11 @@
+{"decals": [
+  {"file": "ai_code_it_you_own_it.png", "width_m": 1.6, "description": "Stencil plate: AI code it, you own it"},
+  {"file": "written_by_ai_tested_by_bullets.png", "width_m": 1.2, "description": "Shot target poster: written by AI, tested by bullets"},
+  {"file": "your_neighborhood_our_battlefield.png", "width_m": 1.6, "description": "Green street sign: your neighborhood, our battlefield"},
+  {"file": "from_openstreetmap_to_open_warfare.png", "width_m": 1.6, "description": "Contour-map poster: from OpenStreetMap to open warfare"},
+  {"file": "if_its_on_the_map_we_fight_on_it.png", "width_m": 1.0, "description": "Camouflage shield: if it's on the map, we fight on it"},
+  {"file": "no_mapper_needed_just_coordinates.png", "width_m": 1.6, "description": "Wooden crate plate: no mapper needed, just coordinates"},
+  {"file": "open_source_open_fire.png", "width_m": 1.2, "description": "Hazard sign: open source, open fire"},
+  {"file": "los_ohculos_team_plate.png", "width_m": 1.6, "description": "Stencil plate: Los OhCulos Team"},
+  {"file": "los_ohculos_team_shield.png", "width_m": 1.0, "description": "Camouflage shield: Los OhCulos Team"}
+]}

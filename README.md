@@ -101,6 +101,10 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
 
+### Project wall decals
+
+Every map carries the project's nine wall decals from `assets/decals/` (stencil plates and signs such as *From OpenStreetMap to open warfare* and *Open source, open fire*; MIT), each once on a wall of the playable core. `map.json` `"project_decals": false` leaves them out of a map.
+
 ### Your own wall decals
 
 Put PNG images (with a transparent background where the decal is not a rectangle, at least 400 px on the long side) in `assets/user_decals/`, a local folder that is never committed, and list them in `assets/user_decals/decals.json` with their size on the wall in metres (`width_m` or `height_m`, 0.2 to 3 m):
@@ -148,6 +152,7 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `map.json` `"facades": {"mode": "trim" \| "legacy", "style": "<name>" \| "auto", "weathering": "clean" \| "worn" \| "heavy"}` | Force a facade style, the old per-material facades, or aged walls |
 | `map.json` `"triangle_limit": N` | 100 000 to 300 000 (default 300 000): what props and library trees fill up to and what the package is checked against; 250 000 for the Onward Workshop ([ADR-005](docs/decisions/ADR-005-quest-performance.md) amendment) |
 | `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
+| `map.json` `"project_decals": false` | Leaves the project's wall decals (`assets/decals/`) off this map |
 
 **Data sources:** `--source nl.ahn` and `--source de.nrw_ndom` are opt-in LiDAR heights, used only inside their coverage. `onward-generator source list` shows every source; `--no-source <id>` turns one off.
 

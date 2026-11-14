@@ -101,6 +101,8 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 
 You may set a documented key in `maps/<id>/map.json` (the keys in [reference/options.md](reference/options.md)) when the user asks. Show the change first, then rerun with `task map -- --name "…" --lat … --lon … --from <stage>`.
 
+Every map already carries the **project's nine wall decals** (`assets/decals/`, text and symbols, safe for the Workshop); `"project_decals": false` in `map.json` leaves them out.
+
 **The user's own wall decals** (a logo, a poster, a photo they took), on every map:
 
 1. Each image is a **PNG**, at least 400 px on its long side (it is scaled to 512 px), shot straight on, with a **transparent background** where the decal is not a rectangle (a PNG without alpha is an opaque rectangle). At most 16 MB.
