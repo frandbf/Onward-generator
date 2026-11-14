@@ -123,7 +123,7 @@ The guide describes more. Assault, Escort, Evac, and Retrieval are described by 
 | Fire Fight, Spec Ops, Gun Game, OITC | Still out. Fire Fight is not named in `GameVariantTypes`. This document does not claim they load |
 | Glass with `PP_Transparent_*` and `AISeeThrough` | After the cost is measured on Quest |
 | `OnwardCustomAudioSource` | Only with a clearly licensed clip, few at a time |
-| Workshop publish | Ideal title 6–18 characters (max 24), description about 250 (max 500), thumbnail 512×256, environment and time of day consistent with the scene. This pipeline does not publish |
+| Workshop publish | Ideal title 6–18 characters (max 24), description about 250 (max 500), thumbnail 512×256, environment and time of day consistent with the scene. Done by the maintainer from a Windows PC through the SDK's Onward Custom Map Dashboard; this pipeline does not publish. Checklist: [12-export.md](12-export.md#onward-workshop) |
 
 ## Card and modes
 

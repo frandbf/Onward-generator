@@ -204,7 +204,7 @@ Decision: [ADR-040](decisions/ADR-040-cutout-trees.md) (accepted after a headset
 
 ## Library normal maps (plan T3)
 
-Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (accepted after a headset session, 14 November 2026). Opt-in per map with `map.json` `"normal_maps": true` (`map create --normal-maps`).
+Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (accepted after a headset session, 14 November 2026). Per map with `map.json` `"normal_maps": true`, on for every map created since 13 November 2026 (`map create` writes it; `--no-normal-maps` turns it off).
 
 - **`materials apply --normal-maps`.** Lists, in the visual GLB's `extras.materials.normal_maps` and in `materials_report.json` `normal_maps`, each material that draws a wide-library photograph with its real CC0 normal map (`nor_gl`, [08-dress.md](08-dress.md)). A party wall or a tint takes its base's map, and the trim facades keep the spike above. `signs place` and `overgrow place` rebuild the visual GLB and carry the list forward; `bounds` and `perf cover` keep the extras they read.
 - **`export package`.** Writes each map once, as `normal_<library id>.png` (role `normal_map`), at most 1024 px, after checking its hash against the library. It prices each map in ASTC 6×6 and refuses a set over 24 MiB (`NORMAL_MAPS_MAX_BYTES`), and also a material that is the `lit_normal_material` as well.
@@ -249,9 +249,24 @@ Everything is baked. No realtime light reaches the Quest.
 
 Unknown, to check on the headset: whether the Onward runtime or the `UrbanDay1` post-processing profile changes fog, ambient light, the skybox (`UseBuiltInSkybox = true`), or how probes and extra baked lights are used.
 
+## Onward Workshop
+
+This pipeline does not publish. What a map needs before the maintainer publishes it, from the Onward *Custom Content Guide* (March 2025, patch 2.0: "Content submission rules", "Quest performance considerations", "Publishing"), checked on Murcia Catedral 2 on 14 November 2026:
+
+| Guide rule | How the pipeline meets it |
+| --- | --- |
+| About 250 000 triangles, 150 draw calls and 1 GB of textures on Quest, "players, objectives and other gameplay objects" already counted | `map.json` `"triangle_limit": 250000` (ADR-005 amendment of 14 November 2026): overgrow fills only up to it and `triangle_budget` checks it. The draw calls per view are estimated in `view_draws`; the guide asks to measure them on the headset (OVRMetricsTool) or in Unity's Frame Debugger. Murcia Catedral 2 pkg_07: 238 559 triangles, 118 / 249 / 293 estimated draws (median, p90, max). |
+| Only the SDK's `PP_*` shaders; lightmapped | The adapter draws every material with `PP_Opaque_Simple_Lit`, `PP_Opaque_Lit`, `PP_Sprite_Lit` or `PP_Opaque_Unlit`, and bakes. Use the `final` bake for a release. |
+| Free Roam and at least one other mode | Every package lists Free Roam (4), Hunt (10) and Uplink (1). |
+| No copyrighted or unlicensed assets | Committed catalogues are CC0. Local Asset Store catalogues (ADR-035) are under the Asset Store EULA: the maintainer checks each package before publishing. |
+| No "full name, likeness or representation of any person (alive or dead)" | `map.json` `"user_decals": false` leaves the maintainer's own decals off (ADR-038 amendment). |
+| Title 6–18 characters (24 at most), description about 250 (500 at most), thumbnail 512 × 256, environment and time of day matching the map | The export card's `map.title` and `map.description`; the thumbnail is written at 512 × 256. |
+
+Publishing itself needs a Windows PC with the Meta Quest (Oculus) PC app open, logged into an account that owns Onward; the Unity project the build used, opened there with Unity 2021.3.23f1; the SDK's registry key (`Assets/RegistryKey/OnwardUGCRegConfig`, then a restart); and the SDK's **Onward Custom Map Dashboard**, which uploads the scene. No file is uploaded by hand: the `.content3` the launcher step writes is only for local testing. Approval takes up to two weeks; updates are reviewed too.
+
 ## Known limits
 
-- The local pair is always `unity-export.local.*`. The adapter passes the package title to `ContentBuilder.BuildScene`. The launcher script sets `MapName` to `Unity Export` and writes the description. The card holds at most 600 characters. A credit already in the map sentence is not repeated, and credits that still do not fit are left off the card. The package `attribution` list keeps every source. It sets `GameModes` to Free Roam (4), Hunt (10), and Uplink (1). When the layout is `gameplay_layout`, it sets `EnvironmentType` to Urban (2). It does not change `ID` or `BundleHash`. `ThumbnailUrl` in the local `.info3` stays empty: Onward fills it only when a map is published to the Workshop. The thumbnail is assigned to `SharedSettings.Thumbnail` and copied to the headset as `unity-export.local.png`. On the headset the card still shows a generic picture, so the game does not appear to read that file; the [listing modes](#quest-listing-modes-experimental) are the opt-in attempts to fix the name and the picture.
+- The local pair is always `unity-export.local.*`. The adapter passes the package title to `ContentBuilder.BuildScene`. The launcher script sets `MapName` to `Unity Export` and writes the description. The card holds at most 600 characters; the Onward Workshop asks for at most 500 (about 250 is ideal), so a map for it gets its own shorter `map.description` (see [Onward Workshop](#onward-workshop)). A credit already in the map sentence is not repeated, and credits that still do not fit are left off the card. The package `attribution` list keeps every source. It sets `GameModes` to Free Roam (4), Hunt (10), and Uplink (1). When the layout is `gameplay_layout`, it sets `EnvironmentType` to Urban (2). It does not change `ID` or `BundleHash`. `ThumbnailUrl` in the local `.info3` stays empty: Onward fills it only when a map is published to the Workshop. The thumbnail is assigned to `SharedSettings.Thumbnail` and copied to the headset as `unity-export.local.png`. On the headset the card still shows a generic picture, so the game does not appear to read that file; the [listing modes](#quest-listing-modes-experimental) are the opt-in attempts to fix the name and the picture.
 - The headset has one local slot. Two maps on disk are built separately. The headset holds the last one that was uploaded.
 - A new map's layout is `onward_generator.gameplay_layout` 0.3.0. It describes Free Roam, Uplink, Assault, Escort, Hunt, Evac, and Retrieval. The phase-05 measurement fixture stays `perf_layout` and does not carry those modes. How the SDK guide is applied is in [11-onward-sdk.md](11-onward-sdk.md).
 - On macOS and Linux, `OnwardLauncher.cs` must not rewrite the bundle path to backslashes. The patch removes only `.Replace('/', '\\')`. The original is `~/Unity/OnwardPhase0Project/OnwardLauncher.cs.sdk-v1.15.orig`, outside `Assets`. Reimporting the `.unitypackage` undoes the patch.
