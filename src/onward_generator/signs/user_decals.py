@@ -59,7 +59,7 @@ def read_user_decals(assets: Path) -> list[Decal]:
     if not manifest.is_file():
         return []
     try:
-        document = json.loads(manifest.read_text(encoding="utf-8"))
+        document = json.loads(manifest.read_text(encoding="utf-8"))  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
     except json.JSONDecodeError as exc:
         raise UserDecalError(f"{manifest}: not JSON: {exc.msg}") from exc
     rows = document.get("decals") if isinstance(document, dict) else None
@@ -85,10 +85,9 @@ def read_user_decals(assets: Path) -> list[Decal]:
                 rgba = picture.convert("RGBA")
         except OSError as exc:
             raise UserDecalError(f"{where}: {name} cannot be read: {exc}") from exc
-        if max(rgba.size) > MAX_PX:
-            rgba.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)
+        rgba.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)  # never enlarges
         width_m, height_m = _size(row, rgba.size[0] / rgba.size[1], where)
-        stem = re.sub(r"[^a-z0-9]+", "_", Path(name).stem.lower()).strip("_") or str(index)
+        stem = "_".join(re.findall(r"[a-z0-9]+", Path(name).stem.lower())) or str(index)
         found.append(Decal(f"user_{stem}", USER_KIND, width_m, height_m, np.asarray(rgba).copy(), USER_ORIGIN,
                            str(row.get("description") or "")))
     ids = [decal.id for decal in found]

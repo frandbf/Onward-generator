@@ -130,7 +130,8 @@ def test_signs_place_puts_every_user_decal_on_the_map_or_stops(tmp_path: Path, m
     base = tmp_path / "base"
     _base(base)
     assets = tmp_path / "repo" / "assets"
-    _folder(assets, {"decals": [{"file": "mural.png", "width_m": 0.8}]}, {"mural.png": (200, 100, "RGBA")})
+    _folder(assets, {"decals": [{"file": "mural.png", "width_m": 0.8}, {"file": "badge.png", "width_m": 0.5}]},
+            {"mural.png": (200, 100, "RGBA"), "badge.png": (100, 100, "RGBA")})
     monkeypatch.setattr(signs_place, "REPO_ROOT", tmp_path / "repo")
     # The tests turn the local catalogues off; the user decals are local too.
     report = place_signs(base, scene, tmp_path / "off")
@@ -138,12 +139,61 @@ def test_signs_place_puts_every_user_decal_on_the_map_or_stops(tmp_path: Path, m
     monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "1")
     report = place_signs(base, scene, tmp_path / "on")
     users = [row for row in report["wall_decals"]["decals"] if row["origin"] == "user"]
-    assert [row["decal"] for row in users] == ["user_mural"] and users[0]["size_m"] == [0.8, 0.4]
+    assert [row["decal"] for row in users] == ["user_mural", "user_badge"] and users[0]["size_m"] == [0.8, 0.4]
     real = signs_place.place_decals
     monkeypatch.setattr(signs_place, "place_decals", lambda *a, required=(), **k: real(*a, **k))  # no wall takes it
-    with pytest.raises(SignsError, match=r"^user decals that fit no exposed wall of the playable core: user_mural \(make them smaller"):
+    with pytest.raises(SignsError, match=r"^user decals that fit no exposed wall of the playable core: user_mural, user_badge \(make them smaller"):
         place_signs(base, scene, tmp_path / "big")
     monkeypatch.setattr(signs_place, "place_decals", real)
     _folder(assets, {"decals": [{"file": "missing.png", "width_m": 1.0}]})
     with pytest.raises(SignsError, match="missing.png does not exist$"):
         place_signs(base, scene, tmp_path / "missing")
+
+
+def test_the_size_bounds_are_inclusive_and_sizes_round_to_the_millimetre(tmp_path: Path) -> None:
+    _folder(tmp_path, {"decals": [{"file": "a.png", "width_m": MIN_SIZE_M}, {"file": "b.png", "width_m": MAX_SIZE_M},
+                                  {"file": "c.png", "width_m": 1.23456}]},
+            {"a.png": (10, 10, "RGBA"), "b.png": (10, 10, "RGBA"), "c.png": (20, 10, "RGBA")})
+    a, b, c = read_user_decals(tmp_path)
+    assert (a.width_m, a.height_m, b.width_m, b.height_m) == (0.2, 0.2, 3.0, 3.0)
+    assert (c.width_m, c.height_m) == (1.235, 0.617)
+
+
+def test_an_error_names_the_row_it_comes_from(tmp_path: Path) -> None:
+    _folder(tmp_path, {"decals": [{"file": "a.png", "width_m": 1.0}, {"file": "b.png", "width_m": 9.0}]},
+            {"a.png": (10, 10, "RGBA"), "b.png": (10, 10, "RGBA")})
+    with pytest.raises(UserDecalError, match=r"user_decals/decals.json decals\[1\]: the width on the wall is 9.00 m"):
+        read_user_decals(tmp_path)
+
+
+def test_ids_come_from_the_letters_and_digits_of_the_name_or_the_row_number(tmp_path: Path) -> None:
+    _folder(tmp_path, {"decals": [{"file": "_Mi Mural_.png", "width_m": 1.0}, {"file": "___.png", "width_m": 1.0}]},
+            {"_Mi Mural_.png": (10, 10, "RGBA"), "___.png": (10, 10, "RGBA")})
+    assert [d.id for d in read_user_decals(tmp_path)] == ["user_mi_mural", "user_1"]
+
+
+def test_only_the_duplicated_ids_are_named(tmp_path: Path) -> None:
+    images = {name: (10, 10, "RGBA") for name in ("a.png", "A.png", "b.png", "B.png", "c.png")}
+    _folder(tmp_path, {"decals": [{"file": name, "width_m": 1.0} for name in images]}, images)
+    with pytest.raises(UserDecalError, match=r"two files give the same decal id: user_a, user_b$"):
+        read_user_decals(tmp_path)
+
+
+def test_a_large_image_is_scaled_smoothly(tmp_path: Path) -> None:
+    rng = np.random.default_rng(3)
+    picture = Image.fromarray(rng.integers(0, 255, (300, 1030, 4), dtype=np.uint8), "RGBA")
+    folder = _folder(tmp_path, {"decals": [{"file": "a.png", "width_m": 2.0}]})
+    picture.save(folder / "a.png")
+    expected = picture.copy()
+    expected.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)
+    assert np.array_equal(read_user_decals(tmp_path)[0].rgba, np.asarray(expected))
+
+
+def test_the_size_limit_is_named_in_mebibytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.signs import user_decals
+
+    _folder(tmp_path, {"decals": [{"file": "a.png", "width_m": 1.0}]}, {"a.png": (10, 10, "RGBA")})
+    monkeypatch.setattr(user_decals, "MAX_FILE_BYTES", 2 * 1024 * 1024)
+    monkeypatch.setattr(user_decals.Path, "stat", lambda self, **k: type("S", (), {"st_size": 3 * 1024 * 1024, "st_mode": 0o100644})())
+    with pytest.raises(UserDecalError, match=r"a.png is over 2 MiB$"):
+        read_user_decals(tmp_path)
