@@ -21,6 +21,7 @@ The local card does not instantiate every mode the layout describes. `GameModes`
 | A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh. The next start is 8 m away when the streets hold 32, and otherwise the largest 0.1 m step that still does, never at or below 5 m. Walkable crossings join the blocks across the carriageway (ADR-015), and routes are spread over the navmesh island of the navigation origin when it holds 32 (see [Hunt routes](#hunt-routes)) |
 | Navigation-map origin on walkable ground, near the centre, plus an outdoor area | The Uplink, after it is snapped to the navmesh |
 | Flight goes to `LevelHeight / 2` of the MapQuad. A volume that crosses it clips the aircraft | `LevelHeight` puts the ceiling 20 m above the highest collider |
+| The MapQuad frames the minimap: a `LevelSize` square centred on its position (its gizmo, `MapQuad.cs`) | `map_quad_m` is the centre of the site and `level_size_m` its larger side. Beside the attackers' block, as before 13 November 2026, the tablet drew the map in one corner, black down two sides |
 | Tent under the play space, `DamageVolume` under the map, do not edit SDK prefabs | Already the case |
 | About 150 draws, about 250 000 triangles, about 1 GB of textures, mesh combining | ADR-005: a 100 m cell, measured on a headset for one scene |
 
