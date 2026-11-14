@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -210,6 +211,14 @@ def _spawn_site(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> tup
     return area, a
 
 
+def _spawn_region(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -> BaseGeometry:
+    """Every piece of free ground with ``CLEARANCE_M`` clearance, not only the largest (14 November 2026): in a dense
+    city the largest is one square or one wide street, and both teams spawned in it."""
+    region = _free_inside(base, detail_manifest).buffer(-CLEARANCE_M)
+    prepare(region)  # pragma: no mutate: only makes the containment tests faster
+    return region
+
+
 def _midpoint_on(area: BaseGeometry, a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
     """The midpoint of the two teams, moved onto ``area`` when it falls outside, rounded to the centimetre."""
     mid = Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
@@ -235,7 +244,7 @@ def gameplay_layout(
         b = (round(bx, 2), round(by, 2))  # pragma: no mutate: grid points are whole multiples of GRID_M, so any rounding keeps them
         uplink = _midpoint_on(area, a, b)
     else:
-        _check_placement(area, a, placement)
+        _check_placement(_spawn_region(base, detail_manifest), a, placement)
         a, b, uplink = placement.attack, placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
@@ -306,8 +315,9 @@ def _defender_candidates(area: BaseGeometry, a: tuple[float, float], limit: int)
 
 
 def _check_placement(area: BaseGeometry, a: tuple[float, float], placement: Placement) -> None:
-    """The rules of ``gameplay_layout`` for a placement chosen elsewhere: both blocks inside the area and 30 m apart,
-    the Uplink on the area. The attackers may leave ``a`` since the C6 amendment of 11 November 2026."""
+    """The rules of ``gameplay_layout`` for a placement chosen elsewhere: both blocks inside ``area`` and 30 m apart,
+    the Uplink on it. The attackers may leave ``a`` since the C6 amendment of 11 November 2026; ``area`` is every
+    piece of the spawn region since 14 November 2026."""
     for team, centre in (("attackers", placement.attack), ("defenders", placement.defend)):
         if not _fits(area, _block(*centre)):
             raise LayoutError(f"the placed {team}' block does not fit the free area")
@@ -338,10 +348,18 @@ def _objective_ground(base: GeneratedScene, detail_manifest: Mapping[str, Any]) 
 
 
 def _second_blocks(parts: Sequence[BaseGeometry], attack: tuple[float, float], defend: tuple[float, float], uplink: tuple[float, float]) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Assault's second block of each team, as ``playable_layout`` places them."""
-    area = component_holding(parts, uplink)
-    attack_b = extra_spawn_block(area, attack, [attack, defend])
-    defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
+    """Assault's second block of each team: on the Uplink's ground when the team stands on it, as ``playable_layout``
+    places them, and otherwise on the nearest ground that holds one, so a team spawned across the map keeps both its
+    blocks near it."""
+    home = component_holding(parts, uplink)
+
+    anywhere = union_all(list(parts))
+
+    def ground(centre: tuple[float, float]) -> BaseGeometry:
+        return home if home.covers(Point(centre)) else anywhere
+
+    attack_b = extra_spawn_block(ground(attack), attack, [attack, defend])
+    defend_b = extra_spawn_block(ground(defend), defend, [attack, defend, attack_b])
     return attack_b, defend_b
 
 
@@ -363,20 +381,26 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     from onward_generator.gameplay.placement import Placement, score_all, select
 
     area, a = _spawn_site(base, detail_manifest)
+    region = _spawn_region(base, detail_manifest)
     _, parts = _objective_ground(base, detail_manifest)
-    graph = nav_graph(nav_islands(base, playable_area(detail_manifest)))
+    graph = nav_graph(player_ground(base, playable_area(detail_manifest)))
     candidates: list[Placement | str] = []
     defenders = _defender_candidates(area, a, K_DEFENDERS)
-    sites = _spread_sites(area, a, K_SITES)
+    home = _graph_component(graph, snap(graph, a))
+    sites = _spread_sites(region, a, K_SITES, lambda p: snap(graph, p) in home)
     for attack, d in _candidate_pairs(a, defenders, sites):
-        midpoint = _placed(parts, attack, d, _midpoint_on(area, attack, d))
+        on = area if area.covers(Point(attack)) and area.covers(Point(d)) else region
+        midpoint = _placed(parts, attack, d, _midpoint_on(on, attack, d))
         candidates.append(midpoint)
         if isinstance(midpoint, str):
             continue
-        even = _even_uplink(graph, area, snap(graph, attack), midpoint)
+        even = _even_uplink(graph, region, snap(graph, attack), midpoint)
         if even is not None and even != midpoint.uplink:
             candidates.append(_placed(parts, attack, d, even))
-    choice = select(score_all(graph, candidates))
+    buildings = base.partition.buildings
+    prepare(buildings)  # pragma: no mutate: only makes the intersection tests faster
+    scores = [replace(score, in_sight=_in_sight(buildings, candidates[score.index])) for score in score_all(graph, candidates)]
+    choice = select(scores)
     if choice.reason is not None:
         return None, choice
     chosen = candidates[choice.index]
@@ -384,18 +408,40 @@ def choose_placement(base: GeneratedScene, detail_manifest: Mapping[str, Any]) -
     return chosen, choice
 
 
-def _spread_sites(area: BaseGeometry, a: tuple[float, float], limit: int) -> list[tuple[float, float]]:
+def _in_sight(buildings: BaseGeometry, candidate: Placement | str) -> bool:
+    """True when no building cuts the line between the two teams' spawn centres (an invalid candidate: False)."""
+    if isinstance(candidate, str):
+        return False
+    return not LineString([candidate.attack, candidate.defend]).intersects(buildings)
+
+
+def _graph_component(graph: NavGraph, start: int | None) -> frozenset[int]:
+    """The nodes joined to ``start`` (none when ``start`` is None)."""
+    if start is None:
+        return frozenset()
+    seen, stack = {start}, [start]
+    while stack:
+        for other, _cost in graph.neighbours[stack.pop()]:
+            if other not in seen:
+                seen.add(other)
+                stack.append(other)
+    return frozenset(seen)
+
+
+def _spread_sites(area: BaseGeometry, a: tuple[float, float], limit: int,
+                  reachable: Callable[[tuple[float, float]], bool] | None = None) -> list[tuple[float, float]]:
     """``a`` and then, up to ``limit`` in all, the grid point whose block fits farthest from the sites already kept
     (farthest-point sampling, ties to the north, then east), while that distance is at least ``SITE_GAP_M``.
 
     On Rue Mouffetard every defenders' candidate of ``_defender_candidates`` lay at the far end of the attackers'
-    street; sites spread over the whole spawn area let both teams move."""
+    street; sites spread over the whole spawn area let both teams move. ``reachable`` keeps only the sites a player can
+    walk to from ``a`` (14 November 2026: a courtyard closed by buildings is a spawn no team can leave)."""
     minx, miny, maxx, maxy = area.bounds
     x0, y0 = math.floor(minx / GRID_M) * GRID_M, math.floor(miny / GRID_M) * GRID_M
     columns = int((maxx - minx) / GRID_M) + 2  # pragma: no mutate: more columns only add points past the bounds, where no block fits
     rows = int((maxy - miny) / GRID_M) + 2  # pragma: no mutate: more rows only add points past the bounds, where no block fits
     points = [(x0 + GRID_M * i, y0 + GRID_M * j) for j in range(rows) for i in range(columns)]
-    fitting = [p for p in points if _fits(area, _block(*p))]
+    fitting = [p for p in points if _fits(area, _block(*p)) and (reachable is None or reachable(p))]
     sites = [a]
     while len(sites) < limit and fitting:
         gap, site = max(((min(math.dist(p, s) for s in sites), p) for p in fitting), key=lambda t: (t[0], t[1][1], t[1][0]))
@@ -762,6 +808,21 @@ def nav_islands(base: GeneratedScene, inside: BaseGeometry | None = None) -> lis
     return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
 
 
+def player_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> list[BaseGeometry]:
+    """The ground a player can walk, shrunk by the agent radius, one piece per island: ``nav_islands`` plus the
+    carriageway (ADR-032 amendment of 14 November 2026).
+
+    The bots' navmesh leaves the carriageway out but its crossings (ADR-015); a player crosses any street. Where OSM
+    maps no crossing (Mogadishu 1993: 183 islands, one per block) the bots' islands made every route between two
+    blocks "no path", so the routes and the spawn placement read the player's ground instead.
+    """
+    carriageway = [s.geometry for c, s in base.partition.surfaces.items() if c is SurfaceClass.CARRIAGEWAY]
+    ground = union_all([free_ground(base, []), base.partition.crossings, *carriageway])
+    if inside is not None:
+        ground = ground.intersection(inside)
+    return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
+
+
 def navigation_estimate(islands: Sequence[BaseGeometry]) -> dict[str, float]:
     """The adapter's first node spacing for this navmesh: ``max(1, span / 400, sqrt(area / 320))``.
 
@@ -1038,7 +1099,7 @@ def playable_layout(
         attack_b = extra_spawn_block(area, attack, [attack, defend])
         defend_b = extra_spawn_block(area, defend, [attack, defend, attack_b])
     else:
-        attack_b, defend_b = _checked_second_blocks(area, placement)
+        attack_b, defend_b = _checked_second_blocks(union_all(parts), placement)
     spawn_pts = [point for centre in (attack, defend, attack_b, defend_b) for point in _block(*centre)]
     occupied_pts = [uplink, *spawn_pts]
 
@@ -1114,11 +1175,12 @@ def playable_layout(
 
 
 def _checked_second_blocks(area: BaseGeometry, placement: Placement) -> tuple[tuple[float, float], tuple[float, float]]:
-    """A placement's second blocks, refused unless they fit ``area`` and keep ``BLOCK_GAP_M`` from the other centres."""
+    """A placement's second blocks, refused unless they fit ``area`` (the walkable ground with 1 m clearance: a team
+    spawned across the map has its second block on its own ground) and keep ``BLOCK_GAP_M`` from the other centres."""
     centres = [placement.attack, placement.defend, placement.attack_b, placement.defend_b]
     for i, centre in enumerate(centres[2:], start=2):
         if not _fits(area, _block(*centre)):
-            raise LayoutError(f"the placed second block at {centre} does not fit the Uplink's ground")
+            raise LayoutError(f"the placed second block at {centre} does not fit the walkable ground")
         if any(math.dist(centre, other) < BLOCK_GAP_M - 1e-6 for other in centres[:i]):
             raise LayoutError(f"the placed second block at {centre} is closer than {BLOCK_GAP_M:g} m to another block")
     return placement.attack_b, placement.defend_b

@@ -47,7 +47,9 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 HEAD_LAYOUT_SHA256 = "c49f35cbfd7d6cfefd7ef106dbdda8f0ecd3fee48f4ac655ddf591b37f68364c"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
-HEAD_REPORT_SHA256 = "254bf1f45c99d588ed19c1d1e5b471828f7435e0954e3b623cb6488f64f7b805"
+# Re-pinned on 14 November 2026 (ADR-032 amendment): the report measures routes on the player's ground, carriageway
+# included; the layout without the option is unchanged.
+HEAD_REPORT_SHA256 = "43fac12e594fe00ee9009831f0285e0fa585988d8b00066984519a504a272cc3"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 

@@ -996,8 +996,8 @@ def test_placed_second_blocks_must_fit_and_keep_their_gap() -> None:
         ((0.0, -9.9), (40.0, -10.0), r"^the placed second block at \(0.0, -9.9\) is closer than 10 m to another block$"),
         ((0.0, -10.0), (9.9, -10.0), r"^the placed second block at \(9.9, -10.0\) is closer than 10 m to another block$"),
         ((0.0, -10.0), (40.0, 9.9), r"^the placed second block at \(40.0, 9.9\) is closer than 10 m to another block$"),
-        ((78.0, 0.0), (40.0, -10.0), r"^the placed second block at \(78.0, 0.0\) does not fit the Uplink's ground$"),
-        ((0.0, -10.0), (40.0, -78.5), r"^the placed second block at \(40.0, -78.5\) does not fit the Uplink's ground$"),
+        ((78.0, 0.0), (40.0, -10.0), r"^the placed second block at \(78.0, 0.0\) does not fit the walkable ground$"),
+        ((0.0, -10.0), (40.0, -78.5), r"^the placed second block at \(40.0, -78.5\) does not fit the walkable ground$"),
     ):
         with pytest.raises(LayoutError, match=message):
             _checked_second_blocks(area, Placement(a, d, u, attack_b, defend_b))
@@ -1171,13 +1171,14 @@ def test_choose_placement_scores_on_the_navmesh_of_the_core(monkeypatch: pytest.
     import onward_generator.perf.layout as layout
 
     seen: list[object] = []
-    real = layout.nav_islands
+    real = layout.player_ground
 
     def spy(base: object, inside: object = None) -> list:
         seen.append(inside)
         return real(base, inside)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(layout, "nav_islands", spy)
+    # The candidates are scored on the player's ground (carriageway included, 14 November 2026), inside the core.
+    monkeypatch.setattr(layout, "player_ground", spy)
     manifest: dict = {"objects": [], "core": {"half_side_m": 50.0}}
     layout.choose_placement(_plaza_base(), manifest)  # type: ignore[arg-type]
     assert len(seen) == 1 and isinstance(seen[0], BaseGeometry) and seen[0].equals(playable_area(manifest))

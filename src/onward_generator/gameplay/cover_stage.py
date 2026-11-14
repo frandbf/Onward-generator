@@ -66,7 +66,7 @@ from onward_generator.overgrow.library_catalog import library_directories
 from onward_generator.overgrow.realize import fitted_props
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone
-from onward_generator.perf.layout import free_ground, nav_islands, playable_area
+from onward_generator.perf.layout import free_ground, nav_islands, playable_area, player_ground
 
 COVER_DIR = "scene_covered"
 COVER_REPORT = "cover_report.json"
@@ -338,7 +338,7 @@ def apply_cover(
     visual_bytes = visual_path.read_bytes()
     nodes, materials = nodes_from_glb(visual_bytes)
     colliders = read_colliders(collision_path)
-    islands = nav_islands(base, playable_area(manifest))
+    islands = player_ground(base, playable_area(manifest))  # the routes the report measures (ADR-032, 14 November 2026)
     before_report = build_report(islands, base.partition.buildings, colliders, layout)
     targets = open_sight_points(islands, base.partition.buildings, colliders, layout)
     props, _library_rejects = read_library(library)
