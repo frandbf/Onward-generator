@@ -107,3 +107,7 @@ Correction, same day: heavy vehicles are not imported. The library keeps a vehic
 
 About forty textured lamp posts from the local catalogues (*Street Lights Pack*, *Street Lights Pack 01*, *Mobile City Props Collection*, *Post Apocalypse Models Pack*) were imported with role `lamppost` or `streetlight`, but no placement rule takes that role, so no map showed one: `detail`'s grey procedural lamps stood on every street. `overgrow place` now draws every `detail` street lamp with one library lamp post per map (`overgrow/lamps.py`, [01-pipeline.md](../01-pipeline.md)), keeping the node, its record and its post collider. *Street Lamps 2* was catalogued as `room_furniture` by an older classifier; the current one makes its four models `lamppost`, and an `asset-store import --refresh --only` of that package brings them in.
 
+## Amendment, 14 November 2026: earth textures for dirt streets
+
+For Mogadishu 1993 the maintainer imported *25 Free Realistic Textures* (Game Buffs) and *Yughues Free Sand Materials* (Nobiax). `config/dress/asset_store_textures.json` names nine of their sets: five dirt, sand and gravel sets and one Yughues sand in a new family, `earth`, plus a worn asphalt, a dirty concrete and a flaking painted render. The other Yughues diffuse maps are near white, meant for a tint, and stay out. The importer now reads Yughues' `_d` suffix as the diffuse map. `earth` lies on the ground (`GROUND_FAMILIES`) but no automatic texture slot draws it, so no map gets sand streets by chance: a map names an earth texture in its own `config/texture_plan.json`.
+

@@ -30,8 +30,12 @@ from onward_generator.io import atomic_write_bytes, atomic_write_json
 TABLE_PATH = Path(__file__).resolve().parents[3] / "config" / "dress" / "asset_store_textures.json"
 LIBRARY_SCHEMA = "onward_generator.imported_library"
 MAX_PX = 1024
+# Families drawn on the ground. ``earth`` (sand, dry soil, gravel: 14 November 2026) has no automatic texture slot: a map
+# names it in its own texture plan, as Mogadishu 1993 does for its dirt streets.
+GROUND_FAMILIES = frozenset({"paving", "concrete", "asphalt", "earth"})
 IMAGE_SUFFIXES = (".png", ".tga", ".tif", ".tiff", ".jpg", ".jpeg")
-ALBEDO = re.compile(r"(?:_diffuse|_base_?colou?r|_albedo|_color)$", re.IGNORECASE)
+# ``_d`` is the diffuse of Yughues packages (``T_YFSM_03_d.tga``); ``_s`` and ``_n`` beside it are specular and normal.
+ALBEDO = re.compile(r"(?:_diffuse|_base_?colou?r|_albedo|_color|_d)$", re.IGNORECASE)
 NORMAL = re.compile(r"(?:_normal_directx|_normal_opengl|_normal|_n)$", re.IGNORECASE)
 
 
@@ -110,7 +114,7 @@ def texture_rows(package: Package, assets: Path, chosen: Mapping[str, Mapping[st
                 "id": f"as_{package.id[:20]}_{file}"[:80], "name": stem, "family": spec["family"], "provider": "asset_store",
                 "license": "LicenseRef-Unity-Asset-Store-EULA", "license_url": "https://unity.com/legal/as-terms",
                 "credit": f"{stem} from {package.name} by {package.publisher}, Unity Asset Store EULA; local copy, never committed.",
-                "source_url": "", "surface": "ground" if spec["family"] in {"paving", "concrete", "asphalt"} else "wall",
+                "source_url": "", "surface": "ground" if spec["family"] in GROUND_FAMILIES else "wall",
                 "bound": False, "path": (target / f"{file}_albedo.jpg").relative_to(assets.parent).as_posix(),
                 "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "note": f"Albedo {albedo.width} px. {spec['note']}",
             }
