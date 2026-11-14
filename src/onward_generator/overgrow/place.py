@@ -59,6 +59,7 @@ from onward_generator.overgrow.growth import (
     vine_png,
     wreck_mesh,
 )
+from onward_generator.overgrow.lamps import swap_lamps
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.pick import pick_props
@@ -153,6 +154,7 @@ def overgrow(
     except FurnishBuildError as exc:
         raise OvergrowError(str(exc)) from exc
     props, library_rejects = read_library(library)
+    library_props = list(props)
     chosen: list[str] | None = None
     if selection is not None:
         chosen = read_selection(selection)
@@ -175,6 +177,10 @@ def overgrow(
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
     headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles)
+    # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
+    lamps = swap_lamps(nodes, library_props, seed, headroom)
+    nodes = lamps.nodes
+    headroom = max(0, headroom - lamps.added_triangles)
     budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -339,6 +345,9 @@ def overgrow(
     images.setdefault("tree_trunk", trunk_png())
     images.setdefault("tree_canopy", canopy_png())
     images.update(planted.images)
+    images.update(lamps.images)
+    for name in lamps.images:
+        materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
     materials.setdefault("abandoned_vine", Material((1, 1, 1, 1), 0.9))
@@ -456,6 +465,7 @@ def overgrow(
         "library_lod": {item: by_id[item].lod() for item in dict.fromkeys(planted.placed_ids) if by_id[item].source_triangles},
         "max_added_triangles": MAX_ADDED_TRIS,
         "triangle_headroom": headroom,
+        "street_lamps": lamps.report,
         "library_preferred": len(preferred),
         "rejects": rejects[:80],
         "reject_counts": reject_counts,

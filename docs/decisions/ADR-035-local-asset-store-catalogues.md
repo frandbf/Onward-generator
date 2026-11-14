@@ -102,3 +102,8 @@ Four of the maintainer's packages are textures, not models: *18 High Resolution 
 - **Licence.** The images are under the Unity Asset Store EULA: local copies for this user's maps, never committed, used inside built maps only. A plan that names one resolves only on this machine.
 
 Correction, same day: heavy vehicles are not imported. The library keeps a vehicle whole: decimation tore holes in car bodies on the headset, so `level_of_detail` leaves vehicles alone. A 53 000-triangle wreck and the two 37 000-triangle ZIL-130 versions, imported with a higher `--max-triangles`, took most of overgrow's 80 000-triangle budget on Rue Mouffetard (pkg_16: 311 props refused for budget, 6 placed). Vehicle packages stay at the default limit of 8 000 triangles, so *ZIL-130* and *Abandoned Rusty Vehicles* give no row.
+
+## Amendment, 14 November 2026: library lamp posts replace detail's procedural lamps
+
+About forty textured lamp posts from the local catalogues (*Street Lights Pack*, *Street Lights Pack 01*, *Mobile City Props Collection*, *Post Apocalypse Models Pack*) were imported with role `lamppost` or `streetlight`, but no placement rule takes that role, so no map showed one: `detail`'s grey procedural lamps stood on every street. `overgrow place` now draws every `detail` street lamp with one library lamp post per map (`overgrow/lamps.py`, [01-pipeline.md](../01-pipeline.md)), keeping the node, its record and its post collider. *Street Lamps 2* was catalogued as `room_furniture` by an older classifier; the current one makes its four models `lamppost`, and an `asset-store import --refresh --only` of that package brings them in.
+
