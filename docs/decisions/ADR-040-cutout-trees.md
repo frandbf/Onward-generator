@@ -1,6 +1,6 @@
 # ADR-040 — Library trees with alpha cut-out leaves
 
-Status: proposed · 14 November 2026. Asked by the maintainer: use the *Horned Holly Tree* package's trees instead of the procedural ones. It stays proposed until a headset session has looked at the leaves (clipping, both faces, the bake) and measured the frame time on a map with them.
+Status: accepted · 14 November 2026, after a headset session (amendment below). Asked by the maintainer: use the *Horned Holly Tree* package's trees instead of the procedural ones.
 
 ## Context
 
@@ -20,3 +20,8 @@ Status: proposed · 14 November 2026. Asked by the maintainer: use the *Horned H
 - Triangles: Horned Holly Tree 2 and 3 cost 2 127 and 1 539 (both faces of the leaves), against 24 to 200 for a procedural tree; the share of the headroom bounds them.
 - The lightmapper bakes the leaves as solid casters unless it reads the alpha; how the bake looks is part of the headset check.
 - The procedural trees stay for a map without a cut-out tree catalogue, which includes every map built from the committed catalogues alone.
+
+## Amendment, 14 November 2026: seen and measured on the headset, accepted
+
+Murcia Catedral 2, pkg_05 (final bake), Meta Quest 3: 22 of the 56 street trees drawn with Horned Holly Tree 2 and 3 (the other 34 were over the trees' share of the headroom), with 12 library normal maps (ADR-039), 62 props and 288 426 estimated Unity triangles. VrApi logcat over about 6.5 minutes of play: 72–73 FPS median, app GPU time 4.78 ms median and 8.81 ms at most against 13.9 ms. Four seconds dropped one to three frames, and of two seconds at 53 FPS near the end one matches leaving the map and the other is unexplained; the log cannot tie a drop to the trees. The maintainer found the leaves right: clipped, seen from both sides, no black fringe, and the final bake right. The frame time leaves room for more cut-out trees; the triangle budget, not the GPU, is what limits them.
+
