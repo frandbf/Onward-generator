@@ -199,6 +199,7 @@ def test_fallback_variation_spreads_heights_by_id_within_the_range(tmp_path: Pat
     first = found.get("osm-way-1")
     assert first.height_source is HeightSource.FALLBACK and "varied by id within 3.0–7.0 m" in first.rule  # type: ignore[union-attr]
     assert 0.0 <= fallback_unit("x") < 1.0 and fallback_unit("a") != fallback_unit("b")
+    assert fallback_unit("osm-way-1") == 0.27989327294535116  # the first 12 hex digits of sha256, over 16**12
 
 
 def test_fallback_variation_must_be_a_boolean(tmp_path: Path) -> None:

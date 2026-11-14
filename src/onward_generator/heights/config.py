@@ -215,7 +215,7 @@ def config_from_document(
         document=MappingProxyType(json.loads(json.dumps(doc))),
         file=file,
         overrides_file=overrides_ref,
-        fallback_variation=bool(doc.get("fallback_variation", False)),
+        fallback_variation=doc.get("fallback_variation") is True,  # the schema allows only a boolean
         secondary_overrides=MappingProxyType(secondary),
         secondary_overrides_file=secondary_ref,
     )
