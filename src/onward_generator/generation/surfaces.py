@@ -13,7 +13,7 @@ is split.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -151,8 +151,30 @@ def build_partition(
             taken = union_all([taken, geometry])
     carriageway = partition.surfaces.get(SurfaceClass.CARRIAGEWAY)
     if carriageway is not None:
-        partition.crossings, _ = _polygonal(crossing_strips(vehicular, carriageway.geometry), precision, min_area)
+        walkable = crossing_strips(vehicular, carriageway.geometry)
+        unpaved = [w for w in vehicular if is_unpaved(w)]
+        if unpaved:  # a map with no unpaved street keeps its crossings byte for byte
+            walkable = union_all([walkable, unpaved_carriageway(unpaved, carriageway.geometry, buffered)])
+        partition.crossings, _ = _polygonal(walkable, precision, min_area)
     return partition
+
+
+# OSM ``surface`` values of a street with no paving (14 November 2026). Its carriageway is walkable all along, as a
+# crossing is: in Mogadishu 1993, 23 of 29 streets are ``surface=unpaved``, people walk them end to end, and a navmesh
+# that left them out cut the town into blocks the bots could not leave.
+UNPAVED_SURFACES = frozenset({"unpaved", "dirt", "earth", "ground", "sand", "gravel", "fine_gravel", "compacted", "mud",
+                              "grass", "pebblestone"})
+
+
+def is_unpaved(way: LinearWay) -> bool:
+    """True when the way's OSM ``surface`` names no paving (``UNPAVED_SURFACES``)."""
+    return way.paving is not None and way.paving.strip().lower() in UNPAVED_SURFACES
+
+
+def unpaved_carriageway(unpaved: Sequence[LinearWay], carriageway: BaseGeometry,
+                        buffered: Callable[[LinearWay], BaseGeometry]) -> BaseGeometry:
+    """The carriageway of the unpaved ways, walkable like a crossing (the ``collider/walkable_crossing`` slab)."""
+    return union_all([buffered(w) for w in unpaved]).intersection(carriageway)
 
 
 # A walkable strip across the carriageway, like a zebra crossing. The navmesh

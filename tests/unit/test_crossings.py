@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import pytest
@@ -144,3 +145,26 @@ def test_the_carriageway_slab_closes_around_its_crossings() -> None:
 
 def test_a_map_without_a_carriageway_has_no_carriageway_slab() -> None:
     assert carriageway_slab(build_partition(box(-50, -50, 50, 50), [], [], [], CFG), CFG.precision_m).is_empty
+
+
+def test_an_unpaved_street_is_walkable_all_along_and_a_paved_one_only_at_its_crossings() -> None:
+    """14 November 2026: in Mogadishu 1993, 23 of 29 streets are surface=unpaved; people walk them end to end."""
+    from onward_generator.generation.surfaces import UNPAVED_SURFACES, carriageway_slab, is_unpaved
+
+    assert {"unpaved", "dirt", "earth", "ground", "sand", "gravel", "compacted"} <= UNPAVED_SURFACES and "asphalt" not in UNPAVED_SURFACES
+    config = load_generation_config()
+    site = box(-100, -100, 100, 100)
+    dirt = LinearWay("osm-way-1", "vehicular", LineString([(-100, 0), (100, 0)]), 8.0, "observed", "unpaved")
+    road = LinearWay("osm-way-2", "vehicular", LineString([(0, -100), (0, 100)]), 8.0, "observed", "asphalt")
+    assert is_unpaved(dirt) and not is_unpaved(road) and is_unpaved(dataclasses.replace(road, paving=" Dirt "))
+    assert not is_unpaved(dataclasses.replace(road, paving=None))
+    partition = build_partition(site, [], [dirt, road], [], config)
+    carriageway = partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
+    along_dirt = box(-90, -4, -10, 4).intersection(carriageway)
+    along_road = box(-4, -90, 4, -10).intersection(carriageway)
+    assert partition.crossings.intersection(along_dirt).area == pytest.approx(along_dirt.area, rel=1e-6)
+    assert partition.crossings.intersection(along_road).area < 0.5 * along_road.area  # only its crossing strips
+    slab = carriageway_slab(partition, config.precision_m)
+    assert slab.intersection(along_dirt).area == pytest.approx(0.0, abs=1e-6)
+    paved_only = build_partition(site, [], [dataclasses.replace(dirt, paving="asphalt"), road], [], config)
+    assert paved_only.crossings.area < partition.crossings.area
