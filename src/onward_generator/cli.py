@@ -78,7 +78,7 @@ def _cmd_validate_config(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    from onward_generator.maps.workspace import MapError, map_directory
+    from onward_generator.maps.workspace import MAP_SWITCHES, MapError, map_directory
     from onward_generator.pipeline_run import run_map
 
     host = None
@@ -111,7 +111,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         brief=args.brief,
         ambient_ai=args.ai,
         panoramax=args.panoramax,
-        street_profile=args.street_profile,
+        street_profile=args.street_profile is True,
+        switches={switch: getattr(args, switch) for switch in MAP_SWITCHES if getattr(args, switch) is not None},
         time_of_day=args.time_of_day,
         storm=args.storm,
         atmosphere=args.atmosphere,
@@ -244,9 +245,18 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
     run.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     run.add_argument(
-        "--street-profile", action="store_true",
-        help="store map.json street_profile: local Ollama picks enumerated ids (facade style, palette, props, abandonment, cover) that code turns into stage flags; off unless this flag is set (plan D2)",  # pragma: no mutate: help text
+        "--street-profile", action=argparse.BooleanOptionalAction, default=None,
+        help="map.json street_profile: local Ollama picks enumerated ids (facade style, palette, props, abandonment, cover) that code turns into stage flags (plan D2); on for a new map unless --no-street-profile",  # pragma: no mutate: help text
     )
+    from onward_generator.maps.workspace import DEFAULT_OFF_SWITCHES, MAP_SWITCHES
+
+    for switch, text in MAP_SWITCHES.items():
+        if switch == "street_profile":
+            continue
+        run.add_argument(
+            "--" + switch.replace("_", "-"), dest=switch, action=argparse.BooleanOptionalAction, default=None,
+            help=f"new map only: map.json {switch}: {text} (default {'off' if switch in DEFAULT_OFF_SWITCHES else 'on'})",  # pragma: no mutate: help text
+        )
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     run.add_argument(
         "--catastro", action=argparse.BooleanOptionalAction,

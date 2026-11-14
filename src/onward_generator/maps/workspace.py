@@ -80,6 +80,19 @@ MAP_SWITCHES: Mapping[str, str] = {
 }
 
 
+DEFAULT_OFF_SWITCHES = frozenset({"panoramax_atlas"})
+"""Switches ``map create`` leaves off unless asked: the street-photo atlas acts only with Panoramax, still under
+development. Every other switch of ``MAP_SWITCHES`` is on for a new map made from the command line (13 November 2026),
+so a user gives a name, a centre and a radius and gets every improvement; ``--no-<switch>`` turns one off."""
+
+
+def chosen_switches(explicit: Mapping[str, bool | None]) -> list[str]:
+    """The switches a new map gets, in ``MAP_SWITCHES`` order: each one the user named on or off (``explicit``), the
+    others on unless they are in ``DEFAULT_OFF_SWITCHES``."""
+    return [switch for switch in MAP_SWITCHES
+            if (explicit.get(switch) if explicit.get(switch) is not None else switch not in DEFAULT_OFF_SWITCHES)]
+
+
 def create_map(
     directory: str | Path,
     *,

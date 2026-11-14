@@ -944,14 +944,56 @@ def test_map_create_cli_takes_every_switch(tmp_path: Path, monkeypatch: pytest.M
     stored = json.loads((tmp_path / "maps" / "lorca" / "map.json").read_text(encoding="utf-8"))
     assert {name: stored[name] for name in MAP_SWITCHES} == dict.fromkeys(MAP_SWITCHES, True)
     assert "switches " + ", ".join(MAP_SWITCHES) + "\n" in capsys.readouterr().out
-    assert main(["map", "create", "--name", "Yecla", "--lat", "38.61", "--lon", "-1.11", "--balanced-spawns"]) == 0
-    yecla = json.loads((tmp_path / "maps" / "yecla" / "map.json").read_text(encoding="utf-8"))
-    assert [name for name in MAP_SWITCHES if name in yecla] == ["balanced_spawns"]
-    assert "switches balanced_spawns\n" in capsys.readouterr().out
+    default_on = [name for name in MAP_SWITCHES if name != "panoramax_atlas"]
     assert main(["map", "create", "--name", "Mula", "--lat", "38.04", "--lon", "-1.49"]) == 0
-    assert "switches" not in capsys.readouterr().out
+    mula = json.loads((tmp_path / "maps" / "mula" / "map.json").read_text(encoding="utf-8"))
+    assert [name for name in MAP_SWITCHES if mula.get(name)] == default_on and "panoramax_atlas" not in mula  # every switch on but one
+    assert "switches " + ", ".join(default_on) + "\n" in capsys.readouterr().out
+    assert main(["map", "create", "--name", "Yecla", "--lat", "38.61", "--lon", "-1.11", "--no-balanced-spawns", "--no-normal-maps",
+                 "--panoramax-atlas"]) == 0
+    yecla = json.loads((tmp_path / "maps" / "yecla" / "map.json").read_text(encoding="utf-8"))
+    assert [name for name in MAP_SWITCHES if yecla.get(name)] == [
+        name for name in MAP_SWITCHES if name not in ("balanced_spawns", "normal_maps")]
+    assert "balanced_spawns" not in yecla and "normal_maps" not in yecla  # a switch turned off is not written
+    off = [f"--no-{name.replace('_', '-')}" for name in MAP_SWITCHES]
+    assert main(["map", "create", "--name", "Cieza", "--lat", "38.24", "--lon", "-1.42", *off]) == 0
+    capsys.readouterr()
+    cieza = json.loads((tmp_path / "maps" / "cieza" / "map.json").read_text(encoding="utf-8"))
+    assert not set(MAP_SWITCHES) & set(cieza)
     with pytest.raises(SystemExit):
         main(["map", "create", "--help"])
     shown = " ".join(capsys.readouterr().out.split())
-    assert "--sightline-cover store map.json sightline_cover: cover props on long open sightlines (plan C7)" in shown
-    assert "--repetition store map.json repetition: calm roof and paving pools" in shown
+    assert "--sightline-cover, --no-sightline-cover map.json sightline_cover: cover props on long open sightlines (plan C7) (default on)" in shown
+    assert "map.json panoramax_atlas:" in shown and "(default off)" in shown
+
+
+def test_chosen_switches_are_on_by_default_but_the_photo_atlas() -> None:
+    from onward_generator.maps.workspace import DEFAULT_OFF_SWITCHES, chosen_switches
+
+    assert DEFAULT_OFF_SWITCHES == frozenset({"panoramax_atlas"})
+    assert chosen_switches({}) == [name for name in MAP_SWITCHES if name != "panoramax_atlas"]
+    assert chosen_switches({"repetition": False, "panoramax_atlas": True, "wide_library": None}) == [
+        name for name in MAP_SWITCHES if name != "repetition"]
+
+
+def test_run_passes_the_switches_the_user_named_to_map_create() -> None:
+    from onward_generator.pipeline_run import map_create_argv
+
+    argv = map_create_argv(name="Lorca", latitude=37.677, longitude=-1.7, radius_m=150, margin_m=30,
+                           switches={"wide_library": False, "panoramax_atlas": True})
+    assert argv[-2:] == ["--panoramax-atlas", "--no-wide-library"]
+    assert not any(a.startswith(("--no-", "--panoramax-atlas")) for a in map_create_argv(
+        name="Lorca", latitude=37.677, longitude=-1.7, radius_m=150, margin_m=30))
+
+
+def test_the_run_command_hands_run_map_only_the_switches_named(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.pipeline_run as pipeline
+
+    seen: dict = {}
+    monkeypatch.setattr(pipeline, "run_map", lambda **kwargs: seen.update(kwargs) or 0)
+    assert main(["run", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", "--no-wide-library", "--panoramax-atlas",
+                 "--no-street-profile", "--no-unity"]) == 0
+    assert seen["switches"] == {"panoramax_atlas": True, "street_profile": False, "wide_library": False}
+    assert seen["street_profile"] is False
+    assert main(["run", "--name", "Lorca", "--lat", "37.677", "--lon", "-1.700", "--street-profile", "--no-unity"]) == 0
+    assert seen["switches"] == {"street_profile": True} and seen["street_profile"] is True
