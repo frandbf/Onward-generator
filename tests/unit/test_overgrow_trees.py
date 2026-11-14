@@ -272,3 +272,11 @@ def test_every_tree_is_counted_and_none_stops_the_others() -> None:
 def test_a_blend_material_after_a_mask_still_refuses_the_tree() -> None:
     doc = {"materials": [{"name": "leaves", "alphaMode": "MASK"}, {"name": "glass", "alphaMode": "BLEND"}]}
     assert reject_reason(replace(ASSETS_BY_ID["shrub_03"], role="tree"), doc, _tree_mesh()) == "alpha_mode_blend"
+
+
+def test_a_branch_starting_exactly_at_the_trunk_foot_is_not_the_trunk() -> None:
+    from onward_generator.overgrow.fit import TRUNK_FOOT_M
+
+    mesh = trunk_frame(merge([box(-0.15, 0.15, -0.15, 0.15, 0.0, 3.0), box(1.0, 1.2, -0.05, 0.05, TRUNK_FOOT_M, 1.0)]))
+    foot = mesh.vertices[mesh.vertices[:, 2] < 0.1]
+    assert (foot[:, :2].min(axis=0) + foot[:, :2].max(axis=0)) / 2 == pytest.approx([0.0, 0.0], abs=1e-9)
