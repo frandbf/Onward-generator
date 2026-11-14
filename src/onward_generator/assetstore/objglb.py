@@ -157,7 +157,7 @@ def _corner(token: str, nv: int, nt: int, nn: int) -> tuple[int, int | None, int
 MAX_TEXTURE_PX = 512
 
 
-def _png(data: bytes, alpha: bool = False) -> bytes:
+def _png(data: bytes, *, alpha: bool) -> bytes:
     """The albedo as an RGB PNG (RGBA with ``alpha``), at most ``MAX_TEXTURE_PX`` on its long side."""
     picture = Image.open(io.BytesIO(data)).convert("RGBA" if alpha else "RGB")
     if max(picture.size) > MAX_TEXTURE_PX:  # pragma: no mutate: thumbnail leaves an image already at the limit unchanged
@@ -175,7 +175,8 @@ def _flat_png(kd: tuple[float, float, float]) -> bytes:
 
 def two_sided(group: ObjGroup) -> ObjGroup:
     """The triangles of ``group`` and the same triangles facing the other way (corners 0, 2, 1, normals turned)."""
-    order = np.arange(len(group.positions)).reshape(-1, 3)[:, [0, 2, 1]].reshape(-1)
+    order = np.arange(len(group.positions))
+    order[1::3], order[2::3] = order[2::3].copy(), order[1::3].copy()
     return ObjGroup(np.concatenate([group.positions, group.positions[order]]),
                     np.concatenate([group.normals, -group.normals[order]]),
                     np.concatenate([group.uvs, group.uvs[order]]))

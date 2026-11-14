@@ -217,3 +217,58 @@ def test_the_adapter_options_name_each_cut_out_material_once() -> None:
     for bad in (0.0, 1.0, -0.1, 1.2):
         with pytest.raises(CutoutError, match=f"^cut-out material a: the threshold must lie between 0 and 1, got {bad}$"):
             cutout_options({"a": bad}, {"a"})
+
+
+def test_the_nearest_tree_in_plan_goes_first_whatever_its_height_and_a_node_without_a_matrix_stands_at_the_origin() -> None:
+    from onward_generator.detail.facades import stable_unit  # noqa: F401 - the pick below is the module's
+
+    prop = _tree("holly_a", copies=3)
+    raised = _tree_node("urban/tree/raised", 2.0, 0.0)
+    raised = Node(raised.name, raised.primitives, raised.extras, raised.matrix + np.array([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 50.0], [0, 0, 0, 0]]),
+                  raised.mesh_key)
+    far = _tree_node("urban/tree/far", 10.0, 0.0)
+    one = prop.triangles - 24
+    result = swap_trees([far, raised], [prop], 1, int(one / TREE_HEADROOM_SHARE))
+    assert "asset_id" in result.nodes[1].extras and "asset_id" not in result.nodes[0].extras
+    bare = Node("urban/tree/bare", _tree_node("x", 0.0, 0.0).primitives, {"type": "urban_element"}, None, "urban:tree")
+    near = _tree_node("urban/tree/near", 0.5, 0.0)
+    result = swap_trees([near, bare], [prop], 1, int(one / TREE_HEADROOM_SHARE))
+    assert "asset_id" in result.nodes[1].extras and "asset_id" not in result.nodes[0].extras  # (0, 0) is nearer than 0.5 m
+    scale = result.nodes[1].extras["tree_scale"]
+    assert np.allclose(result.nodes[1].matrix, np.diag([scale, scale, scale, 1.0]), atol=1e-4)
+
+
+def test_each_tree_takes_the_model_its_seed_and_name_pick() -> None:
+    from onward_generator.detail.facades import stable_unit
+
+    props = [_tree("holly_a"), _tree("holly_b", crown=1.8), _tree("holly_c", crown=1.7)]
+    nodes = [_tree_node(f"urban/tree/{i}", float(i), 0.0) for i in range(9)]
+    result = swap_trees(nodes, props, 31, 10_000_000)
+    for node in result.nodes:
+        assert node.extras["asset_id"] == ["holly_a", "holly_b", "holly_c"][min(2, int(stable_unit(31, node.name, "tree") * 3))]
+
+
+def test_a_candidate_without_a_crown_keeps_the_procedural_tree() -> None:
+    pole = _tree("pole", crown=0.0)
+    pole = replace(pole, mesh=Mesh(np.c_[np.zeros(len(pole.mesh.vertices)), np.zeros(len(pole.mesh.vertices)), pole.mesh.vertices[:, 2]],
+                                   pole.mesh.triangles))
+    result = swap_trees([_tree_node("urban/tree/a", 0.0, 0.0)], [pole], 1, 1_000_000)
+    assert result.report["count"] == 0 and result.report["out_of_scale"] == 1  # type: ignore[index]
+
+
+def test_every_tree_is_counted_and_none_stops_the_others() -> None:
+    prop = _tree("holly_a", copies=3)
+    one = prop.triangles - 24
+    small = [_tree_node(f"urban/tree/s{i}", float(i), 0.0, crown=0.5) for i in range(2)]
+    fine = [_tree_node(f"urban/tree/f{i}", 20.0 + i, 0.0) for i in range(3)]
+    result = swap_trees([*small, *fine], [prop], 1, int(2 * one / TREE_HEADROOM_SHARE))
+    assert result.report["out_of_scale"] == 2 and result.report["count"] == 2 and result.report["over_budget"] == 1  # type: ignore[index]
+    assert result.added_triangles == 2 * one
+    more = [_tree_node(f"urban/tree/m{i}", 30.0 + i, 0.0) for i in range(3)]
+    result = swap_trees([*fine, *more], [prop], 1, int(2 * one / TREE_HEADROOM_SHARE))
+    assert result.report["over_budget"] == 4 and result.report["count"] == 2  # type: ignore[index]
+
+
+def test_a_blend_material_after_a_mask_still_refuses_the_tree() -> None:
+    doc = {"materials": [{"name": "leaves", "alphaMode": "MASK"}, {"name": "glass", "alphaMode": "BLEND"}]}
+    assert reject_reason(replace(ASSETS_BY_ID["shrub_03"], role="tree"), doc, _tree_mesh()) == "alpha_mode_blend"

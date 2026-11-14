@@ -64,7 +64,8 @@ def tree_candidates(props: Sequence[Prop]) -> list[Prop]:
 
 def trunk_frame(mesh: Mesh) -> Mesh:
     """``mesh`` with its trunk on the origin and its foot at z = 0."""
-    vertices = mesh.vertices - np.array([0.0, 0.0, mesh.vertices[:, 2].min()])
+    vertices = np.array(mesh.vertices, dtype=float)
+    vertices[:, 2] -= vertices[:, 2].min()
     foot = vertices[vertices[:, 2] < TRUNK_FOOT_M]
     vertices[:, :2] -= (foot[:, :2].min(axis=0) + foot[:, :2].max(axis=0)) / 2
     return Mesh(vertices, mesh.triangles)

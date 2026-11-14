@@ -90,6 +90,7 @@ def test_trees_and_bushes_are_vegetation() -> None:
         "vegetation", "tree", "open_ground", "single")
     assert tree.row["surfaces"] == ["park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"]
     assert tree.row["use"] == "Tree (horned holly tree) from Horned Holly Tree, about 7.0 m tall."
+    assert (tree.row["anchor"], tree.row["lane"]) == ("ground", "forbid")
     exact = classify("OakTree", (3.0, 3.0, 2.0), "Trees", "3D ModelsVegetation")
     assert exact.reason == "tree"
     for name, size in (("Simple_Bushes", (1.5, 1.5, 1.0)), ("OakTree", (1.0, 1.0, 1.99)), ("Hedge", (3.0, 0.8, 1.2))):
@@ -97,6 +98,7 @@ def test_trees_and_bushes_are_vegetation() -> None:
         assert bush.reason == "bush", name
         assert bush.row is not None and (bush.row["role"], bush.row["grouping"]) == ("bush", "cluster")
         assert bush.row["surfaces"] == ["courtyard", "yard", "plaza", "park"]
+        assert (bush.row["category"], bush.row["placement"], bush.row["anchor"]) == ("vegetation", "open_ground", "ground")
     # The package's name lends "tree"; the model's own "bushes" decides.
     assert classify("Simple_Bushes_1", (5.7, 5.0, 2.4), "Horned Holly Tree", "3D ModelsEnvironments").reason == "bush"
     assert classify("Simple_Bushes", (1.5, 1.2, 1.0), "Horned Holly Tree", "x").row["use"] == "Bush (simple bushes) from Horned Holly Tree, about 1.5 m."  # type: ignore[index]

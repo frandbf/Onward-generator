@@ -4,6 +4,7 @@ export package's adapter options."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -12,6 +13,7 @@ from PIL import Image
 from onward_generator.assetstore.objglb import obj_to_glb
 from onward_generator.export.cutouts import scene_cutouts
 from onward_generator.generation.gltf import nodes_from_glb, read_glb
+from onward_generator.overgrow import place
 from onward_generator.overgrow.place import overgrow
 from tests.integration.test_overgrow_furnish import _detail_out
 
@@ -30,9 +32,9 @@ def _tree_obj(height: float = 5.0, crown: float = 2.0) -> str:
     return "\n".join(lines) + "\n"
 
 
-@pytest.fixture(scope="module")
-def runs(detail_inputs, tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
-    tmp = tmp_path_factory.mktemp("cutout_trees")
+@pytest.fixture
+def runs(detail_inputs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    tmp = tmp_path
     base = _detail_out(detail_inputs, tmp, False)
     catalogue = tmp / "library" / "test_trees"
     catalogue.mkdir(parents=True)
@@ -45,9 +47,17 @@ def runs(detail_inputs, tmp_path_factory: pytest.TempPathFactory) -> dict[str, o
     row = {"id": "test_holly", "file": "holly.glb", "category": "vegetation", "role": "tree", "anchor": "ground", "lane": "forbid",
            "surfaces": ["park", "plaza", "sidewalk"], "clearance_m": 0.0, "use": "A test tree with cut-out leaves."}
     (catalogue / "manifest.json").write_text(json.dumps({"schema_version": "0.1.0", "assets": [row]}), encoding="utf-8")
+    calls: list[tuple[int, int]] = []
+    real = place.swap_trees
+
+    def spy(nodes, props, seed, headroom):  # type: ignore[no-untyped-def]
+        calls.append((seed, headroom))
+        return real(nodes, props, seed, headroom)
+
+    monkeypatch.setattr(place, "swap_trees", spy)
     out = tmp / "out"
-    report = overgrow(base, detail_inputs[0], out, library=tmp / "library")
-    return {"base": base, "out": out, "report": report}
+    report = overgrow(base, detail_inputs[0], out, library=tmp / "library", seed=777)
+    return {"base": base, "out": out, "report": report, "calls": calls}
 
 
 def test_the_street_trees_take_the_cut_out_tree_and_the_scene_lists_its_leaves(runs) -> None:
@@ -68,6 +78,9 @@ def test_the_street_trees_take_the_cut_out_tree_and_the_scene_lists_its_leaves(r
     assert list(listed.values()) == [0.4] and next(iter(listed)).startswith("prop_test_holly")
     doc, _ = read_glb(visual)
     assert set(listed) <= {m["name"] for m in doc["materials"]}
+    # The trees get the seed and the headroom left after the lamps, and spend it before the props.
+    assert runs["calls"] == [(777, runs["report"]["triangle_headroom"] + report["added_triangles"])]
+    assert report["budget_triangles"] == int(runs["calls"][0][1] * 0.5)
     # The trunk colliders of detail stay where they were.
     collision = {n.name for n in nodes_from_glb((runs["out"] / "scene_collision.glb").read_bytes())[0]}
     assert all(f"{name}#collider" in collision for name in trees)

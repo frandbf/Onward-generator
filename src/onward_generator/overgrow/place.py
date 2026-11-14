@@ -185,7 +185,7 @@ def overgrow(
     # detail's street trees drawn as library cut-out trees (ADR-040), within a share of what is left.
     trees_swap = swap_trees(nodes, library_props, seed, headroom)
     nodes = trees_swap.nodes
-    headroom = max(0, headroom - trees_swap.added_triangles)
+    headroom -= trees_swap.added_triangles  # swap_trees spends at most its share of the headroom
     budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
