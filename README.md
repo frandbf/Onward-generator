@@ -148,16 +148,13 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 
 **On by default, can be turned off:** shop furnishing (`interiors.shops.furnish.enabled`), flat furnishing (`interiors.furnish.enabled`), semantic furniture sets (`ONWARD_SEMANTIC_SETS=0` off) and your local Asset Store catalogues (`ONWARD_LOCAL_CATALOGUES=0` hides them).
 
-Every switch at once, for a day map:
+A new map has every `map.json` switch on except `panoramax_atlas`. That covers calm pools, Overture tints, LiDAR roofs, regional facades, the street profile, gameplay report and balanced spawns, sightline cover, the wide texture library, real normal maps and per-building texture variants. A name, a centre and a radius are enough:
 
 ```bash
-onward-generator map create --name "My map" --lat 48.84045 --lon 2.34981 \
-  --atmosphere golden_hour --repetition --overture-tints --lidar-roofs --regional-facades \
-  --street-profile --ai --panoramax --panoramax-atlas \
-  --gameplay-report --balanced-spawns --sightline-cover
+onward-generator run --name "My map" --lat 48.84045 --lon 2.34981 --radius-m 150
 ```
 
-`onward-generator map create` also takes one flag per `map.json` switch, such as `--regional-facades`, `--balanced-spawns`, `--sightline-cover` or `--repetition`, so a new map needs no hand edit ([docs/02-configuration.md](docs/02-configuration.md)). With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
+Turn a switch off with its `--no-` flag, on `map create` or on `run` for a new map, for example `--no-normal-maps` or `--no-texture-variants` ([docs/02-configuration.md](docs/02-configuration.md)). A map created before keeps the switches its `map.json` lists. With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
 
 **If something goes wrong:**
 

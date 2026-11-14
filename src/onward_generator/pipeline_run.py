@@ -112,6 +112,7 @@ def map_create_argv(
     core_radius_m: float | None = None,
     core_target_triangles: int | None = None,
     overwrite: bool = False,
+    switches: Mapping[str, bool] | None = None,
 ) -> list[str]:
     argv = [
         "map", "create",
@@ -142,6 +143,8 @@ def map_create_argv(
         argv.extend(["--atmosphere", atmosphere])
     if overwrite:
         argv.append("--overwrite")
+    for switch, on in sorted((switches or {}).items()):  # what the user named; map create turns the rest on by default
+        argv.append(("--" if on else "--no-") + switch.replace("_", "-"))
     return argv
 
 
@@ -869,6 +872,7 @@ def run_map(
     ambient_ai: bool = False,
     panoramax: bool = False,
     street_profile: bool = False,
+    switches: Mapping[str, bool] | None = None,
     profile_provider: Provider | None = None,
     time_of_day: str | None = None,
     storm: bool | None = None,
@@ -972,6 +976,7 @@ def run_map(
                     core_radius_m=core_radius_m,
                     core_target_triangles=core_target_triangles,
                     overwrite=overwrite,
+                    switches=switches,
                 ),
             )],
             execute=runner,

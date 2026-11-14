@@ -1606,6 +1606,21 @@ def test_run_stores_the_playable_core_through_map_create(tmp_path: Path, monkeyp
     assert "--core-radius-m" not in seen[0]
 
 
+def test_run_hands_the_named_switches_to_map_create(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    seen: list[list[str]] = []
+
+    def execute(argv: list[str]) -> int:
+        seen.append(list(argv))
+        return 4
+
+    run_map(map_id="murcia", name="Murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
+            radius_m=300, margin_m=30, out="maps/murcia", execute=execute, interactive=False, palette=Palette(),
+            switches={"normal_maps": False, "panoramax_atlas": True})
+    assert seen[0][:2] == ["map", "create"]
+    assert seen[0][-2:] == ["--no-normal-maps", "--panoramax-atlas"]
+
+
 def test_run_passes_the_core_target_only_when_given(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     seen: list[list[str]] = []
