@@ -68,6 +68,7 @@ def test_the_floor_budget_goes_to_the_interior_nearest_the_map_centre(tmp_path: 
     inputs = _detail_inputs(tmp_path, {802: near, 801: far}, {})
     doc = copy.deepcopy(DOC)
     doc["interiors"]["furnish"]["enabled"] = True
+    doc["interiors"]["furnish"]["max_triangles"] = 100_000  # the schema's maximum: the default (15 000 since 13 November 2026) no longer holds both
     unlimited = _detail(inputs, config_from_document(doc))
     cost = {
         o.record["source_ids"][0]: sum(r["furnishing"]["visual_triangles"] for r in o.record["rooms"])
