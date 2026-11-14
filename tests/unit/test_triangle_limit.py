@@ -62,3 +62,19 @@ def test_the_headroom_follows_the_limit() -> None:
     assert triangle_headroom(100_000, 20_000) == 300_000 - 12_300 - 12_000 - 100_000 - 20_000
     assert triangle_headroom(100_000, 20_000, 250_000) == 250_000 - 12_300 - 12_000 - 100_000 - 20_000
     assert triangle_headroom(240_000, 0, 250_000) == 0
+
+
+@pytest.mark.parametrize(("argv", "expected"), [(["--triangle-limit", "250000"], 250_000), ([], UNITY_TRIANGLE_LIMIT)])
+def test_export_package_hands_the_limit_to_the_package(monkeypatch: pytest.MonkeyPatch, argv: list[str], expected: int) -> None:
+    import onward_generator.export.__main__ as cli
+    from onward_generator.export.package import ExportError
+
+    seen: dict[str, object] = {}
+
+    def fake(*args: object, **kwargs: object) -> None:
+        seen.update(kwargs)
+        raise ExportError(["stop here"])
+
+    monkeypatch.setattr(cli, "build_package", fake)
+    assert cli.main(["package", "--project", "p.json", "--detail", "d", "--layout", "l.json", "--out", "o", *argv]) == 1
+    assert seen["triangle_limit"] == expected
