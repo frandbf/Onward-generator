@@ -25,7 +25,7 @@ from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import yaw_matrix
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
-from onward_generator.export.library_normals import carried_normal_maps
+from onward_generator.export.cutouts import carried_material_extras
 from onward_generator.export.triangle_budget import ADAPTER_BASE_TRIANGLES, UNITY_TRIANGLE_LIMIT, visual_triangles
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
@@ -65,6 +65,7 @@ from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import load_replay
+from onward_generator.overgrow.trees import swap_trees
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file, zone_from_polygon
 from onward_generator.tiers import core_of
@@ -181,6 +182,10 @@ def overgrow(
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
     headroom = max(0, headroom - lamps.added_triangles)
+    # detail's street trees drawn as library cut-out trees (ADR-040), within a share of what is left.
+    trees_swap = swap_trees(nodes, library_props, seed, headroom)
+    nodes = trees_swap.nodes
+    headroom = max(0, headroom - trees_swap.added_triangles)
     budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -321,6 +326,8 @@ def overgrow(
     )
     tuft_meshes.extend(planted.grass)
     by_id = {prop.spec.id: prop for prop in props}
+    # A library tree or bush the rules placed may draw cut-out leaves too (ADR-040).
+    planted_cutouts = {name: cutoff for item in dict.fromkeys(planted.placed_ids) for name, cutoff in by_id[item].cutouts().items()}
     records.extend(planted.records)
     rejects.extend(planted.rejects)
     for key, count in planted.reject_counts.items():
@@ -346,7 +353,8 @@ def overgrow(
     images.setdefault("tree_canopy", canopy_png())
     images.update(planted.images)
     images.update(lamps.images)
-    for name in lamps.images:
+    images.update(trees_swap.images)
+    for name in (*lamps.images, *trees_swap.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
@@ -361,7 +369,9 @@ def overgrow(
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
 
     # One shared atlas for the props and furniture: one draw per cell (or building storey) instead of one per model.
-    extra_nodes, images, cells = apply_atlas(extra_nodes, images)
+    # The swapped lamps and trees are base nodes outside the atlas: a prop the rules placed shares their materials.
+    extra_nodes, images, cells = apply_atlas(extra_nodes, images,
+                                             keep_out=frozenset({*planted_cutouts, *lamps.images, *trees_swap.images}))
     materials = {name: m for name, m in materials.items() if name not in cells}
     for name in {cell.atlas for cell in cells.values()}:
         materials[name] = Material((1, 1, 1, 1), 0.9)
@@ -374,7 +384,7 @@ def overgrow(
         [*nodes, *extra_nodes], materials,
         extras={"manifest": "scene_detail.json", "overgrow": len(records),
                 **({PROP_ATLAS_EXTRA: {name: cell.to_list() for name, cell in sorted(cells.items())}} if cells else {}),
-                **carried_normal_maps((base / "scene_visual.glb").read_bytes())},
+                **carried_material_extras((base / "scene_visual.glb").read_bytes(), {**trees_swap.cutouts, **planted_cutouts})},
         repeat_images=images, preserve_uvs=True,
         unit_uv_materials={"glass_dark", "glass_boarded", "glass_view", "door_wood"},
     )
@@ -466,6 +476,7 @@ def overgrow(
         "max_added_triangles": MAX_ADDED_TRIS,
         "triangle_headroom": headroom,
         "street_lamps": lamps.report,
+        "street_trees": trees_swap.report,
         "library_preferred": len(preferred),
         "rejects": rejects[:80],
         "reject_counts": reject_counts,

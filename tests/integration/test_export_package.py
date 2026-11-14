@@ -989,3 +989,59 @@ def test_cli_package_prints_the_library_normal_maps(normal_inputs: tuple[Path, P
     out = capsys.readouterr().out
     assert (f"  normal maps (plan T3, ADR-039): 2 materials on PP_Opaque_Lit, 1 maps, about {astc6x6_bytes(1024, 1024):,} bytes in ASTC 6x6 "
             f"of {NORMAL_MAPS_MAX_BYTES:,}\n") in out
+
+
+@pytest.fixture(scope="module")
+def cutout_inputs(inputs: tuple[Path, Path], tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """The fixture scene whose visual GLB lists one of its materials as cut-out leaves (ADR-040)."""
+    detail = tmp_path_factory.mktemp("cutouts") / "detail"
+    shutil.copytree(inputs[0], detail)
+    doc, blob = read_glb((detail / "scene_visual.glb").read_bytes())
+    doc.setdefault("extras", {}).setdefault("materials", {})["cutouts"] = {doc["materials"][1]["name"]: 0.5}
+    (detail / "scene_visual.glb").write_bytes(pack_glb(doc, blob))
+    return detail, inputs[1]
+
+
+def test_cut_out_leaves_reach_the_adapter_options_and_the_manifest(cutout_inputs: tuple[Path, Path], inputs: tuple[Path, Path],
+                                                                   tmp_path: Path) -> None:
+    on = package(cutout_inputs, tmp_path / "on")
+    assert verify_package(on.directory) == []
+    name = read_glb((cutout_inputs[0] / "scene_visual.glb").read_bytes())[0]["materials"][1]["name"]
+    assert load(on.directory / "adapter_options.json")["cutout_materials"] == [{"material": name, "cutoff": 0.5}]
+    assert on.manifest["cutout_materials"] == [{"material": name, "cutoff": 0.5}]
+    plain = package(inputs, tmp_path / "plain")
+    assert "cutout_materials" not in plain.manifest and "cutout_materials" not in load(plain.directory / "adapter_options.json")
+    assert on.manifest["package_id"] != plain.manifest["package_id"] == GOLDEN_PACKAGE_ID
+
+
+@pytest.mark.parametrize(("listed", "message"), [
+    ({"no_such_material": 0.5}, "^cut-outs: cut-out material no_such_material is not a material of the visual GLB$"),
+    (None, r"^cut-outs: cut-out material \S+: the threshold must lie between 0 and 1, got 1.0$"),
+])
+def test_a_bad_cut_out_list_is_refused_and_nothing_is_left(inputs: tuple[Path, Path], tmp_path: Path, listed: dict | None,
+                                                           message: str) -> None:
+    detail = tmp_path / "detail"
+    shutil.copytree(inputs[0], detail)
+    doc, blob = read_glb((detail / "scene_visual.glb").read_bytes())
+    doc.setdefault("extras", {}).setdefault("materials", {})["cutouts"] = listed or {doc["materials"][0]["name"]: 1.0}
+    (detail / "scene_visual.glb").write_bytes(pack_glb(doc, blob))
+    with pytest.raises(ExportError) as caught:
+        package((detail, inputs[1]), tmp_path / "bad")
+    assert re.match(message, caught.value.problems[0])
+    assert not (tmp_path / "bad").exists()
+
+
+def test_unity_adapter_clips_the_cut_out_materials_it_is_given() -> None:
+    """ADR-040: each material of adapter_options cutout_materials turns on the SDK graph's alpha clipping at its threshold."""
+    source = ADAPTER_CS.read_text(encoding="utf-8")
+    assert "public CutoutRef[] cutout_materials = new CutoutRef[0];" in source
+    assert "[Serializable] private class CutoutRef { public string material; public float cutoff; }" in source
+    assert 'private const string AlphaClipKeyword = "ALPHACLIPPING_ON";' in source
+    assert 'private const string AlphaClipProperty = "_AlphaClipping";' in source
+    scene = source[source.index("Material[] materials = visual.Doc.materials.Select"):source.index("var visualMeshes = new Mesh[")]
+    assert "ApplyCutouts(visual.Doc.materials, materials, opt.cutout_materials);" in scene
+    apply = source[source.index("static void ApplyCutouts"):source.index("// Plan D5 spike (ADR-033, proposed): the one promoted")]
+    assert "which is not a material of the visual GLB" in apply and "!(entry.cutoff > 0f && entry.cutoff < 1f)" in apply
+    assert "if (!material.HasProperty(AlphaClipProperty))" in apply
+    assert "material.EnableKeyword(AlphaClipKeyword);" in apply and "material.SetFloat(AlphaClipProperty, entry.cutoff);" in apply
+    assert "material.renderQueue = (int)RenderQueue.AlphaTest;" in apply and "EditorUtility.SetDirty(material);" in apply

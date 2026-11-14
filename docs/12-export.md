@@ -197,6 +197,11 @@ Off by default; [ADR-033](decisions/ADR-033-lit-normal-spike.md), proposed until
 
 The C# was written without Unity; the first `task unity` build on the macOS host is its compile check.
 
+
+## Cut-out leaves (ADR-040)
+
+Decision: [ADR-040](decisions/ADR-040-cutout-trees.md) (proposed). When the visual GLB lists `extras.materials.cutouts` (written by `overgrow place` for library trees with alpha-mask leaves), `export package` writes `adapter_options.json` `cutout_materials: [{material, cutoff}]`, sorted by material, and the same list as the manifest's `cutout_materials`. A name that is not a material of the visual GLB, or a threshold outside (0, 1), stops the package. The adapter draws each listed material with `PP_Opaque_Simple_Lit` as every other, turns on its `ALPHACLIPPING_ON` keyword, sets `_AlphaClipping` to the threshold and puts it in the alpha-test queue. The albedo PNG keeps its alpha and is imported with `alphaSource FromInput`. Without the list nothing changes and the `package_id` is the same.
+
 ## Library normal maps (plan T3)
 
 Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (proposed). Opt-in per map with `map.json` `"normal_maps": true` (`map create --normal-maps`).

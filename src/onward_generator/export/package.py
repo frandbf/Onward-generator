@@ -37,6 +37,7 @@ from onward_generator.export.atmosphere import (
     lighting,
     load_presets,
 )
+from onward_generator.export.cutouts import CutoutError, cutout_options, scene_cutouts
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.library_normals import NORMAL_MAP_ROLE, LibraryNormalError, normal_map_files, scene_normal_maps
 from onward_generator.export.lightmap import (
@@ -415,6 +416,20 @@ def _library_normals(options: dict[str, Any], visual: bytes) -> tuple[dict[str, 
     return pngs, block
 
 
+def _cutouts(options: dict[str, Any], visual: bytes) -> list[dict[str, Any]]:
+    """ADR-040: ``options["cutout_materials"]`` from the visual GLB's cut-out list; nothing, and no option, without one."""
+    listed = scene_cutouts(visual)
+    if not listed:
+        return []
+    doc, _ = read_glb(visual)
+    try:
+        rows = cutout_options(listed, {str(m.get("name")) for m in doc.get("materials") or []})
+    except CutoutError as exc:
+        raise ExportError([f"cut-outs: {exc}"]) from exc
+    options["cutout_materials"] = rows
+    return rows
+
+
 def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]) -> str:
     credits = "; ".join(f"{a['text']} ({a['license']})" for a in attribution)
     return fit_listing_description(f"{config['map']['description']} Data: {credits}.")
@@ -496,6 +511,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
     lit_normal = _lit_normal(options, visual_bytes, warnings) if "lit_normal_material" in options else None
     # Plan T3 (ADR-039): only a scene that lists library normal maps adds files and an option, so others keep their package_id.
     library_normals = _library_normals(options, visual_bytes)
+    # ADR-040: only a scene that lists cut-out leaves adds the option, so others keep their package_id.
+    cutouts = _cutouts(options, visual_bytes)
     if experimental is not None:
         warnings.append("build.experimental_environment: a test package for the headset (plan E2, ADR-037); do not publish it")
     lights, cap = interior_lights(visual_bytes), int(options.get("interior_lights_max", ADAPTER_INTERIOR_LIGHTS_MAX))
@@ -597,6 +614,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             manifest["lit_normal"] = lit_normal[1]
         if library_normals is not None:
             manifest["normal_maps"] = library_normals[1]
+        if cutouts:
+            manifest["cutout_materials"] = cutouts
         if experimental is not None:
             # Plan E2: what the client shows for each profile is unknown until a headset session (ADR-037).
             manifest["experimental_environment"] = {**experimental, "status": "untested"}

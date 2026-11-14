@@ -58,12 +58,13 @@ def is_prop(material: str) -> bool:
     return material.startswith("prop_") and not material.startswith(ATLAS_PREFIX)
 
 
-def atlas_candidates(nodes: Sequence[Node], images: Mapping[str, bytes]) -> list[str]:
-    """Prop materials with an image whose every primitive keeps its UVs in the unit square, sorted."""
+def atlas_candidates(nodes: Sequence[Node], images: Mapping[str, bytes], keep_out: frozenset[str] = frozenset()) -> list[str]:
+    """Prop materials with an image whose every primitive keeps its UVs in the unit square, sorted. ``keep_out`` (the
+    cut-out leaves, whose alpha an RGB atlas would drop; ADR-040) keep their own image."""
     inside: dict[str, bool] = {}
     for node in nodes:
         for prim in node.primitives:
-            if not is_prop(prim.material) or prim.material not in images:
+            if not is_prop(prim.material) or prim.material not in images or prim.material in keep_out:
                 continue
             ok = prim.uvs is not None and len(prim.uvs) > 0 and bool(
                 (prim.uvs >= -UV_SLACK).all() and (prim.uvs <= 1 + UV_SLACK).all())
@@ -131,9 +132,10 @@ def remap_nodes(nodes: Sequence[Node], cells: Mapping[str, Cell]) -> list[Node]:
     return out
 
 
-def apply_atlas(nodes: Sequence[Node], images: Mapping[str, bytes]) -> tuple[list[Node], dict[str, bytes], dict[str, Cell]]:
-    """Atlas the prop materials of ``nodes``: the new nodes, the images to write (atlases in, atlased out) and the cells."""
-    names = atlas_candidates(nodes, images)
+def apply_atlas(nodes: Sequence[Node], images: Mapping[str, bytes], keep_out: frozenset[str] = frozenset()) -> tuple[list[Node], dict[str, bytes], dict[str, Cell]]:
+    """Atlas the prop materials of ``nodes`` but ``keep_out``: the new nodes, the images to write (atlases in, atlased
+    out) and the cells."""
+    names = atlas_candidates(nodes, images, keep_out)
     if not names:
         return list(nodes), dict(images), {}
     pngs, cells = pack(images, names)

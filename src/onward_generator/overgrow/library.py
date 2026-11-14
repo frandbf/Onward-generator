@@ -79,6 +79,8 @@ class PropPart:
 
     end: int
     albedo: bytes
+    # The alpha-mask threshold of an opaque cut-out (leaves, ADR-040), None for an opaque part.
+    cutoff: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +116,10 @@ class Prop:
     def images(self) -> dict[str, bytes]:
         """Albedo of every part, by material name."""
         return {self.material(index): part.albedo for index, part in enumerate(self._parts())}
+
+    def cutouts(self) -> dict[str, float]:
+        """The alpha-mask threshold of every cut-out part, by material name (ADR-040); empty for an opaque prop."""
+        return {self.material(index): part.cutoff for index, part in enumerate(self._parts()) if part.cutoff is not None}
 
     def _parts(self) -> tuple[PropPart, ...]:
         return self.parts or (PropPart(self.mesh.triangle_count, self.albedo),)
@@ -180,10 +186,16 @@ def read_library(path: str | Path | None) -> tuple[list[Prop], list[LibraryRejec
     return props, rejects
 
 
+# The roles whose leaves may be opaque alpha cut-outs (ADR-040). A cut-out fence or sign stays refused.
+CUTOUT_ROLES = frozenset({"tree", "bush"})
+
+
 def reject_reason(spec: AssetSpec, doc: dict, mesh: Mesh) -> str | None:
     """Why a readable GLB cannot join the library. ``None`` means it can."""
     for material in doc.get("materials") or []:
         mode = str(material.get("alphaMode") or "OPAQUE")
+        if mode == "MASK" and spec.category == "vegetation" and spec.role in CUTOUT_ROLES:
+            continue
         if mode != "OPAQUE":
             return f"alpha_mode_{mode.lower()}"
     if spec.category == "vegetation" and spec.anchor == "flat" and _span(mesh, 2) > FLAT_VEGETATION_MAX_M:
@@ -346,6 +358,9 @@ def level_of_detail(prop: Prop) -> Prop:
     if prop.spec.category == "vehicles":
         # Clustering tore holes in the cars' bodies (headset, 10 November 2026); a vehicle is cover, kept whole.
         return prop
+    if prop.cutouts():
+        # Clustering merges the leaf cards of a cut-out and their two faces (ADR-040): kept whole, priced whole.
+        return prop
     _street, scale = apply_fit_scale(prop.mesh, prop.spec.role)
     if _span(prop.mesh, 2) * scale < FLAT_PROP_M and prop.triangles > IMPOSTOR_MIN_TRIS:
         # A prop lying on the ground is its top face to a standing player: one textured polygon (impostor.py).
@@ -435,28 +450,36 @@ def _semantics(row: dict) -> dict[str, Any]:
 def _read(path: Path, spec: AssetSpec, yaw_deg: float) -> Prop:
     """Every primitive of the scene, grouped by albedo, turned by ``yaw_deg`` and set on the ground."""
     data = path.read_bytes()
+    cutoffs = _cutoffs(data)
     albedos: dict[str, bytes] = {}
-    groups: dict[bytes, list[Primitive]] = {}
+    groups: dict[tuple[bytes, float | None], list[Primitive]] = {}
     for primitive in scene_primitives(data):
         if not primitive.mesh.triangle_count:
             continue
         if primitive.material not in albedos:
             albedos[primitive.material] = _albedo(path, data, primitive.material)
-        groups.setdefault(albedos[primitive.material], []).append(primitive)
+        groups.setdefault((albedos[primitive.material], cutoffs.get(primitive.material)), []).append(primitive)
     if not groups:
         raise ValueError(f"{path}: no mesh")
     meshes: list[Mesh] = []
     uvs: list[np.ndarray] = []
     parts: list[PropPart] = []
     end = 0
-    for albedo, members in groups.items():
+    for (albedo, cutoff), members in groups.items():
         for primitive in members:
             meshes.append(primitive.mesh)
             uvs.append(_uvs(primitive))
             end += primitive.mesh.triangle_count
-        parts.append(PropPart(end, albedo))
+        parts.append(PropPart(end, albedo, cutoff))
     mesh = rest_on_ground(_turned(merge(meshes), yaw_deg))
     return Prop(spec, mesh, np.concatenate(uvs), parts[0].albedo, parts=tuple(parts))
+
+
+def _cutoffs(data: bytes) -> dict[str, float]:
+    """The ``alphaCutoff`` (glTF default 0.5) of every ``MASK`` material of the GLB, by material name."""
+    doc, _blob = read_glb(data)
+    return {str(material.get("name") or f"mat_{index}"): float(material.get("alphaCutoff", 0.5))
+            for index, material in enumerate(doc.get("materials") or []) if material.get("alphaMode") == "MASK"}
 
 
 def _uvs(primitive: Primitive) -> np.ndarray:
