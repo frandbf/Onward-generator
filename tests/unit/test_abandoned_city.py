@@ -22,7 +22,7 @@ from onward_generator.overgrow.growth import grass_png
 from onward_generator.overgrow.library import load_library, read_library
 from onward_generator.overgrow.normalize import cluster_decimate, normalize_arrays
 from onward_generator.overgrow.place import overgrow
-from onward_generator.overgrow.profiles import profile_for, scaled_cap
+from onward_generator.overgrow.profiles import Profile, profile_for, scaled_cap
 from onward_generator.overgrow.zone import ZoneError, radius_zone, square_zone, within_core, zone_from_polygon
 from tests.conftest import MURCIA_CENTER
 
@@ -163,8 +163,15 @@ def test_manifest_uses_the_wider_surface_catalog() -> None:
 
 
 def test_profile_lowers_density_and_caps() -> None:
-    assert profile_for(10).grass < profile_for(100).grass
-    assert scaled_cap(12, profile_for(10).props) < scaled_cap(12, profile_for(100).props)
+    assert profile_for(10).grass < profile_for(30).grass < profile_for(100).grass
+    assert scaled_cap(12, profile_for(10).wrecks) < scaled_cap(12, profile_for(30).wrecks) < scaled_cap(12, profile_for(100).wrecks)
+    assert scaled_cap(12, profile_for(10).trees) < scaled_cap(12, profile_for(100).trees)
+
+
+def test_every_profile_keeps_the_full_street_prop_caps() -> None:
+    # 14 November 2026: the years scale what grows and rusts; the triangle headroom bounds the street props.
+    assert [profile_for(years).props for years in (10, 30, 100)] == [1.0, 1.0, 1.0]
+    assert [scaled_cap(24, profile_for(years).props) for years in (10, 30, 100)] == [24, 24, 24]
 
 
 def test_profile_changes_how_many_grass_tufts_are_kept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -567,7 +574,9 @@ def test_sidewalk_covers_are_seeded(tmp_path: Path) -> None:
 
 
 def test_sidewalk_covers_follow_the_cap_budget_and_the_catalogue(tmp_path: Path) -> None:
-    assert _covers(tmp_path, profile=profile_for(10))[0] == scaled_cap(6, profile_for(10).props) == 2
+    # No years profile lowers the props since 14 November 2026; the cap still follows a profile that does.
+    sparse = Profile(10, 0.2, 0.15, 0.25, 0.35, 0.15, 0.2)
+    assert _covers(tmp_path, profile=sparse)[0] == scaled_cap(6, sparse.props) == 2
     placed, result = _covers(tmp_path, budget=12 * 3)
     assert placed == 3
     assert result.triangles == 36
