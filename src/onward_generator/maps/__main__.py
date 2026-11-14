@@ -12,7 +12,9 @@ import sys
 from onward_generator.ai.providers import OllamaProvider, ProviderError
 from onward_generator.export.atmosphere import NEUTRAL, preset_names
 from onward_generator.maps.workspace import (
+    DEFAULT_OFF_SWITCHES,
     MAP_SWITCHES,
+    chosen_switches,
     MARGIN_DEFAULT_M,
     RADIUS_DEFAULT_M,
     TIME_OF_DAY_DEFAULT,
@@ -49,15 +51,19 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--storm", action="store_true", help="night maps only: lightning and thunder (ADR-028)")  # pragma: no mutate: help text
     create.add_argument("--atmosphere", choices=preset_names(), default=NEUTRAL, help="day maps only: baked light preset (ADR-037)")  # pragma: no mutate: help text
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
-    create.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
-    create.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
+    create.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 25 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
+    create.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 25 m inside the radius, is the largest half-side")
     create.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     create.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     create.add_argument("--overwrite", action="store_true", help="replace map.json and configs when processed/ is empty")
     create.add_argument("--textures", action="store_true", help="write or replace only config/texture_plan.json")
-    # Plan Q8: the map.json switches, so a new map needs no hand edit and no second --textures run.
+    # Plan Q8: the map.json switches, so a new map needs no hand edit and no second --textures run. Since 13 November
+    # 2026 each is on unless --no-<switch> (panoramax_atlas off unless --panoramax-atlas): see DEFAULT_OFF_SWITCHES.
     for switch, text in MAP_SWITCHES.items():
-        create.add_argument("--" + switch.replace("_", "-"), action="store_true", help=f"store map.json {switch}: {text}")
+        create.add_argument(
+            "--" + switch.replace("_", "-"), action=argparse.BooleanOptionalAction, default=None,
+            help=f"map.json {switch}: {text} (default {'off' if switch in DEFAULT_OFF_SWITCHES else 'on'})",  # pragma: no mutate: help text
+        )
 
     show = sub.add_parser("show", help="print a map folder and the geo command that reads it")
     show.add_argument("directory", help="map directory containing map.json")
@@ -93,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
                 core_target_triangles=args.core_target_triangles,
                 overwrite=args.overwrite,
                 texture_provider=_texture_provider(args.seed),
-                switches=[switch for switch in MAP_SWITCHES if getattr(args, switch)],
+                switches=chosen_switches({switch: getattr(args, switch) for switch in MAP_SWITCHES}),
             )
             print(f"map {document['id']} ({document['name']}) at {directory}")
             print(f"texture plan {directory / 'config' / 'texture_plan.json'}")

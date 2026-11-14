@@ -324,9 +324,10 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
 # props became solid. The adapter options were re-pinned with it: their only change is "variant", the package id.
 # Re-pinned again on 11 November 2026 (plans Q5, Q6): the window reveals took the wall's material and the street lamps
 # their spacing, which changes the scene; compared with main, the options again differ only in "variant".
-# Re-pinned on 13 November 2026: observed trees keep 5 m apart and their crowns off the facades, which changes the scene.
-GOLDEN_PACKAGE_ID = "murcia_belluga_ea7e38ff2f"
-GOLDEN_OPTIONS_SHA256 = "f71439cb64a13d488cad51c9ba45d9deff79047805e15e338946d6129553f7a5"  # again only "variant" differs
+# Re-pinned on 13 November 2026: the map quad moved to the centre of the site (the SDK centres the minimap on it), which
+# changes the layout the package id hashes.
+GOLDEN_PACKAGE_ID = "murcia_belluga_01258a8732"
+GOLDEN_OPTIONS_SHA256 = "4b7ba822dc96fe91f332669b0f9176bfb9852323d3012699c72708ccccdc4e90"  # again only "variant" differs
 
 
 def test_lit_normal_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:

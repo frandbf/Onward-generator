@@ -42,12 +42,12 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 # perf layout --playable --gameplay-report on this fixture at workshop/c5 (c3c90b4), before C6 changed any code.
 # Re-pinned on 12 November 2026 (ADR-029 amendment): lift 1 left the carriageway, so it and its roof wind moved;
 # nothing else in the layout changed, and the report changed only its layout_sha256.
-HEAD_LAYOUT_SHA256 = "b4a41ccf2c3a36c57e76c96e2a7d5f6c545ff2042d7180deec50c97450fecef7"
+# Re-pinned on 13 November 2026: the map quad moved to the centre of the site, where the SDK centres the minimap; nothing
+# else in the layout changed, and the report changed only its layout_sha256.
+HEAD_LAYOUT_SHA256 = "c49f35cbfd7d6cfefd7ef106dbdda8f0ecd3fee48f4ac655ddf591b37f68364c"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
-# Re-pinned on 13 November 2026: observed trees keep 5 m apart (detail.urban.TREE_MIN_SPACING_M), so the report counts
-# one cover collider fewer; the layout is unchanged.
-HEAD_REPORT_SHA256 = "d4cfd2fbe3c74e4e6c2a03547ed78ec7789848181060536984768623dff8e62e"
+HEAD_REPORT_SHA256 = "254bf1f45c99d588ed19c1d1e5b471828f7435e0954e3b623cb6488f64f7b805"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 
