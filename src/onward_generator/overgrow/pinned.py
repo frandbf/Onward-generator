@@ -77,7 +77,7 @@ def read_pins(path: str | Path) -> list[Pin]:
     """The pinned props of ``path``, in its order."""
     source = Path(path)
     try:
-        document = json.loads(source.read_text(encoding="utf-8"))
+        document = json.loads(source.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
         raise PinnedError(f"{source}: cannot be read: {exc}") from exc
     rows = document.get("props") if isinstance(document, dict) else None
@@ -114,9 +114,13 @@ def plan(mesh: Mesh) -> Polygon:
 
 def _offsets(search_m: float) -> list[tuple[float, float]]:
     """Points within ``search_m`` of the target, nearest first, on a ``SEARCH_STEP_M`` grid."""
-    steps = int(math.floor(search_m / SEARCH_STEP_M))
-    grid = [(i * SEARCH_STEP_M, j * SEARCH_STEP_M) for i in range(-steps, steps + 1) for j in range(-steps, steps + 1)]
-    return sorted((p for p in grid if math.hypot(*p) <= search_m + 1e-9), key=lambda p: (math.hypot(*p), p))
+    reach = search_m / SEARCH_STEP_M
+    steps = int(reach)
+    cells: list[tuple[float, float]] = []
+    for i in range(-steps, steps + 1):
+        half = int(math.sqrt(reach * reach - i * i))
+        cells.extend((i * SEARCH_STEP_M, j * SEARCH_STEP_M) for j in range(-half, half + 1))
+    return sorted(cells, key=lambda p: (math.hypot(*p), p))
 
 
 def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame, buildings: STRtree, zone: Zone) -> PinnedResult:

@@ -1066,8 +1066,9 @@ def test_overgrow_place_hands_every_path_to_overgrow(tmp_path: Path, monkeypatch
     monkeypatch.setattr(cli, "overgrow", fake)
     assert cli.main(["place", "--base", "b", "--scene", str(tmp_path / "geo_scene.json"), "--out", str(tmp_path / "out"),
                      "--zone-radius", "40", "--library", "lib", "--layout", "layout.json", "--selection", "chosen.json",
-                     "--prefer", "worn.json", "--triangle-limit", "250000"]) == 0
+                     "--prefer", "worn.json", "--triangle-limit", "250000", "--pinned", "pins.json"]) == 0
     assert {key: seen[key] for key in ("zone_radius_m", "zone_polygon", "library", "layout", "selection", "prefer")} == {
         "zone_radius_m": 40.0, "zone_polygon": None, "library": "lib", "layout": "layout.json", "selection": "chosen.json",
         "prefer": "worn.json"}
     assert seen["triangle_limit"] == 250_000
+    assert seen["pinned"] == "pins.json"

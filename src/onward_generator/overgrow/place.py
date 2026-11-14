@@ -181,7 +181,6 @@ def overgrow(
     wreck = wreck_mesh()
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
-    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles, triangle_limit)
     # Props the map must carry where its story put them (config/pinned_props.json), before anything else spends the room.
     pins = PinnedResult()
     if pinned is not None:
@@ -191,7 +190,7 @@ def overgrow(
             raise OvergrowError(str(exc)) from exc
         nodes = [*nodes, *pins.nodes]
         urban_areas.extend(pins.footprints)
-        headroom = max(0, headroom - pins.triangles)
+    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles + pins.triangles, triangle_limit)
     # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
@@ -524,7 +523,7 @@ def overgrow(
 
 def triangle_headroom(input_triangles: int, furniture_triangles: int, limit: int = UNITY_TRIANGLE_LIMIT) -> int:
     """What overgrow may add under the Unity limit: the limit less the adapter's own triangles, the later stages'
-    ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture overgrow adds. Never below 0."""
+    ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture and pinned props overgrow adds. Never below 0."""
     return max(0, limit - ADAPTER_BASE_TRIANGLES - LATER_RESERVE_TRIANGLES - input_triangles - furniture_triangles)
 
 
