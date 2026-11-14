@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "asbestos_sheet",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/asbestos_sheet",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asbestos_sheet/asbestos_sheet_diff_1k.jpg",
+  "md5": "ecf6d6e6ced1104f3eda5626ae148788",
+  "sha256": "5be31323c851a14523aaae7285793b7b42df8e32bb066789cbf315921f60f3ef",
+  "size_bytes": 674792,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/asbestos_sheet/asbestos_sheet_diff_1k.jpg",
+  "retrieved_at": "2026-11-14T19:23:06+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

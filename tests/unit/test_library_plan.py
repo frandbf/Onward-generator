@@ -310,7 +310,7 @@ def test_the_roof_and_paving_limits_and_the_extended_table() -> None:
 
     assert PAVING_CONTRAST_LIMIT == 0.016
     assert ROOF_CONTRAST_LIMIT == 0.019
-    assert set(CONTRAST_LIMITS) == {"asphalt", "concrete", "plaster", "brick", "rock"}
+    assert set(CONTRAST_LIMITS) == {"asphalt", "concrete", "plaster", "brick", "rock", "earth"}
     assert EXTENDED_CONTRAST_LIMITS == {**CONTRAST_LIMITS, "paving": 0.016, "roof": 0.019}
     assert NOT_APPLICABLE_FAMILIES == frozenset({"door"})
     assert contrast_limit("roof") is None

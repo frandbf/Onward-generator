@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "brown_mud_dry",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/brown_mud_dry",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_diff_1k.jpg",
+  "md5": "0c0ad82fec60f091690c69c23657cb74",
+  "sha256": "a56281b644de614787340f3db45e28d2f72ec32fc19a442f99002bae0ab11398",
+  "size_bytes": 920456,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/brown_mud_dry/brown_mud_dry_diff_1k.jpg",
+  "retrieved_at": "2026-11-14T19:21:58+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

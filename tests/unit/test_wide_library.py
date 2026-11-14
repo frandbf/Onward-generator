@@ -138,3 +138,38 @@ def test_the_normal_maps_switch_is_read_from_map_json_and_reaches_materials_appl
     (off / "map.json").write_text(json.dumps({**document, "normal_maps": 1}), encoding="utf-8")
     with pytest.raises(MapError, match='"normal_maps" must be true or false, got 1'):
         normal_maps_enabled(off)
+
+
+def test_the_regional_rows_are_calm_cc0_files_no_automatic_pool_or_variant_draws() -> None:
+    """14 November 2026: dirt, adobe and corrugated roofs for Mogadishu 1993, named only by a map's own plan."""
+    from onward_generator.materials.library_plan import EARTH_CONTRAST_LIMIT, REGIONAL_LIBRARY_PATH, _pools, contrast_limit
+    from onward_generator.materials.variants import variant_picks
+
+    regional = library_rows(REGIONAL_LIBRARY_PATH)
+    assert sorted(row["name"] for row in regional) == [
+        "asbestos_sheet", "blue_plaster_weathered", "box_profile_metal_sheet", "brown_mud_dry", "chipped_concrete",
+        "clay_block_wall", "clay_floor_001", "coast_sand_01", "coast_sand_02"]
+    for row in regional:
+        path = REPO_ROOT / row["path"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == row["sha256"] and row["manual"] is True, row["id"]
+        assert row["license"] == "CC0-1.0" and row["family"] in FAMILIES | {"earth"} and "normal" in row, row["id"]
+        assert is_calm(row, extended=True), row["id"]
+    assert EARTH_CONTRAST_LIMIT == 0.02 and contrast_limit("earth") == 0.02 == contrast_limit("earth", extended=True)
+    assert is_calm({"family": "earth", "path": regional[0]["path"]}, limit=None) and not is_calm(
+        {"family": "earth", "path": regional[0]["path"]}, limit=0.0)
+    ids = {row["id"] for row in regional}
+    assert ids <= {row["id"] for row in catalogue_rows()}
+    pooled = {row["id"] for rows in _pools(catalogue_rows(), extended=True).values() for row in rows}
+    assert not ids & pooled and {row["id"] for row in WIDE} & pooled
+    assert not ids & {i for picks in variant_picks(_plan_entries(), catalogue_rows(), 1, extended=True).values() for i in picks}
+    assert_library_entries({"entries": [{"id": "roofs", "library_id": "ph_asbestos_sheet"},
+                                        {"id": "streets_plazas", "library_id": "ph_brown_mud_dry"},
+                                        {"id": "brick", "library_id": "ph_clay_block_wall"}]}, extended=True)
+
+
+def _plan_entries() -> list[object]:
+    from types import SimpleNamespace
+
+    from onward_generator.materials.variants import VARIANT_SLOTS
+
+    return [SimpleNamespace(id=slot, library_id="") for slot in sorted(VARIANT_SLOTS)]

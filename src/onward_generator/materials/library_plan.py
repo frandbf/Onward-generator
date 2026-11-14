@@ -26,6 +26,7 @@ from onward_generator.materials.polyhaven import TextureRecord
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LIBRARY_PATH = REPO_ROOT / "config" / "dress" / "imported_library.json"
 WIDE_LIBRARY_PATH = REPO_ROOT / "config" / "dress" / "wide_library.json"
+REGIONAL_LIBRARY_PATH = REPO_ROOT / "config" / "dress" / "regional_library.json"
 """Plan T1: CC0 Poly Haven albedos that join the pools only for a map with the map.json ``wide_library`` switch."""
 
 SLOT_BINDINGS: dict[str, tuple[str, ...]] = {
@@ -134,12 +135,12 @@ def library_rows(path: Path | None = None) -> list[dict[str, Any]]:
 
 def catalogue_rows() -> list[dict[str, Any]]:
     """Every texture a plan may name: the imported library, the wide one (plan T1) and, while local catalogues are on,
-    the Asset Store texture catalogues of this machine (ADR-035). Only the pools decide which a map draws on, so a plan
+    the Asset Store texture catalogues of this machine (ADR-035), and the regional rows only a map's own plan names. Only the pools decide which a map draws on, so a plan
     written with ``wide`` still resolves later without the switch."""
     from onward_generator.assetstore import local
     from onward_generator.assetstore.textures import local_texture_rows
 
-    rows = library_rows() + library_rows(WIDE_LIBRARY_PATH)
+    rows = library_rows() + library_rows(WIDE_LIBRARY_PATH) + library_rows(REGIONAL_LIBRARY_PATH)
     return rows + local_texture_rows(REPO_ROOT / "assets") if local.enabled() else rows
 
 
@@ -181,12 +182,16 @@ COARSE_CONTRAST_LIMIT = 0.012
 # 0.0656 (large stains), bricks003 0.0260 (pale stones), bricks100 0.0440, rock022
 # 0.0267, rock055 0.0409.
 WALL_CONTRAST_LIMIT = 0.025
+# Dirt and sand carry stones and trodden patches (14 November 2026). Kept brown_mud_dry 0.0170, coast_sand_01 0.0149,
+# coast_sand_02 0.0168, Rocky_Ground_15 0.0174; dropped coast_sand_03 0.0213 (a grid of dark bands), aerial_sand 0.0370.
+EARTH_CONTRAST_LIMIT = 0.02
 CONTRAST_LIMITS: dict[str | None, float] = {
     "asphalt": COARSE_CONTRAST_LIMIT,
     "concrete": COARSE_CONTRAST_LIMIT,
     "plaster": WALL_CONTRAST_LIMIT,
     "brick": WALL_CONTRAST_LIMIT,
     "rock": WALL_CONTRAST_LIMIT,
+    "earth": EARTH_CONTRAST_LIMIT,
 }
 # Roofs and paving are measured only with the map.json "repetition" switch (plan C1, ADR-009
 # amendment "Repetition per cell"), so the default pools and picks stay as they were.
@@ -241,7 +246,7 @@ def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool) -> dict[str, li
     pools: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         family = texture_family(row)
-        if family is None or not is_calm(row, extended=extended):
+        if family is None or row.get("manual") or not is_calm(row, extended=extended):
             continue
         pools.setdefault(family, []).append(dict(row))
     for family in pools:

@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "coast_sand_02",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Rob Tuytel"
+  ],
+  "page_url": "https://polyhaven.com/a/coast_sand_02",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_02/coast_sand_02_nor_gl_1k.jpg",
+  "md5": "ab2f0168551ddb91350654d620a16be7",
+  "sha256": "285a9b5c7f39215a1446c51a69d81228a01277ebafc48b9aeebd115066b4f796",
+  "size_bytes": 1113299,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/coast_sand_02/coast_sand_02_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-14T19:22:19+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}
