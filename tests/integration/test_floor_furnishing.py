@@ -22,6 +22,8 @@ from tests.integration.test_shop_interiors import DOC, SHOP, _detail, _footprint
 
 ON = copy.deepcopy(DOC)
 ON["interiors"]["furnish"]["enabled"] = True
+# The fixture block's floors need more than the default 7 500 (14 November 2026): the tests read the budget they set.
+ON["interiors"]["furnish"]["max_triangles"] = 15_000
 HOMES = ("osm-way-311", "osm-way-313")
 
 
@@ -109,7 +111,7 @@ def test_on_residential_floors_get_pieces_inside_their_floor_and_out_of_the_stai
     assert stats["pieces"] == len(pieces) == sum(stats["pieces_by_asset"].values())
     assert stats["visual_triangles"] == sum(p["triangles"] for p in pieces)
     assert stats["collision_triangles"] == 12 * sum(p["solid"] for p in pieces)
-    assert stats["max_triangles"] == 30000 and stats["assets"] == len(stats["pieces_by_asset"])
+    assert stats["max_triangles"] == 15_000 and stats["assets"] == len(stats["pieces_by_asset"])
     for key in ("interior_visual_triangles", "interior_collision_triangles", "shop_interior_visual_triangles", "interiors"):
         assert on.stats[key] == off.stats[key]
     assert "shop_furnishing" not in on.stats
@@ -132,7 +134,7 @@ def test_two_runs_give_identical_scene_detail(detail_inputs, on) -> None:
 def test_shop_furnishing_result_and_interior_budgets_unchanged_by_residential_on(detail_inputs) -> None:
     shops = copy.deepcopy(DOC)
     shops["interiors"]["shops"]["furnish"]["enabled"] = True
-    both = _doc(shops, enabled=True)
+    both = _doc(shops, enabled=True, max_triangles=15_000)
     a, b = _detail(detail_inputs, config_from_document(shops)), _detail(detail_inputs, config_from_document(both))
     assert a.stats["shop_furnishing"] == b.stats["shop_furnishing"] and a.stats["shop_furnishing"]["furnished_rooms"] == 1
     assert _obj(a, f"interior/{SHOP}").record == _obj(b, f"interior/{SHOP}").record

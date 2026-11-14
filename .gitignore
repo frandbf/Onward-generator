@@ -36,3 +36,5 @@ src/*.egg-info/
 
 # Local catalogues converted from the user's own Unity Asset Store packs (ADR-035): never committed
 assets/asset_store_*/
+# The maintainer's own wall decals (ADR-038 amendment of 14 November 2026): local photographs, never committed.
+assets/user_decals/

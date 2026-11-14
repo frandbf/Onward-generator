@@ -40,12 +40,15 @@ _TEXELS_DEFAULT = 10.0
 # ``core_radius_m`` a map keeps a scenic ring at least CORE_RING_DEFAULT_M wide and a core of at most this:
 # on Barcelona Sarria (r 150) the whole map was played, at 381 k triangles and up to 376 draws a view.
 CORE_RADIUS_DEFAULT_M = 150.0
-CORE_RING_DEFAULT_M = 50.0
-# The area of a new map (plan Q2b): a 150 m half-side keeps the default core at 100 m. The former 400 m, with its
+# 25 m since 14 November 2026: with 50 m, 55 % of Murcia Catedral (r 150, core 100) could not be played, for about
+# 14 000 scenic triangles. A new map keeps its 100 m core and half the ring.
+CORE_RING_DEFAULT_M = 25.0
+# The area of a new map (plan Q2b): a 150 m half-side kept the default core at 100 m with the 50 m ring; 125 m
+# keeps it with the 25 m ring. The former 400 m, with its
 # 150 m core, gave 421 689 visual triangles on Rue Mouffetard and 430 774 in Unity on Madrid Sol workshop (r 300),
 # against the official 250 000. With 150 m Madrid Sol arena and Barcelona Sarria bake within it (244 834, 232 488);
 # Rue Mouffetard, denser, was still 252 179 with its 100 m core and fitted at 95 m (plan Q2a's estimate says so).
-RADIUS_DEFAULT_M = 150.0
+RADIUS_DEFAULT_M = 125.0
 MARGIN_DEFAULT_M = 30.0
 _TEXELS_MAX = 40.0
 # Linear fog from the wall outwards (ADR-014). The band is a look, not a measurement.
@@ -78,6 +81,19 @@ MAP_SWITCHES: Mapping[str, str] = {
     "normal_maps": "draw the library photographs that have one with their real normal map (PP_Opaque_Lit, plan T3)",
     "texture_variants": "two more calm photographs for building roofs and plaster walls, one per building (plan T4)",
 }
+
+
+DEFAULT_OFF_SWITCHES = frozenset({"panoramax_atlas"})
+"""Switches ``map create`` leaves off unless asked: the street-photo atlas acts only with Panoramax, still under
+development. Every other switch of ``MAP_SWITCHES`` is on for a new map made from the command line (13 November 2026),
+so a user gives a name, a centre and a radius and gets every improvement; ``--no-<switch>`` turns one off."""
+
+
+def chosen_switches(explicit: Mapping[str, bool | None]) -> list[str]:
+    """The switches a new map gets, in ``MAP_SWITCHES`` order: each one the user named on or off (``explicit``), the
+    others on unless they are in ``DEFAULT_OFF_SWITCHES``."""
+    return [switch for switch in MAP_SWITCHES
+            if (explicit.get(switch) if explicit.get(switch) is not None else switch not in DEFAULT_OFF_SWITCHES)]
 
 
 def create_map(
@@ -786,7 +802,8 @@ def _core_budget(target: object, core_radius_m: object, core: float | None, radi
     except CoreError as exc:
         raise MapError(str(exc)) from exc
     if core is None:
-        raise MapError("a budget core needs a playable core: core_radius_m 0, or a radius under 100 m, plays the whole map")
+        raise MapError("a budget core needs a playable core: core_radius_m 0, or a radius under "
+                       f"{MIN_CORE_HALF_SIDE_M + CORE_RING_DEFAULT_M:g} m, plays the whole map")
     cap = radius_m - CORE_RING_DEFAULT_M if core_radius_m is None else core_radius_m
     if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not MIN_CORE_HALF_SIDE_M <= cap <= radius_m - CORE_RING_DEFAULT_M:
         raise MapError(f"the largest core half-side must be between {MIN_CORE_HALF_SIDE_M:g} and {radius_m - CORE_RING_DEFAULT_M:g} m "

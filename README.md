@@ -90,7 +90,7 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 
 | Option | What it does |
 | --- | --- |
-| `--radius-m 50…1500` | Half the side of the square, in metres (default 150, which leaves a 100 m playable core). On an existing map `run` uses the radius in `map.json`. |
+| `--radius-m 50…1500` | Half the side of the square, in metres (default 125, which leaves a 100 m playable core inside a 25 m scenic ring). On an existing map `run` uses the radius in `map.json`. |
 | `--core-radius-m` | The playable core. Past it, buildings are plain shells, so large maps stay inside the Quest budget ([ADR-017](docs/decisions/ADR-017-playable-core.md)). |
 | `--lightmap-texels-per-m` | Lighting detail, at most 40 (default 10). Higher looks sharper and bakes much longer. |
 | `--brief "…"` | How the streets should feel. Ask for an abandoned city and cars and barrels block the road. |
@@ -100,6 +100,16 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 | `--atmosphere golden_hour` | A light preset for a day map, `golden_hour` or `overcast`: sun, ambient, fog and wall palette. `golden_hour` doubles the bounced light so a soldier in a narrow shaded street stays readable ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)). |
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
+
+### Your own wall decals
+
+Put PNG images (with a transparent background where the decal is not a rectangle, at least 400 px on the long side) in `assets/user_decals/`, a local folder that is never committed, and list them in `assets/user_decals/decals.json` with their size on the wall in metres (`width_m` or `height_m`, 0.2 to 3 m):
+
+```json
+{"decals": [{"file": "mural.png", "width_m": 1.2, "description": "A mural from my street"}]}
+```
+
+Every map then carries each of them once, on an exposed wall of the playable core, before the generated decals; a decal that fits no wall stops `signs place` with its name. A map for the Onward Workshop must not show real people (Custom Content Guide): set `"user_decals": false` in its `map.json` to leave them out. Use only photographs you may share: no recognisable people, brands or personal data ([ADR-038](docs/decisions/ADR-038-wall-decals.md)).
 
 ### Every option that is off by default
 
@@ -148,16 +158,13 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 
 **On by default, can be turned off:** shop furnishing (`interiors.shops.furnish.enabled`), flat furnishing (`interiors.furnish.enabled`), semantic furniture sets (`ONWARD_SEMANTIC_SETS=0` off) and your local Asset Store catalogues (`ONWARD_LOCAL_CATALOGUES=0` hides them).
 
-Every switch at once, for a day map:
+A new map has every `map.json` switch on except `panoramax_atlas`. That covers calm pools, Overture tints, LiDAR roofs, regional facades, the street profile, gameplay report and balanced spawns, sightline cover, the wide texture library, real normal maps and per-building texture variants. A name, a centre and a radius are enough:
 
 ```bash
-onward-generator map create --name "My map" --lat 48.84045 --lon 2.34981 \
-  --atmosphere golden_hour --repetition --overture-tints --lidar-roofs --regional-facades \
-  --street-profile --ai --panoramax --panoramax-atlas \
-  --gameplay-report --balanced-spawns --sightline-cover
+onward-generator run --name "My map" --lat 48.84045 --lon 2.34981 --radius-m 150
 ```
 
-`onward-generator map create` also takes one flag per `map.json` switch, such as `--regional-facades`, `--balanced-spawns`, `--sightline-cover` or `--repetition`, so a new map needs no hand edit ([docs/02-configuration.md](docs/02-configuration.md)). With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
+Turn a switch off with its `--no-` flag, on `map create` or on `run` for a new map, for example `--no-normal-maps` or `--no-texture-variants` ([docs/02-configuration.md](docs/02-configuration.md)). A map created before keeps the switches its `map.json` lists. With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
 
 **If something goes wrong:**
 

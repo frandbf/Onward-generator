@@ -484,7 +484,8 @@ from onward_generator.detail.furnish import FLOOR_SCOPE, ShopFurnishing, floor_r
 from onward_generator.detail.interiors import GLASS_VIEW, WELL_CLEARANCE_M, build_interior, flight_landings, plan_interior  # noqa: E402 - as above
 
 DEFAULT = load_detail_config()
-FLOORS = replace(DEFAULT.interiors.furnish, enabled=True)
+# The fixture floors need more than the default 7 500 triangles (14 November 2026); the tests read the budget they set.
+FLOORS = replace(DEFAULT.interiors.furnish, enabled=True, max_triangles=15_000)
 RES_SEED = 3  # stable_unit(3, "b", "interior_floors") < 0.5: three furnished floors
 BLOCK = Polygon([(0, 0), (24, 0), (24, 18), (0, 18)])
 SOUTH = Segment(0, 0, 0, (0.0, 0.0), (24.0, 0.0), True)

@@ -172,6 +172,8 @@ def test_an_abandoned_brief_puts_a_wreck_in_the_carriageway(tmp_path: Path) -> N
     wrecks = [row for row in manifest["objects"] if row.get("kind") == "wreck"]
     assert wrecks
     assert min(abs(row["position_m"][1]) for row in wrecks) < 4.2
+    assert all(row["size_m"] == [4.0, 1.6, 1.55] for row in wrecks)  # the generic body's box: the layout keeps a cabin off it
+    assert all(isinstance(value, float) for row in wrecks for value in row["size_m"])
 
 
 def test_a_wreck_in_the_street_sits_on_the_asphalt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,7 +233,7 @@ def test_the_model_may_only_choose_the_street_rule() -> None:
 
 
 
-def _tree_scene(root: Path, urban: list[dict]) -> tuple[Path, Path]:
+def _tree_scene(root: Path, urban: list[dict], *, extra: tuple[dict, ...] = ()) -> tuple[Path, Path]:
     root.mkdir()
     scene = root / "geo_scene.json"
     scene.write_text(json.dumps({
@@ -244,6 +246,7 @@ def _tree_scene(root: Path, urban: list[dict]) -> tuple[Path, Path]:
                      {"building": "yes", "height": "12"}, "osm-way-block"),
             _feature("poi", {"type": "Point", "coordinates": [10, 36]}, {"natural": "tree"}, "osm-node-tree"),
             _feature("poi", {"type": "Point", "coordinates": [18, 38]}, {"natural": "tree"}, "osm-node-tree-2"),
+            *extra,
         ],
     }), encoding="utf-8")
     base = root / "base"
@@ -354,3 +357,26 @@ def test_detail_urban_elements_become_circles_the_props_keep_out_of() -> None:
     radii = [round(r, 4) for _x, _y, r in found]
     assert radii == [round(math.hypot(1.8, 0.5) / 2 + 0.3, 4), round(math.hypot(0.4, 0.4) / 2 + 0.3, 4), round(1.0 + 0.3, 4)]
     assert (DETAIL_ELEMENT_CLEAR_M, DETAIL_ELEMENT_DEFAULT_M) == (0.3, 1.0)
+
+
+def test_overgrow_does_not_plant_back_a_tree_detail_thinned(tmp_path: Path) -> None:
+    """With the core as its zone, overgrow planted 14 OSM trees on Murcia Catedral that detail had left out to keep its
+    trees 5 m apart (13 November 2026)."""
+    # detail planted osm-node-tree as a second canopy variant, and another tree 4 m from osm-node-tree-2.
+    urban = [_urban("osm-node-tree", 10.0, 36.0, kind="tree_1"), _urban("osm-node-row", 18.0, 34.0)]
+    base, scene = _tree_scene(tmp_path / "thinned", urban)
+    report = overgrow(base, scene, tmp_path / "thinned" / "out")
+    assert report["trees_observed"] == 0
+    assert report["reject_counts"]["in_detail"] == 1 and report["reject_counts"]["too_close_to_another_tree"] == 1
+    assert [row["position_m"][:2] for row in report["rejects"] if row["reason"] == "too_close_to_another_tree"] == [[18.0, 38.0]]
+    assert {(row["asset_id"], row["kind"]) for row in report["rejects"] if row["reason"] == "too_close_to_another_tree"} == {("tree", "tree")}
+    # Exactly 5 m from a detail tree is far enough.
+    base, scene = _tree_scene(tmp_path / "exact", [_urban("osm-node-other", 18.0, 33.0)])
+    report = overgrow(base, scene, tmp_path / "exact" / "out")
+    assert report["trees_observed"] == 2 and "too_close_to_another_tree" not in report["reject_counts"]
+    # Two OSM trees 4.99 m apart that detail did not plant: the first in feature order stands, the second does not.
+    near = _feature("poi", {"type": "Point", "coordinates": [18, 42.99]}, {"natural": "tree"}, "osm-node-tree-3")
+    base, scene = _tree_scene(tmp_path / "pair", [], extra=(near,))
+    report = overgrow(base, scene, tmp_path / "pair" / "out")
+    assert report["trees_observed"] == 2 and report["reject_counts"]["too_close_to_another_tree"] == 1
+    assert [o["source_ids"] for o in _trees(tmp_path / "pair" / "out") if o["origin"] == "observed"] == [["osm-node-tree"], ["osm-node-tree-2"]]

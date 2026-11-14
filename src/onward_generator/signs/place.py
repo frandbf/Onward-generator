@@ -47,6 +47,7 @@ from onward_generator.signs.decals import (
 )
 from onward_generator.signs.plaque import PLATE_H, PLATE_W, plaque_rgba
 from onward_generator.signs.shop import ATLAS_PX, PAD_PX, pack, page_height, shop_signs
+from onward_generator.signs.user_decals import UserDecalError, read_user_decals
 from onward_generator.tiers import core_of
 
 BUILDING_NODE = "building/"  # visual node name prefix; the rest is the building id
@@ -230,11 +231,20 @@ def place_signs(
         replay = (json.loads(previous.read_text(encoding="utf-8")).get("wall_decals") or {}).get("pick") if previous.is_file() else None  # pragma: no mutate: UTF-8 is also the locale encoding of every host and image this runs on
         picked = pick_decals(pool, brief=brief, provider=provider, replay=replay)
         pool = [d for d in pool if d.id in set(picked.decal_ids)]
+    # The maintainer's own decals (assets/user_decals) go on every map, first, each once; the model does not pick them.
+    try:
+        required = read_user_decals(REPO_ROOT / "assets") if local.enabled() and _user_decals_on(base) else []  # local, as the Asset Store catalogues
+    except UserDecalError as exc:
+        raise SignsError(str(exc)) from exc
     decals = place_decals(
         [DecalWall(w.feature_id, w.a, w.b, w.outward, w.height_m) for w in walls], STRtree(_footprints(geo.get("features") or [])),
         decal_blocker([*built, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, _seed(manifest), decal_count(_seed(manifest)),
-        wall_surface([*built, *sign_nodes, *shops.nodes]),
+        wall_surface([*built, *sign_nodes, *shops.nodes]), required=required,
     )
+    missing = [decal.id for decal in required if decal.id not in {p.decal.id for p in decals}]
+    if missing:
+        raise SignsError("user decals that fit no exposed wall of the playable core: " + ", ".join(missing)
+                         + " (make them smaller in assets/user_decals/decals.json)")
     decal_meshes, decal_materials, decal_images, decal_rows = decal_nodes(decals)
     materials.update(decal_materials)
     images.update(decal_images)
@@ -318,6 +328,24 @@ def place_signs(
     if not compare["identical"]:
         raise SignsError("street signs changed a geographic object record; this is a bug")
     return signs_report
+
+
+def _user_decals_on(base: Path) -> bool:
+    """False only when ``map.json`` has ``"user_decals": false``: a map meant for the Onward Workshop, whose rules refuse
+    the likeness of a real person, leaves the maintainer's own decals out. Outside a map folder, or without the key, on."""
+    from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    if root is None:
+        return True
+    try:
+        value = load_map(root).get("user_decals", True)
+    except (MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
+        return True
+    if not isinstance(value, bool):
+        raise SignsError(f'map.json "user_decals" must be true or false, got {value!r}')
+    return value
 
 
 def _ambient(base: Path) -> tuple[str, bool]:

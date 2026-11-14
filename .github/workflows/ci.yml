@@ -24,7 +24,9 @@ jobs:
     name: linux (docker)
     runs-on: ubuntu-latest
     # The whole suite now takes 6 to 7 min locally; every run since 11 November 2026 (PR #28) was cancelled at 6.
-    timeout-minutes: 15
+    # 30 since 14 November 2026: #80 took 11 min 46 s on the runner, and #81 to #88, with the cut-out trees, lamp posts
+    # and user decals tests, were cancelled at 15 min.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: arduino/setup-task@v3
