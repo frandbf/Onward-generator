@@ -376,3 +376,14 @@ def test_observed_trees_keep_5_m_from_each_other_in_id_order() -> None:
                _poi("node/0", 0.0, 0.0, amenity="bench")]
     placed, _ = place_elements(blocked, [], FREE, FAR_BUILDING, PROTOS, _cfg())
     assert sorted(e.id for e in placed) == ["urban/bench/node/0", "urban/tree/node/2"]
+
+
+def test_only_a_narrowed_crown_writes_crown_scale() -> None:
+    from onward_generator.detail.urban import crown_fields, crown_matrix
+
+    whole = Element("urban/tree/n1", "tree", np.eye(4), "observed", ("n1",), "osm_poi_position")
+    narrow = dataclasses.replace(whole, crown_scale=0.6)
+    assert crown_fields(whole) == {} and crown_fields(narrow) == {"crown_scale": 0.6}
+    # A whole crown keeps its matrix; a narrowed one is scaled across only.
+    assert np.array_equal(crown_matrix(np.eye(4), 1.0), np.eye(4))
+    assert np.array_equal(crown_matrix(np.eye(4), 0.5), np.diag([0.5, 0.5, 1.0, 1.0]))

@@ -101,13 +101,18 @@ def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prot
         if crown_radius(prototypes[kind]) <= room:
             return kind, 1.0
     narrowest = min(options, key=lambda k: (crown_radius(prototypes[k]), k))
-    scale = room / crown_radius(prototypes[narrowest])
-    return (narrowest, round(scale, 3)) if scale >= MIN_CROWN_SCALE else None
+    scale = round(room / crown_radius(prototypes[narrowest]), 3)
+    return (narrowest, scale) if scale >= MIN_CROWN_SCALE else None
 
 
 def crown_matrix(matrix: np.ndarray, scale: float) -> np.ndarray:
     """``matrix`` with its plan axes scaled by ``scale``: a narrower crown at the same height."""
-    return matrix @ np.diag([scale, scale, 1.0, 1.0]) if scale != 1.0 else matrix
+    return matrix @ np.diag([scale, scale, 1.0, 1.0])
+
+
+def crown_fields(element: Element) -> dict[str, float]:
+    """The record's ``crown_scale`` (estimated) when the crown was narrowed, else nothing."""
+    return {"crown_scale": element.crown_scale} if element.crown_scale != 1.0 else {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +204,7 @@ def place_elements(
                 rejected.append(Rejected(f["id"], kind, "too_close_to_another_lamp"))
                 continue
         proto_kind = kind
+        options: list[str] = []
         if kind == "tree":
             options = [k for k in ("tree", "tree_1", "tree_2") if k in prototypes]
             if options:
@@ -213,8 +219,7 @@ def place_elements(
                 continue
             yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw")
             if not buildings.is_empty:
-                fit = crown_fit([k for k in ("tree", "tree_1", "tree_2") if k in prototypes] or [proto_kind], proto_kind, prototypes,
-                                float(buildings.distance(p)))
+                fit = crown_fit(options, proto_kind, prototypes, float(buildings.distance(p)))
                 if fit is None:
                     rejected.append(Rejected(f["id"], kind, "crown_against_building"))
                     continue

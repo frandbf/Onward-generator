@@ -97,7 +97,7 @@ from onward_generator.detail.typology import (
     load_typology_config,
     styled_template,
 )
-from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
+from onward_generator.detail.urban import Element, Rejected, classify_poi, crown_fields, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import (
@@ -1981,7 +1981,7 @@ def _assemble_detail(
                 "yaw_deg": round(float(np.degrees(np.arctan2(e.matrix[1, 0], e.matrix[0, 0]))), 2),
                 "representation": "generic_prototype",
                 # Estimated: a crown narrowed to stay off the nearest facade (detail.urban.crown_fit).
-                **({"crown_scale": e.crown_scale} if e.crown_scale != 1.0 else {}),
+                **crown_fields(e),
             }, proto.key, e.matrix))
 
     for o in objects:
