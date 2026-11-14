@@ -1658,7 +1658,7 @@ def test_run_command_passes_the_core_target(monkeypatch: pytest.MonkeyPatch) -> 
     action = {a.dest: a for a in subparsers.choices["run"]._actions}["core_target_triangles"]
     assert action.type is int and action.default is None
     assert action.help == ("budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, "
-                           "1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
+                           "1000 to 2000000; --core-radius-m, or 25 m inside the radius, is the largest half-side")
 
 
 def test_plan_steps_carry_the_budget_core_to_detail(tmp_path: Path) -> None:
@@ -1666,7 +1666,7 @@ def test_plan_steps_carry_the_budget_core_to_detail(tmp_path: Path) -> None:
     create_map(root, map_id="madrid", name="Madrid", latitude=40.40657, longitude=-3.719187, radius_m=300,
                core_target_triangles=150000)
     detail = dict(plan_steps(root))["detail"]
-    assert detail[detail.index("--core-radius-m") + 1] == "250"
+    assert detail[detail.index("--core-radius-m") + 1] == "275"
     assert detail[detail.index("--core-target-triangles") + 1] == "150000"
 
 
@@ -1676,7 +1676,7 @@ def test_run_and_detail_help_describe_the_core() -> None:
     subparsers = next(action for action in build_parser()._actions if isinstance(action, argparse._SubParsersAction))
     helps = {action.dest: action.help for action in subparsers.choices["run"]._actions}
     assert helps["core_radius_m"] == (
-        "half-side of the playable core square, metres " + "(default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
+        "half-side of the playable core square, metres " + "(default: 25 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
     detail = {action.dest: action for action in detail_parser()._actions}["core_radius_m"]
     assert detail.help == "half-side of the playable core square, metres (ADR-017); buildings outside it are scenic shells"
     assert detail.default is None and detail.type is float
@@ -1871,7 +1871,7 @@ def test_a_changed_mid_ring_makes_detail_stale(tmp_path: Path) -> None:
 # ------------------------------------------------------------------------------------------------ the area of a run (plan Q2b)
 
 
-def test_a_new_map_without_a_radius_gets_150_m_and_a_30_m_margin(
+def test_a_new_map_without_a_radius_gets_125_m_and_a_30_m_margin(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -1887,8 +1887,8 @@ def test_a_new_map_without_a_radius_gets_150_m_and_a_30_m_margin(
                    radius_m=None, margin_m=None, out="maps/murcia", execute=execute, interactive=False)
     assert code == 2
     argv = created[0]
-    assert (argv[argv.index("--radius-m") + 1], argv[argv.index("--margin-m") + 1]) == ("150.0", "30.0")
-    assert f"{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 150 m  margin 30 m" in capsys.readouterr().out
+    assert (argv[argv.index("--radius-m") + 1], argv[argv.index("--margin-m") + 1]) == ("125.0", "30.0")
+    assert f"{MURCIA_CENTER_LAT}, {MURCIA_CENTER_LON}  r 125 m  margin 30 m" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(("radius", "margin"), [(None, None), (250.0, None), (None, 20.0), (250.0, 20.0)])
