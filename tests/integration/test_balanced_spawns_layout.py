@@ -47,7 +47,7 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 HEAD_LAYOUT_SHA256 = "c49f35cbfd7d6cfefd7ef106dbdda8f0ecd3fee48f4ac655ddf591b37f68364c"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
-HEAD_REPORT_SHA256 = "a72461ab62c1e0eb1be3f5fa5a2883a59352f9c8c1b53d718bf9afdf072cea3d"
+HEAD_REPORT_SHA256 = "254bf1f45c99d588ed19c1d1e5b471828f7435e0954e3b623cb6488f64f7b805"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 

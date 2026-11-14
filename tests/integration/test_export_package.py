@@ -326,8 +326,8 @@ def test_scenic_out_of_lightmap_absent_is_byte_identical(inputs: tuple[Path, Pat
 # their spacing, which changes the scene; compared with main, the options again differ only in "variant".
 # Re-pinned on 13 November 2026: the map quad moved to the centre of the site (the SDK centres the minimap on it), which
 # changes the layout the package id hashes.
-GOLDEN_PACKAGE_ID = "murcia_belluga_7228053e53"
-GOLDEN_OPTIONS_SHA256 = "769a8c46ef2df32bbbde15e7369ea5f409e56c670a4386397c25e6ad8ca33c38"  # again only "variant" differs
+GOLDEN_PACKAGE_ID = "murcia_belluga_01258a8732"
+GOLDEN_OPTIONS_SHA256 = "4b7ba822dc96fe91f332669b0f9176bfb9852323d3012699c72708ccccdc4e90"  # again only "variant" differs
 
 
 def test_lit_normal_absent_is_byte_identical(inputs: tuple[Path, Path], tmp_path: Path) -> None:

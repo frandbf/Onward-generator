@@ -24,6 +24,7 @@ from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, rea
 from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import yaw_matrix
 from onward_generator.detail.shops import sign_footprints
+from onward_generator.detail.urban import TREE_MIN_SPACING_M
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.export.library_normals import carried_normal_maps
 from onward_generator.generation.config import Material
@@ -195,6 +196,7 @@ def overgrow(
         records.append(_record("grass", "generated", spot, None, z))
 
     tree_count = 0
+    observed_trees: list[tuple[float, float]] = []
     for feature in features:
         if tree_count >= tree_cap:
             break
@@ -204,6 +206,10 @@ def overgrow(
         if feature.get("id") in detail_tree_ids:
             # ``detail`` already planted this OSM tree; a second copy would cross its canopy.
             _note(rejects, reject_counts, "tree", "in_detail", point)
+            continue
+        if any(math.dist((float(point[0]), float(point[1])), tree) < TREE_MIN_SPACING_M for tree in [*detail_trees, *observed_trees]):
+            # ``detail`` left this OSM tree out to thin a row (13 November 2026); overgrow must not plant it back.
+            _note(rejects, reject_counts, "tree", "too_close_to_another_tree", point)
             continue
         reason = block_reason(
             float(point[0]), float(point[1]), zone=area, buildings=buildings,
@@ -217,6 +223,7 @@ def overgrow(
         z = floor.z(float(point[0]), float(point[1]))
         extra_nodes.append(_tree_node(point, variants[0], 0, observed=True, feature_id=str(feature.get("id") or ""), seed=seed, z=z))
         records.append(_record("tree", "observed", point, str(feature.get("id") or ""), z))
+        observed_trees.append((float(point[0]), float(point[1])))
         tree_count += 1
     for edge in edges:
         if tree_count >= tree_cap or edge.length < 16.0:
@@ -491,7 +498,7 @@ def _detail_trees(manifest: Mapping[str, Any]) -> tuple[set[str], list[tuple[flo
     ids: set[str] = set()
     points: list[tuple[float, float]] = []
     for item in manifest.get("objects") or []:
-        if not isinstance(item, dict) or item.get("type") != "urban_element" or item.get("kind") != "tree":
+        if not isinstance(item, dict) or item.get("type") != "urban_element" or not str(item.get("kind")).startswith("tree"):
             continue
         ids.update(str(source) for source in item.get("source_ids") or [])
         position = item.get("position_m") or []

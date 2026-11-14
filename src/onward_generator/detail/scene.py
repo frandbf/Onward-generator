@@ -97,7 +97,7 @@ from onward_generator.detail.typology import (
     load_typology_config,
     styled_template,
 )
-from onward_generator.detail.urban import Element, Rejected, classify_poi, place_elements
+from onward_generator.detail.urban import Element, Rejected, classify_poi, crown_fields, place_elements
 from onward_generator.generation.config import GenerationConfig
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import (
@@ -1188,9 +1188,13 @@ ExtraUrban = Callable[
 
 
 def rejection_severity(rejected: Rejected) -> str:
-    """``info`` for a generated attempt (its id holds ``#``) and for a lamp kept off its neighbour: neither loses
-    observed data (plan Q5). ``warning`` for an observed element that finds no place."""
-    return "info" if "#" in rejected.id or rejected.reason == "too_close_to_another_lamp" else "warning"
+    """``info`` for a generated attempt (its id holds ``#``) and for a lamp or a tree kept off its neighbour: a
+    deliberate thinning, not a place the element failed to find (plan Q5). ``warning`` for an observed element that
+    finds no place."""
+    return "info" if "#" in rejected.id or rejected.reason in SPACING_REASONS else "warning"
+
+
+SPACING_REASONS = frozenset({"too_close_to_another_lamp", "too_close_to_another_tree"})
 
 
 def detail_scene(
@@ -1976,6 +1980,8 @@ def _assemble_detail(
                 "position_m": [round(float(e.matrix[0, 3]), 3), round(float(e.matrix[1, 3]), 3)],
                 "yaw_deg": round(float(np.degrees(np.arctan2(e.matrix[1, 0], e.matrix[0, 0]))), 2),
                 "representation": "generic_prototype",
+                # Estimated: a crown narrowed to stay off the nearest facade (detail.urban.crown_fit).
+                **crown_fields(e),
             }, proto.key, e.matrix))
 
     for o in objects:
