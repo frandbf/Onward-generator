@@ -221,7 +221,11 @@ def test_a_map_can_leave_the_user_decals_out(tmp_path: Path, monkeypatch: pytest
     for value, expected in ((None, ["user_mural"]), (True, ["user_mural"]), (False, [])):
         document = {} if value is None else {"user_decals": value}
         (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
-        monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r, d=document: d)
+        def read(r: Path, d: dict = document) -> dict:
+            assert Path(r).resolve() == root.resolve()  # the map folder the base sits in
+            return d
+
+        monkeypatch.setattr("onward_generator.maps.workspace.load_map", read)
         assert users(f"out_{value}") == expected
     monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: {"user_decals": "no"})
     with pytest.raises(SignsError, match='^map.json "user_decals" must be true or false, got \'no\'$'):
