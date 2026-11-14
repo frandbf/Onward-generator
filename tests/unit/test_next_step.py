@@ -382,3 +382,20 @@ def test_heights_command_takes_the_maps_own_height_config(tmp_path: Path) -> Non
     (root / "config" / "heights.json").write_text("{}", encoding="utf-8")
     assert f"--config {root / 'config' / 'heights.json'}" in heights_command(scene).display()
     assert "--config" not in heights_command(tmp_path / "loose" / "geo_scene.json").display()  # no map folder
+
+
+def test_detail_command_takes_the_maps_own_detail_and_typology_config(tmp_path: Path) -> None:
+    from onward_generator.next_step import detail_command
+
+    root = tmp_path / "obelisco"
+    create_map(root, map_id="obelisco", name="Obelisco", latitude=LAT, longitude=LON, radius_m=400)
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    heights, base = root / "h.json", root / "base"
+    shown = detail_command(scene, heights, base).display()
+    assert "--config" not in shown and "--typology-config" not in shown
+    (root / "config" / "typology.json").write_text("{}", encoding="utf-8")
+    shown = detail_command(scene, heights, base).display()
+    assert f"--typology-config {root / 'config' / 'typology.json'}" in shown and " --config " not in shown
+    (root / "config" / "detail.json").write_text("{}", encoding="utf-8")
+    assert f" --config {root / 'config' / 'detail.json'}" in detail_command(scene, heights, base).display()
+    assert "--config" not in detail_command(tmp_path / "loose" / "geo_scene.json", heights, base).display()

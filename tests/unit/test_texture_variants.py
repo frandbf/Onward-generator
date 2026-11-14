@@ -170,3 +170,24 @@ def test_the_repetition_switch_reaches_the_variant_picks(monkeypatch: pytest.Mon
     with pytest.raises(RuntimeError, match="stop"):
         apply_module._apply_variants([], plan, [], {}, {}, [], seed=1, wide=False, extended=False)
     assert seen == [True, False]
+
+
+def test_a_variant_matches_its_slots_pick_in_family_and_distinctiveness() -> None:
+    """14 November 2026: concrete chosen for the pitched roofs varies with concrete, not tiles; a corrugated sheet varies
+    with the other distinctive roof; an ordinary tile never gets a corrugated variant."""
+    from onward_generator.materials.library_plan import texture_family
+
+    rows = catalogue_rows()
+    by_id = {str(row["id"]): row for row in rows}
+
+    def picks(**chosen: str) -> dict[str, list[str]]:
+        return variant_picks([SimpleNamespace(id=slot, library_id=i) for slot, i in chosen.items()], rows, 7, extended=True)
+
+    concrete = picks(roofs="ph_concrete_floor_01")["roofs"]
+    assert concrete and {texture_family(by_id[i]) for i in concrete} == {"concrete"}
+    sheet = picks(roofs="ph_asbestos_sheet")["roofs"]
+    assert sheet == ["ph_box_profile_metal_sheet"]  # the only other distinctive roof
+    tiles = picks(roofs="ph_clay_roof_tiles")["roofs"]
+    assert len(tiles) == VARIANTS and all(texture_family(by_id[i]) == "roof" and not by_id[i].get("distinctive") for i in tiles)
+    assert picks(roofs="")["roofs"] == picks(roofs="no_such_texture")["roofs"]  # no pick: the slot's own family, ordinary rows
+    assert all(texture_family(by_id[i]) == "roof" and not by_id[i].get("distinctive") for i in picks(roofs="")["roofs"])

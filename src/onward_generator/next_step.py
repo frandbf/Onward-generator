@@ -193,6 +193,13 @@ def _core_flags(scene: Path) -> tuple[str, ...]:
     return (*flags, "--mid-ring-m", f"{ring:g}") if ring is not None else flags
 
 
+def _own_config(scene: Path, name: str, flag: str) -> tuple[str, ...]:
+    """``(flag, path)`` when the map holds its own ``config/<name>`` (a copy of the default with the place's values)."""
+    root = map_root(scene)
+    own = root / "config" / name if root is not None else None
+    return (flag, show(own)) if own is not None and own.is_file() else ()
+
+
 def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,
                    roof_spread: Path | None = None, lod2_landmarks: Path | None = None) -> StageCommand:
     """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), Overture places and colours when given,
@@ -206,6 +213,8 @@ def detail_command(scene: Path, heights: Path, base: Path, places: Path | None =
         *(("--overture-tints", show(tints)) if tints is not None else ()),
         *(("--lidar-roofs", show(roof_spread)) if roof_spread is not None else ()),
         *(("--lod2-landmarks", show(lod2_landmarks)) if lod2_landmarks is not None else ()),
+        *_own_config(scene, "detail.json", "--config"),
+        *_own_config(scene, "typology.json", "--typology-config"),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *_core_flags(scene),
     )

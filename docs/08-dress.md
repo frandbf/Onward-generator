@@ -235,3 +235,9 @@ Local Asset Store texture sets of the family `earth` (sand, dry soil, gravel; AD
 UVs already stored on a primitive (overgrow meshes, Panoramax facades) are copied as they are.
 
 Phase 07 stays open. `device_verified` stays false until the headset checklist is filled in.
+
+## Dirt streets and texture variants (14 November 2026)
+
+When a texture plan puts an `earth` texture on `streets_plazas`, the residual ground between the streets (`ground_neutral`, colour `ground`, the neutral procedural tile) takes the same photograph, recorded in `materials_report.json` `applied` as a `streets_plazas` row with catalogue id `ground_neutral`. A map with OSM pedestrian areas has little residual ground; a map built from Overture alone has mostly that. A paved plan keeps the tile. The rule follows the texture, not a place.
+
+A texture variant (map.json `texture_variants`) is drawn from the family of the texture its slot chose, not always the slot's own family: concrete chosen for the pitched roofs varies with concrete. A variant of a `distinctive` pick (a corrugated sheet) is another distinctive row; an ordinary pick never gets a distinctive variant, so the maps that were already generated keep their variants.

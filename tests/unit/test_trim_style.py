@@ -43,9 +43,11 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     assert table.path == STYLE_TABLE_PATH
     assert len(table.sha256) == 64
     assert {name for name, style in table.styles.items() if style.atlas is not None} == {"mediterranean"}
-    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "haussmann", "generic"}
+    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "haussmann", "east_african", "generic"}
     # Plan Q3: Paris comes first, so its box wins over every coarser one.
-    assert [style for style, _ in table.rules] == ["haussmann", "mediterranean", "anglo", "latin_american", "central_european"]
+    assert [style for style, _ in table.rules] == ["haussmann", "mediterranean", "anglo", "latin_american", "central_european",
+                                                   "east_african"]
+    assert table.rules[-1][1] == ((-2.0, 12.0, 41.0, 51.5), (-11.0, -2.0, 38.5, 41.5))
     assert table.rules[0][1] == ((48.8, 48.93, 2.2, 2.5),)
     assert table.rules[1][1][0] == (35.0, 44.5, -10.0, 29.0)
     assert table.styles["anglo"].note.startswith("Planned")
@@ -64,6 +66,11 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     (48.84045, 2.34981, "haussmann"),  # Paris, Rue Mouffetard (plan Q3)
     (48.8566, 2.3522, "haussmann"),  # Paris, Hôtel de Ville
     (48.6, 2.35, "generic"),  # south of Paris, outside its box
+    (2.047458, 45.326639, "east_african"),  # Mogadishu (14 November 2026)
+    (-4.0435, 39.6682, "east_african"),  # Mombasa, Swahili coast
+    (11.5886, 43.1456, "east_african"),  # Djibouti
+    (12.7855, 45.0187, "generic"),  # Aden, across the gulf, outside the box
+    (-1.2921, 36.8219, "generic"),  # Nairobi, inland
 ])
 def test_the_map_centre_picks_the_style(lat: float, lon: float, style: str) -> None:
     assert select_style(load_style_table(), lat, lon) == style
@@ -196,8 +203,9 @@ def test_layout_rows_and_uvs() -> None:
 
 # The shipped main table, unchanged by plan D1 and changed by plan Q3 (the Paris box): materials reports and the
 # Panoramax tint read its hash.
-MAIN_TABLE_SHA256 = "f09eb4b54d64fe326e311042cdafb492396bb683c8207ece62a0458aeaeff5bb"
-REGIONAL = ("central_european", "anglo", "latin_american", "haussmann")
+# Changed again on 14 November 2026: the east_african style and its box.
+MAIN_TABLE_SHA256 = "39bbec35ae1e4410a804da4d3fd76c7c0b73613132c5dd345995a628a1e21f46"
+REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african")
 
 
 def _regional_doc() -> dict[str, Any]:
@@ -220,7 +228,7 @@ def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
     assert regional.path == REGIONAL_TABLE_PATH and len(regional.sha256) == 64
     assert set(regional.atlases) == set(REGIONAL)
     kinds = {"central_european": {"casement"}, "anglo": {"sash", "casement"}, "latin_american": {"grille", "casement"},
-             "haussmann": {"casement"}}
+             "haussmann": {"casement"}, "east_african": {"grille"}}
     for name, atlas in regional.atlases.items():
         # The Panoramax tint moves inside a wall family: every family is still there.
         assert set(atlas["walls"]) == set(table.styles["mediterranean"].atlas["walls"])  # type: ignore[index]
@@ -235,6 +243,10 @@ def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
     assert set(haussmann["wall_tints"]) == {wall for wall, kind in haussmann["walls"].items() if kind == "ashlar"}
     assert haussmann["dress"] == {"zocalo_share": 1.0, "cornice_share": 0.95, "course_share": 0.9}
     assert "eras" not in haussmann and "wall_tints" not in regional.atlases["central_european"]
+    east = regional.atlases["east_african"]  # lime render over coral stone or adobe, no string courses
+    assert east["sources"] == {"plaster": "ph_painted_plaster_wall", "stone": "ph_old_stone_wall", "brick": "ph_clay_block_wall"}
+    assert east["dress"] == {"zocalo_share": 0.55, "cornice_share": 0.15, "course_share": 0.0} and "eras" not in east
+    assert east["wall_tints"] == {"brick_red": [0.92, 0.86, 0.78]}
 
 
 def test_era_periods_follow_detail() -> None:
