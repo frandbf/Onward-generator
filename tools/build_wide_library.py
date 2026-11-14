@@ -4,7 +4,7 @@ Each row is a cached 1k Diffuse JPEG under assets/textures/<id>/ with its Poly H
 hashes). The family is set here, not guessed from the name, and every row passes its family's calm limit
 (``library_plan.is_calm`` with the extended limits): ``tests/unit/test_wide_library.py`` checks the written file.
 
-    uv run python tools/build_wide_library.py            # rewrite the manifest from the cached files
+    tools/docker/run.sh python tools/build_wide_library.py   # rewrite the manifest from the cached files
 
 A new id is fetched with ``materials.polyhaven.ensure_diffuse_1k`` and its normal map with
 ``materials.polyhaven.ensure_map_1k(url, "nor_gl")`` (plan T3); a row records ``normal`` when that file is cached.
