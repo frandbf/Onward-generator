@@ -303,6 +303,12 @@ def test_each_category_can_place_without_touching_collision_or_footprints(tmp_pa
     objects = written["objects"]
     growth = [row for row in objects if row.get("type") == "overgrowth"]
     props = [row["position_m"][:2] for row in growth if row.get("asset_id")]
+    # Each library prop and each wreck records its placed size, which the layout keeps a lift cabin clear of; grass does not.
+    car = next(row for row in growth if row.get("asset_id") == "synth_car")
+    assert len(car["size_m"]) == 3 and car["size_m"][0] > 1.0
+    assert all(len(row["size_m"]) == 3 for row in growth if row.get("asset_id"))
+    assert all(row["size_m"] == [4.0, 1.6, 1.55] for row in growth if row["kind"] == "wreck")
+    assert not any("size_m" in row for row in growth if row["kind"] == "grass")
     # Clear of every tree (1.5 m) and wreck (3 m); a tuft of grass may lie under a prop.
     for kind, radius in (("tree", 1.5), ("wreck", 3.0)):
         assert all(math.dist(p, row["position_m"][:2]) >= radius for p in props for row in growth if row["kind"] == kind)

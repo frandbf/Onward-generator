@@ -285,6 +285,8 @@ def overgrow(
                 matrix,
             ))
             row = _record("wreck", "generated", spot, None, z)
+            extent = wreck.vertices.max(axis=0) - wreck.vertices.min(axis=0)
+            row["size_m"] = [round(float(extent[0]), 3), round(float(extent[1]), 3), round(float(extent[2]), 3)]
             if turn:
                 row["crosswise"] = True
             records.append(row)
@@ -386,6 +388,8 @@ def overgrow(
             **({"role": row["role"]} if row.get("role") else {}),
             **({"surface": row["surface"]} if row.get("surface") else {}),
             **({"crosswise": True} if row.get("crosswise") else {}),
+            # Length, width and height of the placed mesh: the layout keeps a lift cabin off the whole prop (13 November 2026).
+            **({"size_m": row["size_m"]} if row.get("size_m") else {}),
         }
         for index, row in enumerate(records)
     )

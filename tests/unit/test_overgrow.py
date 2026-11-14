@@ -172,6 +172,7 @@ def test_an_abandoned_brief_puts_a_wreck_in_the_carriageway(tmp_path: Path) -> N
     wrecks = [row for row in manifest["objects"] if row.get("kind") == "wreck"]
     assert wrecks
     assert min(abs(row["position_m"][1]) for row in wrecks) < 4.2
+    assert all(row["size_m"] == [4.0, 1.6, 1.55] for row in wrecks)  # the generic body's box: the layout keeps a cabin off it
 
 
 def test_a_wreck_in_the_street_sits_on_the_asphalt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
