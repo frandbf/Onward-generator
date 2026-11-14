@@ -45,7 +45,9 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 HEAD_LAYOUT_SHA256 = "b4a41ccf2c3a36c57e76c96e2a7d5f6c545ff2042d7180deec50c97450fecef7"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
-HEAD_REPORT_SHA256 = "f4065bb07ea796bc60bb4ec037b10a30d83c8f9ed3e47d711d3f4f7b4f4615e9"
+# Re-pinned on 13 November 2026: observed trees keep 5 m apart (detail.urban.TREE_MIN_SPACING_M), so the report counts
+# one cover collider fewer; the layout is unchanged.
+HEAD_REPORT_SHA256 = "d4cfd2fbe3c74e4e6c2a03547ed78ec7789848181060536984768623dff8e62e"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 
