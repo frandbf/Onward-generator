@@ -888,3 +888,42 @@ def test_the_street_prop_caps_were_doubled() -> None:
     caps = {rule.id: rule.cap for rule in PLACEMENT_RULES}
     assert caps == {"vehicles_curb": 12, "waste_ground": 24, "furniture_off_lane": 12, "structures_edge": 8, "facade_wall": 16,
                     "barriers_curb": 8, "manhole_lane": 2, "manhole_sidewalk": 6, "plants": 16, "bushes": 4, "trees": 2}
+
+
+def test_preferred_props_take_each_rule_first_after_the_textured_ones(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A worn street profile now orders the library instead of keeping out 387 of its 449 props (13 November 2026)."""
+    from types import SimpleNamespace
+
+    import onward_generator.overgrow.dressing as dressing
+
+    flat = {"flat_worn", "flat_new"}
+    monkeypatch.setattr(dressing, "prop_flat", lambda prop: prop.spec.id in flat)
+    props = [SimpleNamespace(spec=SimpleNamespace(id=ident)) for ident in ("flat_worn", "new_a", "flat_new", "worn_b", "new_c", "worn_d")]
+    order = [prop.spec.id for prop in dressing.placement_order(props, frozenset({"worn_b", "worn_d", "flat_worn"}))]  # type: ignore[arg-type]
+    assert order == ["worn_b", "worn_d", "new_a", "new_c", "flat_worn", "flat_new"]
+    assert [prop.spec.id for prop in dressing.placement_order(props, frozenset())] == ["new_a", "worn_b", "new_c", "worn_d", "flat_worn", "flat_new"]  # type: ignore[arg-type]
+
+
+def test_overgrow_spends_only_the_room_under_the_unity_limit() -> None:
+    from onward_generator.export.triangle_budget import ADAPTER_BASE_TRIANGLES, UNITY_TRIANGLE_LIMIT
+    from onward_generator.overgrow.place import LATER_RESERVE_TRIANGLES, triangle_headroom
+
+    assert (UNITY_TRIANGLE_LIMIT, ADAPTER_BASE_TRIANGLES, LATER_RESERVE_TRIANGLES) == (300_000, 12_300, 12_000)
+    # Murcia Catedral: 188 147 triangles in, 72 321 of shop and flat furniture.
+    assert triangle_headroom(188_147, 72_321) == 300_000 - 12_300 - 12_000 - 188_147 - 72_321 == 15_232
+    assert triangle_headroom(275_700, 0) == 0 and triangle_headroom(275_701, 0) == 0
+
+
+def test_without_a_zone_overgrow_dresses_the_whole_playable_core() -> None:
+    """The 110 m block left most of a 200 m core bare: 12 087 spots of Murcia Catedral fell outside it."""
+    from shapely import box as plan_box
+
+    from onward_generator.overgrow.place import _resolve_zone
+
+    core = plan_box(-100.0, -100.0, 100.0, 100.0)
+    zone = _resolve_zone(None, None, None, core)
+    assert zone.kind == "core" and zone.polygon.equals(core)
+    block = _resolve_zone(None, None, None)
+    assert block.kind == "block" and block.bounds() == (-55.0, -55.0, 55.0, 55.0)
+    # A zone that is asked for still wins over the core.
+    assert _resolve_zone(None, 30.0, None, core).kind == "radius"

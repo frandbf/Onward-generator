@@ -138,7 +138,7 @@ def test_on_with_stub_applies_ids(runs: dict[str, Any]) -> None:
     selection = sp.selection_path(runs["root"])
     assert runs["flags"] == {
         "materials": ["--facade-style", "mediterranean", "--repetition", "--cell-m", "100.0", "--street-profile", rec],
-        "overgrow": ["--selection", str(selection), "--profile", "30", "--street-profile", rec],
+        "overgrow": ["--prefer", str(selection), "--profile", "30", "--street-profile", rec],
         "cover": ["--max-props", "8", "--street-profile", rec],
     }
     # The real catalogue: the wrecked group is burned, damaged and wrecked, plus the conditionless shrub.
@@ -150,9 +150,12 @@ def test_on_with_stub_applies_ids(runs: dict[str, Any]) -> None:
     assert "repetition" in materials and "repetition" not in _report(runs["materials_off"], "materials_report.json")
     summary = _report(runs["overgrow_on"], "overgrow_report.json")
     assert summary["street_profile"] == block and summary["profile_years"] == 30
-    assert summary["library_selection"] == ["synth_barrel_burned", "synth_car_wrecked", "synth_shrub"]
+    # Since 13 November 2026 the props profile orders the library instead of filtering it: the three preferred ids go
+    # first and every installed prop is still loaded, as without the profile.
+    assert summary["library_selection"] is None and summary["library_preferred"] == 3
     off = _report(runs["overgrow_off"], "overgrow_report.json")
     assert "street_profile" not in off and off["profile_years"] == 100 and off["library_selection"] is None
+    assert off["library_preferred"] == 0 and summary["library_assets"] == off["library_assets"] == 5
 
 
 def test_on_twice_identical(runs: dict[str, Any]) -> None:

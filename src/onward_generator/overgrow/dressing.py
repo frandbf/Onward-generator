@@ -148,6 +148,7 @@ def dress(
     taken: list[tuple[float, float, float]] | None = None,
     keep_out: list[tuple[float, float, float]] | None = None,
     signs: list[tuple[Polygon, float, float]] | None = None,
+    preferred: frozenset[str] = frozenset(),
 ) -> Dressing:
     """``occupied`` lists (x, y, radius) already taken by wrecks, trees and grass; the sidewalk covers keep clear of all of it.
 
@@ -155,6 +156,7 @@ def dress(
     while only the covers counted the wrecks stood inside one. Grass may lie under a prop.
     ``keep_out`` are circles (x, y, radius) no prop footprint may enter: the urban elements of ``detail``.
     ``signs`` are the shop signs no wall-mounted prop may cover.
+    ``preferred`` props take each rule's places first (a street profile's props_profile); the others fill what is left.
     """
     result = Dressing(keep_out=[Point(x, y).buffer(radius) for x, y, radius in keep_out or []], signs=list(signs or []))
     ground = floor if floor is not None else RoadFloor.empty()
@@ -166,7 +168,7 @@ def dress(
     _place_props(
         props, spots, buildings, lane_tree, lanes, zone, profile, seed, spawns, triangle_budget, result,
         block_streets=block_streets, placed_roles=Counter(placed_roles or {}), floor=ground,
-        used=used, seen=seen,
+        used=used, seen=seen, preferred=preferred,
     )
     sidewalk_covers(
         props, lanes, buildings, lane_tree, zone, profile, seed, spawns, triangle_budget, result,
@@ -196,12 +198,14 @@ def _place_props(
     *,
     used: list[tuple[float, float, float]],
     seen: set[str],
+    preferred: frozenset[str] = frozenset(),
 ) -> None:
     counts: Counter[str] = Counter()
     role_placed = placed_roles if placed_roles is not None else Counter()
     # Textured props first: a rule's cap is shared by its props, so a model drawn in flat colours takes only what the
-    # textured ones leave (``flatness.prop_flat``, 12 November 2026; the order is otherwise kept).
-    props = sorted((_fitted(prop) for prop in props), key=prop_flat)
+    # textured ones leave (``flatness.prop_flat``, 12 November 2026; the order is otherwise kept). Among them a preferred
+    # prop goes first: a worn street profile once kept out 387 of 449 props, so it now orders them (13 November 2026).
+    props = placement_order([_fitted(prop) for prop in props], preferred)
     for prop in props:
         rules = _spot_rules(prop)
         if not rules:
@@ -264,6 +268,11 @@ def _place_props(
         props, spots, buildings, lane_tree, lanes, zone, profile, seed, spawns, budget, result, used, counts, seen,
         block_streets, role_placed, floor,
     )
+
+
+def placement_order(props: list[Prop], preferred: frozenset[str]) -> list[Prop]:
+    """Textured props before flat-coloured ones, and within each a ``preferred`` prop first; otherwise the order kept."""
+    return sorted(props, key=lambda prop: (prop_flat(prop), prop.spec.id not in preferred))
 
 
 def _repeats(props, spots, buildings, lane_tree, lanes, zone, profile, seed, spawns, budget, result, used, counts, seen, block_streets, role_placed, floor) -> None:

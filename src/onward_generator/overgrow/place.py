@@ -26,6 +26,7 @@ from onward_generator.detail.modules import yaw_matrix
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.export.library_normals import carried_normal_maps
+from onward_generator.export.triangle_budget import ADAPTER_BASE_TRIANGLES, UNITY_TRIANGLE_LIMIT, visual_triangles
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, glb_append, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, box, merge, transform
@@ -64,8 +65,13 @@ from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import load_replay
 from onward_generator.overgrow.urban import detail_elements
-from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file
+from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file, zone_from_polygon
 from onward_generator.tiers import core_of
+
+LATER_RESERVE_TRIANGLES = 12_000
+"""What the stages after overgrow still add, kept out of its budget: sightline cover (up to 24 props), ladders and lifts.
+Overgrow's own caps (``MAX_ADDED_TRIS``, ``MAX_LIBRARY_TRIS``) knew nothing of the Unity limit, so a wider zone could have
+pushed a map with heavy shop furniture over 300 000 (13 November 2026)."""
 
 GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 SKIP_HIGHWAYS = frozenset({
@@ -110,6 +116,7 @@ def overgrow(
     ai: bool | None = None,
     provider=None,
     street_profile: Mapping[str, Any] | None = None,
+    prefer: str | Path | None = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -136,8 +143,9 @@ def overgrow(
     detail_tree_ids, detail_trees = _detail_trees(manifest)
     urban_areas = [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
     years = profile_for(profile)
-    area = _resolve_zone(zone, zone_radius_m, zone_polygon)
-    area = within_core(area, core_of(manifest))
+    core = core_of(manifest)
+    area = _resolve_zone(zone, zone_radius_m, zone_polygon, core)
+    area = within_core(area, core)
     spawns = load_spawns(layout if layout is not None else _layout_near(scene_path))
     try:
         # The interior furniture detail planned (ADR-031 shop rooms, ADR-034 stair floors). No plan: nothing is read and nothing is added.
@@ -155,6 +163,8 @@ def overgrow(
                 "selection names assets that are not installed in the library: " + ", ".join(missing)
             )
         props = [prop for prop in props if prop.spec.id in set(chosen)]
+    # A street profile's props_profile: these ids are offered and placed first, and nothing is kept out for it.
+    preferred = frozenset(read_selection(prefer)) & {prop.spec.id for prop in props} if prefer is not None else frozenset()
     stored_brief, stored_ai = _ambient_settings(base)
     use_ai = stored_ai if ai is None else ai
     brief_text = stored_brief if brief is None else brief
@@ -164,7 +174,8 @@ def overgrow(
     wreck = wreck_mesh()
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
-    budget = _Budget(scaled_cap(MAX_ADDED_TRIS, 1.0))
+    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles)
+    budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
     reject_counts: dict[str, int] = {}
@@ -244,7 +255,7 @@ def overgrow(
     if use_ai:
         replay_path = out / "ambient_plan.json"
         replay = load_replay(replay_path.read_text(encoding="utf-8")) if replay_path.is_file() else None
-        picked = pick_props(props, brief=brief_text, provider=provider, replay=replay)
+        picked = pick_props(props, brief=brief_text, provider=provider, replay=replay, preferred=preferred)
         if picked.ok:
             props = [prop for prop in props if prop.spec.id in set(picked.asset_ids)]
     use_pick = picked is not None and picked.ok
@@ -292,7 +303,8 @@ def overgrow(
     planted = dress(
         props,
         edges, features, buildings, lanes, lane_tree, area, years, seed, spawns,
-        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)), triangle_budget=MAX_LIBRARY_TRIS,
+        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)), triangle_budget=min(MAX_LIBRARY_TRIS, headroom - budget.used),
+        preferred=preferred,
         block_streets=plan.street_blocking,
         placed_roles={"wreck": wreck_count},
         floor=floor,
@@ -443,6 +455,8 @@ def overgrow(
         ),
         "library_lod": {item: by_id[item].lod() for item in dict.fromkeys(planted.placed_ids) if by_id[item].source_triangles},
         "max_added_triangles": MAX_ADDED_TRIS,
+        "triangle_headroom": headroom,
+        "library_preferred": len(preferred),
         "rejects": rejects[:80],
         "reject_counts": reject_counts,
         "geometry": compare,
@@ -461,7 +475,15 @@ def overgrow(
     return summary
 
 
-def _resolve_zone(zone: Zone | None, radius_m: float | None, polygon: str | Path | None) -> Zone:
+def triangle_headroom(input_triangles: int, furniture_triangles: int) -> int:
+    """What overgrow may add under the Unity limit: the limit less the adapter's own triangles, the later stages'
+    ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture overgrow adds. Never below 0."""
+    return max(0, UNITY_TRIANGLE_LIMIT - ADAPTER_BASE_TRIANGLES - LATER_RESERVE_TRIANGLES - input_triangles - furniture_triangles)
+
+
+def _resolve_zone(zone: Zone | None, radius_m: float | None, polygon: str | Path | None, core: Any = None) -> Zone:
+    """The zone given, or the playable ``core`` when none is, or one 110 m block on a map without a core. The block
+    left most of a 200 m core bare: 12 087 spots of Murcia Catedral fell outside it (13 November 2026)."""
     chosen = sum(item is not None for item in (zone, radius_m, polygon))
     if chosen > 1:
         raise OvergrowError("pass only one zone")
@@ -471,6 +493,8 @@ def _resolve_zone(zone: Zone | None, radius_m: float | None, polygon: str | Path
         return radius_zone(radius_m)
     if polygon is not None:
         return zone_from_file(polygon)
+    if core is not None:
+        return zone_from_polygon(core, kind="core")
     return default_block_zone()
 
 

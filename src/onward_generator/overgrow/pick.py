@@ -141,10 +141,12 @@ def parse_pick(text: str, offered: Mapping[str, Prop]) -> tuple[tuple[str, ...],
     return chosen, mood
 
 
-def pick_props(props: list[Prop], *, brief: str, provider=None, replay: Mapping[str, object] | None = None) -> PickResult:
-    """Ask for a pick of ``props``, or replay a stored one with the same instruction."""
+def pick_props(props: list[Prop], *, brief: str, provider=None, replay: Mapping[str, object] | None = None,
+               preferred: frozenset[str] = frozenset()) -> PickResult:
+    """Ask for a pick of ``props``, or replay a stored one with the same instruction. ``preferred`` ids go first
+    where the library is too long for the prompt (``prompt.prompt_props``)."""
     fitted = fitted_props(props)
-    usable = prompt_props(placeable(fitted), brief)
+    usable = prompt_props(placeable(fitted), brief, preferred=preferred)
     offered = {prop.spec.id: prop for prop in usable}
     library = {"offered": len(usable), "fitted": len(fitted)}
     digest = instruction_sha256(brief, usable)

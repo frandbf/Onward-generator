@@ -513,6 +513,24 @@ def test_runs_grids_and_brief_words_come_first_in_their_role() -> None:
     assert "lib_007x" not in {p.spec.id for p in prompt_props(props, "short", budget=two + cost["lib_007x"])}
 
 
+
+def test_a_preferred_prop_comes_after_runs_and_grids_but_before_brief_words() -> None:
+    """A worn street profile kept out 387 of 449 props on Murcia Catedral; it now orders them (13 November 2026)."""
+    props = _many(30, roles=("barrier",))
+    run = Prop(replace(props[5].spec, grouping="run"), props[5].mesh, props[5].uvs, props[5].albedo)
+    tagged = Prop(replace(props[6].spec, tags=("sandbags",)), props[6].mesh, props[6].uvs, props[6].albedo)
+    props = [run if i == 5 else tagged if i == 6 else prop for i, prop in enumerate(props)]
+    cost = {str(row["id"]): _row_tokens(row) for row in library_rows(props)}
+    # The prop last by the hash of its id: only the preference can bring it forward.
+    last = max((p.spec.id for p in props if p.spec.id not in ("lib_005", "lib_006")), key=lambda i: hashlib.sha256(i.encode()).hexdigest())
+    two = cost["lib_005"] + cost[last]
+    assert {p.spec.id for p in prompt_props(props, "sandbags", budget=two, preferred=frozenset({last}))} == {"lib_005", last}
+    # Without it the brief word wins the second place.
+    assert {p.spec.id for p in prompt_props(props, "sandbags", budget=cost["lib_005"] + cost["lib_006"])} == {"lib_005", "lib_006"}
+    # A preferred id that is not offered changes nothing; a library that fits is offered whole either way.
+    assert prompt_props(props, "sandbags", budget=two, preferred=frozenset({"elsewhere"})) == prompt_props(props, "sandbags", budget=two)
+    assert prompt_props(props, "", preferred=frozenset({last})) == props
+
 def test_compose_offers_the_budgeted_library_and_records_it() -> None:
     features = _block_features()
     scene = _scene(features, longitude=MURCIA_CENTER[0], latitude=MURCIA_CENTER[1], crs="EPSG:25830")

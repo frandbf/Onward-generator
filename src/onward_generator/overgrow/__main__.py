@@ -38,10 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--out", required=True, help="new output directory")
     place.add_argument("--profile", type=int, choices=(10, 30, 100), default=100, help="abandonment years; density only")
     place.add_argument("--seed", type=int, default=SEED)
-    place.add_argument("--zone-radius", type=float, default=None, help="disc radius in local metres; default is one 110 m block")
+    place.add_argument("--zone-radius", type=float, default=None, help="disc radius in local metres; default is the playable core, else one 110 m block")  # pragma: no mutate: help text
     place.add_argument("--zone-polygon", default=None, help="GeoJSON polygon in local metres")
     place.add_argument("--library", default=None, help="one catalogue directory, or a parent of catalogues; missing means procedural only")
     place.add_argument("--selection", default=None, help="prop_selection.json; only those installed ids are placed")
+    place.add_argument("--prefer", default=None, help="a prop_selection.json whose ids are offered and placed first; the other props still stand (a street profile's props_profile)")  # pragma: no mutate: help text
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
     place.add_argument(
         "--street-profile",
@@ -126,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.base, args.scene, args.out,
             overwrite=args.overwrite, profile=args.profile, seed=args.seed,
             zone_radius_m=args.zone_radius, zone_polygon=args.zone_polygon,
-            library=args.library, layout=args.layout, selection=args.selection,
+            library=args.library, layout=args.layout, selection=args.selection, prefer=args.prefer,
             street_profile=block,
         )
     except (OvergrowError, FitError, FetchError, SketchfabError, ZoneError, LibraryError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:
