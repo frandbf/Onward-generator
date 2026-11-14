@@ -177,6 +177,10 @@ Turn a switch off with its `--no-` flag, on `map create` or on `run` for a new m
 
 Each map lives in `maps/<id>/`, the name in lower case with `_` between words. An export package is never overwritten: the next build of the same map is `pkg_02`. The headset has one local map slot, so its card is always called `Unity Export`; experimental listing modes try to show the map's own name and picture ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)).
 
+## With Claude Code
+
+If you use [Claude Code](https://claude.com/claude-code), the project skill in `.claude/skills/onward-generator/` lets you make maps by describing them: the place, the size, how it should feel. It runs only the `task` commands above, in Docker, asks before anything slow, explains failures in plain words, and walks you through the Quest upload and the Onward Workshop rules. It never uploads to your headset or edits the code.
+
 ## Without Docker
 
 With Python 3.12 or newer (tested with 3.14):

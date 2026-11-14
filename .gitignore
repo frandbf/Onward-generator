@@ -27,7 +27,9 @@ cache/
 mutants/
 
 # Claude Code worktrees.
-.claude/
+.claude/*
+# The map-making skill for Claude Code is part of the repository; local settings stay out.
+!.claude/skills/
 .ruff_cache/
 .mypy_cache/
 
