@@ -111,26 +111,29 @@ Put PNG images (with a transparent background where the decal is not a rectangle
 
 Every map then carries each of them once, on an exposed wall of the playable core, before the generated decals; a decal that fits no wall stops `signs place` with its name. A map for the Onward Workshop must not show real people (Custom Content Guide): set `"user_decals": false` in its `map.json` to leave them out. Use only photographs you may share: no recognisable people, brands or personal data ([ADR-038](docs/decisions/ADR-038-wall-decals.md)).
 
-### Every option that is off by default
+### Every option
 
-A new map gets the base pipeline: OSM, the height sources that cover its centre, trim-sheet facades in the style of its region, the playable core, furnished shops and flats, street lamps, the rule-based dressing, the Hunt layout and the `neutral` light. Each feature below stays off until you turn it on: most are proposed until a headset session validates them, and a map made without them is built as before. `maps/rue_mouffetard` is the reference map with all the day switches on.
+A new map gets the base pipeline: OSM, the height sources that cover its centre, trim-sheet facades in the style of its region, the playable core in a 25 m scenic ring, furnished shops and flats, library lamp posts and cut-out trees when your local catalogues hold them, the rule-based dressing, the Hunt layout and the `neutral` light. Since 13 November 2026 it also has every `map.json` switch below on, except Panoramax; `--no-<switch>` turns one off. Most of them are proposed until a headset session validates them; a map created before keeps the switches its `map.json` lists.
 
-**Switches of `map create` and `run`** (stored in `map.json`; on an existing map, set the key to `true` and rerun from the stage it feeds):
+**Switches of `map create` and `run`** (stored in `map.json`; on for a new map unless marked off; on an existing map, set the key and rerun from the stage it feeds):
 
 | Flag | `map.json` key | What it adds |
 | --- | --- | --- |
-| `--atmosphere golden_hour` or `overcast` | `atmosphere` | Light preset of a day map: sun, ambient, AO, fog colour, wall palette; `golden_hour` doubles the bounced light ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)) |
+| `--atmosphere golden_hour` or `overcast` (off: `neutral`) | `atmosphere` | Light preset of a day map: sun, ambient, AO, fog colour, wall palette; `golden_hour` doubles the bounced light ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)) |
 | `--repetition` | `repetition` | Calm roof and paving pools and a per-cell ground phase, less visible tiling (plan C1) |
 | `--overture-tints` | `overture_tints` | Facade tints from Overture building colours where OSM has none (plan C2) |
 | `--lidar-roofs` | `lidar_roofs` | Flat or pitched roofs from the LiDAR nDSM where OSM has no roof tag (plan C3; needs a LiDAR source: `es.pnoa_ndsm`, `fr.lidar_hd`) |
 | `--regional-facades` | `regional_facades` | Regional trim atlases for `central_european`, `anglo` and `latin_american` (plan D1) |
 | `--street-profile` | `street_profile` | Local Ollama picks a street profile (facade style, palette, props, abandonment, cover) that code turns into stage flags (plan D2) |
-| `--ai` | `ambient_ai` | Local Ollama composes the dressing plan; a rejected reply keeps the rules ([ADR-010](docs/decisions/ADR-010-overgrow-ai-plan.md)) |
-| `--panoramax` | `panoramax` | Under development: 360° street photos projected onto exposed facades |
-| `--panoramax-atlas` | `panoramax_atlas` | With `--panoramax`: one decal image per combine cell, tinted trim walls, coverage report |
+| `--ai` (off unless asked) | `ambient_ai` | Local Ollama picks the props and wall decals; a rejected reply keeps the rules ([ADR-010](docs/decisions/ADR-010-overgrow-ai-plan.md)) |
+| `--panoramax` (off) | `panoramax` | Under development: 360° street photos projected onto exposed facades |
+| `--panoramax-atlas` (off) | `panoramax_atlas` | With `--panoramax`: one decal image per combine cell, tinted trim walls, coverage report |
 | `--gameplay-report` | `gameplay_report` | `gameplay_report.json`: routes, sightlines, contact balance ([ADR-032](docs/decisions/ADR-032-gameplay-metrics.md)) |
 | `--balanced-spawns` | `balanced_spawns` | Spawns and Uplink chosen by the gameplay metrics (plan C6) |
 | `--sightline-cover` | `sightline_cover` | Solid cover props on open sightlines past 60 m (plan C7) |
+| `--wide-library` | `wide_library` | 25 more CC0 Poly Haven photo textures (plan T1) |
+| `--normal-maps` | `normal_maps` | Real relief on ground, roofs and bark: `PP_Opaque_Lit` with the photographs' CC0 normal maps ([ADR-039](docs/decisions/ADR-039-library-normal-maps.md), accepted) |
+| `--texture-variants` | `texture_variants` | Two more calm photographs for roofs and plaster walls, one per building (plan T4) |
 
 `--street-profile` and `--ai` need [Ollama](https://ollama.com) with `qwen3:14b`; without it they fall back to rules. In Docker on macOS the container reaches it as `host.docker.internal` on its own.
 
@@ -142,7 +145,9 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | --- | --- |
 | `--core-target-triangles N` | Budget core: the core half-side is solved for N core triangles instead of a fixed radius ([ADR-017](docs/decisions/ADR-017-playable-core.md) amendment) |
 | `map.json` `"mid_ring_m": W` | 10 to 1000 m of intermediate HLOD ring around the core (plan D3) |
-| `map.json` `"facades": {"mode": "trim" \| "legacy", "style": "<name>" \| "auto"}` | Force a facade style or the old per-material facades |
+| `map.json` `"facades": {"mode": "trim" \| "legacy", "style": "<name>" \| "auto", "weathering": "clean" \| "worn" \| "heavy"}` | Force a facade style, the old per-material facades, or aged walls |
+| `map.json` `"triangle_limit": N` | 100 000 to 300 000 (default 300 000): what props and library trees fill up to and what the package is checked against; 250 000 for the Onward Workshop ([ADR-005](docs/decisions/ADR-005-quest-performance.md) amendment) |
+| `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
 
 **Data sources:** `--source nl.ahn` and `--source de.nrw_ndom` are opt-in LiDAR heights, used only inside their coverage. `onward-generator source list` shows every source; `--no-source <id>` turns one off.
 
@@ -154,14 +159,14 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `lightmap_pages_max: N` | Lowers the texel density until the lightmap fits N pages, never below 4 texels/m (plan C5) |
 | `lit_normal_material: "facade_trim_…"`, `lit_normal_strength` | Spike: one facade material lit with a derived normal map ([ADR-033](docs/decisions/ADR-033-lit-normal-spike.md)) |
 
-**Build and headset:** `ONWARD_BAKE=final task unity` bakes the final lighting (default `draft`). `ONWARD_QUEST_LISTING=local-thumb`, `named` or `named-thumb` try experimental card listings ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)). `task unity` asks before every upload.
+**Build and headset:** `ONWARD_BAKE=final task unity` bakes the final lighting (default `draft`). `ONWARD_QUEST_LISTING=local-thumb`, `named` or `named-thumb` try experimental card listings ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)). `task unity` asks before every upload. To share a map on the Onward Workshop, check it against the guide first and publish it from a Windows PC: [docs/12-export.md](docs/12-export.md#onward-workshop).
 
 **On by default, can be turned off:** shop furnishing (`interiors.shops.furnish.enabled`), flat furnishing (`interiors.furnish.enabled`), semantic furniture sets (`ONWARD_SEMANTIC_SETS=0` off) and your local Asset Store catalogues (`ONWARD_LOCAL_CATALOGUES=0` hides them).
 
-A new map has every `map.json` switch on except `panoramax_atlas`. That covers calm pools, Overture tints, LiDAR roofs, regional facades, the street profile, gameplay report and balanced spawns, sightline cover, the wide texture library, real normal maps and per-building texture variants. A name, a centre and a radius are enough:
+A name, a centre and a radius are enough; every switch above that is not marked off comes on by itself:
 
 ```bash
-onward-generator run --name "My map" --lat 48.84045 --lon 2.34981 --radius-m 150
+onward-generator run --name "My map" --lat 48.84045 --lon 2.34981 --radius-m 125
 ```
 
 Turn a switch off with its `--no-` flag, on `map create` or on `run` for a new map, for example `--no-normal-maps` or `--no-texture-variants` ([docs/02-configuration.md](docs/02-configuration.md)). A map created before keeps the switches its `map.json` lists. With `--regional-facades` a map in Paris gets light limestone Haussmann facades; Kraków, London or Mexico City get their own regional atlas ([docs/08-dress.md](docs/08-dress.md#trim-sheet-facades)).
