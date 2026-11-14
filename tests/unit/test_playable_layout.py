@@ -18,6 +18,9 @@ from onward_generator.perf.layout import (
     AMMO_SPAWN_CLEAR_M,
     BLOCK_GAP_M,
     CLIMB_BALCONY_CLEAR_M,
+    CLIMB_PROP_CLEAR_M,
+    CLIMB_TREE_CLEAR_M,
+    CLIMB_VEHICLE_CLEAR_M,
     GAMEPLAY_VERSION,
     GRID_M,
     MIN_SPAWN_SEPARATION_M,
@@ -46,11 +49,13 @@ from onward_generator.perf.layout import (
     fit_spawn_separation,
     free_ground,
     hunt_routes,
+    map_quad,
     nav_islands,
     navigation_estimate,
     patrol_seeds,
     patrol_spawns,
     playable_area,
+    prop_clearance,
     reachable_ground,
     roof_wind,
     route_islands,
@@ -751,6 +756,24 @@ def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> N
 
 
 
+def test_the_climb_keep_out_covers_a_whole_vehicle() -> None:
+    """On Murcia Catedral a lift cabin stood over a covered car 2.84 m from the cabin's centre: a 1 m circle round the
+    car's spot left most of a 4.5 m car outside the keep-out."""
+    car = {"type": "overgrowth", "kind": "vehicles", "role": "wreck", "position_m": [0.0, 0.0, 0.0], "size_m": [4.4, 1.8, 1.5]}
+    half = math.hypot(4.4, 1.8) / 2
+    assert prop_clearance(car) == pytest.approx(half)
+    keep_out = climb_keep_out([(500.0, 500.0)], [], {"objects": [car]})
+    assert keep_out.contains(Point(half - 0.05, 0.0)) and keep_out.contains(Point(0.0, -(half - 0.05)))
+    assert not keep_out.contains(Point(half + 0.05, 0.0))
+    # A small prop keeps at least the old metre; a tree keeps its crown, whatever size it records.
+    assert prop_clearance({"kind": "waste", "size_m": [0.4, 0.3, 0.5]}) == CLIMB_PROP_CLEAR_M
+    assert prop_clearance({"kind": "tree", "size_m": [9.0, 9.0, 9.0]}) == CLIMB_TREE_CLEAR_M
+    assert prop_clearance({"kind": "barriers", "role": "tree", "size_m": [9.0, 9.0, 9.0]}) == CLIMB_TREE_CLEAR_M
+    # A manifest from before size_m: a vehicle or a procedural wreck keeps a car's half-diagonal, anything else a metre.
+    assert prop_clearance({"kind": "vehicles"}) == prop_clearance({"kind": "wreck"}) == CLIMB_VEHICLE_CLEAR_M == 2.5
+    assert prop_clearance({"kind": "barriers"}) == CLIMB_PROP_CLEAR_M == 1.0
+
+
 def test_no_ammo_crate_lands_on_the_attackers_block() -> None:
     plaza = box(0, 0, 40, 12)
     # The attackers' block stands on the pole of the plaza, where the first crate used to go.
@@ -938,10 +961,12 @@ def test_a_placement_sets_the_defenders_and_the_uplink() -> None:
     assert {k: v for k, v in moved.items() if k not in ("defenders", "uplink_m")} == {k: v for k, v in today.items() if k not in ("defenders", "uplink_m")}
     # Exactly 30 m apart is enough.
     assert gameplay_layout(base, manifest, placement=Placement(a, (30.0, 0.0), (15.0, 0.0), a, a))["defenders"]["centre_m"] == [30.0, 0.0]  # type: ignore[arg-type]
-    # Since the C6 amendment of 11 November 2026 the attackers may move too, and the map quad follows them.
+    # Since the C6 amendment of 11 November 2026 the attackers may move too. The map quad stays at the centre of the site:
+    # it frames the minimap, a level_size_m square centred on it.
     shifted = gameplay_layout(base, manifest, placement=Placement((-40.0, 40.0), (40.0, -40.0), (10.0, -10.0), a, a))  # type: ignore[arg-type]
     assert shifted["attackers"]["centre_m"] == [-40.0, 40.0] and shifted["attackers"]["points_m"][0] == {"x": -41.8, "y": 39.4}
-    assert shifted["map_quad_m"] == [-40.0, 37.6]
+    sx0, sy0, sx1, sy1 = shifted["site_bounds_m"]
+    assert shifted["map_quad_m"] == today["map_quad_m"] == [round((sx0 + sx1) / 2, 2), round((sy0 + sy1) / 2, 2)]
     for placement, message in (
         (Placement((57.0, 0.0), (-40.0, 0.0), (10.0, 0.0), a, a), r"^the placed attackers' block does not fit the free area$"),
         (Placement((-29.9, 0.0), (0.0, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
@@ -1303,3 +1328,12 @@ def test_the_playable_layout_of_a_core_measures_the_core_navmesh_with_or_without
         assert all(inside.covers(Point(p["x"], p["y"])) for p in doc[block]["points_m"])
     assert inside.covers(Point(doc["uplink_m"]))
     assert _check_layout(doc) == []
+
+
+def test_the_map_quad_stands_at_the_centre_of_the_site() -> None:
+    """The SDK centres the minimap on the MapQuad: beside the attackers it drew the map in one corner of the tablet."""
+    assert map_quad((10.0, -40.0, 110.0, 60.0)) == [60.0, 10.0]
+    assert map_quad((0.0, 0.0, 0.123, 0.4567)) == [0.06, 0.23]
+    centre = map_quad((-180.0, -180.01, 180.0, 180.0))
+    assert centre == [0.0, 0.0] and all(math.copysign(1.0, value) == 1.0 for value in centre)
+    assert all(isinstance(value, float) for value in map_quad((0.0, 0.0, 1.0, 1.0)))

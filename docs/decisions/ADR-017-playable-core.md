@@ -54,6 +54,10 @@ The scenic ring is the step ADR-014 left open, done inside the area already extr
 
 The default core was 150 m whatever the radius, so a 150 m map had no core and the whole map was played. Barcelona Sarria (r 150) then reached 380 811 triangles in Unity, 12 lightmap pages and 135 / 318 / 376 draws a view (median, p90, max), against about 250 000 triangles and 150 draws in the guide. Without `--core-radius-m` the core is now `min(150, radius − 50)` (`default_core`, `CORE_RING_DEFAULT_M` 50); under the 50 m minimum, so under a 100 m radius, the whole map is played. A map of 200 m or more keeps its 150 m core. The same Barcelona map with a 100 m core: 234 166 triangles, 5 lightmap pages, 90 / 184 / 216 draws a view, and no lift, since no building of 3 to 6 storeys in that core had room for a cabin. An explicit `--core-radius-m`, 0 included, is kept as before, and a `map.json` already written keeps its value.
 
+## Amendment, 14 November 2026: a 25 m scenic ring and a 125 m default radius
+
+Asked by the maintainer after Murcia Catedral (r 150, core 100): 55 % of the area could not be played, for about 14 000 scenic triangles. `CORE_RING_DEFAULT_M` is now 25, so the default core is `min(150, radius − 25)` and the whole map is played under a 75 m radius. The default radius (`RADIUS_DEFAULT_M`, plan Q2b) is now 125 m, so a new map made without `--radius-m` keeps its 100 m core and the same triangle budget, and its scenic ring is half as wide. The budget core's largest half-side is `radius_m − 25` by default. A `map.json` already written keeps its `core_radius_m`; an explicit `--core-radius-m` is kept as before. On a map of 150 m made from now on, the core is 125 m: pass `--core-radius-m 100` to keep the earlier budget.
+
 ## Amendment, 7 November 2026: budget mode
 
 Status: proposed until a headset session checks it (plan B1, `docs/plans/2026-11-07-workshop-quality.md`). The fixed radius stays the default.
