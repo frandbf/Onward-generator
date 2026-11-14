@@ -339,7 +339,7 @@ The sidewalk and the foot of the facade received grass tufts until 5 November 20
 
 | Flag | Effect |
 | --- | --- |
-| `--profile 10\|30\|100` | Multiplies densities. It is not a simulation. Default `100` |
+| `--profile 10\|30\|100` | Multiplies the densities of grass, trees, bushes, vines and wrecks. It is not a simulation. Default `100`. Since 14 November 2026 it no longer lowers the street props: every profile keeps the rule caps whole, and the triangle headroom under the Unity limit bounds them (ADR-010 amendment) |
 | `--seed` | Seed. Default `48152` |
 | `--zone-radius` | A disc in local metres around the origin. With no zone, the default is the playable core (since 13 November 2026), and on a map without one a 110 m block. On a map with a playable core, any zone is cut to the core square (ADR-017); a zone that leaves nothing, or two pieces, inside it is refused |
 | `--zone-polygon` | A GeoJSON polygon in local metres |
