@@ -256,9 +256,9 @@ def test_detail_command_on_a_budget_map_carries_the_largest_core_and_the_target(
                core_target_triangles=150000)
     scene = root / "data" / "processed" / "geo" / "geo_scene.json"
     argv = list(detail_command(scene, heights, base).argv)
-    assert argv[-4:] == ["--core-radius-m", "250", "--core-target-triangles", "150000"]
+    assert argv[-4:] == ["--core-radius-m", "275", "--core-target-triangles", "150000"]
     assert argv.count("--core-radius-m") == 1
-    assert core_budget(scene) == (250.0, 150000)
+    assert core_budget(scene) == (275.0, 150000)
     assert core_radius(scene) == 150.0
     assert core_budget(tmp_path / "elsewhere" / "geo_scene.json") is None
     document = json.loads((root / "map.json").read_text(encoding="utf-8"))
@@ -353,7 +353,7 @@ def test_detail_command_carries_the_mid_ring_after_the_core(tmp_path: Path) -> N
     scene = budget / "data" / "processed" / "geo" / "geo_scene.json"
     store_mid_ring(budget, 50)
     assert detail_command(scene, heights, base).argv[-6:] == (
-        "--core-radius-m", "250", "--core-target-triangles", "150000", "--mid-ring-m", "50")
+        "--core-radius-m", "275", "--core-target-triangles", "150000", "--mid-ring-m", "50")
     document = json.loads((budget / "map.json").read_text(encoding="utf-8")) | {"mid_ring_m": 5000}
     (budget / "map.json").write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(MapError, match="from 10 to 1000"):
