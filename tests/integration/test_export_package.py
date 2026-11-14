@@ -120,8 +120,7 @@ def test_the_package_estimates_its_unity_triangles(inputs: tuple[Path, Path], tm
         "climb_triangles": climbs, "limit": 300_000, "within": True, "origin": "estimated",
     }
     assert not [w for w in m["warnings"] if "[unity_triangle_budget]" in w]
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", glb)
-    over = package(inputs, tmp_path / "over").manifest
+    over = package(inputs, tmp_path / "over", triangle_limit=glb).manifest
     assert over["triangle_budget"]["within"] is False and over["triangle_budget"]["limit"] == glb
     assert [w for w in over["warnings"] if "[unity_triangle_budget]" in w] == [
         f"triangle_budget: an estimated {glb + 12_300 + climbs} Unity triangles, over the {glb} limit [unity_triangle_budget]"]
