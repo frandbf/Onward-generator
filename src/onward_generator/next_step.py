@@ -332,6 +332,7 @@ def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
         child.is_dir() and (child / "manifest.json").is_file() for child in library.iterdir()
     ):
         parts.extend(["--library", show(library)])
+    parts.extend(_triangle_limit(root))
     if root is not None:
         selection = root / "config" / "prop_selection.json"
         if selection.is_file():
@@ -410,7 +411,16 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     atmosphere = _atmosphere(root)
     if atmosphere is not None:
         parts.extend(["--atmosphere", atmosphere])
+    parts.extend(_triangle_limit(root))
     return invoke(*parts)
+
+
+def _triangle_limit(root: Path | None) -> list[str]:
+    """``--triangle-limit N`` when ``map.json`` sets ``triangle_limit`` (ADR-005 amendment), else nothing."""
+    from onward_generator.maps.workspace import triangle_limit
+
+    limit = triangle_limit(root) if root is not None and (root / "map.json").is_file() else None
+    return [] if limit is None else ["--triangle-limit", str(limit)]
 
 
 def _atmosphere(root: Path) -> str | None:

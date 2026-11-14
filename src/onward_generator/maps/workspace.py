@@ -352,6 +352,24 @@ def texture_variants_enabled(directory: str | Path) -> bool:
     return value
 
 
+# map.json "triangle_limit" (ADR-005 amendment of 14 November 2026): the Unity triangle limit overgrow fills to and
+# export package checks against, lower than the default 300 000 (``export.triangle_budget.UNITY_TRIANGLE_LIMIT``),
+# for instance the Custom Content Guide's 250 000 before a map is sent to Onward.
+TRIANGLE_LIMIT_MIN = 100_000
+TRIANGLE_LIMIT_MAX = 300_000
+
+
+def triangle_limit(directory: str | Path) -> int | None:
+    """``map.json`` ``triangle_limit``, or None without the key. An integer from ``TRIANGLE_LIMIT_MIN`` to
+    ``TRIANGLE_LIMIT_MAX``; anything else is refused."""
+    value = load_map(directory).get("triangle_limit")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or not TRIANGLE_LIMIT_MIN <= value <= TRIANGLE_LIMIT_MAX:
+        raise MapError(f'map.json "triangle_limit" must be an integer from {TRIANGLE_LIMIT_MIN} to {TRIANGLE_LIMIT_MAX}, got {value!r}')
+    return value
+
+
 def normal_maps_enabled(directory: str | Path) -> bool:
     """True only when ``map.json`` has ``"normal_maps": true`` (plan T3, off by default). A value that is not a bool is
     refused."""

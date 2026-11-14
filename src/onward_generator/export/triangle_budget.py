@@ -72,7 +72,7 @@ def suggested_core(half_side_m: float, core_triangles: int, estimated: int, limi
 
 
 def triangle_budget(visual: bytes, layout: Mapping[str, Any], tiers: Mapping[str, Any] | None,
-                    core_half_side_m: float | None) -> dict[str, Any]:
+                    core_half_side_m: float | None, limit: int = UNITY_TRIANGLE_LIMIT) -> dict[str, Any]:
     """The manifest's ``triangle_budget`` block: the estimate, its parts and the limit, and a core that would fit
     when the estimate is over it and the map has a core."""
     glb = visual_triangles(visual)
@@ -83,13 +83,13 @@ def triangle_budget(visual: bytes, layout: Mapping[str, Any], tiers: Mapping[str
         "visual_triangles": glb,
         "adapter_triangles": ADAPTER_BASE_TRIANGLES,
         "climb_triangles": climbs,
-        "limit": UNITY_TRIANGLE_LIMIT,
-        "within": estimated <= UNITY_TRIANGLE_LIMIT,
+        "limit": limit,
+        "within": estimated <= limit,
         "origin": "estimated",
     }
     if not block["within"] and tiers is not None and core_half_side_m is not None:
         block["suggested_core_radius_m"] = suggested_core(core_half_side_m, int(tiers["core"]["visual_triangles"]), estimated,
-                                                          UNITY_TRIANGLE_LIMIT)
+                                                          limit)
     return block
 
 

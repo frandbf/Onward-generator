@@ -993,6 +993,11 @@ def test_the_library_budget_is_the_headroom_less_the_procedural_triangles(tmp_pa
     headroom = place.triangle_headroom(visual_triangles((tmp_path / "base" / "scene_visual.glb").read_bytes()), 0)
     assert report["triangle_headroom"] == headroom > 60_000
     assert seen["dress"]["triangle_budget"] == 60_000
+    # A map.json triangle_limit lowers what overgrow fills to, and the report names it.
+    assert report["triangle_limit"] == 300_000
+    limited = overgrow(tmp_path / "base", scene, tmp_path / "limited", zone=square_zone(80), seed=48152, triangle_limit=250_000)
+    assert limited["triangle_limit"] == 250_000
+    assert limited["triangle_headroom"] == place.triangle_headroom(visual_triangles((tmp_path / "base" / "scene_visual.glb").read_bytes()), 0, 250_000)
     # No grass is planted, so none is left for the props' rules to plant.
     assert seen["dress"]["grass_left"] == 0 and seen["dress"]["grass_mesh"].triangle_count == place.grass_tuft().triangle_count
     # With the library cap out of the way the headroom decides, less what the trees and wrecks already took.
@@ -1061,7 +1066,8 @@ def test_overgrow_place_hands_every_path_to_overgrow(tmp_path: Path, monkeypatch
     monkeypatch.setattr(cli, "overgrow", fake)
     assert cli.main(["place", "--base", "b", "--scene", str(tmp_path / "geo_scene.json"), "--out", str(tmp_path / "out"),
                      "--zone-radius", "40", "--library", "lib", "--layout", "layout.json", "--selection", "chosen.json",
-                     "--prefer", "worn.json"]) == 0
+                     "--prefer", "worn.json", "--triangle-limit", "250000"]) == 0
     assert {key: seen[key] for key in ("zone_radius_m", "zone_polygon", "library", "layout", "selection", "prefer")} == {
         "zone_radius_m": 40.0, "zone_polygon": None, "library": "lib", "layout": "layout.json", "selection": "chosen.json",
         "prefer": "worn.json"}
+    assert seen["triangle_limit"] == 250_000

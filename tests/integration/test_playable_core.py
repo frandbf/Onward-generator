@@ -293,8 +293,7 @@ def test_export_over_the_triangle_limit_suggests_a_smaller_core(
     estimated = within["triangle_budget"]["estimated_unity_triangles"]
     assert "suggested_core_radius_m" not in within["triangle_budget"]
     monkeypatch.setattr(budget, "MIN_CORE_M", 5.0)
-    monkeypatch.setattr(budget, "UNITY_TRIANGLE_LIMIT", estimated - 1)
-    over = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "over", now=FIXED_NOW).manifest
+    over = build_package(EXPORT_PROJECT, ring_detail, layout, tmp_path / "over", now=FIXED_NOW, triangle_limit=estimated - 1).manifest
     core = over["tiers"]["core"]["visual_triangles"]
     assert over["triangle_budget"]["suggested_core_radius_m"] == budget.suggested_core(CORE_M, core, estimated, estimated - 1) == 45.0
     assert any(w.endswith(f"over the {estimated - 1} limit; a core of 45 m should fit (map.json core_radius_m, then run --from detail) "
