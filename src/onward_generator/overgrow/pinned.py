@@ -127,7 +127,7 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
         prop = props.get(pin.asset_id)
         if prop is None:
             raise PinnedError(f"pinned prop {pin.asset_id} ({pin.label or 'no label'}) is not in the library")
-        target = frame.project(Point(pin.longitude, pin.latitude))
+        target = frame.to_local(Point(pin.longitude, pin.latitude))
         local = plan(prop.mesh)
         spot = None
         for dx, dy in _offsets(pin.search_m):
