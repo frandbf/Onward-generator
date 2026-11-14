@@ -896,7 +896,12 @@ CLIMB_KEEP_OUT_M = 3.0
 CLIMB_ROUTE_KEEP_OUT_M = 1.5
 """The navmesh is baked without them, so a bot's route must not cross them."""
 CLIMB_PROP_CLEAR_M = 1.0
-"""From the spot of an overgrow prop: the radius ``free_ground`` gives a detail urban element. An estimate, not a measured footprint."""
+"""From the spot of an overgrow prop: the radius ``free_ground`` gives a detail urban element. The least clearance: a prop
+whose ``size_m`` is recorded keeps half its plan diagonal (``prop_clearance``)."""
+CLIMB_VEHICLE_CLEAR_M = 2.5
+"""From a vehicle or a wreck without ``size_m`` (a manifest from before 13 November 2026): half the diagonal of a 4.5 by
+1.8 m car. A 1 m circle let a lift cabin stand over a covered car on Murcia Catedral."""
+CLIMB_VEHICLES = frozenset({"vehicles", "wreck"})
 CLIMB_TREE_CLEAR_M = 2.0
 """From an overgrow tree: a generated crown is about 3.8 m across, and it once stood in a street cabin."""
 CLIMB_SIGN_CLEAR_M = 1.5
@@ -933,6 +938,18 @@ def _board_line(board: Mapping[str, Any]) -> LineString:
     return LineString([(x + ny * half, y - nx * half), (x - ny * half, y + nx * half)])
 
 
+def prop_clearance(prop: Mapping[str, Any]) -> float:
+    """The radius a cabin or a ladder's foot keeps from an overgrow prop's spot. A tree keeps its crown's
+    ``CLIMB_TREE_CLEAR_M``. A prop with ``size_m`` keeps half its plan diagonal, which covers it at any heading, and at
+    least ``CLIMB_PROP_CLEAR_M``. Without ``size_m``, a vehicle or a wreck keeps ``CLIMB_VEHICLE_CLEAR_M``."""
+    if "tree" in (prop.get("kind"), prop.get("role")):
+        return CLIMB_TREE_CLEAR_M
+    size = prop.get("size_m")
+    if size:
+        return max(CLIMB_PROP_CLEAR_M, math.hypot(float(size[0]), float(size[1])) / 2)
+    return CLIMB_VEHICLE_CLEAR_M if prop.get("kind") in CLIMB_VEHICLES else CLIMB_PROP_CLEAR_M
+
+
 def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mapping[str, Any]], detail_manifest: Mapping[str, Any]) -> BaseGeometry:
     """Where neither a ladder's foot nor a cabin may stand: around ``points``, the interiors' street doors and every other
     ground-floor door of a facade, the bots' routes and the overgrow props. The layout runs after ``overgrow``, which knew
@@ -949,7 +966,7 @@ def climb_keep_out(points: Sequence[tuple[float, float]], routes: Sequence[Mappi
         *(tuple(door) for building in objects if building.get("type") == "building" for door in (building.get("facade") or {}).get("doors_m", [])),
     ]
     props = [
-        Point(prop["position_m"]).buffer(CLIMB_TREE_CLEAR_M if "tree" in (prop.get("kind"), prop.get("role")) else CLIMB_PROP_CLEAR_M)
+        Point(prop["position_m"]).buffer(prop_clearance(prop))
         for prop in objects if prop.get("type") == "overgrowth" and prop.get("kind") not in CLIMB_FLAT_GROWTH
     ]
     boards = [
