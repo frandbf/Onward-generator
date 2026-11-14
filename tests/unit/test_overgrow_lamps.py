@@ -18,6 +18,7 @@ from onward_generator.overgrow.lamps import (
     LAMP_HEIGHT_M,
     LAMP_MAX_TRIANGLES,
     LAMP_MIN_TRIANGLES,
+    LAMP_SOURCE_HEIGHT_M,
     LAMP_ROLES,
     lamp_candidates,
     lamp_model,
@@ -62,6 +63,7 @@ def test_the_lamp_settings() -> None:
     assert LAMP_HEIGHT_M == (4.0, 7.0)
     assert LAMP_MAX_TRIANGLES == 1600
     assert LAMP_MIN_TRIANGLES == 120
+    assert LAMP_SOURCE_HEIGHT_M == (3.5, 10.0)
     assert ARM_MIN_OFFSET_M == 0.1
 
 
@@ -106,8 +108,10 @@ def test_the_candidates_are_textured_lamp_posts_small_enough_to_repeat() -> None
         _prop("z_lamp", "streetlight"), _prop("a_lamp", "lamppost"), _prop("bench", "bench"),
         _prop("flat_lamp", "lamppost", albedo=b""), _prop("huge_lamp", "lamp", mesh=big), _prop("max_lamp", "lamp_post", mesh=fits),
         _prop("kenney_urban_detail_light_Traffic", "lamp"), _prop("blocky_lamp", "lamp", mesh=merge([_lamp_mesh()] * 4)),
+        _prop("head", "lamp", mesh=merge([_lamp_mesh(height=3.49)] * 5)), _prop("low_ok", "lamp", mesh=merge([_lamp_mesh(height=3.5)] * 5)),
+        _prop("mast", "lamp", mesh=merge([_lamp_mesh(height=10.01)] * 5)), _prop("tall_ok", "lamp", mesh=merge([_lamp_mesh(height=10.0)] * 5)),
     ]
-    assert [prop.spec.id for prop in lamp_candidates(props)] == ["a_lamp", "max_lamp", "z_lamp"]
+    assert [prop.spec.id for prop in lamp_candidates(props)] == ["a_lamp", "low_ok", "max_lamp", "tall_ok", "z_lamp"]
 
 
 def test_the_seed_picks_one_model_and_an_empty_library_none() -> None:

@@ -21,9 +21,10 @@ def runs(detail_inputs, tmp_path_factory: pytest.TempPathFactory) -> dict[str, o
     library = _library(tmp / "library", "kenney")
     plain = overgrow(base, detail_inputs[0], tmp / "plain", library=library)
     patch = pytest.MonkeyPatch()
-    # The Kenney lamps are too coarse (68 and 96 triangles), so no candidate; let them in to swap one.
+    # The Kenney lamps are too coarse (68 and 96 triangles) and short, so no candidate; let them in to swap one.
     patch.setattr(lamps, "prop_flat", lambda prop: False)
     patch.setattr(lamps, "LAMP_MIN_TRIANGLES", 0)
+    patch.setattr(lamps, "LAMP_SOURCE_HEIGHT_M", (0.0, 100.0))
     try:
         swapped = overgrow(base, detail_inputs[0], tmp / "swapped", library=library)
     finally:

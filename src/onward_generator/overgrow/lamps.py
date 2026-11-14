@@ -32,6 +32,9 @@ from onward_generator.overgrow.library import Prop
 LAMP_ROLES = frozenset({"lamppost", "streetlight", "lamp_post", "lamp"})
 # ``detail``'s procedural lamp is 4.5 m tall; a street lamp post is about 4 to 8 m.
 LAMP_HEIGHT_M = (4.0, 7.0)
+# The file's own height: a lamp head or a bollard light (1.3 to 3 m in Street Lights Pack) is no post, and scaling it
+# threefold made a fat post on Murcia Catedral 2; an 11 m highway mast towers over a narrow street.
+LAMP_SOURCE_HEIGHT_M = (3.5, 10.0)
 # About twice the triangles of the hydrant-sized props the library keeps whole; a lamp repeats on every street.
 LAMP_MAX_TRIANGLES = 1600
 # Fewer reads as a block: Kenney's low-poly lamps (68 and 96 triangles) stand beside the Asset Store posts (144 up).
@@ -57,7 +60,7 @@ def lamp_candidates(props: Sequence[Prop]) -> list[Prop]:
     return sorted(
         (prop for prop in props
          if prop.spec.role in LAMP_ROLES and "traffic" not in prop.spec.id.lower()
-         and LAMP_MIN_TRIANGLES <= prop.triangles <= LAMP_MAX_TRIANGLES and prop.height_m > 0 and not prop_flat(prop)),
+         and LAMP_MIN_TRIANGLES <= prop.triangles <= LAMP_MAX_TRIANGLES and LAMP_SOURCE_HEIGHT_M[0] <= prop.height_m <= LAMP_SOURCE_HEIGHT_M[1] and not prop_flat(prop)),
         key=lambda prop: prop.spec.id,
     )
 
