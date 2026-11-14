@@ -253,6 +253,10 @@ A withdrawn model stays in the review with `usable: false` so it is not download
 
 GitHub publishes no digest for that release. The archive's SHA-512 matches the one Alpine Linux pins for the same file (`main/font-dejavu/APKBUILD`). Downloaded and checked on 2026-10-29. The font file is unmodified. It covers Latin-1 and Latin Extended-A, so Spanish names (á, é, í, ó, ú, ñ, ü) draw as real glyphs. The font is only rasterised into the plate albedo and the shop-sign atlas; the font file is not part of the exported map.
 
+## Project wall decals
+
+`assets/decals/`: nine PNG wall decals (stencil plates, signs, a target, shields: text and symbols, no person) made by the maintainer for this project and released with it under the repository's MIT licence (`assets/decals/README.md`). Every map carries each once unless its `map.json` says `"project_decals": false` (ADR-038 amendment of 14 November 2026). The maintainer's private decals stay in the gitignored `assets/user_decals/`.
+
 ## Asset Store
 
 `config/props/catalog.json` records Unity Asset Store packs that were reviewed and not baked into the GLB. `props place` can write instances that have OSM evidence. The Unity adapter does not instantiate that list. Visible furniture in the exported scene is the generated furniture from `dress style`, plus the normalized library from `overgrow`.

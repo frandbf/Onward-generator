@@ -101,6 +101,8 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 
 You may set a documented key in `maps/<id>/map.json` (the keys in [reference/options.md](reference/options.md)) when the user asks. Show the change first, then rerun with `task map -- --name "…" --lat … --lon … --from <stage>`.
 
+Every map already carries the **project's nine wall decals** (`assets/decals/`, text and symbols, safe for the Workshop); `"project_decals": false` in `map.json` leaves them out.
+
 **The user's own wall decals** (a logo, a poster, a photo they took), on every map:
 
 1. Each image is a **PNG**, at least 400 px on its long side (it is scaled to 512 px), shot straight on, with a **transparent background** where the decal is not a rectangle (a PNG without alpha is an opaque rectangle). At most 16 MB.
@@ -150,7 +152,7 @@ When the user wants to share the map publicly, check it against the Onward *Cust
 **Publishing itself is not done from here.** Tell the user:
 
 1. It needs a **Windows PC** with the Meta Quest (Oculus) PC app open, logged into an account that owns Onward. The app does not exist for macOS.
-2. Copy the Unity project the build used to that PC, open it with Unity 2021.3.23f1 (Android and Windows build support), double-click `Assets/RegistryKey/OnwardUGCRegConfig` once, and restart the PC.
+2. Copy the Unity project the build used to that PC, open it with Unity 2021.3.23f1 (Android and Windows build support), double-click `Assets/OnwardCustomContent/RegistryKey/OnwardUGCRegConfig.reg` once in Windows Explorer, and restart the PC.
 3. In Unity, open **Onward Custom Map Dashboard**, accept the terms, fill in title, description, environment, map size, time of day, thumbnail and display version `1.0`, and press **Publish**.
 4. Approval can take up to two weeks; updates are reviewed too.
 

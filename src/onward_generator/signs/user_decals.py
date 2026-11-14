@@ -15,7 +15,9 @@ the other decals, and stops when one fits no wall. No folder, or no ``decals.jso
 from __future__ import annotations
 
 import json
+import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +30,11 @@ USER_DECALS_DIR = "user_decals"
 MANIFEST = "decals.json"
 USER_ORIGIN = "user"
 USER_KIND = "user"
+# The project's own decals (``assets/decals/``, committed, MIT): the same format, on every map, for everyone who uses
+# the project (ADR-038 amendment of 14 November 2026). ``ONWARD_PROJECT_DECALS=0`` leaves them out (the tests do).
+PROJECT_DECALS_DIR = "decals"
+PROJECT_ORIGIN = "project"
+PROJECT_DECALS_ENV = "ONWARD_PROJECT_DECALS"
 MAX_PX = 512
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MIN_SIZE_M = 0.2
@@ -52,9 +59,20 @@ def _size(row: dict[str, Any], aspect: float, where: str) -> tuple[float, float]
     return round(width_m, 3), round(height_m, 3)
 
 
-def read_user_decals(assets: Path) -> list[Decal]:
-    """The decals of ``assets/user_decals/decals.json``, in its order; empty when there is no such file."""
-    folder = assets / USER_DECALS_DIR
+def project_decals_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Whether the project's decals are read: unless ``ONWARD_PROJECT_DECALS`` is ``0``."""
+    return (os.environ if env is None else env).get(PROJECT_DECALS_ENV) != "0"
+
+
+def read_project_decals(assets: Path) -> list[Decal]:
+    """The decals of ``assets/decals/decals.json``: ids ``project_<stem>``, kind and origin ``project``."""
+    return read_user_decals(assets, PROJECT_DECALS_DIR, PROJECT_ORIGIN)
+
+
+def read_user_decals(assets: Path, directory: str = USER_DECALS_DIR, origin: str = USER_ORIGIN) -> list[Decal]:
+    """The decals of ``assets/<directory>/decals.json``, in its order; empty when there is no such file. Ids are
+    ``<origin>_<file stem>``, kind and origin ``origin``."""
+    folder = assets / directory
     manifest = folder / MANIFEST
     if not manifest.is_file():
         return []
@@ -88,7 +106,7 @@ def read_user_decals(assets: Path) -> list[Decal]:
         rgba.thumbnail((MAX_PX, MAX_PX), Image.Resampling.LANCZOS)  # never enlarges
         width_m, height_m = _size(row, rgba.size[0] / rgba.size[1], where)
         stem = "_".join(re.findall(r"[a-z0-9]+", Path(name).stem.lower())) or str(index)
-        found.append(Decal(f"user_{stem}", USER_KIND, width_m, height_m, np.asarray(rgba).copy(), USER_ORIGIN,
+        found.append(Decal(f"{origin}_{stem}", origin, width_m, height_m, np.asarray(rgba).copy(), origin,
                            str(row.get("description") or "")))
     ids = [decal.id for decal in found]
     if len(set(ids)) != len(ids):
@@ -96,5 +114,6 @@ def read_user_decals(assets: Path) -> list[Decal]:
     return found
 
 
-__all__ = ["MANIFEST", "MAX_FILE_BYTES", "MAX_PX", "MAX_SIZE_M", "MIN_SIZE_M", "USER_DECALS_DIR", "USER_KIND", "USER_ORIGIN",
-           "UserDecalError", "read_user_decals"]
+__all__ = ["MANIFEST", "MAX_FILE_BYTES", "MAX_PX", "MAX_SIZE_M", "MIN_SIZE_M", "PROJECT_DECALS_DIR", "PROJECT_DECALS_ENV", "PROJECT_ORIGIN",
+           "USER_DECALS_DIR", "USER_KIND", "USER_ORIGIN", "UserDecalError", "project_decals_enabled", "read_project_decals",
+           "read_user_decals"]
