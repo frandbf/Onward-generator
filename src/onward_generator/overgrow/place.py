@@ -180,7 +180,7 @@ def overgrow(
     # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
-    headroom = max(0, headroom - lamps.added_triangles)
+    headroom -= lamps.added_triangles  # swap_lamps adds no more than the headroom
     budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -346,14 +346,12 @@ def overgrow(
     images.setdefault("tree_canopy", canopy_png())
     images.update(planted.images)
     images.update(lamps.images)
-    for name in lamps.images:
-        materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
     materials.setdefault("abandoned_vine", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_trunk", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_canopy", Material((1, 1, 1, 1), 0.8))
-    for name in planted.images:
+    for name in (*planted.images, *lamps.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     extra_nodes.extend(furniture.nodes)
     images.update(furniture.images)
