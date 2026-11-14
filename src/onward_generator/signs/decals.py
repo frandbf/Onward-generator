@@ -324,18 +324,19 @@ def exposed(wall: Wall, footprints: STRtree) -> bool:
 
 
 def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[Polygon, float, float], bool],
-                 decals: Sequence[Decal], seed: int, count: int, surface: Surface | None = None) -> list[Placed]:
+                 decals: Sequence[Decal], seed: int, count: int, surface: Surface | None = None,
+                 required: Sequence[Decal] = ()) -> list[Placed]:
     """Up to ``count`` decals from ``decals`` (in their turn) on the exposed ``walls`` of at least ``MIN_WALL_M``, walls
     taken in a seeded order from the one after the last decal's, each decal at the first height and position it fits:
     clear of ``blocked`` (a plan, bottom and top) and of the decals already on the wall, and on one flat clear face of
     the built facade when ``surface`` is given (``wall_surface``), laid on that face. A decal that fits no wall is
-    skipped."""
+    skipped. Each of ``required`` (the maintainer's own decals) goes first, once, on top of the ``count``."""
     candidates = sorted((w for w in walls if float(np.linalg.norm(w.b - w.a)) >= MIN_WALL_M and exposed(w, footprints)),
                         key=lambda w: _unit(seed, "wall", w.feature_id, float(w.a[0]), float(w.a[1])))
     placed: list[Placed] = []
     taken: dict[int, list[tuple[float, float, float, float]]] = {}
     start = 0
-    for decal in turn_order(decals, count, seed):
+    for decal in [*required, *turn_order(decals, count, seed)]:
         for k in range(len(candidates)):
             wall = candidates[(start + k) % len(candidates)]
             spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed, surface)

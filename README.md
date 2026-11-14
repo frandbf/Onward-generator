@@ -101,6 +101,16 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
 
+### Your own wall decals
+
+Put PNG images (with a transparent background where the decal is not a rectangle, at least 400 px on the long side) in `assets/user_decals/`, a local folder that is never committed, and list them in `assets/user_decals/decals.json` with their size on the wall in metres (`width_m` or `height_m`, 0.2 to 3 m):
+
+```json
+{"decals": [{"file": "mural.png", "width_m": 1.2, "description": "A mural from my street"}]}
+```
+
+Every map then carries each of them once, on an exposed wall of the playable core, before the generated decals; a decal that fits no wall stops `signs place` with its name. Use only photographs you may share: no recognisable people, brands or personal data ([ADR-038](docs/decisions/ADR-038-wall-decals.md)).
+
 ### Every option that is off by default
 
 A new map gets the base pipeline: OSM, the height sources that cover its centre, trim-sheet facades in the style of its region, the playable core, furnished shops and flats, street lamps, the rule-based dressing, the Hunt layout and the `neutral` light. Each feature below stays off until you turn it on: most are proposed until a headset session validates them, and a map made without them is built as before. `maps/rue_mouffetard` is the reference map with all the day switches on.
