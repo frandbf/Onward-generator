@@ -18,6 +18,9 @@ from onward_generator.perf.layout import (
     AMMO_SPAWN_CLEAR_M,
     BLOCK_GAP_M,
     CLIMB_BALCONY_CLEAR_M,
+    CLIMB_PROP_CLEAR_M,
+    CLIMB_TREE_CLEAR_M,
+    CLIMB_VEHICLE_CLEAR_M,
     GAMEPLAY_VERSION,
     GRID_M,
     MIN_SPAWN_SEPARATION_M,
@@ -51,6 +54,7 @@ from onward_generator.perf.layout import (
     patrol_seeds,
     patrol_spawns,
     playable_area,
+    prop_clearance,
     reachable_ground,
     roof_wind,
     route_islands,
@@ -749,6 +753,24 @@ def test_the_climb_keep_out_covers_the_overgrow_props_but_not_flat_growth() -> N
     for outside in ((51.1, 0.0), (2.1, 80.0), (2.1, -80.0), (-50.0, 0.0), (-50.0, 20.0), (-50.0, 40.0), (-80.0, 0.0)):
         assert not keep_out.contains(Point(outside)), outside
 
+
+
+def test_the_climb_keep_out_covers_a_whole_vehicle() -> None:
+    """On Murcia Catedral a lift cabin stood over a covered car 2.84 m from the cabin's centre: a 1 m circle round the
+    car's spot left most of a 4.5 m car outside the keep-out."""
+    car = {"type": "overgrowth", "kind": "vehicles", "role": "wreck", "position_m": [0.0, 0.0, 0.0], "size_m": [4.4, 1.8, 1.5]}
+    half = math.hypot(4.4, 1.8) / 2
+    assert prop_clearance(car) == pytest.approx(half)
+    keep_out = climb_keep_out([(500.0, 500.0)], [], {"objects": [car]})
+    assert keep_out.contains(Point(half - 0.05, 0.0)) and keep_out.contains(Point(0.0, -(half - 0.05)))
+    assert not keep_out.contains(Point(half + 0.05, 0.0))
+    # A small prop keeps at least the old metre; a tree keeps its crown, whatever size it records.
+    assert prop_clearance({"kind": "waste", "size_m": [0.4, 0.3, 0.5]}) == CLIMB_PROP_CLEAR_M
+    assert prop_clearance({"kind": "tree", "size_m": [9.0, 9.0, 9.0]}) == CLIMB_TREE_CLEAR_M
+    assert prop_clearance({"kind": "barriers", "role": "tree", "size_m": [9.0, 9.0, 9.0]}) == CLIMB_TREE_CLEAR_M
+    # A manifest from before size_m: a vehicle or a procedural wreck keeps a car's half-diagonal, anything else a metre.
+    assert prop_clearance({"kind": "vehicles"}) == prop_clearance({"kind": "wreck"}) == CLIMB_VEHICLE_CLEAR_M == 2.5
+    assert prop_clearance({"kind": "barriers"}) == CLIMB_PROP_CLEAR_M == 1.0
 
 
 def test_no_ammo_crate_lands_on_the_attackers_block() -> None:
