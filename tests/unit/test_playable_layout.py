@@ -46,6 +46,7 @@ from onward_generator.perf.layout import (
     fit_spawn_separation,
     free_ground,
     hunt_routes,
+    map_quad,
     nav_islands,
     navigation_estimate,
     patrol_seeds,
@@ -938,10 +939,12 @@ def test_a_placement_sets_the_defenders_and_the_uplink() -> None:
     assert {k: v for k, v in moved.items() if k not in ("defenders", "uplink_m")} == {k: v for k, v in today.items() if k not in ("defenders", "uplink_m")}
     # Exactly 30 m apart is enough.
     assert gameplay_layout(base, manifest, placement=Placement(a, (30.0, 0.0), (15.0, 0.0), a, a))["defenders"]["centre_m"] == [30.0, 0.0]  # type: ignore[arg-type]
-    # Since the C6 amendment of 11 November 2026 the attackers may move too, and the map quad follows them.
+    # Since the C6 amendment of 11 November 2026 the attackers may move too. The map quad stays at the centre of the site:
+    # it frames the minimap, a level_size_m square centred on it.
     shifted = gameplay_layout(base, manifest, placement=Placement((-40.0, 40.0), (40.0, -40.0), (10.0, -10.0), a, a))  # type: ignore[arg-type]
     assert shifted["attackers"]["centre_m"] == [-40.0, 40.0] and shifted["attackers"]["points_m"][0] == {"x": -41.8, "y": 39.4}
-    assert shifted["map_quad_m"] == [-40.0, 37.6]
+    sx0, sy0, sx1, sy1 = shifted["site_bounds_m"]
+    assert shifted["map_quad_m"] == today["map_quad_m"] == [round((sx0 + sx1) / 2, 2), round((sy0 + sy1) / 2, 2)]
     for placement, message in (
         (Placement((57.0, 0.0), (-40.0, 0.0), (10.0, 0.0), a, a), r"^the placed attackers' block does not fit the free area$"),
         (Placement((-29.9, 0.0), (0.0, 0.0), (10.0, 0.0), a, a), r"^the placement holds the teams only 29.9 m apart; 30 m are required$"),
@@ -1303,3 +1306,12 @@ def test_the_playable_layout_of_a_core_measures_the_core_navmesh_with_or_without
         assert all(inside.covers(Point(p["x"], p["y"])) for p in doc[block]["points_m"])
     assert inside.covers(Point(doc["uplink_m"]))
     assert _check_layout(doc) == []
+
+
+def test_the_map_quad_stands_at_the_centre_of_the_site() -> None:
+    """The SDK centres the minimap on the MapQuad: beside the attackers it drew the map in one corner of the tablet."""
+    assert map_quad((10.0, -40.0, 110.0, 60.0)) == [60.0, 10.0]
+    assert map_quad((0.0, 0.0, 0.123, 0.4567)) == [0.06, 0.23]
+    centre = map_quad((-180.0, -180.01, 180.0, 180.0))
+    assert centre == [0.0, 0.0] and all(math.copysign(1.0, value) == 1.0 for value in centre)
+    assert all(isinstance(value, float) for value in map_quad((0.0, 0.0, 1.0, 1.0)))

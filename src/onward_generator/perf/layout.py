@@ -239,7 +239,6 @@ def gameplay_layout(
         a, b, uplink = placement.attack, placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
-    quad = (a[0], a[1] - SPAWN_SPACING_M * 2)
     return {
         "schema": LAYOUT_SCHEMA,
         "schema_version": LAYOUT_VERSION,
@@ -251,7 +250,7 @@ def gameplay_layout(
         "attackers": {"centre_m": list(a), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*a)]},
         "defenders": {"centre_m": list(b), "points_m": [{"x": round(x, 2), "y": round(y, 2)} for x, y in _block(*b)]},
         "uplink_m": [uplink[0], uplink[1]],
-        "map_quad_m": [round(quad[0], 2), round(quad[1], 2)],
+        "map_quad_m": map_quad((sx0, sy0, sx1, sy1)),
         "level_size_m": round(max(sx1 - sx0, sy1 - sy0), 1),
         "site_bounds_m": [round(v, 2) for v in (sx0, sy0, sx1, sy1)],
         "tent_z_m": TENT_DEPTH_M,
@@ -907,6 +906,15 @@ CLIMB_BALCONY_CLEAR_M = 0.5
 window on Rue Mouffetard (12 November 2026)."""
 CLIMB_FLAT_GROWTH = frozenset({"grass", "vine", "moss"})
 """Overgrowth a cabin may stand on or beside: flat on the ground or on a facade."""
+
+
+def map_quad(bounds: Sequence[float]) -> list[float]:
+    """Where the SDK's MapQuad stands: the centre of the site ``bounds`` (min x, min y, max x, max y), to the centimetre.
+    The MapQuad frames the minimap, a LevelSize square centred on its position (its gizmo is that cube). Beside the
+    attackers' block it drew Murcia Catedral's map in one corner of the tablet, black down two sides (13 November 2026).
+    ``+ 0.0`` writes a centre of -0.004 m as 0.0, not -0.0."""
+    x0, y0, x1, y1 = bounds
+    return [round((x0 + x1) / 2, 2) + 0.0, round((y0 + y1) / 2, 2) + 0.0]
 
 
 def ammo_points(
