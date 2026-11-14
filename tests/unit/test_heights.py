@@ -184,6 +184,30 @@ def test_fallback_default_for_unknown_type(cfg: HeightConfig) -> None:
     assert r.height_class is HeightClass.FALLBACK and r.height_confidence == 0.2 and r.category == "unknown"
 
 
+def test_fallback_variation_spreads_heights_by_id_within_the_range(tmp_path: Path) -> None:
+    """Mogadishu 1993, 14 November 2026: 348 buildings with no evidence all stood at 8 m."""
+    from onward_generator.heights.estimator import fallback_unit
+
+    config = custom(tmp_path, fallback_variation=True, fallback_m__unknown={"default": 5.0, "min": 3.0, "max": 7.0})
+    assert config.fallback_variation is True and custom(tmp_path).fallback_variation is False
+    buildings = [bld(n, n * 20.0, 0) for n in range(1, 30)]
+    found = estimate_heights(buildings, config)
+    heights = [found.get(f"osm-way-{n}").height_m for n in range(1, 30)]  # type: ignore[union-attr]
+    assert all(3.0 <= h <= 7.0 for h in heights) and len(set(heights)) > 20
+    assert heights[0] == round(3.0 + fallback_unit("osm-way-1") * 4.0, 2)
+    assert estimate_heights(buildings, config).get("osm-way-1").height_m == heights[0]  # stable  # type: ignore[union-attr]
+    first = found.get("osm-way-1")
+    assert first.height_source is HeightSource.FALLBACK and "varied by id within 3.0–7.0 m" in first.rule  # type: ignore[union-attr]
+    assert 0.0 <= fallback_unit("x") < 1.0 and fallback_unit("a") != fallback_unit("b")
+
+
+def test_fallback_variation_must_be_a_boolean(tmp_path: Path) -> None:
+    from onward_generator.heights.config import HeightConfigError
+
+    with pytest.raises(HeightConfigError):
+        custom(tmp_path, fallback_variation="yes")
+
+
 def test_fallback_default_is_configurable(tmp_path: Path) -> None:
     config = custom(tmp_path, fallback_m__unknown={"default": 10.0, "min": 6.0, "max": 15.0})
     assert estimate_heights([bld(1, 0, 0)], config).get("osm-way-1").height_m == 10.0  # type: ignore[union-attr]

@@ -13,6 +13,7 @@ depend on the geo pipeline internals, geometry generation or export.
 
 from __future__ import annotations
 
+import hashlib
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -363,10 +364,23 @@ class _Estimator:
     # Step 4: fallback.
     def fallback(self, draft: _Draft) -> None:
         r = self.cfg.fallback_m[draft.cls.category]
+        if self.cfg.fallback_variation:
+            # A whole quarter at one default height reads as a model, not a city (Mogadishu 1993: 348 buildings at 8 m).
+            height = round(r.min + fallback_unit(draft.building.id) * (r.max - r.min), 2)
+            self.finish(
+                draft, height, HeightSource.FALLBACK, self.cfg.confidence["fallback"],
+                f"{draft.cls.category} fallback {height} m, varied by id within {r.min}–{r.max} m",
+            )
+            return
         self.finish(
             draft, r.default, HeightSource.FALLBACK, self.cfg.confidence["fallback"],
             f"{draft.cls.category} fallback default {r.default} m (plausible range {r.min}–{r.max} m)",
         )
+
+
+def fallback_unit(building_id: str) -> float:
+    """A stable number in [0, 1) from a building id (sha256, the seeded-choice rule of the project)."""
+    return int(hashlib.sha256(building_id.encode("utf-8")).hexdigest()[:12], 16) / float(16**12)
 
 
 def _blocks(footprints: Sequence[BaseGeometry | None], gap_m: float) -> list[int]:

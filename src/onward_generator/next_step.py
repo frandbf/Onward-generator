@@ -107,7 +107,10 @@ def geo_command(directory: str | Path, retrieved_at: str | None = None) -> Stage
 def heights_command(scene: Path, overrides: Path | None = None, secondary: Path | None = None) -> StageCommand:
     extra = ("--overrides", show(overrides)) if overrides is not None else ()
     third = ("--secondary-overrides", show(secondary)) if secondary is not None else ()
-    return invoke("heights", "--scene", show(scene), *extra, *third, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
+    root = map_root(scene)
+    own = root / "config" / "heights.json" if root is not None else None
+    config = ("--config", show(own)) if own is not None and own.is_file() else ()
+    return invoke("heights", "--scene", show(scene), *config, *extra, *third, "--out", show(stage_path(scene, STAGE_DIRS["heights"])))
 
 
 def overture_fetch_command(root: Path) -> StageCommand:
