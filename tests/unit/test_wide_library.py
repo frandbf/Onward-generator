@@ -183,3 +183,48 @@ def test_the_rows_added_for_mogadishu_join_every_map_and_the_distinctive_ones_wa
     entries = [SimpleNamespace(id=slot, library_id="") for slot in sorted(VARIANT_SLOTS)]
     varied = {i for picks in variant_picks(entries, catalogue_rows(), 1, extended=True).values() for i in picks}
     assert not varied & {f"ph_{name}" for name in distinctive}
+
+
+def test_the_model_is_offered_the_distinctive_rows_and_the_earth_alternates_and_may_choose_them() -> None:
+    """14 November 2026: the model reads the brief, so it gets the corrugated, adobe and earth rows the seeded fallback skips."""
+    from onward_generator.ai.providers import ProviderResult
+    from onward_generator.materials.library_plan import _parse_choices
+
+    rows = catalogue_rows()
+    seeded = deterministic_choices(rows, 3, extended=True)
+    reply = json.dumps({"choices": [{"slot": slot, "library_id": {"roofs": "ph_asbestos_sheet", "streets_plazas": "ph_brown_mud_dry",
+                                                                  "brick": "ph_clay_block_wall"}.get(slot, library_id)}
+                                    for slot, library_id in seeded.items()]})
+    seen: dict[str, object] = {}
+
+    class Recording:
+        def complete(self, system: str, instruction: str, schema: dict[str, object]) -> ProviderResult:
+            seen.update(system=system, instruction=json.loads(instruction), schema=schema)
+            return ProviderResult(reply, {"provider": "replay", "source": "test", "model": None})
+
+    plan = select_texture_plan(name="Mogadishu", map_id="m", latitude=2.05, longitude=45.33, brief="dirt streets, sheet roofs",
+                               seed=3, provider=Recording(), extended=True, wide=True)  # type: ignore[arg-type]
+    assert plan["selector"] == "ollama"
+    chosen = {row["id"]: row["library_id"] for row in plan["entries"]}
+    assert (chosen["roofs"], chosen["streets_plazas"], chosen["brick"]) == ("ph_asbestos_sheet", "ph_brown_mud_dry", "ph_clay_block_wall")
+    instruction = seen["instruction"]
+    assert instruction["slots"]["streets_plazas"] == ["paving", "earth"] and instruction["slots"]["roofs"] == ["roof", "concrete"]  # type: ignore[index]
+    assert instruction["slots"]["doors"] == ["door"]  # type: ignore[index]
+    assert "ph_asbestos_sheet" in instruction["ids_by_family"]["roof"] and "ph_brown_mud_dry" in instruction["ids_by_family"]["earth"]  # type: ignore[index]
+    assert seen["system"] == (
+        "Choose one tileable albedo for each slot of a playable city map. Keep the walls, roofs and ground in one calm palette. "
+        "Use only listed ids, one id once, and a family listed for that slot. A slot's first family is its usual one: choose a "
+        "later family (earth for dirt or sand streets, plaster on the brick slot, concrete roofs) or a corrugated sheet roof "
+        "only when the brief or the place calls for it. Reply with JSON only.")
+    assert _parse_choices(reply, rows, extended=True)["roofs"] == "ph_asbestos_sheet"
+
+
+def test_the_seeded_variants_never_draw_a_distinctive_row() -> None:
+    entries = [SimpleNamespace(id=slot, library_id="") for slot in sorted(VARIANT_SLOTS)]
+    distinctive = {row["id"] for row in catalogue_rows() if row.get("distinctive")}
+    assert distinctive
+    from onward_generator.materials.variants import variant_picks
+
+    for seed in range(40):
+        picks = variant_picks(entries, catalogue_rows(), seed, extended=True)
+        assert not distinctive & {i for ids in picks.values() for i in ids}, seed
