@@ -6,7 +6,6 @@ Downloads are not required. Props are tiny synthetic GLBs.
 from __future__ import annotations
 
 import io
-
 import json
 import math
 from pathlib import Path
@@ -394,8 +393,14 @@ def test_simplification_puts_the_lowest_vertex_back_on_the_ground() -> None:
     assert (hawk["id"], hawk["max_triangles"], hawk["role"], hawk["category"]) == ("uh60_black_hawk", 13000, "wreck", "vehicles")
     heli = SPECS["1ad46b04f23d43dbb2730c9435c1a7cc"]
     assert (heli["max_triangles"], heli["keep_materials"], hawk["keep_materials"]) == (60000, True, True)
-    own = {"854bf0feee5b42dc92ac5329976f7942", "1ad46b04f23d43dbb2730c9435c1a7cc"}
-    assert all("max_triangles" not in spec and "keep_materials" not in spec for uid, spec in SPECS.items() if uid not in own)
+    by_id = {spec["id"]: spec for spec in SPECS.values()}
+    cars = {"mustang_boss_429", "rusty_abandoned_truck", "abandoned_auto", "destroyed_car_03", "burned_police_cars", "abandoned_sedan_2",
+            "crashed_abandoned_car", "abandoned_sedan_1"}
+    assert all((by_id[car]["max_triangles"], by_id[car]["keep_materials"]) == (8000, True) for car in cars)
+    assert all(by_id[i]["keep_materials"] is True and "max_triangles" not in by_id[i]
+               for i in ("abandoned_garage", "fence_door_metal", "scanned_plants_grass"))
+    own = cars | {"uh60_black_hawk", "crashed_helicopter", "abandoned_garage", "fence_door_metal", "scanned_plants_grass"}
+    assert all("max_triangles" not in spec and "keep_materials" not in spec for spec in SPECS.values() if spec["id"] not in own)
 
 
 def test_a_model_with_several_textures_keeps_one_part_per_material(tmp_path: Path) -> None:
