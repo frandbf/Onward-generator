@@ -119,6 +119,7 @@ def overgrow(
     provider=None,
     street_profile: Mapping[str, Any] | None = None,
     prefer: str | Path | None = None,
+    triangle_limit: int = UNITY_TRIANGLE_LIMIT,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -177,7 +178,7 @@ def overgrow(
     wreck = wreck_mesh()
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
-    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles)
+    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles, triangle_limit)
     # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
@@ -474,6 +475,7 @@ def overgrow(
         "library_lod": {item: by_id[item].lod() for item in dict.fromkeys(planted.placed_ids) if by_id[item].source_triangles},
         "max_added_triangles": MAX_ADDED_TRIS,
         "triangle_headroom": headroom,
+        "triangle_limit": triangle_limit,
         "street_lamps": lamps.report,
         "street_trees": trees_swap.report,
         "library_preferred": len(preferred),
@@ -495,10 +497,10 @@ def overgrow(
     return summary
 
 
-def triangle_headroom(input_triangles: int, furniture_triangles: int) -> int:
+def triangle_headroom(input_triangles: int, furniture_triangles: int, limit: int = UNITY_TRIANGLE_LIMIT) -> int:
     """What overgrow may add under the Unity limit: the limit less the adapter's own triangles, the later stages'
     ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture overgrow adds. Never below 0."""
-    return max(0, UNITY_TRIANGLE_LIMIT - ADAPTER_BASE_TRIANGLES - LATER_RESERVE_TRIANGLES - input_triangles - furniture_triangles)
+    return max(0, limit - ADAPTER_BASE_TRIANGLES - LATER_RESERVE_TRIANGLES - input_triangles - furniture_triangles)
 
 
 def _resolve_zone(zone: Zone | None, radius_m: float | None, polygon: str | Path | None, core: Any = None) -> Zone:

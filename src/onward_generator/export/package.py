@@ -62,7 +62,7 @@ from onward_generator.export.normal_map import (
 )
 from onward_generator.export.sun import street_sun
 from onward_generator.export.thumbnail import render_listing_thumbnail
-from onward_generator.export.triangle_budget import budget_warning, triangle_budget
+from onward_generator.export.triangle_budget import UNITY_TRIANGLE_LIMIT, budget_warning, triangle_budget
 from onward_generator.generation.gltf import read_glb
 from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_file
 from onward_generator.perf.climbs import LADDERS_MAX, LIFTS_MAX, ROOF_LINKS_MAX
@@ -437,7 +437,7 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
-                  atmosphere: str | None = None) -> PackageResult:
+                  atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
@@ -540,7 +540,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             applied.append(LIGHTMAP_CORE)
     tiers = _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"]))
     # Plan Q2: the Unity total, estimated now so a map over the official limit is known before the bake.
-    budget = triangle_budget(visual_bytes, layout_doc, tiers, (detail_manifest.get("core") or {}).get("half_side_m"))
+    budget = triangle_budget(visual_bytes, layout_doc, tiers, (detail_manifest.get("core") or {}).get("half_side_m"), triangle_limit)
     over = budget_warning(budget)
     if over is not None:
         warnings.append(over)

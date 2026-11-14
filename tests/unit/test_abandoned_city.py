@@ -987,6 +987,11 @@ def test_the_library_budget_is_the_headroom_less_the_procedural_triangles(tmp_pa
     headroom = place.triangle_headroom(visual_triangles((tmp_path / "base" / "scene_visual.glb").read_bytes()), 0)
     assert report["triangle_headroom"] == headroom > 60_000
     assert seen["dress"]["triangle_budget"] == 60_000
+    # A map.json triangle_limit lowers what overgrow fills to, and the report names it.
+    assert report["triangle_limit"] == 300_000
+    limited = overgrow(tmp_path / "base", scene, tmp_path / "limited", zone=square_zone(80), seed=48152, triangle_limit=250_000)
+    assert limited["triangle_limit"] == 250_000
+    assert limited["triangle_headroom"] == place.triangle_headroom(visual_triangles((tmp_path / "base" / "scene_visual.glb").read_bytes()), 0, 250_000)
     # No grass is planted, so none is left for the props' rules to plant.
     assert seen["dress"]["grass_left"] == 0 and seen["dress"]["grass_mesh"].triangle_count == place.grass_tuft().triangle_count
     # With the library cap out of the way the headroom decides, less what the trees and wrecks already took.

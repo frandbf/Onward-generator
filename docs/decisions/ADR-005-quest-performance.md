@@ -75,3 +75,8 @@ Decision 3 kept occlusion culling off because v01 (before combining) did not red
 
 - A new map's export card sets `build.occlusion_culling: true` (`maps/workspace.py`); the adapter marks the static geometry Occluder and Occludee Static and runs `StaticOcclusionCulling.Compute()` in the bake. A card written before keeps its own value.
 - The Unity triangle limit (`export/triangle_budget.py` `UNITY_TRIANGLE_LIMIT`, `run_export.sh push`) is 300 000, above the guide's rough 250 000. The headset checks of `docs/09-perf.md` (72 fps median, at most 150 draws in views A and B) stay the way to tell whether a denser map still plays.
+
+## Amendment (14 November 2026): a per-map triangle limit
+
+The maintainer wants a map that can go to Onward for review within the guide's rough 250 000 triangles, while the default stays 300 000. On Murcia Catedral 2 (pkg_05, 288 426 in Unity) overgrow's own decoration was about 126 000 triangles (cut-out trees 40 326, interior furniture 44 196, street props 36 555, lamp posts 5 040) against 126 505 for the buildings: overgrow fills whatever headroom the limit leaves, so a smaller radius only gave the trees more room (Catedral de Murcia, r 110: 288 027). `map.json` `"triangle_limit": N` (100 000 to 300 000) is now the limit `overgrow place` fills to (`--triangle-limit`) and `export package` checks (`--triangle-limit`, the `triangle_budget` block's `limit` and `within`); `run` passes both. Without the key nothing changes. `run_export.sh push` keeps its own 300 000 refusal.
+

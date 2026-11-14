@@ -1045,3 +1045,14 @@ def test_unity_adapter_clips_the_cut_out_materials_it_is_given() -> None:
     assert "if (!material.HasProperty(AlphaClipProperty))" in apply
     assert "material.EnableKeyword(AlphaClipKeyword);" in apply and "material.SetFloat(AlphaClipProperty, entry.cutoff);" in apply
     assert "material.renderQueue = (int)RenderQueue.AlphaTest;" in apply and "EditorUtility.SetDirty(material);" in apply
+
+
+def test_a_lower_triangle_limit_is_what_the_package_is_checked_against(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    """map.json triangle_limit (ADR-005 amendment, 14 November 2026): the budget block and its warning use it."""
+    low = package(inputs, tmp_path / "low", triangle_limit=100_000)
+    block = low.manifest["triangle_budget"]
+    assert block["limit"] == 100_000 and block["within"] is (block["estimated_unity_triangles"] <= 100_000)
+    plain = package(inputs, tmp_path / "plain")
+    assert plain.manifest["triangle_budget"]["limit"] == 300_000
+    assert {k: v for k, v in block.items() if k not in ("limit", "within", "suggested_core_radius_m")} == {
+        k: v for k, v in plain.manifest["triangle_budget"].items() if k not in ("limit", "within", "suggested_core_radius_m")}

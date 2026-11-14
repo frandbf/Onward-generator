@@ -58,22 +58,19 @@ def test_the_estimate_is_the_glb_plus_the_adapter_plus_the_climbs() -> None:
     assert budget_warning(block) is None
 
 
-def test_an_estimate_on_the_limit_is_within_and_one_over_is_not(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 12_304)
-    assert triangle_budget(_glb(2), {}, None, None)["within"] is True
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 12_303)
-    block = triangle_budget(_glb(2), {}, None, None)
+def test_an_estimate_on_the_limit_is_within_and_one_over_is_not() -> None:
+    assert triangle_budget(_glb(2), {}, None, None, 12_304)["within"] is True
+    block = triangle_budget(_glb(2), {}, None, None, 12_303)
     assert block["within"] is False and block["limit"] == 12_303 and "suggested_core_radius_m" not in block
+    assert triangle_budget(_glb(2), {}, None, None)["limit"] == UNITY_TRIANGLE_LIMIT == 300_000  # the default
 
 
-def test_over_the_limit_a_core_map_gets_a_core_that_fits(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 12_303)
+def test_over_the_limit_a_core_map_gets_a_core_that_fits() -> None:
     # 12 304 estimated, 1 of them in the core: the rest alone fills the 12 303.
-    assert triangle_budget(_glb(2), {}, {"core": {"visual_triangles": 1}}, 100.0)["suggested_core_radius_m"] is None
+    assert triangle_budget(_glb(2), {}, {"core": {"visual_triangles": 1}}, 100.0, 12_303)["suggested_core_radius_m"] is None
     # All 4 GLB triangles in the core: 3 of them fit, sqrt(3 / 4) of 100 m is 86.6, rounded down to 85.
     tiers = {"core": {"visual_triangles": 4}}
-    assert triangle_budget(_glb(2), {}, tiers, 100.0)["suggested_core_radius_m"] == 85.0
-    monkeypatch.setattr("onward_generator.export.triangle_budget.UNITY_TRIANGLE_LIMIT", 300_000)
+    assert triangle_budget(_glb(2), {}, tiers, 100.0, 12_303)["suggested_core_radius_m"] == 85.0
     assert "suggested_core_radius_m" not in triangle_budget(_glb(2), {}, tiers, 100.0)  # within: no suggestion
 
 
