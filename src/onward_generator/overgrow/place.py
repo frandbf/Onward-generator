@@ -181,12 +181,12 @@ def overgrow(
     # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
-    headroom = max(0, headroom - lamps.added_triangles)
+    headroom -= lamps.added_triangles  # swap_lamps adds no more than the headroom
     # detail's street trees drawn as library cut-out trees (ADR-040), within a share of what is left.
     trees_swap = swap_trees(nodes, library_props, seed, headroom)
     nodes = trees_swap.nodes
     headroom -= trees_swap.added_triangles  # swap_trees spends at most its share of the headroom
-    budget = _Budget(min(scaled_cap(MAX_ADDED_TRIS, 1.0), headroom))
+    budget = _Budget(min(MAX_ADDED_TRIS, headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
     reject_counts: dict[str, int] = {}
@@ -314,7 +314,8 @@ def overgrow(
     planted = dress(
         props,
         edges, features, buildings, lanes, lane_tree, area, years, seed, spawns,
-        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)), triangle_budget=min(MAX_LIBRARY_TRIS, headroom - budget.used),
+        grass_mesh=tuft, grass_left=max(0, tuft_cap - len(tuft_meshes)),
+        triangle_budget=min(MAX_LIBRARY_TRIS, headroom - budget.used),
         preferred=preferred,
         block_streets=plan.street_blocking,
         placed_roles={"wreck": wreck_count},
@@ -354,14 +355,12 @@ def overgrow(
     images.update(planted.images)
     images.update(lamps.images)
     images.update(trees_swap.images)
-    for name in (*lamps.images, *trees_swap.images):
-        materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
     materials.setdefault("abandoned_vine", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_trunk", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_canopy", Material((1, 1, 1, 1), 0.8))
-    for name in planted.images:
+    for name in (*planted.images, *lamps.images, *trees_swap.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     extra_nodes.extend(furniture.nodes)
     images.update(furniture.images)

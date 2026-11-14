@@ -397,6 +397,8 @@ def test_effective_settings_hold_the_protected_and_the_allowed_keys(root: Path) 
     assert settings["cover"] == {"max_props": 24} and settings["sightline_cover"] is False
     assert settings["buildings_sha256"] is None and settings["export"]["sha256"]
     assert settings["area"] == {"radius_m": 150.0, "margin_m": 30.0, "crs": "EPSG:25830"}
+    (root / "config" / "prop_selection.json").write_text(json.dumps({"ids": ["bin_intact"]}))
+    assert sp.effective_settings(root)["overgrow"] == {"profile_years": 100, "selection": "config/prop_selection.json", "prefer": None}
 
 
 def test_translate_writes_only_applied_ids() -> None:

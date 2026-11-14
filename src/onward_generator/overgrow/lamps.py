@@ -76,7 +76,8 @@ def lamp_model(props: Sequence[Prop], seed: int) -> Prop | None:
 def post_frame(mesh: Mesh) -> tuple[Mesh, float]:
     """``mesh`` with its post on the origin, its foot at z = 0, its arm along +x and its height in ``LAMP_HEIGHT_M``,
     and the uniform scale used."""
-    vertices = mesh.vertices - np.array([0.0, 0.0, mesh.vertices[:, 2].min()])
+    vertices = mesh.vertices.copy()
+    vertices[:, 2] -= vertices[:, 2].min()
     height = float(vertices[:, 2].max())
     post = vertices[vertices[:, 2] < POST_FOOT_M]
     centre = (post[:, :2].min(axis=0) + post[:, :2].max(axis=0)) / 2
@@ -100,7 +101,7 @@ def swap_lamps(nodes: Sequence[Node], props: Sequence[Prop], seed: int, headroom
     if not lamps or model is None:
         return LampSwap(list(nodes))
     mesh, scale = post_frame(model.mesh)
-    placed = replace(model, mesh=mesh, fit_scale=model.fit_scale * scale)
+    placed = replace(model, mesh=mesh)
     before = sum(primitive.mesh.triangle_count for index in lamps for primitive in nodes[index].primitives)
     added = placed.triangles * len(lamps) - before
     report: dict[str, Any] = {

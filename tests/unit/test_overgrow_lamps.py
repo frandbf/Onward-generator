@@ -169,3 +169,60 @@ def test_no_lamp_or_no_model_changes_nothing() -> None:
     for result in (swap_lamps(nodes, [], 1, 100_000), swap_lamps([], [_prop()], 1, 100_000)):
         assert result.images == {} and result.added_triangles == 0 and result.report is None
     assert swap_lamps(nodes, [], 1, 100_000).nodes == nodes
+
+
+def test_a_bracket_starting_exactly_at_the_post_foot_is_not_the_post() -> None:
+    from onward_generator.overgrow.fit import POST_FOOT_M
+
+    lamp = merge([box(-0.1, 0.1, -0.1, 0.1, 0.0, 5.0), box(2.0, 2.2, -0.05, 0.05, POST_FOOT_M, POST_FOOT_M + 0.5)])
+    mesh, _ = post_frame(lamp)
+    foot = mesh.vertices[mesh.vertices[:, 2] < 0.5]
+    assert (foot[:, :2].min(axis=0) + foot[:, :2].max(axis=0)) / 2 == pytest.approx([0.0, 0.0], abs=1e-9)
+
+
+def test_a_box_whose_top_is_exactly_at_three_quarters_of_the_height_is_not_the_arm() -> None:
+    # Height 4: the arm is read above 3.0 m. A low box at x = -3 tops out at exactly 3.0 m and must not turn the lamp.
+    lamp = merge([box(-0.1, 0.1, -0.1, 0.1, 0.0, 4.0), box(-0.05, 0.05, 0.0, 1.5, 3.7, 4.0), box(-3.05, -2.95, -0.05, 0.05, 2.8, 3.0)])
+    mesh, scale = post_frame(lamp)
+    assert scale == 1.0
+    # Turned from +y to +x, the low box moves from (-3, 0) to (0, 3).
+    low = mesh.vertices[mesh.vertices[:, 2] < 3.01]
+    low = low[low[:, 2] > 2.79]
+    far = low[np.hypot(low[:, 0], low[:, 1]) > 2.0]
+    assert far[:, 0] == pytest.approx(np.zeros(len(far)), abs=0.06)
+    assert far[:, 1] == pytest.approx(np.full(len(far), 3.0), abs=0.06)
+
+
+def test_an_arm_exactly_at_the_minimum_offset_is_turned(monkeypatch: pytest.MonkeyPatch) -> None:
+    lamp = _lamp_mesh(height=5.0, arm=(0.0, 1.5))
+    vertices = lamp.vertices - np.array([0.0, 0.0, lamp.vertices[:, 2].min()])
+    vertices[:, :2] -= np.array([2.0, 3.0])
+    upper = vertices[vertices[:, 2] > 0.75 * vertices[:, 2].max()]
+    monkeypatch.setattr(lamps_module, "ARM_MIN_OFFSET_M", float(np.hypot(*upper[:, :2].mean(axis=0))))
+    mesh, _ = post_frame(lamp)
+    assert mesh.vertices[:, 0].max() > 1.0  # the arm now points along +x
+
+
+def test_the_model_is_the_one_the_seed_names() -> None:
+    from onward_generator.detail.facades import stable_unit
+
+    props = [_prop(f"lamp_{i}") for i in range(7)]
+    for seed in range(12):
+        expected = sorted(p.spec.id for p in props)[min(6, int(stable_unit(seed, "street_lamp") * 7))]
+        assert lamp_model(props, seed).spec.id == expected  # type: ignore[union-attr]
+        assert swap_lamps([_lamp_node("urban/street_lamp/1", 0.0)], props, seed, 1_000_000).report["asset_id"] == expected  # type: ignore[index]
+
+
+def test_a_lamp_of_exactly_the_maximum_triangles_is_a_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(lamps_module, "LAMP_MAX_TRIANGLES", 120)
+    assert [p.spec.id for p in lamp_candidates([_prop("exact")])] == ["exact"]
+    monkeypatch.setattr(lamps_module, "LAMP_MAX_TRIANGLES", 119)
+    assert lamp_candidates([_prop("exact")]) == []
+
+
+def test_the_report_rounds_the_scale_to_four_places_and_the_height_to_three() -> None:
+    tall = _prop("lamp_a", mesh=merge([_lamp_mesh(height=9.0)] * 5))
+    assert swap_lamps([_lamp_node("urban/street_lamp/1", 0.0)], [tall], 1, 1_000_000).report["scale"] == 0.7778  # type: ignore[index]
+    odd = _prop("lamp_b", mesh=merge([_lamp_mesh(height=5.12345)] * 5))
+    report = swap_lamps([_lamp_node("urban/street_lamp/1", 0.0)], [odd], 1, 1_000_000).report
+    assert report["height_m"] == 5.123 and isinstance(report["height_m"], float)  # type: ignore[index]
