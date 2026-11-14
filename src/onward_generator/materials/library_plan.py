@@ -59,6 +59,17 @@ SLOT_FAMILY = {
     "flat_roofs": "concrete",
 }
 
+# Families a map's own texture plan may also put on a slot (14 November 2026). The automatic choice keeps SLOT_FAMILY;
+# a plan edited by hand may lay dirt on the ground, render where the brick would go, and concrete on pitched roofs, as
+# Mogadishu 1993 does.
+MANUAL_FAMILIES = {
+    "streets_plazas": frozenset({"earth"}),
+    "sidewalks": frozenset({"earth"}),
+    "plain_pedestrian": frozenset({"earth"}),
+    "brick": frozenset({"plaster"}),
+    "roofs": frozenset({"concrete"}),
+}
+
 _CHOICE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -420,7 +431,8 @@ def assert_library_entries(
         if not library_id:
             raise PlanError(f"{slot} has no library texture")
         row = by_id.get(library_id)
-        if row is None or texture_family(row) != SLOT_FAMILY.get(slot):
+        family = texture_family(row) if row is not None else None
+        if row is None or (family != SLOT_FAMILY.get(slot) and family not in MANUAL_FAMILIES.get(slot, frozenset())):
             raise PlanError(f"{slot} cannot use {library_id}")
         if not is_calm(row, extended=extended):
             raise PlanError(

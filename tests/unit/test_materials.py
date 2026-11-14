@@ -840,3 +840,39 @@ def test_the_normal_map_is_fetched_and_cached_beside_the_albedo(tmp_path: Path) 
 
     with pytest.raises(DownloadError, match="Poly Haven files API has no nor_gl 1k jpg"):
         ensure_map_1k("https://polyhaven.com/a/other_id", "nor_gl", cache_dir=tmp_path, download=True, fetch=no_normal)
+
+
+def test_a_plan_may_name_an_asset_store_texture_with_capitals_and_lay_earth_on_the_ground(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Asset Store texture ids keep their file's case (as_25_free_realistic_te_Rocky_Ground_15), and a plan edited by hand
+    may put an earth texture on a ground slot, render on the brick slot and concrete on roofs (Mogadishu 1993)."""
+    from onward_generator.materials import library_plan
+
+    real = library_plan.catalogue_rows()
+    earth = [{"id": i, "family": "earth", "path": "assets/x.jpg", "sha256": "0"} for i in
+             ("as_25_free_realistic_te_Rocky_Ground_15", "as_yughues_free_sand_ma_T_YFSM_03", "as_25_free_realistic_te_Beach_Sand_1")]
+    monkeypatch.setattr(library_plan, "catalogue_rows", lambda: [*real, *earth])
+    doc = _library_plan()
+    used = {e["library_id"] for e in doc["entries"]}
+    choice = {"streets_plazas": "as_25_free_realistic_te_Rocky_Ground_15", "sidewalks": "as_yughues_free_sand_ma_T_YFSM_03"}
+    plaster = next(r["id"] for r in real if library_plan.texture_family(r) == "plaster" and r["id"] not in used and library_plan.is_calm(r, extended=False))
+    concrete = next(r["id"] for r in real if library_plan.texture_family(r) == "concrete" and r["id"] not in used and library_plan.is_calm(r, extended=False))
+    choice |= {"brick": plaster, "roofs": concrete}
+    for slot, library_id in choice.items():
+        next(e for e in doc["entries"] if e["id"] == slot)["library_id"] = library_id
+    path = tmp_path / "plan.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    plan = load_texture_plan(path)
+    assert {slot: plan.by_id[slot].library_id for slot in choice} == choice
+    assert library_plan.MANUAL_FAMILIES == {"streets_plazas": frozenset({"earth"}), "sidewalks": frozenset({"earth"}),
+                                            "plain_pedestrian": frozenset({"earth"}), "brick": frozenset({"plaster"}),
+                                            "roofs": frozenset({"concrete"})}
+    next(e for e in doc["entries"] if e["id"] == "carriageway")["library_id"] = "as_25_free_realistic_te_Beach_Sand_1"  # earth is no asphalt
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(PlanError, match="carriageway cannot use as_25_free_realistic_te_Beach_Sand_1"):
+        load_texture_plan(path)
+    next(e for e in doc["entries"] if e["id"] == "carriageway")["library_id"] = "As_capital_start"  # a capital start is still refused
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(PlanError, match="does not match"):
+        load_texture_plan(path)
