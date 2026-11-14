@@ -865,7 +865,7 @@ def test_a_plan_may_name_an_asset_store_texture_with_capitals_and_lay_earth_on_t
     path.write_text(json.dumps(doc), encoding="utf-8")
     plan = load_texture_plan(path)
     assert {slot: plan.by_id[slot].library_id for slot in choice} == choice
-    assert library_plan.MANUAL_FAMILIES == {"streets_plazas": frozenset({"earth"}), "sidewalks": frozenset({"earth"}),
+    assert library_plan.ALTERNATE_FAMILIES == {"streets_plazas": frozenset({"earth"}), "sidewalks": frozenset({"earth"}),
                                             "plain_pedestrian": frozenset({"earth"}), "brick": frozenset({"plaster"}),
                                             "roofs": frozenset({"concrete"})}
     next(e for e in doc["entries"] if e["id"] == "carriageway")["library_id"] = "as_25_free_realistic_te_Beach_Sand_1"  # earth is no asphalt

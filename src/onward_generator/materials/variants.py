@@ -43,7 +43,7 @@ def variant_picks(entries: Sequence[Any], rows: Sequence[Mapping[str, Any]], see
             continue
         family = SLOT_FAMILY[slot]
         pool = sorted((str(row["id"]) for row in rows
-                       if texture_family(row) == family and not row.get("manual") and str(row["id"]) not in used and is_calm(row, extended=extended)),
+                       if texture_family(row) == family and not row.get("distinctive") and str(row["id"]) not in used and is_calm(row, extended=extended)),
                       key=lambda library_id: hashlib.sha256(f"{seed}:{slot}:{library_id}".encode()).digest())
         picks[slot] = pool[:VARIANTS]
         used.update(picks[slot])

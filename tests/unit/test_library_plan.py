@@ -189,7 +189,7 @@ def test_a_model_reply_with_a_busy_texture_is_rejected() -> None:
         brief=None, seed=3, provider=StaticProvider("replay", reply, "test"),
     )
     assert plan["selector"] == "library"
-    assert "acg_concrete047b is not in the concrete pool" in plan["description"]
+    assert "acg_concrete047b is not in the concrete/earth pool" in plan["description"]  # sidewalks may be earth
 
 
 @pytest.mark.parametrize(("slot", "library_id"), [
@@ -393,7 +393,7 @@ def test_a_model_reply_with_a_busy_roof_or_paving_is_rejected_only_when_extended
     rows = library_rows()
     reply = _reply_with(rows, slot, library_id)
     assert _parse_choices(reply, rows)[slot] == library_id
-    family = "roof" if slot == "roofs" else "paving"
+    family = "roof/concrete" if slot == "roofs" else "paving/earth"  # the slot's family, then its alternates
     with pytest.raises(PlanError, match=rf"^{library_id} is not in the {family} pool$"):
         _parse_choices(reply, rows, extended=True)
     common = {"name": "Murcia", "map_id": "murcia", "latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON,
@@ -564,6 +564,8 @@ def test_a_fallback_plan_keeps_the_name_the_brief_and_the_extended_gaps(extended
 
 
 def test_the_choice_schema_pairs_each_slot_with_its_familys_ids() -> None:
+    from onward_generator.materials.library_plan import slot_families
+
     rows = library_rows()
     for extended in (False, True):
         pools = _pools(rows, extended=extended)
@@ -574,7 +576,7 @@ def test_the_choice_schema_pairs_each_slot_with_its_familys_ids() -> None:
         filled = [slot for slot, family in SLOT_FAMILY.items() if pools.get(family)]
         assert list(branches) == filled and choices["minItems"] == choices["maxItems"] == len(filled)
         for slot, ids in branches.items():
-            assert ids == sorted(str(row["id"]) for row in pools[SLOT_FAMILY[slot]])
+            assert ids == sorted(str(row["id"]) for family in slot_families(slot) for row in pools.get(family, ()))
         for branch in choices["items"]["anyOf"]:
             slot = branch["properties"]["slot"]["const"]
             assert branch == {"type": "object", "additionalProperties": False, "required": ["slot", "library_id"],
