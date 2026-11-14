@@ -1,6 +1,6 @@
 # ADR-039 — Opt-in real normal maps for library photographs
 
-Status: proposed · 13 November 2026. The maintainer approved amending the albedo-only rule (AGENTS.md) for an opt-in list of materials, off by default, to be measured on the headset before any map turns it on by default.
+Status: accepted · 14 November 2026, after a headset session (amendment below). Proposed 13 November 2026: the maintainer approved amending the albedo-only rule (AGENTS.md) for an opt-in list of materials, off by default, to be measured on the headset before any map turns it on by default.
 
 ## Context
 
@@ -20,3 +20,8 @@ Status: proposed · 13 November 2026. The maintainer approved amending the albed
 - Texture memory: one normal map per photograph (about 0.46 MiB in ASTC 6×6), at most a dozen on a map, about 5 MiB. Geometry: tangents on the meshes of those materials. Shader cost: `PP_Opaque_Lit` on those materials only. To be measured on the headset (frame time, memory) before `normal_maps` is turned on for a shipped map.
 - Baked lighting: as ADR-033 notes, without directional lightmaps the relief shows mostly in the specular term.
 - AGENTS.md: the albedo-only rule now names this opt-in exception.
+
+## Amendment, 14 November 2026: measured on the headset, accepted
+
+Murcia Catedral 2, pkg_05 (`murcia_catedral_2_6e8a247d4c`, final bake), Meta Quest 3: 12 library normal maps on `PP_Opaque_Lit` (asphalt, paving, kerb, pavements, roofs, bark), with 22 cut-out trees (ADR-040), 62 props and 288 426 estimated Unity triangles. VrApi logcat, one sample a second over about 6.5 minutes of play (404 samples): 72–73 FPS median, 72 at the 10th percentile; app GPU time 4.78 ms median, 5.99 ms at the 90th percentile, 8.81 ms at most, against 13.9 ms at 72 Hz; GPU load 50 % median, 68 % at most; at least 1 714 MB free. Four seconds dropped one to three frames (69–71 FPS). Two seconds fell to 53 FPS close to the end of the session: the second, with the app GPU time under 1 ms, matches leaving the map; the first was still under normal load (4.2 ms), so it is not explained. The log does not say what the player was looking at, so no drop can be put on the normal maps or on the trees. The maintainer looked at the ground, roofs and facades and found them right. The switch stays on by default for a new map (since 13 November 2026, `maps.workspace.DEFAULT_OFF_SWITCHES`); `--no-normal-maps` turns it off.
+
