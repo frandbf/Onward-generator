@@ -1976,6 +1976,8 @@ def _assemble_detail(
                 "position_m": [round(float(e.matrix[0, 3]), 3), round(float(e.matrix[1, 3]), 3)],
                 "yaw_deg": round(float(np.degrees(np.arctan2(e.matrix[1, 0], e.matrix[0, 0]))), 2),
                 "representation": "generic_prototype",
+                # Estimated: a crown narrowed to stay off the nearest facade (detail.urban.crown_fit).
+                **({"crown_scale": e.crown_scale} if e.crown_scale != 1.0 else {}),
             }, proto.key, e.matrix))
 
     for o in objects:

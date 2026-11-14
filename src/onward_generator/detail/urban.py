@@ -61,6 +61,15 @@ def away_from_buildings(point: Point, buildings: BaseGeometry) -> float:
     return math.atan2(dy, dx) if math.hypot(dx, dy) > 1e-9 else 0.0
 
 
+CROWN_WALL_GAP_M = 0.1
+"""A tree's crown keeps this far from every facade. Within 2 m of a wall the generated crown, up to 2 m across its
+radius, went through it and showed inside the rooms: 42 of the 105 OSM trees of Murcia Catedral (13 November 2026)."""
+MIN_CROWN_SCALE = 0.35
+"""The narrowest crown, as a share of its width: a tree closer to a facade than this is left out (``crown_against_building``).
+At 0.35 every OSM tree of Murcia Catedral stays, the nearest (0.82 m from a wall) as a slim pruned street tree; at 0.5
+thirteen of them were lost."""
+
+
 @dataclass(frozen=True, slots=True)
 class Element:
     id: str
@@ -69,6 +78,32 @@ class Element:
     origin: str  # observed | generated
     source_ids: tuple[str, ...]
     rule: str
+    crown_scale: float = 1.0
+    """Across a tree's crown and trunk, never along its height: below 1 where the crown would reach a facade."""
+
+
+def crown_radius(proto: Prototype) -> float:
+    """The farthest a prototype's visual mesh reaches from its axis, in plan."""
+    return max(float(np.hypot(mesh.vertices[:, 0], mesh.vertices[:, 1]).max()) for _material, mesh in proto.parts if len(mesh.vertices))
+
+
+def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prototype], room_m: float) -> tuple[str, float] | None:
+    """The tree prototype and the crown scale that keep a crown ``CROWN_WALL_GAP_M`` clear of the nearest facade, which
+    stands ``room_m`` away. ``chosen`` when it fits; else the first of the other ``options`` that does; else the
+    narrowest prototype scaled across, down to ``MIN_CROWN_SCALE``; None when not even that fits. The tree stays where
+    OSM puts it."""
+    room = room_m - CROWN_WALL_GAP_M
+    for kind in (chosen, *(k for k in options if k != chosen)):
+        if crown_radius(prototypes[kind]) <= room:
+            return kind, 1.0
+    narrowest = min(options, key=lambda k: (crown_radius(prototypes[k]), k))
+    scale = room / crown_radius(prototypes[narrowest])
+    return (narrowest, round(scale, 3)) if scale >= MIN_CROWN_SCALE else None
+
+
+def crown_matrix(matrix: np.ndarray, scale: float) -> np.ndarray:
+    """``matrix`` with its plan axes scaled by ``scale``: a narrower crown at the same height."""
+    return matrix @ np.diag([scale, scale, 1.0, 1.0]) if scale != 1.0 else matrix
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,13 +200,22 @@ def place_elements(
         if proto_kind not in prototypes:
             continue
         p = shape(f["geometry"])
+        scale = 1.0
         if kind == "tree":
             yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw")
+            if not buildings.is_empty:
+                fit = crown_fit([k for k in ("tree", "tree_1", "tree_2") if k in prototypes] or [proto_kind], proto_kind, prototypes,
+                                float(buildings.distance(p)))
+                if fit is None:
+                    rejected.append(Rejected(f["id"], kind, "crown_against_building"))
+                    continue
+                proto_kind, scale = fit
         elif kind == "street_lamp":
             yaw = away_from_buildings(p, buildings)
         else:
             yaw = 0.0
-        element = Element(f"urban/{kind}/{f['id']}", proto_kind, yaw_matrix(p.x, p.y, 0.0, yaw), "observed", (f["id"],), "osm_poi_position")
+        element = Element(f"urban/{kind}/{f['id']}", proto_kind, crown_matrix(yaw_matrix(p.x, p.y, 0.0, yaw), scale), "observed",
+                          (f["id"],), "osm_poi_position", scale)
         reason = try_place(element)
         if reason:
             rejected.append(Rejected(f["id"], kind, reason))
