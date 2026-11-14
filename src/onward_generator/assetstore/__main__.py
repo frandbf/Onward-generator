@@ -104,8 +104,8 @@ def _textures(args: argparse.Namespace) -> int:
             continue
         rows = texture_rows(packages[package_id], ASSETS, table[package_id])
         normals = sum(1 for row in rows if "normal" in row)
-        print(f"{package_id}: {len(rows)} textures of {len(table[package_id])} named, {normals} with a normal map",
-              flush=True)  # pragma: no mutate: flushing changes when a line shows, not what it says
+        line = f"{package_id}: {len(rows)} textures of {len(table[package_id])} named, {normals} with a normal map"
+        print(line, flush=True)  # pragma: no mutate: flushing changes when a line shows, not what it says
         total += len(rows)
     print(f"{total} textures under {ASSETS}/asset_store_*")
     return 0

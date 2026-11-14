@@ -238,7 +238,7 @@ def test_the_textures_command_imports_the_table_s_packages(tmp_path: Path, monke
     out = capsys.readouterr().out
     assert "absent_pack: not downloaded\n" in out and "wall_pack: 2 textures of 2 named, 1 with a normal map\n" in out
     assert "ground_pack: 1 textures of 1 named, 0 with a normal map\n" in out
-    assert f"3 textures under {tmp_path / 'assets'}/asset_store_*\n" in out  # both packages counted
+    assert f"\n3 textures under {tmp_path / 'assets'}/asset_store_*\n" in out  # both packages counted
     assert cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "wall_pack", "absent_pack"]) == 0
     assert "wall_pack: 2 textures" in capsys.readouterr().out
     with pytest.raises(SystemExit, match="asset-store: other, zzz has no texture sets in config/dress/asset_store_textures.json"):
