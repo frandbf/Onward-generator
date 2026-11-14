@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from shapely import LineString, box
+from shapely import LineString, Polygon, box
 
 from onward_generator.detail.config import DetailConfig, FurnitureItem, StreetFurniture, StreetLamps, load_detail_config
 from onward_generator.detail.modules import Prototype, urban_prototypes
@@ -298,6 +298,8 @@ def test_the_wall_lamp_prototype_hangs_above_head_height_without_a_collider() ->
     ("way/1#lamp0", "too_close_to_building", "info"),
     ("way/2#bench3", "not_on_free_walkable_ground", "info"),
     ("node/5", "too_close_to_another_lamp", "info"),
+    ("node/8", "too_close_to_another_tree", "info"),
+    ("node/9", "crown_against_building", "warning"),
     ("node/6", "not_on_free_walkable_ground", "warning"),
     ("node/7", "overlaps_another_element", "warning"),
 ])
@@ -306,3 +308,84 @@ def test_only_an_observed_element_that_finds_no_place_is_a_warning(rid: str, rea
     from onward_generator.detail.urban import Rejected
 
     assert rejection_severity(Rejected(rid, "street_lamp", reason)) == severity
+
+
+def test_a_tree_crown_keeps_off_the_nearest_facade() -> None:
+    """On Murcia Catedral 42 of the 105 OSM trees stood within 2 m of a facade, and their crowns showed inside the rooms."""
+    from onward_generator.detail.urban import CROWN_WALL_GAP_M, MIN_CROWN_SCALE, crown_fit, crown_radius
+
+    protos = urban_prototypes(tree_variants=3)
+    radius = {kind: crown_radius(protos[kind]) for kind in ("tree", "tree_1", "tree_2")}
+    assert radius == pytest.approx({"tree": 1.9, "tree_1": 2.0, "tree_2": 1.5})
+    assert (CROWN_WALL_GAP_M, MIN_CROWN_SCALE) == (0.1, 0.35)
+    options = ["tree", "tree_1", "tree_2"]
+    # Room for the chosen crown: kept. Room for a narrower one only: the first other variant that fits.
+    assert crown_fit(options, "tree_1", protos, 2.1) == ("tree_1", 1.0)
+    assert crown_fit(options, "tree_1", protos, 2.09) == ("tree", 1.0)
+    assert crown_fit(options, "tree_1", protos, 1.6) == ("tree_2", 1.0)
+    # No variant fits: the narrowest is scaled across, down to 0.35 of its width; nearer than that, no tree.
+    assert crown_fit(options, "tree", protos, 1.0) == ("tree_2", 0.6)
+    assert crown_fit(options, "tree", protos, 0.625) == ("tree_2", 0.35)
+    assert crown_fit(options, "tree", protos, 0.62) is None
+    assert crown_fit(["tree"], "tree", protos, 0.82) == ("tree", 0.379)
+
+    wall = box(-10.0, 1.0, 10.0, 11.0)  # its face at y = 1 m
+    features = [_poi("node/1", 0.0, -0.2, natural="tree"), _poi("node/2", 0.0, -6.0, natural="tree"), _poi("node/3", 5.0, 0.5, natural="tree")]
+    placed, rejected = place_elements(features, [], FREE, wall, PROTOS, _cfg())
+    near, far = sorted(placed, key=lambda e: _xy(e)[1], reverse=True)
+    assert (near.kind, near.crown_scale) == ("tree", round(1.1 / 1.9, 3))
+    assert far.crown_scale == 1.0 and np.allclose(np.linalg.norm(far.matrix[:3, 0]), 1.0)
+    # The crown is narrower across, at the same height, and still turned by its stable yaw.
+    assert np.linalg.norm(near.matrix[:3, 0]) == pytest.approx(near.crown_scale)
+    assert np.linalg.norm(near.matrix[:3, 1]) == pytest.approx(near.crown_scale)
+    assert near.matrix[2, 2] == 1.0 and _xy(near) == (0.0, -0.2)
+    assert [(r.id, r.kind, r.reason) for r in rejected] == [("node/3", "tree", "crown_against_building")]
+    # Without a building nothing is narrowed.
+    alone, _ = place_elements(features[:1], [], FREE, Polygon(), PROTOS, _cfg())
+    assert alone[0].crown_scale == 1.0
+
+
+def test_a_narrowed_crown_is_recorded_and_dress_keeps_it() -> None:
+    from onward_generator.dress.style import _elements_from_records, _urban_nodes
+
+    record = {"id": "urban/tree/node/1", "type": "urban_element", "kind": "tree", "source_ids": ["node/1"], "attribute_origin": "observed",
+              "placement_rule": "osm_poi_position", "position_m": [2.0, 3.0], "yaw_deg": 30.0, "crown_scale": 0.6}
+    plain = dict(record, id="urban/tree/node/2")
+    del plain["crown_scale"]
+    narrow, whole = _elements_from_records([record, plain], PROTOS)
+    assert narrow.crown_scale == 0.6 and whole.crown_scale == 1.0
+    assert (narrow.id, whole.id) == ("urban/tree/node/1", "urban/tree/node/2")
+    assert narrow.matrix[:3, 3].tolist() == [2.0, 3.0, 0.0]
+    assert np.linalg.norm(narrow.matrix[:3, 0]) == pytest.approx(0.6) and narrow.matrix[2, 2] == 1.0
+    _visual, _collision, records = _urban_nodes([narrow, whole], PROTOS)
+    assert records[0]["crown_scale"] == 0.6 and records[0]["yaw_deg"] == 30.0
+    assert "crown_scale" not in records[1]
+
+
+def test_observed_trees_keep_5_m_from_each_other_in_id_order() -> None:
+    """Murcia Catedral's OSM rows stood about 4 m apart: 105 trees where 56 read as the same rows."""
+    from onward_generator.detail.urban import TREE_MIN_SPACING_M
+
+    assert TREE_MIN_SPACING_M == 5.0
+    # node/1 at 0 m, node/2 at 4.99 m (too close), node/3 at 5 m (exactly enough), node/4 at 9 m (too close to node/3).
+    features = [_poi(f"node/{i}", x, 0.0, natural="tree") for i, x in ((4, 9.0), (2, 4.99), (3, 5.0), (1, 0.0))]
+    placed, rejected = place_elements(features, [], FREE, FAR_BUILDING, PROTOS, _cfg())
+    assert [e.id for e in placed] == ["urban/tree/node/1", "urban/tree/node/3"]
+    assert [(r.id, r.kind, r.reason) for r in rejected] == [("node/2", "tree", "too_close_to_another_tree"),
+                                                              ("node/4", "tree", "too_close_to_another_tree")]
+    # A tree that found no place does not hold its neighbours off; other kinds never count.
+    blocked = [_poi("node/1", 300.0, 0.0, natural="tree"), _poi("node/2", 2.0, 0.0, natural="tree"),
+               _poi("node/0", 0.0, 0.0, amenity="bench")]
+    placed, _ = place_elements(blocked, [], FREE, FAR_BUILDING, PROTOS, _cfg())
+    assert sorted(e.id for e in placed) == ["urban/bench/node/0", "urban/tree/node/2"]
+
+
+def test_only_a_narrowed_crown_writes_crown_scale() -> None:
+    from onward_generator.detail.urban import crown_fields, crown_matrix
+
+    whole = Element("urban/tree/n1", "tree", np.eye(4), "observed", ("n1",), "osm_poi_position")
+    narrow = dataclasses.replace(whole, crown_scale=0.6)
+    assert crown_fields(whole) == {} and crown_fields(narrow) == {"crown_scale": 0.6}
+    # A whole crown keeps its matrix; a narrowed one is scaled across only.
+    assert np.array_equal(crown_matrix(np.eye(4), 1.0), np.eye(4))
+    assert np.array_equal(crown_matrix(np.eye(4), 0.5), np.diag([0.5, 0.5, 1.0, 1.0]))

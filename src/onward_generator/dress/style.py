@@ -16,7 +16,7 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.detail.config import DetailConfig
 from onward_generator.detail.facades import material_base, party_base, stable_unit
 from onward_generator.detail.modules import Prototype, urban_prototypes, yaw_matrix
-from onward_generator.detail.urban import Element, Rejected, _footprint
+from onward_generator.detail.urban import Element, Rejected, _footprint, crown_fields, crown_matrix
 from onward_generator.dress.atlas import MIN_TILE_PX, _tile_pixels, build_atlas, encode_png_rgba
 from onward_generator.dress.catalog import MaterialCatalog
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
@@ -141,11 +141,13 @@ def _elements_from_records(objects: Sequence[Mapping[str, Any]], prototypes: Map
             continue
         pos = rec.get("position_m") or [0.0, 0.0]
         yaw = math.radians(float(rec.get("yaw_deg") or 0.0))
+        scale = float(rec.get("crown_scale") or 1.0)
         elements.append(Element(
-            str(rec["id"]), kind, yaw_matrix(float(pos[0]), float(pos[1]), 0.0, yaw),
+            str(rec["id"]), kind, crown_matrix(yaw_matrix(float(pos[0]), float(pos[1]), 0.0, yaw), scale),
             str(rec.get("attribute_origin") or "observed"),
             tuple(rec.get("source_ids") or ()),
             str(rec.get("placement_rule") or "copied_from_detail"),
+            scale,
         ))
     return elements
 
@@ -168,6 +170,7 @@ def _urban_nodes(elements: Sequence[Element], prototypes: Mapping[str, Prototype
             "position_m": [round(float(e.matrix[0, 3]), 3), round(float(e.matrix[1, 3]), 3)],
             "yaw_deg": round(float(math.degrees(math.atan2(e.matrix[1, 0], e.matrix[0, 0]))), 2),
             "representation": "generic_prototype",
+            **crown_fields(e),
         })
     return visual, collision, records
 
