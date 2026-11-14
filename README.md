@@ -109,7 +109,7 @@ Put PNG images (with a transparent background where the decal is not a rectangle
 {"decals": [{"file": "mural.png", "width_m": 1.2, "description": "A mural from my street"}]}
 ```
 
-Every map then carries each of them once, on an exposed wall of the playable core, before the generated decals; a decal that fits no wall stops `signs place` with its name. Use only photographs you may share: no recognisable people, brands or personal data ([ADR-038](docs/decisions/ADR-038-wall-decals.md)).
+Every map then carries each of them once, on an exposed wall of the playable core, before the generated decals; a decal that fits no wall stops `signs place` with its name. A map for the Onward Workshop must not show real people (Custom Content Guide): set `"user_decals": false` in its `map.json` to leave them out. Use only photographs you may share: no recognisable people, brands or personal data ([ADR-038](docs/decisions/ADR-038-wall-decals.md)).
 
 ### Every option that is off by default
 

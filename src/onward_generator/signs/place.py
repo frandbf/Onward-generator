@@ -233,7 +233,7 @@ def place_signs(
         pool = [d for d in pool if d.id in set(picked.decal_ids)]
     # The maintainer's own decals (assets/user_decals) go on every map, first, each once; the model does not pick them.
     try:
-        required = read_user_decals(REPO_ROOT / "assets") if local.enabled() else []  # local, as the Asset Store catalogues
+        required = read_user_decals(REPO_ROOT / "assets") if local.enabled() and _user_decals_on(base) else []  # local, as the Asset Store catalogues
     except UserDecalError as exc:
         raise SignsError(str(exc)) from exc
     decals = place_decals(
@@ -328,6 +328,24 @@ def place_signs(
     if not compare["identical"]:
         raise SignsError("street signs changed a geographic object record; this is a bug")
     return signs_report
+
+
+def _user_decals_on(base: Path) -> bool:
+    """False only when ``map.json`` has ``"user_decals": false``: a map meant for the Onward Workshop, whose rules refuse
+    the likeness of a real person, leaves the maintainer's own decals out. Outside a map folder, or without the key, on."""
+    from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    if root is None:
+        return True
+    try:
+        value = load_map(root).get("user_decals", True)
+    except (MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
+        return True
+    if not isinstance(value, bool):
+        raise SignsError(f'map.json "user_decals" must be true or false, got {value!r}')
+    return value
 
 
 def _ambient(base: Path) -> tuple[str, bool]:

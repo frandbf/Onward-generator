@@ -197,3 +197,34 @@ def test_the_size_limit_is_named_in_mebibytes(tmp_path: Path, monkeypatch: pytes
     monkeypatch.setattr(user_decals.Path, "stat", lambda self, **k: type("S", (), {"st_size": 3 * 1024 * 1024, "st_mode": 0o100644})())
     with pytest.raises(UserDecalError, match=r"a.png is over 2 MiB$"):
         read_user_decals(tmp_path)
+
+
+def test_a_map_can_leave_the_user_decals_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A map for the Onward Workshop, whose rules refuse the likeness of a real person: map.json "user_decals": false."""
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    root = tmp_path / "map"
+    base = root / "data" / "processed" / "scene_materials"
+    base.parent.mkdir(parents=True)
+    _base(base)
+    assets = tmp_path / "repo" / "assets"
+    _folder(assets, {"decals": [{"file": "mural.png", "width_m": 0.8}]}, {"mural.png": (200, 100, "RGBA")})
+    monkeypatch.setattr(signs_place, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.setenv("ONWARD_LOCAL_CATALOGUES", "1")
+    monkeypatch.setattr(signs_place, "_ambient", lambda base: ("", False))
+
+    def users(out: str) -> list[str]:
+        report = place_signs(base, scene, tmp_path / out)
+        return [row["decal"] for row in report["wall_decals"]["decals"] if row["origin"] == "user"]
+
+    root.mkdir(parents=True, exist_ok=True)
+    for value, expected in ((None, ["user_mural"]), (True, ["user_mural"]), (False, [])):
+        document = {} if value is None else {"user_decals": value}
+        (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+        monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r, d=document: d)
+        assert users(f"out_{value}") == expected
+    monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: {"user_decals": "no"})
+    with pytest.raises(SignsError, match='^map.json "user_decals" must be true or false, got \'no\'$'):
+        place_signs(base, scene, tmp_path / "bad")
+    monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
+    assert users("unreadable") == ["user_mural"]  # an unreadable map.json reads as no switch
