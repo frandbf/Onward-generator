@@ -1,0 +1,37 @@
+{
+  "schema": "onward_generator.asset_store_textures",
+  "schema_version": "0.1.0",
+  "description": "Families of the texture sets in the maintainer's Asset Store texture packages (ADR-035 amendment of 13 November 2026). Names only: the images stay local under assets/asset_store_<package>/ and are never committed. Chosen by eye from a contact sheet; a set left out is a terrain (no texture slot uses one), a stained band that would not tile, wood, interior tiles or an odd stone.",
+  "packages": {
+    "18_high_resolution_wall_textures": {
+      "wall05": {"family": "plaster", "note": "Plain pink-grey render."},
+      "wall06": {"family": "plaster", "note": "Light render, faint mottling."},
+      "wall07": {"family": "plaster", "note": "Grey-brown render."},
+      "wall08": {"family": "plaster", "note": "Rough white render."},
+      "wall16": {"family": "plaster", "note": "Cream render."},
+      "wall02": {"family": "concrete", "note": "Grey concrete with small marks."},
+      "wall12": {"family": "asphalt", "note": "Dark speckled aggregate."},
+      "wall01": {"family": "rock", "note": "Grey dressed stone blocks."},
+      "wall04": {"family": "rock", "note": "Grey and brown stone blocks."},
+      "wall09": {"family": "rock", "note": "Light rubble stone."},
+      "wall18": {"family": "rock", "note": "Yellow sandstone blocks."},
+      "wall15": {"family": "brick", "note": "Brick with plaster patches."},
+      "wall11": {"family": "paving", "note": "Grey flagstones."}
+    },
+    "p3d_outdoor_wall_tile_texture_pack_lr": {
+      "Outdoor_Wall_T03": {"family": "plaster", "note": "Beige weathered render."},
+      "Outdoor_Wall_T07": {"family": "concrete", "note": "Concrete panels."},
+      "Outdoor_Wall_T04": {"family": "brick", "note": "Dark brick."},
+      "Outdoor_Wall_T12": {"family": "brick", "note": "Red brick, light mortar."},
+      "Outdoor_Wall_T13": {"family": "brick", "note": "Brick with moss."},
+      "Outdoor_Wall_T16": {"family": "brick", "note": "Dark grey long brick."},
+      "Outdoor_Wall_T05": {"family": "rock", "note": "Brown dressed stone."},
+      "Outdoor_Wall_T06": {"family": "rock", "note": "Sandstone rubble."},
+      "Outdoor_Wall_T09": {"family": "rock", "note": "Grey stone blocks."},
+      "Outdoor_Wall_T15": {"family": "rock", "note": "Brown stone blocks."},
+      "Outdoor_Wall_T01": {"family": "paving", "note": "Grey flagstones."},
+      "Outdoor_Wall_T10": {"family": "paving", "note": "Rounded cobbles."},
+      "Outdoor_Wall_T14": {"family": "paving", "note": "Brown flagstones."}
+    }
+  }
+}

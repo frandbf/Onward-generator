@@ -91,3 +91,14 @@ The maintainer asked for every downloaded package to be imported. Of the 30 pack
 - **Triangle limit**: vehicle packages are imported with `--max-triangles 30000` or `80000`. The library reduces them on load (`overgrow.library`), as before.
 
 Results so far: *Low Poly Street Pack* 30 rows, *Street Lights Pack* 29, *Street Lights Pack 01* 10, *ZIL-130* 2, *Mossy Rocks* 3, *Police Car* 1 (the helicopter refused), *Abandoned Rusty Vehicles* 1, *Barrels* 1, and one rock each from the tree and vine packages. Still refused: *Street Assets* (white, no palette), *Retro Kitch* (every material see-through), the rusty set's ivy (cut-out) and its props named `SM_asset_NN` (no words to classify).
+
+## Amendment, 13 November 2026: texture packages
+
+Four of the maintainer's packages are textures, not models: *18 High Resolution Wall Textures*, *Outdoor Ground Textures*, *P3D Outdoor Wall Tile Texture Pack LR* and *Realistic Terrain Textures FREE*. Each is a set of PBR maps per material.
+
+- **What is read.** `asset-store textures` reads, straight from the package and without the editor, the albedo and the normal map of each set that `config/dress/asset_store_textures.json` names. The table holds names and families only, chosen by eye from a contact sheet, so it is committed. Each set is written as a 1024 px JPEG albedo and an OpenGL normal map to the gitignored `assets/asset_store_<package>/`. A `_Normal_DirectX` map has its green channel flipped. A plain `_Normal` map is taken as OpenGL, an assumption to check on the headset.
+- **How the plan uses it.** The manifest has the imported-library shape, so `library_plan.catalogue_rows` adds these rows while local catalogues are on (`ONWARD_LOCAL_CATALOGUES` not `0`). The texture plan then draws them with the `wide_library` switch, and the normal-map path of ADR-039 reads their `normal`. Like every row, they join a pool only under their family's calm limit.
+- **Result.** 26 sets named (13 per wall package); 18 pass the calm filter. The terrain and ground textures are not named, because no texture slot draws dirt or grass yet. Busy sets (high-contrast brick, rounded cobbles) stay in the catalogue but join no pool.
+- **Licence.** The images are under the Unity Asset Store EULA: local copies for this user's maps, never committed, used inside built maps only. A plan that names one resolves only on this machine.
+
+Correction, same day: heavy vehicles are not imported. The library keeps a vehicle whole: decimation tore holes in car bodies on the headset, so `level_of_detail` leaves vehicles alone. A 53 000-triangle wreck and the two 37 000-triangle ZIL-130 versions, imported with a higher `--max-triangles`, took most of overgrow's 80 000-triangle budget on Rue Mouffetard (pkg_16: 311 props refused for budget, 6 placed). Vehicle packages stay at the default limit of 8 000 triangles, so *ZIL-130* and *Abandoned Rusty Vehicles* give no row.

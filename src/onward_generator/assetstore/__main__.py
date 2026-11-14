@@ -1,8 +1,9 @@
-"""``onward-generator asset-store scan | import`` (ADR-035).
+"""``onward-generator asset-store scan | import | textures`` (ADR-035).
 
 ``scan`` lists the ``.unitypackage`` files in this user's Unity Asset Store cache and whether each one already has a
 local catalogue. ``import`` exports the chosen packages with the host's Unity editor and writes
-``assets/asset_store_<id>/``, which git ignores. Run it on the host, not in Docker: it needs the editor and the cache.
+``assets/asset_store_<id>/``, which git ignores. Run it on the host, not in Docker: it needs the editor and the cache. ``textures`` reads the texture sets that
+``config/dress/asset_store_textures.json`` names straight from their packages (no editor) into ``assets/asset_store_<id>/``.
 """
 
 from __future__ import annotations
@@ -87,6 +88,29 @@ def _import(args: argparse.Namespace) -> int:
     return 1 if failed and not rows else 0
 
 
+def _textures(args: argparse.Namespace) -> int:
+    from onward_generator.assetstore.textures import read_table, texture_rows
+
+    table = read_table()
+    packages = {p.id: p for p in find_packages(_cache(args))}
+    wanted = args.only or sorted(table)
+    missing = sorted(set(wanted) - set(table))
+    if missing:
+        raise SystemExit(f"asset-store: {', '.join(missing)} has no texture sets in config/dress/asset_store_textures.json")
+    total = 0
+    for package_id in wanted:
+        if package_id not in packages:
+            print(f"{package_id}: not downloaded")
+            continue
+        rows = texture_rows(packages[package_id], ASSETS, table[package_id])
+        normals = sum(1 for row in rows if "normal" in row)
+        line = f"{package_id}: {len(rows)} textures of {len(table[package_id])} named, {normals} with a normal map"
+        print(line, flush=True)  # pragma: no mutate: flushing changes when a line shows, not what it says
+        total += len(rows)
+    print(f"{total} textures under {ASSETS}/asset_store_*")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="onward-generator asset-store", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -99,7 +123,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     imp.add_argument("--refresh", action="store_true", help="import again packages that already have a local catalogue")
     imp.add_argument("--max-triangles", type=int, default=DEFAULT_MAX_TRIANGLES, help="skip models with more LOD0 triangles")
     imp.add_argument("--unity", help="the Unity editor executable (default: the host profile's)")
+    tex = sub.add_parser(
+        "textures",
+        help="texture sets named in config/dress/asset_store_textures.json, without the editor",  # pragma: no mutate: help text only
+    )
+    tex.add_argument(
+        "--cache",
+        help="the Unity Asset Store cache (default: the host profile's asset_store_cache)",  # pragma: no mutate: help text only
+    )
+    tex.add_argument(
+        "--only", nargs="+",
+        help="package ids of the table",  # pragma: no mutate: help text only
+    )
     args = parser.parse_args(argv)
+    if args.command == "textures":
+        return _textures(args)
     return _scan(args) if args.command == "scan" else _import(args)
 
 
