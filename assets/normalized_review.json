@@ -805,6 +805,22 @@
       "usable": false,
       "installed": false,
       "reason": "Sketchfab Free Standard, not CC-BY. Not saved."
+    },
+    {
+      "uid": "854bf0feee5b42dc92ac5329976f7942",
+      "name": "US Army UH-60M Black Hawk low poly model",
+      "author": "WTigerTw",
+      "group": "Elicoptero",
+      "url": "https://sketchfab.com/models/854bf0feee5b42dc92ac5329976f7942",
+      "api_url": "https://api.sketchfab.com/v3/models/854bf0feee5b42dc92ac5329976f7942",
+      "license": "CC Attribution",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "usable": true,
+      "installed": false,
+      "reason": "CC-BY on the Sketchfab API on 2026-11-14 (12 606 faces, 1 material, 5 textures). A story prop for config/pinned_props.json: max_triangles 13 000, placement pinned_only.",
+      "id": "uh60_black_hawk",
+      "normalized_file": "uh60_black_hawk.glb",
+      "error": null
     }
   ]
 }

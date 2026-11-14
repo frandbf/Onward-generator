@@ -215,3 +215,36 @@ def test_the_plan_and_the_keep_out_circle() -> None:
     # Off the origin, with digits past the third: the centre and the radius are rounded to the millimetre.
     assert keep_out_circles([shapely_box(10.2468, 20.1357, 13.2468, 21.1357)]) == [(11.747, 20.636, 1.581)]
     assert isinstance(Polygon(), Polygon)
+
+
+def test_a_pin_may_lay_its_model_on_its_side_and_tip_its_nose(tmp_path: Path) -> None:
+    """14 November 2026: an intact Black Hawk laid on its side reads as a crash."""
+    from onward_generator.overgrow.pinned import posed
+
+    path = tmp_path / "pinned_props.json"
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": 80, "pitch_deg": -12}]}))
+    assert read_pins(path) == [Pin("a", 1.0, 2.0, roll_deg=80.0, pitch_deg=-12.0)]
+    for bad in ({"roll_deg": 180.5}, {"roll_deg": -181}, {"pitch_deg": 90.5}, {"pitch_deg": -91}):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, **bad}]}))
+        with pytest.raises(PinnedError, match=r"props\[0\]: roll_deg must lie between -180 and 180 and pitch_deg between -90 and 90"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": 180, "pitch_deg": -90}]}))
+    assert read_pins(path)[0].roll_deg == 180.0
+    wreck = _wreck(14.0, 4.0)  # 14 m long on X, 4 m wide, 2.5 m tall
+    assert posed(wreck, 0.0, 0.0) is wreck
+    side = posed(wreck, 90.0, 0.0)
+    span = side.mesh.vertices.max(axis=0) - side.mesh.vertices.min(axis=0)
+    assert span == pytest.approx([14.0, 2.5, 4.0], abs=1e-9) and side.mesh.vertices[:, 2].min() == pytest.approx(0.0, abs=1e-12)
+    nose = posed(wreck, 0.0, 90.0)
+    assert (nose.mesh.vertices.max(axis=0) - nose.mesh.vertices.min(axis=0)) == pytest.approx([2.5, 4.0, 14.0], abs=1e-9)
+    tipped = posed(wreck, 0.0, 30.0)  # +Y turn: the +X end goes down
+    low = tipped.mesh.vertices[np.argmin(tipped.mesh.vertices[:, 2])]
+    assert low[0] > 0 and tipped.mesh.vertices[:, 2].min() == pytest.approx(0.0, abs=1e-12)
+    result = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0, roll_deg=90.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY,
+                        square_zone(100))
+    assert result.records[0]["roll_deg"] == 90.0 and result.records[0]["pitch_deg"] == 0.0
+    assert result.footprints[0].area == pytest.approx(14.0 * 2.5, rel=1e-6)  # its plan on its side
+    collider = result.colliders[0].primitives[0].mesh
+    assert collider.vertices[:, 2].max() == pytest.approx(4.0, abs=1e-6)  # its side stands 4 m
+    flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert "roll_deg" not in flat.records[0] and "pitch_deg" not in flat.records[0]

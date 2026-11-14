@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 
 from onward_generator import __version__
 from onward_generator.net import fetch_bytes
+from onward_generator.overgrow.constants import TARGET_ASSET_TRIS
 from onward_generator.overgrow.library_catalog import REVIEW_FILE
 from onward_generator.overgrow.manifest import keep_semantics
 from onward_generator.overgrow.normalize import gltf_to_local, materialize_images, normalize_arrays, write_normalized_glb
@@ -53,6 +54,9 @@ SPECS: dict[str, dict] = {
     "68c9e77971874643bcef67dc1987a2b7": {"id": "jungle_ground_roots", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "rooted ground patch in a yard"},
     "3781a00ddb6146ceb51144d00349a240": {"id": "jungle_ground_water", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "wet ground patch in a yard"},
     "1ce5fa26a4ce49d6b170988dd4bc5ee2": {"id": "jungle_ground_tile", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "tileable jungle ground in a yard"},
+    # A story prop pinned to its place (overgrow/pinned.py), kept near its file's 12 606 triangles: decimated to the
+    # 1 800 of the others, the crashed helicopter above lost every recognisable part (14 November 2026).
+    "854bf0feee5b42dc92ac5329976f7942": {"id": "uh60_black_hawk", "category": "vehicles", "role": "wreck", "surfaces": ["carriageway", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "UH-60 Black Hawk helicopter, pinned to a crash site", "max_triangles": 13000},
     "73201f05280d48dcb10ed4ca362d69f8": {"id": "tree_low_poly", "category": "vegetation", "role": "tree", "surfaces": ["park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"], "anchor": "ground", "use": "low poly tree in a park, plaza, sidewalk, yard or lot", "clearance_m": 3.5},
 }
 
@@ -125,7 +129,8 @@ def _one(uid: str, spec: dict, row: dict, raw_root: Path, library: Path, token: 
         raise SketchfabError("glTF requires Draco; not imported")
     materialize_images(gltf_dir)
     vertices, triangles, uvs, albedo = gltf_to_local(gltf_dir)
-    normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None)
+    normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None,
+                                  target_tris=int(spec.get("max_triangles", TARGET_ASSET_TRIS)))
     if normalized.mesh.triangle_count == 0:
         raise SketchfabError("normalized mesh has no triangles")
     write_normalized_glb(library / f"{spec['id']}.glb", spec["id"], normalized)

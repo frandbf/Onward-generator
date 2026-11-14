@@ -63,6 +63,7 @@ from onward_generator.overgrow.fit import check_scene, collider_mesh, grounds_fr
 from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import library_directories
+from onward_generator.overgrow.manifest import PINNED_ONLY
 from onward_generator.overgrow.realize import fitted_props
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone
@@ -342,6 +343,7 @@ def apply_cover(
     before_report = build_report(islands, base.partition.buildings, colliders, layout)
     targets = open_sight_points(islands, base.partition.buildings, colliders, layout)
     props, _library_rejects = read_library(library)
+    props = [prop for prop in props if prop.spec.placement != PINNED_ONLY]  # a story prop is never cover by chance
     candidates, refused = cover_props(fitted_props(props), catalogue_licences(library),
                                       _scene_assets(materials, read_glb(visual_bytes)[0].get("extras", {}).get(PROP_ATLAS_EXTRA)))
     overgrown = _overgrow_triangles(nodes)

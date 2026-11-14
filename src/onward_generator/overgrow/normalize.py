@@ -161,12 +161,13 @@ def normalize_arrays(
     *,
     anchor: str,
     api_dimensions_mm: list[float] | None,
+    target_tris: int = TARGET_ASSET_TRIS,
 ) -> NormalizedMesh:
     before = int(len(triangles))
     scale_note = _apply_scale(vertices, api_dimensions_mm)
     vertices, orientation = _align(vertices, anchor)
     vertices = _ground(vertices)
-    vertices, triangles, uvs = cluster_decimate(vertices, triangles, uvs, TARGET_ASSET_TRIS)
+    vertices, triangles, uvs = cluster_decimate(vertices, triangles, uvs, target_tris)
     mesh = Mesh(np.ascontiguousarray(vertices, dtype=np.float64), np.ascontiguousarray(triangles, dtype=np.int64))
     mesh, dropped = mesh.drop_degenerate()
     # Clustering replaces the contact vertices with a cell average, which lifts

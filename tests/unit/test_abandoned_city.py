@@ -381,6 +381,16 @@ def test_simplification_puts_the_lowest_vertex_back_on_the_ground() -> None:
     assert len(tris) > 1800
     normalized = normalize_arrays(vertices, tris, np.zeros((len(vertices), 2), dtype=np.float32), None, anchor="ground", api_dimensions_mm=None)
     assert abs(float(normalized.mesh.vertices[:, 2].min())) < 1e-6
+    assert normalized.triangles_after <= 1800  # TARGET_ASSET_TRIS
+    # A story prop's own budget (sketchfab SPECS max_triangles, 14 November 2026) keeps a mesh under it whole.
+    whole = normalize_arrays(vertices, tris, np.zeros((len(vertices), 2), dtype=np.float32), None, anchor="ground", api_dimensions_mm=None,
+                             target_tris=len(tris))
+    assert whole.triangles_after == len(tris) == whole.triangles_before
+    from onward_generator.overgrow.sketchfab_fetch import SPECS
+
+    hawk = SPECS["854bf0feee5b42dc92ac5329976f7942"]
+    assert (hawk["id"], hawk["max_triangles"], hawk["role"], hawk["category"]) == ("uh60_black_hawk", 13000, "wreck", "vehicles")
+    assert all("max_triangles" not in spec for uid, spec in SPECS.items() if uid != "854bf0feee5b42dc92ac5329976f7942")
 
 
 def test_a_loaded_prop_rests_its_bottom_on_zero(tmp_path: Path) -> None:
