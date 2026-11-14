@@ -367,6 +367,11 @@ def test_overgrow_does_not_plant_back_a_tree_detail_thinned(tmp_path: Path) -> N
     assert report["trees_observed"] == 0
     assert report["reject_counts"]["in_detail"] == 1 and report["reject_counts"]["too_close_to_another_tree"] == 1
     assert [row["position_m"][:2] for row in report["rejects"] if row["reason"] == "too_close_to_another_tree"] == [[18.0, 38.0]]
+    assert {(row["asset_id"], row["kind"]) for row in report["rejects"] if row["reason"] == "too_close_to_another_tree"} == {("tree", "tree")}
+    # Exactly 5 m from a detail tree is far enough.
+    base, scene = _tree_scene(tmp_path / "exact", [_urban("osm-node-other", 18.0, 33.0)])
+    report = overgrow(base, scene, tmp_path / "exact" / "out")
+    assert report["trees_observed"] == 2 and "too_close_to_another_tree" not in report["reject_counts"]
     # Two OSM trees 4.99 m apart that detail did not plant: the first in feature order stands, the second does not.
     near = _feature("poi", {"type": "Point", "coordinates": [18, 42.99]}, {"natural": "tree"}, "osm-node-tree-3")
     base, scene = _tree_scene(tmp_path / "pair", [], extra=(near,))

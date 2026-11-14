@@ -494,7 +494,7 @@ def _detail_trees(manifest: Mapping[str, Any]) -> tuple[set[str], list[tuple[flo
     ids: set[str] = set()
     points: list[tuple[float, float]] = []
     for item in manifest.get("objects") or []:
-        if not isinstance(item, dict) or item.get("type") != "urban_element" or not str(item.get("kind") or "").startswith("tree"):
+        if not isinstance(item, dict) or item.get("type") != "urban_element" or not str(item.get("kind")).startswith("tree"):
             continue
         ids.update(str(source) for source in item.get("source_ids") or [])
         position = item.get("position_m") or []

@@ -204,7 +204,6 @@ def place_elements(
                 rejected.append(Rejected(f["id"], kind, "too_close_to_another_lamp"))
                 continue
         proto_kind = kind
-        options: list[str] = []
         if kind == "tree":
             options = [k for k in ("tree", "tree_1", "tree_2") if k in prototypes]
             if options:

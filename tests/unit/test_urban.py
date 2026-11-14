@@ -339,7 +339,7 @@ def test_a_tree_crown_keeps_off_the_nearest_facade() -> None:
     assert np.linalg.norm(near.matrix[:3, 0]) == pytest.approx(near.crown_scale)
     assert np.linalg.norm(near.matrix[:3, 1]) == pytest.approx(near.crown_scale)
     assert near.matrix[2, 2] == 1.0 and _xy(near) == (0.0, -0.2)
-    assert [(r.id, r.reason) for r in rejected] == [("node/3", "crown_against_building")]
+    assert [(r.id, r.kind, r.reason) for r in rejected] == [("node/3", "tree", "crown_against_building")]
     # Without a building nothing is narrowed.
     alone, _ = place_elements(features[:1], [], FREE, Polygon(), PROTOS, _cfg())
     assert alone[0].crown_scale == 1.0
@@ -354,6 +354,8 @@ def test_a_narrowed_crown_is_recorded_and_dress_keeps_it() -> None:
     del plain["crown_scale"]
     narrow, whole = _elements_from_records([record, plain], PROTOS)
     assert narrow.crown_scale == 0.6 and whole.crown_scale == 1.0
+    assert (narrow.id, whole.id) == ("urban/tree/node/1", "urban/tree/node/2")
+    assert narrow.matrix[:3, 3].tolist() == [2.0, 3.0, 0.0]
     assert np.linalg.norm(narrow.matrix[:3, 0]) == pytest.approx(0.6) and narrow.matrix[2, 2] == 1.0
     _visual, _collision, records = _urban_nodes([narrow, whole], PROTOS)
     assert records[0]["crown_scale"] == 0.6 and records[0]["yaw_deg"] == 30.0
