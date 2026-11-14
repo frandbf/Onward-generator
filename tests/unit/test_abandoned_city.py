@@ -894,3 +894,165 @@ def test_the_street_prop_caps_were_doubled() -> None:
     caps = {rule.id: rule.cap for rule in PLACEMENT_RULES}
     assert caps == {"vehicles_curb": 12, "waste_ground": 24, "furniture_off_lane": 12, "structures_edge": 8, "facade_wall": 16,
                     "barriers_curb": 8, "manhole_lane": 2, "manhole_sidewalk": 6, "plants": 16, "bushes": 4, "trees": 2}
+
+
+def test_preferred_props_take_each_rule_first_after_the_textured_ones(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A worn street profile now orders the library instead of keeping out 387 of its 449 props (13 November 2026)."""
+    from types import SimpleNamespace
+
+    import onward_generator.overgrow.dressing as dressing
+
+    flat = {"flat_worn", "flat_new"}
+    monkeypatch.setattr(dressing, "prop_flat", lambda prop: prop.spec.id in flat)
+    props = [SimpleNamespace(spec=SimpleNamespace(id=ident)) for ident in ("flat_worn", "new_a", "flat_new", "worn_b", "new_c", "worn_d")]
+    order = [prop.spec.id for prop in dressing.placement_order(props, frozenset({"worn_b", "worn_d", "flat_worn"}))]  # type: ignore[arg-type]
+    assert order == ["worn_b", "worn_d", "new_a", "new_c", "flat_worn", "flat_new"]
+    assert [prop.spec.id for prop in dressing.placement_order(props, frozenset())] == ["new_a", "worn_b", "new_c", "worn_d", "flat_worn", "flat_new"]  # type: ignore[arg-type]
+
+
+def test_overgrow_spends_only_the_room_under_the_unity_limit() -> None:
+    from onward_generator.export.triangle_budget import ADAPTER_BASE_TRIANGLES, UNITY_TRIANGLE_LIMIT
+    from onward_generator.overgrow.place import LATER_RESERVE_TRIANGLES, triangle_headroom
+
+    assert (UNITY_TRIANGLE_LIMIT, ADAPTER_BASE_TRIANGLES, LATER_RESERVE_TRIANGLES) == (300_000, 12_300, 12_000)
+    # Murcia Catedral: 188 147 triangles in, 72 321 of shop and flat furniture.
+    assert triangle_headroom(188_147, 72_321) == 300_000 - 12_300 - 12_000 - 188_147 - 72_321 == 15_232
+    assert triangle_headroom(275_700, 0) == 0 and triangle_headroom(275_701, 0) == 0
+
+
+def test_without_a_zone_overgrow_dresses_the_whole_playable_core() -> None:
+    """The 110 m block left most of a 200 m core bare: 12 087 spots of Murcia Catedral fell outside it."""
+    from shapely import box as plan_box
+
+    from onward_generator.overgrow.place import _resolve_zone
+
+    core = plan_box(-100.0, -100.0, 100.0, 100.0)
+    zone = _resolve_zone(None, None, None, core)
+    assert zone.kind == "core" and zone.polygon.equals(core)
+    block = _resolve_zone(None, None, None)
+    assert block.kind == "block" and block.bounds() == (-55.0, -55.0, 55.0, 55.0)
+    # A zone that is asked for still wins over the core.
+    assert _resolve_zone(None, 30.0, None, core).kind == "radius"
+
+
+def _spy(monkeypatch: pytest.MonkeyPatch, module: object, name: str, seen: dict[str, dict]) -> None:
+    """Replace ``module.name`` by a wrapper that records its keyword arguments and its result, then delegates."""
+    real = getattr(module, name)
+
+    def wrapper(*args: object, **kwargs: object) -> object:
+        result = real(*args, **kwargs)
+        seen[name] = {**kwargs, "result": result}
+        return result
+
+    monkeypatch.setattr(module, name, wrapper)
+
+
+def test_the_prefer_ids_reach_the_pick_and_the_placement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only the installed ids of ``prefer`` are preferred, and the model's offer and every rule's placement both see them."""
+    import onward_generator.overgrow.dressing as dressing
+    import onward_generator.overgrow.pick as pick
+    import onward_generator.overgrow.place as place
+    from onward_generator.ai.providers import StaticProvider
+
+    seen: dict[str, dict] = {}
+    for module, name in ((place, "pick_props"), (place, "dress"), (pick, "prompt_props"), (dressing, "_place_props")):
+        _spy(monkeypatch, module, name, seen)
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    _library(tmp_path / "library")
+    prefer = tmp_path / "prefer.json"
+    prefer.write_text(json.dumps({"ids": ["synth_trash", "synth_fern", "not_installed"]}), encoding="utf-8")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", zone=square_zone(80), library=tmp_path / "library", seed=48152,
+                      prefer=prefer, ai=True, provider=StaticProvider("none", "{nope", "test"))
+    wanted = frozenset({"synth_trash", "synth_fern"})
+    assert report["library_preferred"] == 2 and report["ambient_mode"] == "rules"
+    assert {name: seen[name]["preferred"] for name in ("pick_props", "dress", "prompt_props", "_place_props")} == dict.fromkeys(
+        ("pick_props", "dress", "prompt_props", "_place_props"), wanted)
+
+
+def test_the_library_budget_is_the_headroom_less_the_procedural_triangles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.overgrow.place as place
+    from onward_generator.export.triangle_budget import visual_triangles
+
+    seen: dict[str, dict] = {}
+    _spy(monkeypatch, place, "dress", seen)
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _base(tmp_path / "base")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "capped", zone=square_zone(80), seed=48152)
+    headroom = place.triangle_headroom(visual_triangles((tmp_path / "base" / "scene_visual.glb").read_bytes()), 0)
+    assert report["triangle_headroom"] == headroom > 60_000
+    assert seen["dress"]["triangle_budget"] == 60_000
+    # No grass is planted, so none is left for the props' rules to plant.
+    assert seen["dress"]["grass_left"] == 0 and seen["dress"]["grass_mesh"].triangle_count == place.grass_tuft().triangle_count
+    # With the library cap out of the way the headroom decides, less what the trees and wrecks already took.
+    monkeypatch.setattr(place, "MAX_LIBRARY_TRIS", 10**9)
+    report = overgrow(tmp_path / "base", scene, tmp_path / "open", zone=square_zone(80), seed=48152)
+    assert report["procedural_triangles"] > 0
+    assert seen["dress"]["triangle_budget"] == report["triangle_headroom"] - report["procedural_triangles"]
+
+
+def test_the_rules_may_plant_the_grass_the_procedural_pass_left(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.overgrow.place as place
+
+    _grass_on(monkeypatch)
+    seen: dict[str, dict] = {}
+    _spy(monkeypatch, place, "dress", seen)
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, [
+        _feature("highway", {"type": "LineString", "coordinates": [[-20, 0], [70, 0]]}, {"highway": "residential"}, "osm-way-mayor"),
+        _zigzag(),
+    ])
+    _base(tmp_path / "base")
+    report = overgrow(tmp_path / "base", scene, tmp_path / "out", profile=100, seed=48152, zone=square_zone(80))
+    before = report["grass"] - len(seen["dress"]["result"].grass)
+    assert before > 0
+    assert seen["dress"]["grass_left"] == max(0, scaled_cap(480, profile_for(100).grass) - before)
+
+
+def _core_base(path: Path, half_side_m: float | None) -> None:
+    _base(path)
+    if half_side_m is not None:
+        manifest = json.loads((path / "scene_detail.json").read_text(encoding="utf-8"))
+        manifest["core"] = {"half_side_m": half_side_m}
+        (path / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_overgrow_takes_the_zone_asked_for_else_the_core_else_one_block(tmp_path: Path) -> None:
+    from shapely import box as plan_box
+
+    from onward_generator.overgrow.zone import zone_from_file
+
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene, _city_features())
+    _core_base(tmp_path / "cored", 60.0)
+    _core_base(tmp_path / "bare", None)
+    ring = tmp_path / "zone.json"
+    ring.write_text(json.dumps([[-20, -20], [20, -20], [20, 20], [-20, 20], [-20, -20]]), encoding="utf-8")
+    radius = overgrow(tmp_path / "cored", scene, tmp_path / "radius", zone_radius_m=30.0)
+    assert radius["zone"] == {"kind": "radius", "key": radius_zone(30.0).stable_key()}
+    polygon = overgrow(tmp_path / "cored", scene, tmp_path / "polygon", zone_polygon=ring)
+    assert polygon["zone"] == {"kind": "polygon", "key": zone_from_file(ring).stable_key()}
+    core = overgrow(tmp_path / "cored", scene, tmp_path / "core")
+    assert core["zone"] == {"kind": "core", "key": zone_from_polygon(plan_box(-60, -60, 60, 60), kind="core").stable_key()}
+    block = overgrow(tmp_path / "bare", scene, tmp_path / "block")
+    assert block["zone"]["kind"] == "block"
+
+
+def test_overgrow_place_hands_every_path_to_overgrow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.overgrow.__main__ as cli
+
+    seen: dict[str, object] = {}
+
+    def fake(base: str, scene: str, out: str, **kwargs: object) -> dict[str, int]:
+        seen.update(kwargs)
+        return dict.fromkeys(("grass", "vines", "trees", "trees_observed", "wrecks", "props", "added_triangles"), 0)
+
+    monkeypatch.setattr(cli, "overgrow", fake)
+    assert cli.main(["place", "--base", "b", "--scene", str(tmp_path / "geo_scene.json"), "--out", str(tmp_path / "out"),
+                     "--zone-radius", "40", "--library", "lib", "--layout", "layout.json", "--selection", "chosen.json",
+                     "--prefer", "worn.json"]) == 0
+    assert {key: seen[key] for key in ("zone_radius_m", "zone_polygon", "library", "layout", "selection", "prefer")} == {
+        "zone_radius_m": 40.0, "zone_polygon": None, "library": "lib", "layout": "layout.json", "selection": "chosen.json",
+        "prefer": "worn.json"}

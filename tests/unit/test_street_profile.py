@@ -195,7 +195,7 @@ def test_security_summary_never_in_argv(root: Path, summary: str) -> None:
     assert record["summary"] == summary and record["summary_status"] == "unverified"
     argv = [arg for _name, step in plan_steps(root) for arg in step]
     assert all(summary not in arg for arg in argv)
-    assert "--max-props" in argv and "--selection" in argv
+    assert "--max-props" in argv and "--prefer" in argv
 
 
 # ------------------------------------------------------------------------------------------------ the table
@@ -213,7 +213,7 @@ def test_effects_table_matches_schema() -> None:
         assert effect.pointer in ALLOWED_POINTERS
     assert {e.adr for e in EFFECTS.values()} == {"ADR-020, ADR-027", "ADR-009", "ADR-010", "ADR-032"}
     assert {(e.stage, e.flag) for e in EFFECTS.values()} == {
-        ("materials", "--facade-style"), ("materials", "--repetition"), ("overgrow", "--selection"),
+        ("materials", "--facade-style"), ("materials", "--repetition"), ("overgrow", "--prefer"),
         ("overgrow", "--profile"), ("cover", "--max-props"),
     }
 
@@ -227,7 +227,7 @@ def _expected(root: Path, field: str, ident: str) -> dict[str, list[str]]:
     if field == "palette":
         return {"materials": ["--repetition", "--cell-m", "100.0", "--street-profile", record]}
     if field == "props_profile":
-        return {"overgrow": ["--selection", str(selection_path(root)), "--street-profile", record]}
+        return {"overgrow": ["--prefer", str(selection_path(root)), "--street-profile", record]}
     if field == "abandonment":
         return {"overgrow": ["--profile", ident.removeprefix("years_"), "--street-profile", record]}
     return {"cover": ["--max-props", {"off": "0", "light": "8", "full": "24"}[ident], "--street-profile", record]}
@@ -313,7 +313,8 @@ def test_calm_plan_reads_the_map_texture_plan(root: Path) -> None:
 def test_a_user_prop_selection_wins_over_the_props_profile(root: Path) -> None:
     (root / "config" / "prop_selection.json").write_text(json.dumps({"ids": ["bin_intact"]}))
     (change,) = resolve(root, Stub(reply(props_profile="intact")))["changes"]
-    assert (change["status"], change["reason"], change["before"]) == ("skipped", "user_setting", "config/prop_selection.json")
+    # The user's selection keeps out the other props, so the profile adds no preference (its pointer stays None).
+    assert (change["status"], change["reason"], change["before"]) == ("skipped", "user_setting", None)
     assert not selection_path(root).exists()
 
 
@@ -351,7 +352,7 @@ def _before() -> dict[str, Any]:
         "budgets": {"export_card_sha256": "e"}, "core": {"core_radius_m": None}, "buildings_sha256": "b",
         "sightline_cover": True,
         "materials": {"facade_style": "auto", "repetition": False},
-        "overgrow": {"profile_years": 100, "selection": None},
+        "overgrow": {"profile_years": 100, "selection": None, "prefer": None},
         "cover": {"max_props": 24},
     }
 
@@ -392,10 +393,12 @@ def test_effective_settings_hold_the_protected_and_the_allowed_keys(root: Path) 
     settings = sp.effective_settings(root)
     assert set(settings) == set(_before())
     assert settings["materials"] == {"facade_style": "auto", "repetition": False}
-    assert settings["overgrow"] == {"profile_years": 100, "selection": None}
+    assert settings["overgrow"] == {"profile_years": 100, "selection": None, "prefer": None}
     assert settings["cover"] == {"max_props": 24} and settings["sightline_cover"] is False
     assert settings["buildings_sha256"] is None and settings["export"]["sha256"]
     assert settings["area"] == {"radius_m": 150.0, "margin_m": 30.0, "crs": "EPSG:25830"}
+    (root / "config" / "prop_selection.json").write_text(json.dumps({"ids": ["bin_intact"]}))
+    assert sp.effective_settings(root)["overgrow"] == {"profile_years": 100, "selection": "config/prop_selection.json", "prefer": None}
 
 
 def test_translate_writes_only_applied_ids() -> None:
@@ -403,7 +406,7 @@ def test_translate_writes_only_applied_ids() -> None:
     after, rows = translate(profile, _before(), Context(True, tuple(LIBRARY)))
     assert (after["materials"], after["overgrow"], after["cover"]) == (
         {"facade_style": "anglo", "repetition": True},
-        {"profile_years": 30, "selection": "config/street_profile_selection.json"},
+        {"profile_years": 30, "selection": None, "prefer": "config/street_profile_selection.json"},
         {"max_props": 0},
     )
     assert [row["field"] for row in rows] == list(FIELDS)
@@ -696,9 +699,9 @@ GOLDEN_EFFECTS = [
     ('dominant_typology', 'latin_american', '/materials/facade_style', 'latin_american', 'materials', '--facade-style', 'the map-wide facade atlas style is latin_american; no building is reclassified', 'ADR-020, ADR-027'),
     ('dominant_typology', 'mediterranean', '/materials/facade_style', 'mediterranean', 'materials', '--facade-style', 'the map-wide facade atlas style is mediterranean; no building is reclassified', 'ADR-020, ADR-027'),
     ('palette', 'extended_pools', '/materials/repetition', True, 'materials', '--repetition', 'the calm roof and paving pools and the per-cell ground phase', 'ADR-009'),
-    ('props_profile', 'intact', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is intact, or that have none', 'ADR-010'),
-    ('props_profile', 'worn', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is damaged, worn, or that have none', 'ADR-010'),
-    ('props_profile', 'wrecked', '/overgrow/selection', 'config/street_profile_selection.json', 'overgrow', '--selection', 'overgrow places only library props whose condition is burned, damaged, wrecked, or that have none', 'ADR-010'),
+    ('props_profile', 'intact', '/overgrow/prefer', 'config/street_profile_selection.json', 'overgrow', '--prefer', 'overgrow offers and places first the library props whose condition is intact, or that have none; the others still stand', 'ADR-010'),
+    ('props_profile', 'worn', '/overgrow/prefer', 'config/street_profile_selection.json', 'overgrow', '--prefer', 'overgrow offers and places first the library props whose condition is damaged, worn, or that have none; the others still stand', 'ADR-010'),
+    ('props_profile', 'wrecked', '/overgrow/prefer', 'config/street_profile_selection.json', 'overgrow', '--prefer', 'overgrow offers and places first the library props whose condition is burned, damaged, wrecked, or that have none; the others still stand', 'ADR-010'),
     ('abandonment', 'years_10', '/overgrow/profile_years', 10, 'overgrow', '--profile', 'grass, vines and trees follow the 10-year profile', 'ADR-010'),
     ('abandonment', 'years_30', '/overgrow/profile_years', 30, 'overgrow', '--profile', 'grass, vines and trees follow the 30-year profile', 'ADR-010'),
     ('abandonment', 'years_100', '/overgrow/profile_years', 100, 'overgrow', '--profile', 'grass, vines and trees follow the 100-year profile', 'ADR-010'),
@@ -766,7 +769,7 @@ def test_effective_settings_golden(root: Path) -> None:
         "buildings_sha256": sha256_file(osm),
         "sightline_cover": False,
         "materials": {"facade_style": "auto", "repetition": False},
-        "overgrow": {"profile_years": 100, "selection": None},
+        "overgrow": {"profile_years": 100, "selection": None, "prefer": None},
         "cover": {"max_props": 24},
     }
     del document["sources"]

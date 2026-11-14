@@ -83,23 +83,24 @@ def _row_tokens(row: dict[str, object]) -> int:
     return len(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()) // BYTES_PER_TOKEN + 1
 
 
-def prompt_props(props: list[Prop], brief: str, budget: int = LIBRARY_BUDGET_TOKENS) -> list[Prop]:
+def prompt_props(props: list[Prop], brief: str, budget: int = LIBRARY_BUDGET_TOKENS, preferred: frozenset[str] = frozenset()) -> list[Prop]:
     """The props whose rows the prompt carries: all of them when they fit ``budget`` tokens, else a varied subset.
 
     The subset takes one prop of each role in turn (roles by name), so every kind of object stays offered. Within a
-    role a run or a grid comes first, then a prop whose role, category, tags or description share a word of four
-    letters or more with the brief, then the order of a hash of the id. Deterministic: the same props and brief give
+    role a run or a grid comes first, then a ``preferred`` prop (a street profile's props_profile), then a prop whose
+    role, category, tags or description share a word of four letters or more with the brief, then the order of a hash
+    of the id. Deterministic: the same props and brief give
     the same subset. The model may only use the ids it was sent."""
     rows = {str(row["id"]): row for row in library_rows(props)}
     if sum(_row_tokens(row) for row in rows.values()) <= budget:  # pragma: no mutate: at exactly the budget the subset below takes every row in the same order
         return list(props)
     words = set(re.findall(r"[a-z]{4,}", brief.lower()))
 
-    def rank(prop: Prop) -> tuple[int, int, str]:
+    def rank(prop: Prop) -> tuple[bool, bool, bool, str]:
         spec = prop.spec
         text = " ".join((spec.role, spec.category, spec.description, *spec.tags)).lower()
         matched = bool(words & set(re.findall(r"[a-z]{4,}", text)))
-        return (spec.grouping not in PATTERN_GROUPINGS, not matched, hashlib.sha256(spec.id.encode()).hexdigest())
+        return (spec.grouping not in PATTERN_GROUPINGS, spec.id not in preferred, not matched, hashlib.sha256(spec.id.encode()).hexdigest())
 
     by_role: dict[str, list[Prop]] = defaultdict(list)
     for prop in props:

@@ -64,7 +64,7 @@ STYLE_IDS = ("anglo", "central_european", "generic", "haussmann", "latin_america
 
 # The only settings a profile can reach. Anything else that differs is refused.
 ALLOWED_POINTERS = frozenset({
-    "/materials/facade_style", "/materials/repetition", "/overgrow/selection", "/overgrow/profile_years", "/cover/max_props",
+    "/materials/facade_style", "/materials/repetition", "/overgrow/prefer", "/overgrow/profile_years", "/cover/max_props",
 })
 # Documented for people and checked by tests; the allowlist above is what enforces it.
 PROTECTED_POINTERS = ("/area", "/center", "/sources", "/export", "/budgets", "/core", "/buildings_sha256", "/sightline_cover")
@@ -100,12 +100,12 @@ _ROWS = (
            "the map-wide facade atlas style is mediterranean; no building is reclassified", "ADR-020, ADR-027"),
     Effect("palette", "extended_pools", "/materials/repetition", True, "materials", "--repetition",
            "the calm roof and paving pools and the per-cell ground phase", "ADR-009"),
-    Effect("props_profile", "intact", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
-           "overgrow places only library props whose condition is intact, or that have none", "ADR-010"),
-    Effect("props_profile", "worn", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
-           "overgrow places only library props whose condition is damaged, worn, or that have none", "ADR-010"),
-    Effect("props_profile", "wrecked", "/overgrow/selection", "config/street_profile_selection.json", "overgrow", "--selection",
-           "overgrow places only library props whose condition is burned, damaged, wrecked, or that have none", "ADR-010"),
+    Effect("props_profile", "intact", "/overgrow/prefer", "config/street_profile_selection.json", "overgrow", "--prefer",
+           "overgrow offers and places first the library props whose condition is intact, or that have none; the others still stand", "ADR-010"),
+    Effect("props_profile", "worn", "/overgrow/prefer", "config/street_profile_selection.json", "overgrow", "--prefer",
+           "overgrow offers and places first the library props whose condition is damaged, worn, or that have none; the others still stand", "ADR-010"),
+    Effect("props_profile", "wrecked", "/overgrow/prefer", "config/street_profile_selection.json", "overgrow", "--prefer",
+           "overgrow offers and places first the library props whose condition is burned, damaged, wrecked, or that have none; the others still stand", "ADR-010"),
     Effect("abandonment", "years_10", "/overgrow/profile_years", 10, "overgrow", "--profile",
            "grass, vines and trees follow the 10-year profile", "ADR-010"),
     Effect("abandonment", "years_30", "/overgrow/profile_years", 30, "overgrow", "--profile",
@@ -282,7 +282,9 @@ def effective_settings(root: Path) -> dict[str, Any]:
         "buildings_sha256": _file_sha(osm),
         "sightline_cover": sightline_cover_enabled(root),
         "materials": {"facade_style": style, "repetition": repetition_enabled(root)},
-        "overgrow": {"profile_years": max(PROFILES), "selection": "config/prop_selection.json" if user_selection.is_file() else None},
+        # The user's own selection keeps out every other prop; the profile's preference only orders them (13 November 2026).
+        "overgrow": {"profile_years": max(PROFILES), "selection": "config/prop_selection.json" if user_selection.is_file() else None,
+                     "prefer": None},
         "cover": {"max_props": max(COVER_PROPS.values())},
     }
 
