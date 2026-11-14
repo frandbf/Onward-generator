@@ -51,8 +51,8 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--storm", action="store_true", help="night maps only: lightning and thunder (ADR-028)")  # pragma: no mutate: help text
     create.add_argument("--atmosphere", choices=preset_names(), default=NEUTRAL, help="day maps only: baked light preset (ADR-037)")  # pragma: no mutate: help text
     create.add_argument("--lightmap-texels-per-m", type=float, default=10.0, help="lightmap texels per metre (default 10, greater than 0 and at most 40)")
-    create.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 50 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
-    create.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 50 m inside the radius, is the largest half-side")
+    create.add_argument("--core-radius-m", type=float, help="half-side of the playable core square, metres (default: 25 m inside the radius, at most 150; 0 or at least the radius plays the whole map; ADR-017)")
+    create.add_argument("--core-target-triangles", type=int, help="budget core (ADR-017 amendment): solve the core half-side for this many core visual triangles in detail, 1000 to 2000000; --core-radius-m, or 25 m inside the radius, is the largest half-side")
     create.add_argument("--ai", action="store_true", help="ask local Ollama for a placement plan; a rejected reply keeps the current overgrow rules")
     create.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")
     create.add_argument("--overwrite", action="store_true", help="replace map.json and configs when processed/ is empty")
