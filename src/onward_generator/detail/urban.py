@@ -64,6 +64,10 @@ def away_from_buildings(point: Point, buildings: BaseGeometry) -> float:
 CROWN_WALL_GAP_M = 0.1
 """A tree's crown keeps this far from every facade. Within 2 m of a wall the generated crown, up to 2 m across its
 radius, went through it and showed inside the rooms: 42 of the 105 OSM trees of Murcia Catedral (13 November 2026)."""
+TREE_MIN_SPACING_M = 5.0
+"""An observed tree keeps this far from the trees already placed, in id order, whatever OSM maps: Murcia Catedral's rows
+stood about 4 m apart (median nearest neighbour 3.97 m), 105 trees where 56 read as the same rows with crowns, up to 4 m
+across, that no longer touch (13 November 2026, at the maintainer's request: fewer triangles where trees crowd)."""
 MIN_CROWN_SCALE = 0.35
 """The narrowest crown, as a share of its width: a tree closer to a facade than this is left out (``crown_against_building``).
 At 0.35 every OSM tree of Murcia Catedral stays, the nearest (0.82 m from a wall) as a slim pruned street tree; at 0.5
@@ -171,6 +175,8 @@ def place_elements(
     def lamp_spaced(point: Point) -> bool:
         return all(point.distance(q) >= lamps.min_spacing_m for q in lamp_points)
 
+    tree_points: list[Point] = []
+
     for f in sorted(features, key=lambda f: f["id"]):
         if f.get("kind") != "poi":
             continue
@@ -202,6 +208,9 @@ def place_elements(
         p = shape(f["geometry"])
         scale = 1.0
         if kind == "tree":
+            if any(p.distance(q) < TREE_MIN_SPACING_M for q in tree_points):
+                rejected.append(Rejected(f["id"], kind, "too_close_to_another_tree"))
+                continue
             yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw")
             if not buildings.is_empty:
                 fit = crown_fit([k for k in ("tree", "tree_1", "tree_2") if k in prototypes] or [proto_kind], proto_kind, prototypes,
@@ -221,6 +230,8 @@ def place_elements(
             rejected.append(Rejected(f["id"], kind, reason))
         elif kind == "street_lamp":
             lamp_points.append(p)
+        elif kind == "tree":
+            tree_points.append(p)
 
     if lamps.enabled and "street_lamp" in prototypes:
         for way in sorted((w for w in ways if w.road_class == "vehicular" and isinstance(w.geometry, LineString)), key=lambda w: w.id):

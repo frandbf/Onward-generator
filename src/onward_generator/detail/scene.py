@@ -1188,9 +1188,13 @@ ExtraUrban = Callable[
 
 
 def rejection_severity(rejected: Rejected) -> str:
-    """``info`` for a generated attempt (its id holds ``#``) and for a lamp kept off its neighbour: neither loses
-    observed data (plan Q5). ``warning`` for an observed element that finds no place."""
-    return "info" if "#" in rejected.id or rejected.reason == "too_close_to_another_lamp" else "warning"
+    """``info`` for a generated attempt (its id holds ``#``) and for a lamp or a tree kept off its neighbour: a
+    deliberate thinning, not a place the element failed to find (plan Q5). ``warning`` for an observed element that
+    finds no place."""
+    return "info" if "#" in rejected.id or rejected.reason in SPACING_REASONS else "warning"
+
+
+SPACING_REASONS = frozenset({"too_close_to_another_lamp", "too_close_to_another_tree"})
 
 
 def detail_scene(

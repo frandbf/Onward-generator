@@ -298,6 +298,8 @@ def test_the_wall_lamp_prototype_hangs_above_head_height_without_a_collider() ->
     ("way/1#lamp0", "too_close_to_building", "info"),
     ("way/2#bench3", "not_on_free_walkable_ground", "info"),
     ("node/5", "too_close_to_another_lamp", "info"),
+    ("node/8", "too_close_to_another_tree", "info"),
+    ("node/9", "crown_against_building", "warning"),
     ("node/6", "not_on_free_walkable_ground", "warning"),
     ("node/7", "overlaps_another_element", "warning"),
 ])
@@ -328,7 +330,7 @@ def test_a_tree_crown_keeps_off_the_nearest_facade() -> None:
     assert crown_fit(["tree"], "tree", protos, 0.82) == ("tree", 0.379)
 
     wall = box(-10.0, 1.0, 10.0, 11.0)  # its face at y = 1 m
-    features = [_poi("node/1", 0.0, -0.2, natural="tree"), _poi("node/2", 0.0, -5.0, natural="tree"), _poi("node/3", 5.0, 0.5, natural="tree")]
+    features = [_poi("node/1", 0.0, -0.2, natural="tree"), _poi("node/2", 0.0, -6.0, natural="tree"), _poi("node/3", 5.0, 0.5, natural="tree")]
     placed, rejected = place_elements(features, [], FREE, wall, PROTOS, _cfg())
     near, far = sorted(placed, key=lambda e: _xy(e)[1], reverse=True)
     assert (near.kind, near.crown_scale) == ("tree", round(1.1 / 1.9, 3))
@@ -356,3 +358,21 @@ def test_a_narrowed_crown_is_recorded_and_dress_keeps_it() -> None:
     _visual, _collision, records = _urban_nodes([narrow, whole], PROTOS)
     assert records[0]["crown_scale"] == 0.6 and records[0]["yaw_deg"] == 30.0
     assert "crown_scale" not in records[1]
+
+
+def test_observed_trees_keep_5_m_from_each_other_in_id_order() -> None:
+    """Murcia Catedral's OSM rows stood about 4 m apart: 105 trees where 56 read as the same rows."""
+    from onward_generator.detail.urban import TREE_MIN_SPACING_M
+
+    assert TREE_MIN_SPACING_M == 5.0
+    # node/1 at 0 m, node/2 at 4.99 m (too close), node/3 at 5 m (exactly enough), node/4 at 9 m (too close to node/3).
+    features = [_poi(f"node/{i}", x, 0.0, natural="tree") for i, x in ((4, 9.0), (2, 4.99), (3, 5.0), (1, 0.0))]
+    placed, rejected = place_elements(features, [], FREE, FAR_BUILDING, PROTOS, _cfg())
+    assert [e.id for e in placed] == ["urban/tree/node/1", "urban/tree/node/3"]
+    assert [(r.id, r.kind, r.reason) for r in rejected] == [("node/2", "tree", "too_close_to_another_tree"),
+                                                              ("node/4", "tree", "too_close_to_another_tree")]
+    # A tree that found no place does not hold its neighbours off; other kinds never count.
+    blocked = [_poi("node/1", 300.0, 0.0, natural="tree"), _poi("node/2", 2.0, 0.0, natural="tree"),
+               _poi("node/0", 0.0, 0.0, amenity="bench")]
+    placed, _ = place_elements(blocked, [], FREE, FAR_BUILDING, PROTOS, _cfg())
+    assert sorted(e.id for e in placed) == ["urban/bench/node/0", "urban/tree/node/2"]
