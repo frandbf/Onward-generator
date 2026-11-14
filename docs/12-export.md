@@ -199,7 +199,7 @@ The C# was written without Unity; the first `task unity` build on the macOS host
 
 ## Library normal maps (plan T3)
 
-Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (proposed). Opt-in per map with `map.json` `"normal_maps": true` (`map create --normal-maps`).
+Decision: [ADR-039](decisions/ADR-039-library-normal-maps.md) (accepted after a headset session, 14 November 2026). Opt-in per map with `map.json` `"normal_maps": true` (`map create --normal-maps`).
 
 - **`materials apply --normal-maps`.** Lists, in the visual GLB's `extras.materials.normal_maps` and in `materials_report.json` `normal_maps`, each material that draws a wide-library photograph with its real CC0 normal map (`nor_gl`, [08-dress.md](08-dress.md)). A party wall or a tint takes its base's map, and the trim facades keep the spike above. `signs place` and `overgrow place` rebuild the visual GLB and carry the list forward; `bounds` and `perf cover` keep the extras they read.
 - **`export package`.** Writes each map once, as `normal_<library id>.png` (role `normal_map`), at most 1024 px, after checking its hash against the library. It prices each map in ASTC 6×6 and refuses a set over 24 MiB (`NORMAL_MAPS_MAX_BYTES`), and also a material that is the `lit_normal_material` as well.
