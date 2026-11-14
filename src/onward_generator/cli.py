@@ -254,7 +254,7 @@ def build_parser() -> argparse.ArgumentParser:
         if switch == "street_profile":
             continue
         run.add_argument(
-            "--" + switch.replace("_", "-"), dest=switch, action=argparse.BooleanOptionalAction, default=None,
+            "--" + switch.replace("_", "-"), action=argparse.BooleanOptionalAction, default=None,
             help=f"new map only: map.json {switch}: {text} (default {'off' if switch in DEFAULT_OFF_SWITCHES else 'on'})",  # pragma: no mutate: help text
         )
     run.add_argument("--panoramax", action="store_true", help="under development: project 360 street photos onto exposed facades; off unless this flag is set")

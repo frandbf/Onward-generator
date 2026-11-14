@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     # 2026 each is on unless --no-<switch> (panoramax_atlas off unless --panoramax-atlas): see DEFAULT_OFF_SWITCHES.
     for switch, text in MAP_SWITCHES.items():
         create.add_argument(
-            "--" + switch.replace("_", "-"), dest=switch, action=argparse.BooleanOptionalAction, default=None,
+            "--" + switch.replace("_", "-"), action=argparse.BooleanOptionalAction, default=None,
             help=f"map.json {switch}: {text} (default {'off' if switch in DEFAULT_OFF_SWITCHES else 'on'})",  # pragma: no mutate: help text
         )
 
