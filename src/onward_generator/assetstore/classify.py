@@ -59,6 +59,11 @@ INDOOR_ONLY_WORDS = frozenset({"giftbox", "gift"})
 # Reviewed 13 November 2026 (ADR-035 amendment, the wide import): rocks are open-ground vegetation; a light on a pole
 # is a lamp post; a model named only "Object1" takes the words of its package (Street Lights Pack: lamp posts).
 ROCK_WORDS = frozenset({"rock", "rocks", "boulder", "stone", "stones", "pebble"})
+# Trees and bushes (ADR-040): their leaves are opaque alpha cut-outs, which the exporter now keeps.
+TREE_WORDS = frozenset({"tree"})
+BUSH_WORDS = frozenset({"bush", "shrub", "hedge"})
+# Under this a "tree" is a sapling or a bush.
+TREE_MIN_HEIGHT_M = 2.0
 LIGHT_WORDS = frozenset({"light", "lights", "lamp", "lantern"})
 POLE_WORDS = frozenset({"street", "post", "pole", "road"})
 AIR_SEA_WORDS = frozenset({"helicopter", "plane", "airplane", "aircraft", "jet", "boat", "ship", "yacht"})
@@ -155,6 +160,13 @@ def classify(name: str, size: tuple[float, float, float], package: str, category
                              "cluster", f"Storage or waste item ({_label(name)}) from {package}, about {longest:.2f} m.", words), "storage_outdoor")
     if words & (INTERIOR_WORDS | STORAGE_WORDS):
         return _interior(name, words, length, depth, height, package, context)
+    # A bush first: a model named only "Simple_Bushes" takes "tree" from its package's name (Horned Holly Tree).
+    if words & TREE_WORDS and not words & BUSH_WORDS and height >= TREE_MIN_HEIGHT_M:
+        return Decision(_row("vegetation", "tree", "open_ground", "ground", ["park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"],
+                             "single", f"Tree ({_label(name)}) from {package}, about {height:.1f} m tall.", words), "tree")
+    if words & (TREE_WORDS | BUSH_WORDS):
+        return Decision(_row("vegetation", "bush", "open_ground", "ground", ["courtyard", "yard", "plaza", "park"],
+                             "cluster", f"Bush ({_label(name)}) from {package}, about {longest:.1f} m.", words), "bush")
     if words & ROCK_WORDS:
         return Decision(_row("vegetation", "rock", "open_ground", "ground", ["yard", "empty_lot", "plaza", "courtyard"],
                              "cluster", f"Rock ({_label(name)}) from {package}, about {longest:.2f} m.", words), "rock")

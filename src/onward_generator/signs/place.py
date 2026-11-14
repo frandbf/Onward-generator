@@ -28,7 +28,7 @@ from onward_generator.config.validation import REPO_ROOT
 from onward_generator.detail.shops import sign_footprints
 from onward_generator.dress.atlas import encode_png_rgba
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
-from onward_generator.export.library_normals import carried_normal_maps
+from onward_generator.export.cutouts import carried_material_extras
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb
 from onward_generator.generation.mesh import Mesh, quad
@@ -243,7 +243,7 @@ def place_signs(
         [*nodes, *sign_nodes, *shops.nodes, *decal_meshes],
         materials,
         extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows), "wall_decals": len(decal_rows),
-                **carried_normal_maps(visual_bytes)},
+                **carried_material_extras(visual_bytes)},
         repeat_images=images,
         preserve_uvs=True,
     )

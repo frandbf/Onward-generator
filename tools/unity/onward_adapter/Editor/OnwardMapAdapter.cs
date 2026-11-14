@@ -133,6 +133,9 @@ namespace OnwardGenerator
             // Plan T3 (ADR-039): the materials drawn with PP_Opaque_Lit and a real library normal map, each with its
             // normal_<id>.png. Empty (absent in older packages) keeps every other material on PP_Opaque_Simple_Lit.
             public NormalMapRef[] normal_maps = new NormalMapRef[0];
+            // ADR-040: the materials whose albedo alpha clips a library tree's leaves, each with its threshold. Empty
+            // (absent in older packages) keeps every material opaque.
+            public CutoutRef[] cutout_materials = new CutoutRef[0];
             public float combine_cell_m = 0f;
             // ADR-013: baked point lights from the interior light anchors, at most this many per map.
             public int interior_lights_max = 24;
@@ -174,6 +177,11 @@ namespace OnwardGenerator
 
         [Serializable] private class LightmapScale { public string material; public float scale = 1f; }
         [Serializable] private class NormalMapRef { public string material; public string path; }
+        [Serializable] private class CutoutRef { public string material; public float cutoff; }
+        // The SDK's PP_Opaque_Simple_Lit graph: Alpha comes from the Base Map's alpha when this keyword is on, and is
+        // clipped at _AlphaClipping (ADR-040). The graph draws front faces only; the importer doubled the leaves.
+        private const string AlphaClipKeyword = "ALPHACLIPPING_ON";
+        private const string AlphaClipProperty = "_AlphaClipping";
         private const string NormalMapRole = "normal_map";
         [Serializable] private class LightmapCore { public float half_side_m; public float scale; }
         [Serializable] private class XY { public float x; public float y; public float yaw; }
@@ -861,6 +869,7 @@ namespace OnwardGenerator
                         return GetOrCreateMaterial(g, root + "/Materials", tex, libraryNormal, SafeName(g.name));
                     return GetOrCreateMaterial(g, root + "/Materials", tex, litNormalMap, opt.lit_normal_material);
                 }).ToArray();
+                ApplyCutouts(visual.Doc.materials, materials, opt.cutout_materials);
                 var visualMeshes = new Mesh[visual.Doc.meshes.Length];
                 var visualMaterials = new int[visual.Doc.meshes.Length][];
                 AssetDatabase.StartAssetEditing();
@@ -3557,6 +3566,28 @@ namespace OnwardGenerator
             material.enableInstancing = false;
             AssetDatabase.CreateAsset(material, path);
             return material;
+        }
+
+        // ADR-040: each listed material clips its albedo alpha at its threshold, in the alpha-test queue. A name that is
+        // not a material of the visual GLB, a threshold outside (0, 1), or a material not on PP_Opaque_Simple_Lit stops the build.
+        static void ApplyCutouts(GMaterial[] gltf, Material[] materials, CutoutRef[] cutouts)
+        {
+            foreach (CutoutRef entry in cutouts ?? new CutoutRef[0])
+            {
+                int k = Array.FindIndex(gltf, g => g.name == entry.material);
+                if (k < 0)
+                    throw new InvalidDataException($"cutout_materials names {entry.material}, which is not a material of the visual GLB");
+                if (!(entry.cutoff > 0f && entry.cutoff < 1f))
+                    throw new InvalidDataException($"cutout_materials {entry.material}: the threshold must lie between 0 and 1, got {entry.cutoff}");
+                Material material = materials[k];
+                if (!material.HasProperty(AlphaClipProperty))
+                    throw new InvalidOperationException($"{material.name} ({material.shader.name}) has no {AlphaClipProperty}; a cut-out needs PP_Opaque_Simple_Lit");
+                material.EnableKeyword(AlphaClipKeyword);
+                material.SetFloat(AlphaClipProperty, entry.cutoff);
+                material.renderQueue = (int)RenderQueue.AlphaTest;
+                EditorUtility.SetDirty(material);
+                Debug.Log($"{LogPrefix} {material.name}: alpha clipped at {entry.cutoff} ({AlphaClipKeyword}).");
+            }
         }
 
         // Plan D5 spike (ADR-033, proposed): the one promoted facade material on the SDK's PP_Opaque_Lit, with the same

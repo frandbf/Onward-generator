@@ -4,6 +4,10 @@ The Unity exporter (``tools/unity/asset_store_export``) writes right-handed, Y-u
 ``map_Kd`` PNG per textured material (already tinted by the material colour and at most 512 px), or a ``Kd`` colour
 for an untextured one. A textured primitive keeps its UVs (OBJ v up becomes glTF v down) and its PNG; an untextured
 one gets a 4 px PNG of its colour, as the Kenney and Quaternius imports do, because the library reads albedo images.
+
+A material the exporter marks ``onward_cutoff T`` (an opaque alpha cut-out: leaves, ADR-040) keeps the alpha of its
+PNG and becomes ``alphaMode: MASK`` with ``alphaCutoff`` T. The SDK shader draws front faces only, so each of its
+triangles is written twice, the second facing the other way with its normals turned.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ class MtlMaterial:
     texture: str | None = None
     scale: tuple[float, float] = (1.0, 1.0)
     offset: tuple[float, float] = (0.0, 0.0)
+    cutoff: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +72,11 @@ def parse_mtl(text: str) -> dict[str, MtlMaterial]:
             found[name]["kd"] = (float(parts[1]), float(parts[2]), float(parts[3]))
         elif parts[0] == "map_Kd" and len(parts) >= 2:
             found[name].update(_map_options(parts[1:]))
+        elif parts[0] == "onward_cutoff" and len(parts) == 2:
+            cutoff = float(parts[1])
+            if not 0.0 < cutoff < 1.0:
+                raise ObjError(f"{name}: onward_cutoff must lie between 0 and 1, got {parts[1]}")
+            found[name]["cutoff"] = cutoff
     return {key: MtlMaterial(**value) for key, value in found.items()}
 
 
@@ -147,9 +157,9 @@ def _corner(token: str, nv: int, nt: int, nn: int) -> tuple[int, int | None, int
 MAX_TEXTURE_PX = 512
 
 
-def _png(data: bytes) -> bytes:
-    """The albedo as an RGB PNG, at most ``MAX_TEXTURE_PX`` on its long side."""
-    picture = Image.open(io.BytesIO(data)).convert("RGB")
+def _png(data: bytes, *, alpha: bool) -> bytes:
+    """The albedo as an RGB PNG (RGBA with ``alpha``), at most ``MAX_TEXTURE_PX`` on its long side."""
+    picture = Image.open(io.BytesIO(data)).convert("RGBA" if alpha else "RGB")
     if max(picture.size) > MAX_TEXTURE_PX:  # pragma: no mutate: thumbnail leaves an image already at the limit unchanged
         picture.thumbnail((MAX_TEXTURE_PX, MAX_TEXTURE_PX), Image.Resampling.LANCZOS)
     out = io.BytesIO()
@@ -161,6 +171,15 @@ def _flat_png(kd: tuple[float, float, float]) -> bytes:
     out = io.BytesIO()
     Image.new("RGB", (FLAT_ALBEDO_PX, FLAT_ALBEDO_PX), tuple(round(255 * srgb(c)) for c in kd)).save(out, format="PNG")
     return out.getvalue()
+
+
+def two_sided(group: ObjGroup) -> ObjGroup:
+    """The triangles of ``group`` and the same triangles facing the other way (corners 0, 2, 1, normals turned)."""
+    order = np.arange(len(group.positions))
+    order[1::3], order[2::3] = order[2::3].copy(), order[1::3].copy()
+    return ObjGroup(np.concatenate([group.positions, group.positions[order]]),
+                    np.concatenate([group.normals, -group.normals[order]]),
+                    np.concatenate([group.uvs, group.uvs[order]]))
 
 
 def obj_to_glb(obj_text: str, mtl_text: str, name: str, texture_dir: Path | None = None, factor: float = 1.0) -> bytes:
@@ -188,10 +207,13 @@ def obj_to_glb(obj_text: str, mtl_text: str, name: str, texture_dir: Path | None
     primitives = []
     for material_name, group in groups.items():
         material = materials.get(material_name, MtlMaterial(DEFAULT_KD))
+        cutout = material.cutoff is not None and material.texture is not None
+        if cutout:
+            group = two_sided(group)
         if material.texture is not None:
             if texture_dir is None or not (texture_dir / material.texture).is_file():
                 raise ObjError(f"{name}: missing texture {material.texture}")
-            image = _png((texture_dir / material.texture).read_bytes())
+            image = _png((texture_dir / material.texture).read_bytes(), alpha=cutout)
             uv = group.uvs * np.array(material.scale, dtype=np.float32) + np.array(material.offset, dtype=np.float32)
             uv = np.column_stack([uv[:, 0], 1.0 - uv[:, 1]]).astype(np.float32)
         else:
@@ -199,7 +221,8 @@ def obj_to_glb(obj_text: str, mtl_text: str, name: str, texture_dir: Path | None
             uv = np.full((len(group.positions), 2), 0.5, dtype=np.float32)
         doc["images"].append({"mimeType": "image/png", "bufferView": view(image)})
         doc["textures"].append({"source": len(doc["images"]) - 1})
-        doc["materials"].append({"name": re.sub(r"[^A-Za-z0-9_]+", "_", material_name), "alphaMode": "OPAQUE", "doubleSided": False,
+        alpha: dict[str, Any] = {"alphaMode": "MASK", "alphaCutoff": material.cutoff} if cutout else {"alphaMode": "OPAQUE"}
+        doc["materials"].append({"name": re.sub(r"[^A-Za-z0-9_]+", "_", material_name), **alpha, "doubleSided": False,
                                  "pbrMetallicRoughness": {"baseColorTexture": {"index": len(doc["textures"]) - 1},
                                                           "metallicFactor": 0.0, "roughnessFactor": 1.0}})
         primitives.append({"attributes": {"POSITION": accessor(group.positions, "VEC3", bounds=True),

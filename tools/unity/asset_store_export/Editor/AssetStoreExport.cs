@@ -108,10 +108,10 @@ public static class AssetStoreExport
             int triangles = renderers.Sum(r => r.GetComponent<MeshFilter>().sharedMesh.triangles.Length / 3);
             item.triangles = triangles;
             if (triangles > maxTriangles) { item.status = "too_many_triangles"; return item; }
-            // Glass (a car's windows, a lamp's lens) is drawn as dark opaque glass; anything else see-through, and every
-            // alpha cut-out (leaves, a fence's mesh), still refuses the model (ADR-035 amendment of 13 November 2026).
+            // Glass (a car's windows, a lamp's lens) is drawn as dark opaque glass. An opaque alpha cut-out (leaves) is
+            // written with its alpha and threshold (ADR-040); anything else see-through still refuses the model.
             var seeThrough = renderers.SelectMany(r => r.sharedMaterials).Where(IsTransparent).Distinct().ToList();
-            if (seeThrough.Any(m => IsCutout(m) || !IsGlass(m))) { item.status = "transparent_material"; return item; }
+            if (seeThrough.Any(m => !IsGlass(m) && !IsOpaqueCutout(m))) { item.status = "transparent_material"; return item; }
             currentRoot = PackageRoot(source);
             var bounds = renderers.Select(r => r.bounds).Aggregate((a, b) => { a.Encapsulate(b); return a; });
             item.size = new[] { bounds.size.x, bounds.size.z, bounds.size.y };
@@ -150,6 +150,23 @@ public static class AssetStoreExport
 
     static bool IsCutout(Material m) =>
         m != null && ((m.HasProperty("_AlphaClip") && m.GetFloat("_AlphaClip") > 0.5f) || m.IsKeywordEnabled("_ALPHATEST_ON"));
+
+    // An alpha-clipped material that is otherwise opaque: no blend surface, no blend keyword, queue under Transparent.
+    // A URP material in this Built-in project has no shader, so the saved floats decide as well as the live ones.
+    static bool IsOpaqueCutout(Material m) =>
+        m != null && (IsCutout(m) || SavedFloat(m, "_AlphaClip", 0f) > 0.5f)
+        && !(m.HasProperty("_Surface") && m.GetFloat("_Surface") > 0.5f) && SavedFloat(m, "_Surface", 0f) < 0.5f
+        && m.renderQueue < 3000 && !m.IsKeywordEnabled("_ALPHABLEND_ON") && !m.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON");
+
+    static float SavedFloat(Material mat, string wanted, float fallback)
+    {
+        foreach (var (name, value) in Saved(mat, "m_Floats"))
+            if (name == wanted) return value.floatValue;
+        return fallback;
+    }
+
+    // The saved clip threshold (_Cutoff), 0.5 when the material names none.
+    static float SavedCutoff(Material mat) => SavedFloat(mat, "_Cutoff", 0.5f);
 
     static bool IsGlass(Material m) => m != null && GlassWords.Any(w => m.name.ToLowerInvariant().Contains(w));
 
@@ -237,9 +254,10 @@ public static class AssetStoreExport
         // so HasProperty and GetTexture find nothing, but the .mat still names its textures and colours.
         Color colour = SavedColour(mat);
         var (tex, scale, offset) = SavedAlbedo(mat);
+        bool cutout = IsOpaqueCutout(mat) && !IsGlass(mat);
         if (IsTransparent(mat) && IsGlass(mat)) { colour = DarkGlass; tex = null; }  // glass, drawn opaque and dark
         else if (tex == null && colour.r > 0.99f && colour.g > 0.99f && colour.b > 0.99f) tex = PackagePalette(currentRoot);
-        byte[] png = tex != null ? Readable(tex, colour) : null;
+        byte[] png = tex != null ? Readable(tex, colour, cutout) : null;
         var lin = colour.linear;
         mtl.AppendFormat(CultureInfo.InvariantCulture, "newmtl {0}\nKd {1} {2} {3}\n", name, lin.r, lin.g, lin.b);
         if (png != null)
@@ -247,6 +265,8 @@ public static class AssetStoreExport
             string file = name + ".png";
             File.WriteAllBytes(Path.Combine(target, file), png);
             mtl.AppendFormat(CultureInfo.InvariantCulture, "map_Kd -s {0} {1} 1 -o {2} {3} 0 {4}\n", scale.x, scale.y, offset.x, offset.y, file);
+            // The PNG keeps its alpha; objglb reads the threshold and writes an alpha-mask material with back faces.
+            if (cutout) mtl.AppendFormat(CultureInfo.InvariantCulture, "onward_cutoff {0}\n", SavedCutoff(mat));
         }
         return name;
     }
@@ -297,7 +317,7 @@ public static class AssetStoreExport
     // Read the texture on the CPU (batch mode runs with -nographics, where a GPU blit returns a blank grey): make its
     // importer readable, uncompressed, sRGB and at most 1024 px, reimport, and read the pixels, tinted by the material
     // colour (the albedo the shader shows: _BaseColor x _BaseMap). Null when the texture cannot be read.
-    static byte[] Readable(Texture tex, Color tint)
+    static byte[] Readable(Texture tex, Color tint, bool keepAlpha = false)
     {
         string path = AssetDatabase.GetAssetPath(tex);
         if (AssetImporter.GetAtPath(path) is TextureImporter importer)
@@ -315,10 +335,10 @@ public static class AssetStoreExport
         Color32[] pixels;
         try { pixels = source.GetPixels32(); }
         catch (Exception) { return null; }
-        var copy = new Texture2D(source.width, source.height, TextureFormat.RGB24, false);
+        var copy = new Texture2D(source.width, source.height, keepAlpha ? TextureFormat.RGBA32 : TextureFormat.RGB24, false);
         var tinted = new Color32[pixels.Length];
         for (int i = 0; i < pixels.Length; i++)
-            tinted[i] = new Color32((byte)(pixels[i].r * tint.r), (byte)(pixels[i].g * tint.g), (byte)(pixels[i].b * tint.b), 255);
+            tinted[i] = new Color32((byte)(pixels[i].r * tint.r), (byte)(pixels[i].g * tint.g), (byte)(pixels[i].b * tint.b), keepAlpha ? pixels[i].a : (byte)255);
         copy.SetPixels32(tinted);
         copy.Apply();
         var bytes = copy.EncodeToPNG();

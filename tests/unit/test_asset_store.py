@@ -404,20 +404,31 @@ def test_a_coarser_level_of_detail_is_not_a_model_of_its_own(tmp_path: Path) -> 
     assert "Shelf_Short_LOD0.glb" in files and "Shelf_Wide.glb" in files and "Shelf_Short_LOD1.glb" not in files
 
 
-def test_the_exporter_draws_glass_opaque_refuses_cut_outs_and_lends_white_pieces_the_package_palette() -> None:
+def test_the_exporter_draws_glass_opaque_keeps_opaque_cut_outs_and_lends_white_pieces_the_package_palette() -> None:
     """C# cannot run here: the rules the wide import needs are pinned in the exporter's source."""
     from onward_generator.assetstore.importer import EXPORTER
 
     source = EXPORTER.read_text(encoding="utf-8")
     item = source[source.index("static Item ExportObject"):source.index("static List<MeshRenderer> Lod0")]
     assert "var seeThrough = renderers.SelectMany(r => r.sharedMaterials).Where(IsTransparent).Distinct().ToList();" in item
-    assert 'if (seeThrough.Any(m => IsCutout(m) || !IsGlass(m))) { item.status = "transparent_material"; return item; }' in item
+    # ADR-040: an opaque alpha cut-out (leaves) is kept with its alpha; a blended surface still refuses the model.
+    assert 'if (seeThrough.Any(m => !IsGlass(m) && !IsOpaqueCutout(m))) { item.status = "transparent_material"; return item; }' in item
+    cutout = source[source.index("static bool IsOpaqueCutout"):source.index("static bool IsGlass")]
+    assert '(IsCutout(m) || SavedFloat(m, "_AlphaClip", 0f) > 0.5f)' in cutout
+    assert 'SavedFloat(m, "_Surface", 0f) < 0.5f' in cutout and "m.renderQueue < 3000" in cutout
+    assert '!m.IsKeywordEnabled("_ALPHABLEND_ON") && !m.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON")' in cutout
+    assert 'static float SavedCutoff(Material mat) => SavedFloat(mat, "_Cutoff", 0.5f);' in cutout
     assert item.index("too_many_triangles") < item.index("transparent_material")
     assert 'static readonly string[] GlassWords = { "glass", "window", "windshield", "windscreen", "lens", "headlight", "taillight" };' in source
     assert "static readonly Color DarkGlass = new Color(0.08f, 0.1f, 0.12f);" in source
     material = source[source.index("static string MaterialName"):source.index("static readonly string[] NotAlbedo")]
     assert "if (IsTransparent(mat) && IsGlass(mat)) { colour = DarkGlass; tex = null; }" in material
     assert "else if (tex == null && colour.r > 0.99f && colour.g > 0.99f && colour.b > 0.99f) tex = PackagePalette(currentRoot);" in material
+    assert "bool cutout = IsOpaqueCutout(mat) && !IsGlass(mat);" in material
+    assert "byte[] png = tex != null ? Readable(tex, colour, cutout) : null;" in material
+    assert 'if (cutout) mtl.AppendFormat(CultureInfo.InvariantCulture, "onward_cutoff {0}\\n", SavedCutoff(mat));' in material
+    readable = source[source.index("static byte[] Readable"):source.index("static string Safe")]
+    assert "keepAlpha ? TextureFormat.RGBA32 : TextureFormat.RGB24" in readable and "keepAlpha ? pixels[i].a : (byte)255" in readable
     palette = source[source.index("static Texture PackagePalette"):source.index("static bool IsTransparent")]
     assert 'new[] { "atlas", "palette", "colors", "colours" }' in palette and ".GroupBy(t => t).OrderByDescending(g => g.Count())" in palette
     assert "fallbackTexture[root] = chosen;" in palette  # one look-up per package
