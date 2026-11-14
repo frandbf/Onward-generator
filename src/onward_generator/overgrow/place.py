@@ -286,7 +286,7 @@ def overgrow(
             ))
             row = _record("wreck", "generated", spot, None, z)
             extent = wreck.vertices.max(axis=0) - wreck.vertices.min(axis=0)
-            row["size_m"] = [round(float(extent[0]), 3), round(float(extent[1]), 3), round(float(extent[2]), 3)]
+            row["size_m"] = [float(value) for value in extent]  # the generic body is whole centimetres: 4.0 x 1.6 x 1.55 m
             if turn:
                 row["crosswise"] = True
             records.append(row)
