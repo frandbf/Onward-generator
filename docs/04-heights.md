@@ -133,3 +133,8 @@ Outputs are deterministic (no timestamps) and are not overwritten without `--ove
 - Blocks come from footprints that touch, not from streets. A centre with disconnected footprints falls through to the radius level.
 - When few heights are known, one tagged group dominates its surroundings.
 - `roof:levels`, `min_height`, and `building:part` are not used here. `detail` extrudes each `building:part` from its `height`, or from `(building:levels + roof:levels)` × the `storey_height_m` of this configuration for the category of the building it stands on, and draws the `roof:*` tags (`docs/07-detail.md`, *Roofs* and *Parts*).
+
+## A map's own height configuration (14 November 2026)
+
+`maps/<id>/config/heights.json`, when it exists, replaces `config/heights.default.json` for that map: `run` passes it as `heights --config`. Write it as a copy of the default with the values the place needs; its `overrides_file` resolves as in the default. The optional key `"fallback_variation": true` gives each building with no height evidence a stable height in its category's `fallback_m` range (from a sha256 of its id) instead of the category default. Mogadishu 1993 had 348 buildings and no height data at all: every one stood at the unknown default of 8 m. Its own file lowers the unknown range to 3–7.5 m, one or two storeys, and turns the variation on. A changed file needs `run --from heights`.
+

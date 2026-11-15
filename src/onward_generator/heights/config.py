@@ -87,6 +87,8 @@ class HeightConfig:
     secondary_overrides: Mapping[str, Override] = MappingProxyType({})
     """Third-party values (Overture): below an OSM ``height`` and authoritative overrides, above ``building:levels``."""
     secondary_overrides_file: FileRef | None = None
+    fallback_variation: bool = False
+    """A building with no height evidence takes a stable height in its category's fallback range, not the default."""
 
     @property
     def category_names(self) -> frozenset[str]:
@@ -213,6 +215,7 @@ def config_from_document(
         document=MappingProxyType(json.loads(json.dumps(doc))),
         file=file,
         overrides_file=overrides_ref,
+        fallback_variation=doc.get("fallback_variation") is True,  # the schema allows only a boolean
         secondary_overrides=MappingProxyType(secondary),
         secondary_overrides_file=secondary_ref,
     )

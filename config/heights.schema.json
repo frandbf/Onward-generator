@@ -109,6 +109,7 @@
         "landmark_placeholder": { "$ref": "#/$defs/probability" }
       }
     },
-    "overrides_file": { "type": ["string", "null"], "pattern": "\\.json$" }
+    "overrides_file": { "type": ["string", "null"], "pattern": "\\.json$" },
+    "fallback_variation": { "type": "boolean" }
   }
 }
