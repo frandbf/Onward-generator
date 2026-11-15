@@ -133,7 +133,7 @@ def test_within_the_contact_tolerance_more_routes_win_and_past_it_the_balance() 
 def test_a_centre_snaps_up_to_2_m_from_a_node() -> None:
     graph = _chain(5)
     on = contact_score(graph, _place((0.0, 2.0), (8.0, 0.0), (4.0, 0.0)), 0)
-    assert on == Score(0, diff_pct=0.0)
+    assert on == Score(0, diff_pct=0.0, contact_m=4.0)  # each team walks 4 m to the Uplink
     off = contact_score(graph, _place((0.0, 2.01), (8.0, 0.0), (4.0, 0.0)), 1)
     assert off == Score(1, reason="attackers is off the navmesh") and not off.valid
     assert contact_score(graph, _place((0.0, 0.0), (8.0, 0.0), (4.0, 0.0), defend_b=(8.0, -2.01)), 2).reason == "defenders_b is off the navmesh"
@@ -281,7 +281,7 @@ def test_stage_2_stops_when_candidate_0_has_no_route() -> None:
     assert scores[1].routes is None
     assert select(scores).reason == f"{KEPT}: candidate 0 cannot be scored (no path from attackers to defenders)"
     off = score_all(graph, ["no block", *candidates[1:]])
-    assert off == [Score(0, reason="no block"), Score(1, diff_pct=0.0)]
+    assert off == [Score(0, reason="no block"), Score(1, diff_pct=0.0, contact_m=10.0)]
     assert score_all(graph, []) == []
 
 
@@ -342,3 +342,24 @@ def test_placement_blocks_use_the_layout_names() -> None:
     placement = Placement((1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0), (9.0, 10.0))
     assert placement.blocks() == {"attackers": (1.0, 2.0), "defenders": (3.0, 4.0), "attackers_b": (7.0, 8.0), "defenders_b": (9.0, 10.0)}
     assert Score(0, diff_pct=0.0).valid and not Score(0).valid and not Score(0, diff_pct=0.0, reason="x").valid
+
+
+def test_spawns_out_of_sight_then_a_long_walk_to_contact_rank_before_more_routes() -> None:
+    """14 November 2026: Mogadishu 1993 chose teams 49 m apart, 30.5 m from the Uplink, for one route more."""
+    from onward_generator.gameplay.placement import MIN_CONTACT_M
+
+    assert MIN_CONTACT_M == 40.0
+    base = Score(0, diff_pct=10.0, routes=1, max_overlap=0.0, contact_m=50.0)
+    near = Score(1, diff_pct=1.0, routes=3, max_overlap=0.0, contact_m=30.5)
+    far = Score(2, diff_pct=2.0, routes=2, max_overlap=0.0, contact_m=40.0)  # exactly the least walk: not short
+    seen = Score(3, diff_pct=0.5, routes=4, max_overlap=0.0, contact_m=90.0, in_sight=True)
+    assert near.short_contact and not far.short_contact and not Score(4).short_contact
+    assert select([base, near, far, seen]).index == 2
+    assert select([base, near, seen]).index == 0  # the current placement is out of sight with a long walk: it stays
+    short = Score(0, diff_pct=10.0, routes=1, max_overlap=0.0, contact_m=10.0)
+    assert select([short, near, seen]).index == 1  # in sight ranks after a short walk within the tolerance
+    assert select([short, seen]).index == 0  # spawns in sight weigh more than a short walk
+    assert select([Score(0, diff_pct=10.0, routes=1, max_overlap=0.0, contact_m=10.0, in_sight=True), seen]).index == 3
+    past = Score(5, diff_pct=16.0, routes=5, max_overlap=0.0, contact_m=90.0)
+    worse = Score(0, diff_pct=20.0, routes=1, max_overlap=0.0, contact_m=10.0)
+    assert select([worse, past, Score(6, diff_pct=15.0, routes=1, max_overlap=0.0, contact_m=10.0, in_sight=True)]).index == 6

@@ -177,17 +177,17 @@ def score_all(graph: NavGraph, candidates: Sequence[Placement | str], *, routes:
     return scores
 
 
-def _key(score: Score) -> tuple[float, float, float, float, float, int]:
+def _key(score: Score) -> tuple[float, ...]:
     """Within ``CONTACT_TOLERANCE_PCT``: teams that cannot see each other from their spawns first, then a walk to
     the Uplink of at least ``MIN_CONTACT_M`` for both (14 November 2026: Mogadishu 1993 spawned both teams 49 m
     apart, 8 s from contact), then more routes, then the lower difference; past it, the difference first.
 
     A key within starts with 0 or 1; a key past it starts with a difference above 15. So every candidate within
-    ranks before every candidate past it."""
+    ranks before every candidate past it, whatever follows."""
     assert score.diff_pct is not None and score.routes is not None and score.max_overlap is not None  # pragma: no mutate: only admissible scores reach the key
     if score.diff_pct <= CONTACT_TOLERANCE_PCT:
         return (float(score.in_sight), float(score.short_contact), -score.routes, score.diff_pct, score.max_overlap, score.index)
-    return (score.diff_pct, -score.routes, score.max_overlap, 0.0, 0.0, score.index)
+    return (score.diff_pct, -score.routes, score.max_overlap, score.index)
 
 
 def admissible(score: Score, baseline: Score) -> bool:

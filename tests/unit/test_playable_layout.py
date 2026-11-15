@@ -6,7 +6,7 @@ import dataclasses
 import math
 
 import pytest
-from shapely import LineString, MultiLineString, Point, Polygon, STRtree, box, union_all
+from shapely import LineString, MultiLineString, MultiPolygon, Point, Polygon, STRtree, box, union_all
 from shapely.geometry.base import BaseGeometry
 
 from onward_generator.export.package import _check_climbs, _check_layout
@@ -1338,3 +1338,123 @@ def test_the_map_quad_stands_at_the_centre_of_the_site() -> None:
     centre = map_quad((-180.0, -180.01, 180.0, 180.0))
     assert centre == [0.0, 0.0] and all(math.copysign(1.0, value) == 1.0 for value in centre)
     assert all(isinstance(value, float) for value in map_quad((0.0, 0.0, 1.0, 1.0)))
+
+
+def _two_blocks_base() -> object:
+    """Two blocks east and west of an 8 m carriageway with no crossing over it."""
+    from types import SimpleNamespace
+
+    from onward_generator.generation.surfaces import SurfaceClass
+
+    surfaces = {SurfaceClass.CARRIAGEWAY: SimpleNamespace(geometry=box(-4, -60, 4, 60)),
+                SurfaceClass.GROUND: SimpleNamespace(geometry=box(-60, -60, 60, 60).difference(box(-4, -60, 4, 60)))}
+    return SimpleNamespace(partition=SimpleNamespace(surfaces=surfaces, buildings=Polygon(), crossings=Polygon()))
+
+
+def test_the_players_ground_crosses_a_street_the_bots_navmesh_does_not() -> None:
+    from onward_generator.perf.layout import player_ground
+
+    base = _two_blocks_base()
+    bots = nav_islands(base)  # type: ignore[arg-type]
+    players = player_ground(base)  # type: ignore[arg-type]
+    assert len(bots) == 2 and len(players) == 1
+    assert players[0].covers(Point(0.0, 0.0)) and not any(island.covers(Point(0.0, 0.0)) for island in bots)
+    clipped = player_ground(base, box(-60, -60, -10, 60))  # type: ignore[arg-type]
+    assert len(clipped) == 1 and clipped[0].bounds[2] <= -10.0 - 0.35 + 1e-6  # ``inside`` clips it, then the agent radius
+
+
+def test_spawn_sites_are_spread_over_every_piece_a_player_can_reach() -> None:
+    from onward_generator.gameplay.metrics import nav_graph, snap
+    from onward_generator.perf.layout import _graph_component, _in_sight, _spread_sites
+
+    region = MultiPolygon([box(-50, -50, -10, 50), box(10, -50, 50, 50), box(80, 0, 90, 10)])
+    sites = _spread_sites(region, (-30.0, 0.0), 6)
+    assert sites[0] == (-30.0, 0.0) and any(x > 0 for x, _ in sites)
+    assert any(x > 70 for x, _ in sites)  # the far piece, before reach is asked
+    graph = nav_graph([box(-50, -50, 50, 50)])
+    home = _graph_component(graph, snap(graph, (-30.0, 0.0)))
+    assert len(home) == graph.size and _graph_component(graph, None) == frozenset()
+    reach = _spread_sites(region, (-30.0, 0.0), 6, lambda p: snap(graph, p) in home)
+    assert all(x < 70 for x, _ in reach) and any(x > 0 for x, _ in reach)
+    split = nav_graph([box(-50, -50, -10, 50), box(10, -50, 50, 50)])
+    assert len(_graph_component(split, snap(split, (-30.0, 0.0)))) < split.size
+    from onward_generator.gameplay.placement import Placement
+
+    wall = box(-1, -50, 1, 50)
+    place = Placement((-30.0, 0.0), (30.0, 0.0), (0.0, 0.0), (-30.0, 20.0), (30.0, 20.0))
+    assert not _in_sight(wall, place) and _in_sight(box(-1, 30, 1, 50), place) and not _in_sight(wall, "invalid")
+
+
+def test_a_team_off_the_uplinks_ground_keeps_its_second_block_near_it() -> None:
+    from onward_generator.perf.layout import _second_blocks
+
+    west, east = box(-50, -50, -10, 50), box(10, -50, 50, 50)
+    attack_b, defend_b = _second_blocks([west, east], (-30.0, 0.0), (30.0, 0.0), (-30.0, 30.0))
+    assert west.covers(Point(attack_b)) and east.covers(Point(defend_b))
+    assert math.dist(attack_b, (-30.0, 0.0)) >= BLOCK_GAP_M and math.dist(defend_b, (30.0, 0.0)) >= BLOCK_GAP_M
+    assert math.dist(defend_b, (30.0, 0.0)) < 12.0  # the nearest slot, on the defenders' own ground
+
+
+def test_a_team_on_the_uplinks_ground_keeps_its_second_block_there() -> None:
+    """The nearest free slot of all lies on another piece; a team on the Uplink's ground still takes the nearest on it."""
+    from onward_generator.perf.layout import _second_blocks
+
+    home, east = box(-50, -3, -10, 3), box(-9, -50, 50, 50)
+    attack_b, _ = _second_blocks([home, east], (-12.0, 0.0), (30.0, 0.0), (-30.0, 0.0))
+    assert attack_b == (-22.0, 0.0)
+
+
+def _bridged_site() -> BaseGeometry:
+    """Two plazas joined by a 2 m bridge a player walks but no spawn block fits, and an islet nobody reaches."""
+    return union_all([box(-60, -40, -6, 40), box(6, -40, 60, 40), box(-6, -1, 6, 1), box(-60, 46, -30, 58)])
+
+
+def test_choose_placement_offers_reachable_sites_and_puts_the_uplink_on_the_teams_ground(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.gameplay.placement as placement
+    import onward_generator.perf.layout as layout
+
+    base, manifest = _plaza_base(_bridged_site()), {"objects": []}
+    area, a = layout._spawn_site(base, manifest)  # type: ignore[arg-type]
+    region = layout._spawn_region(base, manifest)  # type: ignore[arg-type]
+    assert not area.equals(region) and area.covers(Point(a))
+    reach: list[object] = []
+    real_sites = layout._spread_sites
+
+    def sites_spy(where: BaseGeometry, start: tuple[float, float], limit: int, reachable: object = None) -> list:
+        reach.append(reachable)
+        return real_sites(where, start, limit, reachable)  # type: ignore[arg-type]
+
+    grounds: list[tuple[BaseGeometry, tuple[float, float], tuple[float, float]]] = []
+    real_midpoint = layout._midpoint_on
+
+    def midpoint_spy(on: BaseGeometry, attack: tuple[float, float], defend: tuple[float, float]) -> object:
+        grounds.append((on, attack, defend))
+        return real_midpoint(on, attack, defend)
+
+    sights: list[object] = []
+
+    def sight_spy(buildings: BaseGeometry, candidate: object) -> bool:
+        sights.append(buildings)
+        return len(sights) % 2 == 1  # every other candidate "in sight", to see the flag reach the scores
+
+    seen: list[list] = []
+    real_select = placement.select
+
+    def select_spy(scores: list) -> object:
+        seen.append(list(scores))
+        return real_select(scores)
+
+    monkeypatch.setattr(layout, "_spread_sites", sites_spy)
+    monkeypatch.setattr(layout, "_midpoint_on", midpoint_spy)
+    monkeypatch.setattr(layout, "_in_sight", sight_spy)
+    monkeypatch.setattr(placement, "select", select_spy)
+    layout.choose_placement(base, manifest)  # type: ignore[arg-type]
+    (reachable,) = reach
+    assert callable(reachable) and reachable((30.0, 0.0)) and not reachable((-45.0, 52.0))
+    assert grounds and {on.equals(area) for on, _, _ in grounds} == {True, False}
+    for on, attack, defend in grounds:
+        inside = area.covers(Point(attack)) and area.covers(Point(defend))
+        assert on.equals(area if inside else region), (attack, defend)
+    assert sights and all(b is base.partition.buildings for b in sights)  # type: ignore[attr-defined]
+    (scores,) = seen
+    assert [s.in_sight for s in scores] == [i % 2 == 0 for i in range(len(scores))]

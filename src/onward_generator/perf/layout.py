@@ -244,7 +244,7 @@ def gameplay_layout(
         b = (round(bx, 2), round(by, 2))  # pragma: no mutate: grid points are whole multiples of GRID_M, so any rounding keeps them
         uplink = _midpoint_on(area, a, b)
     else:
-        _check_placement(_spawn_region(base, detail_manifest), a, placement)
+        _check_placement(_spawn_region(base, detail_manifest), placement)
         a, b, uplink = placement.attack, placement.defend, placement.uplink
     site = base.partition.site
     sx0, sy0, sx1, sy1 = site.bounds
@@ -314,9 +314,9 @@ def _defender_candidates(area: BaseGeometry, a: tuple[float, float], limit: int)
     return kept
 
 
-def _check_placement(area: BaseGeometry, a: tuple[float, float], placement: Placement) -> None:
+def _check_placement(area: BaseGeometry, placement: Placement) -> None:
     """The rules of ``gameplay_layout`` for a placement chosen elsewhere: both blocks inside ``area`` and 30 m apart,
-    the Uplink on it. The attackers may leave ``a`` since the C6 amendment of 11 November 2026; ``area`` is every
+    the Uplink on it. The attackers may leave the first spawn site since the C6 amendment of 11 November 2026; ``area`` is every
     piece of the spawn region since 14 November 2026."""
     for team, centre in (("attackers", placement.attack), ("defenders", placement.defend)):
         if not _fits(area, _block(*centre)):
@@ -812,12 +812,13 @@ def player_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> l
     """The ground a player can walk, shrunk by the agent radius, one piece per island: ``nav_islands`` plus the
     carriageway (ADR-032 amendment of 14 November 2026).
 
-    The bots' navmesh leaves the carriageway out but its crossings (ADR-015); a player crosses any street. Where OSM
-    maps no crossing (Mogadishu 1993: 183 islands, one per block) the bots' islands made every route between two
-    blocks "no path", so the routes and the spawn placement read the player's ground instead.
+    The bots' navmesh leaves the carriageway out but its crossings (ADR-015); a player crosses any street. On the
+    bots' ground the 2 m route grid of Mogadishu 1993 broke into 183 parts, the largest 653 of 3 410 nodes, and every
+    route between two of them was "no path"; on the player's ground the largest holds 2 961 of 4 498. The routes and
+    the spawn placement read the player's ground.
     """
     carriageway = [s.geometry for c, s in base.partition.surfaces.items() if c is SurfaceClass.CARRIAGEWAY]
-    ground = union_all([free_ground(base, []), base.partition.crossings, *carriageway])
+    ground = union_all([free_ground(base, []), base.partition.crossings, *carriageway])  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
     if inside is not None:
         ground = ground.intersection(inside)
     return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
