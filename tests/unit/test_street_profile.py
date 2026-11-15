@@ -20,6 +20,7 @@ from onward_generator.ai.street_profile import (
     EFFECTS,
     FIELDS,
     MAX_RESPONSE_BYTES,
+    NOT_OFFERED_STYLES,
     PROFILE_ATTEMPTS,
     PROTECTED_POINTERS,
     RULES_PROFILE,
@@ -205,7 +206,8 @@ def test_effects_table_matches_schema() -> None:
     from_schema = {(f, i) for f in FIELDS for i in field_ids(f) if i != "map_default"}
     assert set(EFFECTS) == from_schema
     assert all(i == "map_default" or (f, i) in EFFECTS for f in FIELDS for i in field_ids(f))
-    assert set(field_ids("dominant_typology")) - {"map_default"} == set(load_style_table().styles)
+    assert set(field_ids("dominant_typology")) - {"map_default"} == set(load_style_table().styles) - NOT_OFFERED_STYLES
+    assert NOT_OFFERED_STYLES == {"arid"} and NOT_OFFERED_STYLES <= set(load_style_table().styles)
     assert set(field_ids("abandonment")) - {"map_default"} == {f"years_{y}" for y in (10, 30, 100)}
     for (field, ident), effect in EFFECTS.items():
         assert (effect.field, effect.id) == (field, ident)

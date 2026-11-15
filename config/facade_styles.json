@@ -36,7 +36,7 @@
           30.0,
           42.0,
           26.0,
-          37.0
+          38.0
         ],
         [
           27.0,
@@ -120,7 +120,7 @@
     },
     {
       "style": "east_african",
-      "note": "The Horn of Africa (Somalia, Djibouti, eastern Ethiopia) and the Swahili coast of Kenya and Tanzania",
+      "note": "The Horn of Africa (Somalia, Djibouti, eastern Ethiopia), the Swahili coast from Kenya to northern Mozambique, and the Comoros",
       "boxes": [
         [
           -2.0,
@@ -129,10 +129,40 @@
           51.5
         ],
         [
-          -11.0,
+          -16.0,
           -2.0,
           38.5,
           41.5
+        ],
+        [
+          -13.0,
+          -11.0,
+          43.0,
+          44.6
+        ]
+      ]
+    },
+    {
+      "style": "arid",
+      "note": "Arid flat-roof towns: Mesopotamia, the Arabian Peninsula and the Gulf, Iran, Afghanistan, and Sudan and Chad",
+      "boxes": [
+        [
+          12.0,
+          38.0,
+          38.0,
+          63.0
+        ],
+        [
+          29.0,
+          38.5,
+          60.5,
+          75.0
+        ],
+        [
+          8.0,
+          23.0,
+          21.0,
+          38.5
         ]
       ]
     }
@@ -298,6 +328,10 @@
     },
     "east_african": {
       "note": "Horn of Africa and the Swahili coast: lime-washed render over coral stone or adobe, flat roofs with parapets, iron window grilles with painted shutters, a painted base band.",
+      "atlas": null
+    },
+    "arid": {
+      "note": "Arid flat-roof towns: concrete block and clay brick under cement render in sand, beige, light grey and weathered white; flat concrete roofs with parapets; small windows in metal frames, often behind grilles; dark metal doors and courtyard gates.",
       "atlas": null
     }
   }

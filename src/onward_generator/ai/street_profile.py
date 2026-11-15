@@ -47,6 +47,10 @@ MAX_RECORD_BYTES = 64 * 1024
 PROFILE_ATTEMPTS = 2
 NEUTRAL = "map_default"
 FIELDS = ("dominant_typology", "palette", "props_profile", "abandonment", "cover")
+NOT_OFFERED_STYLES = frozenset({"arid"})
+"""Facade styles the model is not offered yet: a new enum value changes the schema hash every stored profile replays
+by, so every map would ask the model again. Such a style is reached by its box or by map.json facades.style until the
+schema is next revised (15 November 2026)."""
 
 Origin = Literal["ai_generated", "replay", "rules"]
 ORIGINS: tuple[Origin, ...] = ("ai_generated", "replay", "rules")
