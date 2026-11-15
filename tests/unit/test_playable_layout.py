@@ -1331,6 +1331,10 @@ def test_the_playable_layout_of_a_core_measures_the_core_navmesh_with_or_without
         assert all(inside.covers(Point(p["x"], p["y"])) for p in doc[block]["points_m"])
     assert inside.covers(Point(doc["uplink_m"]))
     assert _check_layout(doc) == []
+    for layout in (today, doc):  # the bots' ground is the core's too
+        xs, ys = layout["nav_ground"]["vertices_m"][0::3], layout["nav_ground"]["vertices_m"][1::3]
+        assert min(xs) >= -60 and max(xs) <= 60 and min(ys) >= -60 and max(ys) <= 60
+    assert _check_layout({**doc, "nav_ground": {}}) == ["layout: nav_ground.vertices_m must be flat x, y, z triples"]
 
 
 def test_the_map_quad_stands_at_the_centre_of_the_site() -> None:
@@ -1472,6 +1476,40 @@ def test_a_route_stops_before_a_leg_that_cuts_a_corner() -> None:
     assert _sample(LineString([(0, 0), (20, 0), (20, 60)]), wide, 0.0, [wide]) == [(0.0, 0.0), (14.0, 0.0), (20.0, 8.0)]
 
 
+def test_a_route_stops_at_a_leg_across_a_house_even_when_the_loop_closes_on_the_sidewalk() -> None:
+    """A sidewalk all round a house: the leg from (14, 0) to (20, 8) cuts its corner although the last points come back
+    beside the first."""
+    ring = box(-2, -2, 22, 22).difference(box(2, 2, 18, 18))
+    assert _sample(LineString([(0, 0), (20, 0), (20, 20), (0, 20), (0, 2)]), ring, 0.0, [ring]) == [(0.0, 0.0), (14.0, 0.0)]
+
+
+def test_the_loop_is_closed_down_to_two_points_from_the_first_point() -> None:
+    """Every leg runs on the L, but only (0, 14) closes the loop to (0, 0) without crossing the house in the corner."""
+    corner = union_all([box(-6, -6, 4.5, 26), box(-6, 14, 60, 26)])
+    reach: dict[int, BaseGeometry] = {}
+    points = _sample_route(LineString([(0, 0), (0, 20), (60, 20)]), corner, 0.0, [corner], STRtree([corner]), reach)
+    assert [(p["x"], p["y"]) for p in points] == [(0.0, 0.0), (0.0, 14.0)]
+    assert list(reach) == [0] and reach[0].equals(corner.buffer(0.35))  # the caller's cache keeps the grown island
+
+
+def test_routes_share_one_cache_of_grown_islands(monkeypatch: pytest.MonkeyPatch) -> None:
+    import onward_generator.perf.layout as layout
+
+    caches: list[object] = []
+    sample = layout._sample_route
+
+    def spy(*args: object) -> list[dict[str, float]]:
+        caches.append(args[5])
+        return sample(*args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(layout, "_sample_route", spy)
+    way = LinearWay("foot", "pedestrian", LineString([(0, 0), (0, 36.5)]), 3.0, "config_default")
+    ground = box(-1.5, -1, 1.5, 40)
+    assert len(_routes(_base(way), ground, [ground])) == 3  # type: ignore[arg-type]
+    assert len(caches) == 3 and all(cache is caches[0] for cache in caches)
+    assert isinstance(caches[0], dict) and list(caches[0]) == [0]
+
+
 def test_the_bots_navmesh_ground_holds_every_house_as_a_hole() -> None:
     """14 November 2026: the adapter cut houses out of the ground with 2.6 m boxes on a 2 m grid, which left walkable
     strips inside every wall; nav_ground is the exact free ground, footprints as holes, crossings at road level."""
@@ -1502,6 +1540,20 @@ def test_the_bots_navmesh_ground_holds_every_house_as_a_hole() -> None:
     assert max(clipped["vertices_m"][1::3]) <= 60 and min(clipped["vertices_m"][1::3]) >= 5 - 1e-9
     with pytest.raises(LayoutError, match=r"^no walkable ground for the bots' navmesh$"):
         nav_ground(base, box(1000, 1000, 1001, 1001))  # type: ignore[arg-type]
+
+
+def test_the_bots_navmesh_ground_drops_slivers_and_keeps_millimetres() -> None:
+    """A clipped piece of more than half a cell of the partition's 1 mm grid stays; vertices keep the millimetre."""
+    from onward_generator.perf.layout import NAV_SLIVER_M2, nav_ground
+
+    assert NAV_SLIVER_M2 == 0.75e-6
+    street = LinearWay("street", "vehicular", LineString([(-60, 0), (60, 0)]), 8.0, "config_default")
+    base = _base(street, partition=build_partition(box(-60, -60, 60, 60), [], [street], [], load_generation_config()))
+    for piece, kept in ((Polygon([(40, 40), (40.001, 40), (40, 40.001)]), False), (box(40, 40, 40.001, 40.001), True)):
+        found = nav_ground(base, union_all([box(-50, 20, -30, 40), piece]))  # type: ignore[arg-type]
+        assert any(x > 39.9 for x in found["vertices_m"][0::3]) is kept
+    xs = nav_ground(base, box(-40.12345, 20, -30, 40))["vertices_m"][0::3]  # type: ignore[arg-type]
+    assert sorted(set(xs)) == [-40.123, -30.0]
 
 
 def test_the_package_checks_the_shape_of_the_navmesh_ground() -> None:

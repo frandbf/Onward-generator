@@ -79,6 +79,9 @@ ROUTE_STEP_M = 14.0
 # that to a wall or kerb is not on the mesh, and a gap narrower than twice that
 # splits it into islands.
 NAV_AGENT_RADIUS_M = 0.35
+# A piece of the bots' ground this small or smaller is a clipping sliver: more than half and less than one cell of the
+# partition's 1 mm grid.
+NAV_SLIVER_M2 = 0.75e-6
 # Plan Q1b. Unity voxelises the navmesh and trims a little more than the exact 2D outline: a patrol point 0.41 m from
 # the core wall and one 0.2 m off the eroded ground fell on strips Unity's grid never reached, and the adapter dropped
 # both routes on Rue Mouffetard. Patrol points keep this much more ground round them.
@@ -705,7 +708,7 @@ def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence
     reach = {} if reach is None else reach
     points: list[dict[str, float]] = []
     island: BaseGeometry | None = None
-    grown: BaseGeometry | None = None
+    grown: BaseGeometry  # set with the island, at the first point; read only once a point is kept
     previous: Point | None = None
     distance = start_m
     while distance < line.length - 2 and len(points) < ROUTE_POINTS:
@@ -724,11 +727,11 @@ def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence
             grown = reach[hits[0]]
         elif not dwithin(island, point, NAV_AGENT_RADIUS_M):
             break
-        if previous is not None and grown is not None and not grown.covers(LineString([previous, point])):
+        if previous is not None and not grown.covers(LineString([previous, point])):
             break
         points.append({"x": round(float(point.x), 2), "y": round(float(point.y), 2)})
         previous = point
-    while len(points) > 2 and grown is not None and not grown.covers(LineString([(points[-1]["x"], points[-1]["y"]), (points[0]["x"], points[0]["y"])])):
+    while len(points) >= 3 and not grown.covers(LineString([(points[-1]["x"], points[-1]["y"]), (points[0]["x"], points[0]["y"])])):
         points.pop()
     return points
 
@@ -842,6 +845,10 @@ def player_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> l
     return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
 
 
+def _sliver(piece: BaseGeometry) -> bool:
+    return bool(piece.area <= NAV_SLIVER_M2)  # pragma: no mutate: an area exactly at the limit is a float coincidence; <= and < split every real piece alike
+
+
 def nav_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> dict[str, list[float] | list[int]]:
     """The exact ground the adapter bakes the bots' navmesh from (14 November 2026): ``nav_islands`` before the agent
     radius, the free ground at 0 and the walkable crossings at the carriageway's top, as flat local x, y, z triples
@@ -858,7 +865,7 @@ def nav_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> dict
     for ground, top in ((free, 0.0), (crossings, -depth)):
         if inside is not None:
             ground = ground.intersection(inside)
-        pieces = MultiPolygon([p for p in polygons_of(ground) if p.area > 1e-6])
+        pieces = MultiPolygon([p for p in polygons_of(ground) if not _sliver(p)])
         if not pieces.is_empty:
             meshes.append(cap(pieces, top))
     if not meshes:
