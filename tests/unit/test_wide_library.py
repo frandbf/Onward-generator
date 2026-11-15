@@ -169,9 +169,13 @@ def test_the_rows_added_for_mogadishu_join_every_map_and_the_distinctive_ones_wa
     offered = {row["id"] for pool in _pools(catalogue_rows(), extended=True, model=True).values() for row in pool}
     assert not {f"ph_{name}" for name in distinctive} & seeded and {f"ph_{name}" for name in distinctive} <= offered
     assert "ph_chipped_concrete" in seeded and "ph_brown_mud_dry" in seeded  # pooled, but no slot's own family is earth
+    earth = {row["id"] for row in rows.values() if row["family"] == "earth"}
     for seed in range(40):
-        picked = set(deterministic_choices(catalogue_rows(), seed, extended=True).values())
-        assert not picked & ({f"ph_{name}" for name in distinctive} | {row["id"] for row in rows.values() if row["family"] == "earth"})
+        choices = deterministic_choices(catalogue_rows(), seed, extended=True)
+        # 15 November 2026: earth is drawn by chance only on the unpaved_carriageway slot (a street OSM tags unpaved).
+        assert choices["unpaved_carriageway"] in earth
+        picked = {library_id for slot, library_id in choices.items() if slot != "unpaved_carriageway"}
+        assert not picked & ({f"ph_{name}" for name in distinctive} | earth)
     pools = _pools(catalogue_rows(), extended=True, model=True)
     assert slot_families("streets_plazas") == ("paving", "earth") and slot_families("doors") == ("door",)
     assert "ph_brown_mud_dry" in {row["id"] for row in slot_pool("streets_plazas", pools)}
@@ -192,8 +196,9 @@ def test_the_model_is_offered_the_distinctive_rows_and_the_earth_alternates_and_
 
     rows = catalogue_rows()
     seeded = deterministic_choices(rows, 3, extended=True)
+    unpaved = next(i for i in ("ph_coast_sand_02", "ph_clay_floor_001") if i != seeded.get("streets_plazas"))  # one id once
     reply = json.dumps({"choices": [{"slot": slot, "library_id": {"roofs": "ph_asbestos_sheet", "streets_plazas": "ph_brown_mud_dry",
-                                                                  "brick": "ph_clay_block_wall"}.get(slot, library_id)}
+                                                                  "brick": "ph_clay_block_wall", "unpaved_carriageway": unpaved}.get(slot, library_id)}
                                     for slot, library_id in seeded.items()]})
     seen: dict[str, object] = {}
 

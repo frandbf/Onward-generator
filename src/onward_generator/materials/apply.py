@@ -86,7 +86,7 @@ MAX_PHOTO_PX = 1024
 UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "shop_glass", "door_wood"})
 # The map-wide ground surfaces that take a UV phase per combine cell with the "repetition" switch
 # (plan C1, ADR-009 "Repetition per cell"). The open ground and the green keep one phase.
-GROUND_CELL_PHASE_MATERIALS = frozenset({"carriageway", "carriageway_unpaved", "sidewalk", "pedestrian", "cobblestone_paving"})
+GROUND_CELL_PHASE_MATERIALS = frozenset({"carriageway", "sidewalk", "pedestrian", "cobblestone_paving"})
 # The see-through panes keep their RGBA images. The contact atlas is opaque.
 ATLAS_SKIP = frozenset({"glass_view", "shop_glass"})
 # Shop interiors (docs/07-detail.md, *Shop interiors*): one library photograph per shared material,
@@ -559,7 +559,6 @@ def apply_materials(
     if out == base:
         raise MaterialsError("output must be a new directory; will not overwrite the base scene")
 
-    cell_phase = CellPhase(float(cell_m), GROUND_CELL_PHASE_MATERIALS) if repetition else None
     catalog = load_catalog(catalog_path)
     plan = load_texture_plan(plan_path, catalog=catalog)
     if repetition:
@@ -571,6 +570,9 @@ def apply_materials(
 
     before_hashes = _base_hashes(base)
     objects = _objects(manifest)
+    dirt_region = unpaved_region(objects) if "unpaved_carriageway" in plan.by_id else None
+    phased = GROUND_CELL_PHASE_MATERIALS | ({UNPAVED_MATERIAL} if dirt_region is not None else set())  # a paved map reports as before
+    cell_phase = CellPhase(float(cell_m), phased) if repetition else None
     before_geo = geometry_fingerprint([o for o in objects if o.get("type") in GEOGRAPHIC])
     scene = _scene_path(manifest, scene_path)
     features = _load_features(scene)
@@ -596,9 +598,8 @@ def apply_materials(
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
     unpaved_nodes: list[str] = []
-    region = unpaved_region(objects) if "unpaved_carriageway" in plan.by_id else None
-    if region is not None:
-        visual_nodes, unpaved_nodes = rematerialize_unpaved_carriageway(visual_nodes, region)
+    if dirt_region is not None:
+        visual_nodes, unpaved_nodes = rematerialize_unpaved_carriageway(visual_nodes, dirt_region)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
     trim_root = tile_cache_dir() if tile_cache else None
     # A wall strip takes the colour the scene gives that material; a colour the scene does not use
