@@ -56,6 +56,26 @@ def test_the_front_face_fill_tells_a_crowd_barrier_from_a_jersey_block() -> None
     turned = Mesh(bars.vertices[:, [1, 0, 2]], bars.triangles[:, [0, 2, 1]])
     assert face_fill(turned) == pytest.approx(face_fill(bars))
     assert face_fill(mesh_box(0.0, 1.0, 0.0, 1.0, 0.0, 0.0)) == 1.0  # no face: counted full
+    small = _bars(3, gap_m=0.16, height_m=1.0)  # a face of 0.44 m² is measured too
+    assert face_fill(small) == pytest.approx(3 * BAR_M / (2 * 0.2 + BAR_M), rel=1e-3)
+    assert face_fill(mesh_box(0.0, 2.0, 0.0, 0.6, 0.0, 1.0)) <= 1.0
+
+
+def _square_with_a_wall() -> Mesh:
+    """A 1 m wall in the x-z plane at y 0, and a sliver of a triangle at y 1: as wide as it is deep."""
+    wall = Mesh(np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0], [0.0, 0.0, 1.0]]), np.array([[0, 1, 2], [0, 2, 3]]))
+    sliver = Mesh(np.array([[0.0, 1.0, 0.0], [0.001, 1.0, 0.0], [0.0, 1.0, 0.001]]), np.array([[0, 1, 2]]))
+    return merge([wall, sliver])
+
+
+def test_a_prop_as_wide_as_it_is_deep_shows_its_x_face() -> None:
+    assert face_fill(_square_with_a_wall()) == pytest.approx(1.0)
+
+
+def test_a_barrier_filling_exactly_half_its_face_is_not_open() -> None:
+    half = Mesh(np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0], [0.0, 0.0, 1.0], [2.0, 0.0, 0.0], [2.0, 0.1, 0.0]]),
+                np.array([[0, 1, 2], [0, 2, 3], [4, 4, 5]]))  # 1 m of a 2 by 1 m face; the last triangle has no area
+    assert face_fill(half) == OPEN_FILL_MAX and not is_open(half, "barrier")
 
 
 def test_open_roles_and_sparse_barriers_are_open_and_the_rest_is_not() -> None:
@@ -75,6 +95,10 @@ def test_welded_parts_split_at_gaps_and_join_at_shared_corners() -> None:
     assert len(welded_parts(joined)) == 1
     apart = merge([mesh_box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0), mesh_box(1.002, 2.0, 0.0, 1.0, 0.0, 1.0)])
     assert len(welded_parts(apart)) == 2
+    # Either side of zero rounds to the same millimetre: one corner, one part.
+    left = Mesh(np.array([[-0.0002, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 1.0]]), np.array([[0, 1, 2]]))
+    right = Mesh(np.array([[0.0002, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0]]), np.array([[0, 1, 2]]))
+    assert len(welded_parts(merge([left, right]))) == 1
 
 
 def test_an_open_collider_stops_at_the_bars_and_leaves_the_gaps() -> None:
@@ -130,6 +154,14 @@ def test_the_rules_and_an_ai_plan_mark_an_open_collider() -> None:
         (collider,) = result.colliders
         assert collider.extras["open"] is True and collider.extras["role"] == "gate"
         assert collider.primitives[0].mesh.triangle_count == open_collider(gate.mesh).triangle_count
+    assert dict(planned.colliders[0].extras) == {"type": "collision", "origin": "ai_generated", "asset_id": "gate_0", "role": "gate", "open": True}
+    assert planned.colliders[0].primitives[0].material == "collider"
+    body = mesh_box(0.0, 4.0, 0.0, 1.8, 0.0, 1.4)
+    wreck = Prop(AssetSpec("wreck_0", "vehicles", "wreck", ("curb",), "ground", "test"), body,
+                 np.zeros((body.vertex_count, 2), dtype=np.float32), b"")
+    closed = Dressing()
+    emit_planned(wreck, yaw_matrix(0.0, -6.0, 0.0, 0.0), closed, op="place", anchor_id="poi:0", crosswise=False, op_index=0)
+    assert dict(closed.colliders[0].extras) == {"type": "collision", "origin": "ai_generated", "asset_id": "wreck_0", "role": "wreck"}
     # Spacing keeps the plan of the whole fence rule: an open gate holds others as far off as before.
     assert rules.solid_prints and rules.solid_prints[0].area == pytest.approx(
         _plan(collider_mesh(gate.mesh, "gate")).area, rel=0.05)

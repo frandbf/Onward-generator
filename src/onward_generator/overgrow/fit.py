@@ -252,7 +252,7 @@ def face_fill(mesh: Mesh) -> float:
     if face <= 0.0:
         return 1.0
     covered = unary_union([Polygon(corners).buffer(0) for corners in vertices[mesh.triangles][:, :, keep]])
-    return min(1.0, float(covered.area) / face)
+    return float(covered.area) / face  # the face's own triangles cover at most the face
 
 
 def is_open(mesh: Mesh, role: str) -> bool:
@@ -262,9 +262,10 @@ def is_open(mesh: Mesh, role: str) -> bool:
 
 def welded_parts(mesh: Mesh) -> list[Mesh]:
     """The connected parts of a mesh, its vertices welded at ``WELD_M``, in the order of their first triangle."""
-    _, ids = np.unique(np.round(mesh.vertices / WELD_M).astype(np.int64), axis=0, return_inverse=True)
+    # Integers, not rounded floats: rows are compared byte for byte, and -0.0 is not 0.0.
+    welded, ids = np.unique(np.round(mesh.vertices / WELD_M).astype(np.int64), axis=0, return_inverse=True)
     ids = ids.ravel()
-    parent = list(range(int(ids.max()) + 1))
+    parent = list(range(len(welded)))
 
     def root(i: int) -> int:
         while parent[i] != i:
@@ -276,7 +277,7 @@ def welded_parts(mesh: Mesh) -> list[Mesh]:
         ra, rb, rc = root(int(a)), root(int(b)), root(int(c))
         parent[rb] = ra
         parent[root(rc)] = ra
-    owner = [root(int(ids[t[0]])) for t in mesh.triangles]
+    owner = [root(int(a)) for a, _, _ in ids[mesh.triangles]]  # after the union, a triangle's corners share one root
     order = list(dict.fromkeys(owner))
     parts = []
     for key in order:
