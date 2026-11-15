@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,14 +23,15 @@ from onward_generator.materials.library_plan import (
     texture_family,
     texture_record,
 )
+from onward_generator.materials.variants import VARIANT_SLOTS
 from tests.conftest import MURCIA_CENTER
 
 WIDE = library_rows(WIDE_LIBRARY_PATH)
-FAMILIES = {"plaster", "brick", "rock", "paving", "concrete", "asphalt", "roof", "bark"}
+FAMILIES = {"plaster", "brick", "rock", "paving", "concrete", "asphalt", "roof", "bark", "earth"}
 
 
 def test_every_wide_row_is_a_cached_cc0_poly_haven_file_that_matches_its_hash() -> None:
-    assert len(WIDE) == 25
+    assert len(WIDE) == 34
     for row in WIDE:
         path = REPO_ROOT / row["path"]
         data = path.read_bytes()
@@ -138,3 +140,91 @@ def test_the_normal_maps_switch_is_read_from_map_json_and_reaches_materials_appl
     (off / "map.json").write_text(json.dumps({**document, "normal_maps": 1}), encoding="utf-8")
     with pytest.raises(MapError, match='"normal_maps" must be true or false, got 1'):
         normal_maps_enabled(off)
+
+
+def test_the_rows_added_for_mogadishu_join_every_map_and_the_distinctive_ones_wait_for_the_model() -> None:
+    """14 November 2026: dirt, adobe and corrugated roofs join the wide library of every map. The seeded fallback keeps
+    the corrugated, adobe and turquoise rows and the earth alternates out; the model, which reads the brief, gets them."""
+    from onward_generator.materials.library_plan import (
+        ALTERNATE_FAMILIES,
+        EARTH_CONTRAST_LIMIT,
+        _pools,
+        choice_schema,
+        contrast_limit,
+        slot_families,
+        slot_pool,
+    )
+    from onward_generator.materials.variants import variant_picks
+
+    added = {"asbestos_sheet", "blue_plaster_weathered", "box_profile_metal_sheet", "brown_mud_dry", "chipped_concrete",
+             "clay_block_wall", "clay_floor_001", "coast_sand_01", "coast_sand_02"}
+    rows = {row["name"]: row for row in WIDE if row["name"] in added}
+    assert set(rows) == added and all("normal" in row and is_calm(row, extended=True) for row in rows.values())
+    distinctive = {name for name, row in rows.items() if row.get("distinctive")}
+    assert distinctive == {"asbestos_sheet", "blue_plaster_weathered", "box_profile_metal_sheet", "clay_block_wall"}
+    assert {name for name, row in rows.items() if row["family"] == "earth"} == {
+        "brown_mud_dry", "clay_floor_001", "coast_sand_01", "coast_sand_02"}
+    assert EARTH_CONTRAST_LIMIT == 0.02 and contrast_limit("earth") == 0.02 == contrast_limit("earth", extended=True)
+    seeded = {row["id"] for pool in _pools(catalogue_rows(), extended=True).values() for row in pool}
+    offered = {row["id"] for pool in _pools(catalogue_rows(), extended=True, model=True).values() for row in pool}
+    assert not {f"ph_{name}" for name in distinctive} & seeded and {f"ph_{name}" for name in distinctive} <= offered
+    assert "ph_chipped_concrete" in seeded and "ph_brown_mud_dry" in seeded  # pooled, but no slot's own family is earth
+    for seed in range(40):
+        picked = set(deterministic_choices(catalogue_rows(), seed, extended=True).values())
+        assert not picked & ({f"ph_{name}" for name in distinctive} | {row["id"] for row in rows.values() if row["family"] == "earth"})
+    pools = _pools(catalogue_rows(), extended=True, model=True)
+    assert slot_families("streets_plazas") == ("paving", "earth") and slot_families("doors") == ("door",)
+    assert "ph_brown_mud_dry" in {row["id"] for row in slot_pool("streets_plazas", pools)}
+    assert ALTERNATE_FAMILIES["roofs"] == frozenset({"concrete"})
+    branches = {b["properties"]["slot"]["const"]: b["properties"]["library_id"]["enum"]
+                for b in choice_schema(pools)["properties"]["choices"]["items"]["anyOf"]}
+    assert "ph_coast_sand_01" in branches["sidewalks"] and "ph_coast_sand_01" not in branches["carriageway"]
+    assert "ph_asbestos_sheet" in branches["roofs"] and "ph_clay_block_wall" in branches["brick"]
+    entries = [SimpleNamespace(id=slot, library_id="") for slot in sorted(VARIANT_SLOTS)]
+    varied = {i for picks in variant_picks(entries, catalogue_rows(), 1, extended=True).values() for i in picks}
+    assert not varied & {f"ph_{name}" for name in distinctive}
+
+
+def test_the_model_is_offered_the_distinctive_rows_and_the_earth_alternates_and_may_choose_them() -> None:
+    """14 November 2026: the model reads the brief, so it gets the corrugated, adobe and earth rows the seeded fallback skips."""
+    from onward_generator.ai.providers import ProviderResult
+    from onward_generator.materials.library_plan import _parse_choices
+
+    rows = catalogue_rows()
+    seeded = deterministic_choices(rows, 3, extended=True)
+    reply = json.dumps({"choices": [{"slot": slot, "library_id": {"roofs": "ph_asbestos_sheet", "streets_plazas": "ph_brown_mud_dry",
+                                                                  "brick": "ph_clay_block_wall"}.get(slot, library_id)}
+                                    for slot, library_id in seeded.items()]})
+    seen: dict[str, object] = {}
+
+    class Recording:
+        def complete(self, system: str, instruction: str, schema: dict[str, object]) -> ProviderResult:
+            seen.update(system=system, instruction=json.loads(instruction), schema=schema)
+            return ProviderResult(reply, {"provider": "replay", "source": "test", "model": None})
+
+    plan = select_texture_plan(name="Mogadishu", map_id="m", latitude=2.05, longitude=45.33, brief="dirt streets, sheet roofs",
+                               seed=3, provider=Recording(), extended=True, wide=True)  # type: ignore[arg-type]
+    assert plan["selector"] == "ollama"
+    chosen = {row["id"]: row["library_id"] for row in plan["entries"]}
+    assert (chosen["roofs"], chosen["streets_plazas"], chosen["brick"]) == ("ph_asbestos_sheet", "ph_brown_mud_dry", "ph_clay_block_wall")
+    instruction = seen["instruction"]
+    assert instruction["slots"]["streets_plazas"] == ["paving", "earth"] and instruction["slots"]["roofs"] == ["roof", "concrete"]  # type: ignore[index]
+    assert instruction["slots"]["doors"] == ["door"]  # type: ignore[index]
+    assert "ph_asbestos_sheet" in instruction["ids_by_family"]["roof"] and "ph_brown_mud_dry" in instruction["ids_by_family"]["earth"]  # type: ignore[index]
+    assert seen["system"] == (
+        "Choose one tileable albedo for each slot of a playable city map. Keep the walls, roofs and ground in one calm palette. "
+        "Use only listed ids, one id once, and a family listed for that slot. A slot's first family is its usual one: choose a "
+        "later family (earth for dirt or sand streets, plaster on the brick slot, concrete roofs) or a corrugated sheet roof "
+        "only when the brief or the place calls for it. Reply with JSON only.")
+    assert _parse_choices(reply, rows, extended=True)["roofs"] == "ph_asbestos_sheet"
+
+
+def test_the_seeded_variants_never_draw_a_distinctive_row() -> None:
+    entries = [SimpleNamespace(id=slot, library_id="") for slot in sorted(VARIANT_SLOTS)]
+    distinctive = {row["id"] for row in catalogue_rows() if row.get("distinctive")}
+    assert distinctive
+    from onward_generator.materials.variants import variant_picks
+
+    for seed in range(40):
+        picks = variant_picks(entries, catalogue_rows(), seed, extended=True)
+        assert not distinctive & {i for ids in picks.values() for i in ids}, seed

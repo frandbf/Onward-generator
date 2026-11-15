@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "clay_block_wall",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/clay_block_wall",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_block_wall/clay_block_wall_diff_1k.jpg",
+  "md5": "86625b47cdba6a2062cee0f77980006c",
+  "sha256": "b3e78fb0599aef807a943170b1ca59a265ed9875048515638618ad4c867ea58d",
+  "size_bytes": 748952,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/clay_block_wall/clay_block_wall_diff_1k.jpg",
+  "retrieved_at": "2026-11-14T19:21:45+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

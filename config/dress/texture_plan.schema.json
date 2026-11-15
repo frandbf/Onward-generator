@@ -39,7 +39,7 @@
         },
         "library_id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]{1,80}$"
+          "pattern": "^[a-z][A-Za-z0-9_]{1,80}$"
         },
         "catalog_ids": {
           "type": "array",

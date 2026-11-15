@@ -32,6 +32,19 @@
       "Outdoor_Wall_T01": {"family": "paving", "note": "Grey flagstones."},
       "Outdoor_Wall_T10": {"family": "paving", "note": "Rounded cobbles."},
       "Outdoor_Wall_T14": {"family": "paving", "note": "Brown flagstones."}
+    },
+    "25_free_realistic_textures_nature_city_home_cons": {
+      "Rocky_Ground_15": {"family": "earth", "note": "Ochre packed dirt with small stones."},
+      "Dry_Ground_10": {"family": "earth", "note": "Reddish dry ground with pebbles and dust."},
+      "Beach_Sand_1": {"family": "earth", "note": "Smooth tan sand with faint streaks."},
+      "Rocky_Sand_1": {"family": "earth", "note": "Dark grey sand scattered with stones."},
+      "Gravel_11": {"family": "earth", "note": "Grey gravel and broken stone."},
+      "Asphalt_26": {"family": "asphalt", "note": "Worn grey asphalt with dark patches."},
+      "Concrete_3": {"family": "concrete", "note": "Dirty brown concrete, uneven."},
+      "Flaked_Paint_Wall_7": {"family": "plaster", "note": "Pale green paint flaking off white render."}
+    },
+    "yughues_free_sand_materials": {
+      "T_YFSM_03": {"family": "earth", "note": "Brown sand with light grit; the other sets are white diffuse maps meant for a tint."}
     }
   }
 }

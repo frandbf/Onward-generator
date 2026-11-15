@@ -59,6 +59,17 @@ SLOT_FAMILY = {
     "flat_roofs": "concrete",
 }
 
+# Families the model or a map's own texture plan may also put on a slot (14 November 2026): dirt or sand streets,
+# render where the brick would go, concrete on pitched roofs, as Mogadishu 1993 has. The seeded fallback keeps
+# SLOT_FAMILY, so a map without a model never gets sand streets by chance.
+ALTERNATE_FAMILIES = {
+    "streets_plazas": frozenset({"earth"}),
+    "sidewalks": frozenset({"earth"}),
+    "plain_pedestrian": frozenset({"earth"}),
+    "brick": frozenset({"plaster"}),
+    "roofs": frozenset({"concrete"}),
+}
+
 _CHOICE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -170,12 +181,16 @@ COARSE_CONTRAST_LIMIT = 0.012
 # 0.0656 (large stains), bricks003 0.0260 (pale stones), bricks100 0.0440, rock022
 # 0.0267, rock055 0.0409.
 WALL_CONTRAST_LIMIT = 0.025
+# Dirt and sand carry stones and trodden patches (14 November 2026). Kept brown_mud_dry 0.0170, coast_sand_01 0.0149,
+# coast_sand_02 0.0168, Rocky_Ground_15 0.0174; dropped coast_sand_03 0.0213 (a grid of dark bands), aerial_sand 0.0370.
+EARTH_CONTRAST_LIMIT = 0.02
 CONTRAST_LIMITS: dict[str | None, float] = {
     "asphalt": COARSE_CONTRAST_LIMIT,
     "concrete": COARSE_CONTRAST_LIMIT,
     "plaster": WALL_CONTRAST_LIMIT,
     "brick": WALL_CONTRAST_LIMIT,
     "rock": WALL_CONTRAST_LIMIT,
+    "earth": EARTH_CONTRAST_LIMIT,
 }
 # Roofs and paving are measured only with the map.json "repetition" switch (plan C1, ADR-009
 # amendment "Repetition per cell"), so the default pools and picks stay as they were.
@@ -226,11 +241,13 @@ def is_calm(row: Mapping[str, Any], limit: float | None = None, *, extended: boo
     return coarse_contrast(path) <= (family_limit if limit is None else limit)
 
 
-def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool) -> dict[str, list[dict[str, Any]]]:
+def _pools(rows: Sequence[Mapping[str, Any]], *, extended: bool, model: bool = False) -> dict[str, list[dict[str, Any]]]:
+    """Calm rows by family. A ``distinctive`` row (corrugated sheet, adobe) is offered to the model only, which reads
+    the brief; the seeded fallback cannot tell Murcia from Mogadishu."""
     pools: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         family = texture_family(row)
-        if family is None or not is_calm(row, extended=extended):
+        if family is None or (row.get("distinctive") and not model) or not is_calm(row, extended=extended):
             continue
         pools.setdefault(family, []).append(dict(row))
     for family in pools:
@@ -302,8 +319,7 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]], *, extended: bo
     raw = payload.get("choices") if isinstance(payload, dict) else None
     if not isinstance(raw, list):
         raise PlanError("texture reply needs a choices list")
-    pools = _pools(rows, extended=extended)
-    by_id = {str(row["id"]): texture_family(row) for row in rows}
+    pools = _pools(rows, extended=extended, model=True)
     chosen: dict[str, str] = {}
     for item in raw:
         if not isinstance(item, dict):
@@ -314,15 +330,22 @@ def _parse_choices(text: str, rows: Sequence[Mapping[str, Any]], *, extended: bo
             raise PlanError(f"unknown texture slot {slot!r}")
         if library_id in chosen.values():
             raise PlanError(f"{library_id} is used more than once")
-        if by_id.get(library_id) != SLOT_FAMILY[slot]:
-            raise PlanError(f"{slot} cannot use {library_id}")
-        if library_id not in {row["id"] for row in pools[SLOT_FAMILY[slot]]}:
-            raise PlanError(f"{library_id} is not in the {SLOT_FAMILY[slot]} pool")
+        if library_id not in {row["id"] for row in slot_pool(slot, pools)}:
+            raise PlanError(f"{library_id} is not in the {'/'.join(slot_families(slot))} pool")
         chosen[slot] = library_id
     missing = [slot for slot, family in SLOT_FAMILY.items() if pools.get(family) and slot not in chosen]
     if missing:
         raise PlanError(f"texture reply missed {missing}")
     return chosen
+
+
+def slot_families(slot: str) -> tuple[str, ...]:
+    """The slot's own family first, then the alternates the model may choose when the brief describes them."""
+    return (SLOT_FAMILY[slot], *sorted(ALTERNATE_FAMILIES.get(slot, ())))
+
+
+def slot_pool(slot: str, pools: Mapping[str, Sequence[Mapping[str, Any]]]) -> list[Mapping[str, Any]]:
+    return [row for family in slot_families(slot) for row in pools.get(family, ())]
 
 
 def choice_schema(pools: Mapping[str, Sequence[Mapping[str, Any]]]) -> dict[str, Any]:
@@ -335,7 +358,7 @@ def choice_schema(pools: Mapping[str, Sequence[Mapping[str, Any]]]) -> dict[str,
             "type": "object",
             "additionalProperties": False,
             "required": ["slot", "library_id"],
-            "properties": {"slot": {"const": slot}, "library_id": {"enum": sorted(str(row["id"]) for row in pools[family])}},
+            "properties": {"slot": {"const": slot}, "library_id": {"enum": sorted(str(row["id"]) for row in slot_pool(slot, pools))}},
         }
         for slot, family in SLOT_FAMILY.items()
         if pools.get(family)
@@ -348,21 +371,23 @@ def choice_schema(pools: Mapping[str, Sequence[Mapping[str, Any]]]) -> dict[str,
 
 def _ask(provider: Provider, *, name: str, map_id: str, latitude: float, longitude: float, brief: str | None, rows: Sequence[Mapping[str, Any]], complaint: str | None,
          extended: bool) -> dict[str, str]:
-    pools = _pools(rows, extended=extended)
+    pools = _pools(rows, extended=extended, model=True)
     listed = {
         family: [row["id"] for row in pool]
         for family, pool in pools.items()
     }
     instruction = {
         "map": {"id": map_id, "name": name, "latitude": latitude, "longitude": longitude, "brief": brief or ""},
-        "slots": SLOT_FAMILY,
+        "slots": {slot: list(slot_families(slot)) for slot in SLOT_FAMILY},
         "ids_by_family": listed,
         "complaint": complaint or "",
     }
     system = (
         "Choose one tileable albedo for each slot of a playable city map. "
         "Keep the walls, roofs and ground in one calm palette. "
-        "Use only listed ids, one id once, and the family named for that slot. "
+        "Use only listed ids, one id once, and a family listed for that slot. "
+        "A slot's first family is its usual one: choose a later family (earth for dirt or sand streets, plaster on the "
+        "brick slot, concrete roofs) or a corrugated sheet roof only when the brief or the place calls for it. "
         "Reply with JSON only."
     )
     prompt = json.dumps(instruction, ensure_ascii=False)  # pragma: no mutate: None is falsy like False and writes the same JSON
@@ -420,7 +445,8 @@ def assert_library_entries(
         if not library_id:
             raise PlanError(f"{slot} has no library texture")
         row = by_id.get(library_id)
-        if row is None or texture_family(row) != SLOT_FAMILY.get(slot):
+        family = texture_family(row) if row is not None else None
+        if row is None or (family != SLOT_FAMILY.get(slot) and family not in ALTERNATE_FAMILIES.get(slot, frozenset())):
             raise PlanError(f"{slot} cannot use {library_id}")
         if not is_calm(row, extended=extended):
             raise PlanError(

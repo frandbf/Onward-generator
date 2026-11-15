@@ -47,10 +47,14 @@ def _package(tmp_path: Path, members: dict[str, bytes]) -> Path:
 def test_the_table_names_families_the_texture_plan_knows() -> None:
     table = read_table()
     assert TABLE_PATH.name == "asset_store_textures.json" and sorted(table) == ["18_high_resolution_wall_textures",
-                                                                              "p3d_outdoor_wall_tile_texture_pack_lr"]
+                                                                              "25_free_realistic_textures_nature_city_home_cons",
+                                                                              "p3d_outdoor_wall_tile_texture_pack_lr",
+                                                                              "yughues_free_sand_materials"]
     families = {spec["family"] for sets in table.values() for spec in sets.values()}
-    assert families <= {"plaster", "brick", "rock", "paving", "concrete", "asphalt"}
-    assert sum(len(sets) for sets in table.values()) == 26
+    assert families <= {"plaster", "brick", "rock", "paving", "concrete", "asphalt", "earth"}
+    assert sum(len(sets) for sets in table.values()) == 35
+    assert {stem for sets in table.values() for stem, spec in sets.items() if spec["family"] == "earth"} == {
+        "Rocky_Ground_15", "Dry_Ground_10", "Beach_Sand_1", "Rocky_Sand_1", "Gravel_11", "T_YFSM_03"}
 
 
 def test_the_sets_pair_each_albedo_with_its_normal_map_and_read_directx() -> None:
@@ -243,3 +247,21 @@ def test_the_textures_command_imports_the_table_s_packages(tmp_path: Path, monke
     assert "wall_pack: 2 textures" in capsys.readouterr().out
     with pytest.raises(SystemExit, match="asset-store: other, zzz has no texture sets in config/dress/asset_store_textures.json"):
         cli.main(["textures", "--cache", str(tmp_path / "cache"), "--only", "zzz", "other"])
+
+
+def test_a_yughues_diffuse_is_an_albedo_and_earth_lies_on_the_ground() -> None:
+    from onward_generator.assetstore.textures import ALBEDO, GROUND_FAMILIES, NORMAL
+
+    assert ALBEDO.search("T_YFSM_03_d") and ALBEDO.search("T_YFSM_03_D") and not ALBEDO.search("T_YFSM_03_s")
+    assert NORMAL.search("T_YFSM_03_n") and not ALBEDO.search("T_YFSM_03_n")
+    assert GROUND_FAMILIES == frozenset({"paving", "concrete", "asphalt", "earth"})
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for k, path in enumerate(("S/T_YFSM_03_d.tga", "S/T_YFSM_03_n.tga", "S/T_YFSM_03_s.tga")):
+            for name, payload in (("pathname", path.encode()), ("asset", b"x")):
+                info = tarfile.TarInfo(f"{k:032x}/{name}")
+                info.size = len(payload)
+                archive.addfile(info, io.BytesIO(payload))
+    buffer.seek(0)
+    with tarfile.open(fileobj=buffer, mode="r:gz") as archive:
+        assert sorted(texture_sets(archive)["T_YFSM_03"]) == ["albedo", "normal"]

@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "blue_plaster_weathered",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/blue_plaster_weathered",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/blue_plaster_weathered/blue_plaster_weathered_nor_gl_1k.jpg",
+  "md5": "ff205e40651a0f72617bd554e498ba3b",
+  "sha256": "f329329b56dfeefee707cf04602148ba799ea4a97f32e3c38edf9f60185471f8",
+  "size_bytes": 676587,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/blue_plaster_weathered/blue_plaster_weathered_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-14T19:21:56+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

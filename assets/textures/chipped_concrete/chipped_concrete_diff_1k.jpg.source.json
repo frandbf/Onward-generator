@@ -1,0 +1,20 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "chipped_concrete",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Amal Kumar"
+  ],
+  "page_url": "https://polyhaven.com/a/chipped_concrete",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/chipped_concrete/chipped_concrete_diff_1k.jpg",
+  "md5": "d072bf9acecf7655311017b72acaf114",
+  "sha256": "2adf65fe5b702c8882480b04f1802b81d1e8868a03e7047504f5a77a726fd6ff",
+  "size_bytes": 716081,
+  "map": "Diffuse",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/chipped_concrete/chipped_concrete_diff_1k.jpg",
+  "retrieved_at": "2026-11-14T19:22:45+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}

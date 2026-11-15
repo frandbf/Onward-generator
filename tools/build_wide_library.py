@@ -49,6 +49,25 @@ ROWS: dict[str, tuple[str, str, str]] = {
     "bark_brown_02": ("bark", "trunk", "Brown bark with moss."),
 }
 
+# Added 14 November 2026 for places the first picks did not resemble (dirt streets, adobe, corrugated roofs; first used by
+# Mogadishu 1993). Picked by eye from a 2x2-tiled contact sheet; left out: beige_wall_001 (flat colour), beige_wall_002,
+# aerial_sand and coast_sand_03 (visible tile seams), coast_sand_04 (green patches), coast_sand_05 (too dark), asphalt_02
+# (a crack that repeats), asphalt_04 (0.0152, over the asphalt limit). The earth rows lie on the ground slots only when
+# the model or a map's own plan chooses them (ALTERNATE_FAMILIES); the DISTINCTIVE rows are never drawn by the seeded
+# fallback, so a map without a model does not get corrugated roofs by chance.
+ROWS.update({
+    "clay_block_wall": ("brick", "wall", "Brown adobe blocks under a thin render."),
+    "blue_plaster_weathered": ("plaster", "wall", "Turquoise paint worn off a pale render."),
+    "brown_mud_dry": ("earth", "ground", "Dry brown dirt with small stones."),
+    "coast_sand_01": ("earth", "ground", "Tan sand with faint pits."),
+    "coast_sand_02": ("earth", "ground", "Light trodden sand."),
+    "clay_floor_001": ("earth", "ground", "Smooth packed ochre clay."),
+    "chipped_concrete": ("concrete", "ground", "Grey concrete with chipped spots."),
+    "asbestos_sheet": ("roof", "roof", "Weathered brown corrugated sheet."),
+    "box_profile_metal_sheet": ("roof", "roof", "Red box-profile metal sheet."),
+})
+DISTINCTIVE = frozenset({"clay_block_wall", "blue_plaster_weathered", "asbestos_sheet", "box_profile_metal_sheet"})
+
 
 def row(asset_id: str, family: str, surface: str, note: str) -> dict[str, object]:
     image = REPO / "assets" / "textures" / asset_id / f"{asset_id}_diff_1k.jpg"
@@ -87,7 +106,8 @@ def main() -> None:
         "schema": "onward_generator.imported_library", "schema_version": "0.1.0",
         "description": "Wide library (plan T1): CC0 Poly Haven albedos that join the texture pools only when a map's "
                        "map.json has \"wide_library\": true. The default pools and picks do not change.",
-        "textures": [row(asset_id, *spec) for asset_id, spec in sorted(ROWS.items())],
+        "textures": [{**row(asset_id, *spec), **({"distinctive": True} if asset_id in DISTINCTIVE else {})}
+                     for asset_id, spec in sorted(ROWS.items())],
     }
     OUT.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{OUT.relative_to(REPO)}: {len(document['textures'])} textures")

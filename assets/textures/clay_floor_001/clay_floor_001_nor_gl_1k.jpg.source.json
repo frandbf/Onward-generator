@@ -1,0 +1,21 @@
+{
+  "provider": "polyhaven",
+  "asset_id": "clay_floor_001",
+  "license": "CC0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "authors": [
+    "Dimitrios Savva",
+    "Rico Cilliers"
+  ],
+  "page_url": "https://polyhaven.com/a/clay_floor_001",
+  "file_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_floor_001/clay_floor_001_nor_gl_1k.jpg",
+  "md5": "302793228d486ac5400875211fecd943",
+  "sha256": "de22f48cddc12d3c3e13361eb590eadb4828917c016c9b4df0f937ad1f0a9cf2",
+  "size_bytes": 72654,
+  "map": "nor_gl",
+  "resolution": "1k",
+  "format": "jpg",
+  "path": "/Volumes/Personal/Repositorios/Onward-Generator-earth/assets/textures/clay_floor_001/clay_floor_001_nor_gl_1k.jpg",
+  "retrieved_at": "2026-11-14T19:22:42+00:00",
+  "user_agent": "onward-generator/0.1.0 (local research tool)"
+}
