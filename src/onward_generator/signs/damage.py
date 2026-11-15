@@ -70,14 +70,14 @@ def _shell_impact(rng: np.random.Generator, n: int) -> np.ndarray:
     """A crater of render blown off a wall: brick or block courses showing, a dark centre, chips and cracks round it."""
     pixels = np.zeros((n, n, 4), dtype=np.uint8)
     cx, cy = n * rng.uniform(0.45, 0.55), n * rng.uniform(0.45, 0.55)
-    corners = [(cx + n * rng.uniform(0.22, 0.38) * math.cos(a), cy + n * rng.uniform(0.18, 0.34) * math.sin(a))
-               for a in np.linspace(0.0, 2 * math.pi, 14, endpoint=False)]  # pragma: no mutate: endpoint None is as false as False
+    angles = np.linspace(0.0, 2 * math.pi, 14, endpoint=False)  # pragma: no mutate: endpoint None is as false as False
+    corners = [(cx + n * rng.uniform(0.22, 0.38) * math.cos(a), cy + n * rng.uniform(0.18, 0.34) * math.sin(a)) for a in angles]
     spall = Image.new("L", (n, n))
     ImageDraw.Draw(spall).polygon(corners, fill=255)  # pragma: no mutate: PIL clamps an L fill to 255
     inside = np.asarray(_blur(spall, 1.2)) > 128
     course = max(4, n // 24)  # pragma: no mutate: n is PROCEDURAL_SIZE, 256: n // 24 and n // 25 are both 10, above the floor
     yy, xx = np.mgrid[0:n, 0:n]
-    mortar = (yy % course < 2) | (((xx + (yy // course % 2) * course) % (course * 2)) < 2)
+    mortar = (yy % course < 2) | (((xx + (yy // course % 2) * course) % (course * 2)) < 2)  # pragma: no mutate: shifting a row by plus or minus one course is the same modulo two courses
     brick = np.where(mortar[..., None], np.array([150, 140, 126]), np.array([150, 86, 60]) + rng.integers(-18, 18, (n, n, 1)))
     pixels[..., :3] = np.where(inside[..., None], brick, np.array([200, 192, 178]))
     centre = Image.new("L", (n, n))
@@ -123,14 +123,14 @@ def _shrapnel(rng: np.random.Generator, n: int) -> np.ndarray:
     pixels = np.zeros((n, n, 4), dtype=np.uint8)
     pits, chips = Image.new("L", (n, n)), Image.new("L", (n, n))
     pit_draw, chip_draw = ImageDraw.Draw(pits), ImageDraw.Draw(chips)
-    sx, sy = n * rng.uniform(-0.1, 0.15), n * rng.uniform(0.6, 1.0)
+    sx, sy = n * rng.uniform(-0.1, 0.15), n * rng.uniform(0.6)  # below the middle up to the bottom edge (numpy's high is 1)
     for _ in range(int(rng.integers(70, 120))):
         a, d = rng.uniform(-1.2, 0.2), n * abs(rng.normal(0.45, 0.25))
         x, y, s = sx + d * math.cos(a), sy + d * math.sin(a), n * rng.uniform(0.004, 0.012)
         chip_draw.ellipse((x - s * 2.2, y - s * 2.2, x + s * 2.2, y + s * 2.2), fill=int(rng.uniform(90, 170)))
         pit_draw.ellipse((x - s, y - s, x + s, y + s), fill=240)
     chipped, pit = np.asarray(_blur(chips, 0.8)), np.asarray(_blur(pits, 0.5))
-    pixels[..., :3] = np.where(pit[..., None] > 40, np.array([28, 25, 23]), np.array([196, 188, 174]))
+    pixels[..., :3] = np.where(np.asarray(pits)[..., None] > 0, np.array([28, 25, 23]), np.array([196, 188, 174]))  # the pits themselves are dark
     pixels[..., 3] = np.maximum(chipped, pit)
     return pixels
 
@@ -152,13 +152,18 @@ def _road_crack(rng: np.random.Generator, n: int) -> np.ndarray:
         x, y, a = rng.uniform(0.1, 0.25) * n, rng.uniform(0.35, 0.65) * n, rng.uniform(-0.4, 0.4)
         for _ in range(40):
             a += rng.normal(0, 0.3)
-            nx, ny = min(max(x + 5 * math.cos(a), 4.0), n - 4.0), min(max(y + 5 * math.sin(a), 4.0), n - 4.0)
+            nx, ny = _inside(x + 5 * math.cos(a), n), _inside(y + 5 * math.sin(a), n)
             draw.line((x, y, nx, ny), fill=235, width=int(rng.integers(2, 4)))
             if rng.random() < 0.12:  # pragma: no mutate: a uniform draw never lands on the threshold itself
                 b = a + rng.choice([-1.0, 1.0]) * rng.uniform(0.6, 1.2)
                 draw.line((nx, ny, nx + 18 * math.cos(b), ny + 18 * math.sin(b)), fill=200, width=2)
             x, y = nx, ny
     return _rgba((24, 22, 21), _blur(alpha, 0.7))
+
+
+def _inside(value: float, n: int) -> float:
+    """``value`` kept 4 px inside an ``n`` px image."""
+    return min(max(value, 4.0), n - 4.0)
 
 
 def _pothole_patch(rng: np.random.Generator, n: int) -> np.ndarray:
@@ -205,8 +210,8 @@ def _rubble_flat(rng: np.random.Generator, n: int) -> np.ndarray:
     for _ in range(int(rng.integers(60, 110))):
         x, y = rng.normal(0.5, 0.18, 2).clip(0.05, 0.95) * n
         s = n * rng.uniform(0.01, 0.045)
-        corners = [(x + s * rng.uniform(0.5, 1.3) * math.cos(a), y + s * rng.uniform(0.5, 1.3) * math.sin(a))
-                   for a in np.linspace(0, 2 * math.pi, 5, endpoint=False)]  # pragma: no mutate: endpoint None is as false as False
+        angles = np.linspace(0, 2 * math.pi, 5, endpoint=False)  # pragma: no mutate: endpoint None is as false as False
+        corners = [(x + s * rng.uniform(0.5, 1.3) * math.cos(a), y + s * rng.uniform(0.5, 1.3) * math.sin(a)) for a in angles]
         grey = int(rng.uniform(110, 190))
         colour = (grey, grey - 6, grey - 14) if rng.random() < 0.7 else (int(rng.uniform(130, 170)), 76, 52)  # pragma: no mutate: concrete or brick; a uniform draw never lands on the threshold itself
         draw.polygon(corners, fill=(*colour, 255))  # pragma: no mutate: PIL clamps an RGBA fill to 255
@@ -257,10 +262,12 @@ def ground_count(seed: int, level: str) -> int:
     return low + int(_unit(seed, "ground_decal_count") * (high - low + 1))
 
 
-def war_sequence(pool: Sequence[Decal], war: Sequence[Decal], count: int, seed: int, level: str) -> list[Decal]:
+def war_sequence(pool: Sequence[Decal], count: int, seed: int, level: str, war: Sequence[Decal] | None = None) -> list[Decal]:
     """``count`` wall decals in their turn, at least ``WAR_SHARE`` of them war damage: the war kinds of ``pool`` and
-    ``war`` in one turn, the rest of ``pool`` in another, interleaved so the war damage spreads over the walls."""
-    wars = list({d.id: d for d in [*war, *(d for d in pool if d.kind in WAR_KINDS)]}.values())
+    ``war`` (the drawn war kinds of ``seed`` when not given) in one turn, the rest of ``pool`` in another, interleaved
+    so the war damage spreads over the walls."""
+    drawn = war_wall_decals(seed) if war is None else war
+    wars = list({d.id: d for d in [*drawn, *(d for d in pool if d.kind in WAR_KINDS)]}.values())
     rest = [d for d in pool if d.kind not in WAR_KINDS]
     wanted = math.ceil(count * WAR_SHARE[level]) if rest else count
     first, second = turn_order(wars, wanted, seed), turn_order(rest, count - wanted, seed)

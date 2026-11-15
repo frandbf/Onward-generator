@@ -118,7 +118,7 @@ def _decal(name: str, kind: str) -> Decal:
 def test_a_share_of_the_wall_decals_are_war_damage_spread_over_the_walls(level: str, count: int) -> None:
     pool = [_decal("a", "stain"), _decal("b", "moss"), _decal("c", "bullets"), _decal("d", "poster")]
     war = [_decal("w", "shell_impact")]
-    sequence = war_sequence(pool, war, count, 11, level)
+    sequence = war_sequence(pool, count, 11, level, war)
     assert len(sequence) == count
     wars = sum(d.kind in WAR_KINDS for d in sequence)
     assert wars == math.ceil(count * WAR_SHARE[level])
@@ -127,13 +127,13 @@ def test_a_share_of_the_wall_decals_are_war_damage_spread_over_the_walls(level: 
 
 
 def test_without_other_decals_every_one_is_war_damage() -> None:
-    sequence = war_sequence([_decal("c", "crack")], [_decal("w", "scorch")], 9, 2, "light")
+    sequence = war_sequence([_decal("c", "crack")], 9, 2, "light", [_decal("w", "scorch")])
     assert len(sequence) == 9 and all(d.kind in WAR_KINDS for d in sequence)
 
 
 def test_a_war_decal_in_both_lists_is_one_decal() -> None:
     shared = _decal("w", "scorch")
-    sequence = war_sequence([shared, _decal("a", "stain")], [shared], 4, 2, "heavy")
+    sequence = war_sequence([shared, _decal("a", "stain")], 4, 2, "heavy", [shared])
     assert [d.id for d in sequence].count("w") == 3 and len(sequence) == 4
 
 
@@ -261,7 +261,7 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     kinds = {row["kind"] for row in heavy["wall_decals"]["decals"]}
     assert {"shell_impact", "scorch", "shrapnel"} & kinds  # the drawn war kinds come in with the sequence
     # The walls follow the war sequence of the map's seed (a decal that fits no wall drops out, so a subsequence).
-    expected = iter(d.id for d in war_sequence(drawn(seed), war_wall_decals(seed), heavy["wall_decals"]["wanted"], seed, "heavy"))
+    expected = iter(d.id for d in war_sequence(drawn(seed), heavy["wall_decals"]["wanted"], seed, "heavy"))
     assert all(any(row["decal"] == want for want in expected) for row in heavy["wall_decals"]["decals"])
     # The ground is the one place_ground lays for the map's seed on the built scene.
     built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
@@ -298,11 +298,14 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     document["damage"] = "loads"
     with pytest.raises(SignsError, match='^map.json "damage" must be one of auto, none, light, heavy, got \'loads\'$'):
         place_signs(base, scene, tmp_path / "bad")
-    monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
-    assert "damage" not in place_signs(base, scene, tmp_path / "unreadable")
+    from onward_generator.maps.workspace import MapError
+
+    for error in (ValueError("broken"), OSError("gone"), MapError("bad")):
+        monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r, e=error: (_ for _ in ()).throw(e))
+        assert "damage" not in place_signs(base, scene, tmp_path / f"unreadable_{type(error).__name__}")
 
 
-WAR_HASHES = {"gen_shell_impact": "6682a0670bd9", "gen_scorch_mark": "bafcf5ac0b17", "gen_shrapnel_spray": "b737f439fd55"}
+WAR_HASHES = {"gen_shell_impact": "6682a0670bd9", "gen_scorch_mark": "bafcf5ac0b17", "gen_shrapnel_spray": "fcd50da59708"}
 GROUND_HASHES = {"gen_road_crack": "83454fa162b2", "gen_pothole_patch": "631c5174a011", "gen_sand_drift": "a9935331af6a",
                  "gen_ground_scorch": "397969ff0d72", "gen_flat_rubble": "3651cf3d5597"}
 
@@ -323,7 +326,7 @@ def test_twelve_seeds_are_pinned() -> None:
     for seed in range(12):
         for decal in [*war_wall_decals(seed), *ground_decals(seed)]:
             digest.update(decal.rgba.tobytes())
-    assert digest.hexdigest()[:16] == "e6c58ce14580421e"
+    assert digest.hexdigest()[:16] == "2647f255f44a5603"
 
 
 def test_the_counts_are_pinned_by_seed() -> None:
@@ -334,7 +337,7 @@ def test_the_counts_are_pinned_by_seed() -> None:
 
 def test_the_war_sequence_is_pinned() -> None:
     pool = [_decal("a", "stain"), _decal("b", "moss"), _decal("c", "bullets"), _decal("d", "poster")]
-    sequence = war_sequence(pool, [_decal("w", "shell_impact"), _decal("v", "scorch")], 10, 11, "heavy")
+    sequence = war_sequence(pool, 10, 11, "heavy", [_decal("w", "shell_impact"), _decal("v", "scorch")])
     assert [d.id for d in sequence] == ["w", "d", "v", "b", "c", "a", "w", "d", "v", "c"]
 
 
@@ -384,3 +387,36 @@ def damage_area(base: Path, scene: Path):  # type: ignore[no-untyped-def]
 
     walls = signs_place._walls(json.loads(scene.read_text()).get("features") or [])
     return MultiPoint([tuple(w.a) for w in walls]).envelope
+
+
+def test_without_a_war_list_the_seed_s_drawn_war_kinds_come_in() -> None:
+    sequence = war_sequence([_decal("a", "stain")], 6, 9, "heavy")
+    drawn = {d.id: d for d in war_wall_decals(9)}
+    wars = [d for d in sequence if d.id in drawn]
+    assert {d.id for d in wars} == set(drawn)
+    assert all(np.array_equal(d.rgba, drawn[d.id].rgba) for d in wars)  # drawn from the map's seed
+
+
+def test_the_ground_decals_say_what_they_are() -> None:
+    assert all(d.origin == "generated" and d.description and d.id == f"gen_{name}" for d, name in zip(ground_decals(2), damage.WAR_GROUND, strict=True))
+    assert [d.description for d in ground_decals(2)] == [row[4] for row in damage.WAR_GROUND.values()]
+
+
+class _Scripted:
+    """A generator whose uniform draws come from a script, one value a call."""
+
+    def __init__(self, values: list[float]) -> None:
+        self.values = values
+
+    def uniform(self, low: float, high: float) -> float:
+        return self.values.pop(0)
+
+
+@pytest.mark.parametrize(("misses", "placed"), [(24, 1), (25, 0)])
+def test_a_ground_decal_gets_exactly_its_tries(monkeypatch: pytest.MonkeyPatch, misses: int, placed: int) -> None:
+    """Each wanted decal gives the turn ``GROUND_TRIES`` spots: 24 misses then a hit places it, 25 misses do not."""
+    script = [-5.0, -5.0, 0.0] * misses + [10.0, 5.0, 0.0] * 3  # a miss lies outside the area
+    small = [d for d in ground_decals(5) if d.width_m <= 2.0][:1]
+    monkeypatch.setattr(damage, "_rng", lambda seed, name: _Scripted(list(script)))
+    assert damage.GROUND_TRIES == 25
+    assert len(place_ground(Ground(_ground_nodes()), box(0.0, 0.0, 20.0, 14.0), small, 1, 5)) == placed

@@ -245,7 +245,7 @@ def place_signs(
     seed = _seed(manifest)
     level, level_origin = _damage(base)
     wanted = damage.wall_count(seed, level, decal_count(seed))
-    sequence = damage.war_sequence(pool, damage.war_wall_decals(seed), wanted, seed, level) if level != "none" else None
+    sequence = damage.war_sequence(pool, wanted, seed, level) if level != "none" else None
     decals = place_decals(
         [DecalWall(w.feature_id, w.a, w.b, w.outward, w.height_m) for w in walls], STRtree(_footprints(geo.get("features") or [])),
         decal_blocker([*built, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, seed, wanted,
@@ -380,13 +380,13 @@ def _damage(base: Path) -> tuple[str, str]:
 
     root = map_root(base)
     value = None
+    props_profile = None  # pragma: no mutate: an empty id is no more wrecked than none
     if root is not None:
         with contextlib.suppress(MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
             value = load_map(root).get("damage")
-    props_profile = None  # pragma: no mutate: an empty id is no more wrecked than none
-    if root is not None and value == "auto":
-        with contextlib.suppress(StreetProfileError):  # no profile yet: the rules' neutral profile
-            props_profile = str(load_record(record_path(root))["ids"]["props_profile"])
+        if value == "auto":
+            with contextlib.suppress(StreetProfileError):  # no profile yet: the rules' neutral profile
+                props_profile = str(load_record(record_path(root))["ids"]["props_profile"])
     try:
         return damage.resolve_damage(value, props_profile)
     except ValueError as exc:
