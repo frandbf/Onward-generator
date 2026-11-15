@@ -114,8 +114,10 @@ def test_a_slice_no_triangle_reaches_is_not_extruded() -> None:
 
 
 def test_a_flat_prop_keeps_its_box() -> None:
-    flat = mesh_box(0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
-    assert np.array_equal(layered_collider(flat).vertices, collider_mesh(flat, "box").vertices)
+    flat = mesh_box(2.0, 5.0, -1.0, 3.0, 0.4, 0.4)
+    vertices = layered_collider(flat).vertices
+    assert np.array_equal(vertices, collider_mesh(flat, "box").vertices)
+    assert vertices.min(axis=0).tolist() == [2.0, -1.0, 0.4] and vertices.max(axis=0).tolist() == [5.0, 3.0, 0.4]
 
 
 @pytest.mark.parametrize("role", ["tree", "lamp"])
@@ -147,8 +149,8 @@ def test_a_prop_lower_than_a_slice_is_one_slice() -> None:
 
 
 def _plate(x0: float, x1: float, z: float) -> Mesh:
-    """A flat square at height z, facing up."""
-    return Mesh(np.array([[x0, 0.0, z], [x1, 0.0, z], [x1, 1.0, z], [x0, 1.0, z]]), np.array([[0, 1, 2], [0, 2, 3]]))
+    """A flat square at height z, facing up, standing off the origin (y from 2 to 3)."""
+    return Mesh(np.array([[x0, 2.0, z], [x1, 2.0, z], [x1, 3.0, z], [x0, 3.0, z]]), np.array([[0, 1, 2], [0, 2, 3]]))
 
 
 def test_a_flat_face_on_a_boundary_counts_on_its_own_side() -> None:
@@ -174,7 +176,11 @@ def test_the_foot_counts_in_the_first_slice() -> None:
 
 def test_the_top_face_counts_in_the_last_slice() -> None:
     post = mesh_box(0.0, 0.1, 0.0, 0.1, 0.0, 0.9)
-    plans = layer_plans(merge([post, _plate(0.0, 2.0, 0.9)]))
+    plate = _plate(0.0, 2.0, 0.9)
+    # Facing down at the very top (a lid seen from below) it still counts in the last slice.
+    lid = layer_plans(merge([post, Mesh(plate.vertices, plate.triangles[:, ::-1])]))
+    assert lid[-1][0].bounds[2] == pytest.approx(2.0 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
+    plans = layer_plans(merge([post, plate]))
     assert plans[-1][2] == pytest.approx(0.9) and plans[-1][0].bounds[2] == pytest.approx(2.0 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
     assert plans[0][0].bounds[2] == pytest.approx(0.1 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
 

@@ -280,7 +280,7 @@ def layer_plans(mesh: Mesh) -> list[tuple[BaseGeometry, float, float]]:
     corners = vertices[mesh.triangles]
     bottoms, tops = corners[:, :, 2].min(axis=1), corners[:, :, 2].max(axis=1)
     level = tops == bottoms
-    up = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])[:, 2] > 0.0
+    up = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])[:, 2] > 0.0  # pragma: no mutate: (b - a) x (c - b) has the same sign, and a flat face with no area has no side: either slice takes its 1 cm line
     plans: list[tuple[BaseGeometry, float, float]] = []
     for index in range(count):
         z0, z1 = float(edges[index]), float(edges[index + 1])
