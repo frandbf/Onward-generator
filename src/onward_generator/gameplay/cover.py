@@ -30,7 +30,7 @@ from onward_generator.generation.mesh import Mesh, polygons_of
 from onward_generator.overgrow.ambient import COVER_DEPTH_M, COVER_HEIGHT_M, is_solid
 from onward_generator.overgrow.constants import MAX_ADDED_TRIS
 from onward_generator.overgrow.dressing import block_reason
-from onward_generator.overgrow.fit import PASSAGE_M, PROP_OVERLAP_M2, _footprint, object_reason
+from onward_generator.overgrow.fit import PASSAGE_M, PROP_OVERLAP_M2, _footprint, is_open, object_reason
 from onward_generator.overgrow.ground import RoadFloor
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.zone import Zone
@@ -129,6 +129,8 @@ def prop_reason(prop: Prop, licence: str | None) -> str | None:
     _matrix, length, depth, height = _local(prop.mesh)
     if not is_solid(spec.role, spec.category, (length, depth, height)):
         return "not_solid"
+    if is_open(prop.mesh, spec.role):
+        return "see_through"  # bullets and sight pass between its bars (14 November 2026)
     if height < COVER_HEIGHT_M:
         return "too_low"
     if depth < COVER_DEPTH_M:

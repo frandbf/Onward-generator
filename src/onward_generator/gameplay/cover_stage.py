@@ -256,7 +256,7 @@ def _nodes(placements: Sequence[Placement]) -> tuple[list[Node], list[Node], dic
             "crosswise": True, "solid": True,
         }
         visual.append(Node(f"overgrow/prop/{spec.id}/cover/{index}", prop.primitives(), extras, item.matrix, f"cover:{spec.id}"))
-        colliders.append(Node(
+        colliders.append(Node(  # never an open collider: prop_reason refuses a see-through prop as cover
             f"overgrow/collider/prop/{spec.id}/cover/{index}",
             (Primitive(collider_mesh(prop.mesh, spec.role), "collider"),),
             {"type": "collision", "origin": "generated", "asset_id": spec.id, "role": spec.role, "op": OP},

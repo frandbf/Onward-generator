@@ -96,6 +96,8 @@ def read_colliders(path: str | Path) -> list[Collider]:
         vertices = np.vstack(meshes)
         low, high = vertices.min(axis=0), vertices.max(axis=0)
         kind = collider_kind(node.name, node.extras.get("type"))
+        if kind == "prop" and node.extras.get("open") is True:
+            kind = "open"  # a fence or gate collides by its bars: neither cover nor a sight blocker
         colliders.append(Collider(
             node.name, kind,
             (float(low[0]), float(low[1]), float(high[0]), float(high[1])),

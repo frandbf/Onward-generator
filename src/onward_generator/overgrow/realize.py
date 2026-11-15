@@ -24,12 +24,13 @@ from onward_generator.overgrow.ambient import is_solid
 from onward_generator.overgrow.catalog import FACADE_Z_M
 from onward_generator.overgrow.constants import MAX_LIBRARY_TRIS
 from onward_generator.overgrow.digest import Digest, Facade, build_digest
-from onward_generator.overgrow.dressing import Dressing, block_reason, collider_mesh
+from onward_generator.overgrow.dressing import Dressing, block_reason
 from onward_generator.overgrow.fit import (
     FIRE_ESCAPE_DEPTH_M,
     apply_fit_scale,
     measure,
     object_reason,
+    prop_collider,
     size_reason,
 )
 from onward_generator.overgrow.ground import RoadFloor
@@ -482,10 +483,12 @@ def _emit(prop: Prop, matrix: np.ndarray, result: Dressing, *, op: str, anchor_i
         "op_index": op_index,
     })
     if solid:
+        collider, see_through = prop_collider(prop.mesh, prop.spec.role)
         result.colliders.append(Node(
             f"overgrow/collider/prop/{prop.spec.id}/{len(result.colliders)}",
-            (Primitive(collider_mesh(prop.mesh, prop.spec.role), "collider"),),
-            {"type": "collision", "origin": "ai_generated", "asset_id": prop.spec.id, "role": prop.spec.role},
+            (Primitive(collider, "collider"),),
+            {"type": "collision", "origin": "ai_generated", "asset_id": prop.spec.id, "role": prop.spec.role,
+             **({"open": True} if see_through else {})},
             matrix,
         ))
 

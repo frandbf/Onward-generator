@@ -39,6 +39,7 @@ from onward_generator.overgrow.fit import (
     collider_mesh,
     measure,
     object_reason,
+    prop_collider,
     size_reason,
 )
 from onward_generator.overgrow.flatness import prop_flat
@@ -449,10 +450,12 @@ def _emit(prop: Prop, spot: Spot, result: Dressing, seen: set[str], block_street
     })
     if is_solid(prop.spec.role, prop.spec.category, prop.size_m):
         result.solid_prints.append(_footprint(collider_mesh(prop.mesh, prop.spec.role), matrix))
+        collider, see_through = prop_collider(prop.mesh, prop.spec.role)
         result.colliders.append(Node(
             f"overgrow/collider/prop/{prop.spec.id}/{len(result.colliders)}",
-            (Primitive(collider_mesh(prop.mesh, prop.spec.role), "collider"),),
-            {"type": "collision", "origin": "generated", "asset_id": prop.spec.id, "role": prop.spec.role},
+            (Primitive(collider, "collider"),),
+            {"type": "collision", "origin": "generated", "asset_id": prop.spec.id, "role": prop.spec.role,
+             **({"open": True} if see_through else {})},
             matrix,
         ))
     return x, y

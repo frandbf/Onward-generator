@@ -231,6 +231,78 @@ def collider_mesh(mesh: Mesh, role: str) -> Mesh:
     return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
 
 
+# A see-through prop (14 November 2026): bars and rails collide, the gaps between them stay open.
+OPEN_ROLES = frozenset({"fence", "gate", "fire_escape", "scaffold"})
+"""Roles that are open by nature: bullets and sight pass between the bars, a body does not."""
+OPEN_FILL_MAX = 0.5
+"""A barrier is open when its triangles cover less than this share of its front face (a metal crowd barrier, not a
+jersey block)."""
+OPEN_PARTS_MAX = 64
+"""Above this many welded parts the prop's own triangles are the collider, not one prism per part."""
+WELD_M = 0.001
+
+
+def face_fill(mesh: Mesh) -> float:
+    """The share of the prop's front face (its two largest extents, length and height) its triangles cover."""
+    vertices = mesh.vertices
+    extent = vertices.max(axis=0) - vertices.min(axis=0)
+    drop = 0 if extent[0] < extent[1] else 1
+    keep = [axis for axis in (0, 1) if axis != drop] + [2]
+    face = float(extent[keep[0]] * extent[keep[1]])
+    if face <= 0.0:
+        return 1.0
+    covered = unary_union([Polygon(corners).buffer(0) for corners in vertices[mesh.triangles][:, :, keep]])
+    return float(covered.area) / face  # the face's own triangles cover at most the face
+
+
+def is_open(mesh: Mesh, role: str) -> bool:
+    """Whether a solid prop collides by its bars, gaps open: an open role, or a barrier with a sparse front face."""
+    return role in OPEN_ROLES or (role == "barrier" and face_fill(mesh) < OPEN_FILL_MAX)
+
+
+def welded_parts(mesh: Mesh) -> list[Mesh]:
+    """The connected parts of a mesh, its vertices welded at ``WELD_M``, in the order of their first triangle."""
+    welded, ids = np.unique(np.round(mesh.vertices / WELD_M), axis=0, return_inverse=True)  # -0.0 and 0.0 are one corner
+    ids = ids.ravel()
+    parent = list(range(len(welded)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for a, b, c in ids[mesh.triangles]:
+        ra, rb, rc = root(int(a)), root(int(b)), root(int(c))
+        parent[rb] = ra
+        parent[root(rc)] = ra
+    owner = [root(int(a)) for a, _, _ in ids[mesh.triangles]]  # after the union, a triangle's corners share one root
+    order = list(dict.fromkeys(owner))
+    parts = []
+    for key in order:
+        tris = mesh.triangles[[o == key for o in owner]]
+        used = np.unique(tris)
+        parts.append(Mesh(mesh.vertices[used], np.searchsorted(used, tris)))
+    return parts
+
+
+def open_collider(mesh: Mesh) -> Mesh:
+    """Each bar and rail its own collider, the gaps between them open: the fence rule on every welded part, or the
+    prop's own triangles when it has more than ``OPEN_PARTS_MAX`` parts (a fire escape)."""
+    parts = welded_parts(mesh)
+    if len(parts) > OPEN_PARTS_MAX:
+        return Mesh(mesh.vertices.copy(), mesh.triangles.copy())
+    return merge(collider_mesh(part, "fence") for part in parts)
+
+
+def prop_collider(mesh: Mesh, role: str) -> tuple[Mesh, bool]:
+    """The collider a solid prop is written with, and whether it is open. Spacing and overlap still use
+    ``collider_mesh``: an open fence keeps others as far off as before."""
+    if is_open(mesh, role):
+        return open_collider(mesh), True
+    return collider_mesh(mesh, role), False
+
+
 def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]]:
     """Measure every placed prop, wreck and street plate. Moss, grass, vines and trees stay out."""
     directory = Path(base)
