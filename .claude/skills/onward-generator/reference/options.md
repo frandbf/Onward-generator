@@ -52,7 +52,7 @@ Edit `maps/<id>/map.json`, show the change first, then rerun from the stage name
 | `"brief"`, `"ambient_ai"` | text / `true`, `false` | `overgrow` | Set by `--brief` and `--ai`; edit them to change the mood or the AI choice later. |
 | `"mid_ring_m"` | 10 to 1000 | `detail` | A middle ring of simpler buildings between the core and the scenic ring. |
 
-**Pinned props** (a model the map must carry at a real place, e.g. a monument or a crashed helicopter): write `maps/<id>/config/pinned_props.json` as `{"props": [{"asset_id": "<library id>", "latitude": Y, "longitude": X, "yaw_deg": 0, "search_m": 30, "label": "…"}]}` and rerun from `overgrow`. The id must exist in the library (`assets/*/manifest.json`); the prop keeps its own size and moves to the nearest free spot. Keep the point inside the playable core, or it will not find a spot.
+**Pinned props** (a model the map must carry at a real place, e.g. a monument or a crashed helicopter): write `maps/<id>/config/pinned_props.json` as `{"props": [{"asset_id": "<library id>", "latitude": Y, "longitude": X, "yaw_deg": 0, "search_m": 30, "label": "…"}]}` and rerun from `overgrow`. The id must exist in the library (`assets/*/manifest.json`); the prop keeps its own size and moves to the nearest free spot. To lay a model on its side add `"roll_deg": 80`; add `"sink_m"` (metres, up to 10) when it then floats on a rotor or a corner. Keep the point inside the playable core, or it will not find a spot.
 
 Never edit `center`, `radius_m`, `crs`, `seed` or `paths`: make a new map instead.
 

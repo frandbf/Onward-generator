@@ -165,12 +165,23 @@ def gltf_to_local_parts(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarra
     return local, np.vstack(indices), np.vstack(uvs), np.concatenate(owners), _material_albedos(folder, doc)
 
 
+def base_color_texture(material: dict) -> dict | None:
+    """The texture info of a material's base colour: ``baseColorTexture``, or the ``diffuseTexture`` of the older
+    ``KHR_materials_pbrSpecularGlossiness`` extension that many Sketchfab exports still use (their metallic-roughness
+    block names no texture, so the model came out flat grey)."""
+    texture = (material.get("pbrMetallicRoughness") or {}).get("baseColorTexture")
+    if texture:
+        return dict(texture)
+    diffuse = ((material.get("extensions") or {}).get("KHR_materials_pbrSpecularGlossiness") or {}).get("diffuseTexture")
+    return dict(diffuse) if diffuse else None
+
+
 def _material_albedos(folder: Path, doc: dict) -> list[bytes | None]:
     """The base colour image of each material, in the document's order; None for a material without one."""
     textures, images = doc.get("textures") or [], doc.get("images") or []
     found: list[bytes | None] = []
     for material in doc.get("materials") or []:
-        texture = (material.get("pbrMetallicRoughness") or {}).get("baseColorTexture")
+        texture = base_color_texture(material)
         uri = images[int(textures[int(texture["index"])].get("source"))].get("uri") if texture else None
         found.append((folder / uri).read_bytes() if uri and (folder / uri).is_file() else None)
     return found
@@ -428,7 +439,7 @@ def _diffuse_bytes(folder: Path, doc: dict) -> bytes | None:
     images = doc.get("images") or []
     found: list[str] = []
     for material in materials:
-        texture = (material.get("pbrMetallicRoughness") or {}).get("baseColorTexture")
+        texture = base_color_texture(material)
         if not texture:
             continue
         source = textures[int(texture["index"])].get("source")

@@ -39,6 +39,7 @@ from onward_generator.overgrow.zone import Zone
 SEARCH_DEFAULT_M = 30.0
 SEARCH_MAX_M = 200.0
 SEARCH_STEP_M = 1.0
+SINK_MAX_M = 10.0
 BUILDING_GAP_M = 0.3
 
 
@@ -58,6 +59,9 @@ class Pin:
     """A turn about the model's length (+X) before the yaw: 80 lays a helicopter on its side (14 November 2026)."""
     pitch_deg: float = 0.0
     """A turn about the model's width (+Y) before the yaw: a nose down in the ground."""
+    sink_m: float = 0.0
+    """How far the posed model goes below the ground: a helicopter on its side rests on a rotor tip, its body metres up,
+    until the blades are buried (14 November 2026)."""
 
 
 @dataclass
@@ -101,8 +105,11 @@ def read_pins(path: str | Path) -> list[Pin]:
         roll, pitch = _number(row, "roll_deg", where, 0.0), _number(row, "pitch_deg", where, 0.0)
         if not (-180.0 <= roll <= 180.0 and -90.0 <= pitch <= 90.0):
             raise PinnedError(f"{where}: roll_deg must lie between -180 and 180 and pitch_deg between -90 and 90, got {roll:g} / {pitch:g}")
+        sink = _number(row, "sink_m", where, 0.0)
+        if not 0.0 <= sink <= SINK_MAX_M:
+            raise PinnedError(f"{where}: sink_m must lie between 0 and {SINK_MAX_M:g}, got {sink:g}")
         pins.append(Pin(row["asset_id"], latitude, longitude, _number(row, "yaw_deg", where, 0.0), search, str(row.get("label") or ""),
-                        roll, pitch))
+                        roll, pitch, sink))
     return pins
 
 
@@ -174,7 +181,7 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
             raise PinnedError(f"pinned prop {pin.asset_id} ({pin.label or 'no label'}) finds no free spot within "
                               f"{pin.search_m:g} m of {pin.latitude}, {pin.longitude}: raise search_m or move the point")
         x, y, yaw, footprint = spot
-        matrix = yaw_matrix(x, y, 0.0, yaw)
+        matrix = yaw_matrix(x, y, -pin.sink_m, yaw)
         extras = {"type": "overgrowth", "origin": "pinned", "kind": prop.spec.category, "role": prop.spec.role,
                   "asset_id": prop.spec.id, "label": pin.label}
         result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}"))
@@ -189,6 +196,7 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
             "position_m": [round(x, 3), round(y, 3)], "offset_m": round(math.hypot(x - target.x, y - target.y), 3),
             "yaw_deg": round(math.degrees(yaw) % 360.0, 2), "triangles": prop.triangles,
             **({"roll_deg": pin.roll_deg, "pitch_deg": pin.pitch_deg} if pin.roll_deg or pin.pitch_deg else {}),
+            **({"sink_m": pin.sink_m} if pin.sink_m else {}),
         })
     return result
 
@@ -203,5 +211,5 @@ def keep_out_circles(footprints: Sequence[Polygon]) -> list[tuple[float, float, 
     return circles
 
 
-__all__ = ["BUILDING_GAP_M", "Pin", "PinnedError", "PinnedResult", "SEARCH_DEFAULT_M", "SEARCH_MAX_M", "SEARCH_STEP_M",
+__all__ = ["BUILDING_GAP_M", "Pin", "PinnedError", "PinnedResult", "SEARCH_DEFAULT_M", "SEARCH_MAX_M", "SEARCH_STEP_M", "SINK_MAX_M",
            "frame_of", "keep_out_circles", "place_pins", "plan", "posed", "read_pins"]

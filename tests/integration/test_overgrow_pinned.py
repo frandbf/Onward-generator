@@ -80,35 +80,60 @@ def test_a_pinned_prop_stands_at_its_point_with_its_collider_and_spends_the_head
     assert placed and not [o for o in placed if footprint.buffer(0.5).contains(Point(o["position_m"][:2]))]
 
 
+def _own_kenney(root: Path) -> Path:
+    """The Kenney catalogue with its own manifest: its files linked, its ``manifest.json`` copied, so a test may
+    rewrite a row (a symlink to the folder wrote into the repository's manifest)."""
+    from tests.integration.test_overgrow_furnish import ASSETS
+
+    folder = root / "kenney"
+    folder.mkdir(parents=True)
+    for child in (ASSETS / "kenney").iterdir():
+        if child.name == "manifest.json":
+            (folder / child.name).write_bytes(child.read_bytes())
+        else:
+            (folder / child.name).symlink_to(child, target_is_directory=child.is_dir())
+    return root
+
+
 def test_a_pinned_only_prop_stands_where_it_is_pinned_and_nowhere_by_chance(detail_inputs, tmp_path: Path) -> None:
-    """14 November 2026: a story prop (a crashed Black Hawk) is never placed at random."""
+    """14 November 2026: a story prop (a crashed Black Hawk) is never placed at random.
+
+    A Kenney truck stands in for it: the first one the free run places by chance, so the test does not hang on
+    which truck a seed happens to pick.
+    """
     from onward_generator.ai.street_profile import library_conditions
     from onward_generator.overgrow.manifest import PINNED_ONLY
 
     assert PINNED_ONLY == "pinned_only"
     scene = detail_inputs[0]
     base = _detail_out(detail_inputs, tmp_path, False)
-    library = _library(tmp_path / "library", "kenney")
+    library = _own_kenney(tmp_path / "library")
 
-    def trucks(out: Path) -> list[str]:
+    def placed(out: Path) -> list[tuple[str, str]]:
         nodes, _ = nodes_from_glb((out / "scene_visual.glb").read_bytes())
-        return [n.name for n in nodes if (n.extras or {}).get("asset_id") == TRUCK]
+        return [(n.name, str((n.extras or {}).get("asset_id"))) for n in nodes]
 
     overgrow(base, scene, tmp_path / "free", library=library, seed=4242, profile=100)
-    assert trucks(tmp_path / "free")  # the truck is placed by chance when it may be
+    chance = sorted({asset for _name, asset in placed(tmp_path / "free") if asset.startswith("kenney_urban_truck")})
+    assert chance  # a truck is placed by chance when it may be
+    story = chance[0]
+
+    def trucks(out: Path) -> list[str]:
+        return [name for name, asset in placed(out) if asset == story]
+
     manifest = library / "kenney" / "manifest.json"
     document = json.loads(manifest.read_text(encoding="utf-8"))
     for row in document["assets"]:
-        if row["id"] == TRUCK:
+        if row["id"] == story:
             row["placement"] = PINNED_ONLY
     manifest.write_text(json.dumps(document), encoding="utf-8")
-    assert TRUCK not in {ident for ident, _ in library_conditions(library)}
+    assert story not in {ident for ident, _ in library_conditions(library)}
     overgrow(base, scene, tmp_path / "kept", library=library, seed=4242, profile=100)
     assert trucks(tmp_path / "kept") == []
     frame = frame_of(json.loads(scene.read_text(encoding="utf-8")))
     point = frame.to_wgs84(Point(*SPOT))
     pins = tmp_path / "pinned_props.json"
-    pins.write_text(json.dumps({"props": [{"asset_id": TRUCK, "latitude": point.y, "longitude": point.x}]}), encoding="utf-8")
+    pins.write_text(json.dumps({"props": [{"asset_id": story, "latitude": point.y, "longitude": point.x}]}), encoding="utf-8")
     report = overgrow(base, scene, tmp_path / "pinned", library=library, seed=4242, profile=100, pinned=pins)
-    assert [row["asset_id"] for row in report["pinned"]] == [TRUCK]
-    assert trucks(tmp_path / "pinned") == [f"overgrow/pinned/{TRUCK}/0"]
+    assert [row["asset_id"] for row in report["pinned"]] == [story]
+    assert trucks(tmp_path / "pinned") == [f"overgrow/pinned/{story}/0"]

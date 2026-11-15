@@ -438,6 +438,30 @@ def test_a_model_with_several_textures_keeps_one_part_per_material(tmp_path: Pat
     assert len(halved.parts) <= 3 and halved.triangles_after <= 6
 
 
+def test_a_specular_glossiness_material_gives_its_diffuse_texture(tmp_path: Path) -> None:
+    """14 November 2026: both helicopters came out flat grey; their Sketchfab exports name the colour image in
+    ``KHR_materials_pbrSpecularGlossiness.diffuseTexture``, not in ``baseColorTexture``."""
+    from onward_generator.overgrow.normalize import _diffuse_bytes, _material_albedos, base_color_texture
+
+    for name in ("metal.png", "gloss.png"):
+        (tmp_path / name).write_bytes(name.encode())
+    doc = {
+        "images": [{"uri": "metal.png"}, {"uri": "gloss.png"}],
+        "textures": [{"source": 0}, {"source": 1}],
+        "materials": [
+            {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}},
+             "extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseTexture": {"index": 1}}}},
+            {"pbrMetallicRoughness": {}, "extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseTexture": {"index": 1}}}},
+            {"extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseFactor": [1, 1, 1, 1]}}},
+            {},
+        ],
+    }
+    assert [base_color_texture(m) for m in doc["materials"]] == [{"index": 0}, {"index": 1}, None, None]
+    assert _material_albedos(tmp_path, doc) == [b"metal.png", b"gloss.png", None, None]
+    gloss_only = {**doc, "materials": doc["materials"][1:]}
+    assert _diffuse_bytes(tmp_path, gloss_only) == b"gloss.png"
+
+
 def test_a_loaded_prop_rests_its_bottom_on_zero(tmp_path: Path) -> None:
     root = tmp_path / "library"
     root.mkdir()

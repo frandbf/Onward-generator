@@ -248,3 +248,32 @@ def test_a_pin_may_lay_its_model_on_its_side_and_tip_its_nose(tmp_path: Path) ->
     assert collider.vertices[:, 2].max() == pytest.approx(4.0, abs=1e-6)  # its side stands 4 m
     flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
     assert "roll_deg" not in flat.records[0] and "pitch_deg" not in flat.records[0]
+
+
+def test_a_pin_may_sink_its_model_into_the_ground(tmp_path: Path) -> None:
+    """14 November 2026: on its side, the Black Hawk rests on a rotor tip with its body metres up; sink_m buries the
+    blades so the body lies on the ground."""
+    from onward_generator.overgrow.pinned import SINK_MAX_M
+
+    assert SINK_MAX_M == 10.0
+    path = tmp_path / "pinned_props.json"
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": 4.5}]}))
+    assert read_pins(path) == [Pin("a", 1.0, 2.0, sink_m=4.5)]
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2}]}))
+    assert read_pins(path)[0].sink_m == 0.0
+    for edge in (0, 10):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": edge}]}))
+        assert read_pins(path)[0].sink_m == float(edge)
+    for bad in (-0.1, 10.1):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": bad}]}))
+        with pytest.raises(PinnedError, match=rf"props\[0\]: sink_m must lie between 0 and 10, got {bad:g}"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": "4"}]}))
+    with pytest.raises(PinnedError, match=r"sink_m must be a number"):
+        read_pins(path)
+    wreck = _wreck(14.0, 4.0)
+    sunk = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0, sink_m=1.5)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert sunk.nodes[0].matrix[2, 3] == pytest.approx(-1.5) and sunk.colliders[0].matrix[2, 3] == pytest.approx(-1.5)
+    assert sunk.records[0]["sink_m"] == 1.5 and "roll_deg" not in sunk.records[0]
+    flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert flat.nodes[0].matrix[2, 3] == 0.0 and "sink_m" not in flat.records[0]
