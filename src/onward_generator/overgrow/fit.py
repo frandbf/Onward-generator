@@ -262,8 +262,7 @@ def is_open(mesh: Mesh, role: str) -> bool:
 
 def welded_parts(mesh: Mesh) -> list[Mesh]:
     """The connected parts of a mesh, its vertices welded at ``WELD_M``, in the order of their first triangle."""
-    # Integers, not rounded floats: rows are compared byte for byte, and -0.0 is not 0.0.
-    welded, ids = np.unique(np.round(mesh.vertices / WELD_M).astype(np.int64), axis=0, return_inverse=True)
+    welded, ids = np.unique(np.round(mesh.vertices / WELD_M), axis=0, return_inverse=True)  # -0.0 and 0.0 are one corner
     ids = ids.ravel()
     parent = list(range(len(welded)))
 
