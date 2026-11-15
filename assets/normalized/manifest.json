@@ -1554,7 +1554,7 @@
       "lane": "forbid",
       "clearance_m": 0.0,
       "use": "metal container building at a block edge, plaza, lot or curb",
-      "description": "Grey metal container cabin, 14 m long and 5.7 m tall; a site office or emergency shelter.",
+      "description": "Olive-green metal container cabin, 14 m long and 5.7 m tall; a site office or emergency shelter.",
       "placement": "open_ground",
       "grouping": "single",
       "condition": "worn",
