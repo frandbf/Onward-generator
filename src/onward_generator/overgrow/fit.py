@@ -12,11 +12,14 @@ ground, and two solid props standing inside each other.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
+import shapely
 from shapely import MultiPoint, Point, STRtree, unary_union
 from shapely.geometry import LineString, Polygon, shape
+from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
 
 from onward_generator.detail.shops import sign_footprints
@@ -231,6 +234,93 @@ def collider_mesh(mesh: Mesh, role: str) -> Mesh:
     return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
 
 
+# A layered collider (15 November 2026, ADR-042): a solid prop collides by 30 cm slices of its own shape, not by its
+# whole box, so a shot over a car's bonnet or under a helicopter's blades no longer hits air.
+LAYER_M = 0.3
+"""The tallest slice; a prop's height is cut into equal slices no taller than this."""
+LAYER_PAD_M = 0.01
+"""Each triangle's piece of a slice is widened by this, so an upright wall, flat in plan, still has a plan."""
+LAYER_SIMPLIFY_M = 0.02
+"""A slice's plan is simplified to this tolerance; two stacked slices whose plans lie within it of each other (their
+Hausdorff distance) are one prism, with the lower plan."""
+
+
+def _clip_band(corners: np.ndarray, z0: float, z1: float) -> np.ndarray:
+    """The part of a polygon (rows x, y, z) between the planes z0 and z1: Sutherland-Hodgman against each plane."""
+    points = list(corners)
+    for level, above in ((z0, True), (z1, False)):
+        kept = []
+        for index, a in enumerate(points):
+            b = points[(index + 1) % len(points)]
+            a_in = a[2] >= level if above else a[2] <= level
+            b_in = b[2] >= level if above else b[2] <= level
+            if a_in:
+                kept.append(a)
+            if a_in != b_in:
+                kept.append(a + (level - a[2]) / (b[2] - a[2]) * (b - a))
+        points = kept
+        if not points:
+            break
+    return np.array(points).reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the one unknown dimension
+
+
+def layer_plans(mesh: Mesh) -> list[tuple[BaseGeometry, float, float]]:
+    """The slices a layered collider extrudes: (plan, bottom, top), lowest first.
+
+    The height is cut into the fewest equal slices no taller than ``LAYER_M``. A slice's plan is the union of the
+    plans of the triangle pieces inside it, each widened by ``LAYER_PAD_M``, simplified, with its holes filled (a car's
+    cabin is one solid, not a ring of pillars). A flat face on a boundary counts on the side it faces away from: a
+    box's top below it, a ledge's underside above it. A slice no triangle reaches is left open; a slice whose plan lies
+    within ``LAYER_SIMPLIFY_M`` of the one below is merged into it.
+    """
+    vertices = mesh.vertices
+    low, high = float(vertices[:, 2].min()), float(vertices[:, 2].max())
+    count = max(1, math.ceil((high - low) / LAYER_M - 1e-9))
+    edges = np.linspace(low, high, count + 1)  # the last edge is the top itself
+    corners = vertices[mesh.triangles]
+    bottoms, tops = corners[:, :, 2].min(axis=1), corners[:, :, 2].max(axis=1)
+    level = tops == bottoms
+    up = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])[:, 2] > 0.0  # pragma: no mutate: (b - a) x (c - b) has the same sign, and a flat face with no area has no side: either slice takes its 1 cm line
+    plans: list[tuple[BaseGeometry, float, float]] = []
+    for index in range(count):
+        z0, z1 = float(edges[index]), float(edges[index + 1])
+        pieces = []
+        # A triangle that crosses the slice counts. A flat one on a boundary counts on its own side only: facing up (the
+        # top of a box) in the slice below, facing down (under a ledge) in the slice above, so neither reaches into the
+        # next slice; the prop's foot counts in the first slice and its top in the last.
+        tops_here = level & up & (bottoms <= z1) & ((bottoms > z0) | (index == 0))
+        unders_here = level & ~up & (bottoms >= z0) & ((bottoms < z1) | (index == count - 1))
+        for triangle in np.nonzero(((tops > z0) & (bottoms < z1)) | tops_here | unders_here)[0]:
+            piece = _clip_band(corners[triangle], z0, z1)
+            if len(piece):
+                pieces.append(shapely.multipoints(piece[:, :2]))  # pragma: no mutate: shapely's plan operations ignore z, so x, y, z points give the same hull
+        if not pieces:
+            continue
+        widened = shapely.buffer(shapely.convex_hull(np.array(pieces)), LAYER_PAD_M, cap_style="square")
+        plan = shapely.union_all(widened).simplify(LAYER_SIMPLIFY_M)
+        plan = unary_union([Polygon(part.exterior) for part in getattr(plan, "geoms", [plan])])
+        if plans and plans[-1][2] == z0 and plans[-1][0].hausdorff_distance(plan) <= LAYER_SIMPLIFY_M:  # pragma: no mutate: no two plans lie exactly 2 cm apart to the bit
+            plans[-1] = (plans[-1][0], plans[-1][1], z1)
+        else:
+            plans.append((plan, z0, z1))
+    return plans
+
+
+def layered_collider(mesh: Mesh) -> Mesh:
+    """The collider of a solid prop: a closed prism per slice of ``layer_plans``; its whole box when it is flat."""
+    low, high = mesh.vertices.min(axis=0), mesh.vertices.max(axis=0)
+    if high[2] <= low[2]:
+        return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
+    return merge(prism(plan, z0, z1, bottom=True) for plan, z0, z1 in layer_plans(mesh))
+
+
+def solid_collider(mesh: Mesh, role: str) -> Mesh:
+    """A closed prop's collider: a tree's trunk and a lamp's post as ``collider_mesh`` gives them, anything else layered."""
+    if role in ("tree", "lamp"):
+        return collider_mesh(mesh, role)
+    return layered_collider(mesh)
+
+
 # A see-through prop (14 November 2026): bars and rails collide, the gaps between them stay open.
 OPEN_ROLES = frozenset({"fence", "gate", "fire_escape", "scaffold"})
 """Roles that are open by nature: bullets and sight pass between the bars, a body does not."""
@@ -297,10 +387,10 @@ def open_collider(mesh: Mesh) -> Mesh:
 
 def prop_collider(mesh: Mesh, role: str) -> tuple[Mesh, bool]:
     """The collider a solid prop is written with, and whether it is open. Spacing and overlap still use
-    ``collider_mesh``: an open fence keeps others as far off as before."""
+    ``collider_mesh``: an open fence or a layered car keeps others as far off as before."""
     if is_open(mesh, role):
         return open_collider(mesh), True
-    return collider_mesh(mesh, role), False
+    return solid_collider(mesh, role), False
 
 
 def check_scene(base: str | Path, geo_scene: str | Path) -> tuple[int, list[str]]:

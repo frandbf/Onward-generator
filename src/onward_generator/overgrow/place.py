@@ -46,8 +46,8 @@ from onward_generator.overgrow.constants import (
     MAX_WRECKS,
     SEED,
 )
-from onward_generator.overgrow.dressing import block_reason, collider_mesh, dress, keep, load_spawns
-from onward_generator.overgrow.fit import _footprint, object_reason
+from onward_generator.overgrow.dressing import block_reason, dress, keep, load_spawns
+from onward_generator.overgrow.fit import _footprint, layered_collider, object_reason
 from onward_generator.overgrow.furnish import FurnishBuildError, build_furniture
 from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.growth import (
@@ -324,7 +324,7 @@ def overgrow(
             ))
             wreck_colliders.append(Node(
                 f"overgrow/collider/wreck/{wreck_count}",
-                (Primitive(collider_mesh(wreck, "wreck"), "collider"),),  # pragma: no mutate: any role but tree or lamp gives the whole box
+                (Primitive(layered_collider(wreck), "collider"),),
                 {"type": "collision", "origin": "generated", "role": "wreck"},
                 matrix,
             ))

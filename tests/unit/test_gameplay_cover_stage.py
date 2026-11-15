@@ -45,7 +45,7 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb
 from onward_generator.generation.mesh import box as mesh_box
 from onward_generator.generation.surfaces import SurfaceClass
 from onward_generator.overgrow.catalog import AssetSpec
-from onward_generator.overgrow.fit import collider_mesh
+from onward_generator.overgrow.fit import layered_collider
 from onward_generator.overgrow.library import Prop
 from tests.conftest import MURCIA_CENTER
 
@@ -174,7 +174,7 @@ def test_nodes_put_the_prop_in_the_visual_and_its_box_in_the_collision() -> None
     assert [node.name for node in colliders] == ["overgrow/collider/prop/barrier/cover/0", "overgrow/collider/prop/rail/cover/1"]
     assert dict(colliders[1].extras) == {"type": "collision", "origin": "generated", "asset_id": "rail", "role": "barrier", "op": "sightline_cover"}
     assert colliders[1].matrix is second.matrix and colliders[1].primitives[0].material == "collider"
-    expected = collider_mesh(fence.prop.mesh, "barrier")
+    expected = layered_collider(fence.prop.mesh)  # ADR-042: 30 cm slices, not the whole box
     assert np.array_equal(colliders[1].primitives[0].mesh.vertices, expected.vertices)
     assert images == {"prop_barrier": b"png", "prop_rail": b"png"}
 

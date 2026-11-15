@@ -22,6 +22,7 @@ from onward_generator.overgrow.fit import (
     collider_mesh,
     face_fill,
     is_open,
+    layered_collider,
     open_collider,
     prop_collider,
     welded_parts,
@@ -130,7 +131,7 @@ def test_prop_collider_says_which_kind_it_wrote() -> None:
     collider, see_through = prop_collider(bars, "gate")
     assert see_through and collider.triangle_count == open_collider(bars).triangle_count
     collider, see_through = prop_collider(car, "wreck")
-    assert not see_through and np.array_equal(collider.vertices, collider_mesh(car, "wreck").vertices)
+    assert not see_through and np.array_equal(collider.vertices, layered_collider(car).vertices)  # ADR-042
 
 
 def _gate() -> Prop:

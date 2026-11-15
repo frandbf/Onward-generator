@@ -19,7 +19,7 @@ from onward_generator.generation.mesh import Mesh, box
 from onward_generator.geo.projection import frame_for_origin
 from onward_generator.overgrow import pinned
 from onward_generator.overgrow.catalog import ASSETS_BY_ID
-from onward_generator.overgrow.fit import collider_mesh
+from onward_generator.overgrow.fit import collider_mesh, layered_collider
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.pinned import (
     BUILDING_GAP_M,
@@ -140,8 +140,8 @@ def test_a_pin_stands_on_its_point_when_it_is_free() -> None:
     prop = _wreck()
     assert [(p.material, p.mesh.vertices.tolist()) for p in node.primitives] == [(p.material, p.mesh.vertices.tolist()) for p in prop.primitives()]
     ((collider,),) = [c.primitives for c in result.colliders]
-    fence, whole = collider_mesh(prop.mesh, "fence"), collider_mesh(prop.mesh, "box")
-    assert collider.material == "collider" and collider.mesh.vertices.tolist() == fence.vertices.tolist() != whole.vertices.tolist()
+    layered, whole = layered_collider(prop.mesh), collider_mesh(prop.mesh, "box")
+    assert collider.material == "collider" and collider.mesh.vertices.tolist() == layered.vertices.tolist() != whole.vertices.tolist()
     assert result.colliders[0].extras == {"type": "collision", "origin": "pinned", "asset_id": "crashed_helicopter"}
     assert np.array_equal(result.colliders[0].matrix, node.matrix)
     assert list(result.images) == list(prop.images())
