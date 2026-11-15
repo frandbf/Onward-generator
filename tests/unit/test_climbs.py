@@ -573,6 +573,15 @@ def test_a_roof_reached_by_its_interior_stair_leads_on_to_its_neighbours() -> No
     assert all(site["roof_x"] > 20.0 for site in street)  # the stair roof still gets no street ladder of its own
 
 
+def test_two_stair_roofs_touching_only_each_other_are_linked() -> None:
+    """Only the stair roofs seed this link: a street climb reaches the far roof, which touches neither."""
+    footprints = {"s": box(0, 100, 20, 110), "t": box(20, 100, 40, 110), "n": box(-60, -40, -40, -30)}
+    stairs = [{"type": "interior", "source_ids": [k], "roof_access": True} for k in "st"]
+    manifest = [_building("s", 2, interior=True), _building("t", 2, interior=True), *stairs, _building("n", 2)]
+    links = [site["link"] for site in _place(manifest, footprints)["ladders"] if "link" in site]
+    assert links == [["s", "t"]]
+
+
 def test_two_roofs_each_reached_on_its_own_are_linked_too() -> None:
     from onward_generator.perf.climbs import roof_links
 

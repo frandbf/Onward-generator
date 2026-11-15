@@ -198,12 +198,6 @@ def _inside_wall(detail_manifest: Mapping[str, Any], footprint: BaseGeometry, he
     return height_m <= float(envelope.get("height_m") or DEFAULT_HEIGHT_M) or core.exterior.distance(footprint) >= WALL_JUMP_CLEAR_M
 
 
-def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, BaseGeometry]) -> list[tuple[str, dict[str, Any], Polygon]]:
-    """The roofs a street climb may lead to: ``playable_roofs`` less those an interior stair already reaches."""
-    roofs, stair_roofs = playable_roofs(detail_manifest, footprints)
-    return [row for row in roofs if row[0] not in stair_roofs]
-
-
 def playable_roofs(detail_manifest: Mapping[str, Any], footprints: Mapping[str, BaseGeometry]) -> tuple[list[tuple[str, dict[str, Any], Polygon]], set[str]]:
     """Every flat roof inside the wall with ``ROOF_MIN_M2`` of deck, and the ids of those an interior stair reaches."""
     objects = detail_manifest.get("objects", [])
@@ -248,7 +242,7 @@ def place_climbs(
 
     A building gets one access. Lifts choose first: a cabin and its apron need far more street than a ladder's foot,
     so on Rue Mouffetard the ladders took the one roof a lift fitted and the map had no lift. An interior does not
-    keep a ladder away; one whose stair reaches the roof keeps both away (``_candidates``).
+    keep a ladder away; one whose stair reaches the roof keeps both away (``playable_roofs`` names its roof).
 
     ``free`` is widened by ``COVER_TOLERANCE_M`` before a foot or a street cabin is checked against it: the layout
     hands over an intersection of two grounds, whose edge along a facade lands a few micrometres off the wall, and
@@ -353,15 +347,14 @@ def roof_links(candidates: Sequence[tuple[str, dict[str, Any], Polygon]], climbe
     2026; before, each roof was linked once and two roofs reached by their own stairs never were)."""
     by_id = {source: (source, building, footprint) for source, building, footprint in candidates}
     reached = [source for source in sorted(set(climbed)) if source in by_id]
-    seen = set(reached)
     joined: set[frozenset[str]] = set()
     links: list[dict[str, Any]] = []
     queue = list(reached)
     while queue:
         here = by_id[queue.pop(0)]
-        for other_id in sorted(by_id):
+        for other_id in sorted(by_id.keys() - {here[0]}):
             pair = frozenset((here[0], other_id))
-            if other_id == here[0] or pair in joined:
+            if pair in joined:
                 continue
             other = by_id[other_id]
             low, high = sorted((here, other), key=lambda row: (float(row[1]["height"]["height_m"]), row[0]))
@@ -371,9 +364,7 @@ def roof_links(candidates: Sequence[tuple[str, dict[str, Any], Polygon]], climbe
                 joined.add(pair)
                 if len(links) == ROOF_LINKS_MAX:
                     return links
-                if other_id not in seen:
-                    seen.add(other_id)
-                    queue.append(other_id)
+                queue.append(other_id)  # a roof joins the queue once per new link: at most ROOF_LINKS_MAX times
     return links
 
 
