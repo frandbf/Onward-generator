@@ -74,3 +74,26 @@ def test_a_story_prop_over_the_cap_still_loads(tmp_path: Path) -> None:
     triangles = _heavy_car(tmp_path / "lib", "pinned_only")
     (prop,), rejects = read_library(tmp_path / "lib")
     assert rejects == [] and prop.triangles == triangles  # a vehicle keeps its whole mesh
+
+
+def _write(root: Path, rows: list[tuple[str, int]]) -> None:
+    """A catalogue of vehicles, each a box drawn with ``triangles`` triangles (vehicles keep their whole mesh)."""
+    from onward_generator.generation.mesh import Mesh, box
+
+    root.mkdir()
+    entries = []
+    for name, triangles in rows:
+        shape = box(0.0, 4.4, 0.0, 1.8, 0.0, 1.5)
+        mesh = Mesh(shape.vertices, np.tile(shape.triangles, (triangles // 12 + 1, 1))[:triangles])
+        (root / f"{name}.glb").write_bytes(build_glb([Node(name, (Primitive(mesh, name, np.zeros((mesh.vertex_count, 2), dtype=np.float32)),), {"type": "prop"})],
+                                                     {name: Material((1, 1, 1, 1), 0.9)}, preserve_uvs=True))
+        entries.append({"id": name, "file": f"{name}.glb", "category": "vehicles", "role": "wreck", "surfaces": ["carriageway"],
+                        "anchor": "ground", "lane": "forbid", "clearance_m": 0.0, "use": "test"})
+    (root / "manifest.json").write_text(json.dumps({"assets": entries}), encoding="utf-8")
+
+
+def test_the_cap_itself_is_allowed_and_a_refusal_skips_only_its_row(tmp_path: Path) -> None:
+    _write(tmp_path / "lib", [("over", CHANCE_MAX_TRIANGLES + 1), ("at_cap", CHANCE_MAX_TRIANGLES)])
+    props, rejects = read_library(tmp_path / "lib")
+    assert [(p.spec.id, p.triangles) for p in props] == [("at_cap", CHANCE_MAX_TRIANGLES)]
+    assert [(r.asset_id, r.reason) for r in rejects] == [("over", "too_heavy_for_chance")]
