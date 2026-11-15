@@ -13,6 +13,7 @@ The flags of `onward-generator run` (what `task map -- …` passes on), and the 
 | "Use AI" | `--ai` | Needs Ollama on the machine with `qwen3:14b`. Without it the run falls back to the rules and the map is still valid. |
 | Night | `--time-of-day night` | Lit by the street lamps. `--storm` adds lightning and thunder (night only). |
 | Warm evening light, cloudy light | `--atmosphere golden_hour` or `--atmosphere overcast` | Day maps only. `neutral` (default) changes nothing. |
+| Dry, dusty, desert air; a city after a battle | `--atmosphere dusty` | Day maps only. A warm muted sun, a close sand-coloured haze and dirtier walls. Pairs well with `"damage"` (below). |
 | Sharper lighting | `--lightmap-texels-per-m N` (default 10, at most 40) | Higher looks better and bakes much longer; 20 is a good "final" value. |
 | Leave out a data source | `--no-source <id>` | `tools/docker/run.sh onward-generator source list --lat Y --lon X` shows them. |
 | Use an opt-in data source | `--source <id>` | Only where it covers the centre. |

@@ -28,6 +28,7 @@ from onward_generator.contracts import is_schema
 from onward_generator.export.atmosphere import (
     APPLIED,
     FOG,
+    FOG_SCALE,
     INDIRECT,
     LIGHTMAP_CORE,
     NEUTRAL,
@@ -554,6 +555,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             # Plan E7: the preset tints the fog; where it starts and ends stays the map's, from its wall (ADR-014).
             options["fog_color"] = str(chosen["fog"]["color"])
             applied.append(FOG)
+            if "scale" in chosen["fog"]:
+                # Plan 2026-11-15, increment B: a dusty preset brings the map's own fog closer, by a factor, not a distance.
+                scale = float(chosen["fog"]["scale"])
+                options["fog_start_m"] = round(float(options["fog_start_m"]) * scale, 1)
+                options["fog_end_m"] = round(float(options["fog_end_m"]) * scale, 1)
+                applied.append(FOG_SCALE)
         if core_lightmap is not None:
             applied.append(LIGHTMAP_CORE)
     tiers = _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"]))

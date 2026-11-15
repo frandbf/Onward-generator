@@ -31,9 +31,16 @@ def _write(tmp_path: Path, document: object) -> Path:
     return path
 
 
-def test_the_default_file_has_the_two_presets_of_the_plan() -> None:
+def test_the_default_file_has_the_presets_of_the_plans() -> None:
     presets = load_presets()
-    assert sorted(presets) == ["golden_hour", "overcast"]
+    assert sorted(presets) == ["dusty", "golden_hour", "overcast"]
+    # Plan 2026-11-15, increment B: dry dusty air, its haze brought closer by a factor on the map's own fog.
+    dusty = presets["dusty"]
+    assert dusty["sun"] == {"elevation_deg": 40, "azimuth": "streets", "color": "#FFE6C2", "intensity": 1.15, "shadow_angle_deg": 4}
+    assert dusty["ambient"] == {"mode": "trilight", "sky": "#B8A88A", "equator": "#A89474", "ground": "#6B5A44"}
+    assert dusty["fog"] == {"color": "#C9B48E", "scale": 0.55} and dusty["indirect_intensity"] == 1.6
+    assert (dusty["grime"], dusty["wall_desaturation"], dusty["wall_value_max"]) == (1.3, 0.12, 0.85)
+    assert "scale" not in presets["golden_hour"]["fog"] and "scale" not in presets["overcast"]["fog"]
     golden = presets["golden_hour"]
     assert golden["sun"] == {"elevation_deg": 30, "azimuth": "streets", "color": "#FFE0B8", "intensity": 1.4, "shadow_angle_deg": 1.5}
     assert golden["ambient"] == {"mode": "trilight", "sky": "#8A9BB3", "equator": "#9A9080", "ground": "#5A5044"}
@@ -49,13 +56,13 @@ def test_the_presets_cannot_be_changed_through_the_mapping() -> None:
 
 
 def test_neutral_comes_first_and_the_rest_in_name_order(tmp_path: Path) -> None:
-    assert preset_names() == ("neutral", "golden_hour", "overcast")
+    assert preset_names() == ("neutral", "dusty", "golden_hour", "overcast")
     document = _document()
     document["presets"] = {"zeta": document["presets"]["overcast"], "alpha": document["presets"]["golden_hour"]}
     assert preset_names(_write(tmp_path, document)) == ("neutral", "alpha", "zeta")
 
 
-@pytest.mark.parametrize(("time_of_day", "name"), [("day", "neutral"), ("day", "golden_hour"), ("day", "overcast"), ("night", "neutral")])
+@pytest.mark.parametrize(("time_of_day", "name"), [("day", "neutral"), ("day", "dusty"), ("day", "golden_hour"), ("day", "overcast"), ("night", "neutral")])
 def test_a_known_preset_on_a_day_map_and_neutral_anywhere_are_accepted(time_of_day: str, name: str) -> None:
     assert check_atmosphere(name, time_of_day) == name
 
@@ -63,7 +70,7 @@ def test_a_known_preset_on_a_day_map_and_neutral_anywhere_are_accepted(time_of_d
 def test_an_unknown_preset_is_refused_with_the_names() -> None:
     with pytest.raises(AtmosphereError) as refused:
         check_atmosphere("sunset", "day")
-    assert str(refused.value) == "atmosphere must be one of neutral, golden_hour, overcast, not 'sunset'"
+    assert str(refused.value) == "atmosphere must be one of neutral, dusty, golden_hour, overcast, not 'sunset'"
 
 
 @pytest.mark.parametrize("time_of_day", ["night", "Day", ""])
@@ -127,6 +134,9 @@ _O = "presets.overcast"
         (f"{_G}.fog.color", "#E8D2B", "/presets/golden_hour/fog/color"),
         (f"{_G}.fog.color", _DELETE, "/presets/golden_hour/fog"),
         (f"{_G}.fog.start_m", 140, "/presets/golden_hour/fog"),
+        (f"{_G}.fog.scale", 0.29, "/presets/golden_hour/fog/scale"),
+        (f"{_G}.fog.scale", 1.01, "/presets/golden_hour/fog/scale"),
+        (f"{_G}.fog.scale", "0.5", "/presets/golden_hour/fog/scale"),
         (f"{_G}.indirect_intensity", 0.9, "/presets/golden_hour/indirect_intensity"),
         (f"{_G}.indirect_intensity", 4.1, "/presets/golden_hour/indirect_intensity"),
         (f"{_G}.indirect_intensity", "2", "/presets/golden_hour/indirect_intensity"),

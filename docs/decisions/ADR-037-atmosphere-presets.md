@@ -80,3 +80,9 @@ With the FPS met and the draws unchanged by a preset, the maintainer accepted th
 
 - Whether the Onward runtime keeps `RenderSettings.fog`, the ambient mode and the ambient colours: the user saw the warm fog and the lighter shade of `pkg_19`, so the bake and the fog reach the client.
 - Whether a soldier in the shade stays readable with the trilight ambient (plan E5): yes, by the user's judgement on `pkg_18`, 11 November 2026.
+
+## Amendment, 15 November 2026: a `dusty` preset and a fog scale
+
+- **Context.** The maintainer asked for a dry, dusty light for a Fallujah map of November 2004 and for any map of an arid city at war (plan [2026-11-15-ambiente-belico](../plans/2026-11-15-ambiente-belico.md), increment B). Point 4 of the decision keeps the fog distances the map's, so a preset could tint the haze but not bring it closer.
+- **Decision.** A preset's `fog` block may carry `scale`, 0.3 to 1: with the card's fog on, the package multiplies `fog_start_m` and `fog_end_m` by it (rounded to 0.1 m) and `applied` gains `fog_scale`. It is a factor on the map's own distances, not a distance, so a large map is not fogged inside its playable area. A third preset, `dusty`: the sun at 40° across the streets, `#FFE6C2`, intensity 1.15, a 4° shadow angle (softer shadows in the haze); a sandy `trilight` ambient (`#B8A88A`, `#A89474`, `#6B5A44`); `indirect_intensity` 1.6; fog `#C9B48E` at 0.55 of the map's distances; core density 14 texels/m; `grime` 1.3, `wall_desaturation` 0.12, `wall_value_max` 0.85.
+- **Starting values**, to tune on the headset as `golden_hour` was. `golden_hour` and `overcast` carry no scale, so their packages are byte for byte the same.

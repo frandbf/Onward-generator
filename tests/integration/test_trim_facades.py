@@ -138,7 +138,7 @@ def test_the_cli_tones_the_atlas_with_a_preset(runs: dict[str, Path], tmp_path: 
     assert "atmosphere" not in capsys.readouterr().out
     assert "atmosphere" not in json.loads((tmp_path / "n" / "materials_report.json").read_bytes())["facades"]
     assert main(["materials", "apply", "--base", str(detail), "--plan", str(plan), "--out", str(tmp_path / "d"), "--atmosphere", "dusk"]) == 1
-    assert "materials: atmosphere must be one of neutral, golden_hour, overcast, not 'dusk'" in capsys.readouterr().err
+    assert "materials: atmosphere must be one of neutral, dusty, golden_hour, overcast, not 'dusk'" in capsys.readouterr().err
 
 
 def test_the_cli_weathers_the_atlas_and_reports_its_calm_sources(runs: dict[str, Path], tmp_path: Path,
