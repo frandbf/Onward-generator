@@ -572,7 +572,7 @@ def apply_materials(
             # procedural tile. A paved plan keeps the tile; this follows the texture, not a place.
             photo_tiles[OPEN_GROUND] = (rgb, binding.albedo_mode)
             if binding.albedo_mode == "color_albedo":
-                materials[OPEN_GROUND] = Material(WHITE, (materials.get(OPEN_GROUND) or Material(WHITE, 0.9)).roughness)
+                materials[OPEN_GROUND] = Material(WHITE, materials[OPEN_GROUND].roughness)  # a used material is in the GLB
             applied.append(_applied_row(binding, OPEN_GROUND_CATALOG_ID, OPEN_GROUND, record))
         if binding.id == "streets_plazas" and not cobble_ok:
             skipped.append({

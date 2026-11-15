@@ -313,6 +313,11 @@ def test_an_earth_streets_texture_covers_the_residual_ground_and_a_paved_one_doe
     assert [(r["id"], r["catalog_id"], r["asset_id"], r["albedo_mode"]) for r in rows] == [
         ("streets_plazas", "ground_neutral", "ph_brown_mud_dry", "color_albedo")]
     assert rows[0]["license"] == "CC0-1.0" and rows[0]["repo_path"] == "assets/textures/brown_mud_dry/brown_mud_dry_diff_1k.jpg"
+    assert set(rows[0]) == {"id", "catalog_id", "color_id", "albedo_mode", "asset_id", "provider", "license", "authors", "page_url",
+                            "md5", "sha256", "repo_path"}
+    street = next(r for r in earth["applied"] if r["id"] == "streets_plazas" and r["color_id"] != "ground")
+    assert all(rows[0][key] == street[key] for key in ("provider", "authors", "page_url", "md5", "sha256", "repo_path"))
+    assert rows[0]["provider"] == "polyhaven" and rows[0]["authors"] and len(rows[0]["md5"]) == 32 and len(rows[0]["sha256"]) == 64
     doc = read_glb((tmp_path / "earth" / "scene_visual.glb").read_bytes())[0]
     ground = next(m for m in doc["materials"] if m["name"] == "ground")
     assert ground["pbrMetallicRoughness"]["baseColorFactor"][:3] == [1.0, 1.0, 1.0] and ground["pbrMetallicRoughness"]["roughnessFactor"] == 0.95
