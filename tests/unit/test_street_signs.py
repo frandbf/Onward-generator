@@ -923,9 +923,9 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
         seeds.append(seed)
         return real_drawn(seed)
 
-    def place(walls, footprints, blocked, decals, seed, count, surface, required=()):
-        seen.update(footprints=footprints, blocked=blocked, surface=surface, required=required)
-        return real_place(walls, footprints, blocked, decals, seed, count, surface, required=required)
+    def place(walls, footprints, blocked, decals, seed, count, surface, required=(), sequence=None):
+        seen.update(footprints=footprints, blocked=blocked, surface=surface, required=required, sequence=sequence)
+        return real_place(walls, footprints, blocked, decals, seed, count, surface, required=required, sequence=sequence)
 
     monkeypatch.setattr(place_module, "procedural_decals", drawn)
     monkeypatch.setattr(place_module, "sign_footprints", lambda manifest: [(box(700, 700, 701, 701), 0.0, 5.0)])
@@ -936,6 +936,7 @@ def test_the_signs_stage_hands_the_decals_the_map_seed_the_footprints_and_the_si
     manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
     assert seeds == [_seed(manifest)]
     assert seen["required"] == []  # the local catalogues off: no user decal
+    assert seen["sequence"] is None  # no map damage: the decals' own turn
     geo = json.loads(scene.read_text(encoding="utf-8"))
     buildings = [f for f in geo["features"] if f.get("kind") == "building"]
     assert len(seen["footprints"].geometries) == len(buildings) > 0  # type: ignore[attr-defined]

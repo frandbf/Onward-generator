@@ -7,6 +7,7 @@ vinyls come from ``facade.shops`` in the detail manifest (``signs/shop.py``).
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
@@ -16,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from shapely import LineString, Point, Polygon, STRtree, box, get_parts
+from shapely import LineString, MultiPoint, Point, Polygon, STRtree, box, get_parts
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import orient
@@ -34,6 +35,7 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, images_
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.signs import damage
 from onward_generator.signs.decal_pick import pick_decals
 from onward_generator.signs.decals import Wall as DecalWall
 from onward_generator.signs.decals import (
@@ -238,24 +240,35 @@ def place_signs(
         required = [*project, *user]
     except UserDecalError as exc:
         raise SignsError(str(exc)) from exc
+    # War damage (plan 2026-11-15, increment A): with a map's damage, more decals, a share of them war damage, and the
+    # ground gets its own. Without it nothing below changes.
+    seed = _seed(manifest)
+    level, level_origin = _damage(base)
+    wanted = damage.wall_count(seed, level, decal_count(seed))
+    sequence = damage.war_sequence(pool, wanted, seed, level) if level != "none" else None
     decals = place_decals(
         [DecalWall(w.feature_id, w.a, w.b, w.outward, w.height_m) for w in walls], STRtree(_footprints(geo.get("features") or [])),
-        decal_blocker([*built, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, _seed(manifest), decal_count(_seed(manifest)),
-        wall_surface([*built, *sign_nodes, *shops.nodes]), required=required,
+        decal_blocker([*built, *sign_nodes, *shops.nodes], sign_footprints(manifest)), pool, seed, wanted,
+        wall_surface([*built, *sign_nodes, *shops.nodes]), required=required, sequence=sequence,
     )
+    ground = []
+    if level != "none":  # pragma: no mutate: without damage the count is 0 and nothing is placed; the guard only skips building the ground tree
+        area = core if core is not None else MultiPoint([tuple(w.a) for w in walls]).envelope
+        ground = damage.place_ground(damage.Ground(built), area, damage.ground_count(seed, level), seed)
     missing = [decal.id for decal in required if decal.id not in {p.decal.id for p in decals}]
     if missing:
         raise SignsError("required decals that fit no exposed wall of the playable core: " + ", ".join(missing)
                          + " (make them smaller in their decals.json)")
-    decal_meshes, decal_materials, decal_images, decal_rows = decal_nodes(decals)
+    decal_meshes, decal_materials, decal_images, decal_rows = decal_nodes(decals, ground)
+    wall_rows = [row for row in decal_rows if row["type"] == "wall_decal"]
     materials.update(decal_materials)
     images.update(decal_images)
 
     visual = build_glb(
         [*nodes, *sign_nodes, *shops.nodes, *decal_meshes],
         materials,
-        extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows), "wall_decals": len(decal_rows),
-                **carried_material_extras(visual_bytes)},
+        extras={"manifest": "scene_detail.json", "street_signs": len(signs), "shop_signs": len(shops.rows), "wall_decals": len(wall_rows),
+                **({"ground_decals": len(ground), "damage": level} if level != "none" else {}), **carried_material_extras(visual_bytes)},
         repeat_images=images,
         preserve_uvs=True,
     )
@@ -286,7 +299,9 @@ def place_signs(
     compare = compare_fingerprints(before, after)
     detail_report["street_signs"] = {"count": len(signs), "geometry": compare}
     detail_report["shop_signs"] = {"count": len(shops.rows), "skipped": shops.skipped}
-    detail_report["wall_decals"] = {"count": len(decal_rows), "kinds": sorted({str(row["kind"]) for row in decal_rows})}
+    detail_report["wall_decals"] = {"count": len(wall_rows), "kinds": sorted({str(row["kind"]) for row in wall_rows})}
+    if level != "none":
+        detail_report["ground_decals"] = {"count": len(ground), "kinds": sorted({item.decal.kind for item in ground})}
     atomic_write_json(targets[3], detail_report)
     signs_report = {
         "schema": "onward_generator.street_signs",
@@ -316,10 +331,15 @@ def place_signs(
             "signs": shops.rows,
         },
         "wall_decals": {
-            "count": len(decal_rows), "wanted": decal_count(_seed(manifest)),
-            "distinct": len({row["decal"] for row in decal_rows}), "decals": decal_rows,
+            "count": len(wall_rows), "wanted": wanted,
+            "distinct": len({row["decal"] for row in wall_rows}), "decals": wall_rows,
             "pick": picked.record if picked is not None else None,
         },
+        **({"damage": {"level": level, "origin": level_origin, "war_share": damage.WAR_SHARE[level],
+                       "war_decals": sum(1 for row in wall_rows if row["kind"] in damage.WAR_KINDS),
+                       "ground_decals": {"count": len(ground), "wanted": damage.ground_count(seed, level),
+                                         "decals": [row for row in decal_rows if row["type"] == "ground_decal"]}}}
+           if level != "none" else {}),
         "geometry": compare,
         "input_hashes": {
             "scene_detail.json": file_sha256(base / "scene_detail.json"),
@@ -349,6 +369,28 @@ def _map_switch(base: Path, key: str) -> bool:
     if not isinstance(value, bool):
         raise SignsError(f'map.json "{key}" must be true or false, got {value!r}')
     return value
+
+
+def _damage(base: Path) -> tuple[str, str]:
+    """The map's war damage level and its origin (``signs.damage.resolve_damage``): ``none`` outside a map folder or
+    without the key; ``auto`` reads the map's street profile record."""
+    from onward_generator.ai.street_profile import StreetProfileError, load_record, record_path
+    from onward_generator.maps.workspace import load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    value = None
+    props_profile = None  # pragma: no mutate: an empty id is no more wrecked than none
+    if root is not None:
+        with contextlib.suppress(ValueError, OSError):  # an unreadable map.json (a MapError is a ValueError) reads as no switch
+            value = load_map(root).get("damage")
+        if value == "auto":
+            with contextlib.suppress(StreetProfileError):  # no profile yet: the rules' neutral profile
+                props_profile = str(load_record(record_path(root))["ids"]["props_profile"])
+    try:
+        return damage.resolve_damage(value, props_profile)
+    except ValueError as exc:
+        raise SignsError(str(exc)) from exc
 
 
 def _ambient(base: Path) -> tuple[str, bool]:
