@@ -694,6 +694,7 @@ def test_a_stage_given_a_bad_record_exits_1(tmp_path: Path, capsys: pytest.Captu
 GOLDEN_EFFECTS = [
     ('dominant_typology', 'anglo', '/materials/facade_style', 'anglo', 'materials', '--facade-style', 'the map-wide facade atlas style is anglo; no building is reclassified', 'ADR-020, ADR-027'),
     ('dominant_typology', 'central_european', '/materials/facade_style', 'central_european', 'materials', '--facade-style', 'the map-wide facade atlas style is central_european; no building is reclassified', 'ADR-020, ADR-027'),
+    ('dominant_typology', 'east_african', '/materials/facade_style', 'east_african', 'materials', '--facade-style', 'the map-wide facade atlas style is east_african; no building is reclassified', 'ADR-020, ADR-027'),
     ('dominant_typology', 'generic', '/materials/facade_style', 'generic', 'materials', '--facade-style', 'the map-wide facade atlas style is generic; no building is reclassified', 'ADR-020, ADR-027'),
     ('dominant_typology', 'haussmann', '/materials/facade_style', 'haussmann', 'materials', '--facade-style', 'the map-wide facade atlas style is haussmann; no building is reclassified', 'ADR-020, ADR-027'),
     ('dominant_typology', 'latin_american', '/materials/facade_style', 'latin_american', 'materials', '--facade-style', 'the map-wide facade atlas style is latin_american; no building is reclassified', 'ADR-020, ADR-027'),
@@ -718,12 +719,13 @@ def test_effects_golden() -> None:
 def test_inputs_and_prompt_hashes_are_pinned() -> None:
     library = [("b", "worn"), ("a", "")]
     centre = {"latitude": 37.984071234, "longitude": -1.12863}
-    # The styles enter the hash, so a stored profile goes stale when a style is added (haussmann, plan Q3).
-    assert sp.inputs_sha256("ñ calle", centre, library, True) == "9d97f72f3eb99214607879de3f316d10778b135a69ed1a324413969b9e7d5b3f"
+    # The styles enter the hash, so a stored profile goes stale when a style is added (haussmann, plan Q3; east_african,
+    # 14 November 2026).
+    assert sp.inputs_sha256("ñ calle", centre, library, True) == "8c43b25c38d3c6b523ed9e5d62fdd296ccce93b42869dc51410abe7f65c4e95e"
     assert sp.inputs_sha256("ñ calle", centre, list(reversed(library)), True) == sp.inputs_sha256("ñ calle", centre, library, True)
     assert sp.inputs_sha256("ñ calle", centre, library, False) != sp.inputs_sha256("ñ calle", centre, library, True)
     # The system prompt lists the styles too.
-    assert sp.prompt_sha256("x") == "3bec886c4ac34adc550aee3bf53a681195f41ef68c850dd7106bac57a63cb108"
+    assert sp.prompt_sha256("x") == "7c138214ac3b5c4469452c9d3b518ce305fdb226a849ca11604ca5f46f3b57af"  # east_african added
     assert (sp._round(1.123456), sp._round(2), sp._round(True), sp._round("1"), sp._round(None)) == (1.12346, 2.0, None, None, None)
 
 

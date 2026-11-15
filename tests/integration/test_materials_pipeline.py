@@ -290,3 +290,42 @@ def test_cli_repetition_through_run_cli(tmp_path: Path) -> None:
                  "--no-tile-cache", "--repetition", "--cell-m", "50"]) == 0
     report = json.loads((out / "materials_report.json").read_text(encoding="utf-8"))
     assert report["repetition"]["cell_m"] == 50.0
+
+
+def _ground_base(root: Path) -> Path:
+    """The C1 scene with the residual ground of an OSM-poor map (Overture only): a ``ground`` surface."""
+    base = _c1_base(root)
+    nodes, materials = nodes_from_glb((base / "scene_visual.glb").read_bytes())
+    ground = Node("surface/ground", (Primitive(_c1_quad(-80, -80, 80, -60), "ground"),),
+                  {"type": "surface", "source_ids": [], "object_id": "surface/ground"})
+    materials["ground"] = Material((0.55, 0.55, 0.52, 1.0), 0.95)
+    for name in ("scene_visual.glb", "scene_collision.glb"):
+        (base / name).write_bytes(build_glb([*nodes, ground], materials))
+    return base
+
+
+def test_an_earth_streets_texture_covers_the_residual_ground_and_a_paved_one_does_not(tmp_path: Path) -> None:
+    """Dirt streets (14 November 2026): the ground between them takes the same dirt; any paved plan keeps the tile."""
+    base = _ground_base(tmp_path)
+    earth = apply_materials(base, tmp_path / "earth", tile_cache=False,
+                            plan_path=_c1_plan(tmp_path / "earth.json", streets_plazas="ph_brown_mud_dry"))
+    rows = [row for row in earth["applied"] if row["color_id"] == "ground"]
+    assert [(r["id"], r["catalog_id"], r["asset_id"], r["albedo_mode"]) for r in rows] == [
+        ("streets_plazas", "ground_neutral", "ph_brown_mud_dry", "color_albedo")]
+    assert rows[0]["license"] == "CC0-1.0" and rows[0]["repo_path"] == "assets/textures/brown_mud_dry/brown_mud_dry_diff_1k.jpg"
+    assert set(rows[0]) == {"id", "catalog_id", "color_id", "albedo_mode", "asset_id", "provider", "license", "authors", "page_url",
+                            "md5", "sha256", "repo_path"}
+    street = next(r for r in earth["applied"] if r["id"] == "streets_plazas" and r["color_id"] != "ground")
+    assert all(rows[0][key] == street[key] for key in ("provider", "authors", "page_url", "md5", "sha256", "repo_path"))
+    assert rows[0]["provider"] == "polyhaven" and rows[0]["authors"] and len(rows[0]["md5"]) == 32 and len(rows[0]["sha256"]) == 64
+    doc = read_glb((tmp_path / "earth" / "scene_visual.glb").read_bytes())[0]
+    ground = next(m for m in doc["materials"] if m["name"] == "ground")
+    assert ground["pbrMetallicRoughness"]["baseColorFactor"][:3] == [1.0, 1.0, 1.0] and ground["pbrMetallicRoughness"]["roughnessFactor"] == 0.95
+    paved = apply_materials(base, tmp_path / "paved", tile_cache=False, plan_path=_c1_plan(tmp_path / "paved.json"))
+    assert not [row for row in paved["applied"] if row["color_id"] == "ground"]
+    doc = read_glb((tmp_path / "paved" / "scene_visual.glb").read_bytes())[0]
+    assert next(m for m in doc["materials"] if m["name"] == "ground")["pbrMetallicRoughness"]["baseColorFactor"][:3] != [1.0, 1.0, 1.0]
+    from onward_generator.materials.apply import earth_texture
+
+    assert earth_texture("ph_brown_mud_dry") and not earth_texture("ph_worn_asphalt") and not earth_texture("")
+    assert not earth_texture("no_such_texture")

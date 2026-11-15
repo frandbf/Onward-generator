@@ -127,6 +127,36 @@ def share_facade_photos(
     return shared
 
 
+OPEN_GROUND = "ground"
+OPEN_GROUND_CATALOG_ID = "ground_neutral"
+
+
+def earth_texture(library_id: str) -> bool:
+    """True when a plan's library texture is of the earth family (dirt, sand, clay)."""
+    if not library_id:
+        return False
+    from onward_generator.materials.library_plan import catalogue_rows, texture_family
+
+    return any(str(row["id"]) == library_id and texture_family(row) == "earth" for row in catalogue_rows())
+
+
+def _applied_row(binding: Any, catalog_id: str, color_id: str, record: Any) -> dict[str, Any]:
+    return {
+        "id": binding.id,
+        "catalog_id": catalog_id,
+        "color_id": color_id,
+        "albedo_mode": binding.albedo_mode,
+        "asset_id": record.asset_id,
+        "provider": record.provider,
+        "license": record.license,
+        "authors": list(record.authors),
+        "page_url": record.page_url,
+        "md5": record.md5,
+        "sha256": record.sha256,
+        "repo_path": _rel(Path(record.path)),
+    }
+
+
 def _apply_variants(nodes: list[Node], plan: TexturePlan, applied: Sequence[Mapping[str, Any]], photo_tiles: dict[str, tuple[Any, str]],
                     materials: dict[str, Material], trim_materials: Collection[str], *, seed: int, wide: bool,
                     extended: bool) -> tuple[list[Node], list[dict[str, Any]], dict[str, Any]]:
@@ -537,6 +567,13 @@ def apply_materials(
     for binding in plan.entries:
         record = records[binding.id]
         rgb = decode_jpeg_rgb(Path(record.path).read_bytes())
+        if binding.id == "streets_plazas" and earth_texture(binding.library_id) and OPEN_GROUND in used:
+            # Dirt streets (14 November 2026): the residual ground between the streets is the same dirt, not the neutral
+            # procedural tile. A paved plan keeps the tile; this follows the texture, not a place.
+            photo_tiles[OPEN_GROUND] = (rgb, binding.albedo_mode)
+            if binding.albedo_mode == "color_albedo":
+                materials[OPEN_GROUND] = Material(WHITE, materials[OPEN_GROUND].roughness)  # a used material is in the GLB
+            applied.append(_applied_row(binding, OPEN_GROUND_CATALOG_ID, OPEN_GROUND, record))
         if binding.id == "streets_plazas" and not cobble_ok:
             skipped.append({
                 "id": binding.id,
@@ -569,20 +606,7 @@ def apply_materials(
             if binding.albedo_mode == "color_albedo":
                 prev = materials.get(slot) or materials.get(entry.color_id) or Material(WHITE, 0.9)
                 materials[slot] = Material(WHITE, prev.roughness)
-            applied.append({
-                "id": binding.id,
-                "catalog_id": catalog_id,
-                "color_id": slot,
-                "albedo_mode": binding.albedo_mode,
-                "asset_id": record.asset_id,
-                "provider": record.provider,
-                "license": record.license,
-                "authors": list(record.authors),
-                "page_url": record.page_url,
-                "md5": record.md5,
-                "sha256": record.sha256,
-                "repo_path": _rel(Path(record.path)),
-            })
+            applied.append(_applied_row(binding, catalog_id, slot, record))
     interior_shared = share_interior_photos(plan, records, catalog, used, photo_tiles, materials)
     facade_shared = share_facade_photos(records, used, photo_tiles)
     tint_shared = share_tint_photos(used, photo_tiles)

@@ -32,23 +32,125 @@
         "scenic_wall_warm": "plaster_cream",
         "scenic_wall_ochre": "plaster_ochre"
       },
-      "sources": { "plaster": "ph_painted_plaster_wall", "stone": "acg_rock022", "brick": "acg_bricks023" },
-      "source_tile_m": { "plaster": 2.0, "stone": 2.0, "brick": 1.0 },
-      "zocalo_color": [0.36, 0.35, 0.33],
-      "cornice_color": [0.86, 0.85, 0.8],
-      "stone_color": [0.82, 0.8, 0.76],
-      "window_families": [
-        { "kind": "casement", "frame": [0.88, 0.87, 0.84], "shutter": [0.8, 0.76, 0.66], "closed": [0.0, 0.35] },
-        { "kind": "casement", "frame": [0.28, 0.18, 0.11], "shutter": [0.74, 0.7, 0.6], "closed": [0.15, 0.5] },
-        { "kind": "casement", "frame": [0.3, 0.31, 0.32], "shutter": [0.62, 0.62, 0.6], "closed": [0.0, 0.45] }
+      "sources": {
+        "plaster": "ph_painted_plaster_wall",
+        "stone": "acg_rock022",
+        "brick": "acg_bricks023"
+      },
+      "source_tile_m": {
+        "plaster": 2.0,
+        "stone": 2.0,
+        "brick": 1.0
+      },
+      "zocalo_color": [
+        0.36,
+        0.35,
+        0.33
       ],
-      "door_colors": [[0.26, 0.17, 0.1], [0.2, 0.22, 0.24]],
-      "tones": [[1.0, 1.0, 1.0], [0.92, 0.95, 1.0], [1.0, 0.93, 0.86]],
-      "dress": { "zocalo_share": 0.8, "cornice_share": 0.75, "course_share": 0.6 },
+      "cornice_color": [
+        0.86,
+        0.85,
+        0.8
+      ],
+      "stone_color": [
+        0.82,
+        0.8,
+        0.76
+      ],
+      "window_families": [
+        {
+          "kind": "casement",
+          "frame": [
+            0.88,
+            0.87,
+            0.84
+          ],
+          "shutter": [
+            0.8,
+            0.76,
+            0.66
+          ],
+          "closed": [
+            0.0,
+            0.35
+          ]
+        },
+        {
+          "kind": "casement",
+          "frame": [
+            0.28,
+            0.18,
+            0.11
+          ],
+          "shutter": [
+            0.74,
+            0.7,
+            0.6
+          ],
+          "closed": [
+            0.15,
+            0.5
+          ]
+        },
+        {
+          "kind": "casement",
+          "frame": [
+            0.3,
+            0.31,
+            0.32
+          ],
+          "shutter": [
+            0.62,
+            0.62,
+            0.6
+          ],
+          "closed": [
+            0.0,
+            0.45
+          ]
+        }
+      ],
+      "door_colors": [
+        [
+          0.26,
+          0.17,
+          0.1
+        ],
+        [
+          0.2,
+          0.22,
+          0.24
+        ]
+      ],
+      "tones": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.92,
+          0.95,
+          1.0
+        ],
+        [
+          1.0,
+          0.93,
+          0.86
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 0.8,
+        "cornice_share": 0.75,
+        "course_share": 0.6
+      },
       "grime": {
         "streaks_per_strip": 80,
         "streak_dark": 0.12,
-        "streak_length_m": [0.3, 1.8],
+        "streak_length_m": [
+          0.3,
+          1.8
+        ],
         "under_course_dark": 0.24,
         "base_splash_dark": 0.3,
         "base_splash_m": 0.35,
@@ -56,30 +158,82 @@
       },
       "eras": {
         "pre_1900": {
-          "tones": [0, 2],
-          "window_families": [0, 1],
-          "dress": { "cornice_share": 0.9, "course_share": 0.75 }
+          "tones": [
+            0,
+            2
+          ],
+          "window_families": [
+            0,
+            1
+          ],
+          "dress": {
+            "cornice_share": 0.9,
+            "course_share": 0.75
+          }
         },
-        "1900_1939": { "tones": [0, 1, 2], "window_families": [0, 1] },
+        "1900_1939": {
+          "tones": [
+            0,
+            1,
+            2
+          ],
+          "window_families": [
+            0,
+            1
+          ]
+        },
         "1940_1959": {
-          "tones": [1],
-          "window_families": [1, 2],
-          "dress": { "cornice_share": 0.4, "course_share": 0.3 }
+          "tones": [
+            1
+          ],
+          "window_families": [
+            1,
+            2
+          ],
+          "dress": {
+            "cornice_share": 0.4,
+            "course_share": 0.3
+          }
         },
         "1960_1979": {
-          "tones": [1],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            1
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "1980_1999": {
-          "tones": [0, 1],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0,
+            1
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "2000_plus": {
-          "tones": [0],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         }
       }
     },
@@ -112,23 +266,125 @@
         "scenic_wall_warm": "plaster_cream",
         "scenic_wall_ochre": "plaster_ochre"
       },
-      "sources": { "plaster": "ph_plastered_wall", "stone": "acg_rock051", "brick": "acg_bricks059" },
-      "source_tile_m": { "plaster": 2.0, "stone": 2.0, "brick": 1.0 },
-      "zocalo_color": [0.7, 0.68, 0.63],
-      "cornice_color": [0.88, 0.87, 0.83],
-      "stone_color": [0.86, 0.85, 0.8],
-      "window_families": [
-        { "kind": "sash", "frame": [0.9, 0.9, 0.88], "shutter": [0.85, 0.82, 0.74], "closed": [0.0, 0.3] },
-        { "kind": "sash", "frame": [0.1, 0.14, 0.11], "shutter": [0.8, 0.76, 0.68], "closed": [0.1, 0.45] },
-        { "kind": "casement", "frame": [0.92, 0.92, 0.92], "shutter": [0.7, 0.7, 0.7], "closed": [0.0, 0.4] }
+      "sources": {
+        "plaster": "ph_plastered_wall",
+        "stone": "acg_rock051",
+        "brick": "acg_bricks059"
+      },
+      "source_tile_m": {
+        "plaster": 2.0,
+        "stone": 2.0,
+        "brick": 1.0
+      },
+      "zocalo_color": [
+        0.7,
+        0.68,
+        0.63
       ],
-      "door_colors": [[0.08, 0.1, 0.09], [0.35, 0.06, 0.06]],
-      "tones": [[1.0, 1.0, 1.0], [0.82, 0.8, 0.78], [0.95, 0.9, 0.82]],
-      "dress": { "zocalo_share": 0.45, "cornice_share": 0.5, "course_share": 0.35 },
+      "cornice_color": [
+        0.88,
+        0.87,
+        0.83
+      ],
+      "stone_color": [
+        0.86,
+        0.85,
+        0.8
+      ],
+      "window_families": [
+        {
+          "kind": "sash",
+          "frame": [
+            0.9,
+            0.9,
+            0.88
+          ],
+          "shutter": [
+            0.85,
+            0.82,
+            0.74
+          ],
+          "closed": [
+            0.0,
+            0.3
+          ]
+        },
+        {
+          "kind": "sash",
+          "frame": [
+            0.1,
+            0.14,
+            0.11
+          ],
+          "shutter": [
+            0.8,
+            0.76,
+            0.68
+          ],
+          "closed": [
+            0.1,
+            0.45
+          ]
+        },
+        {
+          "kind": "casement",
+          "frame": [
+            0.92,
+            0.92,
+            0.92
+          ],
+          "shutter": [
+            0.7,
+            0.7,
+            0.7
+          ],
+          "closed": [
+            0.0,
+            0.4
+          ]
+        }
+      ],
+      "door_colors": [
+        [
+          0.08,
+          0.1,
+          0.09
+        ],
+        [
+          0.35,
+          0.06,
+          0.06
+        ]
+      ],
+      "tones": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.82,
+          0.8,
+          0.78
+        ],
+        [
+          0.95,
+          0.9,
+          0.82
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 0.45,
+        "cornice_share": 0.5,
+        "course_share": 0.35
+      },
       "grime": {
         "streaks_per_strip": 60,
         "streak_dark": 0.1,
-        "streak_length_m": [0.3, 1.4],
+        "streak_length_m": [
+          0.3,
+          1.4
+        ],
         "under_course_dark": 0.2,
         "base_splash_dark": 0.28,
         "base_splash_m": 0.3,
@@ -136,30 +392,79 @@
       },
       "eras": {
         "pre_1900": {
-          "tones": [0, 1],
-          "window_families": [0, 1],
-          "dress": { "course_share": 0.5 }
+          "tones": [
+            0,
+            1
+          ],
+          "window_families": [
+            0,
+            1
+          ],
+          "dress": {
+            "course_share": 0.5
+          }
         },
-        "1900_1939": { "tones": [0, 2], "window_families": [0, 1] },
+        "1900_1939": {
+          "tones": [
+            0,
+            2
+          ],
+          "window_families": [
+            0,
+            1
+          ]
+        },
         "1940_1959": {
-          "tones": [2],
-          "window_families": [1, 2],
-          "dress": { "cornice_share": 0.3, "course_share": 0.2 }
+          "tones": [
+            2
+          ],
+          "window_families": [
+            1,
+            2
+          ],
+          "dress": {
+            "cornice_share": 0.3,
+            "course_share": 0.2
+          }
         },
         "1960_1979": {
-          "tones": [2],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            2
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "1980_1999": {
-          "tones": [2],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            2
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "2000_plus": {
-          "tones": [0],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         }
       }
     },
@@ -192,35 +497,135 @@
         "scenic_wall_warm": "plaster_cream",
         "scenic_wall_ochre": "plaster_ochre"
       },
-      "sources": { "plaster": "acg_paintedplaster006", "stone": "acg_rock034", "brick": "acg_bricks097" },
-      "source_tile_m": { "plaster": 3.0, "stone": 2.0, "brick": 1.0 },
-      "zocalo_color": [0.48, 0.24, 0.16],
-      "cornice_color": [0.94, 0.92, 0.88],
-      "stone_color": [0.9, 0.88, 0.84],
+      "sources": {
+        "plaster": "acg_paintedplaster006",
+        "stone": "acg_rock034",
+        "brick": "acg_bricks097"
+      },
+      "source_tile_m": {
+        "plaster": 3.0,
+        "stone": 2.0,
+        "brick": 1.0
+      },
+      "zocalo_color": [
+        0.48,
+        0.24,
+        0.16
+      ],
+      "cornice_color": [
+        0.94,
+        0.92,
+        0.88
+      ],
+      "stone_color": [
+        0.9,
+        0.88,
+        0.84
+      ],
       "window_families": [
         {
           "kind": "grille",
-          "frame": [0.3, 0.2, 0.13],
-          "shutter": [0.36, 0.24, 0.15],
-          "iron": [0.05, 0.05, 0.06],
-          "closed": [0.0, 0.5]
+          "frame": [
+            0.3,
+            0.2,
+            0.13
+          ],
+          "shutter": [
+            0.36,
+            0.24,
+            0.15
+          ],
+          "iron": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "closed": [
+            0.0,
+            0.5
+          ]
         },
         {
           "kind": "grille",
-          "frame": [0.15, 0.3, 0.25],
-          "shutter": [0.16, 0.32, 0.26],
-          "iron": [0.05, 0.05, 0.06],
-          "closed": [0.2, 0.7]
+          "frame": [
+            0.15,
+            0.3,
+            0.25
+          ],
+          "shutter": [
+            0.16,
+            0.32,
+            0.26
+          ],
+          "iron": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "closed": [
+            0.2,
+            0.7
+          ]
         },
-        { "kind": "casement", "frame": [0.6, 0.61, 0.62], "shutter": [0.8, 0.78, 0.72], "closed": [0.0, 0.4] }
+        {
+          "kind": "casement",
+          "frame": [
+            0.6,
+            0.61,
+            0.62
+          ],
+          "shutter": [
+            0.8,
+            0.78,
+            0.72
+          ],
+          "closed": [
+            0.0,
+            0.4
+          ]
+        }
       ],
-      "door_colors": [[0.32, 0.18, 0.1], [0.12, 0.24, 0.3]],
-      "tones": [[1.0, 1.0, 1.0], [1.0, 0.94, 0.84], [0.9, 0.95, 1.0]],
-      "dress": { "zocalo_share": 0.75, "cornice_share": 0.35, "course_share": 0.25 },
+      "door_colors": [
+        [
+          0.32,
+          0.18,
+          0.1
+        ],
+        [
+          0.12,
+          0.24,
+          0.3
+        ]
+      ],
+      "tones": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.94,
+          0.84
+        ],
+        [
+          0.9,
+          0.95,
+          1.0
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 0.75,
+        "cornice_share": 0.35,
+        "course_share": 0.25
+      },
       "grime": {
         "streaks_per_strip": 70,
         "streak_dark": 0.11,
-        "streak_length_m": [0.3, 1.6],
+        "streak_length_m": [
+          0.3,
+          1.6
+        ],
         "under_course_dark": 0.18,
         "base_splash_dark": 0.34,
         "base_splash_m": 0.4,
@@ -228,26 +633,79 @@
       },
       "eras": {
         "pre_1900": {
-          "tones": [0, 1],
-          "window_families": [0, 1],
-          "dress": { "zocalo_share": 0.9 }
+          "tones": [
+            0,
+            1
+          ],
+          "window_families": [
+            0,
+            1
+          ],
+          "dress": {
+            "zocalo_share": 0.9
+          }
         },
-        "1900_1939": { "tones": [0, 1, 2], "window_families": [0, 1] },
-        "1940_1959": { "tones": [0, 2], "window_families": [1, 2] },
+        "1900_1939": {
+          "tones": [
+            0,
+            1,
+            2
+          ],
+          "window_families": [
+            0,
+            1
+          ]
+        },
+        "1940_1959": {
+          "tones": [
+            0,
+            2
+          ],
+          "window_families": [
+            1,
+            2
+          ]
+        },
         "1960_1979": {
-          "tones": [0, 2],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0,
+            2
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "1980_1999": {
-          "tones": [0, 2],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0,
+            2
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         },
         "2000_plus": {
-          "tones": [0],
-          "window_families": [2],
-          "dress": { "zocalo_share": 0.2, "cornice_share": 0.1, "course_share": 0.0 }
+          "tones": [
+            0
+          ],
+          "window_families": [
+            2
+          ],
+          "dress": {
+            "zocalo_share": 0.2,
+            "cornice_share": 0.1,
+            "course_share": 0.0
+          }
         }
       }
     },
@@ -275,39 +733,328 @@
         "stone_warm": "ashlar",
         "brick_red": "brick"
       },
-      "estimated_walls": { "brick_red": "plaster_cream" },
+      "estimated_walls": {
+        "brick_red": "plaster_cream"
+      },
       "wall_tints": {
-        "plaster_ochre": [0.7, 0.6, 0.45],
-        "plaster_cream": [0.74, 0.66, 0.52],
-        "plaster_white": [0.78, 0.72, 0.6],
-        "plaster_salmon": [0.72, 0.62, 0.5],
-        "stone_warm": [0.68, 0.6, 0.47]
+        "plaster_ochre": [
+          0.7,
+          0.6,
+          0.45
+        ],
+        "plaster_cream": [
+          0.74,
+          0.66,
+          0.52
+        ],
+        "plaster_white": [
+          0.78,
+          0.72,
+          0.6
+        ],
+        "plaster_salmon": [
+          0.72,
+          0.62,
+          0.5
+        ],
+        "stone_warm": [
+          0.68,
+          0.6,
+          0.47
+        ]
       },
       "scenic_walls": {
         "scenic_wall_light": "plaster_white",
         "scenic_wall_warm": "plaster_cream",
         "scenic_wall_ochre": "plaster_ochre"
       },
-      "sources": { "plaster": "ph_painted_plaster_wall", "stone": "acg_concrete012", "brick": "acg_bricks023" },
-      "source_tile_m": { "plaster": 2.0, "stone": 2.0, "brick": 1.0 },
-      "zocalo_color": [0.55, 0.5, 0.42],
-      "cornice_color": [0.8, 0.75, 0.64],
-      "stone_color": [0.8, 0.76, 0.66],
-      "window_families": [
-        { "kind": "casement", "frame": [0.85, 0.84, 0.8], "shutter": [0.62, 0.63, 0.62], "closed": [0.0, 0.25] },
-        { "kind": "casement", "frame": [0.25, 0.27, 0.28], "shutter": [0.55, 0.56, 0.55], "closed": [0.0, 0.2] }
+      "sources": {
+        "plaster": "ph_painted_plaster_wall",
+        "stone": "acg_concrete012",
+        "brick": "acg_bricks023"
+      },
+      "source_tile_m": {
+        "plaster": 2.0,
+        "stone": 2.0,
+        "brick": 1.0
+      },
+      "zocalo_color": [
+        0.55,
+        0.5,
+        0.42
       ],
-      "door_colors": [[0.1, 0.2, 0.16], [0.08, 0.1, 0.14]],
-      "tones": [[1.0, 1.0, 1.0], [0.97, 0.96, 0.93], [1.0, 0.97, 0.9]],
-      "dress": { "zocalo_share": 1.0, "cornice_share": 0.95, "course_share": 0.9 },
+      "cornice_color": [
+        0.8,
+        0.75,
+        0.64
+      ],
+      "stone_color": [
+        0.8,
+        0.76,
+        0.66
+      ],
+      "window_families": [
+        {
+          "kind": "casement",
+          "frame": [
+            0.85,
+            0.84,
+            0.8
+          ],
+          "shutter": [
+            0.62,
+            0.63,
+            0.62
+          ],
+          "closed": [
+            0.0,
+            0.25
+          ]
+        },
+        {
+          "kind": "casement",
+          "frame": [
+            0.25,
+            0.27,
+            0.28
+          ],
+          "shutter": [
+            0.55,
+            0.56,
+            0.55
+          ],
+          "closed": [
+            0.0,
+            0.2
+          ]
+        }
+      ],
+      "door_colors": [
+        [
+          0.1,
+          0.2,
+          0.16
+        ],
+        [
+          0.08,
+          0.1,
+          0.14
+        ]
+      ],
+      "tones": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.97,
+          0.96,
+          0.93
+        ],
+        [
+          1.0,
+          0.97,
+          0.9
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 1.0,
+        "cornice_share": 0.95,
+        "course_share": 0.9
+      },
       "grime": {
         "streaks_per_strip": 80,
         "streak_dark": 0.12,
-        "streak_length_m": [0.3, 1.8],
+        "streak_length_m": [
+          0.3,
+          1.8
+        ],
         "under_course_dark": 0.24,
         "base_splash_dark": 0.3,
         "base_splash_m": 0.35,
         "mottle": 0.05
+      }
+    },
+    "east_african": {
+      "size_px": 2048,
+      "height_px": 4096,
+      "gutter_px": 8,
+      "fit_row_px": 384,
+      "fit_cell_px": 192,
+      "cornice_px": 128,
+      "zocalo_px": 128,
+      "stone_px": 64,
+      "wall_repeat_m": 12.0,
+      "zocalo_m": 0.9,
+      "zocalo_repeat_m": 6.0,
+      "cornice_repeat_m": 6.0,
+      "stone_repeat_m": 1.0,
+      "storey_ref_m": 3.0,
+      "max_band_m": 4.5,
+      "walls": {
+        "plaster_ochre": "plaster",
+        "plaster_cream": "plaster",
+        "plaster_white": "plaster",
+        "plaster_salmon": "plaster",
+        "stone_warm": "ashlar",
+        "brick_red": "brick"
+      },
+      "scenic_walls": {
+        "scenic_wall_light": "plaster_white",
+        "scenic_wall_warm": "plaster_cream",
+        "scenic_wall_ochre": "plaster_ochre"
+      },
+      "sources": {
+        "plaster": "ph_painted_plaster_wall",
+        "stone": "ph_old_stone_wall",
+        "brick": "ph_clay_block_wall"
+      },
+      "source_tile_m": {
+        "plaster": 3.0,
+        "stone": 2.0,
+        "brick": 1.2
+      },
+      "zocalo_color": [
+        0.22,
+        0.44,
+        0.42
+      ],
+      "cornice_color": [
+        0.95,
+        0.94,
+        0.9
+      ],
+      "stone_color": [
+        0.86,
+        0.82,
+        0.74
+      ],
+      "window_families": [
+        {
+          "kind": "grille",
+          "frame": [
+            0.18,
+            0.36,
+            0.34
+          ],
+          "shutter": [
+            0.2,
+            0.42,
+            0.4
+          ],
+          "iron": [
+            0.06,
+            0.06,
+            0.07
+          ],
+          "closed": [
+            0.0,
+            0.6
+          ]
+        },
+        {
+          "kind": "grille",
+          "frame": [
+            0.16,
+            0.26,
+            0.42
+          ],
+          "shutter": [
+            0.18,
+            0.3,
+            0.48
+          ],
+          "iron": [
+            0.06,
+            0.06,
+            0.07
+          ],
+          "closed": [
+            0.2,
+            0.8
+          ]
+        },
+        {
+          "kind": "grille",
+          "frame": [
+            0.5,
+            0.48,
+            0.44
+          ],
+          "shutter": [
+            0.42,
+            0.4,
+            0.36
+          ],
+          "iron": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "closed": [
+            0.0,
+            0.5
+          ]
+        }
+      ],
+      "door_colors": [
+        [
+          0.16,
+          0.34,
+          0.38
+        ],
+        [
+          0.2,
+          0.24,
+          0.42
+        ],
+        [
+          0.34,
+          0.3,
+          0.26
+        ]
+      ],
+      "tones": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.95,
+          0.86
+        ],
+        [
+          0.97,
+          0.92,
+          0.84
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 0.55,
+        "cornice_share": 0.15,
+        "course_share": 0.0
+      },
+      "grime": {
+        "streaks_per_strip": 90,
+        "streak_dark": 0.14,
+        "streak_length_m": [
+          0.4,
+          2.0
+        ],
+        "under_course_dark": 0.12,
+        "base_splash_dark": 0.4,
+        "base_splash_m": 0.6,
+        "mottle": 0.07
+      },
+      "wall_tints": {
+        "brick_red": [
+          0.92,
+          0.86,
+          0.78
+        ]
       }
     }
   }

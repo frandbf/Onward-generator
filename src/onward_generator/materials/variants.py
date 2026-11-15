@@ -36,14 +36,20 @@ def variant_picks(entries: Sequence[Any], rows: Sequence[Mapping[str, Any]], see
     order of ``sha256(seed:slot:id)``; fewer when the family has fewer. (Not crc32: it is affine, so changing the seed
     barely reorders ids of one length.)"""
     used = {str(entry.library_id) for entry in entries}
+    by_id = {str(row["id"]): row for row in rows}
     picks: dict[str, list[str]] = {}
     for entry in entries:
         slot = str(entry.id)
         if slot not in VARIANT_SLOTS:
             continue
-        family = SLOT_FAMILY[slot]
+        # A variant looks like the slot's own pick: its family (concrete on a roof slot when the plan put concrete there)
+        # and, for a distinctive pick such as a corrugated sheet, the other distinctive rows; an ordinary pick never gets one.
+        chosen = by_id.get(str(entry.library_id))
+        family = texture_family(chosen) if chosen is not None else SLOT_FAMILY[slot]
+        distinctive = bool(chosen is not None and chosen.get("distinctive"))
         pool = sorted((str(row["id"]) for row in rows
-                       if texture_family(row) == family and not row.get("distinctive") and str(row["id"]) not in used and is_calm(row, extended=extended)),
+                       if texture_family(row) == family and bool(row.get("distinctive")) == distinctive
+                       and str(row["id"]) not in used and is_calm(row, extended=extended)),
                       key=lambda library_id: hashlib.sha256(f"{seed}:{slot}:{library_id}".encode()).digest())
         picks[slot] = pool[:VARIANTS]
         used.update(picks[slot])
