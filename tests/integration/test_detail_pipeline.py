@@ -577,9 +577,10 @@ def test_on_a_haussmann_map_the_flat_building_without_an_interior_takes_the_mans
         asked.append((haussmann, landmark, template))
         return real(haussmann, landmark, SimpleNamespace(count=99, height_m=storeys.height_m), template)
 
-    monkeypatch.setattr(scene_module, "regional_style", lambda base: "haussmann")
     monkeypatch.setattr(scene_module, "mansard_for", tall)
-    detailed = _detail(row_inputs)
+    scene, heights, base = row_inputs
+    generated, ref = load_base(base, scene, heights, GEN)
+    detailed = detail_scene(generated, ref, heights, scene, CFG, style_request="haussmann")  # the map names its style
     roofs = {o.id: o.record["roof"]["type"] for o in detailed.objects if o.type == "building"}
     assert roofs["building/osm-way-605"] == "mansard"
     assert sum(kind == "mansard" for kind in roofs.values()) == 1
