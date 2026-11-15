@@ -397,6 +397,11 @@ def test_a_dusty_preset_brings_the_map_s_fog_closer_by_its_scale(inputs: tuple[P
     unfogged = json.loads((foggless.directory / "adapter_options.json").read_bytes())
     assert (unfogged["fog_start_m"], unfogged["fog_end_m"]) == (card["build"]["fog_start_m"], card["build"]["fog_end_m"])
     assert "fog_scale" not in foggless.manifest["atmosphere"]["applied"]
+    # Scaled distances keep a tenth of a metre: 133 and 777 m give 73.2 and 427.4 m.
+    card["build"].update(fog_enabled=True, fog_start_m=133.0, fog_end_m=777.0)
+    path.write_text(json.dumps(card), encoding="utf-8")
+    odd = json.loads((_package(inputs, tmp_path / "odd", atmosphere="dusty", export_config=path).directory / "adapter_options.json").read_bytes())
+    assert (odd["fog_start_m"], odd["fog_end_m"]) == (73.2, 427.4)
 
 
 def _cored(inputs: tuple[Path, Path, Path], tmp_path: Path) -> Path:
