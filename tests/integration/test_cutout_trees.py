@@ -48,15 +48,18 @@ def runs(detail_inputs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict
            "surfaces": ["park", "plaza", "sidewalk"], "clearance_m": 0.0, "use": "A test tree with cut-out leaves."}
     (catalogue / "manifest.json").write_text(json.dumps({"schema_version": "0.1.0", "assets": [row]}), encoding="utf-8")
     calls: list[tuple[int, int]] = []
+    climates: list[object] = []
     real = place.swap_trees
 
-    def spy(nodes, props, seed, headroom):  # type: ignore[no-untyped-def]
+    def spy(nodes, props, seed, headroom, climate=None):  # type: ignore[no-untyped-def]
         calls.append((seed, headroom))
-        return real(nodes, props, seed, headroom)
+        climates.append(climate)
+        return real(nodes, props, seed, headroom, climate)
 
     monkeypatch.setattr(place, "swap_trees", spy)
     out = tmp / "out"
     report = overgrow(base, detail_inputs[0], out, library=tmp / "library", seed=777)
+    assert climates == ["mediterranean"]  # the fixture stands in Murcia: the box gives the mediterranean style
     return {"base": base, "out": out, "report": report, "calls": calls}
 
 

@@ -304,15 +304,18 @@
           "base_splash_m": 0.35,
           "mottle": 0.04
         }
-      }
+      },
+      "climate": "mediterranean"
     },
     "central_european": {
       "note": "Planned: pastel render over a rusticated ground floor, window aediculae, a deep cornice, casement windows without shutters.",
-      "atlas": null
+      "atlas": null,
+      "climate": "temperate"
     },
     "anglo": {
       "note": "Planned: brick in Flemish bond, painted sash windows, stone lintels and sills, a rendered or stone ground floor on shops.",
-      "atlas": null
+      "atlas": null,
+      "climate": "temperate"
     },
     "latin_american": {
       "note": "Planned: bright lime-washed render, a painted zocalo band, iron window grilles, flat parapets.",
@@ -320,8 +323,12 @@
     },
     "haussmann": {
       "note": "Paris (plan Q3): light limestone ashlar on every storey, a stone plinth, a cornice and a string course at every storey, tall casements in painted or dark grey frames. Opt-in atlas in facade_styles.regional.json. Its zinc mansards and wrought-iron balcons filants are drawn by detail (geometry).",
-      "geometry": ["mansard", "filants"],
-      "atlas": null
+      "geometry": [
+        "mansard",
+        "filants"
+      ],
+      "atlas": null,
+      "climate": "temperate"
     },
     "generic": {
       "note": "No regional atlas: the per-material facade path.",
@@ -329,11 +336,13 @@
     },
     "east_african": {
       "note": "Horn of Africa and the Swahili coast: lime-washed render over coral stone or adobe, flat roofs with parapets, iron window grilles with painted shutters, a painted base band.",
-      "atlas": null
+      "atlas": null,
+      "climate": "arid"
     },
     "arid": {
       "note": "Arid flat-roof towns: concrete block and clay brick under cement render in sand, beige, light grey and weathered white; flat concrete roofs with parapets; small windows in metal frames, often behind grilles; dark metal doors and courtyard gates.",
-      "atlas": null
+      "atlas": null,
+      "climate": "arid"
     }
   }
 }

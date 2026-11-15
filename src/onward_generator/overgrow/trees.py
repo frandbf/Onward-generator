@@ -76,13 +76,21 @@ def crown_reach(meshes: Sequence[Mesh]) -> float:
     return max((float(np.hypot(mesh.vertices[:, 0], mesh.vertices[:, 1]).max()) for mesh in meshes if len(mesh.vertices)), default=0.0)
 
 
-def swap_trees(nodes: Sequence[Node], props: Sequence[Prop], seed: int, headroom: int) -> TreeSwap:
-    """``nodes`` with ``detail``'s street trees drawn as library cut-out trees, nearest the centre first."""
+ARID = "arid"
+"""A map whose facade style's climate is arid keeps detail's street trees: the library's cut-out trees are broad-leaved
+trees of temperate streets (15 November 2026; a Mogadishu or Fallujah street got holly trees before)."""
+
+
+def swap_trees(nodes: Sequence[Node], props: Sequence[Prop], seed: int, headroom: int, climate: str | None = None) -> TreeSwap:
+    """``nodes`` with ``detail``'s street trees drawn as library cut-out trees, nearest the centre first; none on an
+    ``ARID`` map, which records why."""
     trees = [index for index, node in enumerate(nodes)
              if node.name.startswith(TREE_NODE_PREFIX) and (node.extras or {}).get("type") == "urban_element"]
     candidates = tree_candidates(props)
     if not trees or not candidates:
         return TreeSwap(list(nodes))
+    if climate == ARID:
+        return TreeSwap(list(nodes), report={"skipped": "arid_climate", "count": 0, "climate": climate})
     placed = [replace(prop, mesh=trunk_frame(prop.mesh)) for prop in candidates]
     reaches = [crown_reach([prop.mesh]) for prop in placed]
     budget = int(headroom * TREE_HEADROOM_SHARE)

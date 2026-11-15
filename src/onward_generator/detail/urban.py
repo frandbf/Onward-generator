@@ -65,11 +65,12 @@ CROWN_WALL_GAP_M = 0.1
 """A tree's crown keeps this far from every facade. Within 2 m of a wall the generated crown, up to 2 m across its
 radius, went through it and showed inside the rooms: 42 of the 105 OSM trees of Murcia Catedral (13 November 2026)."""
 TREE_MIN_SPACING_M = 5.0
-"""An observed tree keeps this far from the trees already placed, in id order, whatever OSM maps: Murcia Catedral's rows
+"""The default of ``urban.tree_min_spacing_m`` (15 November 2026: a map's own detail config may change it). An observed
+tree keeps this far from the trees already placed, in id order, whatever OSM maps: Murcia Catedral's rows
 stood about 4 m apart (median nearest neighbour 3.97 m), 105 trees where 56 read as the same rows with crowns, up to 4 m
 across, that no longer touch (13 November 2026, at the maintainer's request: fewer triangles where trees crowd)."""
 MIN_CROWN_SCALE = 0.35
-"""The narrowest crown, as a share of its width: a tree closer to a facade than this is left out (``crown_against_building``).
+"""The default of ``urban.tree_min_crown_scale``. The narrowest crown, as a share of its width: a tree closer to a facade than this is left out (``crown_against_building``).
 At 0.35 every OSM tree of Murcia Catedral stays, the nearest (0.82 m from a wall) as a slim pruned street tree; at 0.5
 thirteen of them were lost."""
 
@@ -91,10 +92,11 @@ def crown_radius(proto: Prototype) -> float:
     return max(float(np.hypot(mesh.vertices[:, 0], mesh.vertices[:, 1]).max()) for _material, mesh in proto.parts if len(mesh.vertices))
 
 
-def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prototype], room_m: float) -> tuple[str, float] | None:
+def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prototype], room_m: float,
+              min_scale: float = MIN_CROWN_SCALE) -> tuple[str, float] | None:
     """The tree prototype and the crown scale that keep a crown ``CROWN_WALL_GAP_M`` clear of the nearest facade, which
     stands ``room_m`` away. ``chosen`` when it fits; else the first of the other ``options`` that does; else the
-    narrowest prototype scaled across, down to ``MIN_CROWN_SCALE``; None when not even that fits. The tree stays where
+    narrowest prototype scaled across, down to ``min_scale``; None when not even that fits. The tree stays where
     OSM puts it."""
     room = room_m - CROWN_WALL_GAP_M
     for kind in (chosen, *(k for k in options if k != chosen)):
@@ -102,7 +104,7 @@ def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prot
             return kind, 1.0
     narrowest = min(options, key=lambda k: (crown_radius(prototypes[k]), k))
     scale = round(room / crown_radius(prototypes[narrowest]), 3)
-    return (narrowest, scale) if scale >= MIN_CROWN_SCALE else None
+    return (narrowest, scale) if scale >= min_scale else None
 
 
 def crown_matrix(matrix: np.ndarray, scale: float) -> np.ndarray:
@@ -213,12 +215,12 @@ def place_elements(
         p = shape(f["geometry"])
         scale = 1.0
         if kind == "tree":
-            if any(p.distance(q) < TREE_MIN_SPACING_M for q in tree_points):
+            if any(p.distance(q) < cfg.tree_min_spacing_m for q in tree_points):
                 rejected.append(Rejected(f["id"], kind, "too_close_to_another_tree"))
                 continue
             yaw = 2 * math.pi * stable_unit(cfg.seed, f["id"], "yaw")
             if not buildings.is_empty:
-                fit = crown_fit(options, proto_kind, prototypes, float(buildings.distance(p)))
+                fit = crown_fit(options, proto_kind, prototypes, float(buildings.distance(p)), cfg.tree_min_crown_scale)
                 if fit is None:
                     rejected.append(Rejected(f["id"], kind, "crown_against_building"))
                     continue

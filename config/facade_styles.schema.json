@@ -48,6 +48,10 @@
         "properties": {
           "note": { "type": "string" },
           "atlas": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/atlas" }] },
+          "climate": {
+            "description": "The climate the style's towns stand in, for what else a map draws (15 November 2026): on an arid map the library's broad-leaved cut-out trees do not replace detail's street trees",
+            "enum": ["temperate", "mediterranean", "arid"]
+          },
           "geometry": {
             "description": "Pieces detail builds for this style, whatever chose it (the map centre's box, map.json facades.style or the street profile): mansard (the top storey of a flat-roofed building of 5 or more storeys as a zinc mansard with dormers) and filants (continuous balconies on storeys 2 and 5)",
             "type": "array", "uniqueItems": true, "items": { "enum": ["mansard", "filants"] }

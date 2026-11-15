@@ -44,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--library", default=None, help="one catalogue directory, or a parent of catalogues; missing means procedural only")
     place.add_argument("--selection", default=None, help="prop_selection.json; only those installed ids are placed")
     place.add_argument("--triangle-limit", type=int, default=UNITY_TRIANGLE_LIMIT, help="the Unity triangle limit overgrow fills to (map.json triangle_limit; default 300000)")  # pragma: no mutate: help text
+    place.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it; its climate decides whether library trees replace the street trees")  # pragma: no mutate: help text
     place.add_argument("--pinned", default=None, help="a pinned_props.json: library props the map must carry near given WGS84 points, at their own size")  # pragma: no mutate: help text
     place.add_argument("--prefer", default=None, help="a prop_selection.json whose ids are offered and placed first; the other props still stand (a street profile's props_profile)")  # pragma: no mutate: help text
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
@@ -130,7 +131,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.base, args.scene, args.out,
             overwrite=args.overwrite, profile=args.profile, seed=args.seed,
             zone_radius_m=args.zone_radius, zone_polygon=args.zone_polygon,
-            library=args.library, layout=args.layout, selection=args.selection, prefer=args.prefer, triangle_limit=args.triangle_limit, pinned=args.pinned,
+            library=args.library, layout=args.layout, selection=args.selection, prefer=args.prefer, triangle_limit=args.triangle_limit, pinned=args.pinned, style_request=args.facade_style,
             street_profile=block,
         )
     except (OvergrowError, FitError, FetchError, SketchfabError, ZoneError, LibraryError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:

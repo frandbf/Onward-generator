@@ -389,3 +389,18 @@ def test_only_a_narrowed_crown_writes_crown_scale() -> None:
     # A whole crown keeps its matrix; a narrowed one is scaled across only.
     assert np.array_equal(crown_matrix(np.eye(4), 1.0), np.eye(4))
     assert np.array_equal(crown_matrix(np.eye(4), 0.5), np.diag([0.5, 0.5, 1.0, 1.0]))
+
+
+def test_tree_spacing_and_crown_scale_come_from_the_config() -> None:
+    """15 November 2026: a map's own detail config may keep more of its mapped trees, or fewer."""
+    from onward_generator.detail.config import config_from_document, load_detail_config
+    from onward_generator.detail.urban import MIN_CROWN_SCALE, TREE_MIN_SPACING_M
+
+    default = load_detail_config()
+    assert (default.tree_min_spacing_m, default.tree_min_crown_scale) == (TREE_MIN_SPACING_M, MIN_CROWN_SCALE) == (5.0, 0.35)
+    document = dict(default.document)
+    urban = {k: v for k, v in document["urban"].items() if k not in ("tree_min_spacing_m", "tree_min_crown_scale")}
+    old = config_from_document({**document, "urban": urban})  # a map's copy made before the keys keeps the defaults
+    assert (old.tree_min_spacing_m, old.tree_min_crown_scale) == (5.0, 0.35)
+    tuned = config_from_document({**document, "urban": {**urban, "tree_min_spacing_m": 0, "tree_min_crown_scale": 0.6}})
+    assert (tuned.tree_min_spacing_m, tuned.tree_min_crown_scale) == (0.0, 0.6)

@@ -348,6 +348,10 @@ class DetailConfig:
     document: Mapping[str, Any]
     path: str | None = None
     sha256: str | None = None
+    tree_min_spacing_m: float = 5.0
+    """``urban.tree_min_spacing_m``: an observed tree keeps this far from the trees already placed (``detail.urban``)."""
+    tree_min_crown_scale: float = 0.35
+    """``urban.tree_min_crown_scale``: the narrowest crown, as a share of its width, before a tree by a wall is left out."""
 
     def template_for(self, category: str, landmark: bool) -> Template:
         if landmark:
@@ -651,6 +655,8 @@ def config_from_document(doc: Mapping[str, Any], *, path: str | None = None, sha
                                  float(lamps["min_building_distance_m"]), float(lamps["min_spacing_m"])),
         street_furniture=_furniture(doc["urban"].get("generated_furniture")),
         urban_clearance_m=float(doc["urban"]["clearance_m"]),
+        tree_min_spacing_m=float(doc["urban"].get("tree_min_spacing_m", 5.0)),
+        tree_min_crown_scale=float(doc["urban"].get("tree_min_crown_scale", 0.35)),
         budget=MappingProxyType({k: int(v) for k, v in doc["budget"].items() if k != "note"}),
         closeup_focus=tuple(float(v) for v in doc["preview"]["closeup_focus_m"]),  # type: ignore[arg-type]
         closeup_elevation_deg=float(doc["preview"]["closeup_elevation_deg"]),

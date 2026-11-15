@@ -280,3 +280,35 @@ def test_a_branch_starting_exactly_at_the_trunk_foot_is_not_the_trunk() -> None:
     mesh = trunk_frame(merge([box(-0.15, 0.15, -0.15, 0.15, 0.0, 3.0), box(1.0, 1.2, -0.05, 0.05, TRUNK_FOOT_M, 1.0)]))
     foot = mesh.vertices[mesh.vertices[:, 2] < 0.1]
     assert (foot[:, :2].min(axis=0) + foot[:, :2].max(axis=0)) / 2 == pytest.approx([0.0, 0.0], abs=1e-9)
+
+
+def test_an_arid_map_keeps_its_street_trees(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """15 November 2026: the library's cut-out trees are broad-leaved street trees; an arid town keeps detail's."""
+    from onward_generator.overgrow import trees
+
+    nodes = [Node("urban/tree/1", (), {"type": "urban_element"})]
+    monkeypatch.setattr(trees, "tree_candidates", lambda props: ["holly"])
+    swap = trees.swap_trees(nodes, [], 1, 50_000, "arid")
+    assert swap.nodes == nodes and swap.added_triangles == 0
+    assert swap.report == {"skipped": "arid_climate", "count": 0, "climate": "arid"}
+    assert trees.ARID == "arid"
+
+
+def test_the_map_climate_comes_from_its_resolved_style() -> None:
+    import pytest as _pytest
+
+    from onward_generator.overgrow.place import OvergrowError, map_climate
+
+    def manifest(origin: object) -> dict:
+        return {"frame": {"origin_wgs84": origin}}
+
+    assert map_climate(manifest([-1.12863, 37.98407])) == "mediterranean"  # Murcia
+    assert map_climate(manifest([45.326639, 2.047458])) == "arid"  # Mogadishu, east_african
+    assert map_climate(manifest([2.34981, 48.84045])) == "temperate"  # Paris
+    assert map_climate(manifest([139.65, 35.68])) is None  # Tokyo: generic names no climate
+    assert map_climate(manifest([-1.12863, 37.98407]), "east_african") == "arid"  # the map's own style wins
+    assert map_climate(manifest([43.79589, 33.36522])) == "arid"  # Fallujah, the arid style's box
+    assert map_climate(manifest([-1.12863, 37.98407]), "arid") == "arid"
+    assert map_climate({}) is None
+    with _pytest.raises(OvergrowError, match="unknown facade style 'baroque'"):
+        map_climate(manifest(None), "baroque")

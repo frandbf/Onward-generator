@@ -362,6 +362,7 @@ def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
     ):
         parts.extend(["--library", show(library)])
     parts.extend(_triangle_limit(root))
+    parts.extend(_facade_style(base))
     if root is not None:
         pins = root / "config" / "pinned_props.json"
         if pins.is_file():
