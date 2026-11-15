@@ -8,9 +8,9 @@ monument, a checkpoint. ``maps/<id>/config/pinned_props.json`` lists them::
 
 Each one keeps the size its file gives it (the placement rules would fit a wreck to a car), stands at the free spot
 nearest its point, within ``search_m`` (default ``SEARCH_DEFAULT_M``) and inside the zone, whose plan stays
-``BUILDING_GAP_M`` clear of every footprint, trying its yaw and then the three quarter turns. It collides along the
-plan its triangles cover (``fit.collider_mesh`` with the fence rule), so the gaps between the pieces of a wreck stay
-open, and the other props and wrecks keep out of that plan. A prop that is not in the library, or that finds no spot,
+``BUILDING_GAP_M`` clear of every footprint, trying its yaw and then the three quarter turns. It collides by 30 cm
+slices of its own shape (``fit.layered_collider``, ADR-042), so the air under its blades and between the pieces of a
+wreck stays open, and the other props and wrecks keep out of its plan. A prop that is not in the library, or that finds no spot,
 stops the stage: a pinned prop is not optional.
 """
 
@@ -32,7 +32,7 @@ from onward_generator.detail.modules import yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import Mesh
 from onward_generator.geo.projection import LocalFrame
-from onward_generator.overgrow.fit import collider_mesh
+from onward_generator.overgrow.fit import layered_collider
 from onward_generator.overgrow.library import Prop
 from onward_generator.overgrow.zone import Zone
 
@@ -188,7 +188,7 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
         # first pin's turned mesh (14 November 2026).
         pose = f":{pin.roll_deg:g}:{pin.pitch_deg:g}" if pin.roll_deg or pin.pitch_deg else ""
         result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}{pose}"))
-        result.colliders.append(Node(f"overgrow/collider/pinned/{prop.spec.id}/{number}", (Primitive(collider_mesh(prop.mesh, "fence"), "collider"),),
+        result.colliders.append(Node(f"overgrow/collider/pinned/{prop.spec.id}/{number}", (Primitive(layered_collider(prop.mesh), "collider"),),
                                      {"type": "collision", "origin": "pinned", "asset_id": prop.spec.id}, matrix))
         result.images.update(prop.images())
         result.footprints.append(footprint)
