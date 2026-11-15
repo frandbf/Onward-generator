@@ -189,6 +189,8 @@ namespace OnwardGenerator
         [Serializable] private class Damage { public float z_m; public float[] size_m; public float[] centre_m; }
         [Serializable] private class Route { public XY[] points; }
         // ADR-029. roof_yaw is read only for a lift.
+        // The bots' navmesh ground (14 November 2026): flat local x, y, z triples and triangle indices.
+        [Serializable] private class NavGround { public float[] vertices_m; public int[] triangles; }
         [Serializable] private class Climb { public float x; public float y; public float yaw; public float height_m; public float parapet_m; public float roof_x; public float roof_y; public float roof_yaw; public float base_m; }
 
         [Serializable]
@@ -228,6 +230,7 @@ namespace OnwardGenerator
             public int lightning;
             public Climb[] ladders;
             public Climb[] lifts;
+            public NavGround nav_ground;
         }
 
         private sealed class Package
@@ -1543,16 +1546,26 @@ namespace OnwardGenerator
         private static void BakeNavigation(string root, GameObject collisionRoot, Layout layout)
         {
             var sources = new List<NavMeshBuildSource>();
-            NavMeshBuilder.CollectSources(collisionRoot.transform, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
-            sources.RemoveAll(source => !WalkableGround(source.component != null ? source.component.gameObject.name : ""));
-            if (sources.Count == 0)
-                throw new InvalidOperationException("NavMesh collect found no walkable ground colliders.");
-            // The walkable mesh still covers building footprints. Boxes are
-            // dropped only where a ray hits the building mesh, so a rotated
-            // footprint does not erase the sidewalk inside its bounding box.
             int blocked = NavMesh.GetAreaFromName("Not Walkable");
             if (blocked < 0) blocked = 1;
-            BlockBuildingFootprints(collisionRoot, sources, blocked);
+            if (HasNavGround(layout))
+            {
+                // The layout's exact free ground, every footprint a hole in it: the walls are
+                // the mesh border and the agent radius keeps the bots off them (14 November 2026).
+                sources.Add(NavGroundSource(layout.nav_ground));
+                Debug.Log($"{LogPrefix} Navigation: baked from the layout's nav_ground ({layout.nav_ground.triangles.Length / 3} triangles).");
+            }
+            else
+            {
+                NavMeshBuilder.CollectSources(collisionRoot.transform, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
+                sources.RemoveAll(source => !WalkableGround(source.component != null ? source.component.gameObject.name : ""));
+                if (sources.Count == 0)
+                    throw new InvalidOperationException("NavMesh collect found no walkable ground colliders.");
+                // An older layout has no nav_ground: the walkable mesh still covers building
+                // footprints. Boxes are dropped only where a ray hits the building mesh, so a
+                // rotated footprint does not erase the sidewalk inside its bounding box.
+                BlockBuildingFootprints(collisionRoot, sources, blocked);
+            }
             BlockLiftCabins(layout, sources, blocked);
             Renderer[] renderers = collisionRoot.GetComponentsInChildren<Renderer>();
             Bounds bounds = renderers.Length > 0 ? renderers[0].bounds : new Bounds(collisionRoot.transform.position, Vector3.one * 20f);
@@ -2348,6 +2361,33 @@ namespace OnwardGenerator
                 });
             }
             if (lifts.Length > 0) Debug.Log($"{LogPrefix} Navigation: {lifts.Length} street cabins blocked.");
+        }
+
+        private static bool HasNavGround(Layout layout) =>
+            layout?.nav_ground?.vertices_m != null && layout.nav_ground.triangles != null && layout.nav_ground.triangles.Length >= 3;
+
+        private static NavMeshBuildSource NavGroundSource(NavGround ground)
+        {
+            float[] v = ground.vertices_m;
+            int[] t = ground.triangles;
+            if (v.Length % 3 != 0 || t.Length % 3 != 0)
+                throw new InvalidDataException("layout nav_ground: vertices_m and triangles must be triples");
+            var vertices = new Vector3[v.Length / 3];
+            for (int i = 0; i < vertices.Length; i++) vertices[i] = new Vector3(v[3 * i], v[3 * i + 2], v[3 * i + 1]);
+            // Local (x, y, z up) to Unity (x, z, y) mirrors the plan, so each triangle swaps two
+            // corners to keep facing up.
+            var triangles = new int[t.Length];
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                triangles[i] = t[i];
+                triangles[i + 1] = t[i + 2];
+                triangles[i + 2] = t[i + 1];
+            }
+            var mesh = new Mesh { name = "nav_ground", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.vertices = vertices;
+            mesh.triangles = triangles;
+            mesh.RecalculateBounds();
+            return new NavMeshBuildSource { shape = NavMeshBuildSourceShape.Mesh, sourceObject = mesh, transform = Matrix4x4.identity, area = 0 };
         }
 
         private static void BlockBuildingFootprints(GameObject collisionRoot, List<NavMeshBuildSource> sources, int blocked)
