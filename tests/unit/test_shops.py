@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from functools import partial
 from typing import Any
 
 import pytest
@@ -33,7 +34,12 @@ from onward_generator.detail.facades import (
     stable_unit,
 )
 from onward_generator.detail.scene import _shops_of
-from onward_generator.detail.shops import plan_shops, shop_name
+from onward_generator.detail.shop_names import load_shop_names, shop_words
+from onward_generator.detail.shops import plan_shops as _plan_shops
+from onward_generator.detail.shops import shop_name
+
+ES = shop_words([-1.12863, 37.98407])  # the words of the Murcia centre the tests stand in (15 November 2026)
+plan_shops = partial(_plan_shops, words=ES)
 
 CFG = load_detail_config()
 DOC = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
@@ -131,13 +137,14 @@ def test_other_entrances_keep_their_back(kind: str) -> None:
     ],
 )
 def test_shop_name_is_the_osm_name_or_a_generic_spanish_word(tags: dict, expected: tuple[str, str, str]) -> None:
-    assert shop_name(tags, CFG) == dict(zip(("name", "name_origin", "name_rule"), expected, strict=True))
+    assert shop_name(tags, CFG, ES) == dict(zip(("name", "name_origin", "name_rule"), expected, strict=True))
 
 
 def test_a_key_without_a_generic_word_falls_through_to_the_next_key() -> None:
-    cfg = config_from_document(_doc(shops__generic_names={"amenity=bar": "Bar"}))
+    # A map's own detail config may name its words; then they win over the language of its centre.
+    cfg = config_from_document(_doc(shops__generic_names={"amenity=bar": "Bar"}, shops__default_name="Negozio"))
     assert shop_name({"shop": "bakery", "amenity": "bar"}, cfg)["name"] == "Bar"
-    assert shop_name({"shop": "bakery"}, cfg) == {"name": "Comercio", "name_origin": "estimated", "name_rule": "default"}
+    assert shop_name({"shop": "bakery"}, cfg) == {"name": "Negozio", "name_origin": "estimated", "name_rule": "default"}
 
 
 def test_shops_of_a_building_are_its_pois_or_the_building() -> None:
@@ -315,8 +322,10 @@ def test_shop_config_is_read_as_given() -> None:
     assert (shops.blade_width_m, shops.blade_height_m, shops.blade_thickness_m, shops.blade_wall_gap_m,
             shops.blade_clearance_m) == (0.7, 0.5, 0.04, 0.15, 2.4)
     assert (shops.vinyl_height_m, shops.vinyl_centre_m, shops.vinyl_width_share) == (0.26, 1.6, 0.8)
-    assert shops.default_name == "Comercio" and shops.generic_names["amenity=pharmacy"] == "Farmacia"
-    assert list(shops.generic_names) == sorted(shops.generic_names)
+    # 15 November 2026: the default config names no words; the Spanish ones moved to config/shop_names.json.
+    assert shops.default_name is None and shops.generic_names is None
+    spanish = load_shop_names().languages["es"]
+    assert spanish[0] == "Comercio" and spanish[1]["amenity=pharmacy"] == "Farmacia" and list(spanish[1]) == sorted(spanish[1])
     assert (cfg.shopfront.min_width_m, cfg.shopfront.max_width_m, cfg.shopfront.sill_m, cfg.shopfront.min_height_m,
             cfg.shopfront.max_height_m, cfg.shopfront.head_m) == (2.0, 3.4, 0.25, 1.9, 3.2, 0.45)
     assert (cfg.shop_door.width_m, cfg.shop_door.height_m) == (1.1, 2.3)

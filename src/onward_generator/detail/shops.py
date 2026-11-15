@@ -10,8 +10,9 @@ back or on the see-through pane of a shop interior (``shop_glass``, or ``glass_v
 Each vinyl records the ``glass`` it sits on: ``signs`` draws black letters with no
 background on ``shop_glass`` and an opaque strip on the rest.
 
-The name is the OSM ``name`` tag (observed). Without it, a generic Spanish word
-for the ``shop``/``amenity``/``office``/``craft`` value is used (estimated). The
+The name is the OSM ``name`` tag (observed). Without it, a generic word for the
+``shop``/``amenity``/``office``/``craft`` value is used (estimated), in the language
+of the map's centre (``detail.shop_names``, 15 November 2026; Spanish on every map before). The
 signs are generic: they do not show the real sign of any shop. This module only
 records where they go. ``signs place`` draws them.
 """
@@ -28,6 +29,7 @@ from shapely.geometry.base import BaseGeometry
 
 from onward_generator.detail.config import FASCIA_GAP_M, DetailConfig, ShopCategory
 from onward_generator.detail.facades import Hole, Segment, stable_unit
+from onward_generator.detail.shop_names import ShopWords, shop_words
 
 CATASTRO_USE_TAG = "catastro:current_use"
 """The tag a shop of a Catastro-use building carries in place of an OSM POI's tags (ADR-022). Not an OSM tag."""
@@ -41,13 +43,15 @@ SIGN_CLEAR_M = 0.05
 Shop = tuple[str | None, Mapping[str, Any], tuple[float, float] | None]
 
 
-def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
-    """``{"name", "name_origin", "name_rule"}``: the OSM name, else a generic word for the first evidence key,
-    else the generic word for the building's Catastro use, else the default."""
+def shop_name(tags: Mapping[str, Any], cfg: DetailConfig, words: ShopWords | None = None) -> dict[str, str]:
+    """``{"name", "name_origin", "name_rule"}``: the OSM name, else a generic word of ``words`` (the map's language,
+    ``detail.shop_names``; the map's own words without a centre) for the first evidence key, else the generic word for
+    the building's Catastro use (Spanish, as Catastro is), else the default word."""
     name = " ".join(str(tags.get("name") or "").split())
     if name:
         return {"name": name, "name_origin": "observed", "name_rule": "name"}
-    names = cfg.shops.generic_names
+    words = words or shop_words(None, cfg.shops.default_name, cfg.shops.generic_names)
+    names = words.generic_names
     for key in cfg.shop_evidence_keys:
         if key not in tags:
             continue
@@ -57,7 +61,7 @@ def shop_name(tags: Mapping[str, Any], cfg: DetailConfig) -> dict[str, str]:
     use = str(tags.get(CATASTRO_USE_TAG))
     if use in cfg.shop_catastro_uses:
         return {"name": cfg.shop_catastro_uses[use], "name_origin": "estimated", "name_rule": f"catastro_use={use}"}
-    return {"name": cfg.shops.default_name, "name_origin": "estimated", "name_rule": "default"}
+    return {"name": words.default_name, "name_origin": "estimated", "name_rule": "default"}
 
 
 def shop_category(shops: Sequence[Mapping[str, Any]], cfg: DetailConfig) -> ShopCategory:
@@ -153,8 +157,10 @@ def plan_shops(
     entrances: Sequence[Hole] = (),
     slabs: Sequence[Slab] = (),
     footprints: BaseGeometry | None = None,
+    words: ShopWords | None = None,
 ) -> list[dict[str, Any]]:
-    """One record per shop ``(poi_id, tags, point)``: its name, its sign, and the vinyls on the windows it owns.
+    """One record per shop ``(poi_id, tags, point)``: its name (generic words from ``words``), its sign, and the
+    vinyls on the windows it owns.
 
     A shop takes its bay (``shop_bays``) and its sign goes on it. A shop left without one gets no sign
     and no vinyl. A door in ``entrances`` gets no vinyl. ``shops`` is never empty. ``slabs`` are the
@@ -168,7 +174,7 @@ def plan_shops(
     for index, (poi_id, tags, _) in enumerate(shops):
         bay = assigned[index]
         key = poi_id or "building"
-        record: dict[str, Any] = {"id": f"shop/{building_id}/{key}", "poi_id": poi_id, **shop_name(tags, cfg), "sign": None, "vinyls": []}
+        record: dict[str, Any] = {"id": f"shop/{building_id}/{key}", "poi_id": poi_id, **shop_name(tags, cfg, words), "sign": None, "vinyls": []}
         records.append(record)
         if bay is None:
             continue

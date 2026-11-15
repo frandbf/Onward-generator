@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from functools import partial
 
 import numpy as np
 import pytest
 
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Segment
-from onward_generator.detail.shops import plan_shops
+from onward_generator.detail.shop_names import shop_words
+from onward_generator.detail.shops import plan_shops as _plan_shops
 from onward_generator.dress.atlas import decode_png_rgba
 from onward_generator.signs import shop
 from onward_generator.signs.shop import (
@@ -28,6 +30,8 @@ from onward_generator.signs.shop import (
     shop_items,
     shop_signs,
 )
+
+plan_shops = partial(_plan_shops, words=shop_words([-1.12863, 37.98407]))  # Murcia's Spanish words (15 November 2026)
 
 CFG = load_detail_config()
 SEG = Segment(0, 0, 0, (0.0, 0.0), (12.0, 0.0), True)
