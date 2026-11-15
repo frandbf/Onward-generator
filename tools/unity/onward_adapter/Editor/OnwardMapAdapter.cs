@@ -823,7 +823,7 @@ namespace OnwardGenerator
         private static string SceneDir(Package pkg) => $"{WorkRoot}/{pkg.Manifest.package_id}";
         private static string ScenePath(Package pkg) => $"{SceneDir(pkg)}/{pkg.Manifest.package_id}.unity";
 
-        [MenuItem("ONWARD Murcia Export/1. Build scene from export package")]
+        [MenuItem("ONWARD Map Export/1. Build scene from export package")]
         public static void BuildScene() =>
             BuildSceneFromPaths(RequireArg("-exportPackage"), RequireArg("-exportReport"), OptionalArg("-onwardBake"));
 
@@ -1093,7 +1093,7 @@ namespace OnwardGenerator
             public CaptureView[] views;
         }
 
-        [MenuItem("ONWARD Murcia Export/3. Capture fixed views of the baked scene")]
+        [MenuItem("ONWARD Map Export/3. Capture fixed views of the baked scene")]
         public static void CaptureViews() => CaptureViewsFromPaths(RequireArg("-exportPackage"));
 
         public static void CaptureViewsFromPaths(string packageDir)
@@ -1158,7 +1158,7 @@ namespace OnwardGenerator
             });
         }
 
-        [MenuItem("ONWARD Murcia Export/2. Build for Quest via Onward Launcher")]
+        [MenuItem("ONWARD Map Export/2. Build for Quest via Onward Launcher")]
         public static void BuildQuestViaLauncher() =>
             BuildLauncherFromPaths(RequireArg("-exportPackage"), RequireArg("-exportOut"), OptionalArg("-exportReport"));
 

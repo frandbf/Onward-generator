@@ -6,7 +6,7 @@
     {
       "id": "historic_plaster_cream",
       "name": "Historic cream plaster",
-      "description": "Warm cream stucco for historic or unknown walls in the Murcia centre.",
+      "description": "Warm cream stucco for historic or unknown walls.",
       "compatible_surfaces": ["wall"],
       "color_id": "plaster_cream",
       "textures": { "kind": "procedural", "paths": [], "note": "Bound in texture_plan.murcia_0.1 as greyscale modulation (coral_fort_wall_02). File paths appear only after materials apply." },

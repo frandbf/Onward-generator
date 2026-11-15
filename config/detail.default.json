@@ -1,6 +1,6 @@
 {
   "version": "0.3.0",
-  "description": "Phase 04/07.2 assumptions: generic facade templates, a warmer Murcia palette, roofs, urban elements, selected interiors, shopfronts with signs and vinyls, and landmark towers only when OSM records an observed height. Every number that is not tagged observed is a modelling assumption.",
+  "description": "Phase 04/07.2 assumptions: generic facade templates, a warm palette, roofs, urban elements, selected interiors, shopfronts with signs and vinyls, and landmark towers only when OSM records an observed height. Every number that is not tagged observed is a modelling assumption.",
   "seed": 48152,
   "exposure": {
     "probe_m": 1.0,

@@ -111,9 +111,9 @@ VEGETATION_ASSETS: tuple[AssetSpec, ...] = (
 ALL_ASSETS: tuple[AssetSpec, ...] = NAMED_ASSETS + VEGETATION_ASSETS
 ASSETS_BY_ID = {spec.id: spec for spec in ALL_ASSETS}
 
-# The caps of the street props, vehicles, structures, facade props, barriers and plants doubled on 12 November 2026:
-# Rue Mouffetard had 16 props with the AI pick and 34 with the rules, and the maintainer asked for more on the
-# headset (the 300 000 Unity triangle limit leaves room; ``MAX_LIBRARY_TRIS`` still bounds the library copies).
+# The caps of the street props, vehicles, structures, facade props, barriers and plants doubled on 12 November 2026, at
+# the maintainer's request for fuller streets on the headset. The caps are an upper bound per rule: the triangle
+# headroom under the map's Unity limit (``place.triangle_headroom``) and ``MAX_LIBRARY_TRIS`` decide how many land.
 PLACEMENT_RULES: tuple[PlacementRule, ...] = (
     PlacementRule("vehicles_curb", "vehicles", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "park"), "forbid", 12),
     PlacementRule("waste_ground", "waste", ("curb", "carriageway", "sidewalk", "courtyard", "yard", "empty_lot", "plaza"), "forbid", 24),

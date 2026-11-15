@@ -287,7 +287,7 @@ def build_atlas(
     note = (
         f"Atlas {size}², {len(slots)} tiles on a {tiles}×{tiles} grid "
         f"({len(photo_ids)} photographic, rest greyscale procedural). "
-        "Not a photograph of Murcia. "
+        "Not a photograph of the place. "
         + (f"Photo slots: {', '.join(photo_ids)}. " if photo_ids else "")
         + (f"Pending photographic textures: {', '.join(pending)}." if pending else "")
     )
