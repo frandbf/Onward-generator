@@ -271,7 +271,7 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
     }
     assert _check_layout(doc) == []
     night = {**doc, "time_of_day": "Night", "profile": "UrbanNight1", "street_lights_m": [1.0, 2.0, 4.2]}
-    assert _check_layout(night) == []
+    assert _check_layout({**night, "audio_global": "Suburban Night"}) == []
     for bad, message in (
         ({**night, "profile": "UrbanDay1"}, "environment must be"),
         ({**doc, "profile": "UrbanNight1"}, "environment must be"),
@@ -286,6 +286,14 @@ def test_gameplay_schema_requires_hunt_audio_and_urban_day() -> None:
     assert "layout: street_lights_m must be flat x, y, z triples" in _check_layout({**night, "street_lights_m": "x"})
     assert "layout: street_lights_m is only for a night map" in _check_layout({**doc, "street_lights_m": [1.0, 2.0, 4.2]})
     assert _check_layout({**doc, "audio_roof_wind_m": [1.0, 2.0, 3.0]}) == []
+    # The ambience follows the time of day (15 November 2026), and the reverb is a point or nothing.
+    clip = "layout: audio_global must be the SDK clip Suburban Day by day and Suburban Night by night"
+    assert clip in _check_layout({**night})  # a night map with the day track
+    assert _check_layout({**night, "audio_global": "Suburban Night"}) == []
+    assert clip in _check_layout({**doc, "audio_global": "Suburban Night"})
+    assert _check_layout({**doc, "reverb_m": [4.0, -2.5]}) == [] and _check_layout({**doc, "reverb_m": []}) == []
+    for bad in ([1.0], [1.0, 2.0, 3.0], "x", [1.0, True]):
+        assert "layout: reverb_m must be empty or an x, y point" in _check_layout({**doc, "reverb_m": bad})
     for bad in ([1.0, 2.0], "x", [1.0, 2.0, True]):
         assert "layout: audio_roof_wind_m must be flat x, y, z triples" in _check_layout({**doc, "audio_roof_wind_m": bad})
     doc["schema_version"] = GAMEPLAY_VERSION
@@ -1568,3 +1576,40 @@ def test_the_package_checks_the_shape_of_the_navmesh_ground() -> None:
     index = "layout: nav_ground.triangles must be index triples into its 3 vertices"
     for triangles in ([0, 1], [], [0, 1, 3], [0, 1, -1], [0, 1, 2.0], [0, 1, True], None):
         assert _check_nav_ground({**good, "triangles": triangles}) == [index]
+
+
+def _landmark(source: str, x0: float, y0: float, x1: float, y1: float) -> object:
+    from types import SimpleNamespace
+
+    from onward_generator.generation.mesh import box as solid
+
+    return SimpleNamespace(type="building", record={"source_ids": [source]},
+                           visual=[SimpleNamespace(mesh=solid(x0, x1, y0, y1, 0.0, 12.0))])
+
+
+def test_the_focus_is_the_largest_landmark_not_a_name_or_a_direction() -> None:
+    """15 November 2026: a landmark named "catedral" won, else the northernmost; now the largest plan, nearest on a tie."""
+    from types import SimpleNamespace
+
+    from onward_generator.perf.layout import _focus_xy
+
+    heights = {"buildings": [{"building_id": "a", "landmark": True, "name": "Catedral"},
+                             {"building_id": "b", "landmark": True, "name": "Mosque"},
+                             {"building_id": "c", "landmark": False, "name": "Big shed"}]}
+    small_north = _landmark("a", 0.0, 50.0, 10.0, 60.0)    # named catedral, northernmost, 100 m²
+    large_south = _landmark("b", -20.0, -40.0, 20.0, -20.0)  # 800 m²
+    not_landmark = _landmark("c", 60.0, 60.0, 120.0, 120.0)
+    base = SimpleNamespace(objects=[small_north, large_south, not_landmark])
+    assert _focus_xy(base, heights) == pytest.approx((0.0, -30.0))
+    # A tie in area: the one nearer the site centre.
+    twins = {"buildings": [{"building_id": "a", "landmark": True}, {"building_id": "b", "landmark": True}]}
+    near, far = _landmark("a", 10.0, 0.0, 20.0, 10.0), _landmark("b", 50.0, 0.0, 60.0, 10.0)
+    assert _focus_xy(SimpleNamespace(objects=[far, near]), twins) == pytest.approx((15.0, 5.0))
+    assert _focus_xy(SimpleNamespace(objects=[not_landmark]), heights) is None
+
+
+def test_the_ambience_follows_the_time_of_day() -> None:
+    from onward_generator.perf.layout import GLOBAL_AMBIENCE, TIME_OF_DAY_SETTINGS
+
+    assert GLOBAL_AMBIENCE == {"day": "Suburban Day", "night": "Suburban Night"}
+    assert set(GLOBAL_AMBIENCE) == set(TIME_OF_DAY_SETTINGS)

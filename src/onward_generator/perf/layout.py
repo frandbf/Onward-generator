@@ -21,7 +21,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from shapely import LineString, MultiLineString, MultiPolygon, Point, STRtree, contains_xy, dwithin, offset_curve, prepare, union_all
+from shapely import (
+    LineString,
+    MultiLineString,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    STRtree,
+    contains_xy,
+    dwithin,
+    offset_curve,
+    prepare,
+    union_all,
+)
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge, nearest_points, polylabel
 
@@ -642,22 +654,22 @@ def _xy(x: float, y: float, focus: tuple[float, float]) -> dict[str, float]:
 
 
 def _focus_xy(base: GeneratedScene, heights: Mapping[str, Any]) -> tuple[float, float] | None:
-    names = {b["building_id"]: str(b.get("name") or "") for b in heights.get("buildings", []) if b.get("landmark")}
-    centroids = []
+    """The map's focus: the centre of its largest landmark by plan area (a cathedral, a mosque, a palace), the one
+    nearest the site centre on a tie; None without a landmark. Until 15 November 2026 a landmark named "catedral" won,
+    else the northernmost: a Spanish word and a direction, neither of them a reason."""
+    landmarks = {b["building_id"] for b in heights.get("buildings", []) if b.get("landmark")}
+    found = []
     for obj in base.objects:
         if obj.type != "building" or not obj.visual:
             continue
         source = (obj.record.get("source_ids") or [None])[0]
-        if source not in names:
+        if source not in landmarks:
             continue
         vertices = np.vstack([prim.mesh.vertices for prim in obj.visual])
-        centroids.append((names[source], (float(vertices[:, 0].mean()), float(vertices[:, 1].mean()))))
-    for name, point in centroids:
-        if "catedral" in name.lower():
-            return point
-    if not centroids:
-        return None
-    return max((point for _, point in centroids), key=lambda p: (p[1], p[0]))
+        area = MultiPoint([tuple(v) for v in vertices[:, :2]]).convex_hull.area
+        centre = (float(vertices[:, 0].mean()), float(vertices[:, 1].mean()))
+        found.append((-round(area, 3), round(math.hypot(*centre), 3), centre))
+    return min(found)[2] if found else None
 
 
 def _centerlines(geometry: BaseGeometry) -> list[LineString]:
@@ -956,6 +968,9 @@ def spread_routes(routes: list[dict[str, Any]], count: int, origin: tuple[float,
 
 TIME_OF_DAY_SETTINGS: Mapping[str, tuple[str, str]] = {"day": ("Day", "UrbanDay1"), "night": ("Night", "UrbanNight1")}
 """``time_of_day`` → SDK ``ETimeOfDay`` and ``EProfileId`` names (``LevelDescriptor.cs``, SDK v1.15)."""
+GLOBAL_AMBIENCE = {"day": "Suburban Day", "night": "Suburban Night"}
+"""``time_of_day`` → the SDK's global ambience (``OnwardAudioDataStrings.cs``): birds and distant cars by day, crickets
+by night. Every map had the day track until 15 November 2026."""
 STREET_LIGHTS_MAX = 64
 """As many as the schema allows interior lights. A baked light costs bake time, not frame time."""
 LAMP_HEAD_REACH_M = 1.0
@@ -1139,7 +1154,8 @@ def playable_layout(
     inside = playable_area(detail_manifest)
     uplink = tuple(doc["uplink_m"])
     area = component_holding(parts, uplink)
-    focus = _focus_xy(base, heights) or uplink
+    landmark = _focus_xy(base, heights)
+    focus = landmark or uplink
 
     islands = nav_islands(base, inside)
     patrol, home = route_islands(islands, uplink)
@@ -1211,9 +1227,12 @@ def playable_layout(
         "navigation": navigation_estimate(islands),
         "nav_ground": nav_ground(base, inside),
         "ammo_m": [_xy(*p, focus) for p in ammo],
-        "audio_global": "Suburban Day",
+        "audio_global": GLOBAL_AMBIENCE[time_of_day],
         "audio_birds_m": list(uplink) if time_of_day == "day" else [],
         "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
+        # A large reflective space round the focus only when the focus is a landmark (15 November 2026): every map got
+        # one at its Uplink before, an indoor hall's reverb out in a street.
+        "reverb_m": [round(landmark[0], 2), round(landmark[1], 2)] if landmark is not None else [],
         "audio_roof_wind_m": roof_wind(detail_manifest, focus, climbed_roofs(climbs)),
         **climbs,
         "environment": "Urban",

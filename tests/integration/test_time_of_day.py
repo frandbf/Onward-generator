@@ -31,7 +31,7 @@ def layouts(detail_inputs: tuple[Path, Path, Path]) -> dict[str, dict]:
     return {time: playable_layout(generated, manifest, levels, time_of_day=time) for time in ("day", "night")} | {"manifest": manifest}
 
 
-def test_a_night_layout_changes_only_the_profile_the_birds_and_the_lights(layouts: dict[str, dict]) -> None:
+def test_a_night_layout_changes_only_the_profile_the_birds_the_lights_and_the_ambience(layouts: dict[str, dict]) -> None:
     day, night = layouts["day"], layouts["night"]
     assert (day["time_of_day"], day["profile"], day["street_lights_m"]) == ("Day", "UrbanDay1", [])
     assert isinstance(day["audio_roof_wind_m"], list)
@@ -39,7 +39,8 @@ def test_a_night_layout_changes_only_the_profile_the_birds_and_the_lights(layout
     assert day["audio_birds_m"] == day["uplink_m"] and night["audio_birds_m"] == []
     lamps = [o for o in layouts["manifest"]["objects"] if o.get("kind") == "street_lamp"]
     assert lamps and len(night["street_lights_m"]) == 3 * len(lamps)
-    ignored = {"time_of_day", "profile", "street_lights_m", "audio_birds_m"}
+    assert (day["audio_global"], night["audio_global"]) == ("Suburban Day", "Suburban Night")  # 15 November 2026
+    ignored = {"time_of_day", "profile", "street_lights_m", "audio_birds_m", "audio_global"}
     assert {k: v for k, v in day.items() if k not in ignored} == {k: v for k, v in night.items() if k not in ignored}
     assert _check_layout(day) == [] and _check_layout(night) == []
 
