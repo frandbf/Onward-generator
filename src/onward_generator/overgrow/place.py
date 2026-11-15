@@ -64,6 +64,7 @@ from onward_generator.overgrow.lamps import swap_lamps
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.pick import pick_props
+from onward_generator.overgrow.pinned import PinnedError, PinnedResult, frame_of, keep_out_circles, place_pins, read_pins
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import load_replay
 from onward_generator.overgrow.trees import swap_trees
@@ -121,6 +122,7 @@ def overgrow(
     street_profile: Mapping[str, Any] | None = None,
     prefer: str | Path | None = None,
     triangle_limit: int = UNITY_TRIANGLE_LIMIT,
+    pinned: str | Path | None = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -179,7 +181,16 @@ def overgrow(
     wreck = wreck_mesh()
     variants = [tree_parts(i) for i in range(3)]
     tree_tris = [sum(part.triangle_count for _, part in parts) for parts in variants]
-    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles, triangle_limit)
+    # Props the map must carry where its story put them (config/pinned_props.json), before anything else spends the room.
+    pins = PinnedResult()
+    if pinned is not None:
+        try:
+            pins = place_pins(read_pins(pinned), {prop.spec.id: prop for prop in library_props}, frame_of(geo), buildings, area)
+        except PinnedError as exc:
+            raise OvergrowError(str(exc)) from exc
+        nodes = [*nodes, *pins.nodes]
+        urban_areas.extend(pins.footprints)
+    headroom = triangle_headroom(visual_triangles((base / "scene_visual.glb").read_bytes()), furniture.triangles + pins.triangles, triangle_limit)
     # detail's procedural street lamps drawn as one library lamp post, before the props spend the headroom.
     lamps = swap_lamps(nodes, library_props, seed, headroom)
     nodes = lamps.nodes
@@ -332,7 +343,7 @@ def overgrow(
         floor=floor,
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
-        keep_out=detail_elements(manifest),
+        keep_out=[*detail_elements(manifest), *keep_out_circles(pins.footprints)],
         signs=sign_footprints(manifest),
     )
     tuft_meshes.extend(planted.grass)
@@ -364,13 +375,14 @@ def overgrow(
     images.setdefault("tree_canopy", canopy_png())
     images.update(planted.images)
     images.update(lamps.images)
+    images.update(pins.images)
     images.update(trees_swap.images)
     materials.setdefault("abandoned_grass", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("abandoned_wreck", Material((1, 1, 1, 1), 0.85))
     materials.setdefault("abandoned_vine", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_trunk", Material((1, 1, 1, 1), 0.9))
     materials.setdefault("tree_canopy", Material((1, 1, 1, 1), 0.8))
-    for name in (*planted.images, *lamps.images, *trees_swap.images):
+    for name in (*planted.images, *lamps.images, *trees_swap.images, *pins.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     extra_nodes.extend(furniture.nodes)
     images.update(furniture.images)
@@ -380,7 +392,7 @@ def overgrow(
     # One shared atlas for the props and furniture: one draw per cell (or building storey) instead of one per model.
     # The swapped lamps and trees are base nodes outside the atlas: a prop the rules placed shares their materials.
     extra_nodes, images, cells = apply_atlas(extra_nodes, images,
-                                             keep_out=frozenset({*planted_cutouts, *lamps.images, *trees_swap.images}))
+                                             keep_out=frozenset({*planted_cutouts, *lamps.images, *trees_swap.images, *pins.images}))
     materials = {name: m for name, m in materials.items() if name not in cells}
     for name in {cell.atlas for cell in cells.values()}:
         materials[name] = Material((1, 1, 1, 1), 0.9)
@@ -408,10 +420,10 @@ def overgrow(
         )
         for index, node in enumerate(trees)
     ]
-    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders]
+    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders, *pins.colliders]
     collision = base / "scene_collision.glb"
     atomic_write_bytes(targets[1], _collision_bytes(collision.read_bytes() if collision.is_file() else b"", colliders))
-    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces:
+    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces + len(pins.colliders):
         raise OvergrowError("a solid prop was placed without a collision box")
     objects = [dict(o) for o in (manifest.get("objects") or []) if isinstance(o, dict)]
     objects.extend(
@@ -488,6 +500,7 @@ def overgrow(
         "triangle_headroom": headroom,
         "triangle_limit": triangle_limit,
         "street_lamps": lamps.report,
+        "pinned": pins.records,
         "street_trees": trees_swap.report,
         "library_preferred": len(preferred),
         "rejects": rejects[:80],
@@ -510,7 +523,7 @@ def overgrow(
 
 def triangle_headroom(input_triangles: int, furniture_triangles: int, limit: int = UNITY_TRIANGLE_LIMIT) -> int:
     """What overgrow may add under the Unity limit: the limit less the adapter's own triangles, the later stages'
-    ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture overgrow adds. Never below 0."""
+    ``LATER_RESERVE_TRIANGLES``, the input scene and the interior furniture and pinned props overgrow adds. Never below 0."""
     return max(0, limit - ADAPTER_BASE_TRIANGLES - LATER_RESERVE_TRIANGLES - input_triangles - furniture_triangles)
 
 

@@ -174,6 +174,18 @@ def test_layout_and_compact_overgrow_write_their_own_directories(tmp_path: Path)
     assert signs_command(processed / "scene_materials").argv[-2:] == ("--out", str(processed / "scene_signs"))
 
 
+def test_overgrow_carries_the_maps_pinned_props_only_when_it_has_them(tmp_path: Path) -> None:
+    root = tmp_path / "mogadishu"
+    create_map(root, map_id="mogadishu", name="Mogadishu", latitude=LAT, longitude=LON, radius_m=400)
+    signs = root / "data" / "processed" / "scene_signs"
+    assert "--pinned" not in overgrow_command(signs).argv
+    pins = root / "config" / "pinned_props.json"
+    pins.parent.mkdir(parents=True, exist_ok=True)
+    pins.write_text('{"props": []}', encoding="utf-8")
+    argv = list(overgrow_command(signs).argv)
+    assert argv.count("--pinned") == 1 and argv[argv.index("--pinned") + 1] == str(pins.resolve())
+
+
 def _facades(root: Path, block: object) -> None:
     document = json.loads((root / "map.json").read_text(encoding="utf-8"))
     document["facades"] = block
