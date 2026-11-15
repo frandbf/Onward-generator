@@ -871,7 +871,8 @@ def nav_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> dict
     if not meshes:
         raise LayoutError("no walkable ground for the bots' navmesh")
     mesh = merge(meshes)
-    return {"vertices_m": [round(float(v), 3) for v in mesh.vertices.ravel()], "triangles": [int(i) for i in mesh.triangles.ravel()]}
+    vertices = [round(float(v), 3) for v in mesh.vertices.ravel()]  # pragma: no mutate: the ground keeps the partition's 1 mm grid, so 3 or more places round alike
+    return {"vertices_m": vertices, "triangles": [int(i) for i in mesh.triangles.ravel()]}
 
 
 def navigation_estimate(islands: Sequence[BaseGeometry]) -> dict[str, float]:
