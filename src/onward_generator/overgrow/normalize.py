@@ -118,7 +118,7 @@ def flatten_albedo(data: bytes, size: int = ALBEDO_PX) -> bytes:
 def gltf_to_local(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, bytes | None]:
     """World-space glTF vertices → local Z-up, plus the diffuse image bytes."""
     local, triangles, uvs, _materials, _albedos = gltf_to_local_parts(folder)
-    return local, triangles, uvs, _diffuse_bytes(folder, json.loads(next(folder.glob("*.gltf")).read_text(encoding="utf-8")))
+    return local, triangles, uvs, _diffuse_bytes(folder, json.loads(next(folder.glob("*.gltf")).read_bytes()))
 
 
 def gltf_to_local_parts(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[bytes | None]]:
@@ -157,7 +157,7 @@ def gltf_to_local_parts(folder: Path) -> tuple[np.ndarray, np.ndarray, np.ndarra
             positions.append(pos)
             uvs.append(uv[:, :2])
             indices.append(idx + offset)
-            owners.append(np.full(len(idx), int(prim.get("material", -1)), dtype=np.int64))
+            owners.append(np.full(len(idx), int(prim.get("material", -1)), dtype=np.int64))  # pragma: no mutate: np.full of a Python int is int64 already
             offset += len(pos)
     if not positions:
         raise ValueError(f"{folder}: glTF has no triangles")
@@ -248,7 +248,9 @@ def normalize_parts(
         local_v, local_t, local_u = vertices[used], np.searchsorted(used, own), uvs[used]
         share = max(1, round(target_tris * len(own) / before))
         local_v, local_t, local_u = cluster_decimate(local_v, local_t, local_u, share)
-        mesh, _dropped = Mesh(np.ascontiguousarray(local_v, dtype=np.float64), np.ascontiguousarray(local_t, dtype=np.int64)).drop_degenerate()
+        part_v = np.ascontiguousarray(local_v, dtype=np.float64)  # pragma: no mutate: gltf_to_local_parts gives float64 and clustering keeps it
+        part_t = np.ascontiguousarray(local_t, dtype=np.int64)  # pragma: no mutate: searchsorted gives int64 and clustering keeps it
+        mesh, _dropped = Mesh(part_v, part_t).drop_degenerate()
         if mesh.triangle_count == 0:
             continue
         meshes.append(mesh)

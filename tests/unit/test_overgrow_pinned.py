@@ -291,3 +291,18 @@ def test_pins_of_one_model_share_its_mesh_only_in_the_same_pose() -> None:
                                                   "pinned:crashed_helicopter:-80:0", "pinned:crashed_helicopter"]
     heights = [round(float(np.vstack([p.mesh.vertices for p in n.primitives])[:, 2].max()), 6) for n in result.nodes]
     assert heights[1] == heights[2] != heights[0] and heights[3] == pytest.approx(2.5)
+
+
+def test_a_bad_pose_number_names_its_pin_and_the_bounds_are_kept(tmp_path: Path) -> None:
+    from onward_generator.overgrow.pinned import posed
+
+    path = tmp_path / "pinned_props.json"
+    for key in ("roll_deg", "pitch_deg", "sink_m"):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, key: "x"}]}))
+        with pytest.raises(PinnedError, match=rf"^{path} props\[0\]: {key} must be a number, got 'x'$"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": -180, "pitch_deg": 90}]}))
+    assert (read_pins(path)[0].roll_deg, read_pins(path)[0].pitch_deg) == (-180.0, 90.0)
+    # A roll turns +Y onto +Z: on its side, a 4 m wide wreck lies on the -Y side of its axis, 2.5 m deep.
+    side = posed(_wreck(14.0, 4.0), 90.0, 0.0)
+    assert side.mesh.vertices[:, 1].min() == pytest.approx(-2.5) and side.mesh.vertices[:, 1].max() == pytest.approx(0.0, abs=1e-9)
