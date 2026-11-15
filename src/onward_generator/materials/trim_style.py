@@ -47,6 +47,8 @@ class Style:
     name: str
     note: str
     atlas: Mapping[str, Any] | None
+    geometry: frozenset[str] = frozenset()
+    """The pieces detail builds for the style (``mansard``, ``filants``), whatever chose it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +73,7 @@ def load_style_table(path: str | Path | None = None) -> StyleTable:
     if first is not None:
         where = "/".join(str(p) for p in first.absolute_path) or "(root)"
         raise StyleError(f"{source}: {where}: {first.message}")
-    styles = {name: Style(name, str(body["note"]), body["atlas"]) for name, body in doc["styles"].items()}
+    styles = {name: Style(name, str(body["note"]), body["atlas"], frozenset(body.get("geometry") or ())) for name, body in doc["styles"].items()}
     rules = tuple((str(r["style"]), tuple(_box(box) for box in r["boxes"])) for r in doc["selection"])
     for name in [doc["default_style"], *(style for style, _ in rules)]:
         if name not in styles:

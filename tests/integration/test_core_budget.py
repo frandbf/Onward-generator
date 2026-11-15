@@ -473,21 +473,13 @@ def test_a_core_building_records_each_column_of_balconies(ring_inputs: tuple[Pat
     assert all(b["facade"]["balconies_m"] == [] for b in buildings if not b["facade"]["openings"].get("balcony"))
 
 
-def test_a_haussmann_map_lays_balcons_filants_along_its_tall_street_walls(ring_inputs: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch) -> None:
-    """Plan Q3b (ADR-020 amendment of 12 November 2026): only a map in the Haussmann box gets them."""
-    from onward_generator.detail import scene as scene_module
-
+def test_a_haussmann_map_lays_balcons_filants_along_its_tall_street_walls(ring_inputs: tuple[Path, Path, Path]) -> None:
+    """Plan Q3b (ADR-020 amendment of 12 November 2026): a map whose style is Haussmann gets them. Since 15 November
+    2026 the style may come from the map (facades.style, the street profile), not only from the Paris box: this fixture
+    stands in Murcia."""
     scene, heights, base = ring_inputs
     generated, ref = load_base(base, scene, heights, GEN)
-    asked: list[object] = []
-
-    def style(base_scene: object) -> str:
-        asked.append(base_scene)
-        return "haussmann"
-
-    monkeypatch.setattr(scene_module, "regional_style", style)
-    paris = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0).manifest()
-    assert asked and asked[0] is generated
+    paris = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0, style_request="haussmann").manifest()
     tall = [o for o in paris["objects"] if o.get("type") == "building" and (o["facade"].get("storeys") or {}).get("count", 0) >= 4]
     with_filants = [o for o in tall if o["facade"]["openings"].get("balcony_filant")]
     assert with_filants
@@ -495,6 +487,5 @@ def test_a_haussmann_map_lays_balcons_filants_along_its_tall_street_walls(ring_i
         assert any(math.dist(a, b) >= 3.0 for a, b in building["facade"]["balconies_m"])  # a filant's span runs along the wall
     assert not [o for o in paris["objects"] if o.get("type") == "building" and (o["facade"].get("storeys") or {}).get("count", 0) < 4
                 and o["facade"]["openings"].get("balcony_filant")]
-    monkeypatch.setattr(scene_module, "regional_style", lambda base_scene: "mediterranean")
-    elsewhere = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0).manifest()
+    elsewhere = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0).manifest()  # Murcia's own box
     assert not [o for o in elsewhere["objects"] if o.get("type") == "building" and o["facade"]["openings"].get("balcony_filant")]

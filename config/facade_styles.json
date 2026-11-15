@@ -319,7 +319,8 @@
       "atlas": null
     },
     "haussmann": {
-      "note": "Paris (plan Q3): light limestone ashlar on every storey, a stone plinth, a cornice and a string course at every storey, tall casements in painted or dark grey frames. Opt-in atlas in facade_styles.regional.json. Wrought-iron balconies and zinc mansards are geometry and not drawn yet.",
+      "note": "Paris (plan Q3): light limestone ashlar on every storey, a stone plinth, a cornice and a string course at every storey, tall casements in painted or dark grey frames. Opt-in atlas in facade_styles.regional.json. Its zinc mansards and wrought-iron balcons filants are drawn by detail (geometry).",
+      "geometry": ["mansard", "filants"],
       "atlas": null
     },
     "generic": {
