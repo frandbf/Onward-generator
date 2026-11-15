@@ -130,7 +130,7 @@ def _shrapnel(rng: np.random.Generator, n: int) -> np.ndarray:
         chip_draw.ellipse((x - s * 2.2, y - s * 2.2, x + s * 2.2, y + s * 2.2), fill=int(rng.uniform(90, 170)))
         pit_draw.ellipse((x - s, y - s, x + s, y + s), fill=240)
     chipped, pit = np.asarray(_blur(chips, 0.8)), np.asarray(_blur(pits, 0.5))
-    pixels[..., :3] = np.where(np.asarray(pits)[..., None] > 0, np.array([28, 25, 23]), np.array([196, 188, 174]))  # the pits themselves are dark
+    pixels[..., :3] = np.where(np.asarray(pits)[..., None] > 0, np.array([28, 25, 23]), np.array([196, 188, 174]))  # pragma: no mutate: the pits themselves are dark; the unblurred mask holds only 0 and 240
     pixels[..., 3] = np.maximum(chipped, pit)
     return pixels
 
@@ -326,8 +326,9 @@ class Ground:
         return best
 
 
-def place_ground(ground: Ground, area: BaseGeometry, decals: Sequence[Decal], count: int, seed: int) -> list[GroundPlaced]:
-    """Up to ``count`` ground decals in their turn at seeded spots inside ``area``: where the top face under the
+def place_ground(ground: Ground, area: BaseGeometry, count: int, seed: int, decals: Sequence[Decal] | None = None) -> list[GroundPlaced]:
+    """Up to ``count`` ground decals (``decals``, else the drawn ground kinds of ``seed``) in their turn at seeded
+    spots inside ``area``: where the top face under the
     centre and the four corners is allowed ground (``GROUND_NODES``, not a crossing or a manhole), all within
     ``GROUND_FLAT_M`` of one height, and ``GROUND_SPACING_M`` clear of the decals already down."""
     if area.is_empty:  # no decal or no count leaves the turn empty below
@@ -336,7 +337,7 @@ def place_ground(ground: Ground, area: BaseGeometry, decals: Sequence[Decal], co
     x0, y0, x1, y1 = area.bounds
     placed: list[GroundPlaced] = []
     taken: list[Polygon] = []
-    order = turn_order(decals, count, seed)
+    order = turn_order(ground_decals(seed) if decals is None else decals, count, seed)
     tries = 0
     for decal in order:
         while tries < GROUND_TRIES * count:

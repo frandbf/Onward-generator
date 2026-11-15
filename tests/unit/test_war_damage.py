@@ -159,7 +159,7 @@ def test_the_ground_under_a_point_is_its_top_face() -> None:
 def test_ground_decals_lie_flat_on_one_surface_spaced_apart() -> None:
     ground = Ground(_ground_nodes())
     decals = [d for d in ground_decals(5) if d.width_m <= 2.0]
-    placed = place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals, 8, 5)
+    placed = place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 8, 5, decals)
     assert len(placed) == 8
     for item in placed:
         corners = item.corners()
@@ -173,17 +173,17 @@ def test_ground_decals_lie_flat_on_one_surface_spaced_apart() -> None:
     from shapely.geometry import Polygon
     plans = [Polygon(p.corners()[:, :2]) for p in placed]
     assert all(a.distance(b) >= GROUND_SPACING_M for i, a in enumerate(plans) for b in plans[i + 1:])
-    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals, 8, 5) == placed  # deterministic
+    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 8, 5, decals) == placed  # deterministic
 
 
 def test_nothing_to_place_places_nothing() -> None:
     ground = Ground(_ground_nodes())
-    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), [], 5, 1) == []
-    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), ground_decals(1), 0, 1) == []
-    assert place_ground(ground, box(0.0, 0.0, 0.0, 0.0).buffer(0), ground_decals(1), 5, 1) == []
+    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 5, 1, []) == []
+    assert place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 0, 1, ground_decals(1)) == []
+    assert place_ground(ground, box(0.0, 0.0, 0.0, 0.0).buffer(0), 5, 1, ground_decals(1)) == []
     # No allowed ground at all: tries run out.
     roofs = Ground([_ground_nodes()[3]])
-    assert place_ground(roofs, box(0.0, 0.0, 20.0, 14.0), ground_decals(1), 3, 1) == []
+    assert place_ground(roofs, box(0.0, 0.0, 20.0, 14.0), 3, 1, ground_decals(1)) == []
 
 
 def test_a_ground_quad_faces_up_and_turns_by_its_yaw() -> None:
@@ -238,6 +238,11 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
 
     plain = place_signs(base, scene, tmp_path / "plain")
     assert "damage" not in plain
+    assert "ground_decals" not in json.loads((tmp_path / "plain" / "detail_report.json").read_text())
+    from onward_generator.generation.gltf import read_glb
+
+    plain_extras = read_glb((tmp_path / "plain" / "scene_visual.glb").read_bytes())[0].get("extras") or {}
+    assert "ground_decals" not in plain_extras and "damage" not in plain_extras
     plain_nodes, _ = nodes_from_glb((tmp_path / "plain" / "scene_visual.glb").read_bytes())
     assert not any(n.name.startswith("ground_decal/") for n in plain_nodes)
 
@@ -253,11 +258,14 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     nodes, _ = nodes_from_glb((tmp_path / "heavy" / "scene_visual.glb").read_bytes())
     assert sum(n.name.startswith("ground_decal/") for n in nodes) == len(ground_rows)
     detail = json.loads((tmp_path / "heavy" / "detail_report.json").read_text())
-    assert detail["ground_decals"]["count"] == len(ground_rows)
+    assert detail["ground_decals"] == {"count": len(ground_rows), "kinds": sorted({row["kind"] for row in ground_rows})}
+    extras = read_glb((tmp_path / "heavy" / "scene_visual.glb").read_bytes())[0]["extras"]
+    assert (extras["ground_decals"], extras["damage"]) == (len(ground_rows), "heavy")
 
     from onward_generator.signs.decals import procedural_decals as drawn
 
     seed = signs_place._seed(json.loads((base / "scene_detail.json").read_text()))
+    assert block["ground_decals"]["wanted"] == ground_count(seed, "heavy")
     kinds = {row["kind"] for row in heavy["wall_decals"]["decals"]}
     assert {"shell_impact", "scorch", "shrapnel"} & kinds  # the drawn war kinds come in with the sequence
     # The walls follow the war sequence of the map's seed (a decal that fits no wall drops out, so a subsequence).
@@ -265,7 +273,7 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     assert all(any(row["decal"] == want for want in expected) for row in heavy["wall_decals"]["decals"])
     # The ground is the one place_ground lays for the map's seed on the built scene.
     built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
-    again = place_ground(Ground(built), damage_area(base, scene), ground_decals(seed), ground_count(seed, "heavy"), seed)
+    again = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed)
     assert [[round(v, 3) for v in p.centre] for p in again] == [row["position_m"] for row in ground_rows]
 
     # With a core, the ground decals are laid in the core square, not the walls' envelope.
@@ -273,7 +281,7 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     cored = {**plain_manifest, "core": {"half_side_m": 50.0}}
     (base / "scene_detail.json").write_text(json.dumps(cored), encoding="utf-8")
     inside = place_signs(base, scene, tmp_path / "cored")["damage"]["ground_decals"]["decals"]
-    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_decals(seed), ground_count(seed, "heavy"), seed)
+    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_count(seed, "heavy"), seed)
     assert [[round(v, 3) for v in p.centre] for p in in_core] == [r["position_m"] for r in inside] != [row["position_m"] for row in ground_rows]
     (base / "scene_detail.json").write_text(json.dumps(plain_manifest), encoding="utf-8")
 
@@ -348,18 +356,18 @@ def _spots(placed: list[GroundPlaced]) -> list[tuple[str, list[float], float]]:
 def test_the_ground_placements_are_pinned() -> None:
     ground = Ground(_ground_nodes())
     decals = [d for d in ground_decals(5) if d.width_m <= 2.0]
-    assert _spots(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals, 8, 5)) == [
+    assert _spots(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 8, 5, decals)) == [
         ("gen_flat_rubble", [7.029, 1.473, 0.115], 0.939), ("gen_pothole_patch", [9.972, 12.298, 0.265], 0.211),
         ("gen_flat_rubble", [10.037, 4.914, 0.115], 1.594), ("gen_pothole_patch", [5.146, 12.409, 0.265], 3.131),
         ("gen_flat_rubble", [1.474, 12.514, 0.265], 1.741), ("gen_pothole_patch", [12.843, 2.164, 0.115], 1.299),
         ("gen_flat_rubble", [3.981, 8.06, 0.115], 1.129), ("gen_pothole_patch", [1.16, 4.248, 0.115], 1.664)]
     # A round area: spots outside it are tried again, not given up.
-    assert _spots(place_ground(ground, Point(10.0, 7.0).buffer(4.0), decals[:1], 4, 3)) == [
+    assert _spots(place_ground(ground, Point(10.0, 7.0).buffer(4.0), 4, 3, decals[:1])) == [
         ("gen_pothole_patch", [9.108, 5.641, 0.115], 0.239), ("gen_pothole_patch", [9.262, 8.669, 0.115], 1.766),
         ("gen_pothole_patch", [11.409, 4.467, 0.115], 1.102), ("gen_pothole_patch", [6.401, 8.002, 0.115], 1.94)]
     # Tries run out: a vast area with little allowed ground places one of six in its 150 tries.
-    assert len(place_ground(ground, box(0.0, 0.0, 200.0, 140.0), decals[:1], 6, 2)) == 1
-    assert len(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals[:1], 1, 2)) == 1
+    assert len(place_ground(ground, box(0.0, 0.0, 200.0, 140.0), 6, 2, decals[:1])) == 1
+    assert len(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), 1, 2, decals[:1])) == 1
 
 
 def test_a_ground_quad_carries_its_atlas_cell_and_the_millimetre() -> None:
@@ -419,4 +427,10 @@ def test_a_ground_decal_gets_exactly_its_tries(monkeypatch: pytest.MonkeyPatch, 
     small = [d for d in ground_decals(5) if d.width_m <= 2.0][:1]
     monkeypatch.setattr(damage, "_rng", lambda seed, name: _Scripted(list(script)))
     assert damage.GROUND_TRIES == 25
-    assert len(place_ground(Ground(_ground_nodes()), box(0.0, 0.0, 20.0, 14.0), small, 1, 5)) == placed
+    assert len(place_ground(Ground(_ground_nodes()), box(0.0, 0.0, 20.0, 14.0), 1, 5, small)) == placed
+
+
+def test_without_a_list_the_ground_takes_the_seed_s_drawn_kinds() -> None:
+    placed = place_ground(Ground(_ground_nodes()), box(0.0, 0.0, 20.0, 14.0), 6, 4)
+    drawn = {d.id: d for d in ground_decals(4)}
+    assert placed and all(np.array_equal(p.decal.rgba, drawn[p.decal.id].rgba) for p in placed)

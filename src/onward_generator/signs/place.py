@@ -254,7 +254,7 @@ def place_signs(
     ground = []
     if level != "none":  # pragma: no mutate: without damage the count is 0 and nothing is placed; the guard only skips building the ground tree
         area = core if core is not None else MultiPoint([tuple(w.a) for w in walls]).envelope
-        ground = damage.place_ground(damage.Ground(built), area, damage.ground_decals(seed), damage.ground_count(seed, level), seed)
+        ground = damage.place_ground(damage.Ground(built), area, damage.ground_count(seed, level), seed)
     missing = [decal.id for decal in required if decal.id not in {p.decal.id for p in decals}]
     if missing:
         raise SignsError("required decals that fit no exposed wall of the playable core: " + ", ".join(missing)
@@ -375,14 +375,14 @@ def _damage(base: Path) -> tuple[str, str]:
     """The map's war damage level and its origin (``signs.damage.resolve_damage``): ``none`` outside a map folder or
     without the key; ``auto`` reads the map's street profile record."""
     from onward_generator.ai.street_profile import StreetProfileError, load_record, record_path
-    from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.maps.workspace import load_map  # the workspace imports the pipeline, which imports signs
     from onward_generator.next_step import map_root
 
     root = map_root(base)
     value = None
     props_profile = None  # pragma: no mutate: an empty id is no more wrecked than none
     if root is not None:
-        with contextlib.suppress(MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
+        with contextlib.suppress(ValueError, OSError):  # an unreadable map.json (a MapError is a ValueError) reads as no switch
             value = load_map(root).get("damage")
         if value == "auto":
             with contextlib.suppress(StreetProfileError):  # no profile yet: the rules' neutral profile
