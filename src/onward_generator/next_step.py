@@ -427,7 +427,16 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     if atmosphere is not None:
         parts.extend(["--atmosphere", atmosphere])
     parts.extend(_triangle_limit(root))
+    parts.extend(_smoke(root))
     return invoke(*parts)
+
+
+def _smoke(root: Path) -> list[str]:
+    """``--smoke N`` when ``map.json`` asks for smoke columns (plan 2026-11-15, increment C), else nothing."""
+    from onward_generator.maps.workspace import smoke_columns
+
+    count = smoke_columns(root) if (root / "map.json").is_file() else 0
+    return ["--smoke", str(count)] if count else []
 
 
 def _triangle_limit(root: Path | None) -> list[str]:

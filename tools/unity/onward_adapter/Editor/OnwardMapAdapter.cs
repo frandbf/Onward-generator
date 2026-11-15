@@ -64,6 +64,13 @@ namespace OnwardGenerator
         // is added and the SDK graphs are not edited; every other material keeps the lines above.
         private const string LitNormalShaderPath = SdkRoot + "/Internal/Shaders/PP_Opaque_Lit.shadergraph";
         private const string LitNormalRole = "lit_normal";
+        // Plan 2026-11-15, increment C: smoke columns, a ParticleSystem each on the SDK's lit particle shader and the
+        // package's smoke_puff.png. Its Base Map is _MainTex, Base Color _BaseColor and its alpha clip _Cutoff.
+        private const string SmokeShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Simple_Lit.shadergraph";
+        private const string SmokeRole = "smoke_texture";
+        private const float SmokeCutoff = 0.02f;
+        private const float SmokeConeAngleDeg = 8f;
+        private const float SmokeConeRadiusM = 0.6f;
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
         private const float LitNormalSpecular = 0.04f;
@@ -151,6 +158,26 @@ namespace OnwardGenerator
             // ADR-037: the light of an atmosphere preset, in numbers. Absent (sun_intensity 0) keeps the
             // light of before: 50 degrees, heading -30, intensity 1.2, white.
             public Lighting lighting = new Lighting();
+            // Plan 2026-11-15, increment C: smoke columns over wrecks. Absent (no columns) in every package without smoke.
+            public SmokeOptions smoke = new SmokeOptions();
+        }
+
+        [Serializable] private class SmokeColumn { public float x; public float y; public float z; public int seed; }
+
+        [Serializable]
+        private class SmokeOptions
+        {
+            public string texture = "";
+            public float height_m;
+            public float rate_per_s;
+            public float lifetime_s;
+            public float start_size_m;
+            public float end_size_m;
+            public float drift_m_s;
+            public string color = "";
+            public float alpha;
+            public int max_particles;
+            public SmokeColumn[] columns = new SmokeColumn[0];
         }
 
         [Serializable]
@@ -296,6 +323,11 @@ namespace OnwardGenerator
                 throw new InvalidDataException($"adapter_options.json normal_maps name {namedNormals.Count} files, the package lists {normalFiles.Count} '{NormalMapRole}' files");
             if ((pkg.Options.normal_maps ?? new NormalMapRef[0]).Any(r => r.material == pkg.Options.lit_normal_material))
                 throw new InvalidDataException("a material is both the lit_normal_material and a library normal-map material");
+            // Plan 2026-11-15, increment C: smoke columns come with exactly one listed (and so verified) smoke texture.
+            int smokeFiles = m.files.Count(f => f.role == SmokeRole);
+            int smokeColumns = (pkg.Options.smoke?.columns ?? new SmokeColumn[0]).Length;
+            if (smokeFiles > 1 || (smokeColumns > 0) != (smokeFiles == 1))
+                throw new InvalidDataException($"adapter_options.json smoke has {smokeColumns} columns, the package lists {smokeFiles} '{SmokeRole}' files");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -993,6 +1025,7 @@ namespace OnwardGenerator
                 var probes = new List<Vector3>();
                 AddInteriorLights(visual, opt, probes);
                 AddStreetLights(pkg.Layout);
+                AddSmoke(pkg, root);
                 AddClimbProbes(pkg.Layout, probes);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
                 EditorSceneManager.SaveScene(scene, scenePath);
@@ -2994,6 +3027,97 @@ namespace OnwardGenerator
                 light.shadows = LightShadows.Soft;
             }
             Debug.Log($"{LogPrefix} Street lights: {lights.Length / 3} baked.");
+        }
+
+        // Plan 2026-11-15, increment C: a column of smoke per listed site, rising and thinning above the roofs. Not static
+        // and not baked: particles take no lightmap and cast no shadow; light probes light them.
+        private static void AddSmoke(Package pkg, string root)
+        {
+            SmokeOptions smoke = pkg.Options.smoke;
+            if (smoke == null || smoke.columns == null || smoke.columns.Length == 0) return;
+            if (!(smoke.height_m > 0f && smoke.lifetime_s > 0f && smoke.rate_per_s > 0f && smoke.max_particles > 0
+                  && smoke.start_size_m > 0f && smoke.end_size_m >= smoke.start_size_m))
+                throw new InvalidDataException("smoke: height_m, lifetime_s, rate_per_s, max_particles and start_size_m must be positive, end_size_m at least start_size_m");
+            Color colour;
+            if (!ColorUtility.TryParseHtmlString(smoke.color, out colour))
+                throw new InvalidDataException($"smoke color {smoke.color} is not #RRGGBB");
+            colour.a = Mathf.Clamp01(smoke.alpha);
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(SmokeShaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {SmokeShaderPath}.");
+            string texturePath = $"{root}/Textures/T_smoke_puff.png";
+            File.WriteAllBytes(texturePath, File.ReadAllBytes(pkg.Path(SmokeRole)));
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter
+                ?? throw new InvalidOperationException($"{texturePath}: no TextureImporter after the import");
+            importer.textureType = TextureImporterType.Default;
+            importer.sRGBTexture = true;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.mipmapEnabled = true;
+            importer.SaveAndReimport();
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
+                ?? throw new InvalidOperationException($"{texturePath}: imported, but no Texture2D to load");
+            var material = new Material(shader) { name = "M_smoke" };
+            material.SetTexture("_MainTex", texture);
+            material.SetColor("_BaseColor", Color.white);
+            material.SetFloat("_Cutoff", SmokeCutoff);
+            AssetDatabase.CreateAsset(material, $"{root}/M_smoke.mat");
+
+            var parent = new GameObject("Smoke");
+            var fade = new Gradient();
+            fade.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                         new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(0.6f, 0.6f), new GradientAlphaKey(0f, 1f) });
+            foreach (SmokeColumn column in smoke.columns)
+            {
+                var go = new GameObject("Smoke_" + column.seed.ToString(CultureInfo.InvariantCulture));
+                go.transform.SetParent(parent.transform, false);
+                go.transform.position = Local(column.x, column.y, column.z);
+                go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);  // the cone's axis points up
+                var ps = go.AddComponent<ParticleSystem>();
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                ps.useAutoRandomSeed = false;
+                ps.randomSeed = (uint)Math.Max(1, column.seed);
+                var main = ps.main;
+                main.loop = true;
+                main.prewarm = true;
+                main.playOnAwake = true;
+                main.duration = smoke.lifetime_s;
+                main.startLifetime = smoke.lifetime_s;
+                main.startSpeed = smoke.height_m / smoke.lifetime_s;
+                main.startSize = smoke.start_size_m;
+                main.startRotation = new ParticleSystem.MinMaxCurve(0f, 2f * Mathf.PI);
+                main.startColor = colour;
+                main.maxParticles = smoke.max_particles;
+                main.simulationSpace = ParticleSystemSimulationSpace.World;
+                var emission = ps.emission;
+                emission.rateOverTime = smoke.rate_per_s;
+                var shape = ps.shape;
+                shape.shapeType = ParticleSystemShapeType.Cone;
+                shape.angle = SmokeConeAngleDeg;
+                shape.radius = SmokeConeRadiusM;
+                var velocity = ps.velocityOverLifetime;
+                velocity.enabled = true;
+                velocity.space = ParticleSystemSimulationSpace.World;
+                velocity.x = new ParticleSystem.MinMaxCurve(smoke.drift_m_s);
+                velocity.y = new ParticleSystem.MinMaxCurve(0f);
+                velocity.z = new ParticleSystem.MinMaxCurve(0f);
+                var size = ps.sizeOverLifetime;
+                size.enabled = true;
+                size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, smoke.end_size_m / smoke.start_size_m));
+                var life = ps.colorOverLifetime;
+                life.enabled = true;
+                life.color = fade;
+                var renderer = go.GetComponent<ParticleSystemRenderer>();
+                renderer.renderMode = ParticleSystemRenderMode.Billboard;
+                renderer.sortMode = ParticleSystemSortMode.Distance;
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
+                ps.Play();
+            }
+            Debug.Log($"{LogPrefix} Smoke: {smoke.columns.Length} columns, {smoke.max_particles} particles each at most, {shader.name}.");
         }
 
         // One baked point light per furnished room, in node order, up to interior_lights_max.
