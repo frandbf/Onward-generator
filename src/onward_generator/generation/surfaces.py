@@ -73,6 +73,8 @@ class Partition:
     surfaces: dict[SurfaceClass, Surface] = field(default_factory=dict)
     carriageway_raw: BaseGeometry = field(default_factory=Polygon)
     crossings: BaseGeometry = field(default_factory=Polygon)
+    unpaved: BaseGeometry = field(default_factory=Polygon)
+    """The carriageway of the ways whose OSM ``surface`` names no paving (15 November 2026): materials draws it as earth."""
 
     def overlap_area(self) -> float:
         parts = [s.geometry for s in self.surfaces.values()] + [self.buildings.intersection(self.site)]
@@ -154,7 +156,9 @@ def build_partition(
         walkable = crossing_strips(vehicular, carriageway.geometry)
         unpaved = [w for w in vehicular if is_unpaved(w)]
         if unpaved:  # a map with no unpaved street keeps its crossings byte for byte
-            walkable = union_all([walkable, unpaved_carriageway(unpaved, carriageway.geometry, buffered)])
+            dirt = unpaved_carriageway(unpaved, carriageway.geometry, buffered)
+            walkable = union_all([walkable, dirt])
+            partition.unpaved, _ = _polygonal(dirt, precision, min_area)
         partition.crossings, _ = _polygonal(walkable, precision, min_area)
     return partition
 

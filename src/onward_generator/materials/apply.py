@@ -14,6 +14,11 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from shapely import MultiPolygon, Polygon, contains_xy
+from shapely import prepare as prepare_region
+from shapely.geometry.base import BaseGeometry
+
 from onward_generator import __version__
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.detail.config import load_detail_config
@@ -31,8 +36,9 @@ from onward_generator.dress.atlas import (
 from onward_generator.dress.catalog import MaterialCatalog, load_catalog
 from onward_generator.dress.geometry import compare_fingerprints, file_sha256, geometry_fingerprint
 from onward_generator.dress.surfaces import _load_features, _tags_of
-from onward_generator.generation.config import Material
+from onward_generator.generation.config import Material, load_generation_config
 from onward_generator.generation.gltf import CellPhase, Node, Primitive, build_glb, nodes_from_glb
+from onward_generator.generation.mesh import Mesh
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
 from onward_generator.materials.openings import boarded_png, shop_glass_png, window_png
 from onward_generator.materials.plan import TexturePlan, load_texture_plan
@@ -80,7 +86,7 @@ MAX_PHOTO_PX = 1024
 UNIT_UV_MATERIALS = frozenset({"glass_dark", "glass_boarded", "glass_view", "shop_glass", "door_wood"})
 # The map-wide ground surfaces that take a UV phase per combine cell with the "repetition" switch
 # (plan C1, ADR-009 "Repetition per cell"). The open ground and the green keep one phase.
-GROUND_CELL_PHASE_MATERIALS = frozenset({"carriageway", "sidewalk", "pedestrian", "cobblestone_paving"})
+GROUND_CELL_PHASE_MATERIALS = frozenset({"carriageway", "carriageway_unpaved", "sidewalk", "pedestrian", "cobblestone_paving"})
 # The see-through panes keep their RGBA images. The contact atlas is opaque.
 ATLAS_SKIP = frozenset({"glass_view", "shop_glass"})
 # Shop interiors (docs/07-detail.md, *Shop interiors*): one library photograph per shared material,
@@ -362,6 +368,54 @@ def rematerialize_cobble_nodes(nodes: Sequence[Node]) -> tuple[list[Node], list[
     return out, changed
 
 
+UNPAVED_MATERIAL = "carriageway_unpaved"
+"""The carriageway of an unpaved street when the plan has an ``unpaved_carriageway`` slot (15 November 2026)."""
+
+
+def unpaved_region(objects: Sequence[Mapping[str, Any]]) -> BaseGeometry | None:
+    """The unpaved carriageway generate recorded on ``surface/carriageway`` (``unpaved.polygons``), or None."""
+    for obj in objects:
+        if obj.get("id") != "surface/carriageway":
+            continue
+        rings = (obj.get("unpaved") or {}).get("polygons") or []
+        parts = [Polygon(polygon[0], polygon[1:]) for polygon in rings if polygon]
+        return MultiPolygon(parts) if parts else None
+    return None
+
+
+def _subset(prim: Primitive, keep: np.ndarray, material: str) -> Primitive | None:
+    """The triangles of ``prim`` that ``keep`` marks, as a primitive of ``material`` with their own vertices and UVs."""
+    triangles = prim.mesh.triangles[keep]
+    if not len(triangles):
+        return None
+    used, local = np.unique(triangles, return_inverse=True)
+    uvs = prim.uvs[used] if prim.uvs is not None else None
+    return Primitive(Mesh(prim.mesh.vertices[used], local.reshape(triangles.shape)), material, uvs)
+
+
+def rematerialize_unpaved_carriageway(nodes: Sequence[Node], region: BaseGeometry) -> tuple[list[Node], list[str]]:
+    """Give the carriageway triangles inside ``region`` (generate capped them apart) the ``UNPAVED_MATERIAL``; the node
+    keeps its name, so the road floor and the ground decals read it as before."""
+    prepare_region(region)  # in place: the many point tests below stay fast
+    out: list[Node] = []
+    changed: list[str] = []
+    for node in nodes:
+        if node.name.split("#", 1)[0] != "surface/carriageway":
+            out.append(node)
+            continue
+        prims: list[Primitive] = []
+        for prim in node.world_primitives():
+            centres = prim.mesh.vertices[prim.mesh.triangles].mean(axis=1)
+            inside = contains_xy(region, centres[:, 0], centres[:, 1])
+            prims += [p for p in (_subset(prim, ~inside, prim.material), _subset(prim, inside, UNPAVED_MATERIAL)) if p is not None]
+        if any(p.material == UNPAVED_MATERIAL for p in prims):
+            out.append(replace(node, primitives=tuple(prims), matrix=None))
+            changed.append(node.name)
+        else:
+            out.append(node)
+    return out, changed
+
+
 def _is_brick_building(source_ids: Sequence[str], features: Mapping[str, Mapping[str, Any]]) -> bool:
     tags = _tags_of(features, source_ids)
     value = tags.get("building:material") or tags.get("material")
@@ -541,6 +595,10 @@ def apply_materials(
         visual_nodes, brick_nodes = rematerialize_brick_walls(visual_nodes, features)
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
+    unpaved_nodes: list[str] = []
+    region = unpaved_region(objects) if "unpaved_carriageway" in plan.by_id else None
+    if region is not None:
+        visual_nodes, unpaved_nodes = rematerialize_unpaved_carriageway(visual_nodes, region)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
     trim_root = tile_cache_dir() if tile_cache else None
     # A wall strip takes the colour the scene gives that material; a colour the scene does not use
@@ -560,6 +618,9 @@ def apply_materials(
     cobble_ok = bool(cobble_nodes)
 
     materials = dict(vis_mats)
+    if unpaved_nodes:
+        dirt = load_generation_config().materials[UNPAVED_MATERIAL]  # packed earth, under the slot's photograph
+        materials[UNPAVED_MATERIAL] = Material(dirt.color, dirt.roughness)
     photo_tiles: dict[str, tuple[Any, str]] = {}
     applied: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
@@ -580,6 +641,9 @@ def apply_materials(
                 "catalog_ids": list(binding.catalog_ids),
                 "reason": "no_pedestrian_cobble_split",
             })
+            continue
+        if binding.id == "unpaved_carriageway" and not unpaved_nodes:
+            skipped.append({"id": binding.id, "catalog_ids": list(binding.catalog_ids), "reason": "no_unpaved_carriageway"})
             continue
         if binding.id == "brick" and not brick_nodes and "brick_red" not in used:
             skipped.append({

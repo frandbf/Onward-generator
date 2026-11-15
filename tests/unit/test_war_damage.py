@@ -273,7 +273,8 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     assert all(any(row["decal"] == want for want in expected) for row in heavy["wall_decals"]["decals"])
     # The ground is the one place_ground lays for the map's seed on the built scene.
     built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
-    again = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed)
+    drawn = [d for d in ground_decals(seed) if d.kind in damage.ground_kinds(0.0, None)]  # paved, no dusty light: no sand
+    again = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed, drawn)
     assert [[round(v, 3) for v in p.centre] for p in again] == [row["position_m"] for row in ground_rows]
 
     # With a core, the ground decals are laid in the core square, not the walls' envelope.
@@ -281,7 +282,7 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     cored = {**plain_manifest, "core": {"half_side_m": 50.0}}
     (base / "scene_detail.json").write_text(json.dumps(cored), encoding="utf-8")
     inside = place_signs(base, scene, tmp_path / "cored")["damage"]["ground_decals"]["decals"]
-    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_count(seed, "heavy"), seed)
+    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_count(seed, "heavy"), seed, drawn)
     assert [[round(v, 3) for v in p.centre] for p in in_core] == [r["position_m"] for r in inside] != [row["position_m"] for row in ground_rows]
     (base / "scene_detail.json").write_text(json.dumps(plain_manifest), encoding="utf-8")
 

@@ -240,6 +240,23 @@ def war_wall_decals(seed: int) -> list[Decal]:
             for name, (kind, draw, w, h, text) in WAR_WALL.items()]
 
 
+UNPAVED_MAJORITY = 0.5
+"""The share of a map's vehicular street length OSM tags unpaved above which its ground decals are a dirt map's."""
+
+
+def ground_kinds(unpaved_share: float, atmosphere: str | None) -> frozenset[str]:
+    """The ground decal kinds a map draws (15 November 2026): every kind on a paved map, but no asphalt patch where most
+    streets are dirt, and sand drifts only on a dirt map or under the ``dusty`` light; until then every damaged map got
+    sand and asphalt patches, a cold paved city and a dirt-road town alike."""
+    dirt = unpaved_share > UNPAVED_MAJORITY
+    kinds = {kind for kind, *_ in WAR_GROUND.values()}
+    if dirt:
+        kinds.discard("pothole")
+    if not dirt and atmosphere != "dusty":
+        kinds.discard("sand")
+    return frozenset(kinds)
+
+
 def ground_decals(seed: int) -> list[Decal]:
     """The drawn ground decals, one of each kind."""
     return [Decal(f"gen_{name}", kind, w, h, draw(_rng(seed, name), PROCEDURAL_SIZE), "generated", text)

@@ -134,6 +134,19 @@
       "status": "available"
     },
     {
+      "id": "dirt_road",
+      "name": "Dirt carriageway",
+      "description": "Packed earth for the carriageway of a street whose OSM surface names no paving (15 November 2026).",
+      "compatible_surfaces": ["street"],
+      "color_id": "carriageway_unpaved",
+      "textures": { "kind": "procedural", "paths": [], "note": "Bound by a texture plan's unpaved_carriageway slot to an earth photograph. File paths appear only after materials apply." },
+      "technical": { "shader_hint": "opaque_lit", "tile_m": 6.0, "notes": "Only the carriageway of ways tagged surface=unpaved, dirt, earth, ground, sand, gravel, compacted, mud and the like (generation.surfaces.UNPAVED_SURFACES)." },
+      "performance_cost": "low",
+      "source": "generation: the unpaved part of surface/carriageway",
+      "license": "project-generated",
+      "status": "available"
+    },
+    {
       "id": "cobblestone_paving",
       "name": "Cobblestone paving",
       "description": "Warm paving for pedestrian streets, plazas and tagged sett or cobblestone surfaces.",
