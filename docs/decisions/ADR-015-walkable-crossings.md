@@ -48,3 +48,8 @@ C# cannot be compiled on the Linux host. To check in Unity (`task unity`) and on
 - The log line `Navmesh islands:` reports one large island holding most of the area, and the per-attempt `Navigation spacing ...` line keeps a depth at or under 400.
 - `Waypoint nodes anchored` reports no waypoint tens of metres from its node, and few or no routes dropped for no return path.
 - On the headset, Hunt bots patrol both sides of a street and cross on the strips, and do not stand on the road elsewhere.
+
+## Amendment, 14 November 2026: unpaved streets are walkable all along
+
+The carriageway of a vehicular way whose OSM `surface` names no paving (`UNPAVED_SURFACES`: unpaved, dirt, earth, ground, sand, gravel, fine_gravel, compacted, mud, grass, pebblestone) joins the crossings (`Partition.crossings`), so it is part of `collider/walkable_crossing` and of the bots' navmesh from end to end, not only at its crossing strips. A paved street, or one with no `surface` tag, keeps the rule above. Zebra paint is unchanged: it comes from `crossing_sites` and the OSM crossings. In Mogadishu 1993, 23 of 29 streets are `surface=unpaved`, and the navmesh without them cut the town into blocks the bots could not leave. A map built before this keeps its navmesh until it runs again from `generate`.
+
