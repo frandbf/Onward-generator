@@ -291,7 +291,8 @@ def route_points(graph: NavGraph, route: Route) -> list[tuple[float, float]]:
 class Collider:
     """A collision node's axis-aligned box in local metres and what it is for the report.
 
-    ``kind`` is ``prop`` (may be cover and may block sight), ``wall`` (the perimeter wall:
+    ``kind`` is ``prop`` (may be cover and may block sight), ``open`` (a see-through prop that
+    collides by its bars: neither, since 14 November 2026), ``wall`` (the perimeter wall:
     blocks sight, never cover), ``ground`` or ``building`` (both left out: buildings come
     from the partition footprints).
     """

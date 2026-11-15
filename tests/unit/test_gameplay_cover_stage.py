@@ -158,7 +158,7 @@ def test_catalogue_licences_read_each_row_and_the_kenney_default(tmp_path: Path)
 
 def test_nodes_put_the_prop_in_the_visual_and_its_box_in_the_collision() -> None:
     prop = _cover()
-    fence = _cover("rail", size=(2.0, 0.5, 1.0), role="fence")
+    fence = _cover("rail", size=(2.0, 0.5, 1.0), role="barrier")  # a fence is see-through, never cover (ADR-041)
     first = _placement(prop, 13.0, -7.65, math.pi / 2, 0.25, TARGET)
     second = _placement(fence, 30.0, -7.0, 0.0, 0.0, TARGET)
     visual, colliders, images = _nodes([first, second])
@@ -172,9 +172,9 @@ def test_nodes_put_the_prop_in_the_visual_and_its_box_in_the_collision() -> None
     assert visual[0].matrix is first.matrix and len(visual[0].primitives) == 1
     assert visual[0].primitives[0].material == "prop_barrier"
     assert [node.name for node in colliders] == ["overgrow/collider/prop/barrier/cover/0", "overgrow/collider/prop/rail/cover/1"]
-    assert dict(colliders[1].extras) == {"type": "collision", "origin": "generated", "asset_id": "rail", "role": "fence", "op": "sightline_cover"}
+    assert dict(colliders[1].extras) == {"type": "collision", "origin": "generated", "asset_id": "rail", "role": "barrier", "op": "sightline_cover"}
     assert colliders[1].matrix is second.matrix and colliders[1].primitives[0].material == "collider"
-    expected = collider_mesh(fence.prop.mesh, "fence")
+    expected = collider_mesh(fence.prop.mesh, "barrier")
     assert np.array_equal(colliders[1].primitives[0].mesh.vertices, expected.vertices)
     assert images == {"prop_barrier": b"png", "prop_rail": b"png"}
 

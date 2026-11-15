@@ -59,7 +59,7 @@ from onward_generator.io import atomic_write_bytes, atomic_write_json, sha256_fi
 from onward_generator.overgrow.atlas import ATLAS_PREFIX, PROP_ATLAS_EXTRA, Cell, remap_nodes
 from onward_generator.overgrow.constants import MAX_ADDED_TRIS
 from onward_generator.overgrow.dressing import load_spawns
-from onward_generator.overgrow.fit import check_scene, collider_mesh, grounds_from_scene
+from onward_generator.overgrow.fit import check_scene, grounds_from_scene, prop_collider
 from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import library_directories
@@ -256,10 +256,12 @@ def _nodes(placements: Sequence[Placement]) -> tuple[list[Node], list[Node], dic
             "crosswise": True, "solid": True,
         }
         visual.append(Node(f"overgrow/prop/{spec.id}/cover/{index}", prop.primitives(), extras, item.matrix, f"cover:{spec.id}"))
+        collider, see_through = prop_collider(prop.mesh, spec.role)
         colliders.append(Node(
             f"overgrow/collider/prop/{spec.id}/cover/{index}",
-            (Primitive(collider_mesh(prop.mesh, spec.role), "collider"),),
-            {"type": "collision", "origin": "generated", "asset_id": spec.id, "role": spec.role, "op": OP},
+            (Primitive(collider, "collider"),),
+            {"type": "collision", "origin": "generated", "asset_id": spec.id, "role": spec.role, "op": OP,
+             **({"open": True} if see_through else {})},
             item.matrix,
         ))
         images.update(prop.images())
