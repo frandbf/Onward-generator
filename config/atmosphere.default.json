@@ -2,6 +2,18 @@
   "$schema": "./atmosphere.schema.json",
   "version": "0.1.0",
   "presets": {
+    "dusty": {
+      "description": "Dry dusty air: a warm muted sun, sandy trilight shade, a close sand-coloured haze, dirtier walls",
+      "sun": { "elevation_deg": 40, "azimuth": "streets", "color": "#FFE6C2", "intensity": 1.15, "shadow_angle_deg": 4 },
+      "ambient": { "mode": "trilight", "sky": "#B8A88A", "equator": "#A89474", "ground": "#6B5A44" },
+      "ao": { "max_distance_m": 1.5, "exponent_indirect": 1.0, "exponent_direct": 0.15 },
+      "indirect_intensity": 1.6,
+      "fog": { "color": "#C9B48E", "scale": 0.55 },
+      "lightmap_texels_per_m_core": 14,
+      "grime": 1.3,
+      "wall_desaturation": 0.12,
+      "wall_value_max": 0.85
+    },
     "golden_hour": {
       "description": "Warm low sun across the streets, cool trilight shade, warm haze",
       "sun": { "elevation_deg": 30, "azimuth": "streets", "color": "#FFE0B8", "intensity": 1.4, "shadow_angle_deg": 1.5 },

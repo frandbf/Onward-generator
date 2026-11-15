@@ -69,7 +69,8 @@
           "description": "The colour of the map's fog; where it starts and ends stays the map's own, from its wall (ADR-014)",
           "required": ["color"],
           "properties": {
-            "color": { "$ref": "#/$defs/colour" }
+            "color": { "$ref": "#/$defs/colour" },
+            "scale": { "description": "Factor on the map's own fog start and end (1 when absent): a dusty preset brings the haze closer without a fixed distance (plan 2026-11-15, increment B)", "type": "number", "minimum": 0.3, "maximum": 1 }
           }
         },
         "indirect_intensity": { "description": "Scale of the bounced light in the bake (Unity's Indirect Intensity, 1 when absent): it lifts the shade of narrow streets and the probes that light the players there, and leaves the direct sun as it is (plan Q4)", "type": "number", "minimum": 1, "maximum": 4 },

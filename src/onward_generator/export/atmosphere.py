@@ -30,6 +30,8 @@ STREETS = "streets"
 # E7 the colour of the fog, only when the map's card has its fog on).
 APPLIED = ("sun", "ambient", "ao")
 FOG = "fog"
+# Plan 2026-11-15, increment B: the fog distances scaled by the preset, only when it sets a scale.
+FOG_SCALE = "fog_scale"
 # E10: the playable core bakes at the preset's density, only with a core, combining and a lower card density.
 LIGHTMAP_CORE = "lightmap_core"
 # Plan Q4: the bake's bounced light, only when the preset scales it.

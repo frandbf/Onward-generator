@@ -88,7 +88,7 @@ def test_the_cli_reads_the_preset_and_refuses_an_unknown_one() -> None:
     assert wall_palette(None) is None and wall_palette("neutral") is None
     assert wall_palette("golden_hour") == GOLDEN
     assert wall_palette("overcast") == WallPalette("overcast", 1.2, 0.05, 0.85)
-    with pytest.raises(AtmosphereError, match=r"^atmosphere must be one of neutral, golden_hour, overcast, not 'dusk'$"):
+    with pytest.raises(AtmosphereError, match=r"^atmosphere must be one of neutral, dusty, golden_hour, overcast, not 'dusk'$"):
         wall_palette("dusk")
 
 

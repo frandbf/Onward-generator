@@ -82,7 +82,7 @@ def test_the_export_command_passes_whatever_map_json_names(tmp_path: Path) -> No
 
 
 def test_an_unknown_preset_or_one_on_a_night_map_is_refused(tmp_path: Path) -> None:
-    with pytest.raises(MapError, match="atmosphere must be one of neutral, golden_hour, overcast, not 'sunset'"):
+    with pytest.raises(MapError, match="atmosphere must be one of neutral, dusty, golden_hour, overcast, not 'sunset'"):
         _map(tmp_path, atmosphere="sunset")
     with pytest.raises(MapError) as refused:
         _map(tmp_path, time_of_day="night", atmosphere="golden_hour")
@@ -284,7 +284,7 @@ def test_a_preset_is_recorded_in_the_options_and_the_manifest(inputs: tuple[Path
 def test_the_package_refuses_an_unknown_preset_or_one_on_a_night_layout(inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
     with pytest.raises(ExportError) as unknown:
         _package(inputs, tmp_path / "unknown", atmosphere="sunset")
-    assert unknown.value.problems == ["atmosphere: atmosphere must be one of neutral, golden_hour, overcast, not 'sunset'"]
+    assert unknown.value.problems == ["atmosphere: atmosphere must be one of neutral, dusty, golden_hour, overcast, not 'sunset'"]
     with pytest.raises(ExportError) as night:
         _package(inputs, tmp_path / "night", atmosphere="golden_hour", layout=inputs[2])
     assert night.value.problems == [f"atmosphere: {DAY_ONLY}"]
@@ -378,6 +378,25 @@ def test_a_preset_leaves_a_map_without_fog_without_fog(inputs: tuple[Path, Path,
     plain = json.loads((_package(inputs, tmp_path / "plain").directory / "adapter_options.json").read_bytes())
     tinted = json.loads((golden.directory / "adapter_options.json").read_bytes())
     assert (tinted["fog_start_m"], tinted["fog_end_m"]) == (plain["fog_start_m"], plain["fog_end_m"])
+
+
+def test_a_dusty_preset_brings_the_map_s_fog_closer_by_its_scale(inputs: tuple[Path, Path, Path], tmp_path: Path) -> None:
+    """Plan 2026-11-15, increment B: the preset's fog scale multiplies the card's distances; colour as plan E7."""
+    plain = json.loads((_package(inputs, tmp_path / "plain").directory / "adapter_options.json").read_bytes())
+    dusty = _package(inputs, tmp_path / "dusty", atmosphere="dusty")
+    options = json.loads((dusty.directory / "adapter_options.json").read_bytes())
+    assert options["fog_start_m"] == round(plain["fog_start_m"] * 0.55, 1) and options["fog_end_m"] == round(plain["fog_end_m"] * 0.55, 1)
+    assert options["fog_color"] == "#C9B48E" and options["lighting"]["indirect_intensity"] == 1.6
+    assert dusty.manifest["atmosphere"]["applied"] == ["sun", "ambient", "ao", "indirect", "fog", "fog_scale"]
+    # Without fog on the card, no fog and no scale.
+    card = json.loads((REPO_ROOT / "config" / "export" / "onward.default.json").read_bytes())
+    card["build"]["fog_enabled"] = False
+    path = tmp_path / "card.json"
+    path.write_text(json.dumps(card), encoding="utf-8")
+    foggless = _package(inputs, tmp_path / "foggless", atmosphere="dusty", export_config=path)
+    unfogged = json.loads((foggless.directory / "adapter_options.json").read_bytes())
+    assert (unfogged["fog_start_m"], unfogged["fog_end_m"]) == (card["build"]["fog_start_m"], card["build"]["fog_end_m"])
+    assert "fog_scale" not in foggless.manifest["atmosphere"]["applied"]
 
 
 def _cored(inputs: tuple[Path, Path, Path], tmp_path: Path) -> Path:
