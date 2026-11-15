@@ -2832,7 +2832,7 @@ namespace OnwardGenerator
             };
             List<Vector3> grips = ladder.Rungs.Select(r => go.transform.InverseTransformPoint(r.Transform.position) + new Vector3(0f, go.transform.position.y, 0f)).ToList();
             List<float> bars = grips.GroupBy(g => (float)Math.Round(g.y, 2))
-                .Where(level => level.Key > foot && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))
+                .Where(level => AboveFoot(level.Key, foot) && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))
                 .Select(level => level.Key).OrderBy(y => y).ToList();
             foreach (float y in bars)
                 boxes.Add(Box(new Vector3(0f, y, 0f), new Vector3(LadderRailWidthM, 0.04f, 0.04f)));
@@ -2848,7 +2848,7 @@ namespace OnwardGenerator
                 if (!grips.Any(g => Math.Abs(g.y - bar) <= GripReachM && Math.Abs(g.x) <= CrossbarGripHalfM))
                     throw new InvalidOperationException($"{name}: a crossbar at {bar:F2} m has no grip on it.");
             int onBars = 0, onRails = 0;
-            foreach (Vector3 g in grips.Where(g => g.y > foot))
+            foreach (Vector3 g in grips.Where(g => AboveFoot(g.y, foot)))
             {
                 if (Math.Abs(g.x) <= CrossbarGripHalfM && bars.Any(bar => Math.Abs(g.y - bar) <= GripReachM)) onBars++;
                 else if (Math.Abs(Math.Abs(g.x) - LadderRailWidthM / 2f) <= 0.03f && g.y <= top + GripReachM) onRails++;
@@ -2856,6 +2856,10 @@ namespace OnwardGenerator
             }
             Debug.Log($"{LogPrefix} {name} grips: {onBars} on crossbars, {onRails} on the rails, every crossbar gripped.");
         }
+
+        // A grip or a crossbar counts above the foot when it is so to the centimetre, the same rounding for both: a roof
+        // link whose prefab rung fell a hair above the lower roof (Mogadishu 1993, 6.64 m) was a grip with no crossbar.
+        internal static bool AboveFoot(float y, float foot) => Math.Round(y, 2) > Math.Round(foot, 2);
 
         private static void FillRungsToGround(Ladder ladder, float baseM)
         {

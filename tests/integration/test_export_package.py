@@ -882,11 +882,14 @@ def test_unity_adapter_draws_a_crossbar_only_where_the_sdk_grips_it() -> None:
     source = ADAPTER_CS.read_text(encoding="utf-8")
     look = source[source.index("private static void AddLadder"):source.index("private static void FillRungsToGround")]
     assert "internal const float CrossbarGripHalfM = LadderRailWidthM / 2f - 0.05f;" in source
-    assert ".Where(level => level.Key > foot && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))" in look
+    assert ".Where(level => AboveFoot(level.Key, foot) && level.All(g => Math.Abs(g.x) <= CrossbarGripHalfM))" in look
     assert "foreach (float y in bars)" in look and "ladder.Rungs.Where(r => r.Transform.position.y > foot)" not in look
     assert look.index("CheckLadderGrips(go.name, grips, bars, foot, top);") < look.index("AddClimbLook(go.name")
     check = source[source.index("internal static void CheckLadderGrips"):]
     assert "has no grip on it." in check and "has nothing drawn under the hand." in check
+    # Grips and crossbars count above the foot by one rounding (15 November 2026: a link's rung a hair above the low roof).
+    assert "foreach (Vector3 g in grips.Where(g => AboveFoot(g.y, foot)))" in check
+    assert "internal static bool AboveFoot(float y, float foot) => Math.Round(y, 2) > Math.Round(foot, 2);" in source
     assert "Math.Abs(Math.Abs(g.x) - LadderRailWidthM / 2f) <= 0.03f && g.y <= top + GripReachM" in check
 
 
