@@ -16,6 +16,7 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -86,6 +87,21 @@ class Placed:
     z_m: float
     depth_m: float = 0.0
     """How far outward of the wall line the built facade stands under the decal (negative: inward)."""
+
+
+class GroundLike(Protocol):
+    """A ground decal down (``signs.damage.GroundPlaced``): its decal, centre, yaw and quad corners."""
+
+    @property
+    def decal(self) -> Decal: ...
+
+    @property
+    def centre(self) -> tuple[float, float, float]: ...
+
+    @property
+    def yaw(self) -> float: ...
+
+    def corners(self) -> np.ndarray: ...
 
 
 Surface = Callable[[Wall, float, float, float, float], float | None]
@@ -325,18 +341,19 @@ def exposed(wall: Wall, footprints: STRtree) -> bool:
 
 def place_decals(walls: Sequence[Wall], footprints: STRtree, blocked: Callable[[Polygon, float, float], bool],
                  decals: Sequence[Decal], seed: int, count: int, surface: Surface | None = None,
-                 required: Sequence[Decal] = ()) -> list[Placed]:
+                 required: Sequence[Decal] = (), sequence: Sequence[Decal] | None = None) -> list[Placed]:
     """Up to ``count`` decals from ``decals`` (in their turn) on the exposed ``walls`` of at least ``MIN_WALL_M``, walls
     taken in a seeded order from the one after the last decal's, each decal at the first height and position it fits:
     clear of ``blocked`` (a plan, bottom and top) and of the decals already on the wall, and on one flat clear face of
     the built facade when ``surface`` is given (``wall_surface``), laid on that face. A decal that fits no wall is
-    skipped. Each of ``required`` (the maintainer's own decals) goes first, once, on top of the ``count``."""
+    skipped. Each of ``required`` (the maintainer's own decals) goes first, once, on top of the ``count``. A given
+    ``sequence`` (war damage, ``signs.damage.war_sequence``) replaces the turn of ``decals``."""
     candidates = sorted((w for w in walls if float(np.linalg.norm(w.b - w.a)) >= MIN_WALL_M and exposed(w, footprints)),
                         key=lambda w: _unit(seed, "wall", w.feature_id, float(w.a[0]), float(w.a[1])))
     placed: list[Placed] = []
     taken: dict[int, list[tuple[float, float, float, float]]] = {}
     start = 0
-    for decal in [*required, *turn_order(decals, count, seed)]:
+    for decal in [*required, *(turn_order(decals, count, seed) if sequence is None else sequence)]:
         for k in range(len(candidates)):
             wall = candidates[(start + k) % len(candidates)]
             spot = _fit(wall, decal, blocked, taken.get(id(wall), []), seed, surface)
@@ -395,9 +412,10 @@ def _atlas(decals: Sequence[Decal]) -> tuple[dict[str, np.ndarray], dict[str, tu
     return pages, slots
 
 
-def decal_nodes(placed: Sequence[Placed]) -> tuple[list[Node], dict[str, Material], dict[str, bytes], list[dict[str, object]]]:
-    """One node per decal, the transparent atlas materials and their PNGs, and a record per decal."""
-    distinct = list({p.decal.id: p.decal for p in placed}.values())
+def decal_nodes(placed: Sequence[Placed], ground: Sequence[GroundLike] = ()) -> tuple[list[Node], dict[str, Material], dict[str, bytes], list[dict[str, object]]]:
+    """One node per decal, the transparent atlas materials and their PNGs, and a record per decal. ``ground`` decals
+    (``signs.damage``) share the wall decals' pages: one quad each, flat, facing up."""
+    distinct = list({d.id: d for d in [*(p.decal for p in placed), *(g.decal for g in ground)]}.values())
     pages, slots = _atlas(distinct)
     nodes: list[Node] = []
     rows: list[dict[str, object]] = []
@@ -413,6 +431,14 @@ def decal_nodes(placed: Sequence[Placed]) -> tuple[list[Node], dict[str, Materia
                           {"type": "wall_decal", "decal": decal.id, "kind": decal.kind, "wall": wall.feature_id, "attribute_origin": "generated"}))
         rows.append({"id": f"wall_decal/{n}", "type": "wall_decal", "decal": decal.id, "kind": decal.kind, "origin": decal.origin,
                      "wall_feature": wall.feature_id, "position_m": [round(float(v), 3) for v in (*centre, item.z_m)],
+                     "size_m": [decal.width_m, decal.height_m], "attribute_origin": "generated"})
+    for n, down in enumerate(ground):
+        decal = down.decal
+        page, uv = slots[decal.id]
+        nodes.append(Node(f"ground_decal/{n}", (Primitive(Mesh(down.corners(), np.array([[0, 1, 2], [0, 2, 3]])), page, uv),),
+                          {"type": "ground_decal", "decal": decal.id, "kind": decal.kind, "attribute_origin": "generated"}))
+        rows.append({"id": f"ground_decal/{n}", "type": "ground_decal", "decal": decal.id, "kind": decal.kind, "origin": decal.origin,
+                     "position_m": [round(float(v), 3) for v in down.centre], "yaw_deg": round(math.degrees(down.yaw), 2),
                      "size_m": [decal.width_m, decal.height_m], "attribute_origin": "generated"})
     materials = {name: Material((1.0, 1.0, 1.0, 1.0), 0.8) for name in pages}
     images = {}
