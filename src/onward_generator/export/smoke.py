@@ -63,8 +63,9 @@ def wreck_sites(objects: Iterable[Mapping[str, Any]]) -> list[tuple[str, float, 
         if record.get("type") != "overgrowth":
             continue
         kind, role = record.get("kind"), record.get("role")
-        if kind == "wreck" or (kind == "vehicles" and role == "wreck"):
-            x, y, *rest = record.get("position_m") or (0.0, 0.0)
+        position = record.get("position_m")
+        if position and (kind == "wreck" or (kind == "vehicles" and role == "wreck")):  # a record without a place has no site
+            x, y, *rest = position
             sites.append((str(record.get("id")), float(x), float(y), float(rest[0]) if rest else 0.0))
     return sites
 

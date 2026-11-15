@@ -55,6 +55,7 @@ def test_the_sites_are_the_wrecks() -> None:
         {"id": "overgrow/prop/barrel/2", "type": "overgrowth", "kind": "waste", "role": "barrel", "position_m": [5.0, 6.0, 0.0]},
         {"id": "overgrow/prop/van/3", "type": "overgrowth", "kind": "vehicles", "role": "vehicle", "position_m": [7.0, 8.0, 0.0]},
         {"id": "building/x", "type": "building", "kind": "wreck", "position_m": [9.0, 9.0, 0.0]},
+        {"id": "overgrow/wreck/9", "type": "overgrowth", "kind": "wreck"},
     ]
     assert wreck_sites(objects) == [("overgrow/wreck/0", 1.0, 2.0, -0.15), ("overgrow/prop/car/1", 3.0, 4.0, 0.0)]
 
@@ -150,3 +151,38 @@ def test_the_adapter_draws_each_column_with_the_sdk_particle_shader() -> None:
         assert line in body, line
     assert "AddSmoke(pkg, root);" in source
     assert "the package lists {smokeFiles} '{SmokeRole}' files" in source
+
+
+def test_each_keep_out_is_measured_from_where_it_stands() -> None:
+    layout = {"attackers": {"points_m": [{"x": 30.0, "y": 20.0}]}, "ladders": [{"x": -50.0, "y": 50.0}]}
+    sites = [
+        ("spawn_x", 25.0, 20.0, 0.0),      # 5 m east of the spawn
+        ("spawn_y", 30.0, 25.0, 0.0),      # 5 m north of it
+        ("foot_far", -50.0, 60.0, 0.0),    # 10 m north of the ladder foot: clear
+        ("foot_near", -48.0, 51.0, 0.0),   # 2.2 m from it
+        ("out_x", 100.5, 0.0, 0.0),
+        ("out_y", 0.0, -100.5, 0.0),
+        ("edge", -100.0, -80.0, 0.0),      # on the core's edge: inside
+    ]
+    columns, refused = choose(sites, 5, 100.0, layout)
+    assert refused == {"outside_core": 2, "near_spawn": 2, "near_climb": 1, "near_column": 0}
+    assert sorted((c["x"], c["y"]) for c in columns) == [(-100.0, -80.0), (-50.0, 60.0)]
+
+
+def test_columns_exactly_apart_both_stand_and_closer_ones_count() -> None:
+    columns, _ = choose([("p", 0.0, 0.0, 0.0), ("q", 15.0, 0.0, 0.0)], 5, None, {})
+    assert sorted((c["x"], c["y"]) for c in columns) == [(0.0, 0.0), (15.0, 0.0)]
+    huddle, refused = choose([("a", 0.0, 0.0, 0.0), ("b", 3.0, 0.0, 0.0), ("c", 0.0, 3.0, 0.0)], 5, None, {})
+    assert len(huddle) == 1 and refused["near_column"] == 2
+
+
+def test_a_column_keeps_the_millimetre() -> None:
+    columns, _ = choose([("m", 40.12345, -40.98765, 0.12345)], 1, None, {})
+    assert columns == [{"x": 40.123, "y": -40.988, "z": 1.123, "seed": 1}]
+
+
+def test_the_puff_pixels_are_pinned() -> None:
+    import hashlib
+
+    pixels = np.asarray(Image.open(io.BytesIO(puff_png())))
+    assert hashlib.sha256(pixels.tobytes()).hexdigest()[:16] == "ae69440be69c0c40"

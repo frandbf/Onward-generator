@@ -64,6 +64,8 @@ def test_smoke_columns_stand_on_the_wrecks_with_their_texture(inputs: tuple[Path
                                         "refused": {"outside_core": 0, "near_spawn": 0, "near_climb": 0, "near_column": 0}}
     listed = [f for f in result.manifest["files"] if f["role"] == "smoke_texture"]
     assert [f["path"] for f in listed] == ["smoke_puff.png"] and listed[0]["source"] == "generated"
+    assert listed[0]["bytes"] == (result.directory / "smoke_puff.png").stat().st_size
+    assert not [w for w in result.manifest["warnings"] if w.startswith("smoke:")]  # every column asked for stands
     assert (result.directory / "smoke_puff.png").read_bytes() == puff_png()
     assert result.manifest["package_id"] != GOLDEN_PACKAGE_ID
     assert verify_package(result.directory) == []
@@ -84,3 +86,25 @@ def test_the_export_command_takes_the_count(inputs: tuple[Path, Path], tmp_path:
     assert main([*args, "--out", str(tmp_path / "three"), "--smoke", "3"]) == 0
     assert json.loads((tmp_path / "three" / "onward_export.json").read_bytes())["smoke"]["wanted"] == 3
     assert main([*args, "--out", str(tmp_path / "six"), "--smoke", "6"]) == 2
+
+
+def test_the_default_is_no_smoke(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    detail, layout = inputs
+    assert build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW).manifest["package_id"] == GOLDEN_PACKAGE_ID
+
+
+def test_wrecks_outside_the_core_or_too_close_are_refused_and_named(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    detail, layout = inputs
+    spawns = json.loads(layout.read_bytes())
+    points = [(p["x"], p["y"]) for key in ("attackers", "defenders") for p in (spawns.get(key) or {}).get("points_m") or []]
+    x0, y0 = next((x, y) for x, y in ((-70.0, -70.0), (70.0, -70.0), (-70.0, 70.0), (70.0, 70.0))
+                  if all(((x - px) ** 2 + (y - py) ** 2) ** 0.5 >= 20.0 for px, py in points))
+    copy = _wrecked(detail, tmp_path, [(150.0, 0.0), (x0, y0), (x0 * 0.95, y0)])  # the third 3.5 m from the second
+    document = json.loads((copy / "scene_detail.json").read_bytes())
+    document["core"] = {**(document.get("core") or {}), "half_side_m": 100.0}
+    (copy / "scene_detail.json").write_text(json.dumps(document), encoding="utf-8")
+    result = build_package(EXPORT_PROJECT, copy, layout, tmp_path / "pkg", now=FIXED_NOW, smoke=3)
+    assert result.manifest["smoke"]["refused"] == {"outside_core": 1, "near_spawn": 0, "near_climb": 0, "near_column": 1}
+    assert result.manifest["smoke"]["columns"] == 1
+    assert ("smoke: 1 of 3 columns found a wreck of the core clear of the spawns, the climbs and each other "
+            "(outside_core 1, near_column 1)") in result.manifest["warnings"]
