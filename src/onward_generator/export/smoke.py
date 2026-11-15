@@ -111,15 +111,16 @@ def puff_png(seed: int = 0) -> bytes:
     rng = np.random.default_rng(seed)
     n = TEXTURE_PX
     yy, xx = np.mgrid[0:n, 0:n] / (n - 1) * 2.0 - 1.0
-    radial = np.clip(1.0 - np.hypot(xx, yy), 0.0, 1.0) ** 1.6
+    radial = np.maximum(1.0 - np.hypot(xx, yy), 0.0) ** 1.6
     noise = np.zeros((n, n))
     for octave in (8, 16, 32):
         coarse = rng.uniform(0.0, 1.0, (octave, octave))
-        noise += np.asarray(Image.fromarray((coarse * 255).astype(np.uint8)).resize((n, n), Image.Resampling.BICUBIC)) / 255.0 / (octave / 8)
+        resized = Image.fromarray((coarse * 255).astype(np.uint8)).resize((n, n), Image.Resampling.BICUBIC)  # pragma: no mutate: Pillow's default resampling is bicubic too
+        noise += np.asarray(resized) / 255.0 / (octave / 8)  # pragma: no mutate: the noise is normalised by its maximum below, so a factor common to every octave changes nothing
     noise /= noise.max()
-    alpha = Image.fromarray((np.clip(radial * (0.55 + 0.45 * noise), 0.0, 1.0) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.5))
-    pixels = np.zeros((n, n, 4), dtype=np.uint8)
-    pixels[..., :3] = 255
+    # radial and noise lie in [0, 1], so the alpha does too.
+    alpha = Image.fromarray((radial * (0.55 + 0.45 * noise) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.5))
+    pixels = np.full((n, n, 4), 255, dtype=np.uint8)
     pixels[..., 3] = np.asarray(alpha)
     out = io.BytesIO()
     Image.fromarray(pixels).save(out, format="PNG")

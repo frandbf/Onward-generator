@@ -154,18 +154,19 @@ def test_the_adapter_draws_each_column_with_the_sdk_particle_shader() -> None:
 
 
 def test_each_keep_out_is_measured_from_where_it_stands() -> None:
-    layout = {"attackers": {"points_m": [{"x": 30.0, "y": 20.0}]}, "ladders": [{"x": -50.0, "y": 50.0}]}
+    layout = {"attackers": {"points_m": [{"x": 30.0, "y": 20.0}]}, "ladders": [{"x": -50.0, "y": 50.0}, {"x": 60.0, "y": -60.0}]}
     sites = [
         ("spawn_x", 25.0, 20.0, 0.0),      # 5 m east of the spawn
         ("spawn_y", 30.0, 25.0, 0.0),      # 5 m north of it
         ("foot_far", -50.0, 60.0, 0.0),    # 10 m north of the ladder foot: clear
         ("foot_near", -48.0, 51.0, 0.0),   # 2.2 m from it
+        ("foot_other", 61.0, -61.0, 0.0),  # 1.4 m from the other ladder
         ("out_x", 100.5, 0.0, 0.0),
         ("out_y", 0.0, -100.5, 0.0),
         ("edge", -100.0, -80.0, 0.0),      # on the core's edge: inside
     ]
     columns, refused = choose(sites, 5, 100.0, layout)
-    assert refused == {"outside_core": 2, "near_spawn": 2, "near_climb": 1, "near_column": 0}
+    assert refused == {"outside_core": 2, "near_spawn": 2, "near_climb": 2, "near_column": 0}
     assert sorted((c["x"], c["y"]) for c in columns) == [(-100.0, -80.0), (-50.0, 60.0)]
 
 
