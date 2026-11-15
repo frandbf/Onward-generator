@@ -58,7 +58,7 @@ from onward_generator.overgrow.constants import (
 from onward_generator.overgrow.fit import apply_fit_scale
 from onward_generator.overgrow.impostor import flat_impostor
 from onward_generator.overgrow.library_catalog import LibraryError, library_directories
-from onward_generator.overgrow.manifest import INTERIOR, KIT_ONLY, check_manifest
+from onward_generator.overgrow.manifest import INTERIOR, KIT_ONLY, PINNED_ONLY, check_manifest
 from onward_generator.overgrow.normalize import cluster_decimate, rest_on_ground
 
 
@@ -234,8 +234,20 @@ def _load_directory(root: Path) -> tuple[list[Prop], list[LibraryReject]]:
         if reason is not None:
             rejects.append(LibraryReject(spec.id, reason))
             continue
-        props.append(level_of_detail(prop))
+        loaded = level_of_detail(prop)
+        if loaded.triangles > CHANCE_MAX_TRIANGLES and spec.placement != PINNED_ONLY:
+            # One prop placed by chance must not spend a map's whole library budget (15 November 2026): a 59 771-triangle
+            # helicopter wreck could, on any map. A heavier model is a story prop, pinned where a map wants it.
+            rejects.append(LibraryReject(spec.id, "too_heavy_for_chance"))
+            continue
+        props.append(loaded)
     return props, rejects
+
+
+CHANCE_MAX_TRIANGLES = 8000
+"""The most triangles a prop the rules or the model place by chance may cost, after level of detail: a whole car, the
+heaviest street prop the library keeps whole (vehicles are never reduced). A heavier row loads only as a
+``pinned_only`` story prop."""
 
 
 INTERIOR_LICENCES = {"CC0 1.0": "CC0-1.0", local.LICENCE_NAME: local.LICENCE_SPDX}

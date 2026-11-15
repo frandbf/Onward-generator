@@ -1605,7 +1605,7 @@
       "clearance_m": 0.0,
       "use": "crashed helicopter in a street, plaza, park, yard or lot",
       "description": "Torn, charred attack-helicopter wreck in pieces, spread over 15 m; a crash site.",
-      "placement": "open_ground",
+      "placement": "pinned_only",
       "grouping": "single",
       "condition": "wrecked",
       "tags": [
