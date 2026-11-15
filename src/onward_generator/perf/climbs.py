@@ -199,6 +199,13 @@ def _inside_wall(detail_manifest: Mapping[str, Any], footprint: BaseGeometry, he
 
 
 def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, BaseGeometry]) -> list[tuple[str, dict[str, Any], Polygon]]:
+    """The roofs a street climb may lead to: ``playable_roofs`` less those an interior stair already reaches."""
+    roofs, stair_roofs = playable_roofs(detail_manifest, footprints)
+    return [row for row in roofs if row[0] not in stair_roofs]
+
+
+def playable_roofs(detail_manifest: Mapping[str, Any], footprints: Mapping[str, BaseGeometry]) -> tuple[list[tuple[str, dict[str, Any], Polygon]], set[str]]:
+    """Every flat roof inside the wall with ``ROOF_MIN_M2`` of deck, and the ids of those an interior stair reaches."""
     objects = detail_manifest.get("objects", [])
     climbed = {o["source_ids"][0] for o in objects if o.get("type") == "interior" and o.get("roof_access")}
     found = []
@@ -207,7 +214,7 @@ def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, Bas
         if building.get("type") != "building" or building.get("tier", CORE) != CORE:
             continue
         source = building["source_ids"][0]
-        if source in climbed or source not in footprints or building["height"].get("landmark"):
+        if source not in footprints or building["height"].get("landmark"):
             continue
         if not _inside_wall(detail_manifest, footprints[source], float(building["height"]["height_m"])):
             continue
@@ -216,7 +223,7 @@ def _candidates(detail_manifest: Mapping[str, Any], footprints: Mapping[str, Bas
             largest = max(getattr(footprint, "geoms", [footprint]), key=lambda part: part.area)
             if deck(largest, _parapet_thickness(building)).area >= ROOF_MIN_M2:
                 found.append((source, building, largest))
-    return found
+    return found, climbed & {row[0] for row in found}
 
 
 def _parapet_thickness(building: Mapping[str, Any]) -> float:
@@ -254,8 +261,10 @@ def place_climbs(
     free = free.buffer(COVER_TOLERANCE_M)
     cabin_free = free if lift_free is None else lift_free.buffer(COVER_TOLERANCE_M)
     spawns = [*attackers, *defenders]
+    roofs, stair_roofs = playable_roofs(detail_manifest, footprints)
+    clear = [row for row in roofs if min(row[2].distance(Point(p)) for p in spawns) >= SPAWN_CLEAR_M]
     ranked = sorted(
-        (row for row in _candidates(detail_manifest, footprints) if min(row[2].distance(Point(p)) for p in spawns) >= SPAWN_CLEAR_M),
+        (row for row in clear if row[0] not in stair_roofs),
         key=lambda row: (round(_fairness(row[2], attackers, defenders) / BALANCE_STEP_M), float(row[1]["height"]["height_m"]), row[0]),
     )
     ladders: list[dict[str, float]] = []
@@ -278,14 +287,16 @@ def place_climbs(
             if site is not None and spaced(site):
                 ladders.append(site)
                 used.add(source)
-    # Roof links: from the climbed roofs on to their flat neighbours, so the roofs play as a run (each link climbed both ways).
-    return {"ladders": ladders + roof_links(ranked, used), "lifts": lifts}
+    # Roof links: from every roof a player can reach, by a street climb or an interior stair, on to its flat neighbours,
+    # so the roofs play as a run (each link climbed both ways; 15 November 2026: stair roofs seed links too).
+    return {"ladders": ladders + roof_links(clear, used | {row[0] for row in clear if row[0] in stair_roofs}), "lifts": lifts}
 
 
 # Roof links (12 November 2026): from the roofs a street climb reaches, ladders lead on to flat roofs next door, so a
 # squad can play along a run of roofs. Each link is a ladder against the higher building's wall with its foot on the
 # lower roof: climbed both ways, so every linked roof leads back to the street.
-ROOF_LINKS_MAX = 6
+ROOF_LINKS_MAX = 12
+"""Raised from 6 on 15 November 2026, when every reachable roof began to seed links: Mogadishu 1993 has 11."""
 LINK_MAX_RISE_M = 6.0
 LINK_TOUCH_M = 0.3
 LINK_MIN_SHARED_M = LADDER_WIDTH_M + 0.4
@@ -336,27 +347,33 @@ def link_ladder(low: tuple[str, Mapping[str, Any], Polygon], high: tuple[str, Ma
 
 
 def roof_links(candidates: Sequence[tuple[str, dict[str, Any], Polygon]], climbed: Iterable[str]) -> list[dict[str, Any]]:
-    """Ladders from the ``climbed`` roofs on to touching ``candidates``, breadth first, each roof reached once, at most
-    ``ROOF_LINKS_MAX``. A link joins two roofs both ways; a roof is linked only from one already reached."""
+    """Ladders from the ``climbed`` roofs (any a player reaches: a street climb or an interior stair) on to touching
+    ``candidates``, breadth first, at most ``ROOF_LINKS_MAX``. A link joins two roofs both ways, so a newly linked roof
+    leads on in turn. A roof may have several links: to each touching neighbour, reached already or not (15 November
+    2026; before, each roof was linked once and two roofs reached by their own stairs never were)."""
     by_id = {source: (source, building, footprint) for source, building, footprint in candidates}
     reached = [source for source in sorted(set(climbed)) if source in by_id]
     seen = set(reached)
+    joined: set[frozenset[str]] = set()
     links: list[dict[str, Any]] = []
     queue = list(reached)
     while queue:
         here = by_id[queue.pop(0)]
         for other_id in sorted(by_id):
-            if other_id in seen:
+            pair = frozenset((here[0], other_id))
+            if other_id == here[0] or pair in joined:
                 continue
             other = by_id[other_id]
             low, high = sorted((here, other), key=lambda row: (float(row[1]["height"]["height_m"]), row[0]))
             site = link_ladder(low, high)
             if site is not None:
                 links.append(site)
+                joined.add(pair)
                 if len(links) == ROOF_LINKS_MAX:
                     return links
-                seen.add(other_id)
-                queue.append(other_id)
+                if other_id not in seen:
+                    seen.add(other_id)
+                    queue.append(other_id)
     return links
 
 

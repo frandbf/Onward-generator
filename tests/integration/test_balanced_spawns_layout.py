@@ -46,13 +46,16 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 # else in the layout changed, and the report changed only its layout_sha256.
 # Re-pinned on 14 November 2026: the layout gained nav_ground (the bots' navmesh ground, ADR-015 amendment); every
 # other key, the 32 routes and their 200 points included, is unchanged, and the report changed only its layout_sha256.
-HEAD_LAYOUT_SHA256 = "8c3263e7edb90384c69c9aa2f4197761e871ea3f6703c091d5ce8ea14fc0b9a3"
+# Re-pinned on 15 November 2026: roofs reached by an interior stair seed roof links (ADR-029 amendment); the layout
+# gained two link ladders and nothing else changed (compared with fix/navmesh-footprints'); the report follows the layout.
+HEAD_LAYOUT_SHA256 = "ac0414061f59d7c7561c9ca14c6cd0447e032d7c2d4cdfe841ce3e7f668943a2"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
 # Re-pinned on 14 November 2026 (ADR-032 amendment): the report measures routes on the player's ground, carriageway
 # included; the layout without the option is unchanged.
 # Re-pinned on 15 November 2026: the layout gained nav_ground; the report changed only its layout_sha256.
-HEAD_REPORT_SHA256 = "2c4f65465ae46d45db7d37466418786c5c667ba8a89b4e835fa2f12c974b24ed"
+# Re-pinned on 15 November 2026: the layout gained two roof-link ladders; the report changed only its layout_sha256.
+HEAD_REPORT_SHA256 = "ccd2d8fe137bedae75b1490cd9c77d4b42bab4e6b008edc3788f748d713e7877"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 
