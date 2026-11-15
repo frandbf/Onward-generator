@@ -649,6 +649,11 @@ def patrol_seeds(routes: list[dict[str, Any]], limit: int) -> list[tuple[float, 
     return seeds
 
 
+def _cm(point: tuple[float, float]) -> list[float]:
+    """A layout point ``[x, y]`` to the centimetre."""
+    return [round(point[0], 2), round(point[1], 2)]
+
+
 def _xy(x: float, y: float, focus: tuple[float, float]) -> dict[str, float]:
     return {"x": round(x, 2), "y": round(y, 2), "yaw": yaw_toward(x, y, *focus)}
 
@@ -666,9 +671,9 @@ def _focus_xy(base: GeneratedScene, heights: Mapping[str, Any]) -> tuple[float, 
         if source not in landmarks:
             continue
         vertices = np.vstack([prim.mesh.vertices for prim in obj.visual])
-        area = MultiPoint([tuple(v) for v in vertices[:, :2]]).convex_hull.area
+        area = MultiPoint([tuple(v) for v in vertices[:, :2]]).convex_hull.area  # pragma: no mutate: shapely's area of x, y, z points is their plan's
         centre = (float(vertices[:, 0].mean()), float(vertices[:, 1].mean()))
-        found.append((-round(area, 3), round(math.hypot(*centre), 3), centre))
+        found.append((-area, math.hypot(*centre), centre))
     return min(found)[2] if found else None
 
 
@@ -1218,7 +1223,7 @@ def playable_layout(
         "escort_b_m": [round(escort[1][0], 2), round(escort[1][1], 2)],
         "evac_m": [round(evac[0], 2), round(evac[1], 2)],
         "harddrives_m": [_xy(*point, focus) for point in drives],
-        "focus_m": [round(focus[0], 2), round(focus[1], 2)],
+        "focus_m": _cm(focus),
         "attackers": with_yaw(doc["attackers"]),
         "defenders": with_yaw(doc["defenders"]),
         "ai_m": [_xy(*p, focus) for p in ai],
@@ -1229,10 +1234,10 @@ def playable_layout(
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": GLOBAL_AMBIENCE[time_of_day],
         "audio_birds_m": list(uplink) if time_of_day == "day" else [],
-        "audio_wind_m": [round(focus[0], 2), round(focus[1], 2)],
+        "audio_wind_m": _cm(focus),
         # A large reflective space round the focus only when the focus is a landmark (15 November 2026): every map got
         # one at its Uplink before, an indoor hall's reverb out in a street.
-        "reverb_m": [round(landmark[0], 2), round(landmark[1], 2)] if landmark is not None else [],
+        "reverb_m": _cm(landmark) if landmark is not None else [],
         "audio_roof_wind_m": roof_wind(detail_manifest, focus, climbed_roofs(climbs)),
         **climbs,
         "environment": "Urban",

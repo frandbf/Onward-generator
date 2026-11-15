@@ -1596,11 +1596,11 @@ def test_the_focus_is_the_largest_landmark_not_a_name_or_a_direction() -> None:
     heights = {"buildings": [{"building_id": "a", "landmark": True, "name": "Catedral"},
                              {"building_id": "b", "landmark": True, "name": "Mosque"},
                              {"building_id": "c", "landmark": False, "name": "Big shed"}]}
-    small_north = _landmark("a", 0.0, 50.0, 10.0, 60.0)    # named catedral, northernmost, 100 m²
-    large_south = _landmark("b", -20.0, -40.0, 20.0, -20.0)  # 800 m²
+    small_north = _landmark("a", 0.0, 10.0, 10.0, 20.0)       # named catedral, northernmost, nearest the centre, 100 m²
+    large_south = _landmark("b", -20.0, -90.0, 20.0, -70.0)   # 800 m², far to the south
     not_landmark = _landmark("c", 60.0, 60.0, 120.0, 120.0)
     base = SimpleNamespace(objects=[small_north, large_south, not_landmark])
-    assert _focus_xy(base, heights) == pytest.approx((0.0, -30.0))
+    assert _focus_xy(base, heights) == pytest.approx((0.0, -80.0))  # the largest, not the name, the north or the nearest
     # A tie in area: the one nearer the site centre.
     twins = {"buildings": [{"building_id": "a", "landmark": True}, {"building_id": "b", "landmark": True}]}
     near, far = _landmark("a", 10.0, 0.0, 20.0, 10.0), _landmark("b", 50.0, 0.0, 60.0, 10.0)
@@ -1613,3 +1613,9 @@ def test_the_ambience_follows_the_time_of_day() -> None:
 
     assert GLOBAL_AMBIENCE == {"day": "Suburban Day", "night": "Suburban Night"}
     assert set(GLOBAL_AMBIENCE) == set(TIME_OF_DAY_SETTINGS)
+
+
+def test_a_layout_point_keeps_the_centimetre() -> None:
+    from onward_generator.perf.layout import _cm
+
+    assert _cm((40.12345, -18.98765)) == [40.12, -18.99]
