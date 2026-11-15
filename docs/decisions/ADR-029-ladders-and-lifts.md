@@ -129,3 +129,8 @@ On the headset, Murcia Catedral pkg_01 showed part of a covered car inside a str
 - Overgrow records `size_m` (length, width and height of the placed mesh) on each library prop and each procedural wreck in `scene_detail.json`. The field is added; nothing else changes.
 - `perf/layout.prop_clearance` gives each prop half its plan diagonal, which covers it at any heading, and never less than `CLIMB_PROP_CLEAR_M` (1 m). A tree keeps its crown's 2 m.
 - A manifest from before this amendment has no `size_m`. A vehicle or a wreck there keeps `CLIMB_VEHICLE_CLEAR_M` (2.5 m, half the diagonal of a 4.5 by 1.8 m car); any other prop keeps 1 m.
+
+## Amendment, 15 November 2026: every reachable roof seeds links
+
+At the maintainer's request, every roof a player can climb to, whatever the means, may lead on to the roofs it touches. `roof_links` now spreads from the roofs the street ladders and lifts reach and from every roof an interior stair reaches (`interior.roof_access`; `playable_roofs` lists the rule-1 roofs and which of them have a stair). A roof may have several links: one to each touching neighbour that qualifies, reached already or not; each pair is linked once. Before, each roof was linked once and links grew only from the street climbs: Mogadishu 1993 had 57 stair roofs, 20 touching pairs that met the link rules and no link, since none touched its three ladder roofs. `ROOF_LINKS_MAX` goes from 6 to 12, so Mogadishu 1993 gets all 11 of its links (6 with the old cap); a ladder link costs a few hundred triangles. The link rules and the 30 m spawn clearance are unchanged; a stair roof still gets no street ladder of its own.
+

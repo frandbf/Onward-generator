@@ -438,7 +438,7 @@ def test_a_core_tier_or_no_tier_keeps_a_building() -> None:
 def test_a_link_climbs_from_the_lower_roof_up_the_higher_wall_and_back() -> None:
     from onward_generator.perf.climbs import LINK_MAX_RISE_M, LINK_MIN_SHARED_M, ROOF_LINKS_MAX, link_ladder
 
-    assert (ROOF_LINKS_MAX, LINK_MAX_RISE_M, LINK_MIN_SHARED_M) == (6, 6.0, 2.0)
+    assert (ROOF_LINKS_MAX, LINK_MAX_RISE_M, LINK_MIN_SHARED_M) == (12, 6.0, 2.0)
     low = ("low", _building("low", 3), box(0, 0, 20, 10))
     high = ("high", _building("high", 4), box(20, 0, 40, 10))
     site = link_ladder(low, high)
@@ -458,11 +458,11 @@ def test_a_link_climbs_from_the_lower_roof_up_the_higher_wall_and_back() -> None
 def test_links_spread_from_the_climbed_roofs_breadth_first_each_roof_once() -> None:
     from onward_generator.perf.climbs import ROOF_LINKS_MAX, roof_links
 
-    row = [(f"b{k}", _building(f"b{k}", 3 + k % 2), box(20 * k, 0, 20 * k + 20, 10)) for k in range(9)]
-    links = roof_links(row, ["b0"])
-    assert len(links) == ROOF_LINKS_MAX and [link["link"] for link in links][:2] == [["b0", "b1"], ["b2", "b1"]]
-    reached = {"b0"} | {source for link in links for source in link["link"]}
-    assert reached == {f"b{k}" for k in range(7)}
+    row = [(f"b{k:02d}", _building(f"b{k:02d}", 3 + k % 2), box(20 * k, 0, 20 * k + 20, 10)) for k in range(15)]
+    links = roof_links(row, ["b00"])
+    assert len(links) == ROOF_LINKS_MAX and [link["link"] for link in links][:2] == [["b00", "b01"], ["b02", "b01"]]
+    reached = {"b00"} | {source for link in links for source in link["link"]}
+    assert reached == {f"b{k:02d}" for k in range(ROOF_LINKS_MAX + 1)}
     assert roof_links(row, []) == [] and roof_links(row, ["elsewhere"]) == []
 
 
@@ -532,13 +532,14 @@ def test_a_link_s_limits_are_inclusive() -> None:
     assert _shared(box(30, 0, 40, 10), low) is None  # apart
 
 
-def test_a_star_of_neighbours_takes_six_links_at_most() -> None:
+def test_a_star_of_neighbours_takes_the_cap_at_most() -> None:
     from onward_generator.perf.climbs import ROOF_LINKS_MAX, roof_links
 
     centre = _roofed("c", 9.0, box(0, 0, 40, 40))
-    around = [_roofed(f"n{k}", 9.0, box(-20, 5 * k, 0, 5 * k + 4.5)) for k in range(8)]
-    assert len(roof_links([centre, *around], ["c"])) == ROOF_LINKS_MAX
-    assert len(roof_links([centre, *around[:4]], ["c"])) == 4
+    west = [_roofed(f"w{k}", 9.0, box(-20, 5 * k, 0, 5 * k + 4.5)) for k in range(8)]
+    east = [_roofed(f"e{k}", 9.0, box(40, 5 * k, 60, 5 * k + 4.5)) for k in range(8)]
+    assert len(roof_links([centre, *west, *east], ["c"])) == ROOF_LINKS_MAX
+    assert len(roof_links([centre, *west[:4]], ["c"])) == 4
 
 
 def test_a_clockwise_footprint_and_a_roof_without_a_parapet_link_alike() -> None:
@@ -556,3 +557,44 @@ def test_a_clockwise_footprint_and_a_roof_without_a_parapet_link_alike() -> None
     bare = {"id": "building/h", "type": "building", "source_ids": ["h"], "height": {"height_m": 12.0}, "roof": {"type": "flat"}}
     site = link_ladder(_roofed("low", 9.0, low), ("h", bare, high))
     assert site is not None and site["parapet_m"] == 0.0
+
+
+# --- every reachable roof seeds links (15 November 2026) --------------------------------------------------------------
+
+def test_a_roof_reached_by_its_interior_stair_leads_on_to_its_neighbours() -> None:
+    """Mogadishu 1993: 57 roofs had a stair from inside, 20 touching pairs could be linked, and no link was placed
+    because links grew only from the three street ladders."""
+    stair = {"type": "interior", "source_ids": ["s"], "roof_access": True}
+    footprints = {"s": box(0, 100, 20, 110), "n": box(20, 100, 40, 110)}
+    placed = _place([_building("s", 2, interior=True), stair, _building("n", 2)], footprints)
+    links = [site["link"] for site in placed["ladders"] if "link" in site]
+    assert ["n", "s"] in links or ["s", "n"] in links
+    street = [site for site in placed["ladders"] if "link" not in site]
+    assert all(site["roof_x"] > 20.0 for site in street)  # the stair roof still gets no street ladder of its own
+
+
+def test_two_stair_roofs_touching_only_each_other_are_linked() -> None:
+    """Only the stair roofs seed this link: a street climb reaches the far roof, which touches neither."""
+    footprints = {"s": box(0, 100, 20, 110), "t": box(20, 100, 40, 110), "n": box(-60, -40, -40, -30)}
+    stairs = [{"type": "interior", "source_ids": [k], "roof_access": True} for k in "st"]
+    manifest = [_building("s", 2, interior=True), _building("t", 2, interior=True), *stairs, _building("n", 2)]
+    links = [site["link"] for site in _place(manifest, footprints)["ladders"] if "link" in site]
+    assert links == [["s", "t"]]
+
+
+def test_two_roofs_each_reached_on_its_own_are_linked_too() -> None:
+    from onward_generator.perf.climbs import roof_links
+
+    rows = [("a", _building("a", 2), box(0, 0, 20, 10)), ("b", _building("b", 2), box(20, 0, 40, 10))]
+    assert [link["link"] for link in roof_links(rows, ["a", "b"])] == [["a", "b"]]
+    assert [link["link"] for link in roof_links(rows, ["b", "a", "b"])] == [["a", "b"]]  # one link per pair
+
+
+def test_a_roof_may_have_a_link_to_each_touching_neighbour() -> None:
+    from onward_generator.perf.climbs import roof_links
+
+    # A block of four: a b / c d, each touching its row and column neighbour (a and d meet at a corner only).
+    rows = [(k, _building(k, 2), box(x, y, x + 20, y + 10)) for k, x, y in (("a", 0, 0), ("b", 20, 0), ("c", 0, 10), ("d", 20, 10))]
+    pairs = [frozenset(link["link"]) for link in roof_links(rows, ["a"])]
+    assert pairs == [frozenset("ab"), frozenset("ac"), frozenset("bd"), frozenset("cd")]  # d is linked from b and from c
+    assert len(set(pairs)) == len(pairs)
