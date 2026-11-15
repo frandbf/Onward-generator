@@ -413,12 +413,18 @@ def test_detail_gets_the_map_s_named_facade_style(tmp_path: Path, monkeypatch: p
     facades: list[str] = []
     profile: dict[str, list[str]] = {}
     monkeypatch.setattr("onward_generator.maps.workspace.facade_options", lambda r: list(facades))
-    monkeypatch.setattr("onward_generator.ai.street_profile.profile_flags", lambda r: dict(profile))
+    def flags(r: object) -> dict[str, list[str]]:
+        assert r == root  # the profile of this map
+        return dict(profile)
+
+    monkeypatch.setattr("onward_generator.ai.street_profile.profile_flags", flags)
     assert next_step._facade_style(scene) == ()
     profile["materials"] = ["--facade-style", "haussmann", "--street-profile", "x"]
     assert next_step._facade_style(scene) == ("--facade-style", "haussmann")
     facades[:] = ["--facades", "trim", "--facade-style", "mediterranean"]
     assert next_step._facade_style(scene) == ("--facade-style", "mediterranean")  # the map's own setting wins
+    command = next_step.detail_command(scene, scene.parent / "heights.json", scene.parent / "base")
+    assert command.argv[command.argv.index("--facade-style") + 1] == "mediterranean"
     facades[:] = ["--facade-style", "auto"]
     assert next_step._facade_style(scene) == ()
     monkeypatch.setattr(next_step, "map_root", lambda path: None)

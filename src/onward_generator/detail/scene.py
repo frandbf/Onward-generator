@@ -1507,7 +1507,7 @@ def _detail_buildings(
     flat_openings: int,
     exposed_m: float,
     party_m: float,
-    style_request: str = "auto",
+    style_request: str,
 ) -> DetailedScene:
     """The building loop of ``detail_scene``: each building in ``order`` drawn as a core, mid or scenic one, then ``_assemble_detail``.
 

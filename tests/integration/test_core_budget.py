@@ -489,3 +489,30 @@ def test_a_haussmann_map_lays_balcons_filants_along_its_tall_street_walls(ring_i
                 and o["facade"]["openings"].get("balcony_filant")]
     elsewhere = detail_scene(generated, ref, heights, scene, CFG, core_half_side_m=50.0).manifest()  # Murcia's own box
     assert not [o for o in elsewhere["objects"] if o.get("type") == "building" and o["facade"]["openings"].get("balcony_filant")]
+
+
+def test_the_detail_command_passes_the_facade_style_on_both_paths(ring_inputs: tuple[Path, Path, Path], tmp_path: Path,
+                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    """15 November 2026: ``detail --facade-style`` reaches the building loop with a fixed core and with a budget core."""
+    from onward_generator.detail import __main__ as detail_cli
+
+    seen: list[object] = []
+    real_scene, real_budget = detail_cli.detail_scene, detail_cli.detail_scene_budget
+
+    def scene_spy(*args, **kwargs):  # type: ignore[no-untyped-def]
+        seen.append(kwargs.get("style_request"))
+        return real_scene(*args, **kwargs)
+
+    def budget_spy(*args, **kwargs):  # type: ignore[no-untyped-def]
+        seen.append(kwargs.get("style_request"))
+        return real_budget(*args, **kwargs)
+
+    monkeypatch.setattr(detail_cli, "detail_scene", scene_spy)
+    monkeypatch.setattr(detail_cli, "detail_scene_budget", budget_spy)
+    scene, heights, base = ring_inputs
+    common = ["--scene", str(scene), "--heights", str(heights), "--base", str(base), "--no-preview", "--facade-style", "haussmann"]
+    assert detail_cli.main([*common, "--out", str(tmp_path / "fixed"), "--core-radius-m", "50"]) == 0
+    assert detail_cli.main([*common, "--out", str(tmp_path / "budget"), "--core-radius-m", "60", "--core-target-triangles", "20000"]) == 0
+    assert seen == ["haussmann", "haussmann"]
+    assert detail_cli.main([*common[:-2], "--out", str(tmp_path / "auto"), "--core-radius-m", "50"]) == 0
+    assert seen[-1] == "auto"

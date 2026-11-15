@@ -65,9 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="lod2_index.json of a landmark_mesh source plugin (es.madrid_lod2): observed LoD2 volumes clipped to the "  # pragma: no mutate: help text
              "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
     )
-    parser.add_argument("--facade-style", default="auto",
-                        help="the map's facade style as materials resolves it (map.json facades.style or the street profile); "  # pragma: no mutate: help text
-                             "auto takes the box of the map's centre. Decides the style's geometry, such as Haussmann mansards")  # pragma: no mutate: help text
+    parser.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it (map.json facades.style or the street profile); auto takes the box of the map's centre; decides the style's geometry")  # pragma: no mutate: help text
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
