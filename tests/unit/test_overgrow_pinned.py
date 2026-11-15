@@ -277,3 +277,17 @@ def test_a_pin_may_sink_its_model_into_the_ground(tmp_path: Path) -> None:
     assert sunk.records[0]["sink_m"] == 1.5 and "roll_deg" not in sunk.records[0]
     flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
     assert flat.nodes[0].matrix[2, 3] == 0.0 and "sink_m" not in flat.records[0]
+
+
+def test_pins_of_one_model_share_its_mesh_only_in_the_same_pose() -> None:
+    """14 November 2026: one mesh key for every pin of a model drew Super Six-One with Super Six-Four's pose."""
+    wreck = _wreck(4.0, 2.0)
+    pins = [Pin("crashed_helicopter", LAT, LON, 0.0, roll_deg=35.0, pitch_deg=-10.0),
+            Pin("crashed_helicopter", LAT + 0.0005, LON, 0.0, roll_deg=-80.0),
+            Pin("crashed_helicopter", LAT - 0.0005, LON, 0.0, roll_deg=-80.0),
+            Pin("crashed_helicopter", LAT, LON + 0.0005, 0.0)]
+    result = place_pins(pins, {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(200))
+    assert [n.mesh_key for n in result.nodes] == ["pinned:crashed_helicopter:35:-10", "pinned:crashed_helicopter:-80:0",
+                                                  "pinned:crashed_helicopter:-80:0", "pinned:crashed_helicopter"]
+    heights = [round(float(np.vstack([p.mesh.vertices for p in n.primitives])[:, 2].max()), 6) for n in result.nodes]
+    assert heights[1] == heights[2] != heights[0] and heights[3] == pytest.approx(2.5)

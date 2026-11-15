@@ -184,7 +184,10 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
         matrix = yaw_matrix(x, y, -pin.sink_m, yaw)
         extras = {"type": "overgrowth", "origin": "pinned", "kind": prop.spec.category, "role": prop.spec.role,
                   "asset_id": prop.spec.id, "label": pin.label}
-        result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}"))
+        # Pins of one model share its glTF mesh only in the same pose: with one key for all, every pin drew the
+        # first pin's turned mesh (14 November 2026).
+        pose = f":{pin.roll_deg:g}:{pin.pitch_deg:g}" if pin.roll_deg or pin.pitch_deg else ""
+        result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}{pose}"))
         result.colliders.append(Node(f"overgrow/collider/pinned/{prop.spec.id}/{number}", (Primitive(collider_mesh(prop.mesh, "fence"), "collider"),),
                                      {"type": "collision", "origin": "pinned", "asset_id": prop.spec.id}, matrix))
         result.images.update(prop.images())
