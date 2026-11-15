@@ -19,9 +19,17 @@ from urllib.parse import urlparse
 
 from onward_generator import __version__
 from onward_generator.net import fetch_bytes
+from onward_generator.overgrow.constants import TARGET_ASSET_TRIS
 from onward_generator.overgrow.library_catalog import REVIEW_FILE
 from onward_generator.overgrow.manifest import keep_semantics
-from onward_generator.overgrow.normalize import gltf_to_local, materialize_images, normalize_arrays, write_normalized_glb
+from onward_generator.overgrow.normalize import (
+    gltf_to_local,
+    gltf_to_local_parts,
+    materialize_images,
+    normalize_arrays,
+    normalize_parts,
+    write_normalized_glb,
+)
 
 MAX_BYTES = 260 * 1024 * 1024
 MAX_JSON_BYTES = 8 * 1024 * 1024
@@ -29,30 +37,37 @@ TOKEN_ENV = "SKETCHFAB_API_TOKEN"
 API_HOSTS = frozenset({"api.sketchfab.com"})
 DOWNLOAD_API = "https://api.sketchfab.com/v3/models/{uid}/download"
 USER_AGENT = f"onward-generator/{__version__}"
+# Re-imported on 14 November 2026: the vehicles at 8 000 triangles (the load keeps a vehicle whole) and every model with
+# several materials with one albedo each; all of them had been clustered to 1 800 with the first material's image.
 SPECS: dict[str, dict] = {
-    "97e3bdfe47ea40f49351debaa11cd1e2": {"id": "mustang_boss_429", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned muscle car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "68f715c39c07464db59e099bb8dc2d4e": {"id": "rusty_abandoned_truck", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "rusty truck at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "d5307c411b2246d69d9b29c5880223ec": {"id": "abandoned_auto", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "efc4dfe2c7284a64bc9281eb4f61d402": {"id": "destroyed_car_03", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "destroyed sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "ad16f7085cb047b494997cf9efed5059": {"id": "burned_police_cars", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "burned police car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "db2df46c49f9441286c84c66208ef7ac": {"id": "abandoned_sedan_2", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "66ef51a84c9843dda53bf0b4b9020011": {"id": "crashed_abandoned_car", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "crashed car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
-    "6a2169dafc254f399387a679305bb1bf": {"id": "abandoned_sedan_1", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"},
+    "97e3bdfe47ea40f49351debaa11cd1e2": {"id": "mustang_boss_429", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned muscle car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "68f715c39c07464db59e099bb8dc2d4e": {"id": "rusty_abandoned_truck", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "rusty truck at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "d5307c411b2246d69d9b29c5880223ec": {"id": "abandoned_auto", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "efc4dfe2c7284a64bc9281eb4f61d402": {"id": "destroyed_car_03", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "destroyed sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "ad16f7085cb047b494997cf9efed5059": {"id": "burned_police_cars", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "burned police car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "db2df46c49f9441286c84c66208ef7ac": {"id": "abandoned_sedan_2", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "66ef51a84c9843dda53bf0b4b9020011": {"id": "crashed_abandoned_car", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "crashed car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
+    "6a2169dafc254f399387a679305bb1bf": {"id": "abandoned_sedan_1", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "sidewalk", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "abandoned sedan at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza", "max_triangles": 8000, "keep_materials": True},
     "36380c606bae46848237e9bbe073fa3b": {"id": "building_container_metal", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "metal container building at a block edge, plaza, lot or curb"},
-    "1ad46b04f23d43dbb2730c9435c1a7cc": {"id": "crashed_helicopter", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "courtyard", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "crashed helicopter in a street, plaza, park, yard or lot"},
+    # Re-imported on 14 November 2026 with its three materials and 60 000 of its 120 921 triangles: clustered to 1 800
+    # with one texture, it read as grey scrap.
+    "1ad46b04f23d43dbb2730c9435c1a7cc": {"id": "crashed_helicopter", "category": "vehicles", "role": "wreck", "surfaces": ["curb", "carriageway", "courtyard", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "crashed helicopter in a street, plaza, park, yard or lot", "max_triangles": 60000, "keep_materials": True},
     "642f7e533f3242bb9f43addea71efbc4": {"id": "forest_hut", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "forest hut at a block edge, plaza, lot or curb"},
     "240baad0fd7b4924a5705950be7adee6": {"id": "gas_tanker", "category": "structures", "role": "tank", "surfaces": ["block_edge", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "bulk gas tank in a yard, lot or plaza"},
     "a624f8c74f2b4774b4436aaf093c1e01": {"id": "fire_escape_sf", "category": "facade", "role": "fire_escape", "surfaces": ["facade"], "anchor": "facade", "use": "fire escape against a wall"},
-    "a1959927a98e4752bdb01b6e1f7f7d26": {"id": "abandoned_garage", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "abandoned garage at a block edge, plaza, lot or curb"},
+    "a1959927a98e4752bdb01b6e1f7f7d26": {"id": "abandoned_garage", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "abandoned garage at a block edge, plaza, lot or curb", "keep_materials": True},
     "bda39e79dbfa4976b1791b6b1f58259c": {"id": "watchtower", "category": "structures", "role": "building", "surfaces": ["block_edge", "curb", "yard", "empty_lot", "plaza", "park"], "anchor": "ground", "use": "watchtower at a block edge, plaza, lot or curb"},
     "af50e8d36c7e481c8ddc375ce751c1d6": {"id": "road_closed_barrier", "category": "barriers", "role": "barrier", "surfaces": ["curb", "carriageway", "sidewalk", "plaza"], "anchor": "ground", "use": "road-closed barrier at the curb, across the street, on a sidewalk or in a plaza"},
     "f61862267fdf489386aeadae20754229": {"id": "barrier_low", "category": "barriers", "role": "barrier", "surfaces": ["curb", "carriageway", "sidewalk", "plaza"], "anchor": "ground", "use": "low barrier at the curb, across the street, on a sidewalk or in a plaza"},
-    "82227d60e9484b958feb856a2c8f4d33": {"id": "fence_door_metal", "category": "structures", "role": "fence", "surfaces": ["block_edge", "carriageway"], "anchor": "ground", "use": "metal fence door at a block edge or across a street"},
+    "82227d60e9484b958feb856a2c8f4d33": {"id": "fence_door_metal", "category": "structures", "role": "fence", "surfaces": ["block_edge", "carriageway"], "anchor": "ground", "use": "metal fence door at a block edge or across a street", "keep_materials": True},
     "5805213c2b54454fb22d8176c8741210": {"id": "warning_signboard", "category": "barriers", "role": "barrier", "surfaces": ["curb", "carriageway", "sidewalk", "plaza"], "anchor": "ground", "use": "warning sign at the curb, across the street, on a sidewalk or in a plaza"},
-    "d0fbc8fecfbb40bf9029bc97b6e9e122": {"id": "scanned_plants_grass", "category": "vegetation", "role": "plant", "surfaces": ["sidewalk", "yard", "empty_lot"], "anchor": "ground", "use": "scanned plants and grass off the drive lane"},
+    "d0fbc8fecfbb40bf9029bc97b6e9e122": {"id": "scanned_plants_grass", "category": "vegetation", "role": "plant", "surfaces": ["sidewalk", "yard", "empty_lot"], "anchor": "ground", "use": "scanned plants and grass off the drive lane", "keep_materials": True},
     "68c9e77971874643bcef67dc1987a2b7": {"id": "jungle_ground_roots", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "rooted ground patch in a yard"},
     "3781a00ddb6146ceb51144d00349a240": {"id": "jungle_ground_water", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "wet ground patch in a yard"},
     "1ce5fa26a4ce49d6b170988dd4bc5ee2": {"id": "jungle_ground_tile", "category": "vegetation", "role": "plant", "surfaces": ["yard", "empty_lot"], "anchor": "ground", "use": "tileable jungle ground in a yard"},
+    # A story prop pinned to its place (overgrow/pinned.py), kept near its file's 12 606 triangles: decimated to the
+    # 1 800 of the others, the crashed helicopter above lost every recognisable part (14 November 2026).
+    "854bf0feee5b42dc92ac5329976f7942": {"id": "uh60_black_hawk", "category": "vehicles", "role": "wreck", "surfaces": ["carriageway", "yard", "empty_lot", "plaza"], "anchor": "ground", "use": "UH-60 Black Hawk helicopter, pinned to a crash site", "max_triangles": 13000, "keep_materials": True},
     "73201f05280d48dcb10ed4ca362d69f8": {"id": "tree_low_poly", "category": "vegetation", "role": "tree", "surfaces": ["park", "plaza", "sidewalk", "courtyard", "yard", "empty_lot"], "anchor": "ground", "use": "low poly tree in a park, plaza, sidewalk, yard or lot", "clearance_m": 3.5},
 }
 
@@ -124,8 +139,14 @@ def _one(uid: str, spec: dict, row: dict, raw_root: Path, library: Path, token: 
     if "KHR_draco_mesh_compression" in json.loads(next(gltf_dir.glob("*.gltf")).read_text(encoding="utf-8")).get("extensionsRequired", []):
         raise SketchfabError("glTF requires Draco; not imported")
     materialize_images(gltf_dir)
-    vertices, triangles, uvs, albedo = gltf_to_local(gltf_dir)
-    normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None)
+    target = int(spec.get("max_triangles", TARGET_ASSET_TRIS))
+    if spec.get("keep_materials"):
+        # One albedo per material: with a single one, the parts mapped to the others showed the wrong image.
+        vertices, triangles, uvs, owners, albedos = gltf_to_local_parts(gltf_dir)
+        normalized = normalize_parts(vertices, triangles, uvs, owners, albedos, anchor=spec["anchor"], target_tris=target)
+    else:
+        vertices, triangles, uvs, albedo = gltf_to_local(gltf_dir)
+        normalized = normalize_arrays(vertices, triangles, uvs, albedo, anchor=spec["anchor"], api_dimensions_mm=None, target_tris=target)
     if normalized.mesh.triangle_count == 0:
         raise SketchfabError("normalized mesh has no triangles")
     write_normalized_glb(library / f"{spec['id']}.glb", spec["id"], normalized)

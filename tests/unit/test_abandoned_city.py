@@ -5,6 +5,7 @@ Downloads are not required. Props are tiny synthetic GLBs.
 
 from __future__ import annotations
 
+import io
 import json
 import math
 from pathlib import Path
@@ -381,6 +382,84 @@ def test_simplification_puts_the_lowest_vertex_back_on_the_ground() -> None:
     assert len(tris) > 1800
     normalized = normalize_arrays(vertices, tris, np.zeros((len(vertices), 2), dtype=np.float32), None, anchor="ground", api_dimensions_mm=None)
     assert abs(float(normalized.mesh.vertices[:, 2].min())) < 1e-6
+    assert normalized.triangles_after <= 1800  # TARGET_ASSET_TRIS
+    # A story prop's own budget (sketchfab SPECS max_triangles, 14 November 2026) keeps a mesh under it whole.
+    whole = normalize_arrays(vertices, tris, np.zeros((len(vertices), 2), dtype=np.float32), None, anchor="ground", api_dimensions_mm=None,
+                             target_tris=len(tris))
+    assert whole.triangles_after == len(tris) == whole.triangles_before
+    from onward_generator.overgrow.sketchfab_fetch import SPECS
+
+    hawk = SPECS["854bf0feee5b42dc92ac5329976f7942"]
+    assert (hawk["id"], hawk["max_triangles"], hawk["role"], hawk["category"]) == ("uh60_black_hawk", 13000, "wreck", "vehicles")
+    heli = SPECS["1ad46b04f23d43dbb2730c9435c1a7cc"]
+    assert (heli["max_triangles"], heli["keep_materials"], hawk["keep_materials"]) == (60000, True, True)
+    by_id = {spec["id"]: spec for spec in SPECS.values()}
+    cars = {"mustang_boss_429", "rusty_abandoned_truck", "abandoned_auto", "destroyed_car_03", "burned_police_cars", "abandoned_sedan_2",
+            "crashed_abandoned_car", "abandoned_sedan_1"}
+    assert all((by_id[car]["max_triangles"], by_id[car]["keep_materials"]) == (8000, True) for car in cars)
+    assert all(by_id[i]["keep_materials"] is True and "max_triangles" not in by_id[i]
+               for i in ("abandoned_garage", "fence_door_metal", "scanned_plants_grass"))
+    own = cars | {"uh60_black_hawk", "crashed_helicopter", "abandoned_garage", "fence_door_metal", "scanned_plants_grass"}
+    assert all("max_triangles" not in spec and "keep_materials" not in spec for spec in SPECS.values() if spec["id"] not in own)
+
+
+def test_a_model_with_several_textures_keeps_one_part_per_material(tmp_path: Path) -> None:
+    """14 November 2026: with one albedo for the whole crashed helicopter, the parts mapped to its two other textures
+    showed the wrong image."""
+    from PIL import Image
+
+    from onward_generator.overgrow.library import read_library
+    from onward_generator.overgrow.normalize import normalize_parts, write_normalized_glb
+
+    def png(color: tuple[int, int, int]) -> bytes:
+        out = io.BytesIO()
+        Image.new("RGB", (4, 4), color).save(out, format="PNG")
+        return out.getvalue()
+
+    quad = np.array([[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], dtype=np.float64)
+    vertices = np.vstack([quad, quad + [2.0, 0, 0], quad + [4.0, 0, 0]])
+    triangles = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7], [8, 9, 10], [8, 10, 11]], dtype=np.int64)
+    uvs = np.tile(np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32), (3, 1))
+    owners = np.array([1, 1, 0, 0, 2, 2])  # material 2 has no image
+    normalized = normalize_parts(vertices, triangles, uvs, owners, [png((200, 0, 0)), png((0, 200, 0)), None], anchor="ground",
+                                 target_tris=1000)
+    assert normalized.triangles_before == 6 and normalized.triangles_after == 6 and [end for end, _ in normalized.parts] == [2, 4, 6]
+    colours = [Image.open(io.BytesIO(image)).convert("RGB").getpixel((0, 0)) for _end, image in normalized.parts]
+    assert colours == [(200, 0, 0), (0, 200, 0), (90, 90, 90)]  # material order, then grey for the one without an image
+    assert normalized.mesh.vertices[:, 2].min() == pytest.approx(0.0, abs=1e-9)
+    library = tmp_path / "library" / "pack"
+    write_normalized_glb(library / "multi.glb", "multi", normalized)
+    (library / "manifest.json").write_text(json.dumps({"schema": "onward_generator.abandoned_prefabs", "schema_version": "0.1.0", "assets": [
+        {"id": "multi", "file": "multi.glb", "category": "vehicles", "role": "wreck", "surfaces": ["yard"], "anchor": "ground",
+         "use": "test", "license": "CC0-1.0"}]}), encoding="utf-8")
+    (prop,) = read_library(tmp_path / "library")[0]
+    assert len(prop.images()) == 3 and prop.triangles == 6
+    halved = normalize_parts(vertices, triangles, uvs, owners, [None, None, None], anchor="ground", target_tris=3)
+    assert len(halved.parts) <= 3 and halved.triangles_after <= 6
+
+
+def test_a_specular_glossiness_material_gives_its_diffuse_texture(tmp_path: Path) -> None:
+    """14 November 2026: both helicopters came out flat grey; their Sketchfab exports name the colour image in
+    ``KHR_materials_pbrSpecularGlossiness.diffuseTexture``, not in ``baseColorTexture``."""
+    from onward_generator.overgrow.normalize import _diffuse_bytes, _material_albedos, base_color_texture
+
+    for name in ("metal.png", "gloss.png"):
+        (tmp_path / name).write_bytes(name.encode())
+    doc = {
+        "images": [{"uri": "metal.png"}, {"uri": "gloss.png"}],
+        "textures": [{"source": 0}, {"source": 1}],
+        "materials": [
+            {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}},
+             "extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseTexture": {"index": 1}}}},
+            {"pbrMetallicRoughness": {}, "extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseTexture": {"index": 1}}}},
+            {"extensions": {"KHR_materials_pbrSpecularGlossiness": {"diffuseFactor": [1, 1, 1, 1]}}},
+            {},
+        ],
+    }
+    assert [base_color_texture(m) for m in doc["materials"]] == [{"index": 0}, {"index": 1}, None, None]
+    assert _material_albedos(tmp_path, doc) == [b"metal.png", b"gloss.png", None, None]
+    gloss_only = {**doc, "materials": doc["materials"][1:]}
+    assert _diffuse_bytes(tmp_path, gloss_only) == b"gloss.png"
 
 
 def test_a_loaded_prop_rests_its_bottom_on_zero(tmp_path: Path) -> None:

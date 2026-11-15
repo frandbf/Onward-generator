@@ -1,6 +1,6 @@
 # Available props
 
-The 49 normalized models in `assets/normalized`. Each picture is a view of the file, not a photograph of the original. Sizes are length × depth × height, in metres.
+The 50 normalized models in `assets/normalized`. Each picture is a view of the file, not a photograph of the original. Sizes are length × depth × height, in metres.
 
 The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. A plant wider than 2.5 m across is reduced to 2.5 m: `scanned_plants_grass` is 14.16 × 13.41 m in its file and covered a sidewalk and a parked truck on MurciaEjemplo; the other plants are 1.3 to 2.1 m. `fit` refuses a plant still wider than that. Other roles have no size band: their fitted sizes in the library were measured on 4 November 2026 and none was out of scale.
 
@@ -83,9 +83,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `mustang_boss_429`
 - What: Abandoned muscle car.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 0.96 × 0.37 × 0.24 m, 1794 triangles.
+- Size: 989.91 × 396.82 × 262.76 m, 7974 triangles.
 - Licence: CC BY 4.0, mohamedhussien.
-- When placed, `fit` scales it to 4.50 × 1.75 × 1.14 m.
+- When placed, `fit` scales it to 4.50 × 1.80 × 1.19 m.
 
 ### Rusty Abandoned Truck with Interior - Game Ready
 
@@ -94,9 +94,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `rusty_abandoned_truck`
 - What: Rusty truck.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 30.71 × 13.70 × 11.36 m, 1792 triangles.
+- Size: 31.09 × 14.48 × 12.00 m, 7986 triangles.
 - Licence: CC BY 4.0, rashad-brahimli.
-- When placed, `fit` scales it to 4.50 × 2.01 × 1.66 m.
+- When placed, `fit` scales it to 4.50 × 2.10 × 1.74 m.
 
 ### Abandoned Auto Post-apocalyptic
 
@@ -105,9 +105,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `abandoned_auto`
 - What: Abandoned car.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 0.51 × 0.21 × 0.14 m, 1742 triangles.
+- Size: 510.32 × 211.21 × 147.34 m, 7901 triangles.
 - Licence: CC BY 4.0, pixeledbun.
-- When placed, `fit` scales it to 4.50 × 1.86 × 1.26 m.
+- When placed, `fit` scales it to 4.50 × 1.86 × 1.30 m.
 
 ### Destroyed Car 03 / Backrooms Car (Gameready ver)
 
@@ -116,9 +116,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `destroyed_car_03`
 - What: Destroyed sedan.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 3.10 × 1.57 × 0.92 m, 1799 triangles.
+- Size: 3.13 × 1.64 × 0.95 m, 7991 triangles.
 - Licence: CC BY 4.0, kryik1023.
-- When placed, `fit` scales it to 4.50 × 2.29 × 1.33 m.
+- When placed, `fit` scales it to 4.50 × 2.36 × 1.36 m.
 
 ### Free Burned Police Cars
 
@@ -127,9 +127,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `burned_police_cars`
 - What: Burned police car.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 0.68 × 0.58 × 0.19 m, 1791 triangles.
+- Size: 689.20 × 598.41 × 196.40 m, 7986 triangles.
 - Licence: CC BY 4.0, kryik1023.
-- When placed, `fit` scales it to 4.68 × 4.00 × 1.28 m.
+- When placed, `fit` scales it to 4.61 × 4.00 × 1.31 m.
 
 ### Abandoned Generic Sedan 2 - Game Ready
 
@@ -138,9 +138,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `abandoned_sedan_2`
 - What: Abandoned sedan.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 49.36 × 35.91 × 16.95 m, 1798 triangles.
+- Size: 50.55 × 37.00 × 17.74 m, 7947 triangles.
 - Licence: CC BY 4.0, rashad-brahimli.
-- When placed, `fit` scales it to 3.30 × 2.40 × 1.13 m.
+- When placed, `fit` scales it to 3.28 × 2.40 × 1.15 m.
 
 ### Crashed Abandoned Car - Game Ready
 
@@ -149,9 +149,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `crashed_abandoned_car`
 - What: Crashed car.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 7.39 × 4.96 × 2.76 m, 1799 triangles.
+- Size: 7.63 × 5.14 × 2.92 m, 7997 triangles.
 - Licence: CC BY 4.0, rashad-brahimli.
-- When placed, `fit` scales it to 3.57 × 2.40 × 1.34 m.
+- When placed, `fit` scales it to 3.56 × 2.40 × 1.36 m.
 
 ### Abandoned Generic Sedan 1 - Game Ready
 
@@ -160,9 +160,9 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `abandoned_sedan_1`
 - What: Abandoned sedan.
 - Where: kerb, carriageway, sidewalk, yard, empty lot, plaza.
-- Size: 21.18 × 12.16 × 7.30 m, 1797 triangles.
+- Size: 21.34 × 12.73 × 7.74 m, 7993 triangles.
 - Licence: CC BY 4.0, rashad-brahimli.
-- When placed, `fit` scales it to 4.18 × 2.40 × 1.44 m.
+- When placed, `fit` scales it to 4.02 × 2.40 × 1.46 m.
 
 ### Crashed helicopter
 
@@ -171,9 +171,18 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `crashed_helicopter`
 - What: Crashed helicopter.
 - Where: kerb, carriageway, courtyard, yard, empty lot, plaza, park.
-- Size: 14.73 × 9.35 × 2.71 m, 1795 triangles.
+- Size: 14.82 × 9.41 × 2.87 m, 59771 triangles.
 - Licence: CC BY 4.0, jigar6102021.
-- When placed, `fit` scales it to 6.30 × 4.00 × 1.16 m.
+- When placed, `fit` scales it to 6.29 × 4.00 × 1.22 m.
+
+### UH-60M Black Hawk
+
+![UH-60M Black Hawk](abandoned-assets/uh60_black_hawk.png)
+
+- Id: `uh60_black_hawk`
+- What: Intact dark UH-60 Black Hawk utility helicopter with its rotors; a story prop (`placement: pinned_only`), placed only where `config/pinned_props.json` pins it, at its file's size, and laid down with `roll_deg`, `pitch_deg` and `sink_m`.
+- Size: 17.02 × 12.21 × 4.85 m, 12600 triangles (its own budget of 13 000).
+- Licence: CC BY 4.0, WTigerTw.
 
 ### Gas Tanker 14 MB
 
@@ -223,7 +232,7 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `abandoned_garage`
 - What: Abandoned garage.
 - Where: block edge, kerb, yard, empty lot, plaza, park.
-- Size: 16.26 × 7.74 × 2.80 m, 1755 triangles.
+- Size: 16.25 × 7.74 × 2.83 m, 1453 triangles.
 - Licence: CC BY 4.0, olegolegperepelica.
 
 ### Watchtower
@@ -244,7 +253,7 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Id: `fence_door_metal`
 - What: Metal fence door.
 - Where: block edge, carriageway.
-- Size: 20.95 × 0.85 × 3.94 m, 1789 triangles.
+- Size: 20.95 × 0.84 × 3.94 m, 1697 triangles.
 - Licence: CC BY 4.0, ahmagh2e.
 
 ## Facade
@@ -557,5 +566,5 @@ A wall-mounted prop's back stays 0.08 m off its wall, whether the ambient dressi
 - Id: `scanned_plants_grass`
 - What: Scanned plants and grass.
 - Where: sidewalk, yard, empty lot.
-- Size: 14.16 × 13.41 × 1.74 m, 1782 triangles.
+- Size: 14.21 × 13.53 × 1.70 m, 1786 triangles.
 - Licence: CC BY 4.0, klessgyzen.

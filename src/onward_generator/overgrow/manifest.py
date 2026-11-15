@@ -25,6 +25,8 @@ SEMANTIC_FIELDS = ("description", "placement", "grouping", "condition", "tags")
 # Load corrections a person set on a row: a quarter turn, or a refusal such as unknown_scale.
 LOAD_FIELDS = ("yaw_deg", "refused")
 KIT_ONLY = "kit_only"
+PINNED_ONLY = "pinned_only"
+"""A story prop (a crashed Black Hawk): placed only where ``config/pinned_props.json`` pins it, never by chance."""
 INTERIOR = "interior"
 """A prop for inside a room. Placed only by detail shop furnishing (ADR-031); overgrow must not put one on a street."""
 

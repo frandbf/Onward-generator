@@ -215,3 +215,94 @@ def test_the_plan_and_the_keep_out_circle() -> None:
     # Off the origin, with digits past the third: the centre and the radius are rounded to the millimetre.
     assert keep_out_circles([shapely_box(10.2468, 20.1357, 13.2468, 21.1357)]) == [(11.747, 20.636, 1.581)]
     assert isinstance(Polygon(), Polygon)
+
+
+def test_a_pin_may_lay_its_model_on_its_side_and_tip_its_nose(tmp_path: Path) -> None:
+    """14 November 2026: an intact Black Hawk laid on its side reads as a crash."""
+    from onward_generator.overgrow.pinned import posed
+
+    path = tmp_path / "pinned_props.json"
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": 80, "pitch_deg": -12}]}))
+    assert read_pins(path) == [Pin("a", 1.0, 2.0, roll_deg=80.0, pitch_deg=-12.0)]
+    for bad in ({"roll_deg": 180.5}, {"roll_deg": -181}, {"pitch_deg": 90.5}, {"pitch_deg": -91}):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, **bad}]}))
+        with pytest.raises(PinnedError, match=r"props\[0\]: roll_deg must lie between -180 and 180 and pitch_deg between -90 and 90"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": 180, "pitch_deg": -90}]}))
+    assert read_pins(path)[0].roll_deg == 180.0
+    wreck = _wreck(14.0, 4.0)  # 14 m long on X, 4 m wide, 2.5 m tall
+    assert posed(wreck, 0.0, 0.0) is wreck
+    side = posed(wreck, 90.0, 0.0)
+    span = side.mesh.vertices.max(axis=0) - side.mesh.vertices.min(axis=0)
+    assert span == pytest.approx([14.0, 2.5, 4.0], abs=1e-9) and side.mesh.vertices[:, 2].min() == pytest.approx(0.0, abs=1e-12)
+    nose = posed(wreck, 0.0, 90.0)
+    assert (nose.mesh.vertices.max(axis=0) - nose.mesh.vertices.min(axis=0)) == pytest.approx([2.5, 4.0, 14.0], abs=1e-9)
+    tipped = posed(wreck, 0.0, 30.0)  # +Y turn: the +X end goes down
+    low = tipped.mesh.vertices[np.argmin(tipped.mesh.vertices[:, 2])]
+    assert low[0] > 0 and tipped.mesh.vertices[:, 2].min() == pytest.approx(0.0, abs=1e-12)
+    result = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0, roll_deg=90.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY,
+                        square_zone(100))
+    assert result.records[0]["roll_deg"] == 90.0 and result.records[0]["pitch_deg"] == 0.0
+    assert result.footprints[0].area == pytest.approx(14.0 * 2.5, rel=1e-6)  # its plan on its side
+    collider = result.colliders[0].primitives[0].mesh
+    assert collider.vertices[:, 2].max() == pytest.approx(4.0, abs=1e-6)  # its side stands 4 m
+    flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert "roll_deg" not in flat.records[0] and "pitch_deg" not in flat.records[0]
+
+
+def test_a_pin_may_sink_its_model_into_the_ground(tmp_path: Path) -> None:
+    """14 November 2026: on its side, the Black Hawk rests on a rotor tip with its body metres up; sink_m buries the
+    blades so the body lies on the ground."""
+    from onward_generator.overgrow.pinned import SINK_MAX_M
+
+    assert SINK_MAX_M == 10.0
+    path = tmp_path / "pinned_props.json"
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": 4.5}]}))
+    assert read_pins(path) == [Pin("a", 1.0, 2.0, sink_m=4.5)]
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2}]}))
+    assert read_pins(path)[0].sink_m == 0.0
+    for edge in (0, 10):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": edge}]}))
+        assert read_pins(path)[0].sink_m == float(edge)
+    for bad in (-0.1, 10.1):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": bad}]}))
+        with pytest.raises(PinnedError, match=rf"props\[0\]: sink_m must lie between 0 and 10, got {bad:g}"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "sink_m": "4"}]}))
+    with pytest.raises(PinnedError, match=r"sink_m must be a number"):
+        read_pins(path)
+    wreck = _wreck(14.0, 4.0)
+    sunk = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0, sink_m=1.5)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert sunk.nodes[0].matrix[2, 3] == pytest.approx(-1.5) and sunk.colliders[0].matrix[2, 3] == pytest.approx(-1.5)
+    assert sunk.records[0]["sink_m"] == 1.5 and "roll_deg" not in sunk.records[0]
+    flat = place_pins([Pin("crashed_helicopter", LAT, LON, 0.0)], {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(100))
+    assert flat.nodes[0].matrix[2, 3] == 0.0 and "sink_m" not in flat.records[0]
+
+
+def test_pins_of_one_model_share_its_mesh_only_in_the_same_pose() -> None:
+    """14 November 2026: one mesh key for every pin of a model drew Super Six-One with Super Six-Four's pose."""
+    wreck = _wreck(4.0, 2.0)
+    pins = [Pin("crashed_helicopter", LAT, LON, 0.0, roll_deg=35.0, pitch_deg=-10.0),
+            Pin("crashed_helicopter", LAT + 0.0005, LON, 0.0, roll_deg=-80.0),
+            Pin("crashed_helicopter", LAT - 0.0005, LON, 0.0, roll_deg=-80.0),
+            Pin("crashed_helicopter", LAT, LON + 0.0005, 0.0)]
+    result = place_pins(pins, {"crashed_helicopter": wreck}, FRAME, EMPTY, square_zone(200))
+    assert [n.mesh_key for n in result.nodes] == ["pinned:crashed_helicopter:35:-10", "pinned:crashed_helicopter:-80:0",
+                                                  "pinned:crashed_helicopter:-80:0", "pinned:crashed_helicopter"]
+    heights = [round(float(np.vstack([p.mesh.vertices for p in n.primitives])[:, 2].max()), 6) for n in result.nodes]
+    assert heights[1] == heights[2] != heights[0] and heights[3] == pytest.approx(2.5)
+
+
+def test_a_bad_pose_number_names_its_pin_and_the_bounds_are_kept(tmp_path: Path) -> None:
+    from onward_generator.overgrow.pinned import posed
+
+    path = tmp_path / "pinned_props.json"
+    for key in ("roll_deg", "pitch_deg", "sink_m"):
+        path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, key: "x"}]}))
+        with pytest.raises(PinnedError, match=rf"^{path} props\[0\]: {key} must be a number, got 'x'$"):
+            read_pins(path)
+    path.write_text(json.dumps({"props": [{"asset_id": "a", "latitude": 1, "longitude": 2, "roll_deg": -180, "pitch_deg": 90}]}))
+    assert (read_pins(path)[0].roll_deg, read_pins(path)[0].pitch_deg) == (-180.0, 90.0)
+    # A roll turns +Y onto +Z: on its side, a 4 m wide wreck lies on the -Y side of its axis, 2.5 m deep.
+    side = posed(_wreck(14.0, 4.0), 90.0, 0.0)
+    assert side.mesh.vertices[:, 1].min() == pytest.approx(-2.5) and side.mesh.vertices[:, 1].max() == pytest.approx(0.0, abs=1e-9)

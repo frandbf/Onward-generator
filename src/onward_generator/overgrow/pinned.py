@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,7 @@ from onward_generator.overgrow.zone import Zone
 SEARCH_DEFAULT_M = 30.0
 SEARCH_MAX_M = 200.0
 SEARCH_STEP_M = 1.0
+SINK_MAX_M = 10.0
 BUILDING_GAP_M = 0.3
 
 
@@ -54,6 +55,13 @@ class Pin:
     yaw_deg: float = 0.0
     search_m: float = SEARCH_DEFAULT_M
     label: str = ""
+    roll_deg: float = 0.0
+    """A turn about the model's length (+X) before the yaw: 80 lays a helicopter on its side (14 November 2026)."""
+    pitch_deg: float = 0.0
+    """A turn about the model's width (+Y) before the yaw: a nose down in the ground."""
+    sink_m: float = 0.0
+    """How far the posed model goes below the ground: a helicopter on its side rests on a rotor tip, its body metres up,
+    until the blades are buried (14 November 2026)."""
 
 
 @dataclass
@@ -94,7 +102,14 @@ def read_pins(path: str | Path) -> list[Pin]:
         search = _number(row, "search_m", where, SEARCH_DEFAULT_M)
         if not 0.0 <= search <= SEARCH_MAX_M:
             raise PinnedError(f"{where}: search_m must lie between 0 and {SEARCH_MAX_M:g}, got {search:g}")
-        pins.append(Pin(row["asset_id"], latitude, longitude, _number(row, "yaw_deg", where, 0.0), search, str(row.get("label") or "")))
+        roll, pitch = _number(row, "roll_deg", where, 0.0), _number(row, "pitch_deg", where, 0.0)
+        if not (-180.0 <= roll <= 180.0 and -90.0 <= pitch <= 90.0):
+            raise PinnedError(f"{where}: roll_deg must lie between -180 and 180 and pitch_deg between -90 and 90, got {roll:g} / {pitch:g}")
+        sink = _number(row, "sink_m", where, 0.0)
+        if not 0.0 <= sink <= SINK_MAX_M:
+            raise PinnedError(f"{where}: sink_m must lie between 0 and {SINK_MAX_M:g}, got {sink:g}")
+        pins.append(Pin(row["asset_id"], latitude, longitude, _number(row, "yaw_deg", where, 0.0), search, str(row.get("label") or ""),
+                        roll, pitch, sink))
     return pins
 
 
@@ -110,6 +125,18 @@ def frame_of(geo: Mapping[str, Any]) -> LocalFrame:
 def plan(mesh: Mesh) -> Polygon:
     """The convex plan of a mesh in its own frame."""
     return MultiPoint([(float(x), float(y)) for x, y in mesh.vertices[:, :2]]).convex_hull
+
+
+def posed(prop: Prop, roll_deg: float, pitch_deg: float) -> Prop:
+    """``prop`` turned by ``roll_deg`` about +X, then ``pitch_deg`` about +Y, resting on z = 0 again; itself when both are 0."""
+    if roll_deg == 0.0 and pitch_deg == 0.0:
+        return prop
+    r, p = math.radians(roll_deg), math.radians(pitch_deg)
+    roll = np.array([[1.0, 0.0, 0.0], [0.0, math.cos(r), -math.sin(r)], [0.0, math.sin(r), math.cos(r)]])
+    pitch = np.array([[math.cos(p), 0.0, math.sin(p)], [0.0, 1.0, 0.0], [-math.sin(p), 0.0, math.cos(p)]])
+    vertices = prop.mesh.vertices @ (pitch @ roll).T
+    vertices[:, 2] -= vertices[:, 2].min()
+    return replace(prop, mesh=Mesh(vertices, prop.mesh.triangles))
 
 
 def _offsets(search_m: float) -> list[tuple[float, float]]:
@@ -128,9 +155,10 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
     result = PinnedResult()
     taken: list[Polygon] = []
     for number, pin in enumerate(pins):
-        prop = props.get(pin.asset_id)
-        if prop is None:
+        found = props.get(pin.asset_id)
+        if found is None:
             raise PinnedError(f"pinned prop {pin.asset_id} ({pin.label or 'no label'}) is not in the library")
+        prop = posed(found, pin.roll_deg, pin.pitch_deg)
         target = frame.to_local(Point(pin.longitude, pin.latitude))
         local = plan(prop.mesh)
         spot = None
@@ -153,10 +181,13 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
             raise PinnedError(f"pinned prop {pin.asset_id} ({pin.label or 'no label'}) finds no free spot within "
                               f"{pin.search_m:g} m of {pin.latitude}, {pin.longitude}: raise search_m or move the point")
         x, y, yaw, footprint = spot
-        matrix = yaw_matrix(x, y, 0.0, yaw)
+        matrix = yaw_matrix(x, y, -pin.sink_m, yaw)
         extras = {"type": "overgrowth", "origin": "pinned", "kind": prop.spec.category, "role": prop.spec.role,
                   "asset_id": prop.spec.id, "label": pin.label}
-        result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}"))
+        # Pins of one model share its glTF mesh only in the same pose: with one key for all, every pin drew the
+        # first pin's turned mesh (14 November 2026).
+        pose = f":{pin.roll_deg:g}:{pin.pitch_deg:g}" if pin.roll_deg or pin.pitch_deg else ""
+        result.nodes.append(Node(f"overgrow/pinned/{prop.spec.id}/{number}", prop.primitives(), extras, matrix, f"pinned:{prop.spec.id}{pose}"))
         result.colliders.append(Node(f"overgrow/collider/pinned/{prop.spec.id}/{number}", (Primitive(collider_mesh(prop.mesh, "fence"), "collider"),),
                                      {"type": "collision", "origin": "pinned", "asset_id": prop.spec.id}, matrix))
         result.images.update(prop.images())
@@ -167,6 +198,8 @@ def place_pins(pins: Sequence[Pin], props: Mapping[str, Prop], frame: LocalFrame
             "asset_id": prop.spec.id, "label": pin.label, "target_m": [round(target.x, 3), round(target.y, 3)],
             "position_m": [round(x, 3), round(y, 3)], "offset_m": round(math.hypot(x - target.x, y - target.y), 3),
             "yaw_deg": round(math.degrees(yaw) % 360.0, 2), "triangles": prop.triangles,
+            **({"roll_deg": pin.roll_deg, "pitch_deg": pin.pitch_deg} if pin.roll_deg or pin.pitch_deg else {}),
+            **({"sink_m": pin.sink_m} if pin.sink_m else {}),
         })
     return result
 
@@ -181,5 +214,5 @@ def keep_out_circles(footprints: Sequence[Polygon]) -> list[tuple[float, float, 
     return circles
 
 
-__all__ = ["BUILDING_GAP_M", "Pin", "PinnedError", "PinnedResult", "SEARCH_DEFAULT_M", "SEARCH_MAX_M", "SEARCH_STEP_M",
-           "frame_of", "keep_out_circles", "place_pins", "plan", "read_pins"]
+__all__ = ["BUILDING_GAP_M", "Pin", "PinnedError", "PinnedResult", "SEARCH_DEFAULT_M", "SEARCH_MAX_M", "SEARCH_STEP_M", "SINK_MAX_M",
+           "frame_of", "keep_out_circles", "place_pins", "plan", "posed", "read_pins"]

@@ -24,10 +24,10 @@
       "id": "mustang_boss_429",
       "normalized_file": "mustang_boss_429.glb",
       "triangles_before": 1103337,
-      "triangles_after": 1794,
-      "length_m": 0.959,
-      "depth_m": 0.373,
-      "height_m": 0.242,
+      "triangles_after": 7974,
+      "length_m": 989.907,
+      "depth_m": 396.824,
+      "height_m": 262.765,
       "error": null
     },
     {
@@ -45,10 +45,10 @@
       "id": "rusty_abandoned_truck",
       "normalized_file": "rusty_abandoned_truck.glb",
       "triangles_before": 9728,
-      "triangles_after": 1792,
-      "length_m": 30.71,
-      "depth_m": 13.704,
-      "height_m": 11.36,
+      "triangles_after": 7986,
+      "length_m": 31.091,
+      "depth_m": 14.477,
+      "height_m": 11.998,
       "error": null
     },
     {
@@ -92,10 +92,10 @@
       "id": "abandoned_auto",
       "normalized_file": "abandoned_auto.glb",
       "triangles_before": 14730,
-      "triangles_after": 1742,
-      "length_m": 0.509,
-      "depth_m": 0.21,
-      "height_m": 0.143,
+      "triangles_after": 7901,
+      "length_m": 510.325,
+      "depth_m": 211.209,
+      "height_m": 147.336,
       "error": null
     },
     {
@@ -126,10 +126,10 @@
       "id": "destroyed_car_03",
       "normalized_file": "destroyed_car_03.glb",
       "triangles_before": 9995,
-      "triangles_after": 1799,
-      "length_m": 3.096,
-      "depth_m": 1.572,
-      "height_m": 0.915,
+      "triangles_after": 7991,
+      "length_m": 3.127,
+      "depth_m": 1.641,
+      "height_m": 0.946,
       "error": null
     },
     {
@@ -147,10 +147,10 @@
       "id": "burned_police_cars",
       "normalized_file": "burned_police_cars.glb",
       "triangles_before": 21578,
-      "triangles_after": 1791,
-      "length_m": 0.682,
-      "depth_m": 0.583,
-      "height_m": 0.187,
+      "triangles_after": 7986,
+      "length_m": 689.198,
+      "depth_m": 598.414,
+      "height_m": 196.398,
       "error": null
     },
     {
@@ -168,10 +168,10 @@
       "id": "abandoned_sedan_2",
       "normalized_file": "abandoned_sedan_2.glb",
       "triangles_before": 16463,
-      "triangles_after": 1798,
-      "length_m": 49.356,
-      "depth_m": 35.907,
-      "height_m": 16.952,
+      "triangles_after": 7947,
+      "length_m": 50.545,
+      "depth_m": 37.003,
+      "height_m": 17.741,
       "error": null
     },
     {
@@ -189,10 +189,10 @@
       "id": "crashed_abandoned_car",
       "normalized_file": "crashed_abandoned_car.glb",
       "triangles_before": 8330,
-      "triangles_after": 1799,
-      "length_m": 7.386,
-      "depth_m": 4.959,
-      "height_m": 2.763,
+      "triangles_after": 7997,
+      "length_m": 7.627,
+      "depth_m": 5.143,
+      "height_m": 2.924,
       "error": null
     },
     {
@@ -223,10 +223,10 @@
       "id": "abandoned_sedan_1",
       "normalized_file": "abandoned_sedan_1.glb",
       "triangles_before": 9591,
-      "triangles_after": 1797,
-      "length_m": 21.184,
-      "depth_m": 12.16,
-      "height_m": 7.301,
+      "triangles_after": 7993,
+      "length_m": 21.339,
+      "depth_m": 12.735,
+      "height_m": 7.743,
       "error": null
     },
     {
@@ -320,14 +320,14 @@
       "license_url": "http://creativecommons.org/licenses/by/4.0/",
       "usable": true,
       "installed": true,
-      "reason": "CC-BY on the Sketchfab API on 2026-10-19. Download GET /v3/models/<uid>/download returned HTTP 401 without a token, so the file was not saved.",
+      "reason": "CC-BY on the Sketchfab API on 2026-10-19. Download GET /v3/models/<uid>/download returned HTTP 401 without a token, so the file was not saved. Re-import requested on 2026-11-14: max_triangles 60 000 and its three materials.",
       "id": "crashed_helicopter",
       "normalized_file": "crashed_helicopter.glb",
       "triangles_before": 120921,
-      "triangles_after": 1795,
-      "length_m": 14.726,
-      "depth_m": 9.352,
-      "height_m": 2.712,
+      "triangles_after": 59771,
+      "length_m": 14.816,
+      "depth_m": 9.415,
+      "height_m": 2.871,
       "error": null
     },
     {
@@ -421,10 +421,10 @@
       "id": "abandoned_garage",
       "normalized_file": "abandoned_garage.glb",
       "triangles_before": 8367,
-      "triangles_after": 1755,
-      "length_m": 16.262,
-      "depth_m": 7.74,
-      "height_m": 2.8,
+      "triangles_after": 1453,
+      "length_m": 16.248,
+      "depth_m": 7.741,
+      "height_m": 2.833,
       "error": null
     },
     {
@@ -531,9 +531,9 @@
       "id": "fence_door_metal",
       "normalized_file": "fence_door_metal.glb",
       "triangles_before": 24340,
-      "triangles_after": 1789,
+      "triangles_after": 1697,
       "length_m": 20.95,
-      "depth_m": 0.853,
+      "depth_m": 0.845,
       "height_m": 3.945,
       "error": null
     },
@@ -691,10 +691,10 @@
       "error": null,
       "normalized_file": "scanned_plants_grass.glb",
       "triangles_before": 264489,
-      "triangles_after": 1782,
-      "length_m": 14.164,
-      "depth_m": 13.409,
-      "height_m": 1.741
+      "triangles_after": 1786,
+      "length_m": 14.207,
+      "depth_m": 13.527,
+      "height_m": 1.695
     },
     {
       "uid": "68c9e77971874643bcef67dc1987a2b7",
@@ -805,6 +805,27 @@
       "usable": false,
       "installed": false,
       "reason": "Sketchfab Free Standard, not CC-BY. Not saved."
+    },
+    {
+      "uid": "854bf0feee5b42dc92ac5329976f7942",
+      "name": "US Army UH-60M Black Hawk low poly model",
+      "author": "WTigerTw",
+      "group": "Elicoptero",
+      "url": "https://sketchfab.com/models/854bf0feee5b42dc92ac5329976f7942",
+      "api_url": "https://api.sketchfab.com/v3/models/854bf0feee5b42dc92ac5329976f7942",
+      "license": "CC Attribution",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "usable": true,
+      "installed": true,
+      "reason": "CC-BY on the Sketchfab API on 2026-11-14 (12 606 faces, 1 material, 5 textures). A story prop for config/pinned_props.json: max_triangles 13 000, placement pinned_only.",
+      "id": "uh60_black_hawk",
+      "normalized_file": "uh60_black_hawk.glb",
+      "error": null,
+      "triangles_before": 12605,
+      "triangles_after": 12600,
+      "length_m": 17.016,
+      "depth_m": 12.211,
+      "height_m": 4.849
     }
   ]
 }

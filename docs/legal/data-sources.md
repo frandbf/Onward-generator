@@ -227,7 +227,7 @@ CC0 does not require attribution. The report still records the author the source
 
 `overgrow place` adds grass tufts, vines, and trees marked `generated`. An OSM `natural=tree` stays `observed`. Rust and boarded windows that the code builds are project-generated. They are not photographs.
 
-The placeable meshes are the 49 albedo GLBs in `assets/normalized`. Each card, including author and licence, is in [docs/abandoned-assets.md](../abandoned-assets.md). The licence review is `assets/normalized_review.json`.
+The placeable meshes are the 50 albedo GLBs in `assets/normalized`. Each card, including author and licence, is in [docs/abandoned-assets.md](../abandoned-assets.md). The licence review is `assets/normalized_review.json`.
 
 | Source | What is allowed |
 | --- | --- |

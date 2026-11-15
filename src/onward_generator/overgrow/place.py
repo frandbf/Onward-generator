@@ -63,6 +63,7 @@ from onward_generator.overgrow.growth import (
 from onward_generator.overgrow.lamps import swap_lamps
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
+from onward_generator.overgrow.manifest import PINNED_ONLY
 from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.pinned import PinnedError, PinnedResult, frame_of, keep_out_circles, place_pins, read_pins
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
@@ -160,6 +161,8 @@ def overgrow(
         raise OvergrowError(str(exc)) from exc
     props, library_rejects = read_library(library)
     library_props = list(props)
+    # A pinned_only story prop stands only where config/pinned_props.json pins it (14 November 2026).
+    props = [prop for prop in props if prop.spec.placement != PINNED_ONLY]
     chosen: list[str] | None = None
     if selection is not None:
         chosen = read_selection(selection)

@@ -244,9 +244,10 @@ def library_conditions(library: str | Path | None) -> list[tuple[str, str]]:
     if library is None or not Path(library).is_dir():
         return []
     from onward_generator.overgrow.library import read_library
+    from onward_generator.overgrow.manifest import PINNED_ONLY
 
     props, _rejects = read_library(library)
-    return sorted((prop.spec.id, str(prop.spec.condition or "")) for prop in props)
+    return sorted((prop.spec.id, str(prop.spec.condition or "")) for prop in props if prop.spec.placement != PINNED_ONLY)
 
 
 def selection_for(props_profile: str, library: Sequence[tuple[str, str]]) -> list[str]:

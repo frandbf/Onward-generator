@@ -41,7 +41,7 @@ def test_download_list_is_only_the_usable_review() -> None:
 
 def test_sketchfab_review_rejects_noncommercial_and_game_extracts() -> None:
     rows = review_rows(REVIEW_FILE)
-    assert len(rows) == 46
+    assert len(rows) == 47  # 47 since the UH-60M Black Hawk (14 November 2026)
     by_name = {row["name"]: row for row in rows}
     assert by_name["Post-Apoc Civilian Cars"]["usable"] is False
     assert by_name["Collection of oil barrels."]["usable"] is False
@@ -55,7 +55,7 @@ def test_sketchfab_review_rejects_noncommercial_and_game_extracts() -> None:
     assert by_name["Low Poly Tree"]["usable"] is False
     assert by_name["Tree Elm"]["usable"] is False
     assert all(row["installed"] is False for row in rows if row["usable"] is not True)
-    assert sum(1 for row in rows if row["usable"]) == 24
+    assert sum(1 for row in rows if row["usable"]) == 25
     for row in rows:
         if row.get("installed"):
             assert (LIBRARY / f"{row['id']}.glb").is_file()
