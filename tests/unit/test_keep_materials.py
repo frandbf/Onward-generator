@@ -199,12 +199,13 @@ def test_a_cached_download_is_imported_with_its_materials_and_its_budget(tmp_pat
     _write_gltf(raw / "multi" / "unpacked", [(*_grid(40), 0), (*_grid(10, 3.0), 1)],
                 {"a_red.png": _png((200, 0, 0)), "b_green.png": _png((0, 200, 0))},
                 [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}, {"pbrMetallicRoughness": {"baseColorTexture": {"index": 1}}}])
-    entry = _one("uid", _spec(keep_materials=True, max_triangles=600), ROW, raw, library, "")
+    entry = _one("uid", _spec(keep_materials=True, max_triangles=600, anchor="facade"), ROW, raw, library, "")
     assert entry["id"] == "multi" and entry["installed"] is True and entry["error"] is None
     assert entry["normalized_file"] == "multi.glb" and entry["triangles_before"] == 3400
     assert 150 <= entry["triangles_after"] <= 600
     _doc, (node,) = _read(library / "multi.glb")
     assert [p.material for p in node.primitives] == ["prop_multi_0", "prop_multi_1"]
+    assert not str(node.extras["anchor"]).startswith("longest horizontal axis")  # the spec's facade anchor, not the default
     (row,) = json.loads((library / "manifest.json").read_text(encoding="utf-8"))["assets"]
     assert row["triangles"] == entry["triangles_after"] and row["length_m"] == entry["length_m"]
     assert (entry["length_m"], entry["depth_m"], entry["height_m"]) == (row["length_m"], row["depth_m"], row["height_m"])
@@ -218,10 +219,15 @@ def test_a_cached_download_without_keep_materials_is_one_part_at_the_default_bud
     library.mkdir()
     _write_gltf(raw / "multi" / "unpacked", [(*_grid(40), 0)], {"a_red.png": _png((200, 0, 0))},
                 [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}])
-    entry = _one("uid", _spec(), ROW, raw, library, "")
+    entry = _one("uid", _spec(anchor="facade"), ROW, raw, library, "")
     assert entry["triangles_before"] == 3200 and 600 < entry["triangles_after"] <= TARGET_ASSET_TRIS
     _doc, (node,) = _read(library / "multi.glb")
     assert [p.material for p in node.primitives] == ["prop_multi"]
+    assert not str(node.extras["anchor"]).startswith("longest horizontal axis")
+    from onward_generator.generation.gltf import images_by_material
+
+    (image,) = images_by_material((library / "multi.glb").read_bytes()).values()
+    assert Image.open(io.BytesIO(image)).convert("RGB").getpixel((0, 0)) == (200, 0, 0)  # the file's albedo, not a flat one
     small = _one("uid", _spec(max_triangles=300), ROW, raw, library, "")
     assert small["triangles_after"] <= 300
 

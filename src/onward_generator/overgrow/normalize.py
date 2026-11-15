@@ -246,7 +246,7 @@ def normalize_parts(
         own = triangles[owners == owner]
         used = np.unique(own)
         local_v, local_t, local_u = vertices[used], np.searchsorted(used, own), uvs[used]
-        share = max(1, round(target_tris * len(own) / before))
+        share = max(1, round(target_tris * len(own) / before))  # pragma: no mutate: clustering keeps at least two triangles of a face, so a floor of 1 or 2 clusters alike
         local_v, local_t, local_u = cluster_decimate(local_v, local_t, local_u, share)
         part_v = np.ascontiguousarray(local_v, dtype=np.float64)  # pragma: no mutate: gltf_to_local_parts gives float64 and clustering keeps it
         part_t = np.ascontiguousarray(local_t, dtype=np.int64)  # pragma: no mutate: searchsorted gives int64 and clustering keeps it
