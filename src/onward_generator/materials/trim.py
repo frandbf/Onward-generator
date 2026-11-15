@@ -73,8 +73,11 @@ BOARDED_MATERIALS = frozenset({"glass_boarded"})
 # A glass back at least this wide, or starting at the ground, is a shopfront or a glazed door.
 SHOP_GLASS_WIDTH_M = 1.9
 GROUND_Z_M = 0.05
-# A face whose normal leans further than this from horizontal is not a wall plane, and is not cut.
-PLANE_TOL = 1e-6
+# A face whose normal leans further than this from horizontal is not a wall plane, and is not cut. The walls come
+# back from float32 GLB positions leaning up to about 5e-5 (Mogadishu 1993, 14 November 2026: 3 567 of 35 230 wall
+# triangles over the old 1e-6 were kept whole, crossing the zocalo line as wedges of wall over the band); no face
+# leans between 1e-4 and 0.05, and a real slope (roof, soffit, mansard) leans far more.
+PLANE_TOL = 1e-3
 # Faces of one plane agree far below these; the rounding only groups them.
 NORMAL_DECIMALS = 4
 OFFSET_DECIMALS = 3

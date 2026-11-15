@@ -17,6 +17,7 @@ from onward_generator.materials import trim as trim_module
 from onward_generator.materials.tile_cache import TileCache
 from onward_generator.materials.trim import (
     PLAIN_V,
+    PLANE_TOL,
     TRIM_BAKE_VERSION,
     Bands,
     Look,
@@ -1391,3 +1392,19 @@ def test_a_regional_atlas_keeps_its_calm_sources_in_the_report() -> None:
     result = apply_trim([_building()], paris, COLORS, regional=True, wide=True)
     assert result.style == "haussmann" and result.report["atlas_origin"] == "regional"
     assert [(s["key"], s["to"]) for s in result.report["calm_sources"]] == [("brick", "ph_factory_brick")]
+
+
+def test_a_wall_leaning_by_float32_noise_is_still_cut_at_the_zocalo_line() -> None:
+    """14 November 2026: a wall read back from float32 leans ~5e-5; kept whole, its triangles crossed the zocalo line."""
+    assert PLANE_TOL == 1e-3
+    # 10 m long, 3 m high, the top 0.15 mm off the plane of the foot: a lean of 5e-5.
+    noisy = Mesh(np.array([[0, 0, 0], [10, 0, 0], [10, 1.5e-4, 3], [0, 1.5e-4, 3]], dtype=float), np.array([[0, 1, 2], [0, 2, 3]]))
+    mesh, band, _plain, _single = band_mesh(noisy, [0.9, 3.0], [0.9, 3.0])
+    z = mesh.vertices[:, 2]
+    for tri in mesh.triangles:  # no triangle crosses the cut
+        assert not (z[tri].min() < 0.9 - 1e-9 and z[tri].max() > 0.9 + 1e-9), z[tri]
+    assert set(band.tolist()) == {0, 1} and (band[z < 0.9 - 1e-9] == 0).all() and (band[z > 0.9 + 1e-9] == 1).all()
+    # A face leaning 0.05 (a real slope) is kept whole, in the band of its centre.
+    sloped = Mesh(np.array([[0, 0, 0], [10, 0, 0], [10, 0.15, 3], [0, 0.15, 3]], dtype=float), np.array([[0, 1, 2], [0, 2, 3]]))
+    mesh, band, _plain, _single = band_mesh(sloped, [0.9, 3.0], [0.9, 3.0])
+    assert mesh.triangle_count == 2 and band.tolist() == [1, 1, 1, 1]
