@@ -290,7 +290,7 @@ def test_gameplay_report_reads_the_islands_inside_the_core(tmp_path: Path, monke
         seen.append(inside)
         return [inside]
 
-    monkeypatch.setattr(layout_module, "nav_islands", islands)
+    monkeypatch.setattr(layout_module, "player_ground", islands)  # the player's ground since 14 November 2026
     monkeypatch.setattr(layout_module, "playable_area", lambda manifest: core if manifest == {"core": True} else None)
     path = _glb(tmp_path / "scene_collision.glb", [Node("overgrow/collider/prop/box/1", (Primitive(_cube((2.0, 1.0, 1.5)), "collider"),))])
 

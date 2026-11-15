@@ -402,10 +402,10 @@ def open_sight_points(
 
 def gameplay_report(base: Any, manifest: Mapping[str, Any], layout: Mapping[str, Any], collision_path: str | Path) -> dict[str, Any]:
     """The report for a playable layout: ``base`` is the phase 03 scene, ``manifest`` the playable detail manifest."""
-    from onward_generator.perf.layout import nav_islands, playable_area
+    from onward_generator.perf.layout import playable_area, player_ground
 
     colliders = read_colliders(collision_path)
-    islands = nav_islands(base, playable_area(manifest))
+    islands = player_ground(base, playable_area(manifest))  # players cross any street (ADR-032 amendment, 14 November 2026)
     return build_report(islands, base.partition.buildings, colliders, layout)
 
 

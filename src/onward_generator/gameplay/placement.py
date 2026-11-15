@@ -24,6 +24,9 @@ KEPT = "kept the current placement"
 CONTACT_TOLERANCE_PCT = 15.0
 """ADR-032's proposed balance threshold. Among candidates within it, more distinct routes win (C6 amendment of
 11 November 2026); above it the contact difference still comes first."""
+MIN_CONTACT_M = 40.0
+"""The least walk from each team to the Uplink a candidate should give, about 10 s at the report's 4 m/s run
+(14 November 2026; uncalibrated, like ADR-032's thresholds). Mogadishu 1993 chose 30.5 m: first contact after 8 s."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +57,14 @@ class Score:
     routes: int | None = None
     max_overlap: float | None = None
     reason: str | None = None
+    in_sight: bool = False
+    """The two teams' spawn centres see each other: no building cuts the line between them (14 November 2026)."""
+    contact_m: float | None = None
+    """The shorter team's walk to the Uplink, metres (the report's ``balance``)."""
+
+    @property
+    def short_contact(self) -> bool:
+        return self.contact_m is not None and self.contact_m < MIN_CONTACT_M
 
     @property
     def valid(self) -> bool:
@@ -102,7 +113,7 @@ def contact_score(graph: NavGraph, placement: Placement, index: int) -> Score:
             return Score(index, reason=f"no path from the {team} to the Uplink")
         distances[team] = min(known)
     diff = balance(distances["attackers"] / 1000.0, distances["defenders"] / 1000.0)["diff_pct"]
-    return Score(index, diff_pct=diff)
+    return Score(index, diff_pct=diff, contact_m=min(distances.values()) / 1000.0)
 
 
 Routes = dict[tuple[int, int], list[Route]]
@@ -166,14 +177,16 @@ def score_all(graph: NavGraph, candidates: Sequence[Placement | str], *, routes:
     return scores
 
 
-def _key(score: Score) -> tuple[float, float, float, int]:
-    """More routes first within ``CONTACT_TOLERANCE_PCT``, then the lower difference; past it, the difference first.
+def _key(score: Score) -> tuple[float, ...]:
+    """Within ``CONTACT_TOLERANCE_PCT``: teams that cannot see each other from their spawns first, then a walk to
+    the Uplink of at least ``MIN_CONTACT_M`` for both (14 November 2026: Mogadishu 1993 spawned both teams 49 m
+    apart, 8 s from contact), then more routes, then the lower difference; past it, the difference first.
 
-    A key within starts with ``-routes``, below 0 since an admissible candidate has a route; a key past it starts
-    with a difference above 15. So every candidate within ranks before every candidate past it."""
+    A key within starts with 0 or 1; a key past it starts with a difference above 15. So every candidate within
+    ranks before every candidate past it, whatever follows."""
     assert score.diff_pct is not None and score.routes is not None and score.max_overlap is not None  # pragma: no mutate: only admissible scores reach the key
     if score.diff_pct <= CONTACT_TOLERANCE_PCT:
-        return (-score.routes, score.diff_pct, score.max_overlap, score.index)
+        return (float(score.in_sight), float(score.short_contact), -score.routes, score.diff_pct, score.max_overlap, score.index)
     return (score.diff_pct, -score.routes, score.max_overlap, score.index)
 
 
@@ -196,7 +209,8 @@ def admissible(score: Score, baseline: Score) -> bool:
 
 def select(scores: Sequence[Score]) -> Choice:
     """The lowest ``_key`` among the admissible candidates: within ``CONTACT_TOLERANCE_PCT`` of contact difference
-    the most distinct routes, then the lower difference, the lower overlap and the lower index; past it, the lower
+    spawns out of each other's sight, then a walk of at least ``MIN_CONTACT_M`` to the Uplink, then the most distinct
+    routes, then the lower difference, the lower overlap and the lower index; past it, the lower
     difference first, as before the C6 amendment of 11 November 2026.
 
     Candidate 0 is the current placement. It stays unless another one is strictly lower on that key,
