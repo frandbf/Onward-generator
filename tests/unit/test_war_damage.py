@@ -273,3 +273,16 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
         place_signs(base, scene, tmp_path / "bad")
     monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
     assert "damage" not in place_signs(base, scene, tmp_path / "unreadable")
+
+
+WAR_HASHES = {"gen_shell_impact": "6682a0670bd9", "gen_scorch_mark": "bafcf5ac0b17", "gen_shrapnel_spray": "b737f439fd55"}
+GROUND_HASHES = {"gen_road_crack": "83454fa162b2", "gen_pothole_patch": "631c5174a011", "gen_sand_drift": "a9935331af6a",
+                 "gen_ground_scorch": "397969ff0d72", "gen_flat_rubble": "3651cf3d5597"}
+
+
+def test_the_drawn_pixels_are_pinned() -> None:
+    """Every drawn decal, pixel for pixel, for one seed: a change to how one is drawn shows here first."""
+    import hashlib
+
+    assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in war_wall_decals(7)} == WAR_HASHES
+    assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in ground_decals(7)} == GROUND_HASHES
