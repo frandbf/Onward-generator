@@ -21,11 +21,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from shapely import LineString, MultiLineString, Point, STRtree, contains_xy, dwithin, offset_curve, prepare, union_all
+from shapely import LineString, MultiLineString, MultiPolygon, Point, STRtree, contains_xy, dwithin, offset_curve, prepare, union_all
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import linemerge, nearest_points, polylabel
 
-from onward_generator.generation.mesh import polygons_of
+from onward_generator.generation.mesh import cap, merge, polygons_of
 from onward_generator.generation.scene import GeneratedScene
 from onward_generator.generation.surfaces import LinearWay, SurfaceClass
 from onward_generator.perf.climbs import climbed_roofs, place_climbs
@@ -689,16 +689,24 @@ def _patrol_lines(ways: Sequence[LinearWay], sidewalk_width_m: float) -> list[Li
     return lines
 
 
-def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence[BaseGeometry], tree: STRtree) -> list[dict[str, float]]:
+def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence[BaseGeometry], tree: STRtree,
+                  reach: dict[int, BaseGeometry] | None = None) -> list[dict[str, float]]:
     """Up to ``ROUTE_POINTS`` points ``ROUTE_STEP_M`` apart along ``line``.
 
     A point on furniture is skipped. The first point fixes the walkable island,
     the piece of ``parts`` within the agent radius. The route stops at the first
     point off that island: the carriageway splits the navmesh, and a step to
-    another island has no return path, so the adapter drops it.
+    another island has no return path, so the adapter drops it. It also stops at
+    the first step whose straight leg leaves the island grown by the agent radius,
+    and the last points go until the leg that closes the loop stays on it: a leg
+    across a house corner walked a bot through the wall (14 November 2026).
+    ``reach`` caches each island grown by the agent radius, by index into ``parts``.
     """
+    reach = {} if reach is None else reach
     points: list[dict[str, float]] = []
     island: BaseGeometry | None = None
+    grown: BaseGeometry | None = None
+    previous: Point | None = None
     distance = start_m
     while distance < line.length - 2 and len(points) < ROUTE_POINTS:
         point = line.interpolate(distance)
@@ -710,9 +718,18 @@ def _sample_route(line: Any, free: BaseGeometry, start_m: float, parts: Sequence
             if not hits:
                 continue
             island = parts[hits[0]]
+            if hits[0] not in reach:
+                reach[hits[0]] = island.buffer(NAV_AGENT_RADIUS_M)
+                prepare(reach[hits[0]])  # pragma: no mutate: only makes the containment tests faster
+            grown = reach[hits[0]]
         elif not dwithin(island, point, NAV_AGENT_RADIUS_M):
             break
+        if previous is not None and grown is not None and not grown.covers(LineString([previous, point])):
+            break
         points.append({"x": round(float(point.x), 2), "y": round(float(point.y), 2)})
+        previous = point
+    while len(points) > 2 and grown is not None and not grown.covers(LineString([(points[-1]["x"], points[-1]["y"]), (points[0]["x"], points[0]["y"])])):
+        points.pop()
     return points
 
 
@@ -728,11 +745,12 @@ def _routes(
     used: bots spawn on the sidewalk.
     """
     tree = STRtree(list(parts))
+    reach: dict[int, BaseGeometry] = {}
     candidates: list[list[dict[str, float]]] = []
     for line in _patrol_lines(base.ways, base.config.sidewalk_width_m):
         distance = 4.0
         while distance <= line.length - 16:  # pragma: no mutate: a start on the bound holds one point, which the length check drops; test_routes_start_every_separation_until_the_last_two_points pins 16
-            points = _sample_route(line, free, distance, parts, tree)
+            points = _sample_route(line, free, distance, parts, tree, reach)
             if len(points) >= 2:
                 candidates.append(points)
             distance += separation_m
@@ -822,6 +840,31 @@ def player_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> l
     if inside is not None:
         ground = ground.intersection(inside)
     return list(polygons_of(ground.buffer(-NAV_AGENT_RADIUS_M)))
+
+
+def nav_ground(base: GeneratedScene, inside: BaseGeometry | None = None) -> dict[str, list[float] | list[int]]:
+    """The exact ground the adapter bakes the bots' navmesh from (14 November 2026): ``nav_islands`` before the agent
+    radius, the free ground at 0 and the walkable crossings at the carriageway's top, as flat local x, y, z triples
+    and triangle indices for Unity's JsonUtility.
+
+    The ground collider runs under every house, and the adapter used to cut the houses out with 2.6 m boxes on a
+    2 m grid: on Mogadishu 1993 every one of 231 buildings kept 0.5 to 0.95 m of walkable strip inside its walls,
+    and the node graph built on that mesh walked the bots through house corners. Here each footprint is a hole.
+    """
+    depth = base.config.carriageway_depth_m
+    crossings = base.partition.crossings
+    free = free_ground(base, []).difference(crossings)  # pragma: no mutate: free_ground reads [] and None alike, as no furniture
+    meshes = []
+    for ground, top in ((free, 0.0), (crossings, -depth)):
+        if inside is not None:
+            ground = ground.intersection(inside)
+        pieces = MultiPolygon([p for p in polygons_of(ground) if p.area > 1e-6])
+        if not pieces.is_empty:
+            meshes.append(cap(pieces, top))
+    if not meshes:
+        raise LayoutError("no walkable ground for the bots' navmesh")
+    mesh = merge(meshes)
+    return {"vertices_m": [round(float(v), 3) for v in mesh.vertices.ravel()], "triangles": [int(i) for i in mesh.triangles.ravel()]}
 
 
 def navigation_estimate(islands: Sequence[BaseGeometry]) -> dict[str, float]:
@@ -1158,6 +1201,7 @@ def playable_layout(
         "ai_separation_m": separation,
         "routes": routes,
         "navigation": navigation_estimate(islands),
+        "nav_ground": nav_ground(base, inside),
         "ammo_m": [_xy(*p, focus) for p in ammo],
         "audio_global": "Suburban Day",
         "audio_birds_m": list(uplink) if time_of_day == "day" else [],

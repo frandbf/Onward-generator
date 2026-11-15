@@ -53,3 +53,13 @@ C# cannot be compiled on the Linux host. To check in Unity (`task unity`) and on
 
 The carriageway of a vehicular way whose OSM `surface` names no paving (`UNPAVED_SURFACES`: unpaved, dirt, earth, ground, sand, gravel, fine_gravel, compacted, mud, grass, pebblestone) joins the crossings (`Partition.crossings`), so it is part of `collider/walkable_crossing` and of the bots' navmesh from end to end, not only at its crossing strips. A paved street, or one with no `surface` tag, keeps the rule above. Zebra paint is unchanged: it comes from `crossing_sites` and the OSM crossings. In Mogadishu 1993, 23 of 29 streets are `surface=unpaved`, and the navmesh without them cut the town into blocks the bots could not leave. A map built before this keeps its navmesh until it runs again from `generate`.
 
+## Amendment, 14 November 2026: the navmesh ground comes from the layout
+
+On the headset, Mogadishu 1993's bots walked through house corners. The ground collider `collider/walkable` runs under every house, and the adapter cut the houses out with 2.6 m `Not Walkable` boxes on a 2 m grid, where a ray hit the building. Reproduced on the package's footprints, that raster left 0.5 to 0.95 m of walkable strip inside every one of the 231 buildings (1 525 m² in all, strips up to 15 m long along party walls), and the SDK's node graph links nodes on that mesh in straight lines up to 1.5 × the spacing (9.9 m there). The building colliders themselves are closed rings; they are not navmesh sources.
+
+`perf layout --playable` now writes `nav_ground` into `layout.json`: the islands of `nav_islands` before the agent radius (free ground at 0, the crossings at the carriageway's top, inside the core), triangulated with every footprint a hole, as flat x, y, z triples and triangle indices. The adapter bakes that mesh alone when the layout has it, so the walls are the navmesh border and the 0.35 m agent radius keeps bots off them; lift cabins are still blocked. A layout without it bakes as before. The ground colliders are unchanged: players still stand on `collider/walkable` inside houses, and phase 03 output stays the same, so existing maps rerun from `layout`.
+
+Routes also stop at the first leg whose straight segment leaves the island grown by the agent radius, and drop their last points until the loop's closing leg stays on it: 15 of 88 legs and 7 closing legs of Mogadishu 1993 crossed a footprint.
+
+**Pending:** a headset session on Mogadishu 1993 (bots keep off the walls; `Navmesh islands` and the node chain still pass).
+

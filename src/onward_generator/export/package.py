@@ -225,11 +225,29 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
         elif lightning and doc.get("time_of_day") != "Night":
             problems.append("layout: lightning is only for a night map")
         problems.extend(_check_climbs(doc))
+        problems.extend(_check_nav_ground(doc.get("nav_ground")))
         if doc.get("far_clip_m") != 1000 or doc.get("flyover") != 1:
             problems.append("layout: far_clip_m must be 1000 and flyover must be 1")
         if doc.get("schema_version") == GAMEPLAY_VERSION:
             problems.extend(_check_match_modes(doc, point))
     return problems
+
+
+def _check_nav_ground(nav: Any) -> list[str]:
+    """The bots' navmesh ground (optional; older layouts bake the ground colliders): flat x, y, z triples and triangle
+    indices into them, at least one triangle."""
+    if nav is None:
+        return []
+    vertices = nav.get("vertices_m") if isinstance(nav, dict) else None
+    triangles = nav.get("triangles") if isinstance(nav, dict) else None
+    if (not isinstance(vertices, list) or len(vertices) % 3 or not vertices
+            or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in vertices)):
+        return ["layout: nav_ground.vertices_m must be flat x, y, z triples"]
+    count = len(vertices) // 3
+    if (not isinstance(triangles, list) or len(triangles) % 3 or not triangles
+            or any(type(i) is not int or not 0 <= i < count for i in triangles)):
+        return [f"layout: nav_ground.triangles must be index triples into its {count} vertices"]
+    return []
 
 
 def _base_below(site: Mapping[str, Any]) -> bool:
