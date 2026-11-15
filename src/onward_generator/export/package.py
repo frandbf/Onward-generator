@@ -61,6 +61,10 @@ from onward_generator.export.normal_map import (
     encode_png,
     normal_map,
 )
+from onward_generator.export.smoke import TEXTURE_FILE as SMOKE_TEXTURE
+from onward_generator.export.smoke import TEXTURE_ROLE as SMOKE_ROLE
+from onward_generator.export.smoke import choose as choose_smoke
+from onward_generator.export.smoke import puff_png, smoke_options, wreck_sites
 from onward_generator.export.sun import street_sun
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.export.triangle_budget import UNITY_TRIANGLE_LIMIT, budget_warning, triangle_budget
@@ -456,11 +460,12 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
-                  atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT) -> PackageResult:
+                  atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
-    changes nothing, the package id included."""
+    changes nothing, the package id included. ``smoke`` asks for that many smoke columns (plan 2026-11-15,
+    increment C); 0 changes nothing."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -563,6 +568,17 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 applied.append(FOG_SCALE)
         if core_lightmap is not None:
             applied.append(LIGHTMAP_CORE)
+    smoke_record: dict[str, Any] | None = None
+    if smoke:
+        # Plan 2026-11-15, increment C: only a map that asks for smoke writes it, so others keep their package_id.
+        columns, refused = choose_smoke(wreck_sites(detail_manifest.get("objects") or []), smoke,
+                                        (detail_manifest.get("core") or {}).get("half_side_m"), layout_doc)
+        smoke_record = {"wanted": smoke, "columns": len(columns), "origin": "generated", "refused": refused}
+        if columns:
+            options["smoke"] = smoke_options(columns)
+        if len(columns) < smoke:
+            warnings.append(f"smoke: {len(columns)} of {smoke} columns found a wreck of the core clear of the spawns, "
+                            f"the climbs and each other ({', '.join(f'{k} {v}' for k, v in refused.items() if v) or 'no wreck'})")
     tiers = _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"]))
     # Plan Q2: the Unity total, estimated now so a map over the official limit is known before the bake.
     budget = triangle_budget(visual_bytes, layout_doc, tiers, (detail_manifest.get("core") or {}).get("half_side_m"), triangle_limit)
@@ -597,6 +613,10 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 atomic_write_bytes(out / path, png)
                 files.append({"role": NORMAL_MAP_ROLE, "path": path, "sha256": sha256_file(out / path),
                               "bytes": (out / path).stat().st_size, "source": "library"})
+        if "smoke" in options:
+            atomic_write_bytes(out / SMOKE_TEXTURE, puff_png())
+            files.append({"role": SMOKE_ROLE, "path": SMOKE_TEXTURE, "sha256": sha256_file(out / SMOKE_TEXTURE),
+                          "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": "generated"})
         if lit_normal is not None:
             png, _block = lit_normal
             atomic_write_bytes(out / LIT_NORMAL_FILE, png)
@@ -649,6 +669,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             manifest["atmosphere"] = {"preset": preset, "origin": "generated", "applied": applied, "sun": sun_record}
             if core_lightmap is not None:
                 manifest["atmosphere"]["lightmap_core"] = core_lightmap
+        if smoke_record is not None:
+            manifest["smoke"] = smoke_record
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:

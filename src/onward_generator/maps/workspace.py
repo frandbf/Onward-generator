@@ -370,6 +370,17 @@ def triangle_limit(directory: str | Path) -> int | None:
     return value
 
 
+def smoke_columns(directory: str | Path) -> int:
+    """``map.json`` ``smoke``: how many smoke columns the package asks for (plan 2026-11-15, increment C), 0 without
+    the key. An integer from 0 to ``export.smoke.SMOKE_MAX``; anything else is refused."""
+    from onward_generator.export.smoke import SmokeError, check_count
+
+    try:
+        return check_count(load_map(directory).get("smoke"))
+    except SmokeError as exc:
+        raise MapError(str(exc)) from exc
+
+
 def normal_maps_enabled(directory: str | Path) -> bool:
     """True only when ``map.json`` has ``"normal_maps": true`` (plan T3, off by default). A value that is not a bool is
     refused."""
