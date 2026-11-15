@@ -261,7 +261,7 @@ def _clip_band(corners: np.ndarray, z0: float, z1: float) -> np.ndarray:
         points = kept
         if not points:
             break
-    return np.array(points).reshape(-1, 3)
+    return np.array(points).reshape(-1, 3)  # pragma: no mutate: numpy reads any negative size as the one unknown dimension
 
 
 def layer_plans(mesh: Mesh) -> list[tuple[BaseGeometry, float, float]]:
@@ -269,34 +269,37 @@ def layer_plans(mesh: Mesh) -> list[tuple[BaseGeometry, float, float]]:
 
     The height is cut into the fewest equal slices no taller than ``LAYER_M``. A slice's plan is the union of the
     plans of the triangle pieces inside it, each widened by ``LAYER_PAD_M``, simplified, with its holes filled (a car's
-    cabin is one solid, not a ring of pillars). A slice no triangle reaches is left open; a slice whose plan lies
+    cabin is one solid, not a ring of pillars). A flat face on a boundary counts on the side it faces away from: a
+    box's top below it, a ledge's underside above it. A slice no triangle reaches is left open; a slice whose plan lies
     within ``LAYER_SIMPLIFY_M`` of the one below is merged into it.
     """
     vertices = mesh.vertices
     low, high = float(vertices[:, 2].min()), float(vertices[:, 2].max())
     count = max(1, math.ceil((high - low) / LAYER_M - 1e-9))
-    step = (high - low) / count
+    edges = np.linspace(low, high, count + 1)  # the last edge is the top itself
     corners = vertices[mesh.triangles]
     bottoms, tops = corners[:, :, 2].min(axis=1), corners[:, :, 2].max(axis=1)
+    level = tops == bottoms
+    up = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])[:, 2] > 0.0
     plans: list[tuple[BaseGeometry, float, float]] = []
     for index in range(count):
-        z0 = low + index * step
-        z1 = high if index == count - 1 else low + (index + 1) * step
+        z0, z1 = float(edges[index]), float(edges[index + 1])
         pieces = []
-        # A triangle that crosses the slice counts; a flat one on a boundary counts only in the slice above it, so a
-        # ledge does not reach down a slice (the prop's top face counts in the last slice).
-        flat = (tops == bottoms) & (bottoms >= z0) & ((bottoms < z1) | (index == count - 1))
-        for triangle in np.nonzero(((tops > z0) & (bottoms < z1)) | flat)[0]:
-            inside = bottoms[triangle] >= z0 and tops[triangle] <= z1
-            piece = corners[triangle] if inside else _clip_band(corners[triangle], z0, z1)
+        # A triangle that crosses the slice counts. A flat one on a boundary counts on its own side only: facing up (the
+        # top of a box) in the slice below, facing down (under a ledge) in the slice above, so neither reaches into the
+        # next slice; the prop's foot counts in the first slice and its top in the last.
+        tops_here = level & up & (bottoms <= z1) & ((bottoms > z0) | (index == 0))
+        unders_here = level & ~up & (bottoms >= z0) & ((bottoms < z1) | (index == count - 1))
+        for triangle in np.nonzero(((tops > z0) & (bottoms < z1)) | tops_here | unders_here)[0]:
+            piece = _clip_band(corners[triangle], z0, z1)
             if len(piece):
-                pieces.append(shapely.multipoints(piece[:, :2]))
+                pieces.append(shapely.multipoints(piece[:, :2]))  # pragma: no mutate: shapely's plan operations ignore z, so x, y, z points give the same hull
         if not pieces:
             continue
         widened = shapely.buffer(shapely.convex_hull(np.array(pieces)), LAYER_PAD_M, cap_style="square")
         plan = shapely.union_all(widened).simplify(LAYER_SIMPLIFY_M)
         plan = unary_union([Polygon(part.exterior) for part in getattr(plan, "geoms", [plan])])
-        if plans and plans[-1][2] == z0 and plans[-1][0].hausdorff_distance(plan) <= LAYER_SIMPLIFY_M:
+        if plans and plans[-1][2] == z0 and plans[-1][0].hausdorff_distance(plan) <= LAYER_SIMPLIFY_M:  # pragma: no mutate: no two plans lie exactly 2 cm apart to the bit
             plans[-1] = (plans[-1][0], plans[-1][1], z1)
         else:
             plans.append((plan, z0, z1))
@@ -305,8 +308,9 @@ def layer_plans(mesh: Mesh) -> list[tuple[BaseGeometry, float, float]]:
 
 def layered_collider(mesh: Mesh) -> Mesh:
     """The collider of a solid prop: a closed prism per slice of ``layer_plans``; its whole box when it is flat."""
-    if float(np.ptp(mesh.vertices[:, 2])) <= 0.0:
-        return collider_mesh(mesh, "box")
+    low, high = mesh.vertices.min(axis=0), mesh.vertices.max(axis=0)
+    if high[2] <= low[2]:
+        return box(float(low[0]), float(high[0]), float(low[1]), float(high[1]), float(low[2]), float(high[2]))
     return merge(prism(plan, z0, z1, bottom=True) for plan, z0, z1 in layer_plans(mesh))
 
 

@@ -12,6 +12,7 @@ from onward_generator.overgrow.fit import (
     LAYER_M,
     LAYER_PAD_M,
     LAYER_SIMPLIFY_M,
+    _clip_band,
     collider_mesh,
     layer_plans,
     layered_collider,
@@ -126,3 +127,81 @@ def test_a_tree_and_a_lamp_keep_their_trunk_and_post(role: str) -> None:
 def test_any_other_solid_role_is_layered() -> None:
     assert np.array_equal(solid_collider(_car(), "wreck").vertices, layered_collider(_car()).vertices)
     assert np.array_equal(solid_collider(_car(), "barrel").vertices, layered_collider(_car()).vertices)
+
+
+def test_the_slices_start_at_the_prop_s_own_foot() -> None:
+    # A prop standing 1 m up (a pinned prop sunk the other way, a wreck on a raised carriageway) is cut from its foot.
+    raised = merge([mesh_box(0.0, 1.0, 0.0, 1.0, 1.0, 1.3), mesh_box(0.0, 0.5, 0.0, 1.0, 1.3, 1.9)])
+    plans = layer_plans(raised)
+    assert [(round(z0, 6), round(z1, 6)) for _, z0, z1 in plans] == [(1.0, 1.3), (1.3, 1.9)]
+
+
+def test_a_prop_lower_than_a_slice_is_one_slice() -> None:
+    # 0.25 m: one slice, whatever its shape changes inside it.
+    step = merge([mesh_box(0.0, 1.0, 0.0, 1.0, 0.0, 0.12), mesh_box(0.0, 0.4, 0.0, 1.0, 0.12, 0.25)])
+    plans = layer_plans(step)
+    assert len(plans) == 1 and plans[0][0].bounds[2] == pytest.approx(1.0 + LAYER_PAD_M)
+    # Low but not flat: still layered, not its box.
+    collider = layered_collider(step)
+    assert collider.vertices[:, 2].max() == pytest.approx(0.25) and collider.triangle_count == 12
+
+
+def _plate(x0: float, x1: float, z: float) -> Mesh:
+    """A flat square at height z, facing up."""
+    return Mesh(np.array([[x0, 0.0, z], [x1, 0.0, z], [x1, 1.0, z], [x0, 1.0, z]]), np.array([[0, 1, 2], [0, 2, 3]]))
+
+
+def test_a_flat_face_on_a_boundary_counts_on_its_own_side() -> None:
+    # A thin post 0 to 0.9 m (three slices) and a wide flat plate at 0.3 m, the first boundary: facing down (under a
+    # ledge) it counts in the slice above, facing up (a box's top) in the slice below.
+    post = mesh_box(0.0, 0.1, 0.0, 0.1, 0.0, 0.9)
+    plate = _plate(0.0, 2.0, 0.3)
+    under = Mesh(plate.vertices, plate.triangles[:, ::-1])
+    for face, wide in ((under, (0.3, 0.6)), (plate, (0.0, 0.3))):
+        widths = {(round(z0, 6), round(z1, 6)): plan.bounds[2] for plan, z0, z1 in layer_plans(merge([post, face]))}
+        for edges, width in widths.items():
+            expected = 2.0 if edges == wide else 0.1
+            assert width == pytest.approx(expected + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M), (edges, face is plate)
+
+
+def test_the_foot_counts_in_the_first_slice() -> None:
+    post = mesh_box(0.0, 0.1, 0.0, 0.1, 0.0, 0.9)
+    foot = _plate(0.0, 2.0, 0.0)
+    plans = layer_plans(merge([post, Mesh(foot.vertices, foot.triangles[:, ::-1])]))
+    assert plans[0][0].bounds[2] == pytest.approx(2.0 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
+    assert plans[-1][0].bounds[2] == pytest.approx(0.1 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
+
+
+def test_the_top_face_counts_in_the_last_slice() -> None:
+    post = mesh_box(0.0, 0.1, 0.0, 0.1, 0.0, 0.9)
+    plans = layer_plans(merge([post, _plate(0.0, 2.0, 0.9)]))
+    assert plans[-1][2] == pytest.approx(0.9) and plans[-1][0].bounds[2] == pytest.approx(2.0 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
+    assert plans[0][0].bounds[2] == pytest.approx(0.1 + LAYER_PAD_M, abs=LAYER_SIMPLIFY_M)
+
+
+def test_a_wall_that_only_reaches_a_boundary_stays_below_it() -> None:
+    # A narrow box on a wide one: the wide box's walls end at 0.3 m and do not widen the slice above.
+    stacked = merge([mesh_box(0.0, 1.2, 0.0, 1.0, 0.0, 0.3), mesh_box(0.0, 1.0, 0.0, 1.0, 0.3, 0.6)])
+    plans = layer_plans(stacked)
+    assert len(plans) == 2
+    assert plans[0][0].bounds[2] == pytest.approx(1.2 + LAYER_PAD_M) and plans[1][0].bounds[2] == pytest.approx(1.0 + LAYER_PAD_M)
+
+
+def test_the_clip_keeps_the_part_of_a_triangle_inside_the_slice() -> None:
+    triangle = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+    piece = _clip_band(triangle, 0.25, 0.5)
+    assert np.allclose(piece, [[0.75, 0.0, 0.25], [0.5, 0.0, 0.5], [0.0, 0.0, 0.5], [0.0, 0.0, 0.25]])
+    # Widening upward: the top cut is the wider one, so both planes must cut.
+    upward = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 1.0], [-1.0, 0.0, 1.0]])
+    assert _clip_band(upward, 0.0, 0.5)[:, 0].tolist() == pytest.approx([0.0, 0.5, -0.5])
+    # A vertex on a plane is kept once.
+    on_plane = np.array([[0.0, 0.0, 0.5], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    assert np.array_equal(_clip_band(on_plane, 0.0, 0.5), on_plane)
+
+
+def test_a_triangle_outside_the_slice_leaves_nothing() -> None:
+    above = np.array([[0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 2.0]])
+    piece = _clip_band(above, 0.0, 0.5)
+    assert isinstance(piece, np.ndarray) and piece.shape == (0, 3)
+    below = np.array([[0.0, 0.0, -2.0], [1.0, 0.0, -1.0], [0.0, 1.0, -1.0]])
+    assert _clip_band(below, 0.0, 0.5).shape == (0, 3)
