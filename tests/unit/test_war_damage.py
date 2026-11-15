@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from shapely.geometry import box
+from shapely.geometry import Point, box
 
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, nodes_from_glb
@@ -255,8 +255,35 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     detail = json.loads((tmp_path / "heavy" / "detail_report.json").read_text())
     assert detail["ground_decals"]["count"] == len(ground_rows)
 
+    from onward_generator.signs.decals import procedural_decals as drawn
+
+    seed = signs_place._seed(json.loads((base / "scene_detail.json").read_text()))
+    kinds = {row["kind"] for row in heavy["wall_decals"]["decals"]}
+    assert {"shell_impact", "scorch", "shrapnel"} & kinds  # the drawn war kinds come in with the sequence
+    # The walls follow the war sequence of the map's seed (a decal that fits no wall drops out, so a subsequence).
+    expected = iter(d.id for d in war_sequence(drawn(seed), war_wall_decals(seed), heavy["wall_decals"]["wanted"], seed, "heavy"))
+    assert all(any(row["decal"] == want for want in expected) for row in heavy["wall_decals"]["decals"])
+    # The ground is the one place_ground lays for the map's seed on the built scene.
+    built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
+    again = place_ground(Ground(built), damage_area(base, scene), ground_decals(seed), ground_count(seed, "heavy"), seed)
+    assert [[round(v, 3) for v in p.centre] for p in again] == [row["position_m"] for row in ground_rows]
+
+    # With a core, the ground decals are laid in the core square, not the walls' envelope.
+    plain_manifest = json.loads((base / "scene_detail.json").read_text())
+    cored = {**plain_manifest, "core": {"half_side_m": 50.0}}
+    (base / "scene_detail.json").write_text(json.dumps(cored), encoding="utf-8")
+    inside = place_signs(base, scene, tmp_path / "cored")["damage"]["ground_decals"]["decals"]
+    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_decals(seed), ground_count(seed, "heavy"), seed)
+    assert [[round(v, 3) for v in p.centre] for p in in_core] == [r["position_m"] for r in inside] != [row["position_m"] for row in ground_rows]
+    (base / "scene_detail.json").write_text(json.dumps(plain_manifest), encoding="utf-8")
+
     document["damage"] = "auto"
-    monkeypatch.setattr("onward_generator.ai.street_profile.load_record", lambda path: {"ids": {"props_profile": "wrecked"}})
+
+    def record(path: object) -> dict:
+        assert Path(str(path)) == root / "config" / "street_profile.json"
+        return {"ids": {"props_profile": "wrecked"}}
+
+    monkeypatch.setattr("onward_generator.ai.street_profile.load_record", record)
     assert place_signs(base, scene, tmp_path / "auto")["damage"]["origin"] == "street_profile"
     monkeypatch.setattr("onward_generator.ai.street_profile.load_record", lambda path: {"ids": {"props_profile": "worn"}})
     assert "damage" not in place_signs(base, scene, tmp_path / "auto_worn")
@@ -286,3 +313,74 @@ def test_the_drawn_pixels_are_pinned() -> None:
 
     assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in war_wall_decals(7)} == WAR_HASHES
     assert {d.id: hashlib.sha256(d.rgba.tobytes()).hexdigest()[:12] for d in ground_decals(7)} == GROUND_HASHES
+
+
+def test_twelve_seeds_are_pinned() -> None:
+    """Every drawn kind over twelve seeds: a draw that changes only for some seeds still shows here."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for seed in range(12):
+        for decal in [*war_wall_decals(seed), *ground_decals(seed)]:
+            digest.update(decal.rgba.tobytes())
+    assert digest.hexdigest()[:16] == "e6c58ce14580421e"
+
+
+def test_the_counts_are_pinned_by_seed() -> None:
+    assert [wall_count(s, "heavy", 0) for s in range(6)] == [82, 89, 60, 85, 75, 86]
+    assert [ground_count(s, "light") for s in range(6)] == [13, 14, 19, 12, 15, 20]
+    assert [ground_count(s, "heavy") for s in range(6)] == [32, 35, 43, 31, 35, 45]
+
+
+def test_the_war_sequence_is_pinned() -> None:
+    pool = [_decal("a", "stain"), _decal("b", "moss"), _decal("c", "bullets"), _decal("d", "poster")]
+    sequence = war_sequence(pool, [_decal("w", "shell_impact"), _decal("v", "scorch")], 10, 11, "heavy")
+    assert [d.id for d in sequence] == ["w", "d", "v", "b", "c", "a", "w", "d", "v", "c"]
+
+
+def _spots(placed: list[GroundPlaced]) -> list[tuple[str, list[float], float]]:
+    return [(p.decal.id, [round(v, 3) for v in p.centre], round(p.yaw, 3)) for p in placed]
+
+
+def test_the_ground_placements_are_pinned() -> None:
+    ground = Ground(_ground_nodes())
+    decals = [d for d in ground_decals(5) if d.width_m <= 2.0]
+    assert _spots(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals, 8, 5)) == [
+        ("gen_flat_rubble", [7.029, 1.473, 0.115], 0.939), ("gen_pothole_patch", [9.972, 12.298, 0.265], 0.211),
+        ("gen_flat_rubble", [10.037, 4.914, 0.115], 1.594), ("gen_pothole_patch", [5.146, 12.409, 0.265], 3.131),
+        ("gen_flat_rubble", [1.474, 12.514, 0.265], 1.741), ("gen_pothole_patch", [12.843, 2.164, 0.115], 1.299),
+        ("gen_flat_rubble", [3.981, 8.06, 0.115], 1.129), ("gen_pothole_patch", [1.16, 4.248, 0.115], 1.664)]
+    # A round area: spots outside it are tried again, not given up.
+    assert _spots(place_ground(ground, Point(10.0, 7.0).buffer(4.0), decals[:1], 4, 3)) == [
+        ("gen_pothole_patch", [9.108, 5.641, 0.115], 0.239), ("gen_pothole_patch", [9.262, 8.669, 0.115], 1.766),
+        ("gen_pothole_patch", [11.409, 4.467, 0.115], 1.102), ("gen_pothole_patch", [6.401, 8.002, 0.115], 1.94)]
+    # Tries run out: a vast area with little allowed ground places one of six in its 150 tries.
+    assert len(place_ground(ground, box(0.0, 0.0, 200.0, 140.0), decals[:1], 6, 2)) == 1
+    assert len(place_ground(ground, box(0.0, 0.0, 20.0, 14.0), decals[:1], 1, 2)) == 1
+
+
+def test_a_ground_quad_carries_its_atlas_cell_and_the_millimetre() -> None:
+    sand = Decal("gen_sand_drift", "sand", 3.0, 1.2, np.full((8, 8, 4), 200, dtype=np.uint8), "generated")
+    nodes, _, _, rows = decal_nodes([], [GroundPlaced(sand, (1.23456, 2.0, 0.11549), 0.25)])
+    uv = nodes[0].primitives[0].uvs
+    assert uv is not None and uv.shape == (4, 2) and uv.min() > 0.0 and uv.max() < 1.0
+    assert rows[0]["position_m"] == [1.235, 2.0, 0.115]
+
+
+def test_a_given_sequence_replaces_the_turn_of_the_decals() -> None:
+    from shapely import STRtree
+
+    from onward_generator.signs.decals import Wall, place_decals
+
+    wall = Wall("w", np.array([0.0, 0.0]), np.array([30.0, 0.0]), np.array([0.0, -1.0]), 9.0)
+    first, second = _decal("first", "stain"), _decal("second", "scorch")
+    placed = place_decals([wall], STRtree([]), lambda plan, b, t: False, [first], 1, 5, sequence=[second, second])
+    assert [p.decal.id for p in placed] == ["second", "second"]
+
+
+def damage_area(base: Path, scene: Path):  # type: ignore[no-untyped-def]
+    """The area ``signs place`` lays ground decals in without a core: the envelope of the core walls' first ends."""
+    from shapely.geometry import MultiPoint
+
+    walls = signs_place._walls(json.loads(scene.read_text()).get("features") or [])
+    return MultiPoint([tuple(w.a) for w in walls]).envelope

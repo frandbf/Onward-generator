@@ -7,6 +7,7 @@ vinyls come from ``facade.shops`` in the detail manifest (``signs/shop.py``).
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
@@ -251,7 +252,7 @@ def place_signs(
         wall_surface([*built, *sign_nodes, *shops.nodes]), required=required, sequence=sequence,
     )
     ground = []
-    if level != "none":
+    if level != "none":  # pragma: no mutate: without damage the count is 0 and nothing is placed; the guard only skips building the ground tree
         area = core if core is not None else MultiPoint([tuple(w.a) for w in walls]).envelope
         ground = damage.place_ground(damage.Ground(built), area, damage.ground_decals(seed), damage.ground_count(seed, level), seed)
     missing = [decal.id for decal in required if decal.id not in {p.decal.id for p in decals}]
@@ -378,18 +379,14 @@ def _damage(base: Path) -> tuple[str, str]:
     from onward_generator.next_step import map_root
 
     root = map_root(base)
-    if root is None:
-        return "none", "default"
-    try:
-        value = load_map(root).get("damage")
-    except (MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
-        return "none", "default"
-    props_profile = None
-    if value == "auto":
-        try:
+    value = None
+    if root is not None:
+        with contextlib.suppress(MapError, ValueError, OSError):  # an unreadable map.json reads as no switch
+            value = load_map(root).get("damage")
+    props_profile = None  # pragma: no mutate: an empty id is no more wrecked than none
+    if root is not None and value == "auto":
+        with contextlib.suppress(StreetProfileError):  # no profile yet: the rules' neutral profile
             props_profile = str(load_record(record_path(root))["ids"]["props_profile"])
-        except StreetProfileError:  # no profile yet: the rules' neutral profile
-            props_profile = None
     try:
         return damage.resolve_damage(value, props_profile)
     except ValueError as exc:

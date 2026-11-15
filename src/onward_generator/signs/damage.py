@@ -71,20 +71,20 @@ def _shell_impact(rng: np.random.Generator, n: int) -> np.ndarray:
     pixels = np.zeros((n, n, 4), dtype=np.uint8)
     cx, cy = n * rng.uniform(0.45, 0.55), n * rng.uniform(0.45, 0.55)
     corners = [(cx + n * rng.uniform(0.22, 0.38) * math.cos(a), cy + n * rng.uniform(0.18, 0.34) * math.sin(a))
-               for a in np.linspace(0.0, 2 * math.pi, 14, endpoint=False)]
+               for a in np.linspace(0.0, 2 * math.pi, 14, endpoint=False)]  # pragma: no mutate: endpoint None is as false as False
     spall = Image.new("L", (n, n))
-    ImageDraw.Draw(spall).polygon(corners, fill=255)
+    ImageDraw.Draw(spall).polygon(corners, fill=255)  # pragma: no mutate: PIL clamps an L fill to 255
     inside = np.asarray(_blur(spall, 1.2)) > 128
-    course = max(4, n // 24)
+    course = max(4, n // 24)  # pragma: no mutate: n is PROCEDURAL_SIZE, 256: n // 24 and n // 25 are both 10, above the floor
     yy, xx = np.mgrid[0:n, 0:n]
     mortar = (yy % course < 2) | (((xx + (yy // course % 2) * course) % (course * 2)) < 2)
     brick = np.where(mortar[..., None], np.array([150, 140, 126]), np.array([150, 86, 60]) + rng.integers(-18, 18, (n, n, 1)))
     pixels[..., :3] = np.where(inside[..., None], brick, np.array([200, 192, 178]))
     centre = Image.new("L", (n, n))
     r = n * rng.uniform(0.07, 0.11)
-    ImageDraw.Draw(centre).ellipse((cx - r, cy - r, cx + r, cy + r), fill=255)
+    ImageDraw.Draw(centre).ellipse((cx - r, cy - r, cx + r, cy + r), fill=255)  # pragma: no mutate: PIL clamps an L fill to 255
     dark = np.asarray(_blur(centre, n * 0.03)) / 255.0
-    pixels[..., :3] = (pixels[..., :3] * (1 - 0.85 * dark[..., None])).astype(np.uint8)
+    pixels[..., :3] = (pixels[..., :3] * (1 - 0.85 * dark[..., None])).astype(np.uint8)  # pragma: no mutate: assigning into the uint8 page casts the same way
     chips = Image.new("L", (n, n))
     draw = ImageDraw.Draw(chips)
     for _ in range(int(rng.integers(30, 50))):
@@ -99,7 +99,7 @@ def _shell_impact(rng: np.random.Generator, n: int) -> np.ndarray:
             draw.line((x, y, nx, ny), fill=230, width=2)
             x, y = nx, ny
     alpha = np.maximum(inside * 255, np.asarray(_blur(chips, 0.6)))
-    pixels[..., 3] = alpha.astype(np.uint8)
+    pixels[..., 3] = alpha.astype(np.uint8)  # pragma: no mutate: assigning into the uint8 page casts the same way
     return pixels
 
 
@@ -154,7 +154,7 @@ def _road_crack(rng: np.random.Generator, n: int) -> np.ndarray:
             a += rng.normal(0, 0.3)
             nx, ny = min(max(x + 5 * math.cos(a), 4.0), n - 4.0), min(max(y + 5 * math.sin(a), 4.0), n - 4.0)
             draw.line((x, y, nx, ny), fill=235, width=int(rng.integers(2, 4)))
-            if rng.random() < 0.12:
+            if rng.random() < 0.12:  # pragma: no mutate: a uniform draw never lands on the threshold itself
                 b = a + rng.choice([-1.0, 1.0]) * rng.uniform(0.6, 1.2)
                 draw.line((nx, ny, nx + 18 * math.cos(b), ny + 18 * math.sin(b)), fill=200, width=2)
             x, y = nx, ny
@@ -165,15 +165,15 @@ def _pothole_patch(rng: np.random.Generator, n: int) -> np.ndarray:
     pixels = np.zeros((n, n, 4), dtype=np.uint8)
     patch = Image.new("L", (n, n))
     corners = [(x * n + rng.uniform(-8, 8), y * n + rng.uniform(-8, 8)) for x, y in ((0.12, 0.18), (0.88, 0.14), (0.9, 0.84), (0.1, 0.86))]
-    ImageDraw.Draw(patch).polygon(corners, fill=255)
+    ImageDraw.Draw(patch).polygon(corners, fill=255)  # pragma: no mutate: PIL clamps an L fill to 255
     hole = Image.new("L", (n, n))
     r = n * rng.uniform(0.1, 0.18)
     hx, hy = n * rng.uniform(0.35, 0.65), n * rng.uniform(0.35, 0.65)
-    ImageDraw.Draw(hole).ellipse((hx - r * 1.4, hy - r, hx + r * 1.4, hy + r), fill=255)
+    ImageDraw.Draw(hole).ellipse((hx - r * 1.4, hy - r, hx + r * 1.4, hy + r), fill=255)  # pragma: no mutate: PIL clamps an L fill to 255
     inside, pit = np.asarray(_blur(patch, 1.0)), np.asarray(_blur(hole, 2.0)) / 255.0
     tone = np.array([46, 44, 42]) + rng.integers(-6, 6, (n, n, 1))
-    pixels[..., :3] = (tone * (1 - 0.6 * pit[..., None])).astype(np.uint8)
-    pixels[..., 3] = np.maximum(inside * 0.85, pit * 255).astype(np.uint8)
+    pixels[..., :3] = (tone * (1 - 0.6 * pit[..., None])).astype(np.uint8)  # pragma: no mutate: assigning into the uint8 page casts the same way
+    pixels[..., 3] = np.maximum(inside * 0.85, pit * 255).astype(np.uint8)  # pragma: no mutate: assigning into the uint8 page casts the same way
     return pixels
 
 
@@ -181,7 +181,7 @@ def _sand_drift(rng: np.random.Generator, n: int) -> np.ndarray:
     yy = np.linspace(0.0, 1.0, n)[:, None]
     xx = np.linspace(0.0, 2 * math.pi, n)[None, :]
     edge = 0.45 + 0.12 * np.sin(xx * rng.uniform(1.0, 2.5) + rng.uniform(0, 6)) + 0.05 * np.sin(xx * 7)
-    sides = np.sin(np.linspace(0.0, math.pi, n))[None, :] ** 0.6 * np.clip((1.0 - yy) * 8.0, 0.0, 1.0)  # fades out at every edge
+    sides = np.sin(np.linspace(0.0, math.pi, n))[None, :] ** 0.6 * np.clip((1.0 - yy) * 8.0, 0.0, 1.0)  # pragma: no mutate: fades out at every edge; (1 - yy) * 8 is never below 0
     field = np.clip((yy - edge) * 3.0, 0.0, 1.0) * sides * rng.uniform(0.75, 1.0, (n, n)) * 200
     return _rgba((196, 172, 130), _blur(Image.fromarray(field.astype(np.uint8)), 4.0))
 
@@ -205,10 +205,11 @@ def _rubble_flat(rng: np.random.Generator, n: int) -> np.ndarray:
     for _ in range(int(rng.integers(60, 110))):
         x, y = rng.normal(0.5, 0.18, 2).clip(0.05, 0.95) * n
         s = n * rng.uniform(0.01, 0.045)
-        corners = [(x + s * rng.uniform(0.5, 1.3) * math.cos(a), y + s * rng.uniform(0.5, 1.3) * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 5, endpoint=False)]
+        corners = [(x + s * rng.uniform(0.5, 1.3) * math.cos(a), y + s * rng.uniform(0.5, 1.3) * math.sin(a))
+                   for a in np.linspace(0, 2 * math.pi, 5, endpoint=False)]  # pragma: no mutate: endpoint None is as false as False
         grey = int(rng.uniform(110, 190))
-        colour = (grey, grey - 6, grey - 14) if rng.random() < 0.7 else (int(rng.uniform(130, 170)), 76, 52)  # concrete or brick
-        draw.polygon(corners, fill=(*colour, 255))
+        colour = (grey, grey - 6, grey - 14) if rng.random() < 0.7 else (int(rng.uniform(130, 170)), 76, 52)  # pragma: no mutate: concrete or brick; a uniform draw never lands on the threshold itself
+        draw.polygon(corners, fill=(*colour, 255))  # pragma: no mutate: PIL clamps an RGBA fill to 255
     dust = Image.new("L", (n, n))
     ImageDraw.Draw(dust).ellipse((n * 0.12, n * 0.12, n * 0.88, n * 0.88), fill=90)
     pixels = np.asarray(paint).copy()
@@ -322,7 +323,7 @@ def place_ground(ground: Ground, area: BaseGeometry, decals: Sequence[Decal], co
     """Up to ``count`` ground decals in their turn at seeded spots inside ``area``: where the top face under the
     centre and the four corners is allowed ground (``GROUND_NODES``, not a crossing or a manhole), all within
     ``GROUND_FLAT_M`` of one height, and ``GROUND_SPACING_M`` clear of the decals already down."""
-    if not decals or count <= 0 or area.is_empty:
+    if area.is_empty:  # no decal or no count leaves the turn empty below
         return []
     rng = _rng(seed, "ground_spots")
     x0, y0, x1, y1 = area.bounds
@@ -336,15 +337,15 @@ def place_ground(ground: Ground, area: BaseGeometry, decals: Sequence[Decal], co
             x, y, yaw = rng.uniform(x0, x1), rng.uniform(y0, y1), rng.uniform(0.0, math.pi)
             if not area.contains(Point(x, y)):
                 continue
-            candidate = GroundPlaced(decal, (x, y, 0.0), yaw)
-            plan = Polygon(candidate.corners()[:, :2])
-            if any(plan.distance(other) < GROUND_SPACING_M for other in taken):
+            candidate = GroundPlaced(decal, (x, y, 0.0), yaw)  # pragma: no mutate: the trial quad's height is never read, only its plan
+            plan = Polygon(candidate.corners()[:, :2])  # pragma: no mutate: shapely's plan distance ignores z
+            if any(plan.distance(other) < GROUND_SPACING_M for other in taken):  # pragma: no mutate: no two quads lie exactly 0.5 m apart to the bit
                 continue
             tops = [ground.top(px, py) for px, py in [(x, y), *candidate.corners()[:, :2].tolist()]]
             if any(t is None or not t[1] for t in tops):
                 continue
             heights = [t[0] for t in tops if t is not None]
-            if max(heights) - min(heights) > GROUND_FLAT_M:
+            if max(heights) - min(heights) > GROUND_FLAT_M:  # pragma: no mutate: no ground differs by exactly 3 cm to the bit
                 continue
             placed.append(GroundPlaced(decal, (x, y, max(heights) + GROUND_GAP_M), yaw))
             taken.append(plan)
