@@ -388,9 +388,9 @@ def _subset(prim: Primitive, keep: np.ndarray, material: str) -> Primitive | Non
     triangles = prim.mesh.triangles[keep]
     if not len(triangles):
         return None
-    used, local = np.unique(triangles, return_inverse=True)
+    used = np.unique(triangles)
     uvs = prim.uvs[used] if prim.uvs is not None else None
-    return Primitive(Mesh(prim.mesh.vertices[used], local.reshape(-1, 3)), material, uvs)
+    return Primitive(Mesh(prim.mesh.vertices[used], np.searchsorted(used, triangles)), material, uvs)
 
 
 def rematerialize_unpaved_carriageway(nodes: Sequence[Node], region: BaseGeometry) -> tuple[list[Node], list[str]]:
@@ -597,9 +597,8 @@ def apply_materials(
         visual_nodes, brick_nodes = rematerialize_brick_walls(visual_nodes, features)
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
-    unpaved_nodes: list[str] = []
-    if dirt_region is not None:
-        visual_nodes, unpaved_nodes = rematerialize_unpaved_carriageway(visual_nodes, dirt_region)
+    visual_nodes, unpaved_nodes = (rematerialize_unpaved_carriageway(visual_nodes, dirt_region) if dirt_region is not None
+                                   else (visual_nodes, []))
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
     trim_root = tile_cache_dir() if tile_cache else None
     # A wall strip takes the colour the scene gives that material; a colour the scene does not use
@@ -621,7 +620,7 @@ def apply_materials(
     materials = dict(vis_mats)
     if unpaved_nodes:
         dirt = load_generation_config().materials[UNPAVED_MATERIAL]  # packed earth, under the slot's photograph
-        materials[UNPAVED_MATERIAL] = Material(dirt.color, dirt.roughness)
+        materials[UNPAVED_MATERIAL] = Material(dirt.color, dirt.roughness)  # pragma: no mutate: the slot's color_albedo photograph sets the colour white; the roughness stays
     photo_tiles: dict[str, tuple[Any, str]] = {}
     applied: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []

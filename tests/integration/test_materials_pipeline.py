@@ -370,7 +370,11 @@ def test_an_unpaved_carriageway_takes_the_earth_slot_and_a_paved_map_skips_it(tm
     assert "baseColorTexture" in earth["pbrMetallicRoughness"]
 
     (tmp_path / "p").mkdir()
-    paved = apply_materials(_c1_base(tmp_path / "p"), tmp_path / "paved", plan_path=plan, tile_cache=False, repetition=True,
+    first = json.loads(plan.read_text(encoding="utf-8"))  # the earth slot first: skipping it skips nothing after it
+    first["entries"].sort(key=lambda e: e["id"] != "unpaved_carriageway")
+    reordered = tmp_path / "first_plan.json"
+    reordered.write_text(json.dumps(first), encoding="utf-8")
+    paved = apply_materials(_c1_base(tmp_path / "p"), tmp_path / "paved", plan_path=reordered, tile_cache=False, repetition=True,
                             wide_library=True)
     assert [r for r in paved["skipped"] if r["id"] == "unpaved_carriageway"] == [
         {"id": "unpaved_carriageway", "catalog_ids": ["dirt_road"], "reason": "no_unpaved_carriageway"}]

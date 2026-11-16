@@ -32,7 +32,7 @@ def test_an_unpaved_street_is_recorded_and_capped_apart(detail_inputs: tuple[Pat
 
     paved = copy.deepcopy(streets[0])
     paved["id"] = str(paved["id"]) + "-cross"
-    paved["geometry"] = {"type": "LineString", "coordinates": [[0.0, -60.0], [0.0, 60.0]]}
+    paved["geometry"] = {"type": "LineString", "coordinates": [[0.0, -60.0], [7.0, 60.0]]}  # askew: the dirt edge is not on the mm grid
     document["features"].append(paved)
     streets[0]["tags"]["surface"] = "dirt"
     dirt_scene = tmp_path / "geo_scene.json"
@@ -46,6 +46,8 @@ def test_an_unpaved_street_is_recorded_and_capped_apart(detail_inputs: tuple[Pat
     # Millimetres, as every other record of the scene.
     assert unpaved["area_m2"] == round(unpaved["area_m2"], 3)
     assert all(v == round(v, 3) for polygon in unpaved["polygons"] for ring in polygon for point in ring for v in point)
+    assert any(point[0] != round(point[0], 2) for polygon in unpaved["polygons"] for ring in polygon for point in ring)
+    assert any(point[1] != round(point[1], 2) for polygon in unpaved["polygons"] for ring in polygon for point in ring)
     region = MultiPolygon([Polygon(p[0], p[1:]) for p in unpaved["polygons"]])
     assert abs(region.area - unpaved["area_m2"]) < 0.01
     # No triangle straddles the two: its corners all lie in the region (or on its edge) when its centre does.
