@@ -329,3 +329,66 @@ def test_an_earth_streets_texture_covers_the_residual_ground_and_a_paved_one_doe
 
     assert earth_texture("ph_brown_mud_dry") and not earth_texture("ph_worn_asphalt") and not earth_texture("")
     assert not earth_texture("no_such_texture")
+
+
+def _dirt_base(root: Path) -> Path:
+    """The C1 scene whose carriageway generate recorded as dirt west of x = 10 m: one of its two triangles."""
+    root.mkdir()
+    base = _c1_base(root)
+    manifest = json.loads((base / "scene_detail.json").read_text(encoding="utf-8"))
+    road = next(o for o in manifest["objects"] if o["id"] == "surface/carriageway")
+    road["unpaved"] = {"area_m2": 500.0, "attribute_origin": "observed",
+                       "polygons": [[[[-40.0, -5.0], [10.0, -5.0], [10.0, 5.0], [-40.0, 5.0], [-40.0, -5.0]]]]}
+    (base / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return base
+
+
+def test_an_unpaved_carriageway_takes_the_earth_slot_and_a_paved_map_skips_it(tmp_path: Path) -> None:
+    """15 November 2026: the carriageway triangles generate capped as dirt draw the unpaved_carriageway slot's photograph."""
+    from onward_generator.generation.config import load_generation_config
+    from onward_generator.materials.apply import UNPAVED_MATERIAL
+
+    lon, lat = MURCIA_CENTER  # the wide library holds the earth photographs; a narrow plan has no earth slot
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps(select_texture_plan(name="Murcia", map_id="murcia", latitude=lat, longitude=lon, brief=None, seed=1,
+                                                   extended=True, wide=True)), encoding="utf-8")
+    assert "unpaved_carriageway" in {e["id"] for e in json.loads(plan.read_text(encoding="utf-8"))["entries"]}
+    dirt = apply_materials(_dirt_base(tmp_path / "d"), tmp_path / "dirt", plan_path=plan, tile_cache=False, repetition=True,
+                           wide_library=True)
+    rows = [r for r in dirt["applied"] if r["id"] == "unpaved_carriageway"]
+    assert [r["color_id"] for r in rows] == [UNPAVED_MATERIAL]
+    assert not [r for r in dirt["skipped"] if r["id"] == "unpaved_carriageway"]
+    assert UNPAVED_MATERIAL in dirt["repetition"]["cell_phase_materials"]  # the earth is phased per cell like the asphalt
+    nodes, _ = nodes_from_glb((tmp_path / "dirt" / "scene_visual.glb").read_bytes())
+    road = next(n for n in nodes if n.name == "surface/carriageway")
+    assert sorted(p.material for p in road.primitives) == sorted(["carriageway", UNPAVED_MATERIAL])
+    assert all(p.mesh.triangle_count == 1 for p in road.primitives)
+    doc = read_glb((tmp_path / "dirt" / "scene_visual.glb").read_bytes())[0]
+    earth = next(m for m in doc["materials"] if m["name"] == UNPAVED_MATERIAL)
+    expected = load_generation_config().materials[UNPAVED_MATERIAL]
+    assert earth["pbrMetallicRoughness"]["roughnessFactor"] == pytest.approx(expected.roughness)
+    assert "baseColorTexture" in earth["pbrMetallicRoughness"]
+
+    (tmp_path / "p").mkdir()
+    first = json.loads(plan.read_text(encoding="utf-8"))  # the earth slot first: skipping it skips nothing after it
+    first["entries"].sort(key=lambda e: e["id"] != "unpaved_carriageway")
+    reordered = tmp_path / "first_plan.json"
+    reordered.write_text(json.dumps(first), encoding="utf-8")
+    paved = apply_materials(_c1_base(tmp_path / "p"), tmp_path / "paved", plan_path=reordered, tile_cache=False, repetition=True,
+                            wide_library=True)
+    assert [r for r in paved["skipped"] if r["id"] == "unpaved_carriageway"] == [
+        {"id": "unpaved_carriageway", "catalog_ids": ["dirt_road"], "reason": "no_unpaved_carriageway"}]
+    assert {"sidewalks", "doors"} <= {r["id"] for r in paved["applied"]}  # the slots after it are still applied
+    assert UNPAVED_MATERIAL not in paved["repetition"]["cell_phase_materials"]
+    doc = read_glb((tmp_path / "paved" / "scene_visual.glb").read_bytes())[0]
+    assert UNPAVED_MATERIAL not in {m["name"] for m in doc["materials"]}
+
+    # A plan written before the slot existed leaves a dirt record's carriageway as it was.
+    document = json.loads(plan.read_text(encoding="utf-8"))
+    document["entries"] = [e for e in document["entries"] if e["id"] != "unpaved_carriageway"]
+    old = tmp_path / "old_plan.json"
+    old.write_text(json.dumps(document), encoding="utf-8")
+    before = apply_materials(_dirt_base(tmp_path / "o"), tmp_path / "old", plan_path=old, tile_cache=False, wide_library=True)
+    nodes, _ = nodes_from_glb((tmp_path / "old" / "scene_visual.glb").read_bytes())
+    assert [p.material for p in next(n for n in nodes if n.name == "surface/carriageway").primitives] == ["carriageway"]
+    assert not [r for r in before["skipped"] if r["id"] == "unpaved_carriageway"]

@@ -433,7 +433,17 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
         z = -depth if surface_class is SurfaceClass.CARRIAGEWAY else 0.0
         if surface.geometry.is_empty:
             return
-        mesh, d = cap(surface.geometry, z).drop_degenerate()
+        dirt = partition.unpaved if surface_class is SurfaceClass.CARRIAGEWAY else Polygon()
+        if dirt.is_empty:
+            mesh, d = cap(surface.geometry, z).drop_degenerate()
+        else:
+            # The paved and the unpaved carriageway capped apart, so a triangle never straddles the two and materials can
+            # draw the unpaved one as earth (15 November 2026); one mesh, one node, one material as before.
+            mesh, d = merge([cap(surface.geometry.difference(dirt), z), cap(surface.geometry.intersection(dirt), z)]).drop_degenerate()
+            extra = {**(extra or {}), "unpaved": {
+                "area_m2": round(dirt.area, 3), "attribute_origin": "observed",
+                "polygons": [[[[round(x, 3), round(y, 3)] for x, y in ring.coords] for ring in (part.exterior, *part.interiors)]  # pragma: no mutate: the partition is on the 1 mm grid (set_precision); the rounding only drops float noise, as 4 digits would
+                             for part in polygons_of(dirt)]}}
         degenerate += d
         error = abs(upward_area(mesh) - surface.geometry.area)
         if error > max(0.05, 1e-4 * surface.geometry.area):

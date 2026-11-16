@@ -108,7 +108,7 @@ FIXTURE_LIBRARY = [
 
 def test_a_slot_without_a_library_family_is_reported() -> None:
     rows = FIXTURE_LIBRARY
-    assert unfilled_slots(rows) == ["stone_monuments", "trunks"]
+    assert unfilled_slots(rows) == ["stone_monuments", "trunks", "unpaved_carriageway"]  # no earth in the base library
     plan = select_texture_plan(
         name="Murcia", map_id="murcia", latitude=MURCIA_CENTER_LAT, longitude=MURCIA_CENTER_LON,
         brief=None, seed=3, library=rows,

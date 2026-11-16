@@ -29,7 +29,7 @@
       "required": ["id", "catalog_ids", "albedo_mode"],
       "properties": {
         "id": {
-          "enum": ["historic_facades", "stone_monuments", "streets_plazas", "roofs", "brick", "carriageway", "sidewalks", "plain_pedestrian", "doors", "trunks", "flat_roofs", "plain_facades", "ochre_facades"]
+          "enum": ["historic_facades", "stone_monuments", "streets_plazas", "roofs", "brick", "carriageway", "sidewalks", "plain_pedestrian", "doors", "trunks", "flat_roofs", "plain_facades", "ochre_facades", "unpaved_carriageway"]
         },
         "url": {
           "type": "string",
@@ -115,6 +115,15 @@
                 "items": { "enum": ["brick_red_wall"] },
                 "maxItems": 1
               },
+              "albedo_mode": { "const": "color_albedo" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "id": { "const": "unpaved_carriageway" } }, "required": ["id"] },
+          "then": {
+            "properties": {
+              "catalog_ids": { "items": { "enum": ["dirt_road"] }, "maxItems": 1 },
               "albedo_mode": { "const": "color_albedo" }
             }
           }

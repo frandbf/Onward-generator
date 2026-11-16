@@ -22,6 +22,7 @@ AlbedoMode = Literal["greyscale_modulation", "color_albedo"]
 SlotId = Literal[
     "historic_facades", "stone_monuments", "streets_plazas", "roofs", "brick",
     "carriageway", "sidewalks", "plain_pedestrian",     "doors", "trunks", "flat_roofs", "plain_facades", "ochre_facades",
+    "unpaved_carriageway",
 ]
 
 SLOT_ALLOWED: dict[str, frozenset[str]] = {
@@ -31,6 +32,7 @@ SLOT_ALLOWED: dict[str, frozenset[str]] = {
     "roofs": frozenset({"terracotta_roof"}),
     "brick": frozenset({"brick_red_wall"}),
     "carriageway": frozenset({"asphalt_road"}),
+    "unpaved_carriageway": frozenset({"dirt_road"}),
     "sidewalks": frozenset({"sidewalk_concrete"}),
     "plain_pedestrian": frozenset({"pedestrian_plain"}),
     "doors": frozenset({"wood_door"}),
@@ -57,6 +59,7 @@ SLOT_MODE: dict[str, AlbedoMode] = {
     "roofs": "color_albedo",
     "brick": "color_albedo",
     "carriageway": "color_albedo",
+    "unpaved_carriageway": "color_albedo",
     "sidewalks": "color_albedo",
     "plain_pedestrian": "color_albedo",
     "doors": "color_albedo",

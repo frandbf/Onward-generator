@@ -73,6 +73,7 @@
         "pedestrian": { "$ref": "#/$defs/material" },
         "sidewalk": { "$ref": "#/$defs/material" },
         "carriageway": { "$ref": "#/$defs/material" },
+        "carriageway_unpaved": { "$ref": "#/$defs/material", "description": "The carriageway of an unpaved street when a texture plan draws it as earth (15 November 2026)" },
         "curb": { "$ref": "#/$defs/material" },
         "road_marking": { "$ref": "#/$defs/material" },
         "green": { "$ref": "#/$defs/material" },

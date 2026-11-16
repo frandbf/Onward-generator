@@ -273,7 +273,8 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     assert all(any(row["decal"] == want for want in expected) for row in heavy["wall_decals"]["decals"])
     # The ground is the one place_ground lays for the map's seed on the built scene.
     built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
-    again = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed)
+    drawn = [d for d in ground_decals(seed) if d.kind in damage.ground_kinds(0.0, None)]  # paved, no dusty light: no sand
+    again = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed, drawn)
     assert [[round(v, 3) for v in p.centre] for p in again] == [row["position_m"] for row in ground_rows]
 
     # With a core, the ground decals are laid in the core square, not the walls' envelope.
@@ -281,7 +282,7 @@ def test_signs_place_draws_the_map_s_damage(tmp_path: Path, monkeypatch: pytest.
     cored = {**plain_manifest, "core": {"half_side_m": 50.0}}
     (base / "scene_detail.json").write_text(json.dumps(cored), encoding="utf-8")
     inside = place_signs(base, scene, tmp_path / "cored")["damage"]["ground_decals"]["decals"]
-    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_count(seed, "heavy"), seed)
+    in_core = place_ground(Ground(built), signs_place.core_of(cored), ground_count(seed, "heavy"), seed, drawn)
     assert [[round(v, 3) for v in p.centre] for p in in_core] == [r["position_m"] for r in inside] != [row["position_m"] for row in ground_rows]
     (base / "scene_detail.json").write_text(json.dumps(plain_manifest), encoding="utf-8")
 
@@ -434,3 +435,53 @@ def test_without_a_list_the_ground_takes_the_seed_s_drawn_kinds() -> None:
     placed = place_ground(Ground(_ground_nodes()), box(0.0, 0.0, 20.0, 14.0), 6, 4)
     drawn = {d.id: d for d in ground_decals(4)}
     assert placed and all(np.array_equal(p.decal.rgba, drawn[p.decal.id].rgba) for p in placed)
+
+
+def test_the_ground_decal_kinds_follow_the_map_s_streets_and_light(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """15 November 2026: the map's ``atmosphere`` and the share of its streets OSM tags unpaved pick the ground decals."""
+    scene = tmp_path / "geo_scene.json"
+    _scene(scene)
+    root = tmp_path / "map"
+    base = root / "data" / "processed" / "scene_materials"
+    base.parent.mkdir(parents=True)
+    _damaged_base(base)
+    monkeypatch.setattr(signs_place, "_ambient", lambda base: ("", False))
+    (root / "map.json").write_text("{}", encoding="utf-8")
+    document: dict = {"damage": "heavy"}
+
+    def load(r):  # type: ignore[no-untyped-def]
+        assert r == root
+        return document
+
+    monkeypatch.setattr("onward_generator.maps.workspace.load_map", load)
+    seeds: list[object] = []
+    real = damage.ground_decals
+
+    def spy(seed):  # type: ignore[no-untyped-def]
+        seeds.append(seed)
+        return real(seed)
+
+    monkeypatch.setattr(damage, "ground_decals", spy)
+    seed = signs_place._seed(json.loads((base / "scene_detail.json").read_text()))
+    built, _ = nodes_from_glb((base / "scene_visual.glb").read_bytes())
+
+    def expected(share: float, atmosphere: str | None) -> list[list[float]]:
+        drawn = [d for d in real(seed) if d.kind in damage.ground_kinds(share, atmosphere)]
+        laid = place_ground(Ground(built), damage_area(base, scene), ground_count(seed, "heavy"), seed, drawn)
+        return [[round(v, 3) for v in p.centre] for p in laid]
+
+    def placed(out: str, geo: Path = scene) -> list[list[float]]:
+        return [row["position_m"] for row in place_signs(base, geo, tmp_path / out)["damage"]["ground_decals"]["decals"]]
+
+    assert placed("paved") == expected(0.0, None)
+    assert seeds == [seed]
+    document["atmosphere"] = "dusty"
+    assert placed("dusty") == expected(0.0, "dusty") != expected(0.0, None)  # dust in the light: sand drifts too
+    del document["atmosphere"]
+    geo = json.loads(scene.read_text(encoding="utf-8"))
+    for feature in geo["features"]:
+        if (feature.get("tags") or {}).get("highway") in ("residential", "service"):
+            feature["tags"]["surface"] = "dirt"
+    dirt_scene = tmp_path / "dirt_scene.json"
+    dirt_scene.write_text(json.dumps(geo), encoding="utf-8")
+    assert placed("dirt", dirt_scene) == expected(1.0, None) != expected(0.0, None)  # a dirt map: sand, no asphalt patch

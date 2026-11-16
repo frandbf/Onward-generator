@@ -168,3 +168,16 @@ def test_an_unpaved_street_is_walkable_all_along_and_a_paved_one_only_at_its_cro
     assert slab.intersection(along_dirt).area == pytest.approx(0.0, abs=1e-6)
     paved_only = build_partition(site, [], [dataclasses.replace(dirt, paving="asphalt"), road], [], config)
     assert paved_only.crossings.area < partition.crossings.area
+
+
+def test_the_partition_keeps_the_unpaved_carriageway() -> None:
+    """15 November 2026: the earth materials draws on an unpaved street is the unpaved ways' carriageway."""
+    config = load_generation_config()
+    site = box(-100, -100, 100, 100)
+    dirt = LinearWay("osm-way-1", "vehicular", LineString([(-100, 0), (100, 0)]), 8.0, "observed", "unpaved")
+    road = LinearWay("osm-way-2", "vehicular", LineString([(0, -100), (0, 100)]), 8.0, "observed", "asphalt")
+    partition = build_partition(site, [], [dirt, road], [], config)
+    carriageway = partition.surfaces[SurfaceClass.CARRIAGEWAY].geometry
+    assert partition.unpaved.within(carriageway.buffer(1e-6))
+    assert partition.unpaved.contains(box(-90, -3, -10, 3)) and not partition.unpaved.intersects(box(-3, -90, 3, -10))
+    assert build_partition(site, [], [dataclasses.replace(dirt, paving="asphalt"), road], [], config).unpaved.is_empty

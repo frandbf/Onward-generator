@@ -37,6 +37,7 @@ SLOT_BINDINGS: dict[str, tuple[str, ...]] = {
     "roofs": ("terracotta_roof",),
     "brick": ("brick_red_wall",),
     "carriageway": ("asphalt_road",),
+    "unpaved_carriageway": ("dirt_road",),
     "sidewalks": ("sidewalk_concrete",),
     "plain_pedestrian": ("pedestrian_plain",),
     "doors": ("wood_door",),
@@ -57,6 +58,8 @@ SLOT_FAMILY = {
     "doors": "door",
     "trunks": "bark",
     "flat_roofs": "concrete",
+    # 15 November 2026: the carriageway of an unpaved street is earth; a map with no such street skips the slot.
+    "unpaved_carriageway": "earth",
 }
 
 # Families the model or a map's own texture plan may also put on a slot (14 November 2026): dirt or sand streets,

@@ -254,7 +254,9 @@ def place_signs(
     ground = []
     if level != "none":  # pragma: no mutate: without damage the count is 0 and nothing is placed; the guard only skips building the ground tree
         area = core if core is not None else MultiPoint([tuple(w.a) for w in walls]).envelope
-        ground = damage.place_ground(damage.Ground(built), area, damage.ground_count(seed, level), seed)
+        kinds = damage.ground_kinds(unpaved_share(geo.get("features") or []), _map_value(base, "atmosphere"))
+        drawn = [decal for decal in damage.ground_decals(seed) if decal.kind in kinds]
+        ground = damage.place_ground(damage.Ground(built), area, damage.ground_count(seed, level), seed, drawn)
     missing = [decal.id for decal in required if decal.id not in {p.decal.id for p in decals}]
     if missing:
         raise SignsError("required decals that fit no exposed wall of the playable core: " + ", ".join(missing)
@@ -369,6 +371,43 @@ def _map_switch(base: Path, key: str) -> bool:
     if not isinstance(value, bool):
         raise SignsError(f'map.json "{key}" must be true or false, got {value!r}')
     return value
+
+
+VEHICULAR = frozenset({"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "service",
+                       "living_street", "road", "track", "motorway_link", "trunk_link", "primary_link", "secondary_link",
+                       "tertiary_link"})
+"""OSM ``highway`` values of a street a vehicle drives, for the unpaved share of a map's streets."""
+
+
+def unpaved_share(features: Sequence[Mapping[str, Any]]) -> float:
+    """The share of the vehicular street length whose OSM ``surface`` names no paving (``generation.surfaces``)."""
+    from onward_generator.generation.surfaces import UNPAVED_SURFACES
+
+    total = dirt = 0.0
+    for feature in features:
+        tags = feature.get("tags") or {}
+        if not isinstance(tags, Mapping) or tags.get("highway") not in VEHICULAR:
+            continue
+        length = shape(feature["geometry"]).length
+        total += length
+        surface = tags.get("surface")
+        if isinstance(surface, str) and surface.strip().lower() in UNPAVED_SURFACES:
+            dirt += length
+    return dirt / total if total > 0 else 0.0
+
+
+def _map_value(base: Path, key: str) -> str | None:
+    """A string key of the map's ``map.json``, or None outside a map folder, without it or unreadable."""
+    from onward_generator.maps.workspace import load_map
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    if root is None:
+        return None
+    with contextlib.suppress(ValueError, OSError):
+        value = load_map(root).get(key)
+        return str(value) if value is not None else None
+    return None
 
 
 def _damage(base: Path) -> tuple[str, str]:
