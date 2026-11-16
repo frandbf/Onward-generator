@@ -43,11 +43,13 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     assert table.path == STYLE_TABLE_PATH
     assert len(table.sha256) == 64
     assert {name for name, style in table.styles.items() if style.atlas is not None} == {"mediterranean"}
-    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "haussmann", "east_african", "generic"}
+    assert set(table.styles) == {"mediterranean", "central_european", "anglo", "latin_american", "haussmann", "east_african", "arid", "generic"}
     # Plan Q3: Paris comes first, so its box wins over every coarser one.
     assert [style for style, _ in table.rules] == ["haussmann", "mediterranean", "anglo", "latin_american", "central_european",
-                                                   "east_african"]
-    assert table.rules[-1][1] == ((-2.0, 12.0, 41.0, 51.5), (-11.0, -2.0, 38.5, 41.5))
+                                                   "east_african", "arid"]
+    # 15 November 2026: the Swahili coast down to northern Mozambique and the Comoros; arid flat-roof towns.
+    assert table.rules[-2][1] == ((-2.0, 12.0, 41.0, 51.5), (-16.0, -2.0, 38.5, 41.5), (-13.0, -11.0, 43.0, 44.6))
+    assert table.rules[-1][1] == ((12.0, 38.0, 38.0, 63.0), (29.0, 38.5, 60.5, 75.0), (8.0, 23.0, 21.0, 38.5))
     assert table.rules[0][1] == ((48.8, 48.93, 2.2, 2.5),)
     assert table.rules[1][1][0] == (35.0, 44.5, -10.0, 29.0)
     assert table.styles["anglo"].note.startswith("Planned")
@@ -69,7 +71,20 @@ def test_the_shipped_table_has_one_atlas_and_four_planned_styles() -> None:
     (2.047458, 45.326639, "east_african"),  # Mogadishu (14 November 2026)
     (-4.0435, 39.6682, "east_african"),  # Mombasa, Swahili coast
     (11.5886, 43.1456, "east_african"),  # Djibouti
-    (12.7855, 45.0187, "generic"),  # Aden, across the gulf, outside the box
+    (12.7855, 45.0187, "arid"),  # Aden, across the gulf (15 November 2026: arid flat-roof towns)
+    (33.36522, 43.79589, "arid"),  # Fallujah
+    (33.3152, 44.3661, "arid"),  # Baghdad
+    (36.3456, 43.1575, "arid"),  # Mosul
+    (24.7136, 46.6753, "arid"),  # Riyadh
+    (15.3694, 44.191, "arid"),  # Sana'a
+    (35.6892, 51.389, "arid"),  # Tehran
+    (34.5553, 69.2075, "arid"),  # Kabul
+    (15.5007, 32.5599, "arid"),  # Khartoum
+    (36.2021, 37.1343, "mediterranean"),  # Aleppo, inside the Levant box since 15 November 2026
+    (33.5138, 36.2765, "mediterranean"),  # Damascus
+    (30.0444, 31.2357, "mediterranean"),  # Cairo
+    (-12.9741, 40.5178, "east_african"),  # Pemba, northern Mozambique
+    (-11.7022, 43.2551, "east_african"),  # Moroni, the Comoros
     (-1.2921, 36.8219, "generic"),  # Nairobi, inland
 ])
 def test_the_map_centre_picks_the_style(lat: float, lon: float, style: str) -> None:
@@ -100,7 +115,7 @@ def test_resolve_style_by_name_centre_or_default() -> None:
     # The origin is [longitude, latitude], as the detail manifest writes it.
     assert resolve_style(table, "auto", [19.9366, 50.0614]) == ("central_european", "map_centre")
     assert resolve_style(table, "auto", None) == ("generic", "default")
-    with pytest.raises(StyleError, match="unknown facade style 'nordic'; known: anglo, central_european"):
+    with pytest.raises(StyleError, match="unknown facade style 'nordic'; known: anglo, arid, central_european"):
         resolve_style(table, "nordic", None)
 
 
@@ -204,8 +219,9 @@ def test_layout_rows_and_uvs() -> None:
 # The shipped main table, unchanged by plan D1 and changed by plan Q3 (the Paris box): materials reports and the
 # Panoramax tint read its hash.
 # Changed again on 14 November 2026: the east_african style and its box.
-MAIN_TABLE_SHA256 = "39bbec35ae1e4410a804da4d3fd76c7c0b73613132c5dd345995a628a1e21f46"
-REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african")
+# Changed again on 15 November 2026: the arid style and its boxes, the Levant to 38 E, the Swahili coast and the Comoros.
+MAIN_TABLE_SHA256 = "ef527f805129084182de6f2e1c6fc3ec4ca593580a892106200de63c4e1098d0"
+REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african", "arid")
 
 
 def _regional_doc() -> dict[str, Any]:
@@ -228,7 +244,7 @@ def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
     assert regional.path == REGIONAL_TABLE_PATH and len(regional.sha256) == 64
     assert set(regional.atlases) == set(REGIONAL)
     kinds = {"central_european": {"casement"}, "anglo": {"sash", "casement"}, "latin_american": {"grille", "casement"},
-             "haussmann": {"casement"}, "east_african": {"grille"}}
+             "haussmann": {"casement"}, "east_african": {"grille"}, "arid": {"grille"}}
     for name, atlas in regional.atlases.items():
         # The Panoramax tint moves inside a wall family: every family is still there.
         assert set(atlas["walls"]) == set(table.styles["mediterranean"].atlas["walls"])  # type: ignore[index]
@@ -246,7 +262,11 @@ def test_the_shipped_regional_table_draws_the_three_planned_styles() -> None:
     east = regional.atlases["east_african"]  # lime render over coral stone or adobe, no string courses
     assert east["sources"] == {"plaster": "ph_painted_plaster_wall", "stone": "ph_old_stone_wall", "brick": "ph_clay_block_wall"}
     assert east["dress"] == {"zocalo_share": 0.55, "cornice_share": 0.15, "course_share": 0.0} and "eras" not in east
-    assert east["wall_tints"] == {"brick_red": [0.92, 0.86, 0.78]}
+    # 15 November 2026: estimated brick drawn as lime render; observed brick stays brick (it was tinted, observed or not).
+    assert east["estimated_walls"] == {"brick_red": "plaster_white"} and "wall_tints" not in east
+    arid = regional.atlases["arid"]  # cement render over block and brick, a faint base band, dark metal frames
+    assert arid["dress"] == {"zocalo_share": 0.25, "cornice_share": 0.1, "course_share": 0.0}
+    assert arid["tones"] == [[0.98, 0.93, 0.84], [0.93, 0.88, 0.78], [0.9, 0.9, 0.87]]
 
 
 def test_era_periods_follow_detail() -> None:
@@ -320,3 +340,11 @@ def test_a_main_table_keeps_its_own_eras_checks(tmp_path: Path) -> None:
     doc["styles"]["mediterranean"]["atlas"]["eras"] = {"1960_1979": {"tones": [3], "window_families": [0]}}
     with pytest.raises(StyleError, match="style mediterranean: era 1960_1979 tone 3 has no strip"):
         load_style_table(_write(tmp_path, doc))
+
+
+def test_east_african_and_arid_keep_observed_brick() -> None:
+    """15 November 2026: a regional look draws estimated brick as render, and leaves brick OSM observes alone."""
+    regional = load_regional_table(load_style_table())
+    for name, render in (("east_african", "plaster_white"), ("arid", "plaster_cream")):
+        atlas = regional.atlases[name]
+        assert "wall_tints" not in atlas and atlas["estimated_walls"] == {"brick_red": render}

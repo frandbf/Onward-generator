@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     apply_p.add_argument(
         "--regional-facades", action="store_true",
-        help="give central_european, anglo and latin_american their atlas from config/facade_styles.regional.json (plan D1)",  # pragma: no mutate: help text only
+        help="give the regional styles (every style whose atlas is null in config/facade_styles.json) their atlas from config/facade_styles.regional.json (plan D1)",  # pragma: no mutate: help text only
     )
     apply_p.add_argument(
         "--facade-weathering", choices=tuple(WEATHERING), default=None,

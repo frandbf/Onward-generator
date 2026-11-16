@@ -1049,12 +1049,185 @@
         "base_splash_m": 0.6,
         "mottle": 0.07
       },
-      "wall_tints": {
-        "brick_red": [
-          0.92,
-          0.86,
-          0.78
+      "estimated_walls": {
+        "brick_red": "plaster_white"
+      }
+    },
+    "arid": {
+      "size_px": 2048,
+      "height_px": 4096,
+      "gutter_px": 8,
+      "fit_row_px": 384,
+      "fit_cell_px": 192,
+      "cornice_px": 128,
+      "zocalo_px": 128,
+      "stone_px": 64,
+      "wall_repeat_m": 12.0,
+      "zocalo_m": 0.9,
+      "zocalo_repeat_m": 6.0,
+      "cornice_repeat_m": 6.0,
+      "stone_repeat_m": 1.0,
+      "storey_ref_m": 3.0,
+      "max_band_m": 4.5,
+      "walls": {
+        "plaster_ochre": "plaster",
+        "plaster_cream": "plaster",
+        "plaster_white": "plaster",
+        "plaster_salmon": "plaster",
+        "stone_warm": "ashlar",
+        "brick_red": "brick"
+      },
+      "scenic_walls": {
+        "scenic_wall_light": "plaster_white",
+        "scenic_wall_warm": "plaster_cream",
+        "scenic_wall_ochre": "plaster_ochre"
+      },
+      "sources": {
+        "plaster": "ph_painted_plaster_wall",
+        "stone": "ph_old_stone_wall",
+        "brick": "ph_clay_block_wall"
+      },
+      "source_tile_m": {
+        "plaster": 3.0,
+        "stone": 2.0,
+        "brick": 1.2
+      },
+      "zocalo_color": [
+        0.5,
+        0.47,
+        0.42
+      ],
+      "cornice_color": [
+        0.86,
+        0.82,
+        0.74
+      ],
+      "stone_color": [
+        0.8,
+        0.75,
+        0.66
+      ],
+      "window_families": [
+        {
+          "kind": "grille",
+          "frame": [
+            0.14,
+            0.14,
+            0.15
+          ],
+          "shutter": [
+            0.3,
+            0.29,
+            0.27
+          ],
+          "iron": [
+            0.06,
+            0.06,
+            0.07
+          ],
+          "closed": [
+            0.0,
+            0.5
+          ]
+        },
+        {
+          "kind": "grille",
+          "frame": [
+            0.22,
+            0.2,
+            0.17
+          ],
+          "shutter": [
+            0.36,
+            0.32,
+            0.26
+          ],
+          "iron": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "closed": [
+            0.2,
+            0.7
+          ]
+        },
+        {
+          "kind": "grille",
+          "frame": [
+            0.2,
+            0.26,
+            0.24
+          ],
+          "shutter": [
+            0.28,
+            0.34,
+            0.31
+          ],
+          "iron": [
+            0.06,
+            0.06,
+            0.07
+          ],
+          "closed": [
+            0.0,
+            0.6
+          ]
+        }
+      ],
+      "door_colors": [
+        [
+          0.14,
+          0.15,
+          0.15
+        ],
+        [
+          0.24,
+          0.2,
+          0.15
+        ],
+        [
+          0.18,
+          0.24,
+          0.22
         ]
+      ],
+      "tones": [
+        [
+          0.98,
+          0.93,
+          0.84
+        ],
+        [
+          0.93,
+          0.88,
+          0.78
+        ],
+        [
+          0.9,
+          0.9,
+          0.87
+        ]
+      ],
+      "dress": {
+        "zocalo_share": 0.25,
+        "cornice_share": 0.1,
+        "course_share": 0.0
+      },
+      "grime": {
+        "streaks_per_strip": 90,
+        "streak_dark": 0.14,
+        "streak_length_m": [
+          0.4,
+          2.0
+        ],
+        "under_course_dark": 0.12,
+        "base_splash_dark": 0.4,
+        "base_splash_m": 0.6,
+        "mottle": 0.07
+      },
+      "estimated_walls": {
+        "brick_red": "plaster_cream"
       }
     }
   }
