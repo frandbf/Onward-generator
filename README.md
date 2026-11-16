@@ -97,7 +97,7 @@ Map setup, which creates the folder and downloads OpenStreetMap, took 54 s and 3
 | `--ai` | Ask local Ollama for the prop plan; a rejected answer falls back to the rules. |
 | `--no-source <id>` | Switch off a data source; `onward-generator source list` shows them. |
 | `--time-of-day night` | A night map, lit by the street lamps ([ADR-026](docs/decisions/ADR-026-time-of-day.md)). |
-| `--atmosphere golden_hour` | A light preset for a day map, `golden_hour` or `overcast`: sun, ambient, fog and wall palette. `golden_hour` doubles the bounced light so a soldier in a narrow shaded street stays readable ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)). |
+| `--atmosphere golden_hour` | A light preset for a day map, `golden_hour`, `overcast` or `dusty` (a warm muted sun, a close sand-coloured haze, dirtier walls): sun, ambient, fog and wall palette. `golden_hour` doubles the bounced light so a soldier in a narrow shaded street stays readable ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)). |
 
 `task unity -- "Map name"` builds a map other than the newest one. Every command and flag is in [docs/commands.md](docs/commands.md).
 
@@ -123,11 +123,11 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 
 | Flag | `map.json` key | What it adds |
 | --- | --- | --- |
-| `--atmosphere golden_hour` or `overcast` (off: `neutral`) | `atmosphere` | Light preset of a day map: sun, ambient, AO, fog colour, wall palette; `golden_hour` doubles the bounced light ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)) |
+| `--atmosphere golden_hour`, `overcast` or `dusty` (off: `neutral`) | `atmosphere` | Light preset of a day map: sun, ambient, AO, fog colour, wall palette; `golden_hour` doubles the bounced light ([ADR-037](docs/decisions/ADR-037-atmosphere-presets.md)) |
 | `--repetition` | `repetition` | Calm roof and paving pools and a per-cell ground phase, less visible tiling (plan C1) |
 | `--overture-tints` | `overture_tints` | Facade tints from Overture building colours where OSM has none (plan C2) |
 | `--lidar-roofs` | `lidar_roofs` | Flat or pitched roofs from the LiDAR nDSM where OSM has no roof tag (plan C3; needs a LiDAR source: `es.pnoa_ndsm`, `fr.lidar_hd`) |
-| `--regional-facades` | `regional_facades` | Regional trim atlases for `central_european`, `anglo` and `latin_american` (plan D1) |
+| `--regional-facades` | `regional_facades` | Regional trim atlases for `central_european`, `anglo`, `latin_american`, `haussmann`, `east_african` and `arid` (plan D1) |
 | `--street-profile` | `street_profile` | Local Ollama picks a street profile (facade style, palette, props, abandonment, cover) that code turns into stage flags (plan D2) |
 | `--ai` (off unless asked) | `ambient_ai` | Local Ollama picks the props and wall decals; a rejected reply keeps the rules ([ADR-010](docs/decisions/ADR-010-overgrow-ai-plan.md)) |
 | `--panoramax` (off) | `panoramax` | Under development: 360° street photos projected onto exposed facades |
@@ -153,6 +153,8 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `map.json` `"triangle_limit": N` | 100 000 to 300 000 (default 300 000): what props and library trees fill up to and what the package is checked against; 250 000 for the Onward Workshop ([ADR-005](docs/decisions/ADR-005-quest-performance.md) amendment) |
 | `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
 | `map.json` `"project_decals": false` | Leaves the project's wall decals (`assets/decals/`) off this map |
+| `map.json` `"damage": "none" \| "light" \| "heavy" \| "auto"` | War damage on the walls and decals on the ground of the core; rerun from `signs` ([ADR-038](docs/decisions/ADR-038-wall-decals.md) amendment) |
+| `map.json` `"smoke": N` | 0 to 5 smoke columns over wrecks of the core; rerun from `export` ([ADR-043](docs/decisions/ADR-043-smoke-columns.md), proposed) |
 
 **Data sources:** `--source nl.ahn` and `--source de.nrw_ndom` are opt-in LiDAR heights, used only inside their coverage. `onward-generator source list` shows every source; `--no-source <id>` turns one off.
 

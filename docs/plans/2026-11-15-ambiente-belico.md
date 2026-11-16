@@ -2,6 +2,12 @@
 
 Fecha: 15 de noviembre de 2026. Pedido por el mantenedor al preparar Fallujah (noviembre de 2004), pero válido para cualquier mapa cuyo `brief` describa una ciudad en guerra o un clima árido: Mogadiscio 1993 ganaría lo mismo. Nada de este plan depende de un lugar.
 
+**Estado (16 de noviembre de 2026).** A (daño, #111), B (luz `dusty`, #109) y C (humo, #110, ADR-043 propuesto) están fusionados; falta la prueba en el casco. Lo construido difiere de este plan en:
+- `damage` ausente equivale a `none`, y el modelo no recibe un campo nuevo: `auto` lee el perfil de calle existente.
+- Las calcomanías de suelo comparten el atlas de las de pared y van en la enmienda de ADR-038, sin un ADR nuevo. Desde #119 sus tipos dependen de la cuota de calles sin asfaltar y de la luz.
+- La distancia de la niebla es `fog.scale`, de 0,3 a 1.
+- `smoke` es un entero de 0 a 5, sin `auto`, y las columnas salen solo sobre restos dentro del núcleo, a 3 m de los pies de escalera. Son un bloque `smoke` de `adapter_options.json` con 40 partículas por columna.
+
 Retoma dos puntos de la [parte 2 del plan de atmósfera](2026-11-10-atmosphere-advanced.md): C4 (decals de suelo) y C10 (humo). C10 descartaba los billboards estáticos y dejaba abierto si el SDK permitía algo mejor. El SDK v1.15 trae shaders de partículas propios (`PP_Particle_Simple_Lit`, `PP_Particle_UnLit_Dither`, `PP_Particle_Unlit`, sus variantes aditivas y `PP_Particle_Simple_Lit_Threshold`), así que el humo animado cabe dentro de la regla «solo shaders PP_*».
 
 ## 0. Lo que ya existe

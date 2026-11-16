@@ -33,7 +33,7 @@ Measured on the library at street size, old collider triangles to new, and the a
 | `concrete_road_barrier` | 12 → 96 | 47 % → 22 % |
 | `Barrel_01` | 12 → 36 | 1 % → 4 % |
 
-The air left is the step of the slices (a slice reaches its top even where the bonnet ends half way up it) and, on the helicopter, the blades: thin and sloped, each slice holds them edge to edge. A barrel gains the 1 cm widening. A layered collider takes about half a second for an 8 000-triangle car. The scene collision budget is 120 000 triangles; colliders have no renderer, so draw calls do not change.
+The air left is the step of the slices (a slice reaches its top even where the bonnet ends half way up it) and, on the helicopter, the blades: thin and sloped, each slice holds them edge to edge. A barrel gains the 1 cm widening. A layered collider takes about half a second for an 8 000-triangle car. Prop colliders are not counted against the 120 000-triangle collision budget, which `detail` checks before props are placed; colliders have no renderer, so draw calls do not change.
 
 ## Not checked here
 
