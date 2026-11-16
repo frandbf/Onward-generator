@@ -78,10 +78,23 @@ def _broken(change) -> dict:  # type: ignore[no-untyped-def]
     (lambda d: d["languages"]["fr"]["generic_names"].pop("shop"), "languages.fr must name the same keys as en: ['shop']"),
     (lambda d: d["regions"][0].update(language="de"), "regions[0] language 'de' has no words"),
     (lambda d: d["regions"][0].update(boxes=[]), "regions[0] needs boxes"),
-    (lambda d: d["regions"][0].update(boxes=[[1.0, 2.0, 3.0]]), "a box is [lat0, lat1, lon0, lon1]"),
-    (lambda d: d["regions"][0].update(boxes=[[2.0, 1.0, 3.0, 4.0]]), "south-west corner to its north-east corner"),
-    (lambda d: d["regions"][0].update(boxes=[[1.0, 2.0, True, 4.0]]), "a box is [lat0, lat1, lon0, lon1]"),
+    (lambda d: d["regions"][0].update(boxes=[[1.0, 2.0, 3.0]]), "regions[0]: a box is [lat0, lat1, lon0, lon1]"),
+    (lambda d: d["regions"][0].update(boxes=[[2.0, 1.0, 3.0, 4.0]]), "regions[0]: a box runs from its south-west corner to its north-east corner"),
+    (lambda d: d["regions"][0].update(boxes=[[1.0, 1.0, 3.0, 4.0]]), "regions[0]: a box runs from its south-west corner"),
+    (lambda d: d["regions"][0].update(boxes=[[1.0, 2.0, 3.0, 3.0]]), "regions[0]: a box runs from its south-west corner"),
+    (lambda d: d["regions"][0].update(boxes=[[1.0, 2.0, True, 4.0]]), "regions[0]: a box is [lat0, lat1, lon0, lon1]"),
+    (lambda d: d["languages"].update(fr="mot"), "languages.fr needs a default_name"),
+    (lambda d: d["regions"].insert(0, "fr"), "regions[0] language None has no words"),
 ])
 def test_a_bad_table_is_refused(change, message: str) -> None:  # type: ignore[no-untyped-def]
-    with pytest.raises(ShopNamesError, match=message.replace("[", r"\[").replace("]", r"\]")):
+    # The message starts with where the table came from: "shop_names" unless the loader names its file.
+    with pytest.raises(ShopNamesError, match="^shop_names: " + message.replace("[", r"\[").replace("]", r"\]")):
         parse_shop_names(_broken(change))
+
+
+def test_the_parsed_table_keeps_every_language_s_words() -> None:
+    table = parse_shop_names(DOC)
+    assert set(table.languages) == set(DOC["languages"])
+    for code, body in DOC["languages"].items():
+        assert table.languages[code][0] == body["default_name"]
+        assert dict(table.languages[code][1]) == body["generic_names"]

@@ -585,3 +585,16 @@ def test_on_a_haussmann_map_the_flat_building_without_an_interior_takes_the_mans
     assert roofs["building/osm-way-605"] == "mansard"
     assert sum(kind == "mansard" for kind in roofs.values()) == 1
     assert len(asked) == 3 and all(h is True and isinstance(lm, bool) and hasattr(t, "pitched") for h, lm, t in asked)
+
+
+def test_a_map_s_own_shop_words_win_over_its_centre(detail_inputs: tuple[Path, Path, Path]) -> None:
+    """15 November 2026: a map whose detail config names its shop words keeps them; the fixture's centre would say Spanish."""
+    own = copy.deepcopy(DOC)
+    own["shops"]["default_name"] = "Own Shop"
+    own["shops"]["generic_names"] = {"shop=bakery": "Own Bakery"}
+    [shop] = _obj(_detail(detail_inputs, config_from_document(own)), "building/osm-way-312").record["facade"]["shops"]
+    assert (shop["name"], shop["name_origin"], shop["name_rule"]) == ("Own Bakery", "estimated", "shop=bakery")
+    only_default = copy.deepcopy(own)
+    only_default["shops"]["generic_names"] = {"shop=butcher": "Own Butcher"}
+    [shop] = _obj(_detail(detail_inputs, config_from_document(only_default)), "building/osm-way-312").record["facade"]["shops"]
+    assert shop["name"] == "Own Shop"  # the map's own default, not the Spanish table's bakery word
