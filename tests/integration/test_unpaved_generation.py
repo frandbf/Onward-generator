@@ -16,6 +16,8 @@ from onward_generator.generation.scene import generate_scene
 def _carriageway(scene: Path, heights: Path) -> tuple[dict, np.ndarray]:
     generated = generate_scene(scene, heights, load_generation_config())
     road = next(o for o in generated.objects if o.id == "surface/carriageway")
+    # Only the carriageway records the dirt: a sidewalk or plaza on an unpaved street is not the road.
+    assert all("unpaved" not in o.record for o in generated.objects if o.id != "surface/carriageway")
     return road.record, road.visual[0].mesh.vertices[road.visual[0].mesh.triangles]
 
 
@@ -41,6 +43,9 @@ def test_an_unpaved_street_is_recorded_and_capped_apart(detail_inputs: tuple[Pat
     record, tris = _carriageway(dirt_scene, dirt_heights)
     unpaved = record["unpaved"]
     assert unpaved["attribute_origin"] == "observed" and unpaved["area_m2"] > 0
+    # Millimetres, as every other record of the scene.
+    assert unpaved["area_m2"] == round(unpaved["area_m2"], 3)
+    assert all(v == round(v, 3) for polygon in unpaved["polygons"] for ring in polygon for point in ring for v in point)
     region = MultiPolygon([Polygon(p[0], p[1:]) for p in unpaved["polygons"]])
     assert abs(region.area - unpaved["area_m2"]) < 0.01
     # No triangle straddles the two: its corners all lie in the region (or on its edge) when its centre does.

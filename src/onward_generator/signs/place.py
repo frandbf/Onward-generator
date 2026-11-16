@@ -390,7 +390,8 @@ def unpaved_share(features: Sequence[Mapping[str, Any]]) -> float:
             continue
         length = shape(feature["geometry"]).length
         total += length
-        if str(tags.get("surface") or "").strip().lower() in UNPAVED_SURFACES:
+        surface = tags.get("surface")
+        if isinstance(surface, str) and surface.strip().lower() in UNPAVED_SURFACES:
             dirt += length
     return dirt / total if total > 0 else 0.0
 

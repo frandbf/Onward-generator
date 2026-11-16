@@ -390,17 +390,17 @@ def _subset(prim: Primitive, keep: np.ndarray, material: str) -> Primitive | Non
         return None
     used, local = np.unique(triangles, return_inverse=True)
     uvs = prim.uvs[used] if prim.uvs is not None else None
-    return Primitive(Mesh(prim.mesh.vertices[used], local.reshape(triangles.shape)), material, uvs)
+    return Primitive(Mesh(prim.mesh.vertices[used], local.reshape(-1, 3)), material, uvs)
 
 
 def rematerialize_unpaved_carriageway(nodes: Sequence[Node], region: BaseGeometry) -> tuple[list[Node], list[str]]:
     """Give the carriageway triangles inside ``region`` (generate capped them apart) the ``UNPAVED_MATERIAL``; the node
     keeps its name, so the road floor and the ground decals read it as before."""
-    prepare_region(region)  # in place: the many point tests below stay fast
+    prepare_region(region)  # pragma: no mutate: speed only; contains_xy answers the same without the prepared index
     out: list[Node] = []
     changed: list[str] = []
     for node in nodes:
-        if node.name.split("#", 1)[0] != "surface/carriageway":
+        if node.name.partition("#")[0] != "surface/carriageway":
             out.append(node)
             continue
         prims: list[Primitive] = []

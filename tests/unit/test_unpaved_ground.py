@@ -83,3 +83,52 @@ def test_the_ground_decals_follow_the_streets_and_the_light() -> None:
     assert ground_kinds(0.5, "golden_hour") == every - {"sand"}  # half dirt is not a dirt map
     assert ground_kinds(0.51, None) == every - {"pothole"}  # a dirt map: sand, no asphalt patch
     assert ground_kinds(1.0, "dusty") == every - {"pothole"}
+
+
+def test_every_carriageway_node_and_primitive_is_split_in_world_space() -> None:
+    """A carriageway node of several primitives, named with a ``#`` suffix, after another node and moved by a matrix."""
+    road = _road()
+    moved = Node("surface/carriageway#2", (road.primitives[0], road.primitives[0]), {"type": "surface"},
+                 matrix=np.array([[1.0, 0, 0, 100.0], [0, 1.0, 0, 0], [0, 0, 1.0, 0], [0, 0, 0, 1.0]]))
+    other = Node("surface/sidewalk", (Primitive(cap(box(0.0, 8.0, 20.0, 10.0), 0.0), "sidewalk"),), {})
+    nodes, changed = rematerialize_unpaved_carriageway([other, moved], box(100.0, 0.0, 110.0, 8.0))
+    assert changed == ["surface/carriageway#2"] and nodes[0] is other
+    split = nodes[1]
+    assert split.matrix is None  # the vertices are in world space now, so no matrix moves them twice
+    assert [p.material for p in split.primitives] == ["carriageway", UNPAVED_MATERIAL] * 2
+    dirt = [p for p in split.primitives if p.material == UNPAVED_MATERIAL]
+    assert all(p.mesh.vertices[:, 0].min() == pytest.approx(100.0) and p.mesh.vertices[:, 0].max() == pytest.approx(110.0) for p in dirt)
+    assert all(p.mesh.triangles.shape[1] == 3 for p in split.primitives)
+    assert sum(p.mesh.triangle_count for p in split.primitives) == 2 * road.primitives[0].mesh.triangle_count
+
+
+def test_the_unpaved_share_adds_every_dirt_street_after_any_other_feature() -> None:
+    streets = [_street("footway", "dirt", 500.0), _street("residential", "dirt", 0.3), _street("track", "sand", 0.2),
+               _street("primary", None, 0.5), {"tags": {"highway": "service", "surface": 7}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [0, 0]]}}]
+    assert unpaved_share(streets) == pytest.approx(0.5)  # under a metre of street in all: still a share
+    assert unpaved_share([_street("residential", "dirt", 0.4)]) == 1.0
+
+
+def test_the_map_value_reads_one_key_of_the_map_json(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
+    from onward_generator.signs import place as signs_place
+
+    root = tmp_path / "map"
+    base = root / "data" / "processed" / "scene_materials"
+    base.mkdir(parents=True)
+    assert signs_place._map_value(base, "atmosphere") is None  # outside a map folder
+    (root / "map.json").write_text("{}", encoding="utf-8")
+    document: dict = {"atmosphere": "dusty", "radius_m": 125}
+
+    def load(r):  # type: ignore[no-untyped-def]
+        assert r == root
+        if isinstance(document, Exception):
+            raise document
+        return document
+
+    monkeypatch.setattr("onward_generator.maps.workspace.load_map", load)
+    assert signs_place._map_value(base, "atmosphere") == "dusty"
+    assert signs_place._map_value(base, "radius_m") == "125"
+    assert signs_place._map_value(base, "damage") is None
+    for error in (ValueError("bad map.json"), OSError("unreadable")):
+        document = error  # type: ignore[assignment]
+        assert signs_place._map_value(base, "atmosphere") is None
