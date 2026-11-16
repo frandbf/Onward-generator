@@ -7,7 +7,7 @@ within ``ZEBRA_MATCH_M`` of the strip. A strip with no such evidence stays
 plain asphalt, and the report says which strips are observed and which are
 generated.
 
-The paint is a Spanish *paso de cebra*: bars ``ZEBRA_BAR_M`` wide with
+The paint is a zebra crossing as most countries paint one (the dimensions are those of Spain's Norma 8.2-IC): bars ``ZEBRA_BAR_M`` wide with
 ``ZEBRA_GAP_M`` between them, parallel to the street, each as long as the
 strip is wide, laid side by side from kerb to kerb. Each bar is one quad (two
 triangles) ``ZEBRA_LIFT_M`` above the carriageway, so the depth buffer keeps

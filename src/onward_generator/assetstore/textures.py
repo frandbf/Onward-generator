@@ -30,8 +30,8 @@ from onward_generator.io import atomic_write_bytes, atomic_write_json
 TABLE_PATH = Path(__file__).resolve().parents[3] / "config" / "dress" / "asset_store_textures.json"
 LIBRARY_SCHEMA = "onward_generator.imported_library"
 MAX_PX = 1024
-# Families drawn on the ground. ``earth`` (sand, dry soil, gravel: 14 November 2026) has no automatic texture slot: a map
-# names it in its own texture plan, as Mogadishu 1993 does for its dirt streets.
+# Families drawn on the ground. ``earth`` (sand, dry soil, gravel: 14 November 2026) is never drawn by chance on a paved
+# slot: a map's own texture plan names it, and the unpaved_carriageway slot asks for it where OSM tags a street unpaved.
 GROUND_FAMILIES = frozenset({"paving", "concrete", "asphalt", "earth"})
 IMAGE_SUFFIXES = (".png", ".tga", ".tif", ".tiff", ".jpg", ".jpeg")
 # ``_d`` is the diffuse of Yughues packages (``T_YFSM_03_d.tga``); ``_s`` and ``_n`` beside it are specular and normal.

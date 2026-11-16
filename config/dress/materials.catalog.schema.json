@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://onward-generator.local/dress/materials.catalog.schema.json",
-  "title": "Murcia generator material catalogue",
+  "title": "onward-generator material catalogue",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "schema_version", "description", "materials"],

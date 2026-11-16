@@ -56,9 +56,9 @@ CABIN_DEPTH_M = 3.2
 """The SDK cabin is about 3.01 x 3.13 m."""
 CABIN_WALL_GAP_M = 0.05
 CABIN_APRON_M = 1.5
-"""The clear street in front of a cabin's door: 3 m until 12 November 2026, when no cabin fitted Rue Mouffetard's narrow
-sidewalks (one does at 1.5 m, two at 1 m); 1.5 m is still a step out and a turn for a player."""
-"""Clear in front of the door (the cabin's local +Z), so the queue does not close the street."""
+"""The clear street in front of a cabin's door (the cabin's local +Z): a step out and a turn for a player, so the
+queue does not close the street, and narrow enough for the sidewalks of an old town to hold a cabin (it was 3 m until
+12 November 2026, when no cabin fitted a narrow street of Paris)."""
 ROOF_EDGE_M = 0.6
 """A cabin stands behind the parapet (0.3 m at most) and leaves a step of roof."""
 ROOF_APRON_M = 2.0
@@ -290,8 +290,11 @@ def place_climbs(
 # squad can play along a run of roofs. Each link is a ladder against the higher building's wall with its foot on the
 # lower roof: climbed both ways, so every linked roof leads back to the street.
 ROOF_LINKS_MAX = 12
-"""Raised from 6 on 15 November 2026, when every reachable roof began to seed links: Mogadishu 1993 has 11."""
+"""The most roof links a map gets: with the ``LADDERS_MAX`` street ladders, at most 15 climbs, the count the export
+checks for the adapter's ladder triangles and its probes. Raised from 6 on 15 November 2026, when every roof a player
+reaches began to seed links."""
 LINK_MAX_RISE_M = 6.0
+"""The highest step between two linked roofs: two storeys, the tallest ladder a link stands against a wall."""
 LINK_TOUCH_M = 0.3
 LINK_MIN_SHARED_M = LADDER_WIDTH_M + 0.4
 

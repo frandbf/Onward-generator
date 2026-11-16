@@ -1,10 +1,10 @@
 """Props pinned to a place: a library model the map must carry, near a given WGS84 point (14 November 2026).
 
-A map that tells a story needs some props where the story put them: the two crashed Black Hawks of Mogadishu, a
-monument, a checkpoint. ``maps/<id>/config/pinned_props.json`` lists them::
+A map that tells a story needs some props where the story put them: a monument, a checkpoint, a crashed aircraft.
+``maps/<id>/config/pinned_props.json`` lists them::
 
-    {"props": [{"asset_id": "crashed_helicopter", "latitude": 2.047458, "longitude": 45.326639, "yaw_deg": 30,
-                "search_m": 30, "label": "Super Six-Four"}]}
+    {"props": [{"asset_id": "crashed_helicopter", "latitude": 37.98407, "longitude": -1.12863, "yaw_deg": 30,
+                "search_m": 30, "label": "Crash site"}]}
 
 Each one keeps the size its file gives it (the placement rules would fit a wreck to a car), stands at the free spot
 nearest its point, within ``search_m`` (default ``SEARCH_DEFAULT_M``) and inside the zone, whose plan stays

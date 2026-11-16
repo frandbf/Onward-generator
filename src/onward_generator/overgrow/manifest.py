@@ -26,7 +26,7 @@ SEMANTIC_FIELDS = ("description", "placement", "grouping", "condition", "tags")
 LOAD_FIELDS = ("yaw_deg", "refused")
 KIT_ONLY = "kit_only"
 PINNED_ONLY = "pinned_only"
-"""A story prop (a crashed Black Hawk): placed only where ``config/pinned_props.json`` pins it, never by chance."""
+"""A story prop: placed only where a map's ``maps/<id>/config/pinned_props.json`` pins it, never by chance."""
 INTERIOR = "interior"
 """A prop for inside a room. Placed only by detail shop furnishing (ADR-031); overgrow must not put one on a street."""
 
