@@ -13,6 +13,7 @@ from onward_generator.generation.mesh import box
 from onward_generator.overgrow import place
 from onward_generator.overgrow.place import OvergrowError, overgrow
 from onward_generator.overgrow.terraces import TerraceResult
+from onward_generator.overgrow.urban import detail_elements
 from onward_generator.signs import place as signs_place
 from onward_generator.signs.place import SignsError, place_signs
 from tests.integration.test_overgrow_furnish import _detail_out
@@ -148,7 +149,7 @@ def test_the_terraces_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> N
     made.triangles = 12
 
     def fake(manifest, features, buildings, zone, library, **kwargs):  # type: ignore[no-untyped-def]
-        seen.update(kwargs, library=library, zone=zone.kind)
+        seen.update(kwargs, library=library, zone=zone.kind, features=features, buildings=buildings, manifest=manifest)
         return made
 
     dressed: dict[str, object] = {}
@@ -161,10 +162,20 @@ def test_the_terraces_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(place, "place_terraces", fake)
     monkeypatch.setattr(place, "dress", dress_spy)
     out = runs["tmp"] / "terrace_join"
-    report = overgrow(runs["base"], runs["scene"], out, seed=777, street_mood="lived", library=None)
-    assert report["terraces"]["pieces"] == 1 and seen["library"] is None
+    library = runs["tmp"] / "empty_library"
+    library.mkdir(exist_ok=True)
+    layout = runs["tmp"] / "terrace_layout.json"
+    layout.write_text(json.dumps({"ai_m": [{"x": 40.0, "y": -30.0}]}), encoding="utf-8")
+    report = overgrow(runs["base"], runs["scene"], out, seed=777, street_mood="lived", library=library, layout=layout)
+    assert report["terraces"]["pieces"] == 1 and seen["library"] == library
+    assert seen["features"] and all(isinstance(f, dict) for f in seen["features"]) and any(f.get("kind") == "highway" for f in seen["features"])
+    assert len(seen["buildings"].geometries) > 1 and all(g.geom_type == "Polygon" for g in seen["buildings"].geometries)
+    elements = detail_elements(seen["manifest"])
+    assert elements and len(seen["keep_out"]) >= len(elements)  # detail's urban elements are kept off
+    assert seen["keep_out"][0].contains(Point(*elements[0][:2]))
+    assert seen["near_spawn"](41.0, -30.0) is True and seen["near_spawn"](40.0, -40.0) is False and seen["near_spawn"](30.0, -30.0) is False
     assert seen["budget"] == int((report["triangle_headroom"] + made.triangles) * 0.25)  # a quarter of the headroom, before they spend it
-    assert seen["ground_z"](1e6, 1e6) == 0.0 and seen["near_spawn"](1e6, 1e6) is False
+    assert seen["ground_z"](1e6, 1e6) == 0.0
     assert (3.0, 4.0, 1.0) in [tuple(round(v, 3) for v in c) for c in dressed["keep_out"]]  # the street props keep off the terrace
     visual = {node.name for node in nodes_from_glb((out / "scene_visual.glb").read_bytes())[0]}
     collision = {node.name for node in nodes_from_glb((out / "scene_collision.glb").read_bytes())[0]}

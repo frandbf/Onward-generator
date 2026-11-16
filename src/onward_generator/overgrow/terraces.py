@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from jsonschema import Draft202012Validator
@@ -189,14 +189,14 @@ class Wall:
 
 def wall_at(door: tuple[float, float], buildings: STRtree) -> Wall | None:
     """The footprint edge nearest ``door`` within ``WALL_SEARCH_M``, its normal pointing out of the footprint."""
-    here = np.asarray(door, dtype=np.float64)
+    here = np.asarray(door)
     best: tuple[float, np.ndarray, np.ndarray, float, float, Polygon] | None = None
     for index in buildings.query(Point(door).buffer(WALL_SEARCH_M)):
         polygon = buildings.geometries[int(index)]
         if not isinstance(polygon, Polygon):
             continue
         for ring in (polygon.exterior, *polygon.interiors):
-            coords = np.asarray(ring.coords, dtype=np.float64)[:, :2]
+            coords = np.asarray(ring.coords)[:, :2]
             for a, b in zip(coords[:-1], coords[1:]):
                 length = float(np.linalg.norm(b - a))
                 if length < 1e-6:  # pragma: no mutate: a repeated vertex; any tiny bound skips it the same
@@ -254,7 +254,7 @@ def free_across(start: np.ndarray, normal: np.ndarray, buildings: STRtree, reach
     ray = LineString([tuple(start), tuple(start + normal * reach_m)])
     origin = Point(float(start[0]), float(start[1]))
     found = reach_m
-    for index in buildings.query(ray, predicate="intersects"):
+    for index in buildings.query(ray, predicate="intersects"):  # pragma: no mutate: a box-only candidate meets the ray in nothing, whose NaN distance min() keeps out
         found = min(found, origin.distance(buildings.geometries[int(index)].intersection(ray)))
     return found
 
@@ -284,6 +284,8 @@ class TerraceResult:
     pieces: dict[str, str] = field(default_factory=dict)
     missing: dict[str, str] = field(default_factory=dict)
     """Slots none of whose ids is installed, with why each was refused."""
+    pieces_drawn: set[str] = field(default_factory=set)
+    """Models whose mesh a node already carries; the next copies share it by ``mesh_key``."""
 
     def report(self) -> dict[str, Any]:
         """``terraces`` in ``overgrow_report.json``."""
@@ -303,29 +305,32 @@ def _size(piece: InteriorProp) -> tuple[float, float]:
     return float(high[0] - low[0]), float(high[1] - low[1])
 
 
-def unit_pieces(slot: str, models: Mapping[str, InteriorProp], wall: Wall, centre_s: float, config: TerraceConfig) -> tuple[list[Placed], float, float]:
-    """The pieces of one unit centred ``centre_s`` along ``wall``, its width along the wall and its depth out of it."""
+def unit_size(slot: str, models: Mapping[str, InteriorProp], config: TerraceConfig) -> tuple[float, float]:
+    """(width along the wall, depth out of it) of one unit: a table with a chair on each side, or a single piece."""
     if slot != "table":
-        width, depth = _size(models[slot])
-        at = wall.point(centre_s, config.wall_gap_m + depth / 2)
-        return [Placed(slot, models[slot], float(at[0]), float(at[1]), facing_yaw(wall.n))], width, depth
+        return _size(models[slot])
     table_w, table_d = _size(models["table"])
     chair_w, chair_d = _size(models["chair"])
-    depth = max(table_d, chair_w)
-    middle = config.wall_gap_m + depth / 2
-    offset = table_w / 2 + config.piece_gap_m + chair_d / 2
+    return table_w + 2 * (config.piece_gap_m + chair_d), max(table_d, chair_w)
+
+
+def unit_pieces(slot: str, models: Mapping[str, InteriorProp], wall: Wall, centre_s: float, config: TerraceConfig) -> list[Placed]:
+    """The pieces of one unit centred ``centre_s`` along ``wall``: a single piece faces the street, the chairs face their table."""
+    middle = config.wall_gap_m + unit_size(slot, models, config)[1] / 2
     at = wall.point(centre_s, middle)
-    pieces = [Placed("table", models["table"], float(at[0]), float(at[1]), facing_yaw(wall.n))]
-    for side in (1.0, -1.0):
-        at = wall.point(centre_s + side * offset, middle)
-        pieces.append(Placed("chair", models["chair"], float(at[0]), float(at[1]), facing_yaw(-side * wall.u)))
-    return pieces, table_w + 2 * (config.piece_gap_m + chair_d), depth
+    pieces = [Placed(slot, models[slot], float(at[0]), float(at[1]), facing_yaw(wall.n))]
+    if slot == "table":
+        offset = _size(models["table"])[0] / 2 + config.piece_gap_m + _size(models["chair"])[1] / 2
+        for side in (1.0, -1.0):
+            at = wall.point(centre_s + side * offset, middle)
+            pieces.append(Placed("chair", models["chair"], float(at[0]), float(at[1]), facing_yaw(-side * wall.u)))
+    return pieces
 
 
 def chosen_models(library: str | Path, config: TerraceConfig) -> tuple[dict[str, InteriorProp], dict[str, str]]:
     """The first installed row of each slot, and why each slot found none (a table or a chair missing sets no terrace)."""
-    wanted = {item for slot in SLOTS for item in config.pieces[slot]}
-    rows, rejects = read_interior_catalogue(library, FURNISH_CATALOGUES, wanted)
+    wanted = {item for slot in SLOTS for item in config.pieces[slot]}  # pragma: no mutate: the ids only spare the GLBs no slot names
+    rows, rejects = read_interior_catalogue(library, FURNISH_CATALOGUES, wanted)  # pragma: no mutate: the ids only spare the GLBs no slot names
     why = {reject.asset_id: reject.reason for reject in rejects}
     models: dict[str, InteriorProp] = {}
     missing: dict[str, str] = {}
@@ -382,23 +387,20 @@ def place_terraces(
             continue
         own = [door for door in doors if math.dist(door, front.door) > 1e-6]  # pragma: no mutate: the front's own door is the same point
         cursors = {1.0: wall.door_s + cfg.door_clear_m, -1.0: wall.door_s - cfg.door_clear_m}
-        placed_here = 0
+        stood = False
         for number, slot in enumerate(units):
             if slot == "table" and result.sets >= cfg.max_sets:
                 continue  # the map's last table is set; its board and planter still go with it
-            why = "no_frontage"
             first = 1.0 if number % 2 == 0 else -1.0
             for side in (first, -first):
-                why_side = _try_unit(slot, models, wall, side, cursors, cfg, result, buildings, zone, own, keep_out,
-                                     budget, ground_z, near_spawn, front)
-                if why_side is None:
-                    why = ""
-                    placed_here += 1
+                why = _try_unit(slot, models, wall, side, cursors, cfg, result, buildings, zone, own, keep_out,
+                                budget, ground_z, near_spawn, front)
+                if why is None:
+                    stood = True
                     break
-                why = why_side
-            if why:
-                result.skipped[why] += 1
-        result.shops += placed_here > 0
+            else:
+                result.skipped[cast(str, why)] += 1  # the reason of the second side tried
+        result.shops += stood
     return result
 
 
@@ -408,16 +410,18 @@ def _try_unit(
     budget: int, ground_z: Callable[[float, float], float], near_spawn: Callable[[float, float], bool], front: Front,
 ) -> str | None:
     """Set one unit on ``side`` of the door when it keeps every rule; None when it stands, else why not."""
-    _, width, depth = unit_pieces(slot, models, wall, 0.0, cfg)
+    width, depth = unit_size(slot, models, cfg)
     start = cursors[side]
     centre_s = start + side * width / 2
     low, high = sorted((start, start + side * width))
     if max(abs(low - wall.door_s), abs(high - wall.door_s)) > cfg.along_m:
         return "no_frontage"
-    pieces, _, _ = unit_pieces(slot, models, wall, centre_s, cfg)
+    pieces = unit_pieces(slot, models, wall, centre_s, cfg)
     footprint = wall.rect(low, high, cfg.wall_gap_m, cfg.wall_gap_m + depth)
     middle = wall.point(centre_s, cfg.wall_gap_m + depth / 2)
     triangles = sum(piece.piece.prop.triangles for piece in pieces)
+    free = free_across(wall.point(centre_s, RAY_START_M), wall.n, buildings, cfg.reach_m) - RAY_START_M
+    need = cfg.wall_gap_m + depth + cfg.passage_m
     reason = None
     if not _backed(wall.rect(low, high, -BACKING_M, 0.0), buildings):
         reason = "no_wall_behind"
@@ -425,11 +429,11 @@ def _try_unit(
         reason = "outside_zone"
     elif near_spawn(float(middle[0]), float(middle[1])):
         reason = "spawn"
-    elif free_across(wall.point(centre_s, RAY_START_M), wall.n, buildings, cfg.reach_m) - RAY_START_M < cfg.wall_gap_m + depth + cfg.passage_m:
+    elif free < need:  # pragma: no mutate: < or <=: a passage of exactly passage_m, to the float, is not one a test can draw
         reason = "narrow"
     elif len(buildings.query(footprint, predicate="intersects")):
         reason = "building"
-    elif any(footprint.distance(Point(door)) < DOOR_KEEP_M for door in doors):
+    elif any(footprint.distance(Point(door)) < DOOR_KEEP_M for door in doors):  # pragma: no mutate: < or <=: a door exactly DOOR_KEEP_M away, to the float
         reason = "door"
     elif any(footprint.intersects(area) for area in keep_out):
         reason = "urban_element"
@@ -450,7 +454,8 @@ def _try_unit(
 
 def _backed(strip: Polygon, buildings: STRtree) -> bool:
     """Whether buildings cover ``BACKING_SHARE`` of ``strip``."""
-    covered = sum(buildings.geometries[int(index)].intersection(strip).area for index in buildings.query(strip, predicate="intersects"))
+    candidates = buildings.query(strip, predicate="intersects")  # pragma: no mutate: a box-only candidate covers no area of the strip
+    covered = sum(buildings.geometries[int(index)].intersection(strip).area for index in candidates)
     return covered >= BACKING_SHARE * strip.area
 
 
@@ -462,10 +467,11 @@ def _emit(placed: Placed, unit: int, index: int, result: TerraceResult, ground_z
     centre[:2, 3] = -(low[:2] + high[:2]) / 2  # the plan places the middle of the model's box, as furnishing does
     z = ground_z(placed.x, placed.y)
     matrix = yaw_matrix(placed.x, placed.y, z, math.radians(placed.yaw_deg)) @ centre
-    first = not any(node.mesh_key == f"prop:{asset_id}" for node in result.nodes)
+    first = asset_id not in result.pieces_drawn
+    result.pieces_drawn.add(asset_id)
     name = f"{unit}/{index}"
-    size = tuple(float(v) for v in high - low)
-    solid = is_solid(prop.spec.role, prop.spec.category, (size[0], size[1], size[2])) and placed.slot != "chair"
+    length, width, height = (float(v) for v in high - low)
+    solid = placed.slot != "chair" and is_solid(prop.spec.role, prop.spec.category, (length, width, height))
     result.nodes.append(Node(
         NODE_PREFIX + name,
         prop.primitives() if first else (),
@@ -487,7 +493,7 @@ def _emit(placed: Placed, unit: int, index: int, result: TerraceResult, ground_z
     result.records.append({
         "kind": "terrace", "origin": "generated", "source_id": front.building_id,
         "position_m": [round(placed.x, 3), round(placed.y, 3), round(z, 3)],
-        "asset_id": asset_id, "role": placed.slot, "size_m": [round(v, 3) for v in size], "solid": solid,
+        "asset_id": asset_id, "role": placed.slot, "size_m": [round(length, 3), round(width, 3), round(height, 3)], "solid": solid,
     })
 
 
