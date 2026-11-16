@@ -862,22 +862,31 @@ def _door_centres(holes: Sequence[Hole], segments: Sequence[Segment]) -> list[li
     return [[round(float(c), 3) for c in segments[h.segment].point(h.s0 + h.width / 2)[:2]] for h in _ground_doors(holes)]
 
 
-def regional_style(base: GeneratedScene) -> str:
-    """The regional facade style of the map's centre (``materials.trim_style.select_style``), as the materials stage
-    resolves it by default; ``generic`` without a centre. A map's own ``facades.style`` does not reach detail."""
-    from onward_generator.materials.trim_style import load_style_table, select_style  # materials imports detail; load it on use
+def style_geometry(base: GeneratedScene, style_request: str = "auto") -> frozenset[str]:
+    """The pieces the map's facade style builds (``facade_styles.json`` ``geometry``: ``mansard``, ``filants``), the
+    style resolved as the materials stage resolves it (``materials.trim_style.resolve_style``): ``style_request`` when
+    named (``map.json`` ``facades.style`` or the street profile, passed by ``run``), else the box of the map's centre.
+    Until 15 November 2026 only the Paris box could ask for them, so a Haussmann street elsewhere never got them."""
+    from onward_generator.materials.trim_style import (  # materials imports detail; load it on use
+        StyleError,
+        load_style_table,
+        resolve_style,
+    )
 
+    table = load_style_table()
     origin = (base.manifest().get("frame") or {}).get("origin_wgs84")
-    if not origin:
-        return "generic"
-    return select_style(load_style_table(), float(origin[1]), float(origin[0]))
+    try:
+        name, _ = resolve_style(table, style_request, origin or None)
+    except StyleError as exc:
+        raise DetailError(str(exc)) from exc
+    return table.styles[name].geometry
 
 
-def mansard_for(haussmann: bool, landmark: bool, storeys: Any, template: Template) -> Mansard | None:
-    """Plan Q3b: on a Haussmann map a building of at least ``MANSARD_MIN_STOREYS`` storeys (``count`` and ``height_m``)
+def mansard_for(mansards: bool, landmark: bool, storeys: Any, template: Template) -> Mansard | None:
+    """Plan Q3b: when the map's style builds mansards (``style_geometry``) a building of at least ``MANSARD_MIN_STOREYS`` storeys (``count`` and ``height_m``)
     with a flat roof and no landmark keeps its height and turns its top storey into a zinc mansard. A building with an
     interior never asks: its shell is built with the interior."""
-    if (haussmann and not landmark and storeys.count >= MANSARD_MIN_STOREYS
+    if (mansards and not landmark and storeys.count >= MANSARD_MIN_STOREYS
             and template.pitched is None and template.hip is None):
         return Mansard(storeys.height_m)
     return None
@@ -1213,6 +1222,7 @@ def detail_scene(
     roof_spread: SpreadReport | None = None,
     mid_ring_m: float | None = None,
     lod2_landmarks: Lod2Index | None = None,
+    style_request: str = "auto",
 ) -> DetailedScene:
     """Detail every building of ``base``. With a core square of ``core_half_side_m`` (ADR-017), a building
     outside it is a scenic shell, urban elements outside it are dropped and the ground colliders end at its edge.
@@ -1390,6 +1400,7 @@ def detail_scene(
         flat_openings=flat_openings,
         exposed_m=exposed_m,
         party_m=party_m,
+        style_request=style_request,
     )
 
 
@@ -1496,6 +1507,7 @@ def _detail_buildings(
     flat_openings: int,
     exposed_m: float,
     party_m: float,
+    style_request: str,
 ) -> DetailedScene:
     """The building loop of ``detail_scene``: each building in ``order`` drawn as a core, mid or scenic one, then ``_assemble_detail``.
 
@@ -1504,8 +1516,9 @@ def _detail_buildings(
     pending_furnish: list[_PendingFurnish] = []
     # Plan P0: a core wall facing no ground a player reaches is laid out plain (``reach.hidden_face``).
     reached = reached_ground(base) if core is not None else None
-    # Plan Q3b: a map whose centre falls in the Haussmann box gets balcons filants on its core and ring street walls.
-    haussmann = regional_style(base) == "haussmann"
+    # Plan Q3b: a style that builds them (Haussmann) gets balcons filants on its core and ring street walls and mansards.
+    geometry = style_geometry(base, style_request)
+    filants, mansards = "filants" in geometry, "mansard" in geometry
     for o in order:
         first_object, first_issue = len(objects), len(issues)
         bid = o.record["source_ids"][0]
@@ -1562,7 +1575,7 @@ def _detail_buildings(
                     layout_segment(seg, storeys_used, template, ground, door_opening if seg is main else None, door_kind, door_depth,  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                                    bid, refined, others, cfg, layout, floors.get(seg.index, 0.0),  # noqa: B023 - run_layout is called only inside this iteration, so it sees this building's values
                                    hidden=reached is not None and seg.exposed and hidden_face(seg, reached),
-                                   filants=filant_storeys(storeys_used.count) if haussmann and seg.exposed else frozenset())
+                                   filants=filant_storeys(storeys_used.count) if filants and seg.exposed else frozenset())
             return layout
 
         interior = None
@@ -1631,7 +1644,7 @@ def _detail_buildings(
                 pending_furnish.append(_PendingFurnish(shop, bid, interior, built, glass_penetrations(layout, segments), o.id,
                                                        float(geom.distance(Point(0.0, 0.0)))))
         if shell is None:
-            mansard = mansard_for(haussmann, landmark, storeys, shell_template)  # a building with an interior has its shell
+            mansard = mansard_for(mansards, landmark, storeys, shell_template)  # a building with an interior has its shell
             shell = build_shell(refined, segments, layout, height, shell_template, wall_material, roof_material, bid, cfg, mansard)  # pragma: no mutate: only None for building_id or cfg survives, build_shell reads neither; the budget tests pin the shell
         shell.roof["origin"] = roof_origin
         shell.roof["roof_shape"] = roof_shape

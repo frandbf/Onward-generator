@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 from shapely.geometry import Polygon, box
 
 from onward_generator.detail.config import load_detail_config
@@ -68,16 +69,22 @@ def test_no_filant_on_a_hidden_short_or_crowded_wall_or_below_the_setback() -> N
     assert _layout(12.0, filants=frozenset()).filants == []
 
 
-def test_the_map_centre_names_the_style() -> None:
-    from onward_generator.detail.scene import regional_style
+def test_the_resolved_style_names_the_geometry() -> None:
+    """15 November 2026: the style as materials resolves it decides the pieces, not only the Paris box."""
+    from onward_generator.detail.scene import DetailError, style_geometry
 
     def base(origin: object) -> SimpleNamespace:
         return SimpleNamespace(manifest=lambda: {"frame": {"origin_wgs84": origin}})
 
-    assert regional_style(base([2.34981, 48.84045])) == "haussmann"  # Rue Mouffetard
-    assert regional_style(base([-1.12863, 37.98407])) == "mediterranean"  # Murcia
-    assert regional_style(base(None)) == "generic"
-    assert regional_style(SimpleNamespace(manifest=lambda: {})) == "generic"
+    haussmann = frozenset({"mansard", "filants"})
+    assert style_geometry(base([2.34981, 48.84045])) == haussmann  # Rue Mouffetard, by the box
+    assert style_geometry(base([-1.12863, 37.98407])) == frozenset()  # Murcia
+    assert style_geometry(base([-1.12863, 37.98407]), "haussmann") == haussmann  # a map's facades.style or its street profile
+    assert style_geometry(base([2.34981, 48.84045]), "mediterranean") == frozenset()  # a named style wins over the box
+    assert style_geometry(base(None)) == frozenset() and style_geometry(SimpleNamespace(manifest=lambda: {})) == frozenset()
+    assert style_geometry(base(None), "haussmann") == haussmann
+    with pytest.raises(DetailError, match="unknown facade style 'baroque'"):
+        style_geometry(base([-1.12863, 37.98407]), "baroque")
 
 
 def test_the_shell_bakes_each_filant_as_a_slab_and_a_railing_with_a_collider() -> None:

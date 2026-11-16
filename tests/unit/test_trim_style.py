@@ -220,7 +220,8 @@ def test_layout_rows_and_uvs() -> None:
 # Panoramax tint read its hash.
 # Changed again on 14 November 2026: the east_african style and its box.
 # Changed again on 15 November 2026: the arid style and its boxes, the Levant to 38 E, the Swahili coast and the Comoros.
-MAIN_TABLE_SHA256 = "ef527f805129084182de6f2e1c6fc3ec4ca593580a892106200de63c4e1098d0"
+# Changed again on 15 November 2026: haussmann's geometry (mansard, filants) and its note.
+MAIN_TABLE_SHA256 = "72930d33af3c699c3530616d3eb66d4656396b4fb4c94850498f23988c447179"
 REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african", "arid")
 
 
@@ -348,3 +349,18 @@ def test_east_african_and_arid_keep_observed_brick() -> None:
     for name, render in (("east_african", "plaster_white"), ("arid", "plaster_cream")):
         atlas = regional.atlases[name]
         assert "wall_tints" not in atlas and atlas["estimated_walls"] == {"brick_red": render}
+def test_only_haussmann_builds_geometry_and_the_schema_names_the_pieces(tmp_path: Path) -> None:
+    import json as _json
+
+    from onward_generator.materials.trim_style import STYLE_TABLE_PATH, StyleError, load_style_table
+
+    table = load_style_table()
+    assert {name: style.geometry for name, style in table.styles.items() if style.geometry} == {"haussmann": frozenset({"mansard", "filants"})}
+    document = _json.loads(STYLE_TABLE_PATH.read_text(encoding="utf-8"))
+    document["styles"]["anglo"]["geometry"] = ["mansard"]
+    (tmp_path / "ok.json").write_text(_json.dumps(document), encoding="utf-8")
+    assert load_style_table(tmp_path / "ok.json").styles["anglo"].geometry == frozenset({"mansard"})
+    document["styles"]["anglo"]["geometry"] = ["onion_dome"]
+    (tmp_path / "bad.json").write_text(_json.dumps(document), encoding="utf-8")
+    with pytest.raises(StyleError, match="onion_dome"):
+        load_style_table(tmp_path / "bad.json")

@@ -200,6 +200,22 @@ def _own_config(scene: Path, name: str, flag: str) -> tuple[str, ...]:
     return (flag, show(own)) if own is not None and own.is_file() else ()
 
 
+def _facade_style(scene: Path) -> tuple[str, ...]:
+    """``--facade-style NAME`` for detail when the map names a style the way materials gets it: ``map.json``
+    ``facades.style``, else the street profile's applied ``dominant_typology``; nothing for ``auto`` (the box)."""
+    root = map_root(scene)
+    if root is None or not (root / "map.json").is_file():
+        return ()
+    from onward_generator.ai.street_profile import profile_flags
+    from onward_generator.maps.workspace import facade_options
+
+    for flags in (facade_options(root), profile_flags(root).get("materials", [])):
+        if "--facade-style" in flags:
+            style = flags[flags.index("--facade-style") + 1]
+            return () if style == "auto" else ("--facade-style", style)
+    return ()
+
+
 def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,
                    roof_spread: Path | None = None, lod2_landmarks: Path | None = None) -> StageCommand:
     """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), Overture places and colours when given,
@@ -215,6 +231,7 @@ def detail_command(scene: Path, heights: Path, base: Path, places: Path | None =
         *(("--lod2-landmarks", show(lod2_landmarks)) if lod2_landmarks is not None else ()),
         *_own_config(scene, "detail.json", "--config"),
         *_own_config(scene, "typology.json", "--typology-config"),
+        *_facade_style(scene),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *_core_flags(scene),
     )

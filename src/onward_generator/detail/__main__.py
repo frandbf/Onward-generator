@@ -65,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="lod2_index.json of a landmark_mesh source plugin (es.madrid_lod2): observed LoD2 volumes clipped to the "  # pragma: no mutate: help text
              "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
     )
+    parser.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it (map.json facades.style or the street profile); auto takes the box of the map's centre; decides the style's geometry")  # pragma: no mutate: help text
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -235,11 +236,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.core_target_triangles is None:
             detailed = detail_scene(base, base_ref, args.heights, args.scene, cfg, core_half_side_m=args.core_radius_m, places=places,
                                     typology=typology, tints=tints, roof_spread=roof_spread, mid_ring_m=args.mid_ring_m,
-                                    lod2_landmarks=lod2)
+                                    lod2_landmarks=lod2, style_request=args.facade_style)
         else:
             detailed = detail_scene_budget(base, base_ref, args.heights, args.scene, cfg, target_triangles=args.core_target_triangles,
                                            max_half_side_m=args.core_radius_m, places=places, typology=typology, tints=tints,
-                                           roof_spread=roof_spread, mid_ring_m=args.mid_ring_m, lod2_landmarks=lod2)
+                                           roof_spread=roof_spread, mid_ring_m=args.mid_ring_m, lod2_landmarks=lod2,
+                                           style_request=args.facade_style)
     except (DetailConfigError, TypologyConfigError, GenerationConfigError, DetailError, GenerationError, FileExistsError, ValueError, OSError, KeyError) as exc:
         print(f"detail: {exc}", file=sys.stderr)
         return 1

@@ -399,3 +399,33 @@ def test_detail_command_takes_the_maps_own_detail_and_typology_config(tmp_path: 
     (root / "config" / "detail.json").write_text("{}", encoding="utf-8")
     assert f" --config {root / 'config' / 'detail.json'}" in detail_command(scene, heights, base).display()
     assert "--config" not in detail_command(tmp_path / "loose" / "geo_scene.json", heights, base).display()
+
+
+def test_detail_gets_the_map_s_named_facade_style(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """15 November 2026: detail builds the style's geometry from the same style materials draws."""
+    from onward_generator import next_step
+
+    root = tmp_path / "map"
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    scene.parent.mkdir(parents=True)
+    (root / "map.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(next_step, "map_root", lambda path: root)
+    facades: list[str] = []
+    profile: dict[str, list[str]] = {}
+    monkeypatch.setattr("onward_generator.maps.workspace.facade_options", lambda r: list(facades))
+    def flags(r: object) -> dict[str, list[str]]:
+        assert r == root  # the profile of this map
+        return dict(profile)
+
+    monkeypatch.setattr("onward_generator.ai.street_profile.profile_flags", flags)
+    assert next_step._facade_style(scene) == ()
+    profile["materials"] = ["--facade-style", "haussmann", "--street-profile", "x"]
+    assert next_step._facade_style(scene) == ("--facade-style", "haussmann")
+    facades[:] = ["--facades", "trim", "--facade-style", "mediterranean"]
+    assert next_step._facade_style(scene) == ("--facade-style", "mediterranean")  # the map's own setting wins
+    command = next_step.detail_command(scene, scene.parent / "heights.json", scene.parent / "base")
+    assert command.argv[command.argv.index("--facade-style") + 1] == "mediterranean"
+    facades[:] = ["--facade-style", "auto"]
+    assert next_step._facade_style(scene) == ()
+    monkeypatch.setattr(next_step, "map_root", lambda path: None)
+    assert next_step._facade_style(scene) == ()
