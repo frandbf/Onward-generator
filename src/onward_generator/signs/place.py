@@ -35,6 +35,7 @@ from onward_generator.generation.gltf import Node, Primitive, build_glb, images_
 from onward_generator.generation.mesh import Mesh, quad
 from onward_generator.geo.attributes import parse_metres
 from onward_generator.io import atomic_write_bytes, atomic_write_json, prepare_outputs
+from onward_generator.overgrow.moods import Mood, MoodError, load_moods, mood_for
 from onward_generator.signs import damage
 from onward_generator.signs.decal_pick import pick_decals
 from onward_generator.signs.decals import Wall as DecalWall
@@ -226,6 +227,10 @@ def place_signs(
     # With the map's ambient_ai the model picks which decals (decal_pick); the rules place them either way.
     built = untrimmed(base, nodes)
     pool = [*procedural_decals(_seed(manifest)), *(library_decals(REPO_ROOT / "assets") if local.enabled() else [])]
+    # A street mood leaves out the wear its streets would not show (ADR-044): no soot or bullet holes on a street in
+    # daily use. War damage (map.json damage) still adds its own kinds below.
+    mood = _street_mood(base)
+    pool = [decal for decal in pool if decal.kind not in mood.wall_decals_excluded]
     brief, use_ai = _ambient(base)
     picked = None
     if use_ai and pool:
@@ -336,6 +341,7 @@ def place_signs(
             "count": len(wall_rows), "wanted": wanted,
             "distinct": len({row["decal"] for row in wall_rows}), "decals": wall_rows,
             "pick": picked.record if picked is not None else None,
+            **({"street_mood": mood.id, "excluded_kinds": sorted(mood.wall_decals_excluded)} if mood.id != load_moods().default else {}),
         },
         **({"damage": {"level": level, "origin": level_origin, "war_share": damage.WAR_SHARE[level],
                        "war_decals": sum(1 for row in wall_rows if row["kind"] in damage.WAR_KINDS),
@@ -430,6 +436,25 @@ def _damage(base: Path) -> tuple[str, str]:
         return damage.resolve_damage(value, props_profile)
     except ValueError as exc:
         raise SignsError(str(exc)) from exc
+
+
+def _street_mood(base: Path) -> Mood:
+    """The map's street mood (``map.json`` ``street_mood``, ADR-044): the default outside a map folder, without the
+    key or with an unreadable ``map.json`` (as the other switches read); an unknown mood stops ``signs place``."""
+    from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
+    from onward_generator.next_step import map_root
+
+    root = map_root(base)
+    value: object = None
+    if root is not None:
+        try:
+            value = load_map(root).get("street_mood")
+        except (MapError, ValueError, OSError):  # an unreadable map.json reads as no key
+            value = None
+    try:
+        return mood_for(value if isinstance(value, str) or value is None else repr(value))
+    except MoodError as exc:
+        raise SignsError(f"map.json {exc}") from exc
 
 
 def _ambient(base: Path) -> tuple[str, bool]:

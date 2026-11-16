@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +16,10 @@ class Profile:
     props: float
     vines: float
     bushes: float
+    # A street mood (``overgrow.moods``, ADR-044) scales the trees overgrow plants where OSM maps none, and the rule
+    # caps of a prop category; the year profiles leave both at their identity.
+    planted: float = 1.0
+    categories: Mapping[str, float] = field(default_factory=lambda: MappingProxyType({}))
 
 
 # The years scale what grows and what rusts, not the street props: since 14 November 2026 every profile keeps their
@@ -40,6 +46,10 @@ def scaled_cap(base: int, factor: float) -> int:
 
 
 def rule_factor(profile: Profile, category: str, roles: tuple[str, ...]) -> float:
+    return _year_factor(profile, category, roles) * profile.categories.get(category, 1.0)
+
+
+def _year_factor(profile: Profile, category: str, roles: tuple[str, ...]) -> float:
     if category == "vegetation" and "tree" in roles:
         return profile.trees
     if category == "vegetation" and "bush" in roles:
