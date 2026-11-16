@@ -220,10 +220,9 @@ def test_layout_rows_and_uvs() -> None:
 # Panoramax tint read its hash.
 # Changed again on 14 November 2026: the east_african style and its box.
 # Changed again on 15 November 2026: the arid style and its boxes, the Levant to 38 E, the Swahili coast and the Comoros.
-REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african", "arid")
 # Changed again on 15 November 2026: haussmann's geometry (mansard, filants) and its note.
 MAIN_TABLE_SHA256 = "72930d33af3c699c3530616d3eb66d4656396b4fb4c94850498f23988c447179"
-REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african")
+REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african", "arid")
 
 
 def _regional_doc() -> dict[str, Any]:
