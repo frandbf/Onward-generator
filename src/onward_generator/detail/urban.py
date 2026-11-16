@@ -93,7 +93,7 @@ def crown_radius(proto: Prototype) -> float:
 
 
 def crown_fit(options: Sequence[str], chosen: str, prototypes: Mapping[str, Prototype], room_m: float,
-              min_scale: float = MIN_CROWN_SCALE) -> tuple[str, float] | None:
+              min_scale: float) -> tuple[str, float] | None:
     """The tree prototype and the crown scale that keep a crown ``CROWN_WALL_GAP_M`` clear of the nearest facade, which
     stands ``room_m`` away. ``chosen`` when it fits; else the first of the other ``options`` that does; else the
     narrowest prototype scaled across, down to ``min_scale``; None when not even that fits. The tree stays where

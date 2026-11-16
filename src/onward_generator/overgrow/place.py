@@ -525,7 +525,7 @@ def overgrow(
     return summary
 
 
-def map_climate(manifest: Mapping[str, Any], style_request: str = "auto") -> str | None:
+def map_climate(manifest: Mapping[str, Any], style_request: str) -> str | None:
     """The climate of the map's facade style, resolved as materials and detail resolve it (``style_request``, else the
     box of the map's centre), or None where the style names none (15 November 2026)."""
     from onward_generator.materials.trim_style import (  # materials imports overgrow's neighbours; load it on use

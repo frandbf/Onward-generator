@@ -320,14 +320,14 @@ def test_a_tree_crown_keeps_off_the_nearest_facade() -> None:
     assert (CROWN_WALL_GAP_M, MIN_CROWN_SCALE) == (0.1, 0.35)
     options = ["tree", "tree_1", "tree_2"]
     # Room for the chosen crown: kept. Room for a narrower one only: the first other variant that fits.
-    assert crown_fit(options, "tree_1", protos, 2.1) == ("tree_1", 1.0)
-    assert crown_fit(options, "tree_1", protos, 2.09) == ("tree", 1.0)
-    assert crown_fit(options, "tree_1", protos, 1.6) == ("tree_2", 1.0)
+    assert crown_fit(options, "tree_1", protos, 2.1, MIN_CROWN_SCALE) == ("tree_1", 1.0)
+    assert crown_fit(options, "tree_1", protos, 2.09, MIN_CROWN_SCALE) == ("tree", 1.0)
+    assert crown_fit(options, "tree_1", protos, 1.6, MIN_CROWN_SCALE) == ("tree_2", 1.0)
     # No variant fits: the narrowest is scaled across, down to 0.35 of its width; nearer than that, no tree.
-    assert crown_fit(options, "tree", protos, 1.0) == ("tree_2", 0.6)
-    assert crown_fit(options, "tree", protos, 0.625) == ("tree_2", 0.35)
-    assert crown_fit(options, "tree", protos, 0.62) is None
-    assert crown_fit(["tree"], "tree", protos, 0.82) == ("tree", 0.379)
+    assert crown_fit(options, "tree", protos, 1.0, MIN_CROWN_SCALE) == ("tree_2", 0.6)
+    assert crown_fit(options, "tree", protos, 0.625, MIN_CROWN_SCALE) == ("tree_2", 0.35)
+    assert crown_fit(options, "tree", protos, 0.62, MIN_CROWN_SCALE) is None
+    assert crown_fit(["tree"], "tree", protos, 0.82, MIN_CROWN_SCALE) == ("tree", 0.379)
 
     wall = box(-10.0, 1.0, 10.0, 11.0)  # its face at y = 1 m
     features = [_poi("node/1", 0.0, -0.2, natural="tree"), _poi("node/2", 0.0, -6.0, natural="tree"), _poi("node/3", 5.0, 0.5, natural="tree")]

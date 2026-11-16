@@ -302,13 +302,31 @@ def test_the_map_climate_comes_from_its_resolved_style() -> None:
     def manifest(origin: object) -> dict:
         return {"frame": {"origin_wgs84": origin}}
 
-    assert map_climate(manifest([-1.12863, 37.98407])) == "mediterranean"  # Murcia
-    assert map_climate(manifest([45.326639, 2.047458])) == "arid"  # Mogadishu, east_african
-    assert map_climate(manifest([2.34981, 48.84045])) == "temperate"  # Paris
-    assert map_climate(manifest([139.65, 35.68])) is None  # Tokyo: generic names no climate
+    assert map_climate(manifest([-1.12863, 37.98407]), "auto") == "mediterranean"  # Murcia
+    assert map_climate(manifest([45.326639, 2.047458]), "auto") == "arid"  # Mogadishu, east_african
+    assert map_climate(manifest([2.34981, 48.84045]), "auto") == "temperate"  # Paris
+    assert map_climate(manifest([139.65, 35.68]), "auto") is None  # Tokyo: generic names no climate
     assert map_climate(manifest([-1.12863, 37.98407]), "east_african") == "arid"  # the map's own style wins
-    assert map_climate(manifest([43.79589, 33.36522])) == "arid"  # Fallujah, the arid style's box
+    assert map_climate(manifest([43.79589, 33.36522]), "auto") == "arid"  # Fallujah, the arid style's box
     assert map_climate(manifest([-1.12863, 37.98407]), "arid") == "arid"
-    assert map_climate({}) is None
+    assert map_climate({}, "auto") is None
     with _pytest.raises(OvergrowError, match="unknown facade style 'baroque'"):
         map_climate(manifest(None), "baroque")
+
+
+def test_the_overgrow_command_passes_the_map_facade_style(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """15 November 2026: ``overgrow --facade-style`` reaches the placement, which reads the climate from it."""
+    from onward_generator.overgrow import __main__ as cli
+
+    seen: dict[str, object] = {}
+
+    def fake(*args, **kwargs):  # type: ignore[no-untyped-def]
+        seen.update(kwargs)
+        raise OSError("stop here")
+
+    monkeypatch.setattr(cli, "overgrow", fake)
+    common = ["place", "--base", str(tmp_path), "--scene", str(tmp_path / "s.json"), "--out", str(tmp_path / "o")]
+    assert cli.main([*common, "--facade-style", "arid"]) == 1
+    assert seen["style_request"] == "arid"
+    assert cli.main(common) == 1
+    assert seen["style_request"] == "auto"
