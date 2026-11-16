@@ -393,9 +393,12 @@ def _subset(prim: Primitive, keep: np.ndarray, material: str) -> Primitive | Non
     return Primitive(Mesh(prim.mesh.vertices[used], np.searchsorted(used, triangles)), material, uvs)
 
 
-def rematerialize_unpaved_carriageway(nodes: Sequence[Node], region: BaseGeometry) -> tuple[list[Node], list[str]]:
+def rematerialize_unpaved_carriageway(nodes: Sequence[Node], region: BaseGeometry | None) -> tuple[list[Node], list[str]]:
     """Give the carriageway triangles inside ``region`` (generate capped them apart) the ``UNPAVED_MATERIAL``; the node
-    keeps its name, so the road floor and the ground decals read it as before."""
+    keeps its name, so the road floor and the ground decals read it as before. No region (a paved map, or a plan
+    without the earth slot) leaves every node as it was."""
+    if region is None:
+        return list(nodes), []
     prepare_region(region)  # pragma: no mutate: speed only; contains_xy answers the same without the prepared index
     out: list[Node] = []
     changed: list[str] = []
@@ -597,8 +600,7 @@ def apply_materials(
         visual_nodes, brick_nodes = rematerialize_brick_walls(visual_nodes, features)
     if "streets_plazas" in plan.by_id and has_pedestrian_cobble(objects):
         visual_nodes, cobble_nodes = rematerialize_cobble_nodes(visual_nodes)
-    visual_nodes, unpaved_nodes = (rematerialize_unpaved_carriageway(visual_nodes, dirt_region) if dirt_region is not None
-                                   else (visual_nodes, []))
+    visual_nodes, unpaved_nodes = rematerialize_unpaved_carriageway(visual_nodes, dirt_region)
     visual_nodes = stamp_abandoned_facades(visual_nodes, board=plan.atmosphere == "abandoned")
     trim_root = tile_cache_dir() if tile_cache else None
     # A wall strip takes the colour the scene gives that material; a colour the scene does not use

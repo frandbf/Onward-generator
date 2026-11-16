@@ -442,7 +442,7 @@ def _generate_scene(scene_path: str | Path, heights_path: str | Path, config: Ge
             mesh, d = merge([cap(surface.geometry.difference(dirt), z), cap(surface.geometry.intersection(dirt), z)]).drop_degenerate()
             extra = {**(extra or {}), "unpaved": {
                 "area_m2": round(dirt.area, 3), "attribute_origin": "observed",
-                "polygons": [[[[round(x, 3), round(y, 3)] for x, y in ring.coords] for ring in (part.exterior, *part.interiors)]
+                "polygons": [[[[round(x, 3), round(y, 3)] for x, y in ring.coords] for ring in (part.exterior, *part.interiors)]  # pragma: no mutate: the partition is on the 1 mm grid (set_precision); the rounding only drops float noise, as 4 digits would
                              for part in polygons_of(dirt)]}}
         degenerate += d
         error = abs(upward_area(mesh) - surface.geometry.area)

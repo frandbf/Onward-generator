@@ -47,6 +47,9 @@ def test_the_unpaved_triangles_take_the_earth_material_in_the_same_node() -> Non
     # No triangle inside the region: the node is left as it was.
     untouched, none = rematerialize_unpaved_carriageway([_road()], box(50.0, 50.0, 60.0, 60.0))
     assert none == [] and untouched[0].primitives[0].material == "carriageway"
+    # No region: every node as it was.
+    kept, nothing = rematerialize_unpaved_carriageway([_road(), other], None)
+    assert nothing == [] and kept[1] is other and kept[0].primitives[0].material == "carriageway" and len(kept[0].primitives) == 1
     # A road without UVs keeps none.
     bare = Node("surface/carriageway", (Primitive(_road().primitives[0].mesh, "carriageway"),), {})
     assert all(p.uvs is None for p in rematerialize_unpaved_carriageway([bare], box(0.0, 0.0, 10.0, 8.0))[0][0].primitives)
