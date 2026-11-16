@@ -421,7 +421,8 @@ def test_the_ray_starts_out_of_the_shop_s_own_wall() -> None:
 
 def test_the_records_keep_millimetres_and_a_chair_clears_its_table_s_width(monkeypatch: pytest.MonkeyPatch) -> None:
     models = {"table": _model("t", "table", 0.81234, 0.6, 0.74567), "chair": _model("c", "chair", 0.43219, 0.41111, 0.9)}
-    result = _run(ROW, manifest=_manifest([("A", "bar", (0.12345, 0.0))]), monkeypatch=monkeypatch, models=models,
+    shifted = [shapely_box(x0, 0.12345, x1, 10) for x0, x1 in ((-10, 10), (10, 20), (-20, -10))]
+    result = _run(shifted, manifest=_manifest([("A", "bar", (0.12345, 0.12345))]), monkeypatch=monkeypatch, models=models,
                   ground_z=lambda x, y: x / 7)
     assert result.records[0]["size_m"] == [0.812, 0.6, 0.746] and result.records[1]["size_m"] == [0.432, 0.411, 0.9]
     for row in result.records:
