@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "onward-generator café terraces",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "shop_categories", "highways", "street_search_m", "passage_m", "wall_gap_m", "door_clear_m",
+               "piece_gap_m", "set_gap_m", "reach_m", "along_m", "sets_per_shop", "max_sets", "pieces"],
+  "properties": {
+    "schema": { "const": "onward_generator.terraces" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string" },
+    "shop_categories": { "description": "detail shop categories (config/detail.default.json interiors) that set a terrace", "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" } },
+    "highways": { "description": "OSM highway values of the street nearest the terrace that allow one; a pedestrian area (a plaza) always does", "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" } },
+    "street_search_m": { "description": "How far from the terrace the nearest street is looked for", "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+    "passage_m": { "description": "Free width kept between the terrace and the building across", "type": "number", "minimum": 0.8, "maximum": 5 },
+    "wall_gap_m": { "description": "Gap between the shop's wall and the terrace", "type": "number", "minimum": 0, "maximum": 2 },
+    "door_clear_m": { "description": "Half the width kept free before the shop's door", "type": "number", "minimum": 0.5, "maximum": 3 },
+    "piece_gap_m": { "description": "Gap between a table and its chairs", "type": "number", "minimum": 0, "maximum": 0.5 },
+    "set_gap_m": { "description": "Gap between two units of a terrace", "type": "number", "minimum": 0, "maximum": 2 },
+    "reach_m": { "description": "How far across the street a building is looked for; past it the passage is free", "type": "number", "minimum": 5, "maximum": 100 },
+    "along_m": { "description": "How far from the door, along the wall, a unit may reach; past the shop's own footprint only along facades in line with it", "type": "number", "minimum": 1, "maximum": 20 },
+    "sets_per_shop": { "description": "Tables before one shop, alternating right and left of its door", "type": "integer", "minimum": 1, "maximum": 6 },
+    "max_sets": { "description": "Tables on the whole map", "type": "integer", "minimum": 1, "maximum": 200 },
+    "pieces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["table", "chair", "board", "planter"],
+      "properties": {
+        "table": { "$ref": "#/$defs/ids" },
+        "chair": { "$ref": "#/$defs/ids" },
+        "board": { "$ref": "#/$defs/ids_or_none" },
+        "planter": { "$ref": "#/$defs/ids_or_none" }
+      }
+    }
+  },
+  "$defs": {
+    "ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "ids_or_none": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "schema": "onward_generator.street_moods",
-  "schema_version": "0.1.0",
-  "description": "Street moods (plan 2026-11-16, ADR-044): what overgrow and signs add on top of a map's real geometry, by the state of its streets. A map names one with map.json \"street_mood\"; absent is the default, which changes nothing. Factors multiply the year profile's; a category factor multiplies its placement rule caps.",
+  "schema_version": "0.2.0",
+  "description": "Street moods (plan 2026-11-16, ADR-044): what overgrow and signs add on top of a map's real geometry, by the state of its streets. A map names one with map.json \"street_mood\"; absent is the default, which changes nothing. \"terraces\" sets café tables before the bars of pedestrian streets and plazas (config/terraces.json). Factors multiply the year profile's; a category factor multiplies its placement rule caps.",
   "default": "abandoned",
   "moods": {
     "abandoned": {
@@ -11,7 +11,8 @@
       "wrecks": 1.0,
       "conditions": null,
       "categories": {},
-      "wall_decals_excluded": []
+      "wall_decals_excluded": [],
+      "terraces": false
     },
     "emptied": {
       "note": "A town emptied days ago: nothing has grown and few cars were left behind; props intact or worn, fewer barriers and less rubbish, no soot or bullet holes on the walls unless the map asks for damage.",
@@ -20,7 +21,8 @@
       "wrecks": 0.3,
       "conditions": ["intact", "worn"],
       "categories": {"barriers": 0.5, "waste": 0.5},
-      "wall_decals_excluded": ["soot", "bullets", "moss"]
+      "wall_decals_excluded": ["soot", "bullets", "moss"],
+      "terraces": false
     },
     "lived": {
       "note": "A street in daily use: no growth, no wrecks, only intact props; street furniture and plants go up, barriers, rubbish, parked vehicles and site structures go down; the walls keep posters, adverts and light wear.",
@@ -29,7 +31,8 @@
       "wrecks": 0.0,
       "conditions": ["intact"],
       "categories": {"barriers": 0.15, "waste": 0.25, "vehicles": 0.25, "structures": 0.5, "furniture": 2.0, "vegetation": 1.5},
-      "wall_decals_excluded": ["soot", "bullets", "moss", "rust", "peeling", "crack", "chalk"]
+      "wall_decals_excluded": ["soot", "bullets", "moss", "rust", "peeling", "crack", "chalk"],
+      "terraces": true
     }
   }
 }

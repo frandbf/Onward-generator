@@ -46,7 +46,7 @@ from onward_generator.overgrow.constants import (
     MAX_WRECKS,
     SEED,
 )
-from onward_generator.overgrow.dressing import block_reason, dress, keep, load_spawns
+from onward_generator.overgrow.dressing import _near_spawn, block_reason, dress, keep, load_spawns
 from onward_generator.overgrow.fit import _footprint, layered_collider, object_reason
 from onward_generator.overgrow.furnish import FurnishBuildError, build_furniture
 from onward_generator.overgrow.ground import road_floor
@@ -69,6 +69,7 @@ from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.pinned import PinnedError, PinnedResult, frame_of, keep_out_circles, place_pins, read_pins
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import load_replay
+from onward_generator.overgrow.terraces import HEADROOM_SHARE, TerraceResult, place_terraces
 from onward_generator.overgrow.trees import swap_trees
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone, default_block_zone, radius_zone, within_core, zone_from_file, zone_from_polygon
@@ -211,6 +212,15 @@ def overgrow(
     trees_swap = swap_trees(nodes, library_props, seed, headroom, map_climate(manifest, style_request))
     nodes = trees_swap.nodes
     headroom -= trees_swap.added_triangles  # swap_trees spends at most its share of the headroom
+    # Café terraces before the bars of pedestrian streets and plazas, when the street mood asks for them (ADR-044).
+    terraces = TerraceResult()
+    if mood.terraces:
+        terraces = place_terraces(
+            manifest, features, buildings, area, library, budget=int(headroom * HEADROOM_SHARE), ground_z=floor.z,
+            near_spawn=lambda x, y: _near_spawn(x, y, spawns), keep_out=urban_areas,
+        )
+        headroom -= terraces.triangles
+        urban_areas.extend(terraces.footprints)
     budget = _Budget(min(MAX_ADDED_TRIS, headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -355,7 +365,7 @@ def overgrow(
         floor=floor,
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
-        keep_out=[*detail_elements(manifest), *keep_out_circles(pins.footprints)],
+        keep_out=[*detail_elements(manifest), *keep_out_circles([*pins.footprints, *terraces.footprints])],
         signs=sign_footprints(manifest),
     )
     tuft_meshes.extend(planted.grass)
@@ -363,6 +373,7 @@ def overgrow(
     # A library tree or bush the rules placed may draw cut-out leaves too (ADR-040).
     planted_cutouts = {name: cutoff for item in dict.fromkeys(planted.placed_ids) for name, cutoff in by_id[item].cutouts().items()}
     records.extend(planted.records)
+    records.extend(terraces.records)
     rejects.extend(planted.rejects)
     for key, count in planted.reject_counts.items():
         reject_counts[key] = reject_counts.get(key, 0) + count
@@ -397,8 +408,10 @@ def overgrow(
     for name in (*planted.images, *lamps.images, *trees_swap.images, *pins.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     extra_nodes.extend(furniture.nodes)
+    extra_nodes.extend(terraces.nodes)
     images.update(furniture.images)
-    for name in furniture.images:
+    images.update(terraces.images)
+    for name in (*furniture.images, *terraces.images):
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
 
     # One shared atlas for the props and furniture: one draw per cell (or building storey) instead of one per model.
@@ -432,10 +445,12 @@ def overgrow(
         )
         for index, node in enumerate(trees)
     ]
-    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders, *pins.colliders]
+    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders, *pins.colliders, *terraces.colliders]
     collision = base / "scene_collision.glb"
     atomic_write_bytes(targets[1], _collision_bytes(collision.read_bytes() if collision.is_file() else b"", colliders))
-    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces + len(pins.colliders):
+    if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces + len(pins.colliders) + sum(
+        1 for row in terraces.records if row["solid"]
+    ):
         raise OvergrowError("a solid prop was placed without a collision box")
     objects = [dict(o) for o in (manifest.get("objects") or []) if isinstance(o, dict)]
     objects.extend(
@@ -524,6 +539,8 @@ def overgrow(
     }
     if furniture.nodes:
         summary["furnishing"] = furniture.report()
+    if mood.terraces:
+        summary["terraces"] = terraces.report()
     if street_profile is not None:
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         summary["street_profile"] = dict(street_profile)

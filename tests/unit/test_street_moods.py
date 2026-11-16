@@ -37,6 +37,7 @@ def test_the_table_has_the_three_moods_and_abandoned_is_the_default() -> None:
     emptied = mood_for("emptied")
     assert emptied.wrecks == 0.3 and emptied.conditions == frozenset({"intact", "worn"})
     assert mood_for("abandoned").conditions is None and not mood_for("abandoned").wall_decals_excluded
+    assert (lived.terraces, emptied.terraces, mood_for("abandoned").terraces) == (True, False, False)  # only a lived street sets terraces
 
 
 def test_abandoned_is_the_identity_on_every_year_profile() -> None:
@@ -82,6 +83,7 @@ def test_the_parsed_table_keeps_every_value() -> None:
         assert mood.conditions == (frozenset(body["conditions"]) if body["conditions"] is not None else None)
         assert dict(mood.categories) == body["categories"] and isinstance(mood.categories, MappingProxyType)
         assert mood.wall_decals_excluded == frozenset(body["wall_decals_excluded"])
+        assert mood.terraces is body["terraces"]
     assert table.moods["lived"].conditions == frozenset({"intact"}) and table.moods["abandoned"].conditions is None
 
 
@@ -98,6 +100,7 @@ def test_an_unknown_mood_names_the_ones_there_are() -> None:
     (lambda d: d["moods"]["lived"].update(conditions=["shiny"]), "moods/lived/conditions"),
     (lambda d: d["moods"]["lived"]["categories"].update(rubble=1), "moods/lived/categories"),
     (lambda d: d["moods"]["lived"].pop("note"), "'note' is a required property"),
+    (lambda d: d["moods"]["lived"].update(terraces="yes"), "moods/lived/terraces"),
 ])
 def test_a_bad_table_is_refused(change, message: str) -> None:  # type: ignore[no-untyped-def]
     doc = copy.deepcopy(DOC)
