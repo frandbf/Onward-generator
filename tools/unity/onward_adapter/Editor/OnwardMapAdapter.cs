@@ -245,6 +245,7 @@ namespace OnwardGenerator
             public string audio_global;
             public float[] audio_birds_m;
             public float[] audio_wind_m;
+            public float[] reverb_m;  // the main landmark's centre, or empty: no reverb zone (15 November 2026)
             public string environment;
             public string time_of_day;
             public string profile;
@@ -2689,12 +2690,14 @@ namespace OnwardGenerator
                 PlaceLocalAudio("RoofWind_" + (i / 3).ToString(CultureInfo.InvariantCulture), "Wind Rooftop",
                     new[] { roofWind[i], roofWind[i + 1] }, roofWind[i + 2]);
             }
-            if (layout.audio_wind_m != null && layout.audio_wind_m.Length >= 2)
+            // A large reflective space round the map's main landmark, only when the layout names one (15 November 2026):
+            // every map got it at its focus before, an indoor hall's reverb out in a street.
+            if (layout.reverb_m != null && layout.reverb_m.Length >= 2)
             {
                 GameObject reverb = InstantiatePrefab("AreaReverb.prefab");
-                reverb.name = "CathedralReverb";
+                reverb.name = "LandmarkReverb";
                 reverb.GetComponent<AreaReverb>().AreaPreset = AreaReverbPreset.ReflectiveIndoorLarge;
-                reverb.transform.position = Local(layout.audio_wind_m[0], layout.audio_wind_m[1], 6f);
+                reverb.transform.position = Local(layout.reverb_m[0], layout.reverb_m[1], 6f);
                 reverb.transform.localScale = new Vector3(36f, 24f, 36f);
             }
             if (layout.flyover != 0)

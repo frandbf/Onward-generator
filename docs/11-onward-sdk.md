@@ -16,7 +16,7 @@ The local card does not instantiate every mode the layout describes. `GameModes`
 | Lightmap, one baked directional light, built-in skybox, far clip 1000 m | Adapter, profile `Urban` / `Day` / `UrbanDay1`, or `Urban` / `Night` / `UrbanNight1` with `run --time-of-day night`, which bakes a faint moon and one light per street lamp ([ADR-026](decisions/ADR-026-time-of-day.md)). The adapter also bakes one point light per furnished room and adds a `LightProbeGroup` (ADR-013). Not yet shown on the headset that Onward keeps them. Optional linear fog from the export card (ADR-014); not known whether the runtime or the post-processing profile overrides `RenderSettings` fog, ambient, or the skybox |
 | `SetPhysicMaterial` on every collider. Without it, everything is impenetrable concrete | Water → Water, green → Grass, a node named `#glass` → Glass with `AISeeThrough`, the rest → Concrete |
 | `EnableReverbInjection` or `AreaReverb` does nothing on its own | Enabled only for `gameplay_layout` |
-| Library ambience, not custom clips | `Suburban Day`, `Birds Park`, `Wind Rooftop` |
+| Library ambience, not custom clips | `Suburban Day` or `Suburban Night`, `Birds Park`, `Wind Rooftop` |
 | Hunt: 32 Rifleman points and 32 routes | Layout. The launcher puts those bots back. `StableHuntBots` is 32. Snipers are not kept |
 | A bot patrols when it spawns within 5 m of the route start. Otherwise it wanders | One spawn per route, on the first waypoint snapped to the navmesh. The next start is 8 m away when the streets hold 32, and otherwise the largest 0.1 m step that still does, never at or below 5 m. Walkable crossings join the blocks across the carriageway (ADR-015), and routes are spread over the navmesh island of the navigation origin when it holds 32 (see [Hunt routes](#hunt-routes)) |
 | Navigation-map origin on walkable ground, near the centre, plus an outdoor area | The Uplink, after it is snapped to the navmesh |
@@ -78,7 +78,7 @@ Headset confirmation of a full 32-bot match is still the acceptance checklist. `
 
 ## Sound and flyover
 
-- Global: `Suburban Day`. Local: `Birds Park` on the plaza, `Wind Rooftop` on a landmark roof.
+- Global: `Suburban Day`, or `Suburban Night` on a night map. Local: `Birds Park` on the plaza, `Wind Rooftop` on a landmark roof. An `AreaReverb` (`ReflectiveIndoorLarge`, 36 × 24 × 36 m) round the main landmark, only when the layout's `reverb_m` names one.
 - `audio_roof_wind_m`: `Wind Rooftop` 1.5 m above the roofs a stair reaches, and those a ladder or a lift reaches, at most 8, nearest the focus first and at least 35 m apart. 35 m is the fixed radius of this clip in the SDK, and a source has no field to change it. Under a building lower than 33.5 m it is also heard in the street; the game's volume curve decides how loud.
 - Default reverb `SmoothOutdoor`. Inside a nave volume, `ReflectiveIndoorLarge`.
 - `OnwardCustomAudioSource` is not used. It requires a custom clip, and the guide warns about uncompressed memory.

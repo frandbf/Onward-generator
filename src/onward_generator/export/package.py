@@ -116,7 +116,7 @@ QUEST_CHECKLIST = (
     "Free Roam funciona.",
     "Uplink (segundo modo exigido por la guía) funciona.",
     "Hunt: un bot recorre una calle y no atraviesa edificios.",
-    "Se oye el ambiente Suburban Day y cambia la reverberación bajo techo.",
+    "Se oye el ambiente de su hora (Suburban Day o Suburban Night) y, junto al monumento principal, la reverberación de un espacio grande.",
     "El disparo contra un muro responde como hormigón.",
     "Se ve un flyover sobre la plaza.",
     "La ficha del mapa dice entorno urbano, no desierto.",
@@ -212,8 +212,11 @@ def _check_layout(doc: Mapping[str, Any]) -> list[str]:
                 )
             else:
                 problems.extend(hunt_spawn_problems(ai, routes, separation_m=float(separation)))
-        if doc.get("audio_global") != "Suburban Day":
-            problems.append("layout: audio_global must be the SDK clip Suburban Day")
+        if doc.get("audio_global") != {"Night": "Suburban Night"}.get(str(doc.get("time_of_day")), "Suburban Day"):
+            problems.append("layout: audio_global must be the SDK clip Suburban Day by day and Suburban Night by night")
+        reverb = doc.get("reverb_m", [])
+        if not isinstance(reverb, list) or len(reverb) not in (0, 2) or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in reverb):
+            problems.append("layout: reverb_m must be empty or an x, y point")
         if doc.get("environment") != "Urban" or (doc.get("time_of_day"), doc.get("profile")) not in ENVIRONMENT_PROFILES:
             problems.append("layout: environment must be Urban / Day / UrbanDay1 or Urban / Night / UrbanNight1")
         lights = doc.get("street_lights_m", [])

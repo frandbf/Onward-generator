@@ -48,14 +48,17 @@ EXPORT_PROJECT = REPO / "config" / "murcia-belluga.export.json"
 # other key, the 32 routes and their 200 points included, is unchanged, and the report changed only its layout_sha256.
 # Re-pinned on 15 November 2026: roofs reached by an interior stair seed roof links (ADR-029 amendment); the layout
 # gained two link ladders and nothing else changed (compared with fix/navmesh-footprints'); the report follows the layout.
-HEAD_LAYOUT_SHA256 = "ac0414061f59d7c7561c9ca14c6cd0447e032d7c2d4cdfe841ce3e7f668943a2"
+# Re-pinned on 15 November 2026: the layout gained reverb_m (the main landmark, or empty); the focus and every other key
+# are unchanged, and the report changed only its layout_sha256.
+HEAD_LAYOUT_SHA256 = "633df3a5abfceb9a1f845d47f281c5c9c33e4aabd9affc13c3562952ee17fbbf"
 # The report was re-pinned on 10 November 2026: more props are solid (overgrow.ambient.SOLID_DEPTH_M 0.2, tall props),
 # so the report counts more solids; the layout itself, what the off path must keep, is unchanged.
 # Re-pinned on 14 November 2026 (ADR-032 amendment): the report measures routes on the player's ground, carriageway
 # included; the layout without the option is unchanged.
 # Re-pinned on 15 November 2026: the layout gained nav_ground; the report changed only its layout_sha256.
 # Re-pinned on 15 November 2026: the layout gained two roof-link ladders; the report changed only its layout_sha256.
-HEAD_REPORT_SHA256 = "ccd2d8fe137bedae75b1490cd9c77d4b42bab4e6b008edc3788f748d713e7877"
+# Re-pinned on 15 November 2026: the layout gained reverb_m; the report changed only its layout_sha256.
+HEAD_REPORT_SHA256 = "bc4c19261b60040a4de01f91468be75b8c8050facc88bb1d9c214021e1bf2360"
 BLOCKS = ("attackers", "defenders", "attackers_b", "defenders_b")
 
 
