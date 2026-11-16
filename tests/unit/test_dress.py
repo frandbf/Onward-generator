@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import socket
 from pathlib import Path
 from typing import Any
@@ -302,7 +303,7 @@ def test_atlas_png_is_generated_not_loaded_from_disk() -> None:
     assert atlas.png.startswith(b"\x89PNG")
     assert atlas.slots["carriageway"] != atlas.slots["pedestrian"]
     # The note says what the atlas is not, for any place (15 November 2026: it named Murcia on every map).
-    assert "Not a photograph of the place. " in atlas.note and "Murcia" not in atlas.note
+    assert re.search(r"\)\. Not a photograph of the place\. (Photo|Pending|$)", atlas.note) and "Murcia" not in atlas.note
     again = encode_png_rgba(__import__("numpy").zeros((4, 4, 4), dtype=__import__("numpy").uint8))
     assert again.startswith(b"\x89PNG")
 
