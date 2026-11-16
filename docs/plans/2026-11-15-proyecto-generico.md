@@ -4,6 +4,11 @@ Fecha: 15 de noviembre de 2026. Lo pidió el mantenedor tras una revisión de to
 
 Regla de cada paso: hacer los mejores mapas sin regresiones. Lo que hoy es correcto para su región se queda en su región en vez de borrarse. Las tejas de terracota, los rótulos en español y las cebras españolas siguen en España, y un mapa de Murcia sale igual que antes. Cada paso es un PR con tests, mutación limpia y la documentación al día.
 
+**Estado (16 de noviembre de 2026).** Los siete pasos están fusionados: 1 (#112), 2 (#113), 3 (#115), 4 (#114), 5 (#117), 6 (#116 árboles, #119 suelo) y 7 (#118). Queda pendiente:
+- `roof:shape=mansard` de OSM en un edificio suelto;
+- la paleta de tejados por región y la neutra por defecto;
+- las cebras por región.
+
 ## Orden
 
 1. **Catálogo.**

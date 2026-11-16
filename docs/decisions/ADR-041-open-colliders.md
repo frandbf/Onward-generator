@@ -20,7 +20,7 @@ A gap a hand wide is narrower than the player's capsule, so a body still cannot 
 
 ## Cost
 
-Measured on the library: `large_iron_gate` 12 → 1 384 collision triangles, the fire escapes 12 → 1 657 and 1 716, `fence_door_metal` 220 → 736, `barrier_low` 12 → 72; the Kenney fences stay within ±20 of their old count. The scene collision budget is 120 000 triangles; colliders have no renderer, so draw calls do not change.
+Measured on the library: `large_iron_gate` 12 → 1 384 collision triangles, the fire escapes 12 → 1 657 and 1 716, `fence_door_metal` 220 → 736, `barrier_low` 12 → 72; the Kenney fences stay within ±20 of their old count. Prop colliders are not counted against the 120 000-triangle collision budget, which `detail` checks before props are placed; colliders have no renderer, so draw calls do not change.
 
 ## Not checked here
 

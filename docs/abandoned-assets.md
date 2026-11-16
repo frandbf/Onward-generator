@@ -2,7 +2,7 @@
 
 The 50 normalized models in `assets/normalized`. Each picture is a view of the file, not a photograph of the original. Sizes are length × depth × height, in metres.
 
-The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped, such as the helicopter, keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. A plant wider than 2.5 m across is reduced to 2.5 m: `scanned_plants_grass` is 14.16 × 13.41 m in its file and covered a sidewalk and a parked truck on MurciaEjemplo; the other plants are 1.3 to 2.1 m. `fit` refuses a plant still wider than that. Other roles have no size band: their fitted sizes in the library were measured on 4 November 2026 and none was out of scale.
+The sizes on each card are the file's. If a model does not fit the street, `fit` scales a copy uniformly and does not rewrite the GLB. A car lands between 2.8 and 6.5 m long, 1.4 and 2.4 m wide, and 1.0 and 2.4 m tall, aiming at 4.5 m long. A wide model that is not car-shaped keeps the largest size that still leaves 1.2 m of passage on one side (width up to 4.0 m). A fire escape deeper than 1.6 m is reduced to that depth. A plant wider than 2.5 m across is reduced to 2.5 m: `scanned_plants_grass` is 14.16 × 13.41 m in its file and covered a sidewalk and a parked truck on MurciaEjemplo; the other plants are 1.3 to 2.1 m. `fit` refuses a plant still wider than that. Other roles have no size band: their fitted sizes in the library were measured on 4 November 2026 and none was out of scale.
 
 ## Curated manifest fields
 
@@ -11,10 +11,12 @@ Since 2026-10-30 both catalogues, `assets/normalized/manifest.json` and `assets/
 | Field | Values | Read by |
 | --- | --- | --- |
 | `description` | One sentence, 10 to 140 characters: what it is, how it looks, its state | The placement model |
-| `placement` | `kit_only`, `wall_mounted`, `street`, `kerb`, `wall_foot`, `boundary`, `open_ground`, `ground_cover` | The model; the library refuses `kit_only`; the rules keep a `wall_foot` copy within 1.5 m of a wall and an `open_ground` copy off the carriageway, sidewalk and kerb (12 November 2026, `dressing.placement_reason`) |
+| `placement` | `kit_only`, `wall_mounted`, `street`, `kerb`, `wall_foot`, `boundary`, `open_ground`, `ground_cover`, `interior`, `pinned_only` (a story prop: placed only where a map pins it) | The model; the library refuses `kit_only`; the rules keep a `wall_foot` copy within 1.5 m of a wall and an `open_ground` copy off the carriageway, sidewalk and kerb (12 November 2026, `dressing.placement_reason`) |
 | `grouping` | `single`, `cluster`, `run`, `grid` | The model; `realize` refuses a `span` that is not a `run` and a `cover` that is not a `grid` (`wrong_grouping`) |
 | `condition` | `intact`, `worn`, `damaged`, `wrecked`, `burned` | The model |
 | `tags` | Up to four lowercase words | The model |
+
+A row placed by chance that keeps more than 8 000 triangles after its level of detail is refused (`too_heavy_for_chance`, `library.CHANCE_MAX_TRIANGLES`, 15 November 2026); a `pinned_only` story prop is exempt, as a map asks for it by name.
 
 `kit_only` marks a building or road kit piece: the Kenney wall modules, roofs, doors, windows, road tiles, roof posts and scaffold uprights (128 rows). Placing one alone would invent a building or a second road, so the library refuses the row before it reads the GLB (`library_rejects` reason `kit_only`). Doors and windows are kit pieces too: the facades already get their openings from `detail`. `wall_mounted` goes with `anchor: facade` and nothing else does; `street` needs the `carriageway` surface. A 0.2.0 manifest that misses a field, uses another value, or breaks those two rules stops the load with a `LibraryError`. A manifest without `schema_version` 0.2.0 is read as before, with no curated fields. `overgrow fetch` and `overgrow fetch-sketchfab` keep the curated fields of rows they rewrite; a row they add without them turns the manifest back into 0.1.0.
 
@@ -170,17 +172,16 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 
 - Id: `crashed_helicopter`
 - What: Crashed helicopter.
-- Where: kerb, carriageway, courtyard, yard, empty lot, plaza, park.
+- Where: a story prop (`placement: pinned_only`), placed only where a map's `maps/<id>/config/pinned_props.json` pins it, at its file's size (15 November 2026: at 59 771 triangles it was too heavy to place by chance).
 - Size: 14.82 × 9.41 × 2.87 m, 59771 triangles.
 - Licence: CC BY 4.0, jigar6102021.
-- When placed, `fit` scales it to 6.29 × 4.00 × 1.22 m.
 
 ### UH-60M Black Hawk
 
 ![UH-60M Black Hawk](abandoned-assets/uh60_black_hawk.png)
 
 - Id: `uh60_black_hawk`
-- What: Intact dark UH-60 Black Hawk utility helicopter with its rotors; a story prop (`placement: pinned_only`), placed only where `config/pinned_props.json` pins it, at its file's size, and laid down with `roll_deg`, `pitch_deg` and `sink_m`.
+- What: Intact dark UH-60 Black Hawk utility helicopter with its rotors; a story prop (`placement: pinned_only`), placed only where a map's `maps/<id>/config/pinned_props.json` pins it, at its file's size, and laid down with `roll_deg`, `pitch_deg` and `sink_m`.
 - Size: 17.02 × 12.21 × 4.85 m, 12600 triangles (its own budget of 13 000).
 - Licence: CC BY 4.0, WTigerTw.
 

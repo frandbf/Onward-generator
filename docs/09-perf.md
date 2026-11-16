@@ -576,3 +576,15 @@ Pending on the headset (A2) and in Unity (A3), not done; the amendments stay pro
 - [ ] Walk around and against each LoD2 landmark: no walking through walls, no snagging on simplified roof edges, and no route sealed or newly opened (the group prism colliders reach each group's top).
 - [ ] Attribution: "Origen de los datos: Ayuntamiento de Madrid" with the date appears in the map credits next to the OSM line, or the description is changed so it does.
 - [ ] Then move the ADR-008 and ADR-018 D6 amendments from proposed to accepted, or correct them. `quest_acceptance.md` is not marked without the user.
+
+## Roof links, prop colliders and smoke (11 to 15 November 2026)
+
+Three changes add cost the headset has not measured yet. Each has its own record.
+
+- **Roof links** ([ADR-029](decisions/ADR-029-ladders-and-lifts.md), amendments of 12 and 15 November 2026). Every roof a player reaches seeds ladders to the flat roofs it touches, at most `ROOF_LINKS_MAX` (12). With the 3 street ladders, a map has at most 15 climbs, the count the export checks. A link costs a few hundred triangles (12 per rung), counted in `triangle_budget.climb_triangles` by its rise above `base_m`.
+- **Prop colliders** ([ADR-041](decisions/ADR-041-open-colliders.md), [ADR-042](decisions/ADR-042-layered-colliders.md), proposed). A see-through prop collides by its bars, and every other solid prop by 30 cm slices of its own shape. Physics triangles grow, from 12 to about 1 700 for a fire escape. Colliders have no renderer, so draw calls do not change. Prop colliders are not counted against the 120 000 collision budget that `detail` checks.
+- **Smoke** ([ADR-043](decisions/ADR-043-smoke-columns.md), proposed). 0 to 5 columns of at most 40 particles each, up to 200 transparent billboards on `PP_Particle_Simple_Lit`, all in the core.
+
+- [ ] Headset: frame time on a route past 3 smoke columns, against the same route with `"smoke": 0`.
+- [ ] Headset: bots and players pass a slatted fence and a gate where the gaps are open, and stop at a car's real outline (ADR-041, ADR-042).
+- [ ] Headset: every roof link can be climbed, and none stands on a spawn or in a doorway.

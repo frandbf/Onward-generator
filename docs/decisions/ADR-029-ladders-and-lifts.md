@@ -1,6 +1,6 @@
 # ADR-029 — Ladders and lifts to the roofs
 
-Status: proposed · 3 November 2026. Not compiled in Unity and not seen on the headset. Builds on the roof access of the interiors.
+Status: proposed · 3 November 2026. Ladders and lifts seen on the headset on 11 November 2026 (below); the roof links of 15 November 2026 await a headset check. Builds on the roof access of the interiors.
 
 ## Context
 
