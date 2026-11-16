@@ -174,6 +174,8 @@ def test_a_door_finds_its_wall_and_the_way_out() -> None:
     slim = Polygon(shapely_box(-2.5, -10, 2.5, 10).exterior.coords, [shapely_box(-2, -2, 2, 2).exterior.coords])
     near_corner = wall_at((-1.9, -2.0), STRtree([slim]))  # the side test is made at the door, not elsewhere on the wall's line
     assert near_corner is not None and tuple(near_corner.n) == (0.0, 1.0) and near_corner.door_s == pytest.approx(0.1)
+    far_end = wall_at((1.9, -2.0), STRtree([slim]))
+    assert far_end is not None and tuple(far_end.n) == (0.0, 1.0) and far_end.door_s == pytest.approx(3.9)
     assert wall_at((0.0, -1.0), tree) is not None  # exactly WALL_SEARCH_M away still counts
     corner = wall_at((10.0, 0.0), tree)  # on two edges: the first of the ring wins
     assert corner is not None and tuple(corner.u) == (0.0, 1.0) and tuple(corner.n) == (1.0, 0.0)
@@ -415,3 +417,14 @@ def test_the_ray_starts_out_of_the_shop_s_own_wall() -> None:
     wall = wall_at((0.0, 0.0), tree)
     assert wall is not None
     assert free_across(wall.point(10.0, terraces.RAY_START_M), wall.n, tree, 30.0) == 30.0
+
+
+def test_the_records_keep_millimetres_and_a_chair_clears_its_table_s_width(monkeypatch: pytest.MonkeyPatch) -> None:
+    models = {"table": _model("t", "table", 0.81234, 0.6, 0.74567), "chair": _model("c", "chair", 0.43219, 0.41111, 0.9)}
+    result = _run(ROW, manifest=_manifest([("A", "bar", (0.12345, 0.0))]), monkeypatch=monkeypatch, models=models,
+                  ground_z=lambda x, y: x / 7)
+    assert result.records[0]["size_m"] == [0.812, 0.6, 0.746] and result.records[1]["size_m"] == [0.432, 0.411, 0.9]
+    for row in result.records:
+        assert all(value == round(value, 3) for value in row["position_m"]), row["position_m"]
+    table, chair = result.records[0]["position_m"], result.records[1]["position_m"]
+    assert chair[0] - table[0] == pytest.approx(0.81234 / 2 + CFG.piece_gap_m + 0.41111 / 2, abs=1e-3)

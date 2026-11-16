@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 from jsonschema import Draft202012Validator
@@ -363,11 +363,11 @@ def place_terraces(
     if not fronts:
         return result
     if library is None:
-        result.skipped["no_library"] += len(fronts)
+        result.skipped["no_library"] = len(fronts)
         return result
     models, result.missing = chosen_models(library, cfg)
     if "table" not in models or "chair" not in models:
-        result.skipped["no_table_or_chair"] += len(fronts)
+        result.skipped["no_table_or_chair"] = len(fronts)
         return result
     result.pieces = {slot: piece.prop.spec.id for slot, piece in models.items()}
     streets = streets_of(features)
@@ -399,7 +399,7 @@ def place_terraces(
                     stood = True
                     break
             else:
-                result.skipped[cast(str, why)] += 1  # the reason of the second side tried
+                result.skipped[str(why)] += 1  # the reason of the second side tried
         result.shops += stood
     return result
 
