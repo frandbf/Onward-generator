@@ -292,6 +292,8 @@
     "urban": {
       "type": "object", "additionalProperties": false, "required": ["observed", "generated_street_lamps", "clearance_m"],
       "properties": {
+        "tree_min_spacing_m": { "type": "number", "minimum": 0, "maximum": 50, "description": "An observed tree keeps this far from the trees already placed (5 by default; 0 keeps every tree OSM maps)" },
+        "tree_min_crown_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "The narrowest crown, as a share of its width, before a tree by a wall is left out (0.35 by default)" },
         "observed": { "type": "object", "propertyNames": { "$ref": "#/$defs/name" }, "additionalProperties": { "$ref": "#/$defs/tagList" } },
         "generated_street_lamps": {
           "type": "object", "additionalProperties": false, "required": ["enabled", "spacing_m", "curb_offset_m", "min_building_distance_m", "min_spacing_m"],

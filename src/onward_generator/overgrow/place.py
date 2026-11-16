@@ -124,6 +124,7 @@ def overgrow(
     prefer: str | Path | None = None,
     triangle_limit: int = UNITY_TRIANGLE_LIMIT,
     pinned: str | Path | None = None,
+    style_request: str = "auto",
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -199,7 +200,7 @@ def overgrow(
     nodes = lamps.nodes
     headroom -= lamps.added_triangles  # swap_lamps adds no more than the headroom
     # detail's street trees drawn as library cut-out trees (ADR-040), within a share of what is left.
-    trees_swap = swap_trees(nodes, library_props, seed, headroom)
+    trees_swap = swap_trees(nodes, library_props, seed, headroom, map_climate(manifest, style_request))
     nodes = trees_swap.nodes
     headroom -= trees_swap.added_triangles  # swap_trees spends at most its share of the headroom
     budget = _Budget(min(MAX_ADDED_TRIS, headroom))
@@ -522,6 +523,24 @@ def overgrow(
     if not compare["identical"]:
         raise OvergrowError("overgrow changed a geographic object record; this is a bug")
     return summary
+
+
+def map_climate(manifest: Mapping[str, Any], style_request: str) -> str | None:
+    """The climate of the map's facade style, resolved as materials and detail resolve it (``style_request``, else the
+    box of the map's centre), or None where the style names none (15 November 2026)."""
+    from onward_generator.materials.trim_style import (  # materials imports overgrow's neighbours; load it on use
+        StyleError,
+        load_style_table,
+        resolve_style,
+    )
+
+    table = load_style_table()
+    origin = (manifest.get("frame") or {}).get("origin_wgs84")
+    try:
+        name, _ = resolve_style(table, style_request, origin or None)
+    except StyleError as exc:
+        raise OvergrowError(str(exc)) from exc
+    return table.styles[name].climate
 
 
 def triangle_headroom(input_triangles: int, furniture_triangles: int, limit: int = UNITY_TRIANGLE_LIMIT) -> int:

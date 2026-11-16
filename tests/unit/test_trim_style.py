@@ -220,8 +220,8 @@ def test_layout_rows_and_uvs() -> None:
 # Panoramax tint read its hash.
 # Changed again on 14 November 2026: the east_african style and its box.
 # Changed again on 15 November 2026: the arid style and its boxes, the Levant to 38 E, the Swahili coast and the Comoros.
-# Changed again on 15 November 2026: haussmann's geometry (mansard, filants) and its note.
-MAIN_TABLE_SHA256 = "72930d33af3c699c3530616d3eb66d4656396b4fb4c94850498f23988c447179"
+# Changed again on 15 November 2026: haussmann's geometry (mansard, filants) and its note; then each style's climate.
+MAIN_TABLE_SHA256 = "4978a091dfa98a9c001c62b00e68a1e0837c253aadd53daf44851a466ace91ed"
 REGIONAL = ("central_european", "anglo", "latin_american", "haussmann", "east_african", "arid")
 
 

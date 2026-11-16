@@ -320,14 +320,14 @@ def test_a_tree_crown_keeps_off_the_nearest_facade() -> None:
     assert (CROWN_WALL_GAP_M, MIN_CROWN_SCALE) == (0.1, 0.35)
     options = ["tree", "tree_1", "tree_2"]
     # Room for the chosen crown: kept. Room for a narrower one only: the first other variant that fits.
-    assert crown_fit(options, "tree_1", protos, 2.1) == ("tree_1", 1.0)
-    assert crown_fit(options, "tree_1", protos, 2.09) == ("tree", 1.0)
-    assert crown_fit(options, "tree_1", protos, 1.6) == ("tree_2", 1.0)
+    assert crown_fit(options, "tree_1", protos, 2.1, MIN_CROWN_SCALE) == ("tree_1", 1.0)
+    assert crown_fit(options, "tree_1", protos, 2.09, MIN_CROWN_SCALE) == ("tree", 1.0)
+    assert crown_fit(options, "tree_1", protos, 1.6, MIN_CROWN_SCALE) == ("tree_2", 1.0)
     # No variant fits: the narrowest is scaled across, down to 0.35 of its width; nearer than that, no tree.
-    assert crown_fit(options, "tree", protos, 1.0) == ("tree_2", 0.6)
-    assert crown_fit(options, "tree", protos, 0.625) == ("tree_2", 0.35)
-    assert crown_fit(options, "tree", protos, 0.62) is None
-    assert crown_fit(["tree"], "tree", protos, 0.82) == ("tree", 0.379)
+    assert crown_fit(options, "tree", protos, 1.0, MIN_CROWN_SCALE) == ("tree_2", 0.6)
+    assert crown_fit(options, "tree", protos, 0.625, MIN_CROWN_SCALE) == ("tree_2", 0.35)
+    assert crown_fit(options, "tree", protos, 0.62, MIN_CROWN_SCALE) is None
+    assert crown_fit(["tree"], "tree", protos, 0.82, MIN_CROWN_SCALE) == ("tree", 0.379)
 
     wall = box(-10.0, 1.0, 10.0, 11.0)  # its face at y = 1 m
     features = [_poi("node/1", 0.0, -0.2, natural="tree"), _poi("node/2", 0.0, -6.0, natural="tree"), _poi("node/3", 5.0, 0.5, natural="tree")]
@@ -389,3 +389,18 @@ def test_only_a_narrowed_crown_writes_crown_scale() -> None:
     # A whole crown keeps its matrix; a narrowed one is scaled across only.
     assert np.array_equal(crown_matrix(np.eye(4), 1.0), np.eye(4))
     assert np.array_equal(crown_matrix(np.eye(4), 0.5), np.diag([0.5, 0.5, 1.0, 1.0]))
+
+
+def test_tree_spacing_and_crown_scale_come_from_the_config() -> None:
+    """15 November 2026: a map's own detail config may keep more of its mapped trees, or fewer."""
+    from onward_generator.detail.config import config_from_document, load_detail_config
+    from onward_generator.detail.urban import MIN_CROWN_SCALE, TREE_MIN_SPACING_M
+
+    default = load_detail_config()
+    assert (default.tree_min_spacing_m, default.tree_min_crown_scale) == (TREE_MIN_SPACING_M, MIN_CROWN_SCALE) == (5.0, 0.35)
+    document = dict(default.document)
+    urban = {k: v for k, v in document["urban"].items() if k not in ("tree_min_spacing_m", "tree_min_crown_scale")}
+    old = config_from_document({**document, "urban": urban})  # a map's copy made before the keys keeps the defaults
+    assert (old.tree_min_spacing_m, old.tree_min_crown_scale) == (5.0, 0.35)
+    tuned = config_from_document({**document, "urban": {**urban, "tree_min_spacing_m": 0, "tree_min_crown_scale": 0.6}})
+    assert (tuned.tree_min_spacing_m, tuned.tree_min_crown_scale) == (0.0, 0.6)

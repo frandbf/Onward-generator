@@ -215,6 +215,8 @@
       "bench": { "amenity": ["bench"] },
       "waste_basket": { "amenity": ["waste_basket"] }
     },
+    "tree_min_spacing_m": 5.0,
+    "tree_min_crown_scale": 0.35,
     "generated_street_lamps": { "enabled": true, "spacing_m": 25.0, "curb_offset_m": 0.5, "min_building_distance_m": 1.0, "min_spacing_m": 8.0 },
     "generated_furniture": {
       "enabled": true,
