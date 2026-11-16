@@ -4,7 +4,7 @@
 profile, and props of any condition. A street in daily use, or a town emptied days ago, needs none of that.
 ``config/street_moods.json`` names the moods as data: each one scales the year profile's vines, planted trees and
 wrecks, keeps library props of the listed conditions, scales the rule caps of a prop category, and leaves wall decal
-kinds out. A map names one with ``map.json`` ``"street_mood"``; absent is the table's default, ``abandoned``, which
+kinds out, and may set café terraces before the bars. A map names one with ``map.json`` ``"street_mood"``; absent is the table's default, ``abandoned``, which
 is the identity: a map without the key builds exactly what it built before (16 November 2026).
 
 Mapped trees are never removed: a mood scales only the trees overgrow plants where OSM maps none.
@@ -44,6 +44,8 @@ class Mood:
     conditions: frozenset[str] | None
     categories: Mapping[str, float]
     wall_decals_excluded: frozenset[str]
+    terraces: bool = False
+    """Café tables before the bars of pedestrian streets and plazas (``overgrow/terraces.py``, 16 November 2026)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +70,7 @@ def parse_moods(doc: object, schema: Mapping[str, Any], where: str = "street_moo
             conditions=frozenset(body["conditions"]) if body["conditions"] is not None else None,
             categories=MappingProxyType({str(k): float(v) for k, v in body["categories"].items()}),
             wall_decals_excluded=frozenset(body["wall_decals_excluded"]),
+            terraces=bool(body["terraces"]),
         )
         for name, body in doc["moods"].items()
     }

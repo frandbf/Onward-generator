@@ -30,8 +30,9 @@ El daño de guerra (`map.json` `damage`) sigue aparte y añade sus propios tipos
 
 ## Incrementos
 
-1. **`street_mood` con `lived`, `emptied` y `abandoned`** en `overgrow` y `signs`, `run` pasando `--street-mood`, y la validación de la clave. Este PR.
+1. **`street_mood` con `lived`, `emptied` y `abandoned`** en `overgrow` y `signs`, `run` pasando `--street-mood`, y la validación de la clave. Hecho (PR #122).
 2. **Terrazas.** Una ubicación `terrace` delante de los comercios que registra `detail`, solo en calle peatonal o plaza y dejando 1,2 m de paso. Revisar qué mobiliario sirve para exterior y conseguir modelos CC0 de mesa, silla, sombrilla, macetero y caballete.
+   Hecho el 16 de noviembre de 2026 (enmienda de ADR-044). El ambiente dice si pone terrazas (`"terraces"`, solo `lived`). Las reglas están en `config/terraces.json`: delante de los bares (`bar` cubre cafés, bares, pubs y restaurantes), solo en calle peatonal, calle residencial compartida o plaza, con 1,2 m de paso hasta el edificio de enfrente. Cada bar lleva hasta dos mesas con una silla a cada lado, a izquierda y derecha de la puerta, más pizarra y macetero, siguiendo la fachada en línea hasta 6 m de la puerta. No hizo falta descargar nada: los catálogos CC0 ya tenían mesa y silla Quaternius, pizarra Poly Haven y macetero Kenney. Las sombrillas quedan fuera; irían con los toldos del incremento 3, que también necesitan geometría de tela. En Sierpes salen 7 mesas delante de 5 de sus 9 bares.
 3. **Toldos procedurales** sobre los escaparates, a partir de los datos de cada tienda: plano inclinado y faldón de tela, sin colisión.
 4. **El modelo ofrece el ambiente.** Nueva versión del esquema del perfil de calle con un campo de ambiente, y migración de las respuestas guardadas para que no se invaliden en silencio.
 5. **Coberturas por ambiente.** `perf cover` elige coberturas del ambiente (mesas, maceteros, quioscos) en vez de barreras en una calle en uso.
