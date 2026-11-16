@@ -100,3 +100,25 @@ def test_signs_leave_out_the_wall_wear_of_the_mood(tmp_path: Path, monkeypatch: 
         place_signs(base, scene, tmp_path / "number")
     monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
     assert "street_mood" not in place_signs(base, scene, tmp_path / "unreadable")["wall_decals"]  # an unreadable map.json reads as no key
+
+
+def _planted(out: Path) -> list[float]:
+    objects = json.loads((out / "scene_detail.json").read_text(encoding="utf-8"))["objects"]
+    return [o["position_m"][0] for o in objects
+            if (o.get("type") == "overgrow" or str(o.get("id", "")).startswith("overgrow")) and "tree" in json.dumps(o) and "generated" in json.dumps(o)]
+
+
+def test_the_trees_overgrow_plants_follow_the_seed_and_the_years(runs) -> None:  # type: ignore[no-untyped-def]
+    """Run here, not in the module fixture, so a changed line is run by the test that checks it."""
+    planted: dict[int, list[float]] = {}
+    for seed in range(1, 9):
+        out = runs["tmp"] / f"years30_{seed}"
+        overgrow(runs["base"], runs["scene"], out, seed=seed, profile=30)
+        planted[seed] = _planted(out)
+    assert planted == {1: [40.0], 2: [27.6], 3: [27.6, 52.4], 4: [40.0], 5: [40.0], 6: [27.6, 40.0], 7: [27.6, 52.4], 8: [40.0, 52.4]}
+
+
+def test_the_report_names_a_mood_other_than_the_default(runs) -> None:  # type: ignore[no-untyped-def]
+    lived = overgrow(runs["base"], runs["scene"], runs["tmp"] / "report_lived", seed=777, street_mood="lived")
+    assert lived["street_mood"] == "lived" and (lived["vines"], lived["wrecks"]) == (0, 0)
+    assert "street_mood" not in overgrow(runs["base"], runs["scene"], runs["tmp"] / "report_default", seed=777)

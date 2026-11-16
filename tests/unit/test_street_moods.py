@@ -70,14 +70,30 @@ def test_a_mood_keeps_the_props_of_its_conditions_and_those_without_one() -> Non
     assert [p.spec.id for p in mood_props(props, mood_for("abandoned"))] == ["a", "b", "c", "d", "e"]  # type: ignore[arg-type]
 
 
+def test_the_parsed_table_keeps_every_value() -> None:
+    """Read through parse_moods, not the cached load_moods, so a changed parser is the one tested."""
+    table = parse_moods(DOC, SCHEMA)
+    assert table.default == "abandoned" and sorted(table.moods) == ["abandoned", "emptied", "lived"]
+    for name, body in DOC["moods"].items():
+        mood = table.moods[name]
+        assert mood.id == name
+        assert (mood.vines, mood.planted_trees, mood.wrecks) == (body["vines"], body["planted_trees"], body["wrecks"])
+        assert all(isinstance(v, float) for v in (mood.vines, mood.planted_trees, mood.wrecks))
+        assert mood.conditions == (frozenset(body["conditions"]) if body["conditions"] is not None else None)
+        assert dict(mood.categories) == body["categories"] and isinstance(mood.categories, MappingProxyType)
+        assert mood.wall_decals_excluded == frozenset(body["wall_decals_excluded"])
+    assert table.moods["lived"].conditions == frozenset({"intact"}) and table.moods["abandoned"].conditions is None
+
+
 def test_an_unknown_mood_names_the_ones_there_are() -> None:
     with pytest.raises(MoodError, match=r"^street_mood must be one of abandoned, emptied, lived, got 'busy'$"):
         mood_for("busy")
 
 
 @pytest.mark.parametrize(("change", "message"), [
-    (lambda d: d.update(schema="other"), "schema"),
-    (lambda d: d.update(default="busy"), "default 'busy' is not one of its moods"),
+    (lambda d: d.update(schema="other"), "^street_moods: schema: 'onward_generator.street_moods' was expected$"),
+    (lambda d: d.pop("moods"), "^street_moods: 'moods' is a required property$"),
+    (lambda d: d.update(default="busy"), r"^street_moods: default 'busy' is not one of its moods: \['abandoned', 'emptied', 'lived'\]$"),
     (lambda d: d["moods"]["lived"].update(vines=2), "moods/lived/vines"),
     (lambda d: d["moods"]["lived"].update(conditions=["shiny"]), "moods/lived/conditions"),
     (lambda d: d["moods"]["lived"]["categories"].update(rubble=1), "moods/lived/categories"),
