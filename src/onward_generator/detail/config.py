@@ -95,8 +95,9 @@ class ShopSigns:
     vinyl_height_m: float
     vinyl_centre_m: float
     vinyl_width_share: float
-    default_name: str
-    generic_names: Mapping[str, str]
+    default_name: str | None
+    """The map's own generic shop words, or None: then the language of the map's centre (``detail.shop_names``)."""
+    generic_names: Mapping[str, str] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -397,7 +398,7 @@ def _shops(d: Mapping[str, Any]) -> ShopSigns:
         float(f["height_m"]), float(f["overhang_m"]), float(f["depth_m"]),
         float(b["width_m"]), float(b["height_m"]), float(b["thickness_m"]), float(b["wall_gap_m"]), float(b["clearance_m"]),
         float(v["height_m"]), float(v["centre_m"]), float(v["width_share"]),
-        d["default_name"], MappingProxyType(dict(sorted(d["generic_names"].items()))),
+        d.get("default_name"), MappingProxyType(dict(sorted(d["generic_names"].items()))) if "generic_names" in d else None,
     )
 
 

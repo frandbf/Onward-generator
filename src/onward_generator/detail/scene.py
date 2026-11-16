@@ -88,6 +88,7 @@ from onward_generator.detail.modules import Prototype, urban_prototypes
 from onward_generator.detail.reach import hidden_face, reached_ground
 from onward_generator.detail.roofs import MIN_RISE_M, BuiltRoof, build_roof, pitched_spec, with_rise
 from onward_generator.detail.s3db import part_height
+from onward_generator.detail.shop_names import shop_words
 from onward_generator.detail.shops import CATASTRO_USE_TAG, plan_shops
 from onward_generator.detail.typology import (
     FacadeStyle,
@@ -1516,6 +1517,8 @@ def _detail_buildings(
     pending_furnish: list[_PendingFurnish] = []
     # Plan P0: a core wall facing no ground a player reaches is laid out plain (``reach.hidden_face``).
     reached = reached_ground(base) if core is not None else None
+    # Generic shop words in the language of the map's centre, or the map's own (detail.shop_names, 15 November 2026).
+    words = shop_words((base.manifest().get("frame") or {}).get("origin_wgs84"), cfg.shops.default_name, cfg.shops.generic_names)
     # Plan Q3b: a style that builds them (Haussmann) gets balcons filants on its core and ring street walls and mansards.
     geometry = style_geometry(base, style_request)
     filants, mansards = "filants" in geometry, "mansard" in geometry
@@ -1732,7 +1735,7 @@ def _detail_buildings(
         spec = shell_template.balcony
         balcony_slabs = [(seg, bs0, bs0 + spec.width_m, v0 - spec.slab_m) for seg, bs0, v0 in layout.balconies] if spec is not None else []  # pragma: no mutate: a template without a balcony lays out none; the guard only tells mypy spec is set
         shops = plan_shops(bid, _shops_of(evidence[bid], feature_of, shop_tags), layout.holes, segments, cfg,
-                           interior.shop_doors if interior is not None else (), balcony_slabs, every_footprint) if shop else []
+                           interior.shop_doors if interior is not None else (), balcony_slabs, every_footprint, words) if shop else []
         door_fronts.extend(_door_fronts(layout.holes, segments))
         for entry in shops:
             if entry["poi_id"] in place_of:

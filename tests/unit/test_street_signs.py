@@ -16,6 +16,7 @@ from shapely import LineString, STRtree, box
 from onward_generator.cli import main
 from onward_generator.detail.config import load_detail_config
 from onward_generator.detail.facades import Hole, Segment
+from onward_generator.detail.shop_names import shop_words
 from onward_generator.detail.shops import plan_shops
 from onward_generator.generation.config import Material
 from onward_generator.generation.gltf import Node, Primitive, build_glb, images_by_material, nodes_from_glb, read_glb
@@ -162,7 +163,8 @@ def _shop_base(path: Path) -> None:
     _base(path)
     seg = Segment(0, 0, 0, (0.0, 12.0), (20.0, 12.0), True)
     holes = [Hole("shopfront", 0, 1.0, 0.25, 3.0, 2.3, 0.15, "glass_dark", 0, 0)]
-    shops = plan_shops("osm-way-north", [("osm-node-1", {"amenity": "pharmacy"}, (2.0, 11.0))], holes, [seg], cfg)
+    shops = plan_shops("osm-way-north", [("osm-node-1", {"amenity": "pharmacy"}, (2.0, 11.0))], holes, [seg], cfg,
+                       words=shop_words([-1.12863, 37.98407]))  # the Murcia centre's Spanish words
     manifest = json.loads((path / "scene_detail.json").read_text(encoding="utf-8"))
     manifest["objects"][0]["facade"] = {"shops": shops}
     (path / "scene_detail.json").write_text(json.dumps(manifest), encoding="utf-8")

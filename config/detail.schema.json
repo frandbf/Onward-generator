@@ -170,7 +170,8 @@
     },
     "shops": {
       "type": "object", "additionalProperties": false,
-      "required": ["fascia_share", "vinyl_share", "fascia", "blade", "vinyl", "default_name", "generic_names"],
+      "required": ["fascia_share", "vinyl_share", "fascia", "blade", "vinyl"],
+      "dependentRequired": { "default_name": ["generic_names"], "generic_names": ["default_name"] },
       "properties": {
         "fascia_share": { "type": "number", "minimum": 0, "maximum": 1 },
         "vinyl_share": { "type": "number", "minimum": 0, "maximum": 1 },

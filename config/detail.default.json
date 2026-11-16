@@ -91,24 +91,7 @@
     "vinyl_share": 0.5,
     "fascia": { "height_m": 0.36, "overhang_m": 0.15, "depth_m": 0.06 },
     "blade": { "width_m": 0.7, "height_m": 0.5, "thickness_m": 0.04, "wall_gap_m": 0.15, "clearance_m": 2.4 },
-    "vinyl": { "height_m": 0.26, "centre_m": 1.6, "width_share": 0.8 },
-    "default_name": "Comercio",
-    "generic_names": {
-      "shop=bakery": "Panadería", "shop=pastry": "Pastelería", "shop=confectionery": "Confitería",
-      "shop=butcher": "Carnicería", "shop=greengrocer": "Frutería", "shop=seafood": "Pescadería",
-      "shop=supermarket": "Supermercado", "shop=convenience": "Alimentación", "shop=kiosk": "Quiosco",
-      "shop=tobacco": "Estanco", "shop=clothes": "Moda", "shop=shoes": "Zapatería",
-      "shop=hairdresser": "Peluquería", "shop=beauty": "Estética", "shop=optician": "Óptica",
-      "shop=jewelry": "Joyería", "shop=books": "Librería", "shop=stationery": "Papelería",
-      "shop=florist": "Floristería", "shop=hardware": "Ferretería", "shop=mobile_phone": "Telefonía",
-      "shop=electronics": "Electrónica", "shop=furniture": "Muebles", "shop=gift": "Regalos",
-      "shop=dry_cleaning": "Tintorería", "shop=laundry": "Lavandería", "shop=travel_agency": "Viajes",
-      "amenity=pharmacy": "Farmacia", "amenity=cafe": "Cafetería", "amenity=bar": "Bar",
-      "amenity=restaurant": "Restaurante", "amenity=fast_food": "Comida rápida", "amenity=pub": "Pub",
-      "amenity=ice_cream": "Heladería", "amenity=bank": "Banco", "amenity=dentist": "Clínica dental",
-      "amenity=clinic": "Clínica", "amenity=veterinary": "Veterinario",
-      "shop": "Tienda", "amenity": "Local", "office": "Oficina", "craft": "Taller"
-    }
+    "vinyl": { "height_m": 0.26, "centre_m": 1.6, "width_share": 0.8 }
   },
   "interiors": {
     "enabled": true,
