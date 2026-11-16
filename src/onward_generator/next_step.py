@@ -216,6 +216,16 @@ def _facade_style(scene: Path) -> tuple[str, ...]:
     return ()
 
 
+def _street_mood(root: Path | None) -> tuple[str, ...]:
+    """``--street-mood NAME`` for overgrow when ``map.json`` names one (ADR-044); nothing without the key."""
+    if root is None or not (root / "map.json").is_file():
+        return ()
+    from onward_generator.maps.workspace import street_mood
+
+    mood = street_mood(root)
+    return ("--street-mood", mood) if mood is not None else ()
+
+
 def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,
                    roof_spread: Path | None = None, lod2_landmarks: Path | None = None) -> StageCommand:
     """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), Overture places and colours when given,
@@ -363,6 +373,7 @@ def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
         parts.extend(["--library", show(library)])
     parts.extend(_triangle_limit(root))
     parts.extend(_facade_style(base))
+    parts.extend(_street_mood(root))
     if root is not None:
         pins = root / "config" / "pinned_props.json"
         if pins.is_file():

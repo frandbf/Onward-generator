@@ -64,6 +64,7 @@ from onward_generator.overgrow.lamps import swap_lamps
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import read_selection
 from onward_generator.overgrow.manifest import PINNED_ONLY
+from onward_generator.overgrow.moods import MoodError, apply_mood, load_moods, mood_for, mood_props
 from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.pinned import PinnedError, PinnedResult, frame_of, keep_out_circles, place_pins, read_pins
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
@@ -125,6 +126,7 @@ def overgrow(
     triangle_limit: int = UNITY_TRIANGLE_LIMIT,
     pinned: str | Path | None = None,
     style_request: str = "auto",
+    street_mood: str | None = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -150,7 +152,11 @@ def overgrow(
 
     detail_tree_ids, detail_trees = _detail_trees(manifest)
     urban_areas = [Point(x, y).buffer(radius) for x, y, radius in detail_elements(manifest)]
-    years = profile_for(profile)
+    try:
+        mood = mood_for(street_mood)
+    except MoodError as exc:
+        raise OvergrowError(str(exc)) from exc
+    years = apply_mood(profile_for(profile), mood)
     core = core_of(manifest)
     area = _resolve_zone(zone, zone_radius_m, zone_polygon, core)
     area = within_core(area, core)
@@ -164,6 +170,8 @@ def overgrow(
     library_props = list(props)
     # A pinned_only story prop stands only where config/pinned_props.json pins it (14 November 2026).
     props = [prop for prop in props if prop.spec.placement != PINNED_ONLY]
+    # A street mood keeps the props of its conditions (ADR-044): a street in daily use draws no wreck or burned prop.
+    props = mood_props(props, mood)
     chosen: list[str] | None = None
     if selection is not None:
         chosen = read_selection(selection)
@@ -274,7 +282,7 @@ def overgrow(
         if reason:
             _note(rejects, reject_counts, "tree", reason, spot)
             continue
-        if not keep(seed, years.trees, edge.feature_id, edge.index, "tree"):
+        if not keep(seed, years.trees * years.planted, edge.feature_id, edge.index, "tree"):
             continue
         variant = int(stable_unit(seed, edge.feature_id, edge.index, "tree") * 3)
         if not budget.take(tree_tris[variant]):
@@ -469,6 +477,8 @@ def overgrow(
         "generator_version": __version__,
         "base_dir": str(base),
         "profile_years": years.years,
+        # The street mood (ADR-044), when the map names one other than the default.
+        **({"street_mood": mood.id} if mood.id != load_moods().default else {}),
         "seed": seed,
         "zone": {"kind": area.kind, "key": area.stable_key()},
         # The facade moss skirt was removed; the key stays at 0 so the report keeps its shape.

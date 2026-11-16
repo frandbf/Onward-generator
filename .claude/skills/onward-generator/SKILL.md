@@ -94,7 +94,7 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 | Facade style (`facades.style`): it also decides the style's geometry, such as mansards, and whether library trees replace the street trees | `detail` |
 | Light preset (`--atmosphere`), textures or weathering | `materials` |
 | Interior furniture of shops and flats (the detail configuration) | `detail` |
-| Street name plates, shop signs, wall decals, the user's own decals (`user_decals`), war damage (`damage`) | `signs` |
+| Street name plates, shop signs, wall decals, the user's own decals (`user_decals`), war damage (`damage`), street mood (`street_mood`: a living street or an abandoned one) | `signs` |
 | Abandoned look, props, lamp posts, library trees (`--brief`, `--ai`, `triangle_limit`) | `overgrow` |
 | Spawns, routes, game modes | `layout` |
 | Smoke columns (`smoke`) | `export` |

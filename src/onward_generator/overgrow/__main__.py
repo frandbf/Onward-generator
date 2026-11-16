@@ -47,6 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it; its climate decides whether library trees replace the street trees")  # pragma: no mutate: help text
     place.add_argument("--pinned", default=None, help="a pinned_props.json: library props the map must carry near given WGS84 points, at their own size")  # pragma: no mutate: help text
     place.add_argument("--prefer", default=None, help="a prop_selection.json whose ids are offered and placed first; the other props still stand (a street profile's props_profile)")  # pragma: no mutate: help text
+    place.add_argument("--street-mood", default=None, help="a mood of config/street_moods.json (map.json street_mood): lived, emptied or abandoned; absent is the default, abandoned")  # pragma: no mutate: help text
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
     place.add_argument(
         "--street-profile",
@@ -132,7 +133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             overwrite=args.overwrite, profile=args.profile, seed=args.seed,
             zone_radius_m=args.zone_radius, zone_polygon=args.zone_polygon,
             library=args.library, layout=args.layout, selection=args.selection, prefer=args.prefer, triangle_limit=args.triangle_limit, pinned=args.pinned, style_request=args.facade_style,
-            street_profile=block,
+            street_profile=block, street_mood=args.street_mood,
         )
     except (OvergrowError, FitError, FetchError, SketchfabError, ZoneError, LibraryError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:
         print(f"overgrow: {exc}", file=sys.stderr)

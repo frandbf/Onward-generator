@@ -381,6 +381,22 @@ def smoke_columns(directory: str | Path) -> int:
         raise MapError(str(exc)) from exc
 
 
+def street_mood(directory: str | Path) -> str | None:
+    """``map.json`` ``street_mood``: a mood of ``config/street_moods.json`` (ADR-044), or None without the key. An
+    unknown name, or a value that is not a string, is refused with ``MapError``."""
+    from onward_generator.overgrow.moods import MoodError, mood_for
+
+    value = load_map(directory).get("street_mood")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise MapError(f'map.json "street_mood" must be a string, got {value!r}')
+    try:
+        return mood_for(value).id
+    except MoodError as exc:
+        raise MapError(f"map.json {exc}") from exc
+
+
 def normal_maps_enabled(directory: str | Path) -> bool:
     """True only when ``map.json`` has ``"normal_maps": true`` (plan T3, off by default). A value that is not a bool is
     refused."""
