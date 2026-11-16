@@ -158,3 +158,14 @@ def test_the_overgrow_command_passes_the_mood(tmp_path: Path, monkeypatch: pytes
     assert seen["street_mood"] == "lived"
     assert cli.main(common) == 1
     assert seen["street_mood"] is None
+
+
+@pytest.mark.parametrize("module", ["onward_generator.export.package", "onward_generator.signs", "onward_generator.overgrow"])
+def test_each_stage_imports_alone_in_a_fresh_interpreter(module: str) -> None:
+    """16 November 2026: signs imported the moods at the top, and export → signs → overgrow → export closed a cycle
+    that only a fresh interpreter (``run`` starting at export) showed."""
+    import subprocess
+    import sys
+
+    done = subprocess.run([sys.executable, "-c", f"import {module}"], capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
