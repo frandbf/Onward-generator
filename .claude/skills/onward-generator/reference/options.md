@@ -20,6 +20,8 @@ The flags of `onward-generator run` (what `task map -- …` passes on), and the 
 | Turn one recommended switch off | `--no-<switch>` (below) | A new map has them all on except `--panoramax-atlas`. |
 | Redo from a stage | `--from <stage>` | See the skill, step 4. |
 | A fixed random seed | `--seed N` | Rarely needed; the seed comes from the centre. |
+| Dirt or sand streets | nothing | Automatic: a street OpenStreetMap tags unpaved (`surface=dirt`, `sand`, `gravel`…) is drawn as earth on a new map. A map made before 16 November 2026 needs its texture plan written again, a development step (`map create --textures`) outside this skill; or make a new map. |
+| A particular facade style | `"facades": {"style": "<name>"}` in `map.json` (below) | Usually not needed: the style follows the region of the centre. |
 
 ## Switches (on by default for a new map)
 
@@ -35,7 +37,7 @@ Each has a `--no-` form for `task map` on a **new** map, and is a `true`/`false`
 | `gameplay_report` | A gameplay report: routes, sightlines, spawn balance. |
 | `balanced_spawns` | Spawns placed for balance between teams. |
 | `sightline_cover` | Cover where long sightlines cross the street. |
-| `wide_library` | 25 extra CC0 photo textures. |
+| `wide_library` | 34 extra CC0 photo textures, among them the earth for unpaved streets. |
 | `normal_maps` | Real relief on ground, roofs and bark (accepted after a headset session). |
 | `texture_variants` | Two more calm photos for roofs and plaster walls, one per building. |
 | `panoramax_atlas` | **Off by default**; only with `--panoramax`, under development. |

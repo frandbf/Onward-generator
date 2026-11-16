@@ -55,7 +55,7 @@ You need four things. Ask only for what is missing, in one message.
 - **Name**: the card title, 1 to 80 characters (for example "Plaza de Armas"). The folder becomes `maps/<name in lower case, without accents, spaces as _>`. A name already used reopens that map; for a new map pick a new name. If the map may go to the Onward Workshop, suggest a title of 6 to 18 characters (24 at most).
 - **Centre**: latitude and longitude, WGS84 decimals. The easiest way: open https://www.openstreetmap.org, centre the map on the street, and copy the address bar; it ends in `#map=19/<lat>/<lon>`. If they give an address or a place name, you may suggest coordinates, but show them and ask the user to confirm them on the map before running. A wrong point downloads the wrong place.
 - **Size**: `--radius-m`, half the side of the square in metres (50 to 1500, default 125). The default keeps a 100 m playable core inside a 25 m scenic ring (buildings past the core are plain shells). For a first map 100 to 125 is a good size. A smaller radius does **not** make a lighter map: the generator spends the triangle budget it has on props and trees (use `triangle_limit` for that, step 8), and a small core can lose routes and lifts.
-- **Feel and options**: translate what they say ("abandoned", "at night", "golden hour", "use AI", "stormy") into flags with [reference/options.md](reference/options.md). Leave out what they didn't ask for: a new map already has the recommended switches on.
+- **Feel and options**: translate what they say ("abandoned", "at night", "golden hour", "use AI", "stormy", "a city at war", "desert dust") into flags and `map.json` keys with [reference/options.md](reference/options.md). Leave out what they didn't ask for: a new map already has the recommended switches on. The look follows the place by itself: the facade style comes from the region (an arid flat-roof style in the Middle East, for example), shops without a name are signed in the local language, and streets OpenStreetMap marks as unpaved are drawn as earth.
 
 Before running, show the user the command and a one-line summary of what it will do, and wait for a yes. It downloads OpenStreetMap data and takes minutes. For example:
 
@@ -94,9 +94,10 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 | Facade style (`facades.style`): it also decides the style's geometry, such as mansards, and whether library trees replace the street trees | `detail` |
 | Light preset (`--atmosphere`), textures or weathering | `materials` |
 | Interior furniture of shops and flats (the detail configuration) | `detail` |
-| Street name plates, shop signs, wall decals, the user's own decals (`user_decals`) | `signs` |
+| Street name plates, shop signs, wall decals, the user's own decals (`user_decals`), war damage (`damage`) | `signs` |
 | Abandoned look, props, lamp posts, library trees (`--brief`, `--ai`, `triangle_limit`) | `overgrow` |
 | Spawns, routes, game modes | `layout` |
+| Smoke columns (`smoke`) | `export` |
 | Lightmap detail (`build.lightmap_texels_per_m` in `config/export.json`) | `export`, then a new Unity build |
 | Centre or radius | Don't. Make a new map with a new name: `map.json` keeps the area it was created with. |
 
