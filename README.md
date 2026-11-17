@@ -154,6 +154,7 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
 | `map.json` `"project_decals": false` | Leaves the project's wall decals (`assets/decals/`) off this map |
 | `map.json` `"damage": "none" \| "light" \| "heavy" \| "auto"` | War damage on the walls and decals on the ground of the core; rerun from `signs` ([ADR-038](docs/decisions/ADR-038-wall-decals.md) amendment) |
+| `map.json` `"overhead_lines": true \| false` | Poles, wires and service drops along the streets; absent, an `east_african`, `arid` or `latin_american` map gets them and the others do not; rerun from `overgrow` ([ADR-045](docs/decisions/ADR-045-overhead-lines.md), proposed) |
 | `map.json` `"street_mood": "lived" \| "emptied"` | A street in daily use (no growth or wrecks, intact props, street furniture, café terraces under parasols before the bars of pedestrian streets, awnings over the shop windows, no war wear on the walls) or one emptied days ago; absent is `abandoned`, unless the street profile offers a mood from the brief; rerun from `signs` ([ADR-044](docs/decisions/ADR-044-street-moods.md), proposed) |
 | `map.json` `"smoke": N` | 0 to 5 smoke columns over wrecks of the core; rerun from `export` ([ADR-043](docs/decisions/ADR-043-smoke-columns.md), proposed) |
 

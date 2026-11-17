@@ -69,6 +69,7 @@ from onward_generator.overgrow.manifest import PINNED_ONLY
 from onward_generator.overgrow.moods import MoodError, apply_mood, load_moods, mood_for, mood_props
 from onward_generator.overgrow.pick import pick_props
 from onward_generator.overgrow.pinned import PinnedError, PinnedResult, frame_of, keep_out_circles, place_pins, read_pins
+from onward_generator.overgrow.power_lines import LINE_MATERIAL, LineResult, LinesError, lines_enabled, lines_png, load_lines, place_lines
 from onward_generator.overgrow.profiles import profile_for, scaled_cap
 from onward_generator.overgrow.realize import load_replay
 from onward_generator.overgrow.terraces import HEADROOM_SHARE, TerraceResult, place_terraces
@@ -130,6 +131,7 @@ def overgrow(
     pinned: str | Path | None = None,
     style_request: str = "auto",
     street_mood: str | None = None,
+    overhead_lines: bool | None = None,
 ) -> dict[str, Any]:
     base = Path(base_dir).expanduser().resolve()
     scene_path = Path(geo_scene).expanduser().resolve()
@@ -211,7 +213,8 @@ def overgrow(
     nodes = lamps.nodes
     headroom -= lamps.added_triangles  # swap_lamps adds no more than the headroom
     # detail's street trees drawn as library cut-out trees (ADR-040), within a share of what is left.
-    trees_swap = swap_trees(nodes, library_props, seed, headroom, map_climate(manifest, style_request))
+    style = map_style(manifest, style_request)
+    trees_swap = swap_trees(nodes, library_props, seed, headroom, _climate(style))
     nodes = trees_swap.nodes
     headroom -= trees_swap.added_triangles  # swap_trees spends at most its share of the headroom
     # Café terraces before the bars of pedestrian streets and plazas, when the street mood asks for them (ADR-044).
@@ -228,6 +231,17 @@ def overgrow(
     if mood.awnings:
         awnings = place_awnings(manifest, buildings, area, seed, budget=int(headroom * HEADROOM_SHARE))
         headroom -= awnings.triangles
+    # Poles, wires and service drops where the city is wired overhead: by its facade style, or map.json (ADR-045).
+    lines = LineResult()
+    try:
+        wired = lines_enabled(overhead_lines, style, load_lines())
+    except LinesError as exc:
+        raise OvergrowError(str(exc)) from exc
+    if wired:
+        lines = place_lines(manifest, features, buildings, area, seed, budget=int(headroom * HEADROOM_SHARE), ground_z=floor.z,
+                            near_spawn=lambda x, y: _near_spawn(x, y, spawns), blocked=urban_areas)
+        headroom -= lines.triangles
+        urban_areas.extend(lines.footprints)
     budget = _Budget(min(MAX_ADDED_TRIS, headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -372,7 +386,7 @@ def overgrow(
         floor=floor,
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
-        keep_out=[*detail_elements(manifest), *keep_out_circles([*pins.footprints, *terraces.footprints])],
+        keep_out=[*detail_elements(manifest), *keep_out_circles([*pins.footprints, *terraces.footprints, *lines.footprints])],
         signs=[*sign_footprints(manifest), *awnings.footprints],
     )
     tuft_meshes.extend(planted.grass)
@@ -382,6 +396,7 @@ def overgrow(
     records.extend(planted.records)
     records.extend(terraces.records)
     records.extend(awnings.records)
+    records.extend(lines.records)
     rejects.extend(planted.rejects)
     for key, count in planted.reject_counts.items():
         reject_counts[key] = reject_counts.get(key, 0) + count
@@ -418,6 +433,10 @@ def overgrow(
     extra_nodes.extend(furniture.nodes)
     extra_nodes.extend(terraces.nodes)
     extra_nodes.extend(awnings.nodes)
+    extra_nodes.extend(lines.nodes)
+    if lines.nodes:
+        images[LINE_MATERIAL] = lines_png(load_lines())
+        materials[LINE_MATERIAL] = Material((1, 1, 1, 1), 0.9)
     if any(prim.material == FABRIC_MATERIAL for node in [*terraces.nodes, *awnings.nodes] for prim in node.primitives):
         images[FABRIC_MATERIAL] = fabric_png()
         materials[FABRIC_MATERIAL] = Material((1, 1, 1, 1), 0.9)
@@ -457,12 +476,13 @@ def overgrow(
         )
         for index, node in enumerate(trees)
     ]
-    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders, *pins.colliders, *terraces.colliders]
+    colliders = [*wreck_colliders, *tree_colliders, *planted.colliders, *furniture.colliders, *pins.colliders, *terraces.colliders,
+                 *lines.colliders]
     collision = base / "scene_collision.glb"
     atomic_write_bytes(targets[1], _collision_bytes(collision.read_bytes() if collision.is_file() else b"", colliders))
     if len(colliders) != wreck_count + tree_count + sum(1 for row in planted.records if row.get("solid")) + furniture.solid_pieces + len(pins.colliders) + sum(
         1 for row in terraces.records if row["solid"]
-    ):
+    ) + sum(1 for row in lines.records if row["solid"]):
         raise OvergrowError("a solid prop was placed without a collision box")
     objects = [dict(o) for o in (manifest.get("objects") or []) if isinstance(o, dict)]
     objects.extend(
@@ -555,6 +575,8 @@ def overgrow(
         summary["terraces"] = terraces.report()
     if mood.awnings:
         summary["awnings"] = awnings.report()
+    if wired:
+        summary["overhead_lines"] = lines.report(style, overhead_lines)
     if street_profile is not None:
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         summary["street_profile"] = dict(street_profile)
@@ -566,22 +588,32 @@ def overgrow(
     return summary
 
 
-def map_climate(manifest: Mapping[str, Any], style_request: str) -> str | None:
-    """The climate of the map's facade style, resolved as materials and detail resolve it (``style_request``, else the
-    box of the map's centre), or None where the style names none (15 November 2026)."""
+def map_style(manifest: Mapping[str, Any], style_request: str) -> str:
+    """The map's facade style, resolved as materials and detail resolve it: ``style_request``, else the box of the map's
+    centre (15 November 2026)."""
     from onward_generator.materials.trim_style import (  # materials imports overgrow's neighbours; load it on use
         StyleError,
         load_style_table,
         resolve_style,
     )
 
-    table = load_style_table()
     origin = (manifest.get("frame") or {}).get("origin_wgs84")
     try:
-        name, _ = resolve_style(table, style_request, origin or None)
+        name, _ = resolve_style(load_style_table(), style_request, origin or None)
     except StyleError as exc:
         raise OvergrowError(str(exc)) from exc
-    return table.styles[name].climate
+    return str(name)
+
+
+def _climate(style: str) -> str | None:
+    from onward_generator.materials.trim_style import load_style_table
+
+    return load_style_table().styles[style].climate
+
+
+def map_climate(manifest: Mapping[str, Any], style_request: str) -> str | None:
+    """The climate of the map's facade style, or None where the style names none (15 November 2026)."""
+    return _climate(map_style(manifest, style_request))
 
 
 def triangle_headroom(input_triangles: int, furniture_triangles: int, limit: int = UNITY_TRIANGLE_LIMIT) -> int:
