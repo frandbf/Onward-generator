@@ -12,7 +12,7 @@ import pytest
 from PIL import Image
 
 from onward_generator.export.fire import (
-    BASE_DROP_M,
+    BASE_RISE_M,
     EMBERS,
     FLAMES,
     TEXTURE_FILE,
@@ -30,7 +30,7 @@ ADAPTER = Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adap
 
 
 def test_the_settings() -> None:
-    assert (TEXTURE_FILE, TEXTURE_ROLE, TEXTURE_PX, BASE_DROP_M) == ("fire_flame.png", "fire_texture", 64, 0.4)
+    assert (TEXTURE_FILE, TEXTURE_ROLE, TEXTURE_PX, BASE_RISE_M) == ("fire_flame.png", "fire_texture", 64, 0.6)
     assert FLAMES == {"rate_per_s": 20.0, "lifetime_s": 0.6, "min_size_m": 0.4, "max_size_m": 1.0, "end_scale": 0.3, "speed_m_s": 1.5,
                       "cone_deg": 12.0, "radius_m": 0.4, "start_color": "#FFC860", "end_color": "#FF3C0A", "max_particles": 16}
     assert EMBERS == {"rate_per_s": 3.0, "lifetime_s": 2.5, "min_size_m": 0.04, "max_size_m": 0.07, "end_scale": 0.5, "speed_m_s": 1.8,
@@ -48,24 +48,27 @@ def test_anything_else_is_refused(value: object) -> None:
         check_fire(value)
 
 
-def test_the_flame_is_white_bright_low_and_narrows_to_a_tip() -> None:
+def test_the_flame_is_yellow_in_its_low_core_red_at_the_edges_and_narrows_to_a_tip() -> None:
     image = Image.open(io.BytesIO(flame_png()))
     assert image.size == (64, 64) and image.mode == "RGBA"
     pixels = np.asarray(image)
-    assert (pixels[..., :3] == 255).all()  # white: the particles' colour tints it
+    assert pixels[55, 32, :3].tolist() == [255, 206, 114]  # the low core, near CORE_RGB
+    assert pixels[10, 32, :3].tolist() == [255, 106, 34]  # near the tip, towards EDGE_RGB
+    assert pixels[55, 20, :3].tolist() == [255, 175, 89]  # off the axis, between
+    assert pixels[0, 0, :3].tolist() == [255, 84, 16]  # outside the flame: EDGE_RGB exactly
     alpha = pixels[..., 3]
     assert alpha[63, 32] == 0 and alpha[0, 32] == 0  # it fades in at the foot and out at the tip
-    assert alpha[55, 32] == 179 and alpha[32, 32] == 170 and alpha[5, 32] == 55
+    assert alpha[55, 32] == 161 and alpha[32, 32] == 153 and alpha[5, 32] == 50
     assert alpha[55, 0] == 0 and alpha[55, 5] == 0  # narrower than the sprite
-    assert int(np.argmax(alpha[:, 32])) == 52 and alpha.max() == 227  # brightest low down
-    assert hashlib.sha256(pixels.tobytes()).hexdigest()[:16] == "46a5134148f0ae5f"
+    assert int(np.argmax(alpha[:, 32])) == 52 and alpha.max() == 204  # brightest low down, at most ALPHA_PEAK
+    assert hashlib.sha256(pixels.tobytes()).hexdigest()[:16] == "6550f9cc11bd5f3a"
     assert flame_png() == flame_png()
 
 
 def test_the_options_carry_the_numbers_and_a_site_under_each_column() -> None:
     block = fire_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}, {"x": -3.5, "y": 4.25, "z": 2.12345, "seed": 2}])
     assert block == {"texture": "fire_flame.png", "flames": FLAMES, "embers": EMBERS,
-                     "sites": [{"x": 1.0, "y": 2.0, "z": 0.6, "seed": 1}, {"x": -3.5, "y": 4.25, "z": 1.723, "seed": 2}]}
+                     "sites": [{"x": 1.0, "y": 2.0, "z": 1.6, "seed": 1}, {"x": -3.5, "y": 4.25, "z": 2.723, "seed": 2}]}
     block["flames"]["rate_per_s"] = 0.0
     assert FLAMES["rate_per_s"] == 20.0  # the block is a copy
 
@@ -86,9 +89,9 @@ def test_the_map_key_reaches_the_export_command(tmp_path: Path, monkeypatch: pyt
     assert _fire(tmp_path / "elsewhere") == []  # no map.json there
 
 
-def test_the_adapter_draws_flames_and_embers_on_the_sdk_additive_shader() -> None:
+def test_the_adapter_draws_flames_and_embers_on_the_sdk_unlit_shader() -> None:
     source = ADAPTER.read_text(encoding="utf-8")
-    assert 'private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit_Additive.shadergraph";' in source
+    assert 'private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit.shadergraph";' in source
     assert 'private const string FireRole = "fire_texture";' in source
     assert "public FireOptions fire = new FireOptions();" in source and "AddFire(pkg, root);" in source
     assert "adapter_options.json fire has {fireSites} sites, the package lists {fireFiles} '{FireRole}' files" in source
@@ -98,3 +101,11 @@ def test_the_adapter_draws_flames_and_embers_on_the_sdk_additive_shader() -> Non
                  "main.maxParticles = e.max_particles;", "emission.rateOverTime = e.rate_per_s;", "main.startSpeed = e.speed_m_s;",
                  "renderer.shadowCastingMode = ShadowCastingMode.Off;", "renderer.lightProbeUsage = LightProbeUsage.Off;"):
         assert line in body, line
+
+
+def test_the_views_run_the_particles_before_they_render() -> None:
+    source = ADAPTER.read_text(encoding="utf-8")
+    body = source[source.index("public static void CaptureViews"):]
+    simulate = body.index("system.Simulate(system.main.duration * 2f, false, true);")
+    assert simulate < body.index('new GameObject("OnwardCaptureCamera")')
+

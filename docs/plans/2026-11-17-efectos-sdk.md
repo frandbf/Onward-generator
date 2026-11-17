@@ -79,7 +79,7 @@ Orden: **G0** (prueba del LUT, barata y puede descartar el punto 4), **D** (soni
 - **Bloque** `fire` en `adapter_options.json`:
   - Llamas: unas 12 partículas por columna, que viven 0,6 s, miden de 0,4 a 1,2 m y suben a 1,5 m/s.
   - Brasas: 6 partículas por columna, de 4 cm, que viven 2 s, suben con algo de dispersión y se apagan.
-- **Adaptador:** un segundo y un tercer `ParticleSystem`, hijos de cada columna, con `PP_Particle_Unlit_Additive`.
+- **Adaptador:** un segundo y un tercer `ParticleSystem`, hijos de cada columna, con `PP_Particle_Unlit` (la variante aditiva se descartó: de día la llama salía blanca).
   - No se iluminan: el fuego da su propia luz y no necesita sondas.
   - Van sin sombras y sin luz en tiempo real, porque una luz dinámica es cara en el Quest y un parpadeo no se puede hornear.
   - Se rechaza un paquete con bloque `fire` y sin textura, o con textura y sin bloque.

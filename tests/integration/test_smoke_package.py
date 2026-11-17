@@ -132,7 +132,7 @@ def test_fire_burns_under_each_column_with_its_texture(inputs: tuple[Path, Path]
     result = build_package(EXPORT_PROJECT, _wrecked(detail, tmp_path, far), layout, tmp_path / "pkg", now=FIXED_NOW, smoke=len(far), fire=True)
     block = json.loads((result.directory / "adapter_options.json").read_bytes())["fire"]
     assert block["texture"] == "fire_flame.png" and block["flames"] == FLAMES and block["embers"] == EMBERS
-    assert sorted((s["x"], s["y"], s["z"]) for s in block["sites"]) == sorted((x, y, 0.6) for x, y in far)
+    assert sorted((s["x"], s["y"], s["z"]) for s in block["sites"]) == sorted((x, y, 1.6) for x, y in far)
     assert result.manifest["fire"] == {"sites": len(far), "origin": "generated"}
     listed = [f for f in result.manifest["files"] if f["role"] == "fire_texture"]
     assert [f["path"] for f in listed] == ["fire_flame.png"] and listed[0]["source"] == "generated"

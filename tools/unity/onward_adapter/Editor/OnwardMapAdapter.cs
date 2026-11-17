@@ -71,8 +71,8 @@ namespace OnwardGenerator
         private const float SmokeCutoff = 0.02f;
         private const float SmokeConeAngleDeg = 8f;
         private const float SmokeConeRadiusM = 0.6f;
-        // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit additive particle shader.
-        private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit_Additive.shadergraph";
+        // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit particle shader.
+        private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit.shadergraph";
         private const string FireRole = "fire_texture";
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
@@ -1170,6 +1170,9 @@ namespace OnwardGenerator
                 ApplyQuestGraphics();
                 EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
                 EnsureLightmapsAssigned();
+                // An editor render does not play particles: run each system (smoke, fire) to its steady state first.
+                foreach (ParticleSystem system in UnityEngine.Object.FindObjectsOfType<ParticleSystem>())
+                    system.Simulate(system.main.duration * 2f, false, true);
                 var cameraObject = new GameObject("OnwardCaptureCamera");
                 var camera = cameraObject.AddComponent<Camera>();
                 camera.fieldOfView = list.fov_deg;
@@ -3208,7 +3211,7 @@ namespace OnwardGenerator
         }
 
         // Plan 2026-11-17, increment E: small flames and rising embers at the foot of each smoke column, two ParticleSystems
-        // per site on the SDK's unlit additive shader. Unlit, no shadows, no real-time light: the fire is its own light and
+        // per site on the SDK's unlit particle shader. Unlit, no shadows, no real-time light: the fire is its own light and
         // a flicker cannot be baked. Not static, so nothing is baked.
         private static void AddFire(Package pkg, string root)
         {
