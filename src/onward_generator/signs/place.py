@@ -454,10 +454,10 @@ def _street_mood(base: Path) -> tuple[Mood, bool]:
     if root is not None:
         try:
             value = load_map(root).get("street_mood")
-        except (MapError, ValueError, OSError):  # an unreadable map.json reads as no key
+            if value is None:
+                value = applied_street_mood(root)
+        except (MapError, ValueError, OSError):  # an unreadable map.json reads as no key, and as no profile
             value = None
-        if value is None:
-            value = applied_street_mood(root)
     try:
         mood = mood_for(value if isinstance(value, str) or value is None else repr(value))
     except MoodError as exc:

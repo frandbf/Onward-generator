@@ -327,8 +327,9 @@ def test_max_props_from_a_street_profile_caps_the_cover_and_records_its_block(st
         name = "stub"
 
         def complete(self, system: str, instruction: str, schema: dict) -> ProviderResult:
-            return ProviderResult(json.dumps({"profile_version": "0.1.0", "dominant_typology": "map_default", "palette": "map_default",
-                                              "props_profile": "map_default", "abandonment": "map_default", "cover": "off"}))
+            return ProviderResult(json.dumps({"profile_version": "0.2.0", "dominant_typology": "map_default", "palette": "map_default",
+                                              "props_profile": "map_default", "abandonment": "map_default", "cover": "off",
+                                              "street_mood": "map_default"}))
 
     root = tmp_path / "map"
     create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER[1], longitude=MURCIA_CENTER[0], radius_m=150)
