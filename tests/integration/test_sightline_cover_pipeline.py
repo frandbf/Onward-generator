@@ -44,7 +44,7 @@ def _prop_glb(path: Path, name: str, length: float, width: float, height: float)
     ))
 
 
-def _library(root: Path, rows: list[tuple[str, str, str, tuple[float, float, float]]]) -> Path:
+def _library(root: Path, rows: list[tuple[str, str, str, tuple[float, float, float]]], conditions: dict[str, str] | None = None) -> Path:
     root.mkdir(parents=True)
     assets = []
     for asset_id, role, category, size in rows:
@@ -52,6 +52,7 @@ def _library(root: Path, rows: list[tuple[str, str, str, tuple[float, float, flo
         assets.append({
             "id": asset_id, "file": f"{asset_id}.glb", "category": category, "role": role, "surfaces": ["sidewalk"],
             "anchor": "ground", "lane": "forbid", "clearance_m": 0.0, "use": "test", "license": "CC0-1.0",
+            **({"condition": conditions[asset_id]} if conditions and asset_id in conditions else {}),
         })
     (root / "manifest.json").write_text(json.dumps({"assets": assets}), encoding="utf-8")
     return root
@@ -357,11 +358,13 @@ def test_a_lived_street_stands_only_its_civic_cover(stage: dict[str, Path], tmp_
     """Plan 2026-11-16, increment 5: a street in daily use gets planters, not barriers; the default keeps its own rule."""
     library = _library(tmp_path / "civic", [
         ("synth_barrier", "barrier", "barriers", (1.6, 0.5, 1.3)), ("synth_planter", "planter", "furniture", (1.8, 0.8, 1.0)),
-    ])
+        ("synth_planter_worn", "planter", "furniture", (1.8, 0.8, 1.0)),
+    ], {"synth_planter": "intact", "synth_planter_worn": "worn"})
     lived = tmp_path / "lived"
     assert main([*_args(stage, lived, library=library)[:-2], "--street-mood", "lived", "--out", str(lived)]) == 0
     report = json.loads((lived / COVER_REPORT).read_text(encoding="utf-8"))
-    assert report["candidates"] == ["synth_planter"] and report["refused_props"] == {"synth_barrier": "not_a_cover_role"}
+    assert report["candidates"] == ["synth_planter"]
+    assert report["refused_props"] == {"synth_barrier": "not_a_cover_role", "synth_planter_worn": "not_of_the_mood"}
     assert report["placed"] and {row["asset_id"] for row in report["placed"]} == {"synth_planter"}
     assert report["street_mood"] == {"id": "lived", "roles": ["dumpster", "planter", "trashcan", "utility_box"], "conditions": ["intact"]}
     plain = tmp_path / "plain"
@@ -375,3 +378,18 @@ def test_a_lived_street_stands_only_its_civic_cover(stage: dict[str, Path], tmp_
     busy = tmp_path / "busy"
     assert main([*_args(stage, busy, library=library)[:-2], "--street-mood", "busy", "--out", str(busy)]) == 1
     assert "street_mood must be one of abandoned, emptied, lived, got 'busy'" in capsys.readouterr().err and not busy.exists()
+
+
+def test_a_mood_cover_without_conditions_reports_none(stage: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dataclasses
+
+    from onward_generator.gameplay import cover_stage
+    from onward_generator.overgrow.moods import mood_for
+
+    any_planter = dataclasses.replace(mood_for("lived"), cover_roles=frozenset({"planter"}), cover_conditions=None)
+    monkeypatch.setattr(cover_stage, "mood_for", lambda name: any_planter)
+    library = _library(tmp_path / "planters", [("synth_planter_worn", "planter", "furniture", (1.8, 0.8, 1.0))], {"synth_planter_worn": "worn"})
+    out = tmp_path / "any"
+    assert main([*_args(stage, out, library=library)[:-2], "--street-mood", "lived", "--out", str(out)]) == 0
+    report = json.loads((out / COVER_REPORT).read_text(encoding="utf-8"))
+    assert report["street_mood"] == {"id": "lived", "roles": ["planter"], "conditions": None} and report["candidates"] == ["synth_planter_worn"]
