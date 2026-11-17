@@ -351,3 +351,27 @@ def test_max_props_from_a_street_profile_caps_the_cover_and_records_its_block(st
     assert capped["caps"] == {**report["caps"], "props": 8} and report["caps"]["triangles"] == 12_000
     assert len(capped["placed"]) <= 8 and "street_profile" not in capped
     assert main([*_args(stage, tmp_path / "bad")[:-2], "--max-props", "9", *_args(stage, tmp_path / "bad")[-2:]]) == 2
+
+
+def test_a_lived_street_stands_only_its_civic_cover(stage: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Plan 2026-11-16, increment 5: a street in daily use gets planters, not barriers; the default keeps its own rule."""
+    library = _library(tmp_path / "civic", [
+        ("synth_barrier", "barrier", "barriers", (1.6, 0.5, 1.3)), ("synth_planter", "planter", "furniture", (1.8, 0.8, 1.0)),
+    ])
+    lived = tmp_path / "lived"
+    assert main([*_args(stage, lived, library=library)[:-2], "--street-mood", "lived", "--out", str(lived)]) == 0
+    report = json.loads((lived / COVER_REPORT).read_text(encoding="utf-8"))
+    assert report["candidates"] == ["synth_planter"] and report["refused_props"] == {"synth_barrier": "not_a_cover_role"}
+    assert report["placed"] and {row["asset_id"] for row in report["placed"]} == {"synth_planter"}
+    assert report["street_mood"] == {"id": "lived", "roles": ["dumpster", "planter", "trashcan", "utility_box"], "conditions": ["intact"]}
+    plain = tmp_path / "plain"
+    assert main(_args(stage, plain, library=library)) == 0
+    default = json.loads((plain / COVER_REPORT).read_text(encoding="utf-8"))
+    assert default["candidates"] == ["synth_barrier"] and "street_mood" not in default
+    abandoned = tmp_path / "abandoned"
+    assert main([*_args(stage, abandoned, library=library)[:-2], "--street-mood", "abandoned", "--out", str(abandoned)]) == 0
+    assert (abandoned / COVER_REPORT).read_bytes() == (plain / COVER_REPORT).read_bytes()  # the default mood is the identity
+    capsys.readouterr()
+    busy = tmp_path / "busy"
+    assert main([*_args(stage, busy, library=library)[:-2], "--street-mood", "busy", "--out", str(busy)]) == 1
+    assert "street_mood must be one of abandoned, emptied, lived, got 'busy'" in capsys.readouterr().err and not busy.exists()

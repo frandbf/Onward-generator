@@ -39,6 +39,11 @@ def test_the_table_has_the_three_moods_and_abandoned_is_the_default() -> None:
     assert mood_for("abandoned").conditions is None and not mood_for("abandoned").wall_decals_excluded
     assert (lived.terraces, emptied.terraces, mood_for("abandoned").terraces) == (True, False, False)  # only a lived street sets terraces
     assert (lived.awnings, emptied.awnings, mood_for("abandoned").awnings) == (True, False, False)
+    # Cover by mood (plan increment 5): civic props in a lived street, civic props and barriers in an emptied one.
+    assert lived.cover_roles == {"utility_box", "dumpster", "planter", "trashcan"} and lived.cover_conditions == {"intact"}
+    assert emptied.cover_roles == {"barrier", "barrel", "fence", "utility_box", "dumpster", "trash", "planter", "trashcan"}
+    assert emptied.cover_conditions == {"intact", "worn"}
+    assert (mood_for("abandoned").cover_roles, mood_for("abandoned").cover_conditions) == (None, None)  # the stage's own rule
 
 
 def test_abandoned_is_the_identity_on_every_year_profile() -> None:
@@ -85,6 +90,13 @@ def test_the_parsed_table_keeps_every_value() -> None:
         assert dict(mood.categories) == body["categories"] and isinstance(mood.categories, MappingProxyType)
         assert mood.wall_decals_excluded == frozenset(body["wall_decals_excluded"])
         assert mood.terraces is body["terraces"] and mood.awnings is body["awnings"]
+        cover = body["cover"]
+        assert mood.cover_roles == (frozenset(cover["roles"]) if cover is not None else None)
+        assert mood.cover_conditions == (frozenset(cover["conditions"]) if cover is not None else None)
+    doc = copy.deepcopy(DOC)
+    doc["moods"]["lived"]["cover"] = {"roles": ["planter"], "conditions": None}
+    assert (parse_moods(doc, SCHEMA).moods["lived"].cover_roles, parse_moods(doc, SCHEMA).moods["lived"].cover_conditions) == (
+        frozenset({"planter"}), None)
     assert table.moods["lived"].conditions == frozenset({"intact"}) and table.moods["abandoned"].conditions is None
 
 
@@ -103,6 +115,9 @@ def test_an_unknown_mood_names_the_ones_there_are() -> None:
     (lambda d: d["moods"]["lived"].pop("note"), "'note' is a required property"),
     (lambda d: d["moods"]["lived"].update(terraces="yes"), "moods/lived/terraces"),
     (lambda d: d["moods"]["lived"].pop("awnings"), "'awnings' is a required property"),
+    (lambda d: d["moods"]["lived"].pop("cover"), "'cover' is a required property"),
+    (lambda d: d["moods"]["lived"].update(cover={"roles": []}), "moods/lived/cover"),
+    (lambda d: d["moods"]["lived"].update(cover={"roles": ["planter"], "conditions": ["shiny"]}), "moods/lived/cover"),
 ])
 def test_a_bad_table_is_refused(change, message: str) -> None:  # type: ignore[no-untyped-def]
     doc = copy.deepcopy(DOC)
@@ -162,6 +177,31 @@ def test_run_passes_the_map_s_mood_to_overgrow(tmp_path: Path) -> None:
     with pytest.raises(MapError, match="street_mood"):
         overgrow_command(signs)
     assert _street_mood(None) == () and _street_mood(tmp_path / "elsewhere") == ()
+
+
+def test_run_passes_the_map_s_or_the_profile_s_mood_to_cover(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.ai import street_profile
+    from onward_generator.maps.workspace import create_map
+    from onward_generator.next_step import cover_street_mood
+    from tests.conftest import MURCIA_CENTER
+
+    root = tmp_path / "murcia"
+    create_map(root, map_id="murcia", name="Murcia", latitude=MURCIA_CENTER[1], longitude=MURCIA_CENTER[0], radius_m=200)
+    asked: list[Path] = []
+    monkeypatch.setattr(street_profile, "applied_street_mood", lambda r: asked.append(r) or None)
+    assert cover_street_mood(root) == () and asked == [root]  # neither: the stage's default
+    monkeypatch.setattr(street_profile, "applied_street_mood", lambda r: "lived")
+    assert cover_street_mood(root) == ("--street-mood", "lived")  # the profile's, without the key
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    (root / "map.json").write_text(json.dumps({**document, "street_mood": "emptied"}), encoding="utf-8")
+    assert cover_street_mood(root) == ("--street-mood", "emptied")  # the key wins
+    assert cover_street_mood(None) == () and cover_street_mood(tmp_path / "elsewhere") == ()
+    from onward_generator.maps.workspace import store_sightline_cover
+    from onward_generator.pipeline_run import plan_steps
+
+    store_sightline_cover(root, True)
+    cover = dict(plan_steps(root))["cover"]
+    assert cover[cover.index("--street-mood") + 1] == "emptied" and cover[-2] == "--out"  # run hands it to perf cover
 
 
 def test_the_overgrow_command_passes_the_mood(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

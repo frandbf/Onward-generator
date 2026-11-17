@@ -49,6 +49,7 @@ from onward_generator.maps.workspace import (
 )
 from onward_generator.next_step import (
     STAGE_DIRS,
+    cover_street_mood,
     detail_command,
     dress_command,
     export_invocation,
@@ -216,6 +217,7 @@ def plan_steps(directory: str | Path, *, preview: bool = False) -> list[tuple[st
             "--layout", show(layout_path),
             "--library", show(Path("assets")),
             *profile_flags(root).get("cover", []),
+            *cover_street_mood(root),
             "--out", show(exported),
         ).argv)))
     export_argv = list(export_invocation(

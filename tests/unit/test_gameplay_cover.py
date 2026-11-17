@@ -18,6 +18,7 @@ from onward_generator.gameplay import cover as module
 from onward_generator.gameplay.cover import (
     COVER_MAX_ADDED_DRAWS,
     COVER_MAX_ADDED_TRIS,
+    COVER_ROLES,
     MAX_COVER_PROPS,
     MAX_NEW_COVER_ASSETS,
     NO_PROP,
@@ -119,6 +120,29 @@ def test_the_cover_rule_keeps_solid_street_props_and_names_why_others_are_left_o
         "nolicence": "no_licence", "plant": "not_a_cover_role", "thin": "too_thin", "wall_cam": "not_on_the_ground",
     }
     assert list(refused) == sorted(refused)
+
+
+def test_a_street_mood_names_the_cover_roles_and_conditions() -> None:
+    def aged(prop: Prop, condition: str) -> Prop:
+        return dataclasses.replace(prop, spec=dataclasses.replace(prop.spec, condition=condition))
+
+    planter = _prop("planter", "planter", (1.2, 0.6, 0.9), category="furniture")
+    barrier = _prop()
+    civic = frozenset({"planter"})
+    assert prop_reason(planter, "CC0-1.0") == "not_a_cover_role" and prop_reason(barrier, "CC0-1.0") is None
+    assert prop_reason(planter, "CC0-1.0", civic) is None and prop_reason(barrier, "CC0-1.0", civic) == "not_a_cover_role"
+    intact = frozenset({"intact"})
+    assert prop_reason(aged(planter, "intact"), "CC0-1.0", civic, intact) is None
+    assert prop_reason(aged(planter, "worn"), "CC0-1.0", civic, intact) == "not_of_the_mood"
+    assert prop_reason(planter, "CC0-1.0", civic, intact) is None  # a row without a condition is kept
+    assert prop_reason(aged(planter, "worn"), "CC0-1.0", civic) is None  # no conditions keeps every one
+    assert prop_reason(aged(barrier, "worn"), None, COVER_ROLES, intact) == "no_licence"  # the licence is checked first
+    licences = {"planter": "CC0-1.0", "barrier": "CC0-1.0", "old": "CC0-1.0"}
+    old = aged(_prop("old", "planter", (1.2, 0.6, 0.9), category="furniture"), "worn")
+    kept, refused = cover_props([planter, barrier, old], licences, frozenset(), civic, intact)
+    assert [p.asset_id for p in kept] == ["planter"] and refused == {"barrier": "not_a_cover_role", "old": "not_of_the_mood"}
+    kept, refused = cover_props([planter, barrier, old], licences, frozenset(), None, intact)  # None keeps COVER_ROLES
+    assert [p.asset_id for p in kept] == ["barrier"] and refused == {"old": "not_a_cover_role", "planter": "not_a_cover_role"}
 
 
 def test_a_vegetation_debris_row_is_not_solid() -> None:

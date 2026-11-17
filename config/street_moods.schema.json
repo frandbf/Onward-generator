@@ -6,7 +6,7 @@
   "required": ["schema", "schema_version", "default", "moods"],
   "properties": {
     "schema": { "const": "onward_generator.street_moods" },
-    "schema_version": { "const": "0.3.0" },
+    "schema_version": { "const": "0.4.0" },
     "description": { "type": "string" },
     "default": { "type": "string", "pattern": "^[a-z][a-z_]*$" },
     "moods": {
@@ -16,7 +16,7 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["note", "vines", "planted_trees", "wrecks", "conditions", "categories", "wall_decals_excluded", "terraces", "awnings"],
+        "required": ["note", "vines", "planted_trees", "wrecks", "conditions", "categories", "wall_decals_excluded", "terraces", "awnings", "cover"],
         "properties": {
           "note": { "type": "string", "minLength": 1 },
           "vines": { "description": "Factor on the profile's vines", "type": "number", "minimum": 0, "maximum": 1 },
@@ -42,7 +42,27 @@
             "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" }
           },
           "terraces": { "description": "Café tables, chairs, a menu board and a planter before each bar of a pedestrian street or plaza (config/terraces.json)", "type": "boolean" },
-          "awnings": { "description": "Striped awnings under the fascia signs of the shops (config/awnings.json)", "type": "boolean" }
+          "awnings": { "description": "Striped awnings under the fascia signs of the shops (config/awnings.json)", "type": "boolean" },
+          "cover": {
+            "description": "The library props perf cover may stand on a long sightline (plan increment 5): their roles, and their conditions (a prop without one is kept; null keeps every condition). null keeps the cover stage's own roles, of any condition",
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["roles", "conditions"],
+                "properties": {
+                  "roles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" } },
+                  "conditions": {
+                    "oneOf": [
+                      { "type": "null" },
+                      { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["intact", "worn", "damaged", "wrecked", "burned"] } }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
         }
       }
     }

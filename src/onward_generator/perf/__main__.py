@@ -86,6 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="at most this many cover props (a street profile's cover id, plan D2); default 24",  # pragma: no mutate: help text
     )
     cov.add_argument("--street-profile", default=None, help="config/street_profile.json; adds its block to cover_report.json (plan D2)")  # pragma: no mutate: help text
+    cov.add_argument("--street-mood", default=None, help="a mood of config/street_moods.json (map.json street_mood or the street profile's): its cover props; absent is the default, abandoned")  # pragma: no mutate: help text
     cov.add_argument("--out", required=True, help="new output directory (scene_covered)")  # pragma: no mutate: help text
     cov.add_argument("--overwrite", action="store_true")
 
@@ -221,7 +222,7 @@ def _cover(args: argparse.Namespace) -> int:
         base, _ = load_base(args.base, args.scene, args.heights, load_generation_config(args.generation_config))
         block = report_block(args.street_profile) if args.street_profile is not None else None
         result = apply_cover(base, args.scene, args.detail, args.layout, args.out, library=args.library, overwrite=args.overwrite,
-                             max_props=args.max_props, street_profile=block)
+                             max_props=args.max_props, street_profile=block, street_mood=args.street_mood)
     except (DetailError, GenerationError, GenerationConfigError, FileNotFoundError, ValueError) as exc:
         print(f"perf: {exc}", file=sys.stderr)
         return 1

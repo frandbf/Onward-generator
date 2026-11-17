@@ -48,6 +48,10 @@ class Mood:
     """Café tables before the bars of pedestrian streets and plazas (``overgrow/terraces.py``, 16 November 2026)."""
     awnings: bool = False
     """Striped awnings under the shops' fascia signs (``overgrow/awnings.py``, 16 November 2026)."""
+    cover_roles: frozenset[str] | None = None
+    """The roles ``perf cover`` may stand on a long sightline; None keeps its own (17 November 2026)."""
+    cover_conditions: frozenset[str] | None = None
+    """The conditions of those cover props; a prop without one is kept; None keeps every condition."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,12 +78,18 @@ def parse_moods(doc: object, schema: Mapping[str, Any], where: str = "street_moo
             wall_decals_excluded=frozenset(body["wall_decals_excluded"]),
             terraces=bool(body["terraces"]),
             awnings=bool(body["awnings"]),
+            cover_roles=frozenset(body["cover"]["roles"]) if body["cover"] is not None else None,
+            cover_conditions=_conditions(body["cover"]["conditions"]) if body["cover"] is not None else None,
         )
         for name, body in doc["moods"].items()
     }
     if doc["default"] not in moods:
         raise MoodError(f"{where}: default {doc['default']!r} is not one of its moods: {sorted(moods)}")
     return MoodTable(str(doc["default"]), MappingProxyType(moods))
+
+
+def _conditions(value: list[str] | None) -> frozenset[str] | None:
+    return frozenset(value) if value is not None else None
 
 
 @cache

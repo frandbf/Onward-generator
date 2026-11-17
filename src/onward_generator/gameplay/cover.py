@@ -115,13 +115,17 @@ def _local(mesh: Mesh) -> tuple[np.ndarray, float, float, float]:
     return centre, float(span[0]), float(span[1]), float(span[2])
 
 
-def prop_reason(prop: Prop, licence: str | None) -> str | None:
-    """Why a street-size prop cannot be cover, or None."""
+def prop_reason(prop: Prop, licence: str | None, roles: frozenset[str] = COVER_ROLES,
+                conditions: frozenset[str] | None = None) -> str | None:
+    """Why a street-size prop cannot be cover, or None. ``roles`` and ``conditions`` are a street mood's (ADR-044):
+    a prop of another condition is left out, one without a condition is kept, and None keeps every condition."""
     if licence is None:
         return "no_licence"
     spec = prop.spec
-    if spec.role not in COVER_ROLES:
+    if spec.role not in roles:
         return "not_a_cover_role"
+    if conditions is not None and spec.condition and spec.condition not in conditions:
+        return "not_of_the_mood"
     if spec.anchor != "ground":
         return "not_on_the_ground"
     if not prop.mesh.vertex_count:
@@ -142,17 +146,19 @@ def prop_reason(prop: Prop, licence: str | None) -> str | None:
 
 def cover_props(
     props: Sequence[Prop], licences: Mapping[str, str], in_scene: frozenset[str],
+    roles: frozenset[str] | None = None, conditions: frozenset[str] | None = None,
 ) -> tuple[list[CoverProp], dict[str, str]]:
     """The props that meet the cover rule, ranked by ``CoverProp.key``, and the reason each other one is left out.
 
     ``props`` are at street size (``realize.fitted_props``); ``licences`` holds each installed row's licence;
-    ``in_scene`` the asset ids whose material the scene already has.
+    ``in_scene`` the asset ids whose material the scene already has. ``roles`` and ``conditions`` are the street
+    mood's cover (``config/street_moods.json``); None for ``roles`` keeps ``COVER_ROLES``.
     """
     kept: list[CoverProp] = []
     refused: dict[str, str] = {}
     for prop in props:
         licence = licences.get(prop.spec.id)
-        reason = prop_reason(prop, licence)
+        reason = prop_reason(prop, licence, COVER_ROLES if roles is None else roles, conditions)
         if reason is not None:
             refused[prop.spec.id] = reason
             continue
