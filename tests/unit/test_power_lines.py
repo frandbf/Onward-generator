@@ -445,3 +445,77 @@ def test_the_overgrow_command_passes_the_switch(tmp_path: Path, monkeypatch: pyt
     assert cli.main(common) == 1
     assert seen["overhead_lines"] is None
 
+
+
+# ------------------------------------------------------------------------------------------------ millimetres and edges
+
+
+def test_the_records_keep_millimetres_on_an_odd_street() -> None:
+    x0, y0 = -50.1234, 0.4321
+    street = {**_street("odd", x0, 50.5678), "geometry": {"type": "LineString", "coordinates": [[x0, y0], [50.5678, y0]]}}
+    buildings = STRtree([shapely_box(-60, 6.4321, 60, 16), shapely_box(-60, -16, 60, -5.5679)])
+    result = place_lines(_manifest({}), [street], buildings, square_zone(200), 7, budget=100_000, ground_z=lambda x, y: x / 7 + 0.01234,
+                         near_spawn=_never, config=cfg(drops_per_pole=0))
+    side = 1.0 if pl.stable_unit(7, "odd", "side") < 0.5 else -1.0
+    xs = [x0 + 14 + 28 * k for k in range(4)]
+    feet = [np.array([x, y0 + 3.5 * side, x / 7 + 0.01234]) for x in xs]
+    poles = [row for row in result.records if row["kind"] == "power_pole"]
+    assert poles == [{"kind": "power_pole", "origin": "generated", "source_id": "odd", "role": "pole",
+                      "position_m": [round(float(f[0]), 3), round(float(f[1]), 3), round(float(f[2]), 3)],
+                      "size_m": [0.3, 0.3, 8.0], "solid": True} for f in feet]
+    assert [n.name for n in result.nodes if n.extras["kind"] == "power_pole"] == [f"overgrow/power/pole/{k}" for k in range(4)]
+    assert [n.name for n in result.colliders] == [f"overgrow/collider/pole/{k}" for k in range(4)]
+    a = attach_points(feet[0], 8.0, 1.4, np.array([0.0, 1.0]))[0]
+    b = attach_points(feet[1], 8.0, 1.4, np.array([0.0, 1.0]))[0]
+    sag = float(np.linalg.norm(b - a)) * 0.03
+    lowest = float(sag_points(a, b, sag)[:, 2].min())
+    span = next(row for row in result.records if row["kind"] == "power_line")
+    assert span == {"kind": "power_line", "origin": "generated", "source_id": "odd", "role": "span",
+                    "position_m": [round(float(a[0] + b[0]) / 2, 3), round(float(a[1] + b[1]) / 2, 3), round(lowest, 3)],
+                    "size_m": [round(float(np.linalg.norm(b - a)), 3), 0.035, round(max(float(a[2]), float(b[2])) - lowest, 3)],
+                    "solid": False}
+    wire = next(n for n in result.nodes if n.extras["kind"] == "power_line")
+    assert wire.extras == {"type": "overgrowth", "origin": "generated", "attribute_origin": "generated", "kind": "power_line",
+                           "role": "span", "solid": False}
+    for node in result.nodes:
+        primitive = node.primitives[0]
+        assert primitive.uvs is not None and len(primitive.uvs) == primitive.mesh.vertex_count
+    assert result.nodes[0].primitives[0].uvs[0].tolist() == [0.5, 0.25] and wire.primitives[0].uvs[0].tolist() == [0.5, 0.75]
+
+
+def test_a_spot_s_reasons_at_their_bounds() -> None:
+    config = cfg()
+    zone = square_zone(200)
+    spot = np.array([0.0, 0.0])
+    reason = pl._spot_reason
+    assert reason(spot, zone, lambda x, y: y == 0.0 and x == 0.0, [], [], [], config) == "spawn"
+    assert reason(np.array([0.0, 5.0]), zone, lambda x, y: y == 0.0, [], [], [], config) is None
+    assert reason(spot, zone, _never, [Point(config.clear_m, 0.0)], [], [], config) is None  # exactly clear_m away
+    assert reason(spot, zone, _never, [Point(config.clear_m - 0.001, 0.0)], [], [], config) == "occupied"
+    edge = config.spacing_m * pl.NEAR_POLE
+    assert reason(spot, zone, _never, [], [], [_pole("s", 0, edge, 0.0)], config) is None  # exactly four tenths of the spacing
+    assert reason(spot, zone, _never, [], [], [_pole("s", 0, edge - 0.001, 0.0)], config) == "near_pole"
+    door = config.clear_m + config.back_m
+    assert reason(spot, zone, _never, [], [(door, 0.0)], [], config) is None
+    assert reason(spot, zone, _never, [], [(door - 0.001, 0.0)], [], config) == "door"
+    assert reason(np.array([200.0, 0.0]), zone, _never, [], [], [], config) is None and reason(np.array([200.01, 0.0]), zone, _never, [], [], [], config) == "outside_zone"
+
+
+def test_drops_reach_a_facade_within_a_metre_and_at_drop_reach() -> None:
+    index = next(i for i in range(50) if round(pl.stable_unit(7, i, "drops") * 2) == 2)
+    pole = _pole("s", 0, 0.0, 3.5)
+    close = shapely_box(-2, 4.0, 2, 9)  # 0.5 m from the pole
+    at_reach = shapely_box(14.0, 0, 20, 7)  # exactly drop_reach_m
+    heights = [(close, 9.0), (at_reach, 9.0)]
+    tree = STRtree([close, at_reach])
+    ends = drops(pole, index, 7, heights, tree, tree, cfg())
+    assert [round(float(end[0]), 3) for _, end in ends] == [0.0, 13.95] and np.allclose(ends[0][1][:2], [0.0, 3.95])
+    past = [(shapely_box(14.01, 0, 20, 7), 9.0)]
+    assert drops(pole, index, 7, past, STRtree([p for p, _ in past]), tree, cfg()) == []
+
+
+def test_a_building_without_geometry_or_id_is_handled() -> None:
+    features = [{"id": "x", "kind": "building"}, {"kind": "building", "geometry": {"type": "Polygon", "coordinates": [list(NORTH.exterior.coords)]}}]
+    manifest = {"objects": [{"type": "building", "source_ids": ["x", ""], "height": {"height_m": 6.0}}]}
+    found = building_heights(features, manifest)
+    assert [(p.bounds, h) for p, h in found] == [(NORTH.bounds, 6.0)]  # the footprint without an id reads as ""

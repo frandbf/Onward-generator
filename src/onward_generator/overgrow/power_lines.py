@@ -307,7 +307,7 @@ def _spot_reason(spot: np.ndarray, zone: Zone, near_spawn: Callable[[float, floa
         return "door"
     if any(area.distance(here) < config.clear_m for area in blocked):
         return "occupied"
-    if any(math.dist(spot[:2], pole.foot[:2]) < config.spacing_m * NEAR_POLE for pole in poles):
+    if any(math.dist((float(spot[0]), float(spot[1])), (float(pole.foot[0]), float(pole.foot[1]))) < config.spacing_m * NEAR_POLE for pole in poles):
         return "near_pole"
     return None
 
@@ -349,7 +349,7 @@ def place_poles(streets: Sequence[Street], buildings: STRtree, zone: Zone, seed:
 def crosses(segment: LineString, buildings: STRtree) -> bool:
     """Whether ``segment`` runs through a building for longer than ``CROSS_M``."""
     return any(buildings.geometries[int(index)].intersection(segment).length > CROSS_M
-               for index in buildings.query(segment, predicate="intersects"))
+               for index in buildings.query(segment, predicate="intersects"))  # pragma: no mutate: a box-only candidate meets the segment in nothing, of length 0
 
 
 def spans(poles: Sequence[Pole], buildings: STRtree, config: LineConfig) -> list[tuple[Pole, Pole]]:
