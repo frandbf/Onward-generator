@@ -104,6 +104,14 @@ def test_signs_leave_out_the_wall_wear_of_the_mood(tmp_path: Path, monkeypatch: 
     document["street_mood"] = 3
     with pytest.raises(SignsError, match="got '3'"):
         place_signs(base, scene, tmp_path / "number")
+    # Without the key, the mood the map's street profile applies (plan increment 4); a map.json mood wins over it.
+    profiled: list[Path] = []
+    monkeypatch.setattr("onward_generator.ai.street_profile.applied_street_mood", lambda r: profiled.append(r) or "lived")
+    del document["street_mood"]
+    assert place_signs(base, scene, tmp_path / "profiled")["wall_decals"]["street_mood"] == "lived" and profiled == [root]
+    document["street_mood"] = "abandoned"
+    assert "street_mood" not in place_signs(base, scene, tmp_path / "user_wins")["wall_decals"] and len(profiled) == 1
+    monkeypatch.setattr("onward_generator.ai.street_profile.applied_street_mood", lambda r: None)
     monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda r: (_ for _ in ()).throw(ValueError("broken")))
     assert "street_mood" not in place_signs(base, scene, tmp_path / "unreadable")["wall_decals"]  # an unreadable map.json reads as no key
 

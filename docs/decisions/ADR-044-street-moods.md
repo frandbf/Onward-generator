@@ -29,7 +29,7 @@ Status: proposed · 16 November 2026. Plan [2026-11-16-ambientes-de-calle](../pl
 - A new mood is a table row, with no code.
 - The library still has little outdoor furniture. The street profile offering the mood is a later increment of the plan.
 - A `lived` map spends less of its triangle budget on props until those increments land.
-- `street_mood` is not yet in the street profile schema: a map gets a mood only from its own `map.json`.
+- `street_mood` was not in the street profile schema at first: a map got a mood only from its own `map.json`. The third amendment adds it.
 
 ## Amendment of 16 November 2026: café terraces (plan increment 2)
 
@@ -52,3 +52,11 @@ A mood now also says whether it hangs awnings (`"awnings"`, required; schema 0.3
 - `overgrow/cloth.py` builds both from code: a two-sided sloped canopy with a valance and two cheeks (12 triangles; each side on its own copy of the vertices, since a face and its turned copy sharing vertices sum their normals to nothing and Unity draws the cloth black), and an eight-sided cone on a square pole (32 triangles). Both draw one generated material, `awning_fabric`: three bands of red, green or blue stripes on cream, and a grey band for the poles, the stripes repeating once a metre. No model is downloaded. Neither collides. The Unity adapter lights the cloth by light probes, not the lightmap, as it does grass and vines: the two faces of a thin cloth would share texels.
 - Nodes are `overgrow/awning/<n>` and `overgrow/terrace/<unit>/parasol`; the manifest records each as an `overgrowth` object (kind `awning`, or kind `terrace` role `parasol`) with its `size_m`, and `overgrow_report.json` gains an `awnings` block and `terraces.parasols` only for a mood that sets them.
 - On Calle Sierpes (Seville) 34 of 61 fascias get an awning (408 triangles) and the 7 tables their parasols; 17 shops are left out by the share, 7 outside the zone, 2 under a fascia too low and 1 where it would cover a sign.
+
+## Amendment of 17 November 2026: the street profile offers the mood (plan increment 4)
+
+The street profile ([10-ai.md](../10-ai.md#street-profile-plan-d2), ADR-006 amendment of 8 November 2026) gains a sixth field, `street_mood` (`map_default`, `lived`, `emptied`, `abandoned`; profile and record 0.2.0). The local model reads the brief and may say a street is in daily use; it still writes no value.
+
+- The id is one row of the profile's fixed table: pointer `/overgrow/street_mood`, flag `overgrow place --street-mood <id>`. `signs place` takes no profile flag; without a `map.json` `street_mood` it reads the applied row of `config/street_profile.json`, so the wall decals and `overgrow` follow the same mood.
+- A `map.json` `street_mood` always wins: the id is recorded as skipped (`user_setting`). Without either, the mood is `abandoned`, the default, as before.
+- A stored 0.1.0 reply is carried forward, not asked again: when its hashes match the 0.1.0 schema and prompt (kept in the code) and the same inputs, it replays with `street_mood` `map_default` and the record says `AI_PROFILE_MIGRATED`. On Calle Sierpes the stored reply (`mediterranean`, `intact`) replays so, without a call.
