@@ -174,11 +174,11 @@ def soundscape_block(mode: str, style: str, config: SoundConfig, objects: Sequen
         counts[kind] = len(chosen)
         sources += [{"name": f"{kind.capitalize()}_{i + 1}", "clip": source.clip, "x": round(x, 3), "y": round(y, 3),
                      "z": round(z + source.height_m, 3)} for i, (x, y, z) in enumerate(chosen)]
-    block = {"global": config.globals_[mode], "birds": birds, "wind": wind, "sources": sources}
-    record.update({key: value for key, value in block.items() if key != "sources"}, sources=counts)
-    if block["global"] is None and birds is None and wind is None and not sources:
+    combat = config.globals_[mode]
+    record.update({"global": combat, "birds": birds, "wind": wind, "sources": counts})
+    if combat is None and birds is None and wind is None and not sources:
         return None, record
-    return {"mode": mode, **block}, record
+    return {"mode": mode, "global": combat, "birds": birds, "wind": wind, "sources": sources}, record
 
 
 __all__ = ["AUTO", "CHOICES", "DEFAULT", "LOCAL_KINDS", "MODES", "SoundConfig", "SoundscapeError", "Source",

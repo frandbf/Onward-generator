@@ -153,9 +153,9 @@ def test_flies_buzz_over_wrecks_and_the_listed_kinds_only() -> None:
 
 
 def test_the_generator_stands_by_a_power_pole() -> None:
-    objects = [_pole(1, 1.0, 2.0), {"id": "p2", "kind": "power_pole", "position_m": [3.0, 4.0, 0.5]}, {"id": "p3", "kind": "power_pole"},
+    objects = [{"id": "p1", "kind": "power_pole", "position_m": [1.0, 2.0]}, {"id": "p2", "kind": "power_pole", "position_m": [3.0, 4.0, 0.5]}, {"id": "p3", "kind": "power_pole"},
                {"id": "w", "kind": "power_line", "position_m": [0.0, 0.0]}]
-    assert pole_sites(objects) == [("overgrow/power_pole/1", 1.0, 2.0, 0.0), ("p2", 3.0, 4.0, 0.5)]
+    assert pole_sites(objects) == [("p1", 1.0, 2.0, 0.0), ("p2", 3.0, 4.0, 0.5)]  # a pole without a height stands at 0
 
 
 LAYOUT = {"attackers": {"points_m": [{"x": 0.0, "y": 0.0}]}}
@@ -206,8 +206,14 @@ def test_battle_is_dense_and_a_war_with_nothing_local_still_sounds() -> None:
 
 
 def test_a_source_keeps_the_millimetre() -> None:
-    block, _ = soundscape_block("regional", "mediterranean", load_soundscape(), [_pole(1, 40.12345, -40.98765)], [], 100.0, LAYOUT)
-    assert block is not None and block["sources"][0] == {"name": "Generator_1", "clip": "Engine Generator", "x": 40.123, "y": -40.988, "z": 1.0}
+    pole = {"id": "p", "kind": "power_pole", "position_m": [40.12345, -40.98765, 0.12345]}
+    block, _ = soundscape_block("regional", "mediterranean", load_soundscape(), [pole], [], 100.0, LAYOUT)
+    assert block is not None and block["sources"][0] == {"name": "Generator_1", "clip": "Engine Generator", "x": 40.123, "y": -40.988, "z": 1.123}
+
+
+def test_a_source_outside_the_core_is_left_out() -> None:
+    block, record = soundscape_block("regional", "mediterranean", load_soundscape(), [_pole(1, 60.0, 0.0)], [], 50.0, LAYOUT)
+    assert block is None and record["sources"] == {"generator": 0}
 
 
 def test_an_unknown_mode_is_refused() -> None:
