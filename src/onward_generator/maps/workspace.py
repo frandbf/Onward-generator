@@ -381,6 +381,15 @@ def smoke_columns(directory: str | Path) -> int:
         raise MapError(str(exc)) from exc
 
 
+def overhead_lines(directory: str | Path) -> bool | None:
+    """``map.json`` ``overhead_lines`` (ADR-045): True or False to force the poles and wires on or off, None without the
+    key, when the map's facade style decides. Anything else is refused with ``MapError``."""
+    value = load_map(directory).get("overhead_lines")
+    if value is None or isinstance(value, bool):
+        return value
+    raise MapError(f'map.json "overhead_lines" must be true or false, got {value!r}')
+
+
 def street_mood(directory: str | Path) -> str | None:
     """``map.json`` ``street_mood``: a mood of ``config/street_moods.json`` (ADR-044), or None without the key. An
     unknown name, or a value that is not a string, is refused with ``MapError``."""

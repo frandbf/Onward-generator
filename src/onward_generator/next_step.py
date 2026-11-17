@@ -226,6 +226,17 @@ def _street_mood(root: Path | None) -> tuple[str, ...]:
     return ("--street-mood", mood) if mood is not None else ()
 
 
+def _overhead_lines(root: Path | None) -> tuple[str, ...]:
+    """``--overhead-lines on|off`` for overgrow when ``map.json`` says (ADR-045); nothing without the key, so the map's
+    facade style decides."""
+    if root is None or not (root / "map.json").is_file():
+        return ()
+    from onward_generator.maps.workspace import overhead_lines
+
+    wired = overhead_lines(root)
+    return () if wired is None else ("--overhead-lines", "on" if wired else "off")
+
+
 def cover_street_mood(root: Path | None) -> tuple[str, ...]:
     """``--street-mood NAME`` for ``perf cover``: the ``map.json`` mood, or else the one the map's street profile applies
     (plan 2026-11-16, increment 5). ``perf cover`` takes no profile flag for it, as ``signs`` takes none."""
@@ -386,6 +397,7 @@ def overgrow_command(base: Path, scene: Path | None = None) -> StageCommand:
     parts.extend(_triangle_limit(root))
     parts.extend(_facade_style(base))
     parts.extend(_street_mood(root))
+    parts.extend(_overhead_lines(root))
     if root is not None:
         pins = root / "config" / "pinned_props.json"
         if pins.is_file():

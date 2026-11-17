@@ -74,6 +74,7 @@
 - No estaba en la propuesta original, pero en la referencia A los postes y cables definen la escena.
 - Postes a lo largo de las calles residenciales y catenarias entre ellos, `generated`. Si OSM tiene `power=pole` o `power=line`, se usa primero como `observed`.
 - **Riesgos:** los cables finos producen aliasing en el Quest; los postes son colliders en la vereda que pueden estorbar el paso.
+- **Hecho el 17 de noviembre de 2026** ([ADR-045](../decisions/ADR-045-overhead-lines.md)). Se activa por el estilo de fachada del mapa (`east_african`, `arid` y `latin_american`) o con `map.json` `"overhead_lines"`. Son postes generados con travesaño, tres cables entre postes y acometidas a las fachadas. OSM no tiene postes en ningún mapa local, ni en Mogadiscio ni en Falluja, así que todavía no se leen como observados. En Mogadiscio salen 16 postes, 9 tramos y 19 acometidas.
 
 ### C6. `regional_facades` por defecto con un preset
 

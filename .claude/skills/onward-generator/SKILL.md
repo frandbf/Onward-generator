@@ -95,7 +95,7 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 | Light preset (`--atmosphere`), textures or weathering | `materials` |
 | Interior furniture of shops and flats (the detail configuration) | `detail` |
 | Street name plates, shop signs, wall decals, the user's own decals (`user_decals`), war damage (`damage`), street mood (`street_mood`: a living street or an abandoned one) | `signs` |
-| Abandoned look, props, lamp posts, library trees (`--brief`, `--ai`, `triangle_limit`) | `overgrow` |
+| Abandoned look, props, lamp posts, library trees, power poles and wires (`--brief`, `--ai`, `triangle_limit`, `overhead_lines`) | `overgrow` |
 | Spawns, routes, game modes | `layout` |
 | Smoke columns (`smoke`) | `export` |
 | Lightmap detail (`build.lightmap_texels_per_m` in `config/export.json`) | `export`, then a new Unity build |

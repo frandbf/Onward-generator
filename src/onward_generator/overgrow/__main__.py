@@ -48,6 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     place.add_argument("--pinned", default=None, help="a pinned_props.json: library props the map must carry near given WGS84 points, at their own size")  # pragma: no mutate: help text
     place.add_argument("--prefer", default=None, help="a prop_selection.json whose ids are offered and placed first; the other props still stand (a street profile's props_profile)")  # pragma: no mutate: help text
     place.add_argument("--street-mood", default=None, help="a mood of config/street_moods.json (map.json street_mood): lived, emptied or abandoned; absent is the default, abandoned")  # pragma: no mutate: help text
+    place.add_argument("--overhead-lines", choices=("on", "off"), default=None, help="poles and wires along the streets (map.json overhead_lines); absent: by the facade style, config/overhead_lines.json")  # pragma: no mutate: help text
     place.add_argument("--layout", default=None, help="layout.json whose spawn points stay clear")
     place.add_argument(
         "--street-profile",
@@ -134,6 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             zone_radius_m=args.zone_radius, zone_polygon=args.zone_polygon,
             library=args.library, layout=args.layout, selection=args.selection, prefer=args.prefer, triangle_limit=args.triangle_limit, pinned=args.pinned, style_request=args.facade_style,
             street_profile=block, street_mood=args.street_mood,
+            overhead_lines=None if args.overhead_lines is None else args.overhead_lines == "on",
         )
     except (OvergrowError, FitError, FetchError, SketchfabError, ZoneError, LibraryError, ConfigLoadError, FileExistsError, OSError, ValueError) as exc:
         print(f"overgrow: {exc}", file=sys.stderr)
