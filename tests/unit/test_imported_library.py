@@ -102,7 +102,8 @@ def test_overgrow_selection_includes_every_asset_catalogue() -> None:
                                                   "quaternius_nature", "quaternius_ultimate_furniture"}
     rows = installed_rows(REPO / "assets")
     ids = [row["id"] for row in rows]
-    assert len(ids) == len(set(ids)) == 772  # 772 with uh60_black_hawk (14 November 2026)
+    assert len(ids) == len(set(ids)) == 777  # 772 with uh60_black_hawk (14 November 2026); 777 with five civic Poly Haven props (17 November 2026)
+    assert {"utility_box_01", "utility_box_02", "planter_box_01", "planter_box_02", "planter_box_03"} <= set(ids)
     assert "uh60_black_hawk" in ids
     assert "covered_car" in ids
     assert "kenney_suburban_driveway_long" in ids
