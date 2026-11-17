@@ -132,18 +132,18 @@ def test_on_with_stub_applies_ids(runs: dict[str, Any]) -> None:
     assert runs["stub_calls"] == 1
     assert record["origin"] == "ai_generated" and record["provenance"] == "ai_generated"
     assert record["ids"] == {"dominant_typology": "mediterranean", "palette": "extended_pools", "props_profile": "wrecked",
-                             "abandonment": "years_30", "cover": "light"}
+                             "abandonment": "years_30", "cover": "light", "street_mood": "abandoned"}
     assert {row["field"]: row["status"] for row in record["changes"]} == dict.fromkeys(sp.FIELDS, "applied")
     rec = str(sp.record_path(runs["root"]))
     selection = sp.selection_path(runs["root"])
     assert runs["flags"] == {
         "materials": ["--facade-style", "mediterranean", "--repetition", "--cell-m", "100.0", "--street-profile", rec],
-        "overgrow": ["--prefer", str(selection), "--profile", "30", "--street-profile", rec],
+        "overgrow": ["--prefer", str(selection), "--profile", "30", "--street-mood", "abandoned", "--street-profile", rec],
         "cover": ["--max-props", "8", "--street-profile", rec],
     }
     # The real catalogue: the wrecked group is burned, damaged and wrecked, plus the conditionless shrub.
     assert json.loads(selection.read_text())["ids"] == ["synth_barrel_burned", "synth_car_wrecked", "synth_shrub"]
-    block = {"schema_version": "0.1.0", "raw_sha256": record["raw_sha256"], "ids": record["ids"], "provenance": "ai_generated"}
+    block = {"schema_version": "0.2.0", "raw_sha256": record["raw_sha256"], "ids": record["ids"], "provenance": "ai_generated"}
     materials = _report(runs["materials_on"], "materials_report.json")
     assert materials["street_profile"] == block and "street_profile" not in _report(runs["materials_off"], "materials_report.json")
     assert materials["facades"]["style"] == "mediterranean" and materials["facades"]["style_origin"] == "config"

@@ -1,7 +1,7 @@
 """Street profile (plan D2): the local model picks enumerated ids, code turns them into stage flags.
 
 The reply is data. It is parsed as strict JSON and validated against
-``config/street_profile.schema.json``: five fields, each one id of a fixed list,
+``config/street_profile.schema.json``: six fields, each one id of a fixed list,
 and an optional summary that no code reads. Each id stands for one row of
 ``EFFECTS``, an existing and validated stage flag. Nothing in the reply is
 executed, and only the literal values of that table reach a command line.
@@ -13,6 +13,10 @@ replays that reply without calling the model. A provider error or a reply that
 does not validate is tried once more, quoting the failure (ADR-010 §5); after
 that the neutral profile (every field ``map_default``) is used and the reason
 recorded. A missing Ollama never fails the run.
+
+Profile 0.2.0 (17 November 2026) adds ``street_mood`` (ADR-044). A stored 0.1.0 reply is carried forward, not asked
+again: when its hashes match the 0.1.0 schema and prompt, kept here as literals, it replays with ``street_mood``
+``map_default`` and the record says so (``AI_PROFILE_MIGRATED``).
 """
 
 from __future__ import annotations
@@ -36,21 +40,21 @@ from onward_generator.io import atomic_write_bytes, atomic_write_json
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA_PATH = REPO_ROOT / "config" / "street_profile.schema.json"
-PROFILE_VERSION = "0.1.0"
-PROMPT_VERSION = "0.1.0"
+PROFILE_VERSION = "0.2.0"
+PROMPT_VERSION = "0.2.0"
 RECORD_SCHEMA = "onward_generator.street_profile_record"
-RECORD_VERSION = "0.1.0"
+RECORD_VERSION = "0.2.0"
 RECORD_FILE = "street_profile.json"
 SELECTION_FILE = "street_profile_selection.json"
 MAX_RESPONSE_BYTES = 4096
 MAX_RECORD_BYTES = 64 * 1024
 PROFILE_ATTEMPTS = 2
 NEUTRAL = "map_default"
-FIELDS = ("dominant_typology", "palette", "props_profile", "abandonment", "cover")
+FIELDS = ("dominant_typology", "palette", "props_profile", "abandonment", "cover", "street_mood")
 NOT_OFFERED_STYLES = frozenset({"arid"})
-"""Facade styles the model is not offered yet: a new enum value changes the schema hash every stored profile replays
-by, so every map would ask the model again. Such a style is reached by its box or by map.json facades.style until the
-schema is next revised (15 November 2026)."""
+"""Facade styles the model is not offered yet: the offered style ids enter the inputs hash every stored profile replays
+by, so offering one would ask the model again on every map (the 0.2.0 migration carries a reply across a schema change,
+not across other inputs). Such a style is reached by its box or by map.json facades.style (15 November 2026)."""
 
 Origin = Literal["ai_generated", "replay", "rules"]
 ORIGINS: tuple[Origin, ...] = ("ai_generated", "replay", "rules")
@@ -65,10 +69,13 @@ CONDITION_GROUPS: Mapping[str, tuple[str, ...]] = {
 PROFILE_YEARS: Mapping[str, int] = {"years_10": 10, "years_30": 30, "years_100": 100}
 COVER_PROPS: Mapping[str, int] = {"off": 0, "light": 8, "full": 24}
 STYLE_IDS = ("anglo", "central_european", "east_african", "generic", "haussmann", "latin_american", "mediterranean")
+MOOD_IDS = ("abandoned", "emptied", "lived")
+"""The moods of ``config/street_moods.json`` (ADR-044); a test keeps the two lists equal."""
 
 # The only settings a profile can reach. Anything else that differs is refused.
 ALLOWED_POINTERS = frozenset({
-    "/materials/facade_style", "/materials/repetition", "/overgrow/prefer", "/overgrow/profile_years", "/cover/max_props",
+    "/materials/facade_style", "/materials/repetition", "/overgrow/prefer", "/overgrow/profile_years", "/overgrow/street_mood",
+    "/cover/max_props",
 })
 # Documented for people and checked by tests; the allowlist above is what enforces it.
 PROTECTED_POINTERS = ("/area", "/center", "/sources", "/export", "/budgets", "/core", "/buildings_sha256", "/sightline_cover")
@@ -124,6 +131,12 @@ _ROWS = (
            "sightline cover places at most 8 props", "ADR-032"),
     Effect("cover", "full", "/cover/max_props", 24, "cover", "--max-props",
            "sightline cover places at most 24 props", "ADR-032"),
+    Effect("street_mood", "abandoned", "/overgrow/street_mood", "abandoned", "overgrow", "--street-mood",
+           "the street is dressed as abandoned: growth, wrecks and every prop condition, as without a mood", "ADR-044"),
+    Effect("street_mood", "emptied", "/overgrow/street_mood", "emptied", "overgrow", "--street-mood",
+           "the street is dressed as emptied days ago: no growth, fewer wrecks, intact and worn props, no soot or bullet holes", "ADR-044"),
+    Effect("street_mood", "lived", "/overgrow/street_mood", "lived", "overgrow", "--street-mood",
+           "the street is dressed as in daily use: intact props, café terraces and awnings, no growth, wrecks or wall wear", "ADR-044"),
 )
 EFFECTS: Mapping[tuple[str, str], Effect] = {(row.field, row.id): row for row in _ROWS}
 
@@ -135,6 +148,7 @@ class StreetProfile:
     props_profile: str
     abandonment: str
     cover: str
+    street_mood: str = NEUTRAL
     summary: str | None = None
 
     def ids(self) -> dict[str, str]:
@@ -170,8 +184,11 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def parse_street_profile(text: str) -> StreetProfile:
-    """Strict JSON → schema → typed profile. Raises ``StreetProfileError`` with an ``AI_PROFILE_*`` code."""
+def parse_street_profile(text: str, *, stored: bool = False) -> StreetProfile:
+    """Strict JSON → schema → typed profile. Raises ``StreetProfileError`` with an ``AI_PROFILE_*`` code.
+
+    ``stored`` reads a reply kept in a record: a 0.1.0 reply is first carried to this version with ``street_mood``
+    ``map_default``. A model's reply is always parsed as it came."""
     if not text.strip():
         raise StreetProfileError("AI_PROFILE_JSON", "the reply is empty")
     size = len(text.encode("utf-8"))
@@ -183,6 +200,8 @@ def parse_street_profile(text: str) -> StreetProfile:
         raise StreetProfileError("AI_PROFILE_JSON", f"the reply is not strict JSON ({exc}); only one JSON object is accepted") from exc
     if not isinstance(document, dict):
         raise StreetProfileError("AI_PROFILE_SCHEMA", f"the reply must be a JSON object, got {type(document).__name__}")
+    if stored and document.get("profile_version") == LEGACY_PROFILE_VERSION:
+        document = {**document, "profile_version": PROFILE_VERSION, "street_mood": NEUTRAL}
     errors = sorted(Draft202012Validator(profile_schema()).iter_errors(document), key=lambda e: (list(map(str, e.absolute_path)), e.message))
     if errors:
         problems = "; ".join(f"{e.json_path[1:].replace('.', '/') or '/'}: {e.message}" for e in errors)
@@ -193,6 +212,7 @@ def parse_street_profile(text: str) -> StreetProfile:
         props_profile=str(document["props_profile"]),
         abandonment=str(document["abandonment"]),
         cover=str(document["cover"]),
+        street_mood=str(document["street_mood"]),
         summary=document.get("summary"),  # the schema allows only a string here
     )
 
@@ -206,10 +226,29 @@ Every field takes exactly one id from its list. map_default keeps what the map a
 - props_profile: which street props may appear: map_default | intact | worn | wrecked.
 - abandonment: how long the city has been abandoned: map_default | years_10 | years_30 | years_100.
 - cover: cover props on long open sightlines: map_default | off | light | full.
+- street_mood: how the street lives today: map_default | lived (in daily use: open shops, café terraces, awnings, no decay) | emptied (left days ago: no growth, few wrecks) | abandoned (left long ago). lived and emptied grow nothing, whatever abandonment says.
 - summary: optional, one short sentence. It is not read by the generator.
 
 You cannot change the area, the coordinates, the data sources, the export, the budgets or any building. Choose map_default when the brief does not ask for a field."""
 
+
+# Profile 0.1.0, kept only to recognise a stored reply made for it (resolve_street_profile carries it forward).
+LEGACY_PROFILE_VERSION = "0.1.0"
+LEGACY_SCHEMA_SHA256 = "2a0621d43ff6cc3e00454f89ccc6c9a76b6c06e3057f33fb9fec577cbfb5156b"
+LEGACY_SYSTEM_PROMPT = (
+    "You choose a street profile for a procedural 3D map. Reply with one JSON object and nothing else. No prose, no markdown, no code.\n\n"
+    "Every field takes exactly one id from its list. map_default keeps what the map already does. Do not invent ids, numbers or names.\n"
+    '- profile_version: always "0.1.0".\n'
+    "- dominant_typology: the facade style of the whole map: map_default | anglo | central_european | east_african | generic | haussmann"
+    " | latin_american | mediterranean. It never changes a building.\n"
+    "- palette: map_default | extended_pools (calmer roof and paving textures).\n"
+    "- props_profile: which street props may appear: map_default | intact | worn | wrecked.\n"
+    "- abandonment: how long the city has been abandoned: map_default | years_10 | years_30 | years_100.\n"
+    "- cover: cover props on long open sightlines: map_default | off | light | full.\n"
+    "- summary: optional, one short sentence. It is not read by the generator.\n\n"
+    "You cannot change the area, the coordinates, the data sources, the export, the budgets or any building."
+    " Choose map_default when the brief does not ask for a field."
+)
 
 # Quotes the brief as JSON and keeps its accents readable.
 _QUOTE = json.JSONEncoder(ensure_ascii=False)
@@ -232,6 +271,11 @@ def _round(value: Any) -> float | None:
 
 def prompt_sha256(text: str) -> str:
     return _sha(SYSTEM_PROMPT + "\n" + PROMPT_VERSION + "\n" + text)
+
+
+def legacy_prompt_sha256(text: str) -> str:
+    """``prompt_sha256`` as profile 0.1.0 computed it."""
+    return _sha(LEGACY_SYSTEM_PROMPT + "\n" + LEGACY_PROFILE_VERSION + "\n" + text)
 
 
 def inputs_sha256(brief: str, center: Mapping[str, Any], library: Sequence[tuple[str, str]], sightline_cover: bool) -> str:
@@ -268,8 +312,8 @@ def selection_for(props_profile: str, library: Sequence[tuple[str, str]]) -> lis
 
 
 def effective_settings(root: Path) -> dict[str, Any]:
-    """The settings a profile is checked against: the five it may reach, and the protected ones around them."""
-    from onward_generator.maps.workspace import load_map, repetition_enabled, sightline_cover_enabled
+    """The settings a profile is checked against: the six it may reach, and the protected ones around them."""
+    from onward_generator.maps.workspace import load_map, repetition_enabled, sightline_cover_enabled, street_mood
     from onward_generator.osm.acquire import osm_target
     from onward_generator.overgrow.profiles import PROFILES
 
@@ -291,7 +335,7 @@ def effective_settings(root: Path) -> dict[str, Any]:
         "materials": {"facade_style": style, "repetition": repetition_enabled(root)},
         # The user's own selection keeps out every other prop; the profile's preference only orders them (13 November 2026).
         "overgrow": {"profile_years": max(PROFILES), "selection": "config/prop_selection.json" if user_selection.is_file() else None,
-                     "prefer": None},
+                     "prefer": None, "street_mood": street_mood(root)},
         "cover": {"max_props": max(COVER_PROPS.values())},
     }
 
@@ -342,6 +386,8 @@ def _skip_reason(effect: Effect, before: Mapping[str, Any], context: Context) ->
             return "props_profile_empty"
     if effect.field == "cover" and not before["sightline_cover"]:
         return "profile_inactive"
+    if effect.field == "street_mood" and before["overgrow"]["street_mood"] is not None:
+        return "user_setting"
     return None
 
 
@@ -410,9 +456,15 @@ def _read_stored(path: Path) -> dict[str, Any] | None:
     return document if isinstance(document, dict) and document.get("schema") == RECORD_SCHEMA else None
 
 
-def _replay(stored: Mapping[str, Any] | None, hashes: Mapping[str, str]) -> tuple[str, StreetProfile] | None:
-    """The reply of a stored record whose hashes all match, as ``realize._stored_reply``; rules are never replayed."""
-    if stored is None or any(stored.get(key) != value for key, value in hashes.items()):
+def _replay(
+    stored: Mapping[str, Any] | None, hashes: Mapping[str, str], legacy: Mapping[str, str],
+) -> tuple[str, StreetProfile, bool] | None:
+    """The reply of a stored record whose hashes all match, as ``realize._stored_reply``, and whether it was made for
+    profile 0.1.0 (its hashes match ``legacy``) and is carried forward; rules are never replayed."""
+    if stored is None:
+        return None
+    migrated = stored.get("profile_version") == LEGACY_PROFILE_VERSION and all(stored.get(key) == value for key, value in legacy.items())
+    if not migrated and any(stored.get(key) != value for key, value in hashes.items()):
         return None
     if stored.get("origin") not in REPLAYABLE:
         return None
@@ -420,7 +472,7 @@ def _replay(stored: Mapping[str, Any] | None, hashes: Mapping[str, str]) -> tupl
     if not isinstance(raw, str) or _sha(raw) != stored.get("raw_sha256"):
         return None
     try:
-        return raw, parse_street_profile(raw)
+        return raw, parse_street_profile(raw, stored=True), migrated
     except StreetProfileError:
         return None
 
@@ -468,14 +520,18 @@ def resolve_street_profile(
         "prompt_sha256": prompt_sha256(message),
         "inputs_sha256": inputs_sha256(brief, center, rows, bool(before["sightline_cover"])),
     }
+    legacy = {**hashes, "schema_sha256": LEGACY_SCHEMA_SHA256, "prompt_sha256": legacy_prompt_sha256(message)}
     path = record_path(base)
     stored = _read_stored(path)
     diagnostics: list[dict[str, str]] = []
-    replayed = _replay(stored, hashes)
+    replayed = _replay(stored, hashes, legacy)
     origin: Origin
     if replayed is not None and stored is not None:
-        (raw, profile), attempts, reason, provider_info = replayed, 0, None, stored.get("provider")
+        (raw, profile, migrated), attempts, reason, provider_info = replayed, 0, None, stored.get("provider")
         origin = "replay"
+        if migrated:
+            diagnostics.append({"code": "AI_PROFILE_MIGRATED",
+                                "message": f"the stored {LEGACY_PROFILE_VERSION} reply was carried to {PROFILE_VERSION} with street_mood {NEUTRAL}"})
     else:
         if stored is not None and stored.get("origin") in REPLAYABLE:
             _archive(path, stored)
@@ -647,6 +703,23 @@ def profile_flags(root: str | Path | None) -> dict[str, list[str]]:
         if argv is not None:
             flags.setdefault(effect.stage, []).extend(argv)
     return {stage: [*argv, "--street-profile", show(path)] for stage, argv in flags.items()}
+
+
+def applied_street_mood(root: str | Path | None) -> str | None:
+    """The mood the map's stored profile applies, for ``signs``, which takes no profile flag; None with the switch off,
+    without an applied ``street_mood`` row, or with a missing or invalid record (``profile_flags`` warns about that)."""
+    if root is None:
+        return None
+    from onward_generator.maps.workspace import street_profile_enabled
+
+    base = Path(root).expanduser().resolve()
+    if not street_profile_enabled(base):
+        return None
+    try:
+        record = load_record(record_path(base))
+    except StreetProfileError:
+        return None
+    return next((str(row["id"]) for row in record["changes"] if row.get("field") == "street_mood" and row.get("status") == "applied"), None)
 
 
 def describe(result: ProfileResult) -> str:

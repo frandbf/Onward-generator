@@ -5,9 +5,9 @@
   "description": "What the local model may choose for a map: one enumerated id per field, never a number or a free value. Each field has map_default, which changes nothing. Code turns each id into an existing, validated stage flag (docs/10-ai.md, Street profile). The area, the sources, the export, the budgets and the geometry of OSM buildings have no field here. summary is unverified text that no code reads.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["profile_version", "dominant_typology", "palette", "props_profile", "abandonment", "cover"],
+  "required": ["profile_version", "dominant_typology", "palette", "props_profile", "abandonment", "cover", "street_mood"],
   "properties": {
-    "profile_version": { "const": "0.1.0" },
+    "profile_version": { "const": "0.2.0" },
     "dominant_typology": {
       "description": "The map-wide facade atlas style of config/facade_styles.json (materials --facade-style, ADR-020/027). It never reclassifies a building (ADR-024).",
       "enum": ["map_default", "mediterranean", "central_european", "anglo", "latin_american", "haussmann", "east_african", "generic"]
@@ -27,6 +27,10 @@
     "cover": {
       "description": "The sightline cover count when the map already has sightline_cover (perf cover --max-props, ADR-032 C7).",
       "enum": ["map_default", "off", "light", "full"]
+    },
+    "street_mood": {
+      "description": "A mood of config/street_moods.json (overgrow --street-mood and the wall decals of signs, ADR-044): how the street lives today. A map.json street_mood wins.",
+      "enum": ["map_default", "lived", "emptied", "abandoned"]
     },
     "summary": {
       "description": "One short sentence. Unverified text: stored, never read by code.",

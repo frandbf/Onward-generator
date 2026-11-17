@@ -441,8 +441,10 @@ def _damage(base: Path) -> tuple[str, str]:
 
 
 def _street_mood(base: Path) -> tuple[Mood, bool]:
-    """The map's street mood (``map.json`` ``street_mood``, ADR-044): the default outside a map folder, without the
-    key or with an unreadable ``map.json`` (as the other switches read); an unknown mood stops ``signs place``."""
+    """The map's street mood (``map.json`` ``street_mood``, ADR-044, or else the one its street profile applies): the
+    default outside a map folder, without either or with an unreadable ``map.json`` (as the other switches read); an
+    unknown mood stops ``signs place``."""
+    from onward_generator.ai.street_profile import applied_street_mood
     from onward_generator.maps.workspace import MapError, load_map  # the workspace imports the pipeline, which imports signs
     from onward_generator.next_step import map_root
     from onward_generator.overgrow.moods import MoodError, load_moods, mood_for  # overgrow imports export, which imports signs
@@ -452,7 +454,9 @@ def _street_mood(base: Path) -> tuple[Mood, bool]:
     if root is not None:
         try:
             value = load_map(root).get("street_mood")
-        except (MapError, ValueError, OSError):  # an unreadable map.json reads as no key
+            if value is None:
+                value = applied_street_mood(root)
+        except (MapError, ValueError, OSError):  # an unreadable map.json reads as no key, and as no profile
             value = None
     try:
         mood = mood_for(value if isinstance(value, str) or value is None else repr(value))

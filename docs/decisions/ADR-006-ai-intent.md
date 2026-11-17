@@ -49,6 +49,8 @@ The intent above is not widened: `config/intent.schema.json` stays at 0.1.0. A s
 
 Widening this profile again means a schema version, a table row, a guard pointer and tests, as decision 3 says for the intent.
 
+Widened on 17 November 2026 to profile 0.2.0: a sixth field, `street_mood`, with its row, its pointer `/overgrow/street_mood` and a `user_setting` skip for a `map.json` `street_mood` ([ADR-044](ADR-044-street-moods.md) amendment of that date). A stored 0.1.0 reply whose hashes match the 0.1.0 schema and prompt replays with `street_mood` `map_default` (`AI_PROFILE_MIGRATED`) instead of going stale.
+
 ## Amendment (12 November 2026): the machine's loopback seen from a container
 
 Status: accepted (plan Q9, option B chosen by the maintainer).

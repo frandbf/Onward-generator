@@ -5,6 +5,7 @@ Every provider here is a stub that counts its calls; no test needs a running mod
 
 from __future__ import annotations
 
+import hashlib
 import json
 import socket
 from pathlib import Path
@@ -49,13 +50,14 @@ from onward_generator.maps.workspace import (
 )
 from onward_generator.materials.trim_style import load_style_table
 from onward_generator.overgrow.library_catalog import read_selection
+from onward_generator.overgrow.moods import load_moods
 from tests.conftest import MURCIA_CENTER_LAT, MURCIA_CENTER_LON
 
 LIBRARY = [
     ("barrel_burned", "burned"), ("bin_intact", "intact"), ("car_wrecked", "wrecked"),
     ("crate_worn", "worn"), ("fence_damaged", "damaged"), ("tree", ""),
 ]
-NEUTRAL_REPLY = {"profile_version": "0.1.0", **dict.fromkeys(FIELDS, "map_default")}
+NEUTRAL_REPLY = {"profile_version": "0.2.0", **dict.fromkeys(FIELDS, "map_default")}
 
 
 def reply(summary: str | None = "A calm street.", **ids: str) -> str:
@@ -99,6 +101,12 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return path
 
 
+def _set_mood(root: Path, mood: str) -> None:
+    document = load_map(root)
+    document["street_mood"] = mood
+    (root / "map.json").write_text(json.dumps(document))
+
+
 def resolve(root: Path, provider: object) -> dict[str, Any]:
     return resolve_street_profile(root, provider=provider, library=None).record  # type: ignore[arg-type]
 
@@ -123,7 +131,8 @@ def test_parse_rejects_unknown_field(extra: dict[str, Any]) -> None:
 
 @pytest.mark.parametrize(("field", "value"), [
     ("dominant_typology", "gothic"), ("palette", "neon"), ("props_profile", "all"), ("abandonment", "years_50"),
-    ("cover", "max"), ("abandonment", 30), ("cover", None), ("profile_version", "0.2.0"),
+    ("cover", "max"), ("abandonment", 30), ("cover", None), ("street_mood", "busy"), ("street_mood", "map default"),
+    ("profile_version", "0.1.0"),  # a model's reply is never carried forward: only a stored one is
 ])
 def test_parse_rejects_id_outside_enum(field: str, value: object) -> None:
     with pytest.raises(StreetProfileError) as caught:
@@ -213,11 +222,12 @@ def test_effects_table_matches_schema() -> None:
         assert (effect.field, effect.id) == (field, ident)
         assert effect.adr.startswith("ADR-") and effect.effect
         assert effect.pointer in ALLOWED_POINTERS
-    assert {e.adr for e in EFFECTS.values()} == {"ADR-020, ADR-027", "ADR-009", "ADR-010", "ADR-032"}
+    assert {e.adr for e in EFFECTS.values()} == {"ADR-020, ADR-027", "ADR-009", "ADR-010", "ADR-032", "ADR-044"}
     assert {(e.stage, e.flag) for e in EFFECTS.values()} == {
         ("materials", "--facade-style"), ("materials", "--repetition"), ("overgrow", "--prefer"),
-        ("overgrow", "--profile"), ("cover", "--max-props"),
+        ("overgrow", "--profile"), ("overgrow", "--street-mood"), ("cover", "--max-props"),
     }
+    assert set(field_ids("street_mood")) - {"map_default"} == set(sp.MOOD_IDS) == set(load_moods().moods)
 
 
 def _expected(root: Path, field: str, ident: str) -> dict[str, list[str]]:
@@ -232,6 +242,8 @@ def _expected(root: Path, field: str, ident: str) -> dict[str, list[str]]:
         return {"overgrow": ["--prefer", str(selection_path(root)), "--street-profile", record]}
     if field == "abandonment":
         return {"overgrow": ["--profile", ident.removeprefix("years_"), "--street-profile", record]}
+    if field == "street_mood":
+        return {"overgrow": ["--street-mood", ident, "--street-profile", record]}
     return {"cover": ["--max-props", {"off": "0", "light": "8", "full": "24"}[ident], "--street-profile", record]}
 
 
@@ -354,7 +366,7 @@ def _before() -> dict[str, Any]:
         "budgets": {"export_card_sha256": "e"}, "core": {"core_radius_m": None}, "buildings_sha256": "b",
         "sightline_cover": True,
         "materials": {"facade_style": "auto", "repetition": False},
-        "overgrow": {"profile_years": 100, "selection": None, "prefer": None},
+        "overgrow": {"profile_years": 100, "selection": None, "prefer": None, "street_mood": None},
         "cover": {"max_props": 24},
     }
 
@@ -395,20 +407,23 @@ def test_effective_settings_hold_the_protected_and_the_allowed_keys(root: Path) 
     settings = sp.effective_settings(root)
     assert set(settings) == set(_before())
     assert settings["materials"] == {"facade_style": "auto", "repetition": False}
-    assert settings["overgrow"] == {"profile_years": 100, "selection": None, "prefer": None}
+    assert settings["overgrow"] == {"profile_years": 100, "selection": None, "prefer": None, "street_mood": None}
     assert settings["cover"] == {"max_props": 24} and settings["sightline_cover"] is False
     assert settings["buildings_sha256"] is None and settings["export"]["sha256"]
     assert settings["area"] == {"radius_m": 150.0, "margin_m": 30.0, "crs": "EPSG:25830"}
     (root / "config" / "prop_selection.json").write_text(json.dumps({"ids": ["bin_intact"]}))
-    assert sp.effective_settings(root)["overgrow"] == {"profile_years": 100, "selection": "config/prop_selection.json", "prefer": None}
+    assert sp.effective_settings(root)["overgrow"] == {"profile_years": 100, "selection": "config/prop_selection.json", "prefer": None,
+                                                       "street_mood": None}
+    _set_mood(root, "emptied")
+    assert sp.effective_settings(root)["overgrow"]["street_mood"] == "emptied"
 
 
 def test_translate_writes_only_applied_ids() -> None:
-    profile = StreetProfile("anglo", "extended_pools", "wrecked", "years_30", "off")
+    profile = StreetProfile("anglo", "extended_pools", "wrecked", "years_30", "off", "lived")
     after, rows = translate(profile, _before(), Context(True, tuple(LIBRARY)))
     assert (after["materials"], after["overgrow"], after["cover"]) == (
         {"facade_style": "anglo", "repetition": True},
-        {"profile_years": 30, "selection": None, "prefer": "config/street_profile_selection.json"},
+        {"profile_years": 30, "selection": None, "prefer": "config/street_profile_selection.json", "street_mood": "lived"},
         {"max_props": 0},
     )
     assert [row["field"] for row in rows] == list(FIELDS)
@@ -485,7 +500,7 @@ def test_replay_skips_provider(root: Path) -> None:
     for key in ("raw", "raw_sha256", "schema_sha256", "prompt_sha256", "inputs_sha256", "ids", "provider"):
         assert second[key] == first[key]
     assert report_block(record_path(root)) == {
-        "schema_version": "0.1.0", "raw_sha256": first["raw_sha256"], "ids": first["ids"], "provenance": "ai_generated",
+        "schema_version": "0.2.0", "raw_sha256": first["raw_sha256"], "ids": first["ids"], "provenance": "ai_generated",
     }
 
 
@@ -711,6 +726,9 @@ GOLDEN_EFFECTS = [
     ('cover', 'off', '/cover/max_props', 0, 'cover', '--max-props', 'sightline cover places at most 0 props', 'ADR-032'),
     ('cover', 'light', '/cover/max_props', 8, 'cover', '--max-props', 'sightline cover places at most 8 props', 'ADR-032'),
     ('cover', 'full', '/cover/max_props', 24, 'cover', '--max-props', 'sightline cover places at most 24 props', 'ADR-032'),
+    ('street_mood', 'abandoned', '/overgrow/street_mood', 'abandoned', 'overgrow', '--street-mood', 'the street is dressed as abandoned: growth, wrecks and every prop condition, as without a mood', 'ADR-044'),
+    ('street_mood', 'emptied', '/overgrow/street_mood', 'emptied', 'overgrow', '--street-mood', 'the street is dressed as emptied days ago: no growth, fewer wrecks, intact and worn props, no soot or bullet holes', 'ADR-044'),
+    ('street_mood', 'lived', '/overgrow/street_mood', 'lived', 'overgrow', '--street-mood', 'the street is dressed as in daily use: intact props, café terraces and awnings, no growth, wrecks or wall wear', 'ADR-044'),
 ]
 
 
@@ -727,7 +745,9 @@ def test_inputs_and_prompt_hashes_are_pinned() -> None:
     assert sp.inputs_sha256("ñ calle", centre, list(reversed(library)), True) == sp.inputs_sha256("ñ calle", centre, library, True)
     assert sp.inputs_sha256("ñ calle", centre, library, False) != sp.inputs_sha256("ñ calle", centre, library, True)
     # The system prompt lists the styles too.
-    assert sp.prompt_sha256("x") == "7c138214ac3b5c4469452c9d3b518ce305fdb226a849ca11604ca5f46f3b57af"  # east_african added
+    assert sp.prompt_sha256("x") == "a1a5a9a0e7d0d0aa36d13aeec4b52423740b217419b2810ff503f795a37d8f11"  # profile 0.2.0, street_mood
+    # The 0.1.0 prompt a stored reply was hashed with: the value this test pinned before street_mood (17 November 2026).
+    assert sp.legacy_prompt_sha256("x") == "7c138214ac3b5c4469452c9d3b518ce305fdb226a849ca11604ca5f46f3b57af"
     assert (sp._round(1.123456), sp._round(2), sp._round(True), sp._round("1"), sp._round(None)) == (1.12346, 2.0, None, None, None)
 
 
@@ -773,7 +793,7 @@ def test_effective_settings_golden(root: Path) -> None:
         "buildings_sha256": sha256_file(osm),
         "sightline_cover": False,
         "materials": {"facade_style": "auto", "repetition": False},
-        "overgrow": {"profile_years": 100, "selection": None, "prefer": None},
+        "overgrow": {"profile_years": 100, "selection": None, "prefer": None, "street_mood": None},
         "cover": {"max_props": 24},
     }
     del document["sources"]
@@ -802,7 +822,7 @@ def test_record_golden_keys_and_hashes(root: Path) -> None:
         "summary_status", "provider", "changes",
     ]
     assert (record["schema"], record["schema_version"], record["profile_version"], record["prompt_version"]) == (
-        "onward_generator.street_profile_record", "0.1.0", "0.1.0", "0.1.0")
+        "onward_generator.street_profile_record", "0.2.0", "0.2.0", "0.2.0")
     assert record["raw"] == "" and record["raw_sha256"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     assert record["diagnostics"] == [{"code": "AI_PROFILE_PROVIDER", "message": "Ollama is down"}] * 2
     assert record["reason"] == "Ollama is down [AI_PROFILE_PROVIDER]"
@@ -939,8 +959,8 @@ def test_the_selection_file_bytes(root: Path) -> None:
 
 
 @pytest.mark.parametrize(("edit", "message"), [
-    (lambda d: d.update(schema="other"), "not a onward_generator.street_profile_record 0.1.0 record"),
-    (lambda d: d.update(schema_version="0.2.0"), "not a onward_generator.street_profile_record 0.1.0 record"),
+    (lambda d: d.update(schema="other"), "not a onward_generator.street_profile_record 0.2.0 record"),
+    (lambda d: d.update(schema_version="0.1.0"), "not a onward_generator.street_profile_record 0.2.0 record"),
     (lambda d: d["ids"].update(cover="max"), "ids must name one allowed id per field"),
     (lambda d: d.update(origin="rules"), "origin and provenance do not match"),
     (lambda d: d.update(changes=[1]), "changes must be a list of objects"),
@@ -1062,3 +1082,93 @@ def test_a_map_without_a_brief_hashes_an_empty_one(root: Path) -> None:
     centre = {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON}
     assert record["inputs_sha256"] == sp.inputs_sha256("", centre, LIBRARY, False)
     assert stub.calls == [sp.instruction("", centre, LIBRARY)] and '\n""\n' in stub.calls[0]
+
+
+# ------------------------------------------------------------------------------------------------ street mood (plan increment 4)
+
+
+def test_a_map_json_mood_wins_over_the_profile(root: Path) -> None:
+    _set_mood(root, "emptied")
+    record = resolve(root, Stub(reply(street_mood="lived")))
+    assert record["ids"]["street_mood"] == "lived"
+    assert [(row["status"], row["reason"], row["before"], row["after"]) for row in record["changes"]] == [
+        ("skipped", "user_setting", "emptied", "emptied")]
+    assert profile_flags(root) == {} and sp.applied_street_mood(root) is None
+
+
+def test_applied_street_mood_reads_only_an_applied_row(root: Path) -> None:
+    assert sp.applied_street_mood(None) is None and sp.applied_street_mood(root) is None  # no record yet
+    resolve(root, Stub(reply(abandonment="years_10")))
+    assert sp.applied_street_mood(root) is None  # a record without the field
+    store_brief(root, "a busy shopping street")  # other inputs: the model is asked again
+    resolve(root, Stub(reply(abandonment="years_10", street_mood="lived")))
+    assert sp.applied_street_mood(str(root)) == "lived"
+    store_street_profile(root, False)
+    assert sp.applied_street_mood(root) is None
+    store_street_profile(root, True)
+    record_path(root).write_text("{broken")
+    assert sp.applied_street_mood(root) is None
+
+
+def test_the_legacy_schema_is_the_one_0_1_0_shipped() -> None:
+    legacy = Path(__file__).resolve().parents[1] / "fixtures" / "street_profile" / "schema_0.1.0.json"
+    assert hashlib.sha256(legacy.read_bytes()).hexdigest() == sp.LEGACY_SCHEMA_SHA256 != sp.schema_sha256()
+    assert json.loads(legacy.read_text())["properties"]["profile_version"] == {"const": sp.LEGACY_PROFILE_VERSION}
+
+
+LEGACY_REPLY = json.dumps({"profile_version": "0.1.0", "dominant_typology": "anglo", "palette": "map_default",
+                           "props_profile": "map_default", "abandonment": "years_10", "cover": "map_default", "summary": "Old."})
+
+
+def _legacy_record(root: Path, **edits: Any) -> dict[str, Any]:
+    """The record profile 0.1.0 wrote for ``LEGACY_REPLY``: its raw reply and hashes, without street_mood."""
+    first = resolve(root, Stub(reply(dominant_typology="anglo", abandonment="years_10")))
+    centre = {"latitude": MURCIA_CENTER_LAT, "longitude": MURCIA_CENTER_LON}
+    document = {
+        **first, "schema_version": "0.1.0", "profile_version": "0.1.0", "prompt_version": "0.1.0",
+        "raw": LEGACY_REPLY, "raw_sha256": sp._sha(LEGACY_REPLY), "schema_sha256": sp.LEGACY_SCHEMA_SHA256,
+        "prompt_sha256": sp.legacy_prompt_sha256(sp.instruction("", centre, LIBRARY)),
+        "ids": {key: value for key, value in first["ids"].items() if key != "street_mood"}, **edits,
+    }
+    record_path(root).write_text(json.dumps(document))
+    return document
+
+
+def test_a_stored_0_1_0_reply_is_carried_forward_without_asking(root: Path) -> None:
+    legacy = _legacy_record(root)
+    record = resolve(root, Refuse())
+    assert record["origin"] == "replay" and record["attempts"] == 0 and record["reason"] is None
+    assert record["diagnostics"] == [{"code": "AI_PROFILE_MIGRATED",
+                                      "message": "the stored 0.1.0 reply was carried to 0.2.0 with street_mood map_default"}]
+    assert record["ids"] == {"dominant_typology": "anglo", "palette": "map_default", "props_profile": "map_default",
+                             "abandonment": "years_10", "cover": "map_default", "street_mood": "map_default"}
+    assert record["summary"] == "Old." and record["raw"] == legacy["raw"] and record["raw_sha256"] == legacy["raw_sha256"]
+    assert (record["schema_version"], record["profile_version"], record["schema_sha256"]) == ("0.2.0", "0.2.0", sp.schema_sha256())
+    assert record["inputs_sha256"] == legacy["inputs_sha256"] and record["prompt_sha256"] != legacy["prompt_sha256"]
+    assert [row["field"] for row in record["changes"]] == ["dominant_typology", "abandonment"]
+    assert load_record(record_path(root))["ids"] == record["ids"]
+    assert not list(record_path(root).parent.glob("street_profile.*.json"))  # nothing archived: the reply still stands
+    again = resolve(root, Refuse())  # now a plain 0.2.0 replay of the same 0.1.0 text
+    assert again["origin"] == "replay" and again["diagnostics"] == [] and again["ids"] == record["ids"]
+
+
+@pytest.mark.parametrize("edits", [
+    {"schema_sha256": "0" * 64}, {"prompt_sha256": "0" * 64}, {"inputs_sha256": "0" * 64}, {"profile_version": "0.2.0"},
+    {"origin": "rules"},
+], ids=["schema", "prompt", "inputs", "version", "rules"])
+def test_a_0_1_0_record_that_does_not_match_is_asked_again(root: Path, edits: dict[str, Any]) -> None:
+    _legacy_record(root, **edits)
+    stub = Stub(reply(street_mood="lived"))
+    record = resolve(root, stub)
+    assert len(stub.calls) == 1 and record["origin"] == "ai_generated" and record["ids"]["street_mood"] == "lived"
+    assert "AI_PROFILE_MIGRATED" not in {d["code"] for d in record["diagnostics"]}
+
+
+def test_only_a_stored_reply_is_carried_forward() -> None:
+    with pytest.raises(StreetProfileError, match="profile_version"):
+        parse_street_profile(LEGACY_REPLY)
+    carried = parse_street_profile(LEGACY_REPLY, stored=True)
+    assert (carried.dominant_typology, carried.abandonment, carried.street_mood, carried.summary) == ("anglo", "years_10", "map_default", "Old.")
+    assert parse_street_profile(reply(street_mood="lived"), stored=True).street_mood == "lived"
+    with pytest.raises(StreetProfileError, match="street_mood"):  # a 0.2.0 reply without the field is not completed
+        parse_street_profile(json.dumps({**NEUTRAL_REPLY, "street_mood": None}), stored=True)
