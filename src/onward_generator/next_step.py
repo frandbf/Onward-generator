@@ -476,12 +476,12 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     if config.is_file():
         parts.extend(["--config", show(config)])
     parts.extend(["--layout", show(layout), "--out", show(out)])
+    parts.extend(_soundscape(root, detail))
     atmosphere = _atmosphere(root)
     if atmosphere is not None:
         parts.extend(["--atmosphere", atmosphere])
     parts.extend(_triangle_limit(root))
     parts.extend(_smoke(root))
-    parts.extend(_soundscape(root, detail))
     return invoke(*parts)
 
 
