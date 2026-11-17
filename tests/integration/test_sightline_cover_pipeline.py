@@ -358,15 +358,16 @@ def test_a_lived_street_stands_only_its_civic_cover(stage: dict[str, Path], tmp_
     """Plan 2026-11-16, increment 5: a street in daily use gets planters, not barriers; the default keeps its own rule."""
     library = _library(tmp_path / "civic", [
         ("synth_barrier", "barrier", "barriers", (1.6, 0.5, 1.3)), ("synth_planter", "planter", "furniture", (1.8, 0.8, 1.0)),
-        ("synth_planter_worn", "planter", "furniture", (1.8, 0.8, 1.0)),
-    ], {"synth_planter": "intact", "synth_planter_worn": "worn"})
+        ("synth_planter_damaged", "planter", "furniture", (1.8, 0.8, 1.0)),
+    ], {"synth_planter": "intact", "synth_planter_damaged": "damaged"})
     lived = tmp_path / "lived"
     assert main([*_args(stage, lived, library=library)[:-2], "--street-mood", "lived", "--out", str(lived)]) == 0
     report = json.loads((lived / COVER_REPORT).read_text(encoding="utf-8"))
     assert report["candidates"] == ["synth_planter"]
-    assert report["refused_props"] == {"synth_barrier": "not_a_cover_role", "synth_planter_worn": "not_of_the_mood"}
+    assert report["refused_props"] == {"synth_barrier": "not_a_cover_role", "synth_planter_damaged": "not_of_the_mood"}
     assert report["placed"] and {row["asset_id"] for row in report["placed"]} == {"synth_planter"}
-    assert report["street_mood"] == {"id": "lived", "roles": ["dumpster", "planter", "trashcan", "utility_box"], "conditions": ["intact"]}
+    assert report["street_mood"] == {"id": "lived", "roles": ["dumpster", "planter", "trash", "trashcan", "utility_box"],
+                                     "conditions": ["intact", "worn"]}
     plain = tmp_path / "plain"
     assert main(_args(stage, plain, library=library)) == 0
     default = json.loads((plain / COVER_REPORT).read_text(encoding="utf-8"))

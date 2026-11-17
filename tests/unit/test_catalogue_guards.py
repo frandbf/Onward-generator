@@ -99,7 +99,8 @@ def test_the_cap_itself_is_allowed_and_a_refusal_skips_only_its_row(tmp_path: Pa
     assert [(r.asset_id, r.reason) for r in rejects] == [("over", "too_heavy_for_chance")]
 
 
-CIVIC_COVER = {"kenney_suburban_planter", "planter_box_03", "utility_box_01", "utility_box_02"}
+CIVIC_COVER = {"kenney_suburban_planter", "planter_box_03", "utility_box_01", "utility_box_02",
+               "kenney_urban_detail_dumpster_closed", "kenney_urban_detail_dumpster_open", "qt_city_Prop_Planter_Single"}
 
 
 def test_the_committed_catalogues_give_a_lived_street_its_civic_cover() -> None:
@@ -116,6 +117,7 @@ def test_the_committed_catalogues_give_a_lived_street_its_civic_cover() -> None:
     kept, refused = cover_props(fitted, licences, frozenset(), lived.cover_roles, lived.cover_conditions)
     assert {item.asset_id for item in kept} == CIVIC_COVER
     assert {refused[name] for name in ("planter_box_01", "planter_box_02")} == {"not_solid"}  # 0.42 and 0.45 m: too low
+    assert refused["metal_trash_can"] == "not_of_the_mood"  # damaged: a lived street takes intact or worn
     rows = {row["id"]: row for row in json.loads((ASSETS / "normalized" / "manifest.json").read_text(encoding="utf-8"))["assets"]}
     for name in ("utility_box_01", "utility_box_02", "planter_box_01", "planter_box_02", "planter_box_03"):
         row = rows[name]

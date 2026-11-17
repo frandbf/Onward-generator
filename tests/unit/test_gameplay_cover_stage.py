@@ -139,9 +139,10 @@ def test_load_json_names_the_file_and_the_fault(tmp_path: Path) -> None:
     assert _load_json(path) == {"a": "é"}
 
 
-def _catalogue(root: Path, name: str, rows: list[Any]) -> None:
+def _catalogue(root: Path, name: str, rows: list[Any], source: str | None = None) -> None:
     (root / name).mkdir(parents=True)
-    (root / name / "manifest.json").write_text(json.dumps({"assets": rows}), encoding="utf-8")
+    document = {"assets": rows, **({"source": source} if source is not None else {})}
+    (root / name / "manifest.json").write_text(json.dumps(document), encoding="utf-8")
 
 
 def test_catalogue_licences_read_each_row_and_the_kenney_default(tmp_path: Path) -> None:
@@ -151,7 +152,13 @@ def test_catalogue_licences_read_each_row_and_the_kenney_default(tmp_path: Path)
     (tmp_path / "b_broken" / "manifest.json").write_text("{broken", encoding="utf-8")
     _catalogue(tmp_path, "kenney", [{"id": "kenney_block"}, {"id": "kenney_sa", "license": "CC-BY-SA-4.0"}])
     _catalogue(tmp_path, "z_last", [{"id": "last", "license": "CC0-1.0"}])
-    assert catalogue_licences(tmp_path) == {"cc0": "CC0-1.0", "by": "CC-BY-4.0", "kenney_block": "CC0-1.0", "last": "CC0-1.0"}
+    # A catalogue whose manifest source names CC0 1.0 (Quaternius, the Kenney kits): its rows without a licence take it.
+    _catalogue(tmp_path, "q_source", [{"id": "q_planter"}, {"id": "q_by", "license": "CC-BY-4.0"}],
+               source="https://quaternius.com/packs/x.html, CC0 1.0. Only the Prop_* models.")
+    _catalogue(tmp_path, "r_eula", [{"id": "r_store"}], source="Unity Asset Store EULA")
+    _catalogue(tmp_path, "s_number", [{"id": "s_odd"}], source=7)  # type: ignore[arg-type]
+    assert catalogue_licences(tmp_path) == {"cc0": "CC0-1.0", "by": "CC-BY-4.0", "kenney_block": "CC0-1.0", "last": "CC0-1.0",
+                                            "q_planter": "CC0-1.0", "q_by": "CC-BY-4.0"}
     assert catalogue_licences(None) == {}
     assert catalogue_licences(tmp_path / "nowhere") == {}
 

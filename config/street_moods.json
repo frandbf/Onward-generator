@@ -38,7 +38,7 @@
       "wall_decals_excluded": ["soot", "bullets", "moss", "rust", "peeling", "crack", "chalk"],
       "terraces": true,
       "awnings": true,
-      "cover": {"roles": ["utility_box", "dumpster", "planter", "trashcan"], "conditions": ["intact"]}
+      "cover": {"roles": ["utility_box", "dumpster", "trash", "planter", "trashcan"], "conditions": ["intact", "worn"]}
     }
   }
 }
