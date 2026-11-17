@@ -46,6 +46,8 @@ class Mood:
     wall_decals_excluded: frozenset[str]
     terraces: bool = False
     """Café tables before the bars of pedestrian streets and plazas (``overgrow/terraces.py``, 16 November 2026)."""
+    awnings: bool = False
+    """Striped awnings under the shops' fascia signs (``overgrow/awnings.py``, 16 November 2026)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,7 @@ def parse_moods(doc: object, schema: Mapping[str, Any], where: str = "street_moo
             categories=MappingProxyType({str(k): float(v) for k, v in body["categories"].items()}),
             wall_decals_excluded=frozenset(body["wall_decals_excluded"]),
             terraces=bool(body["terraces"]),
+            awnings=bool(body["awnings"]),
         )
         for name, body in doc["moods"].items()
     }

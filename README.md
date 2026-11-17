@@ -154,7 +154,7 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
 | `map.json` `"project_decals": false` | Leaves the project's wall decals (`assets/decals/`) off this map |
 | `map.json` `"damage": "none" \| "light" \| "heavy" \| "auto"` | War damage on the walls and decals on the ground of the core; rerun from `signs` ([ADR-038](docs/decisions/ADR-038-wall-decals.md) amendment) |
-| `map.json` `"street_mood": "lived" \| "emptied"` | A street in daily use (no growth or wrecks, intact props, street furniture, café terraces before the bars of pedestrian streets, no war wear on the walls) or one emptied days ago; absent is `abandoned`; rerun from `signs` ([ADR-044](docs/decisions/ADR-044-street-moods.md), proposed) |
+| `map.json` `"street_mood": "lived" \| "emptied"` | A street in daily use (no growth or wrecks, intact props, street furniture, café terraces under parasols before the bars of pedestrian streets, awnings over the shop windows, no war wear on the walls) or one emptied days ago; absent is `abandoned`; rerun from `signs` ([ADR-044](docs/decisions/ADR-044-street-moods.md), proposed) |
 | `map.json` `"smoke": N` | 0 to 5 smoke columns over wrecks of the core; rerun from `export` ([ADR-043](docs/decisions/ADR-043-smoke-columns.md), proposed) |
 
 **Data sources:** `--source nl.ahn` and `--source de.nrw_ndom` are opt-in LiDAR heights, used only inside their coverage. `onward-generator source list` shows every source; `--no-source <id>` turns one off.

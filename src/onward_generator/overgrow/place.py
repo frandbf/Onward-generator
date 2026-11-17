@@ -37,6 +37,8 @@ from onward_generator.maps.workspace import MapError, load_map
 from onward_generator.next_step import map_root
 from onward_generator.overgrow.ambient import cross_yaw, plan_from_brief
 from onward_generator.overgrow.atlas import PROP_ATLAS_EXTRA, apply_atlas
+from onward_generator.overgrow.awnings import AwningResult, place_awnings
+from onward_generator.overgrow.cloth import FABRIC_MATERIAL, fabric_png
 from onward_generator.overgrow.constants import (
     LANE_M,
     MAX_ADDED_TRIS,
@@ -221,6 +223,11 @@ def overgrow(
         )
         headroom -= terraces.triangles
         urban_areas.extend(terraces.footprints)
+    # Striped awnings under the shops' fascia signs, when the street mood asks for them (ADR-044).
+    awnings = AwningResult()
+    if mood.awnings:
+        awnings = place_awnings(manifest, buildings, area, seed, budget=int(headroom * HEADROOM_SHARE))
+        headroom -= awnings.triangles
     budget = _Budget(min(MAX_ADDED_TRIS, headroom))
     records: list[dict[str, Any]] = []
     rejects: list[dict[str, Any]] = []
@@ -366,7 +373,7 @@ def overgrow(
         occupied=_occupied(records),
         taken=_occupied([row for row in records if row["kind"] != "grass"]),
         keep_out=[*detail_elements(manifest), *keep_out_circles([*pins.footprints, *terraces.footprints])],
-        signs=sign_footprints(manifest),
+        signs=[*sign_footprints(manifest), *awnings.footprints],
     )
     tuft_meshes.extend(planted.grass)
     by_id = {prop.spec.id: prop for prop in props}
@@ -374,6 +381,7 @@ def overgrow(
     planted_cutouts = {name: cutoff for item in dict.fromkeys(planted.placed_ids) for name, cutoff in by_id[item].cutouts().items()}
     records.extend(planted.records)
     records.extend(terraces.records)
+    records.extend(awnings.records)
     rejects.extend(planted.rejects)
     for key, count in planted.reject_counts.items():
         reject_counts[key] = reject_counts.get(key, 0) + count
@@ -409,6 +417,10 @@ def overgrow(
         materials.setdefault(name, Material((1, 1, 1, 1), 0.9))
     extra_nodes.extend(furniture.nodes)
     extra_nodes.extend(terraces.nodes)
+    extra_nodes.extend(awnings.nodes)
+    if any(prim.material == FABRIC_MATERIAL for node in [*terraces.nodes, *awnings.nodes] for prim in node.primitives):
+        images[FABRIC_MATERIAL] = fabric_png()
+        materials[FABRIC_MATERIAL] = Material((1, 1, 1, 1), 0.9)
     images.update(furniture.images)
     images.update(terraces.images)
     for name in (*furniture.images, *terraces.images):
@@ -541,6 +553,8 @@ def overgrow(
         summary["furnishing"] = furniture.report()
     if mood.terraces:
         summary["terraces"] = terraces.report()
+    if mood.awnings:
+        summary["awnings"] = awnings.report()
     if street_profile is not None:
         # The street profile record's block (plan D2): ids, provenance and the reply's hash. Never observed.
         summary["street_profile"] = dict(street_profile)

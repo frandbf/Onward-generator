@@ -1,7 +1,7 @@
 {
   "schema": "onward_generator.terraces",
   "schema_version": "0.1.0",
-  "description": "Café terraces (plan 2026-11-16, increment 2): tables with a chair on each side, then a menu board and a planter, set by overgrow before the door of each shop detail records in a listed category, when a street mood asks for them (config/street_moods.json \"terraces\"). Only on a pedestrian street or a plaza, along the shop's wall and the facades in line with it, at most along_m from the door, and only where a passage of passage_m stays free to the building across. Pieces are rows of the allow-listed CC0 interior catalogues, first that is installed wins.",
+  "description": "Café terraces (plan 2026-11-16, increment 2): tables with a chair on each side, then a menu board and a planter, set by overgrow before the door of each shop detail records in a listed category, when a street mood asks for them (config/street_moods.json \"terraces\"). Only on a pedestrian street or a plaza, along the shop's wall and the facades in line with it, at most along_m from the door, and only where a passage of passage_m stays free to the building across. Each table stands under a procedural parasol (overgrow/cloth.py) unless parasol is null. Pieces are rows of the allow-listed CC0 interior catalogues, first that is installed wins.",
   "shop_categories": ["bar"],
   "highways": ["pedestrian", "living_street"],
   "street_search_m": 12.0,
@@ -14,6 +14,7 @@
   "along_m": 6.0,
   "sets_per_shop": 2,
   "max_sets": 24,
+  "parasol": { "radius_m": 1.1, "rim_m": 2.15, "apex_m": 2.5, "pole_m": 0.05 },
   "pieces": {
     "table": ["qt_home_Table_RoundSmall", "qt_furn_Table"],
     "chair": ["qt_home_Chair_1", "kenney_furniture_chair"],

@@ -38,10 +38,12 @@ from shapely import LineString, Point, Polygon, STRtree
 from shapely.geometry import shape
 
 from onward_generator.detail.config import FURNISH_CATALOGUES
+from onward_generator.detail.facades import stable_unit
 from onward_generator.detail.modules import yaw_matrix
 from onward_generator.generation.gltf import Node, Primitive
 from onward_generator.generation.mesh import box
 from onward_generator.overgrow.ambient import is_solid
+from onward_generator.overgrow.cloth import FABRIC_MATERIAL, POLE_BAND, parasol_mesh
 from onward_generator.overgrow.library import InteriorProp, read_interior_catalogue
 from onward_generator.overgrow.zone import Zone
 
@@ -75,6 +77,16 @@ class TerraceError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class Parasol:
+    """The cloth parasol over each table (``cloth.parasol_mesh``)."""
+
+    radius_m: float
+    rim_m: float
+    apex_m: float
+    pole_m: float
+
+
+@dataclass(frozen=True, slots=True)
 class TerraceConfig:
     shop_categories: frozenset[str]
     highways: frozenset[str]
@@ -89,6 +101,7 @@ class TerraceConfig:
     sets_per_shop: int
     max_sets: int
     pieces: Mapping[str, tuple[str, ...]]
+    parasol: Parasol | None = None
 
 
 def parse_terraces(doc: object, schema: Mapping[str, Any], where: str = "terraces") -> TerraceConfig:
@@ -112,6 +125,7 @@ def parse_terraces(doc: object, schema: Mapping[str, Any], where: str = "terrace
         sets_per_shop=int(doc["sets_per_shop"]),
         max_sets=int(doc["max_sets"]),
         pieces=MappingProxyType({slot: tuple(doc["pieces"][slot]) for slot in SLOTS}),
+        parasol=Parasol(*(float(doc["parasol"][key]) for key in ("radius_m", "rim_m", "apex_m", "pole_m"))) if doc["parasol"] else None,
     )
 
 
@@ -284,13 +298,14 @@ class TerraceResult:
     pieces: dict[str, str] = field(default_factory=dict)
     missing: dict[str, str] = field(default_factory=dict)
     """Slots none of whose ids is installed, with why each was refused."""
+    parasols: int = 0
     pieces_drawn: set[str] = field(default_factory=set)
     """Models whose mesh a node already carries; the next copies share it by ``mesh_key``."""
 
     def report(self) -> dict[str, Any]:
         """``terraces`` in ``overgrow_report.json``."""
         return {"shops": self.shops, "sets": self.sets, "pieces": len(self.nodes), "colliders": len(self.colliders),
-                "triangles": self.triangles, "models": dict(sorted(self.pieces.items())), "skipped": dict(sorted(self.skipped.items())),
+                "parasols": self.parasols, "triangles": self.triangles, "models": dict(sorted(self.pieces.items())), "skipped": dict(sorted(self.skipped.items())),
                 "missing": dict(sorted(self.missing.items()))}
 
 
@@ -419,7 +434,9 @@ def _try_unit(
     pieces = unit_pieces(slot, models, wall, centre_s, cfg)
     footprint = wall.rect(low, high, cfg.wall_gap_m, cfg.wall_gap_m + depth)
     middle = wall.point(centre_s, cfg.wall_gap_m + depth / 2)
-    triangles = sum(piece.piece.prop.triangles for piece in pieces)
+    unit = len(result.footprints)
+    shade = _parasol(pieces[0], cfg.parasol, ground_z, front, unit) if slot == "table" and cfg.parasol is not None else None
+    triangles = sum(piece.piece.prop.triangles for piece in pieces) + (shade[0].primitives[0].mesh.triangle_count if shade else 0)
     free = free_across(wall.point(centre_s, RAY_START_M), wall.n, buildings, cfg.reach_m) - RAY_START_M
     need = cfg.wall_gap_m + depth + cfg.passage_m
     reason = None
@@ -444,12 +461,30 @@ def _try_unit(
     if reason is not None:
         return reason
     cursors[side] = start + side * (width + cfg.set_gap_m)
-    unit = len(result.footprints)
     for index, piece in enumerate(pieces):
         _emit(piece, unit, index, result, ground_z, front)
+    if shade is not None:
+        result.nodes.append(shade[0])
+        result.records.append(shade[1])
+        result.triangles += shade[0].primitives[0].mesh.triangle_count
+        result.parasols += 1
     result.footprints.append(footprint)
     result.sets += slot == "table"
     return None
+
+
+def _parasol(table: Placed, parasol: Parasol, ground_z: Callable[[float, float], float], front: Front, unit: int) -> tuple[Node, dict[str, Any]]:
+    """The parasol over ``table``, its pole through the table's middle, in one colour per bar, and its record."""
+    band = int(stable_unit(0, front.building_id, "parasol") * POLE_BAND)  # the colour bands come before the pole's
+    z = ground_z(table.x, table.y)
+    mesh, uvs = parasol_mesh(table.x, table.y, z, parasol.radius_m, parasol.rim_m, parasol.apex_m, parasol.pole_m, band)
+    across = round(2 * parasol.radius_m, 3)
+    node = Node(f"{NODE_PREFIX}{unit}/parasol", (Primitive(mesh, FABRIC_MATERIAL, uvs),),
+                {"type": "overgrowth", "origin": "generated", "attribute_origin": "generated", "kind": "terrace", "slot": "parasol",
+                 "building_id": front.building_id, "solid": False})
+    record = {"kind": "terrace", "origin": "generated", "source_id": front.building_id, "role": "parasol",
+              "position_m": [round(table.x, 3), round(table.y, 3), round(z, 3)], "size_m": [across, across, round(parasol.apex_m, 3)], "solid": False}
+    return node, record
 
 
 def _backed(strip: Polygon, buildings: STRtree) -> bool:

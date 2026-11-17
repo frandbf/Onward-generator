@@ -6,7 +6,7 @@
   "required": ["schema", "schema_version", "default", "moods"],
   "properties": {
     "schema": { "const": "onward_generator.street_moods" },
-    "schema_version": { "const": "0.2.0" },
+    "schema_version": { "const": "0.3.0" },
     "description": { "type": "string" },
     "default": { "type": "string", "pattern": "^[a-z][a-z_]*$" },
     "moods": {
@@ -16,7 +16,7 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["note", "vines", "planted_trees", "wrecks", "conditions", "categories", "wall_decals_excluded", "terraces"],
+        "required": ["note", "vines", "planted_trees", "wrecks", "conditions", "categories", "wall_decals_excluded", "terraces", "awnings"],
         "properties": {
           "note": { "type": "string", "minLength": 1 },
           "vines": { "description": "Factor on the profile's vines", "type": "number", "minimum": 0, "maximum": 1 },
@@ -41,7 +41,8 @@
             "uniqueItems": true,
             "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" }
           },
-          "terraces": { "description": "Café tables, chairs, a menu board and a planter before each bar of a pedestrian street or plaza (config/terraces.json)", "type": "boolean" }
+          "terraces": { "description": "Café tables, chairs, a menu board and a planter before each bar of a pedestrian street or plaza (config/terraces.json)", "type": "boolean" },
+          "awnings": { "description": "Striped awnings under the fascia signs of the shops (config/awnings.json)", "type": "boolean" }
         }
       }
     }

@@ -4,7 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "schema_version", "shop_categories", "highways", "street_search_m", "passage_m", "wall_gap_m", "door_clear_m",
-               "piece_gap_m", "set_gap_m", "reach_m", "along_m", "sets_per_shop", "max_sets", "pieces"],
+               "piece_gap_m", "set_gap_m", "reach_m", "along_m", "sets_per_shop", "max_sets", "parasol", "pieces"],
   "properties": {
     "schema": { "const": "onward_generator.terraces" },
     "schema_version": { "const": "0.1.0" },
@@ -21,6 +21,23 @@
     "along_m": { "description": "How far from the door, along the wall, a unit may reach; past the shop's own footprint only along facades in line with it", "type": "number", "minimum": 1, "maximum": 20 },
     "sets_per_shop": { "description": "Tables before one shop, alternating right and left of its door", "type": "integer", "minimum": 1, "maximum": 6 },
     "max_sets": { "description": "Tables on the whole map", "type": "integer", "minimum": 1, "maximum": 200 },
+    "parasol": {
+      "description": "The cloth parasol over each table, or null for none",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["radius_m", "rim_m", "apex_m", "pole_m"],
+          "properties": {
+            "radius_m": { "type": "number", "minimum": 0.5, "maximum": 2 },
+            "rim_m": { "description": "Height of the cloth's rim", "type": "number", "minimum": 2.0, "maximum": 3 },
+            "apex_m": { "description": "Height of the cloth's top", "type": "number", "minimum": 2.0, "maximum": 3.5 },
+            "pole_m": { "type": "number", "minimum": 0.02, "maximum": 0.15 }
+          }
+        }
+      ]
+    },
     "pieces": {
       "type": "object",
       "additionalProperties": false,
