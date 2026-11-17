@@ -1,0 +1,13 @@
+{
+  "schema": "onward_generator.awnings",
+  "schema_version": "0.1.0",
+  "description": "Shop awnings (plan 2026-11-16, increment 3): a striped cloth canopy hung just under the fascia sign detail records over a shop window, when a street mood asks for them (config/street_moods.json \"awnings\"). As wide as the fascia, depth_m out of the wall, sloping down at most max_drop_m, with a valance_m skirt; its lowest edge stays head_clear_m above the ground or the canopy slopes less, and under min_drop_m it is left out. One shop in share gets one, by a hash of the seed and the shop. No collision.",
+  "share": 0.7,
+  "depth_m": 0.9,
+  "max_drop_m": 0.35,
+  "min_drop_m": 0.1,
+  "valance_m": 0.2,
+  "head_clear_m": 2.2,
+  "under_fascia_m": 0.02,
+  "free_m": 0.5
+}

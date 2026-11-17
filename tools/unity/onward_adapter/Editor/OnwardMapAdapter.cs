@@ -3616,8 +3616,9 @@ namespace OnwardGenerator
         {
             string n = material != null ? material.name.ToLowerInvariant() : "";
             // Grass tufts and vines are 0.55 m cards and 0.25 m strips: lightmapped they baked black (Barcelona Sarria).
+            // The awning and parasol cloth (overgrow/cloth.py) is two-sided and thin: its two faces would share texels.
             return !(n.Contains("tree_") || n.Contains("urban_metal") || n.Contains("railing_metal")
-                || n.StartsWith("m_prop_") || n.Contains("abandoned_grass") || n.Contains("abandoned_vine")
+                || n.StartsWith("m_prop_") || n.Contains("abandoned_grass") || n.Contains("abandoned_vine") || n.Contains("awning_fabric")
                 || IsSeeThroughOrRim(n) || n.Contains("horizon_backdrop"));
         }
 

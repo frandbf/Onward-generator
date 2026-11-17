@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "onward-generator shop awnings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "share", "depth_m", "max_drop_m", "min_drop_m", "valance_m", "head_clear_m", "under_fascia_m", "free_m"],
+  "properties": {
+    "schema": { "const": "onward_generator.awnings" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string" },
+    "share": { "description": "Share of the shops with a fascia that get an awning", "type": "number", "minimum": 0, "maximum": 1 },
+    "depth_m": { "description": "How far the canopy reaches out of the wall", "type": "number", "minimum": 0.3, "maximum": 2.5 },
+    "max_drop_m": { "description": "How far the canopy slopes down at most", "type": "number", "minimum": 0, "maximum": 1.5 },
+    "min_drop_m": { "description": "A canopy that cannot slope this far is left out", "type": "number", "minimum": 0, "maximum": 1 },
+    "valance_m": { "description": "The skirt hanging from the front edge", "type": "number", "minimum": 0, "maximum": 0.6 },
+    "head_clear_m": { "description": "The lowest edge stays this far above the ground", "type": "number", "minimum": 1.9, "maximum": 3 },
+    "under_fascia_m": { "description": "Gap between the fascia's bottom and the canopy's top", "type": "number", "minimum": 0, "maximum": 0.2 },
+    "free_m": { "description": "Open ground kept beyond the canopy's front to the building across", "type": "number", "minimum": 0, "maximum": 5 }
+  }
+}

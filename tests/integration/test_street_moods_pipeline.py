@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 from shapely.geometry import Point
 
@@ -131,7 +132,7 @@ def test_the_report_names_a_mood_other_than_the_default(runs) -> None:  # type: 
 
 def test_a_lived_street_reports_its_terraces_and_the_default_none(runs) -> None:  # type: ignore[no-untyped-def]
     terraces = runs["reports"]["lived"]["terraces"]
-    assert set(terraces) == {"shops", "sets", "pieces", "colliders", "triangles", "models", "skipped", "missing"}
+    assert set(terraces) == {"shops", "sets", "pieces", "colliders", "parasols", "triangles", "models", "skipped", "missing"}
     assert "terraces" not in runs["reports"][None] and "terraces" not in runs["reports"]["emptied"]
 
 
@@ -174,7 +175,8 @@ def test_the_terraces_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> N
     assert elements and len(seen["keep_out"]) >= len(elements)  # detail's urban elements are kept off
     assert seen["keep_out"][0].contains(Point(*elements[0][:2]))
     assert seen["near_spawn"](41.0, -30.0) is True and seen["near_spawn"](40.0, -40.0) is False and seen["near_spawn"](30.0, -30.0) is False
-    assert seen["budget"] == int((report["triangle_headroom"] + made.triangles) * 0.25)  # a quarter of the headroom, before they spend it
+    # A quarter of the headroom before they spend it; the awnings hung after them spend theirs too.
+    assert seen["budget"] == int((report["triangle_headroom"] + made.triangles + report["awnings"]["triangles"]) * 0.25)
     assert seen["ground_z"](1e6, 1e6) == 0.0
     assert (3.0, 4.0, 1.0) in [tuple(round(v, 3) for v in c) for c in dressed["keep_out"]]  # the street props keep off the terrace
     visual = {node.name for node in nodes_from_glb((out / "scene_visual.glb").read_bytes())[0]}
@@ -184,3 +186,53 @@ def test_the_terraces_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> N
     row = next(o for o in objects if o.get("kind") == "terrace")
     assert row["size_m"] == [0.8, 0.8, 0.75] and row["role"] == "table" and row["source_ids"] == ["B"] and row["asset_id"] == "t"
     assert report["colliders"] == runs["reports"]["lived"]["colliders"] + 1
+
+
+def test_a_lived_street_reports_its_awnings_and_draws_the_cloth(runs) -> None:  # type: ignore[no-untyped-def]
+    awnings = runs["reports"]["lived"]["awnings"]
+    assert set(awnings) == {"fascias", "awnings", "triangles", "skipped"}
+    assert "awnings" not in runs["reports"][None] and "awnings" not in runs["reports"]["emptied"]
+    default = nodes_from_glb((runs["tmp"] / "None" / "scene_visual.glb").read_bytes())[1]
+    assert "awning_fabric" not in default  # the default mood draws no cloth
+
+
+def test_the_awnings_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
+    """An awning's node, record and footprint reach the visual GLB with the cloth, the manifest and the wall props."""
+    from shapely.geometry import box as shapely_box
+
+    from onward_generator.overgrow.awnings import AwningResult
+    from onward_generator.overgrow.cloth import awning_mesh
+
+    seen: dict[str, object] = {}
+    made = AwningResult()
+    mesh, uvs = awning_mesh(np.array([5.0, 5.0]), np.array([1.0, 0.0]), np.array([0.0, -1.0]), 2.0, 3.0, 0.9, 0.3, 0.2, 0)
+    made.nodes.append(Node("overgrow/awning/0", (Primitive(mesh, "awning_fabric", uvs),), {"type": "overgrowth", "kind": "awning"}))
+    made.footprints.append((shapely_box(4.0, 4.1, 6.0, 5.0), 2.5, 3.0))
+    made.records.append({"kind": "awning", "origin": "generated", "source_id": "B", "role": "awning", "position_m": [5.0, 4.55, 2.5],
+                         "size_m": [2.0, 0.9, 0.5], "solid": False})
+    made.triangles = 12
+
+    def fake(manifest, buildings, zone, seed, **kwargs):  # type: ignore[no-untyped-def]
+        seen.update(kwargs, buildings=buildings, zone=zone.kind, seed=seed, manifest=manifest)
+        return made
+
+    dressed: dict[str, object] = {}
+    real_dress = place.dress
+
+    def dress_spy(*args, **kwargs):  # type: ignore[no-untyped-def]
+        dressed.update(kwargs)
+        return real_dress(*args, **kwargs)
+
+    monkeypatch.setattr(place, "place_awnings", fake)
+    monkeypatch.setattr(place, "dress", dress_spy)
+    out = runs["tmp"] / "awning_join"
+    report = overgrow(runs["base"], runs["scene"], out, seed=777, street_mood="lived")
+    assert report["awnings"] == made.report() and seen["seed"] == 777 and seen["zone"] == report["zone"]["kind"]
+    assert seen["budget"] == int((report["triangle_headroom"] + made.triangles) * 0.25)
+    assert len(seen["buildings"].geometries) > 1 and seen["manifest"]["objects"]
+    assert made.footprints[0] in dressed["signs"]  # a wall prop keeps off the awning as off a sign
+    nodes, materials = nodes_from_glb((out / "scene_visual.glb").read_bytes())
+    assert "overgrow/awning/0" in {node.name for node in nodes} and "awning_fabric" in materials
+    objects = json.loads((out / "scene_detail.json").read_text(encoding="utf-8"))["objects"]
+    row = next(o for o in objects if o.get("kind") == "awning")
+    assert row["size_m"] == [2.0, 0.9, 0.5] and row["source_ids"] == ["B"] and row["role"] == "awning"

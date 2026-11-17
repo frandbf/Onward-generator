@@ -27,7 +27,7 @@ Status: proposed · 16 November 2026. Plan [2026-11-16-ambientes-de-calle](../pl
 ## Consequences
 
 - A new mood is a table row, with no code.
-- The library still has little outdoor furniture. Awnings and the street profile offering the mood are later increments of the plan.
+- The library still has little outdoor furniture. The street profile offering the mood is a later increment of the plan.
 - A `lived` map spends less of its triangle budget on props until those increments land.
 - `street_mood` is not yet in the street profile schema: a map gets a mood only from its own `map.json`.
 
@@ -41,3 +41,14 @@ A mood now also says whether it sets café terraces (`"terraces"`, required; sch
 - The pieces are rows of the allow-listed CC0 interior catalogues, the first installed id of each slot: Quaternius round table and chair, Poly Haven chalkboard, Kenney potted plant. No new asset was needed. A table, a board and a planter get a box collider; a chair stays visual.
 - Nodes are `overgrow/terrace/<unit>/<piece>`, combined per ground cell in Unity like the street props; the manifest records each piece as an `overgrowth` object of kind `terrace` with its `size_m`, and `overgrow_report.json` gains a `terraces` block (shops, tables, pieces, colliders, triangles, models, why units were skipped, missing models) only for a mood that sets terraces.
 - On Calle Sierpes (Seville) the rule finds 9 bars and sets 7 tables before 5 of them; the others are kept back by spawns, neighbouring doors, a facade that turns a corner or a street that is not pedestrian.
+
+## Amendment of 16 November 2026: awnings and parasols (plan increment 3)
+
+A mood now also says whether it hangs awnings (`"awnings"`, required; schema 0.3.0). Only `lived` does.
+
+- `config/awnings.json` (schema `config/awnings.schema.json`) holds the rules: the share of shops with a fascia that get one (0.7, by a hash of the seed and the shop), the depth out of the wall (0.9 m), the slope (at most 0.35 m, at least 0.1 m), the valance (0.2 m), the head clearance (2.2 m), the gap under the fascia and the open ground kept beyond it.
+- `overgrow/awnings.py` hangs each awning just under the fascia board `detail` recorded over the shop's window, as wide as the board. Under a low fascia the canopy slopes less, so its lowest edge stays at 2.2 m; one that cannot slope 0.1 m is left out. It is left out, too, outside the zone, where the building across is too near, and where it would cover a street name plate, a wall decal or another shop's sign. A blade sign has no board over the window, so its shop gets none. The wall props placed after it keep off it as off a sign.
+- `config/terraces.json` gains `parasol` (radius 1.1 m, rim at 2.15 m, apex at 2.5 m, a 5 cm pole; `null` for none): each table stands under one, in one colour per bar, and the table and its parasol fit the budget together or not at all.
+- `overgrow/cloth.py` builds both from code: a two-sided sloped canopy with a valance and two cheeks (12 triangles), and an eight-sided cone on a square pole (32 triangles). Both draw one generated material, `awning_fabric`: three bands of red, green or blue stripes on cream, and a grey band for the poles, the stripes repeating once a metre. No model is downloaded. Neither collides. The Unity adapter lights the cloth by light probes, not the lightmap, as it does grass and vines: the two faces of a thin cloth would share texels.
+- Nodes are `overgrow/awning/<n>` and `overgrow/terrace/<unit>/parasol`; the manifest records each as an `overgrowth` object (kind `awning`, or kind `terrace` role `parasol`) with its `size_m`, and `overgrow_report.json` gains an `awnings` block and `terraces.parasols` only for a mood that sets them.
+- On Calle Sierpes (Seville) 34 of 61 fascias get an awning (408 triangles) and the 7 tables their parasols; 17 shops are left out by the share, 7 outside the zone, 2 under a fascia too low and 1 where it would cover a sign.
