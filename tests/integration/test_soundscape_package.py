@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,22 @@ def test_war_sounds_combat_fire_under_the_smoke_and_flies(inputs: tuple[Path, Pa
     assert sorted((s["x"], s["y"]) for s in block["sources"] if s["clip"] == "Flies") == sorted(far)[:4]
     assert result.manifest["soundscape"]["sources"] == {"generator": 0, "fire": len(far), "flies": min(len(far), 4)}
     assert result.manifest["package_id"] != GOLDEN_PACKAGE_ID and verify_package(result.directory) == []
+
+
+def test_a_generator_stands_by_a_pole_of_the_core_only(inputs: tuple[Path, Path], tmp_path: Path) -> None:  # noqa: F811 - the shared fixture
+    detail, layout = inputs
+    copy = tmp_path / "detail"
+    shutil.copytree(detail, copy)
+    document = json.loads((copy / "scene_detail.json").read_bytes())
+    assert document.get("core") is None  # the fixture plays the whole map: give the copy a core
+    half = 60.0
+    document["core"] = {"half_side_m": half}
+    document["objects"] = [*document["objects"], {"id": "overgrow/power_pole/1", "type": "overgrowth", "origin": "generated", "kind": "power_pole",
+                                                  "role": "pole", "source_ids": [], "position_m": [half + 5.0, -half - 5.0, 0.0], "size_m": [0.3, 0.3, 8.0]}]
+    document["envelope"] = {**(document.get("envelope") or {}), "fit": {"checked": 1, "problems": []}}
+    (copy / "scene_detail.json").write_text(json.dumps(document), encoding="utf-8")
+    result = build_package(EXPORT_PROJECT, copy, layout, tmp_path / "pkg", now=FIXED_NOW, soundscape="regional")
+    assert result.manifest["soundscape"]["sources"] == {"generator": 0}  # past the core's edge
 
 
 def test_the_command_takes_the_mode_and_the_style(inputs: tuple[Path, Path], tmp_path: Path) -> None:  # noqa: F811 - the shared fixture

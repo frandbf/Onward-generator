@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from onward_generator.export import soundscape as sound
 from onward_generator.export.soundscape import (
     CONFIG_PATH,
     SCHEMA_PATH,
@@ -48,7 +48,8 @@ def _pole(i: int, x: float, y: float) -> dict[str, Any]:
 
 
 def test_the_configuration_names_sdk_clips_by_mode_and_style() -> None:
-    config = load_soundscape()
+    config = parse_soundscape(_doc(), _schema(), "config")  # parsed here: a cached load would hide its mutants
+    assert load_soundscape() == config
     assert config.globals_ == {"regional": None, "war": "Distant Combat Sparse", "battle": "Distant Combat Dense"}
     assert config.locals_ == {"regional": ("generator",), "war": ("generator", "fire", "flies"), "battle": ("generator", "fire", "flies")}
     assert config.regional == {"east_african": ("Birds African Bush 1", "Wind Desert"), "arid": (None, "Wind Desert")}
@@ -122,6 +123,9 @@ def test_a_site_stands_inside_the_core_clear_of_spawns_and_apart_each_bound_incl
     spawns = [(0.0, 0.0)]
     assert pick([("edge", 50.0, 30.0, 0.0), ("out", 50.001, 0.0, 0.0)], source, 50.0, spawns) == [(50.0, 30.0, 0.0)]
     assert pick([("clear", 0.0, 10.0, 0.0), ("near", 0.0, -9.999, 0.0)], source, 50.0, spawns) == [(0.0, 10.0, 0.0)]
+    off = [(-20.0, 30.0)]  # a spawn off the origin: the distance is measured from where it stands
+    assert pick([("east", -10.0, 30.0, 0.0), ("west", -29.999, 30.0, 0.0)], source, 50.0, off) == [(-10.0, 30.0, 0.0)]
+    assert pick([("north", -20.0, 40.0, 0.0), ("south", -20.0, 20.001, 0.0)], source, 50.0, off) == [(-20.0, 40.0, 0.0)]
     assert len(pick([("out", 50.001, 0.0, 0.0)], source, None, spawns)) == 1  # no core: anywhere counts
     both = pick([("a", 20.0, 20.0, 0.0), ("b", 40.0, 20.0, 0.0)], source, 50.0, spawns)  # exactly 20 m apart
     assert sorted(both) == [(20.0, 20.0, 0.0), (40.0, 20.0, 0.0)]
@@ -132,7 +136,9 @@ def test_the_order_is_fixed_by_the_ids_and_the_count_caps_it() -> None:
     sites = [(f"s{i}", float(10 * i), 40.0, 0.0) for i in range(6)]
     one = pick(sites, Source("Fire", 2, 0.0, 0.0, 0.5), None, [])
     assert one == pick(list(reversed(sites)), Source("Fire", 2, 0.0, 0.0, 0.5), None, [])
-    assert len(one) == 2 and one == [(x, y, z) for _i, x, y, z in sound._ordered(sites)[:2]]
+    by_hash = sorted(sites, key=lambda s: hashlib.sha256(s[0].encode()).hexdigest())
+    assert by_hash != sorted(sites)  # these ids hash in another order than they sort
+    assert len(one) == 2 and one == [(x, y, z) for _i, x, y, z in by_hash[:2]]
 
 
 def test_flies_buzz_over_wrecks_and_the_listed_kinds_only() -> None:
@@ -224,7 +230,7 @@ def test_an_unknown_mode_is_refused() -> None:
 def test_the_configured_counts_and_heights_are_used(monkeypatch: pytest.MonkeyPatch) -> None:
     doc = _doc()
     doc["local"]["flies"] = {"clip": "Water Drip", "max": 1, "apart_m": 0, "spawn_clear_m": 0, "height_m": 2.5}
-    config = parse_soundscape(copy.deepcopy(doc), _schema())
+    config = parse_soundscape(copy.deepcopy(doc), _schema(), "here")
     block, _ = soundscape_block("war", "arid", config, [_wreck(1, 30.0, 30.0), _wreck(2, -30.0, 30.0)], [], 100.0, LAYOUT)
     assert block is not None
     assert [(s["clip"], s["z"]) for s in block["sources"] if s["name"].startswith("Flies")] == [("Water Drip", 2.5)]

@@ -65,7 +65,7 @@ class SoundConfig:
     flies_kinds: frozenset[str]
 
 
-def parse_soundscape(doc: object, schema: Mapping[str, Any], where: str = "soundscape") -> SoundConfig:
+def parse_soundscape(doc: object, schema: Mapping[str, Any], where: str) -> SoundConfig:
     """The configuration, after its schema."""
     first = best_match(Draft202012Validator(schema).iter_errors(doc))
     if first is not None:
