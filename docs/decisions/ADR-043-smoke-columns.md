@@ -25,3 +25,13 @@ Five columns hold at most 200 billboards, all transparent. No triangles are adde
 ## Not checked here
 
 On the headset: the frame rate (at least 72 fps median, as measured on Murcia), how the columns read against the sky, and whether a published map keeps them. If the cost is too high, `PP_Particle_UnLit_Dither` (dithered, no blending) is the next step, then fewer columns.
+
+## Amendment of 17 November 2026: fire under the smoke
+
+Plan [2026-11-17-efectos-sdk](../plans/2026-11-17-efectos-sdk.md), increment E. A column of smoke rose from nothing; now it can have a fire at its foot.
+
+- **When.** `map.json` `"fire": true` (`export package --fire`; absent or `false` writes nothing). It burns only under smoke columns, so a map that asks for fire without `smoke` gets a warning and the package of before. Fire stays off by default, so a map that already has smoke does not change until it asks.
+- **Where.** A site 0.4 m under the foot of each column, on the wreck's top. `adapter_options.json` gains a `fire` block (the numbers of the flames and the embers, and the sites), and the package `fire_flame.png`, a 64 px upright flame drawn by code (CC0, role `fire_texture`). `onward_export.json` records `fire` (`sites`).
+- **Adapter.** `AddFire` draws two `ParticleSystem` per site on the SDK's `PP_Particle_Unlit_Additive`: flames (20 a second living 0.6 s, 0.4 to 1 m, rising at 1.5 m/s in a 12° cone, at most 16) and embers (3 a second living 2.5 s, 4 to 7 cm, in a 25° cone, at most 8), coloured from yellow-orange to red and fading in and out. Unlit and without light probes, shadows or a real-time light: the fire is its own light, and a light that flickers cannot be baked. A package with fire sites and no flame texture, or the other way round, is refused.
+- **Cost.** At most 24 more billboards a column, 120 with five columns, additive and small on screen. No triangle enters the scene budget. Like the smoke, the frame rate with a fire in view is still to be measured on the headset.
+

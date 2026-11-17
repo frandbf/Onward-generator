@@ -482,6 +482,7 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
         parts.extend(["--atmosphere", atmosphere])
     parts.extend(_triangle_limit(root))
     parts.extend(_smoke(root))
+    parts.extend(_fire(root))
     return invoke(*parts)
 
 
@@ -491,6 +492,13 @@ def _smoke(root: Path) -> list[str]:
 
     count = smoke_columns(root) if (root / "map.json").is_file() else 0
     return ["--smoke", str(count)] if count else []
+
+
+def _fire(root: Path) -> list[str]:
+    """``--fire`` when ``map.json`` asks for flames under the smoke (plan 2026-11-17, increment E), else nothing."""
+    from onward_generator.maps.workspace import fire_enabled
+
+    return ["--fire"] if (root / "map.json").is_file() and fire_enabled(root) else []
 
 
 def _soundscape(root: Path, detail: Path) -> list[str]:

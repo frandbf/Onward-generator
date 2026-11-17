@@ -119,3 +119,34 @@ def test_fewer_columns_than_wrecks_take_the_first_in_turn(inputs: tuple[Path, Pa
            if all(((x - px) ** 2 + (y - py) ** 2) ** 0.5 >= 15.0 for px, py in points)]
     result = build_package(EXPORT_PROJECT, _wrecked(detail, tmp_path, far), layout, tmp_path / "pkg", now=FIXED_NOW, smoke=1)
     assert result.manifest["smoke"]["columns"] == 1 and len(json.loads((result.directory / "adapter_options.json").read_bytes())["smoke"]["columns"]) == 1
+
+
+def test_fire_burns_under_each_column_with_its_texture(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    from onward_generator.export.fire import EMBERS, FLAMES, flame_png
+
+    detail, layout = inputs
+    spawns = json.loads(layout.read_bytes())
+    far = [(x, y) for x, y in ((-70.0, -70.0), (70.0, -70.0), (-70.0, 70.0), (70.0, 70.0))
+           if all(((x - p["x"]) ** 2 + (y - p["y"]) ** 2) ** 0.5 >= 15.0
+                  for key in ("attackers", "defenders") for p in (spawns.get(key) or {}).get("points_m") or [])]
+    result = build_package(EXPORT_PROJECT, _wrecked(detail, tmp_path, far), layout, tmp_path / "pkg", now=FIXED_NOW, smoke=len(far), fire=True)
+    block = json.loads((result.directory / "adapter_options.json").read_bytes())["fire"]
+    assert block["texture"] == "fire_flame.png" and block["flames"] == FLAMES and block["embers"] == EMBERS
+    assert sorted((s["x"], s["y"], s["z"]) for s in block["sites"]) == sorted((x, y, 0.6) for x, y in far)
+    assert result.manifest["fire"] == {"sites": len(far), "origin": "generated"}
+    listed = [f for f in result.manifest["files"] if f["role"] == "fire_texture"]
+    assert [f["path"] for f in listed] == ["fire_flame.png"] and listed[0]["source"] == "generated"
+    assert listed[0]["bytes"] == (result.directory / "fire_flame.png").stat().st_size
+    assert (result.directory / "fire_flame.png").read_bytes() == flame_png()
+    assert verify_package(result.directory) == []
+
+
+def test_fire_without_smoke_warns_and_writes_nothing(inputs: tuple[Path, Path], tmp_path: Path) -> None:
+    detail, layout = inputs
+    result = build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW, fire=True)
+    assert result.manifest["package_id"] == GOLDEN_PACKAGE_ID and not (result.directory / "fire_flame.png").exists()
+    assert result.manifest["fire"] == {"sites": 0, "origin": "generated"}
+    assert 'fire: no smoke column to burn under; set map.json "smoke" to light the fire' in result.manifest["warnings"]
+    assert main(["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout),
+                 "--out", str(tmp_path / "cli"), "--fire"]) == 0
+    assert "fire" in json.loads((tmp_path / "cli" / "onward_export.json").read_bytes())

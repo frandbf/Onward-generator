@@ -71,6 +71,9 @@ namespace OnwardGenerator
         private const float SmokeCutoff = 0.02f;
         private const float SmokeConeAngleDeg = 8f;
         private const float SmokeConeRadiusM = 0.6f;
+        // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit additive particle shader.
+        private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit_Additive.shadergraph";
+        private const string FireRole = "fire_texture";
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
         private const float LitNormalSpecular = 0.04f;
@@ -163,6 +166,35 @@ namespace OnwardGenerator
             // Plan 2026-11-17, increment D (ADR-046): the SDK clips of the map's soundscape. Absent (empty mode) in every
             // package whose soundscape changes nothing.
             public SoundscapeOptions soundscape = new SoundscapeOptions();
+            // Plan 2026-11-17, increment E: flames and embers under the smoke columns. Absent (no sites) in every package without fire.
+            public FireOptions fire = new FireOptions();
+        }
+
+        [Serializable] private class FireSite { public float x; public float y; public float z; public int seed; }
+
+        [Serializable]
+        private class FireEmitter
+        {
+            public float rate_per_s;
+            public float lifetime_s;
+            public float min_size_m;
+            public float max_size_m;
+            public float end_scale;
+            public float speed_m_s;
+            public float cone_deg;
+            public float radius_m;
+            public string start_color = "";
+            public string end_color = "";
+            public int max_particles;
+        }
+
+        [Serializable]
+        private class FireOptions
+        {
+            public string texture = "";
+            public FireEmitter flames = new FireEmitter();
+            public FireEmitter embers = new FireEmitter();
+            public FireSite[] sites = new FireSite[0];
         }
 
         [Serializable] private class SoundSource { public string name; public string clip; public float x; public float y; public float z; }
@@ -344,6 +376,11 @@ namespace OnwardGenerator
             int smokeColumns = (pkg.Options.smoke?.columns ?? new SmokeColumn[0]).Length;
             if (smokeFiles > 1 || (smokeColumns > 0) != (smokeFiles == 1))
                 throw new InvalidDataException($"adapter_options.json smoke has {smokeColumns} columns, the package lists {smokeFiles} '{SmokeRole}' files");
+            // Plan 2026-11-17, increment E: fire sites come with exactly one listed (and so verified) flame texture.
+            int fireFiles = m.files.Count(f => f.role == FireRole);
+            int fireSites = (pkg.Options.fire?.sites ?? new FireSite[0]).Length;
+            if (fireFiles > 1 || (fireSites > 0) != (fireFiles == 1))
+                throw new InvalidDataException($"adapter_options.json fire has {fireSites} sites, the package lists {fireFiles} '{FireRole}' files");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -1042,6 +1079,7 @@ namespace OnwardGenerator
                 AddInteriorLights(visual, opt, probes);
                 AddStreetLights(pkg.Layout);
                 AddSmoke(pkg, root);
+                AddFire(pkg, root);
                 ApplySoundscape(pkg.Options.soundscape);
                 AddClimbProbes(pkg.Layout, probes);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
@@ -3167,6 +3205,97 @@ namespace OnwardGenerator
                 ps.Play();
             }
             Debug.Log($"{LogPrefix} Smoke: {smoke.columns.Length} columns, {smoke.max_particles} particles each at most, {shader.name}.");
+        }
+
+        // Plan 2026-11-17, increment E: small flames and rising embers at the foot of each smoke column, two ParticleSystems
+        // per site on the SDK's unlit additive shader. Unlit, no shadows, no real-time light: the fire is its own light and
+        // a flicker cannot be baked. Not static, so nothing is baked.
+        private static void AddFire(Package pkg, string root)
+        {
+            FireOptions fire = pkg.Options.fire;
+            if (fire == null || fire.sites == null || fire.sites.Length == 0) return;
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(FireShaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {FireShaderPath}.");
+            string texturePath = $"{root}/Textures/T_fire_flame.png";
+            File.WriteAllBytes(texturePath, File.ReadAllBytes(pkg.Path(FireRole)));
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter
+                ?? throw new InvalidOperationException($"{texturePath}: no TextureImporter after the import");
+            importer.textureType = TextureImporterType.Default;
+            importer.sRGBTexture = true;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.mipmapEnabled = true;
+            importer.SaveAndReimport();
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
+                ?? throw new InvalidOperationException($"{texturePath}: imported, but no Texture2D to load");
+            var material = new Material(shader) { name = "M_fire" };
+            material.SetTexture("_MainTex", texture);
+            material.SetColor("_BaseColor", Color.white);
+            material.SetFloat("_Cutoff", SmokeCutoff);
+            AssetDatabase.CreateAsset(material, $"{root}/M_fire.mat");
+
+            var parent = new GameObject("Fire");
+            foreach (FireSite site in fire.sites)
+            {
+                var go = new GameObject("Fire_" + site.seed.ToString(CultureInfo.InvariantCulture));
+                go.transform.SetParent(parent.transform, false);
+                go.transform.position = Local(site.x, site.y, site.z);
+                go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);  // the cones' axis points up
+                FireEmitterSystem(go, "Flames", fire.flames, material, site.seed);
+                FireEmitterSystem(go, "Embers", fire.embers, material, site.seed + 1000);
+            }
+            Debug.Log($"{LogPrefix} Fire: {fire.sites.Length} sites, {fire.flames.max_particles} flames and {fire.embers.max_particles} embers each at most, {shader.name}.");
+        }
+
+        private static void FireEmitterSystem(GameObject site, string name, FireEmitter e, Material material, int seed)
+        {
+            if (!(e.rate_per_s > 0f && e.lifetime_s > 0f && e.max_particles > 0 && e.min_size_m > 0f && e.max_size_m >= e.min_size_m && e.end_scale > 0f))
+                throw new InvalidDataException($"fire {name}: rate_per_s, lifetime_s, max_particles, min_size_m and end_scale must be positive, max_size_m at least min_size_m");
+            if (!ColorUtility.TryParseHtmlString(e.start_color, out Color start) || !ColorUtility.TryParseHtmlString(e.end_color, out Color end))
+                throw new InvalidDataException($"fire {name}: start_color {e.start_color} and end_color {e.end_color} must be #RRGGBB");
+            var go = new GameObject(name);
+            go.transform.SetParent(site.transform, false);
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            ps.useAutoRandomSeed = false;
+            ps.randomSeed = (uint)Math.Max(1, seed);
+            var main = ps.main;
+            main.loop = true;
+            main.prewarm = true;
+            main.playOnAwake = true;
+            main.duration = e.lifetime_s;
+            main.startLifetime = e.lifetime_s;
+            main.startSpeed = e.speed_m_s;
+            main.startSize = new ParticleSystem.MinMaxCurve(e.min_size_m, e.max_size_m);
+            main.startRotation = new ParticleSystem.MinMaxCurve(-0.2f, 0.2f);
+            main.startColor = Color.white;
+            main.maxParticles = e.max_particles;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var emission = ps.emission;
+            emission.rateOverTime = e.rate_per_s;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = e.cone_deg;
+            shape.radius = e.radius_m;
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, e.end_scale));
+            var fade = new Gradient();
+            fade.SetKeys(new[] { new GradientColorKey(start, 0f), new GradientColorKey(end, 1f) },
+                         new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.1f), new GradientAlphaKey(0.8f, 0.6f), new GradientAlphaKey(0f, 1f) });
+            var life = ps.colorOverLifetime;
+            life.enabled = true;
+            life.color = fade;
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sortMode = ParticleSystemSortMode.Distance;
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            ps.Play();
         }
 
         // One baked point light per furnished room, in node order, up to interior_lights_max.

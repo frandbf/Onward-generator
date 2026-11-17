@@ -39,6 +39,9 @@ from onward_generator.export.atmosphere import (
     load_presets,
 )
 from onward_generator.export.cutouts import CutoutError, cutout_options, scene_cutouts
+from onward_generator.export.fire import TEXTURE_FILE as FIRE_TEXTURE
+from onward_generator.export.fire import TEXTURE_ROLE as FIRE_ROLE
+from onward_generator.export.fire import fire_options, flame_png
 from onward_generator.export.info3 import fit_listing_description
 from onward_generator.export.library_normals import NORMAL_MAP_ROLE, LibraryNormalError, normal_map_files, scene_normal_maps
 from onward_generator.export.lightmap import (
@@ -466,13 +469,14 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
                   atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0,
-                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto") -> PackageResult:
+                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto", fire: bool = False) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
     changes nothing, the package id included. ``smoke`` asks for that many smoke columns (plan 2026-11-15,
     increment C); 0 changes nothing. ``soundscape`` is a mode of ``export.soundscape`` (plan 2026-11-17, increment D)
-    and ``facade_style`` the map's style as materials resolves it; ``default`` changes nothing."""
+    and ``facade_style`` the map's style as materials resolves it; ``default`` changes nothing. ``fire`` lights flames
+    and embers under every smoke column (plan 2026-11-17, increment E); without a column it writes nothing."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -587,6 +591,14 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         if len(columns) < smoke:
             warnings.append(f"smoke: {len(columns)} of {smoke} columns found a wreck of the core clear of the spawns, "
                             f"the climbs and each other ({', '.join(f'{k} {v}' for k, v in refused.items() if v) or 'no wreck'})")
+    fire_record: dict[str, Any] | None = None
+    if fire:
+        # Plan 2026-11-17, increment E: only a map that asks for fire, and has smoke to burn under, writes it.
+        fire_record = {"sites": len(columns), "origin": "generated"}
+        if columns:
+            options["fire"] = fire_options(columns)
+        else:
+            warnings.append("fire: no smoke column to burn under; set map.json \"smoke\" to light the fire")
     sound_record: dict[str, Any] | None = None
     if soundscape != SOUND_DEFAULT:
         # Plan 2026-11-17, increment D: the block only when the mode changes something, so others keep their package_id.
@@ -636,6 +648,10 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             atomic_write_bytes(out / SMOKE_TEXTURE, puff_png())
             files.append({"role": SMOKE_ROLE, "path": SMOKE_TEXTURE, "sha256": sha256_file(out / SMOKE_TEXTURE),
                           "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": "generated"})
+        if "fire" in options:
+            atomic_write_bytes(out / FIRE_TEXTURE, flame_png())
+            files.append({"role": FIRE_ROLE, "path": FIRE_TEXTURE, "sha256": sha256_file(out / FIRE_TEXTURE),
+                          "bytes": (out / FIRE_TEXTURE).stat().st_size, "source": "generated"})
         if lit_normal is not None:
             png, _block = lit_normal
             atomic_write_bytes(out / LIT_NORMAL_FILE, png)
@@ -690,6 +706,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 manifest["atmosphere"]["lightmap_core"] = core_lightmap
         if smoke_record is not None:
             manifest["smoke"] = smoke_record
+        if fire_record is not None:
+            manifest["fire"] = fire_record
         if sound_record is not None:
             manifest["soundscape"] = sound_record
         atomic_write_json(out / MANIFEST_FILE, manifest)
