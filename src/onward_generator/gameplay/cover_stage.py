@@ -80,7 +80,10 @@ GEOGRAPHIC = frozenset({"building", "surface", "curb", "landmark_part"})
 ALLOWED_LICENCES = frozenset({"CC0-1.0", "CC-BY-4.0"})
 """The licences docs/legal/data-sources.md records for the street catalogues."""
 CATALOGUE_LICENCES: Mapping[str, str] = {"kenney": "CC0-1.0"}
-"""Catalogues whose rows carry no ``license``: each Kenney pack's ``License.txt`` is CC0 1.0 (docs/legal/data-sources.md)."""
+"""Catalogues whose rows and manifest carry no licence: each Kenney pack's ``License.txt`` is CC0 1.0 (docs/legal/data-sources.md)."""
+SOURCE_LICENCES: Mapping[str, str] = {"CC0 1.0": "CC0-1.0"}
+"""Licences a catalogue's manifest ``source`` may name for rows without their own (the Quaternius, Kenney kit and Poly Haven
+shop catalogues), and their SPDX id; the same reading as shop furnishing's ``library.interior_licence`` (17 November 2026)."""
 COPIED = ("bounds_report.json",)
 PROP_MATERIAL = Material((1, 1, 1, 1), 0.9)
 """A catalogue prop's material when the scene has none of that name: white under the albedo, as overgrow writes it."""
@@ -105,7 +108,8 @@ class CoverResult:
 
 
 def catalogue_licences(library: str | Path | None) -> dict[str, str]:
-    """Each installed row's licence when it is one ``ALLOWED_LICENCES`` names: the row's ``license``, else its catalogue's."""
+    """Each installed row's licence when it is one ``ALLOWED_LICENCES`` names: the row's ``license``, else its catalogue's
+    (``CATALOGUE_LICENCES``), else the one its manifest ``source`` names (``SOURCE_LICENCES``)."""
     if library is None:
         return {}
     found: dict[str, str] = {}
@@ -114,10 +118,12 @@ def catalogue_licences(library: str | Path | None) -> dict[str, str]:
             document = json.loads((directory / "manifest.json").read_bytes())
         except (OSError, json.JSONDecodeError):
             continue
+        source = str(document.get("source"))  # "None" without one: it names no licence
+        named = next((spdx for name, spdx in SOURCE_LICENCES.items() if name in source), None)
         for row in document.get("assets") or []:
             if not isinstance(row, dict) or not row.get("id"):
                 continue
-            licence = row.get("license") or CATALOGUE_LICENCES.get(directory.name)
+            licence = row.get("license") or CATALOGUE_LICENCES.get(directory.name) or named
             if licence in ALLOWED_LICENCES:
                 found[str(row["id"])] = str(licence)
     return found

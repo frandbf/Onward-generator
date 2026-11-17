@@ -40,7 +40,8 @@ def test_the_table_has_the_three_moods_and_abandoned_is_the_default() -> None:
     assert (lived.terraces, emptied.terraces, mood_for("abandoned").terraces) == (True, False, False)  # only a lived street sets terraces
     assert (lived.awnings, emptied.awnings, mood_for("abandoned").awnings) == (True, False, False)
     # Cover by mood (plan increment 5): civic props in a lived street, civic props and barriers in an emptied one.
-    assert lived.cover_roles == {"utility_box", "dumpster", "planter", "trashcan"} and lived.cover_conditions == {"intact"}
+    # A worn dumpster still stands in a street in daily use (the maintainer, 17 November 2026).
+    assert lived.cover_roles == {"utility_box", "dumpster", "trash", "planter", "trashcan"} and lived.cover_conditions == {"intact", "worn"}
     assert emptied.cover_roles == {"barrier", "barrel", "fence", "utility_box", "dumpster", "trash", "planter", "trashcan"}
     assert emptied.cover_conditions == {"intact", "worn"}
     assert (mood_for("abandoned").cover_roles, mood_for("abandoned").cover_conditions) == (None, None)  # the stage's own rule
