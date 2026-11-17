@@ -257,6 +257,28 @@ Four catalogues hold props for inside a room. `tools/import_shop_assets.py` writ
 - Size: 20.95 × 0.84 × 3.94 m, 1697 triangles.
 - Licence: CC BY 4.0, ahmagh2e.
 
+### utility box 01
+
+![utility box 01](abandoned-assets/utility_box_01.png)
+
+- Id: `utility_box_01`
+- What: Narrow electrical cabinet, intact.
+- Where: block edge, kerb, yard, plaza, park.
+- Size: 0.52 × 0.43 × 1.12 m, 1744 triangles.
+- Licence: CC0, Poly Haven (James Ray Cock).
+- Cover a `lived` or `emptied` street may stand (ADR-044, 17 November 2026).
+
+### utility box 02
+
+![utility box 02](abandoned-assets/utility_box_02.png)
+
+- Id: `utility_box_02`
+- What: Wide electrical cabinet, intact.
+- Where: block edge, kerb, yard, plaza, park.
+- Size: 0.92 × 0.43 × 1.12 m, 1754 triangles.
+- Licence: CC0, Poly Haven (James Ray Cock).
+- Cover a `lived` or `emptied` street may stand (ADR-044, 17 November 2026).
+
 ## Facade
 
 A wall-mounted prop's back stays 0.08 m off its wall, whether the ambient dressing (`overgrow/dressing.py`) or a planned action (`overgrow/realize.py`) places it. The dressing's facade spot stands 0.35 m out so its point never falls inside the footprint; the prop is pulled back from that spot to the wall. Before this, the dressing added the two offsets and every aircon, camera and awning on MurciaEjemplo hung 0.38–0.44 m off the wall. The base height comes from `FACADE_Z_M` (`overgrow/catalog.py`): aircon 2.4 m, awning 2.5 m (above a 2.4 m door), camera 3.1 m, fire escape on the ground, any other role 1.2 m. The awnings used to take the 1.2 m default and hung at waist height. No wall-mounted prop may cover a shop sign `detail` hung (`facade.shops[].sign`, a fascia along its wall or a blade out of it, its footprint 0.05 m deeper on each side; until 5 November 2026 a blade's footprint ran along the wall instead, because it was laid along the board's normal, which for a blade runs along the wall): when their footprints cross and their heights overlap the spot is rejected as `covers_sign`, and `overgrow fit` refuses one that does. On MurciaEjemplo2, madridescaleras2, barriochino and murciaescaleras placed again, no awning covered a sign before the rule either; nothing stopped one.
@@ -385,6 +407,39 @@ A wall-mounted prop's back stays 0.08 m off its wall, whether the ambient dressi
 - Licence: CC0, Poly Haven.
 
 ## Furniture
+
+### planter box 01
+
+![planter box 01](abandoned-assets/planter_box_01.png)
+
+- Id: `planter_box_01`
+- What: Low wooden planter box, no plants.
+- Where: kerb, sidewalk, courtyard, yard, empty lot, plaza, park.
+- Size: 0.90 × 0.41 × 0.42 m, 1790 triangles.
+- Licence: CC0, Poly Haven (James Ray Cock).
+- Too low for cover: a street prop only.
+
+### planter box 02
+
+![planter box 02](abandoned-assets/planter_box_02.png)
+
+- Id: `planter_box_02`
+- What: Long low wooden planter box, no plants.
+- Where: kerb, sidewalk, courtyard, yard, empty lot, plaza, park.
+- Size: 1.25 × 0.46 × 0.45 m, 1798 triangles.
+- Licence: CC0, Poly Haven (James Ray Cock).
+- Too low for cover: a street prop only.
+
+### planter box 03
+
+![planter box 03](abandoned-assets/planter_box_03.png)
+
+- Id: `planter_box_03`
+- What: Wooden planter box on legs, no plants.
+- Where: kerb, sidewalk, courtyard, yard, empty lot, plaza, park.
+- Size: 0.91 × 0.64 × 0.85 m, 1776 triangles.
+- Licence: CC0, Poly Haven (James Ray Cock).
+- Cover a `lived` or `emptied` street may stand (ADR-044, 17 November 2026).
 
 ### industrial storage cart
 

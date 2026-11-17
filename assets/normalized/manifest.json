@@ -2308,6 +2308,254 @@
         "origin": "estimated",
         "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
       }
+    },
+    {
+      "id": "utility_box_01",
+      "file": "utility_box_01.glb",
+      "category": "structures",
+      "role": "utility_box",
+      "surfaces": [
+        "block_edge",
+        "curb",
+        "yard",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "electrical cabinet against a wall, at the curb or in a plaza",
+      "description": "A narrow grey-blue electrical cabinet with one door, a danger label and a vented plinth, clean.",
+      "placement": "wall_foot",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "utility",
+        "electrical",
+        "cabinet",
+        "street"
+      ],
+      "triangles": 1744,
+      "length_m": 0.52,
+      "depth_m": 0.429,
+      "height_m": 1.12,
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "James Ray Cock",
+      "source_url": "https://polyhaven.com/a/utility_box_01",
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "crate",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
+    },
+    {
+      "id": "utility_box_02",
+      "file": "utility_box_02.glb",
+      "category": "structures",
+      "role": "utility_box",
+      "surfaces": [
+        "block_edge",
+        "curb",
+        "yard",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "electrical cabinet against a wall, at the curb or in a plaza",
+      "description": "A wide green electrical cabinet with two doors, danger labels and a vented plinth, clean.",
+      "placement": "wall_foot",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "utility",
+        "electrical",
+        "cabinet",
+        "street"
+      ],
+      "triangles": 1754,
+      "length_m": 0.92,
+      "depth_m": 0.427,
+      "height_m": 1.12,
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "James Ray Cock",
+      "source_url": "https://polyhaven.com/a/utility_box_02",
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "crate",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park",
+          "industrial"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
+    },
+    {
+      "id": "planter_box_01",
+      "file": "planter_box_01.glb",
+      "category": "furniture",
+      "role": "planter",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wooden planter box on a sidewalk, at the curb or in a plaza",
+      "description": "A low wooden planter box with a black liner and no plants, lightly weathered.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "planter",
+        "wood",
+        "garden",
+        "street"
+      ],
+      "triangles": 1790,
+      "length_m": 0.904,
+      "depth_m": 0.411,
+      "height_m": 0.415,
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "James Ray Cock",
+      "source_url": "https://polyhaven.com/a/planter_box_01",
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "planter",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
+    },
+    {
+      "id": "planter_box_02",
+      "file": "planter_box_02.glb",
+      "category": "furniture",
+      "role": "planter",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wooden planter box on a sidewalk, at the curb or in a plaza",
+      "description": "A long low wooden planter box with a black liner and no plants, lightly weathered.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "planter",
+        "wood",
+        "garden",
+        "street"
+      ],
+      "triangles": 1798,
+      "length_m": 1.245,
+      "depth_m": 0.461,
+      "height_m": 0.446,
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "James Ray Cock",
+      "source_url": "https://polyhaven.com/a/planter_box_02",
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "planter",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
+    },
+    {
+      "id": "planter_box_03",
+      "file": "planter_box_03.glb",
+      "category": "furniture",
+      "role": "planter",
+      "surfaces": [
+        "curb",
+        "sidewalk",
+        "courtyard",
+        "yard",
+        "empty_lot",
+        "plaza",
+        "park"
+      ],
+      "anchor": "ground",
+      "lane": "forbid",
+      "clearance_m": 0.0,
+      "use": "wooden planter box on legs on a sidewalk, at the curb or in a plaza",
+      "description": "A wooden planter box raised on four legs, with a black liner and no plants, lightly weathered.",
+      "placement": "open_ground",
+      "grouping": "single",
+      "condition": "intact",
+      "tags": [
+        "planter",
+        "wood",
+        "garden",
+        "street"
+      ],
+      "triangles": 1776,
+      "length_m": 0.905,
+      "depth_m": 0.64,
+      "height_m": 0.851,
+      "collider": "none",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "author": "James Ray Cock",
+      "source_url": "https://polyhaven.com/a/planter_box_03",
+      "source": "polyhaven",
+      "semantic": {
+        "kind": "planter",
+        "mount": "ground",
+        "settings": [
+          "street",
+          "yard",
+          "park"
+        ],
+        "origin": "estimated",
+        "basis": "name, catalogue, role, placement and size (overgrow/semantics.py)"
+      }
     }
   ]
 }
