@@ -78,6 +78,8 @@ CROSS_M = 0.05
 """A span or drop crossing a building for longer than this is not drawn."""
 POLE_BOX_M = 0.15
 """Half the side of a pole's collision box."""
+STEP_M = 0.25
+"""Half the stretch of street a pole's direction is read over."""
 NEAR_POLE = 0.4
 """Two poles closer than this share of ``spacing_m`` (the end of one street and the start of the next) keep the first."""
 DEFAULT_WIDTH_M = 6.0
@@ -181,7 +183,7 @@ def pole_mesh(foot: np.ndarray, height: float, radius: float, crossarm: float, a
         a, b = k, (k + 1) % SIDES
         triangles += [[a, b, SIDES + b], [a, SIDES + b, SIDES + a]]
     triangles += [[SIDES, SIDES + k + 1, SIDES + k + 2] for k in range(SIDES - 2)]  # the cap, a fan from the first top corner
-    u = np.asarray(across, dtype=np.float64)
+    u = across
     t = np.array([-u[1], u[0]])
     arm_z = top - ARM_DROP_M
     base = len(vertices)
@@ -192,7 +194,7 @@ def pole_mesh(foot: np.ndarray, height: float, radius: float, crossarm: float, a
                  [3, 0, 4], [3, 4, 7]):
         triangles.append([base + i for i in face])
     uvs = np.tile([0.5, POLE_V], (len(vertices), 1))
-    return Mesh(np.array(vertices, dtype=np.float64), np.array(triangles, dtype=np.int64)), uvs
+    return Mesh(np.array(vertices), np.array(triangles)), uvs
 
 
 def attach_points(foot: np.ndarray, height: float, crossarm: float, across: np.ndarray) -> list[np.ndarray]:
@@ -213,8 +215,8 @@ def sag_points(a: np.ndarray, b: np.ndarray, sag: float, segments: int = WIRE_SE
 def wire_mesh(a: np.ndarray, b: np.ndarray, sag: float, width: float) -> tuple[Mesh, np.ndarray]:
     """A wire from ``a`` to ``b``: two crossed ribbons ``width`` wide, one flat and one upright, drawn both ways, so it
     shows from the street, from under it and from the side."""
-    points = sag_points(np.asarray(a, dtype=np.float64), np.asarray(b, dtype=np.float64), sag)
-    run = np.asarray(b[:2], dtype=np.float64) - np.asarray(a[:2], dtype=np.float64)
+    points = sag_points(a, b, sag)
+    run = b[:2] - a[:2]
     length = float(np.hypot(*run))
     side = np.array([-run[1], run[0], 0.0]) / length * (width / 2) if length > 0 else np.array([width / 2, 0.0, 0.0])
     up = np.array([0.0, 0.0, width / 2])
@@ -244,7 +246,7 @@ def streets_for(features: Sequence[Mapping[str, Any]], highways: frozenset[str])
     for feature in features:
         if feature.get("kind") != "highway" or not isinstance(feature.get("geometry"), dict):
             continue
-        if str((feature.get("tags") or {}).get("highway") or "") not in highways:
+        if str((feature.get("tags") or {}).get("highway")) not in highways:
             continue
         geom = shape(feature["geometry"])
         width = ((feature.get("attributes") or {}).get("width_m") or {}).get("value")
@@ -312,6 +314,10 @@ def _spot_reason(spot: np.ndarray, zone: Zone, near_spawn: Callable[[float, floa
     return None
 
 
+def _xy(point: Point) -> np.ndarray:
+    return np.array([point.x, point.y])
+
+
 def place_poles(streets: Sequence[Street], buildings: STRtree, zone: Zone, seed: int, *, near_spawn: Callable[[float, float], bool],
                 blocked: Sequence[BaseGeometry], doors: Sequence[tuple[float, float]], config: LineConfig,
                 ground_z: Callable[[float, float], float]) -> tuple[list[Pole], dict[str, int]]:
@@ -319,18 +325,18 @@ def place_poles(streets: Sequence[Street], buildings: STRtree, zone: Zone, seed:
     poles: list[Pole] = []
     skipped: dict[str, int] = {}
     for street in streets:
-        first_side = 1.0 if stable_unit(seed, street.feature_id, "side") < 0.5 else -1.0  # pragma: no mutate: either side starts; the test pins both
+        hashed_left = stable_unit(seed, street.feature_id, "side") < 0.5
         along = config.spacing_m / 2
         order = 0
         while along < street.line.length and len(poles) < config.max_poles:
-            point = np.asarray(street.line.interpolate(along).coords[0][:2], dtype=np.float64)
-            ahead = np.asarray(street.line.interpolate(min(along + 0.5, street.line.length)).coords[0][:2])
-            behind = np.asarray(street.line.interpolate(max(along - 0.5, 0.0)).coords[0][:2])
+            point = _xy(street.line.interpolate(along))
+            # Half a step each way: a pole always stands at least spacing_m / 2 >= 5 m from either end (the schema's floor).
+            ahead, behind = _xy(street.line.interpolate(along + STEP_M)), _xy(street.line.interpolate(along - STEP_M))
             direction = (ahead - behind) / np.linalg.norm(ahead - behind)
             left = np.array([-direction[1], direction[0]])
             reason = "narrow"
-            for side in (first_side, -first_side):
-                spot = pole_spot(point, left * side, street.half_width, buildings, config)
+            for normal in ((left, -left) if hashed_left else (-left, left)):
+                spot = pole_spot(point, normal, street.half_width, buildings, config)
                 if spot is None:
                     continue
                 why = _spot_reason(spot, zone, near_spawn, blocked, doors, poles, config)
@@ -377,10 +383,11 @@ def drops(pole: Pole, index: int, seed: int, heights: Sequence[tuple[Polygon, fl
         nearest = polygon.exterior.interpolate(polygon.exterior.project(here))
         gap = here.distance(nearest)
         if 0 < gap <= config.drop_reach_m:
-            candidates.append((gap, int(found), np.asarray(nearest.coords[0][:2]), height))
+            candidates.append((gap, int(found), _xy(nearest), height))
     ends: list[tuple[np.ndarray, np.ndarray]] = []
     tops = attach_points(pole.foot, config.pole_height_m, config.crossarm_m, pole.across)
-    for gap, _, wall, height in sorted(candidates, key=lambda item: (item[0], item[1])):
+    # By distance, then footprint order: the indices are unique, so the arrays after them are never compared.
+    for gap, _, wall, height in sorted(candidates):
         if len(ends) >= wanted:
             break
         z = min(config.drop_max_z_m, height - DROP_ROOF_M)
@@ -423,7 +430,7 @@ def _wire(result: LineResult, a: np.ndarray, b: np.ndarray, role: str, source: s
     middle = (a + b) / 2
     result.records.append({"kind": "power_line", "origin": "generated", "source_id": source, "role": role,
                            "position_m": [round(float(middle[0]), 3), round(float(middle[1]), 3), round(lowest, 3)],
-                           "size_m": [round(length, 3), round(config.wire_m, 3), round(max(float(a[2]), float(b[2])) - lowest, 3)],
+                           "size_m": [round(length, 3), config.wire_m, round(max(float(a[2]), float(b[2])) - lowest, 3)],
                            "solid": False})
     result.triangles += mesh.triangle_count
 
@@ -440,32 +447,30 @@ def place_lines(manifest: Mapping[str, Any], features: Sequence[Mapping[str, Any
                                  doors=other_doors(manifest), config=cfg, ground_z=ground_z)
     wired = spans(poles, buildings, cfg)
     heights = building_heights(features, manifest)
-    tree = STRtree([polygon for polygon, _ in heights]) if heights else None
-    served = [drops(pole, index, seed, heights, tree, buildings, cfg) if tree is not None else [] for index, pole in enumerate(poles)]
+    tree = STRtree([polygon for polygon, _ in heights])
     spanned = {id(pole) for pair in wired for pole in pair}
     by_end = {id(pair[1]): pair[0] for pair in wired}
-    kept: list[Pole] = []
-    kept_drops: list[list[tuple[np.ndarray, np.ndarray]]] = []
-    for pole, ends in zip(poles, served, strict=True):
+    kept: list[tuple[Pole, list[tuple[np.ndarray, np.ndarray]]]] = []
+    for index, pole in enumerate(poles):
+        ends = drops(pole, index, seed, heights, tree, buildings, cfg)
         if id(pole) not in spanned and not ends:
             skipped["unwired"] = skipped.get("unwired", 0) + 1
             continue
         previous = by_end.get(id(pole))
-        linked = previous is not None and any(previous is other for other in kept)
+        linked = previous is not None and any(previous is other for other, _ in kept)
         cost = POLE_TRIANGLES + (3 * WIRE_TRIANGLES if linked else 0)
         if result.triangles + cost > budget:
             skipped["budget"] = skipped.get("budget", 0) + 1
             continue
         _pole(result, pole, cfg)
-        kept.append(pole)
-        kept_drops.append(ends)
+        kept.append((pole, ends))
         if linked:
             assert previous is not None  # pragma: no mutate: linked says so; narrows the type only
-            for a, b in zip(attach_points(previous.foot, cfg.pole_height_m, cfg.crossarm_m, previous.across),
-                            attach_points(pole.foot, cfg.pole_height_m, cfg.crossarm_m, pole.across), strict=True):
-                _wire(result, a, b, "span", pole.street, cfg)
+            tops = attach_points(pole.foot, cfg.pole_height_m, cfg.crossarm_m, pole.across)
+            for k, start in enumerate(attach_points(previous.foot, cfg.pole_height_m, cfg.crossarm_m, previous.across)):
+                _wire(result, start, tops[k], "span", pole.street, cfg)
             result.spans += 1
-    for pole, ends in zip(kept, kept_drops, strict=True):
+    for pole, ends in kept:
         for start, end in ends:
             if result.triangles + WIRE_TRIANGLES > budget:
                 skipped["drop_budget"] = skipped.get("drop_budget", 0) + 1
@@ -489,7 +494,7 @@ def _pole(result: LineResult, pole: Pole, config: LineConfig) -> None:
                                  {"type": "collision", "origin": "generated", "role": "pole"}))
     result.records.append({"kind": "power_pole", "origin": "generated", "source_id": pole.street, "role": "pole",
                            "position_m": [round(x, 3), round(y, 3), round(z, 3)],
-                           "size_m": [round(2 * POLE_BOX_M, 3), round(2 * POLE_BOX_M, 3), round(config.pole_height_m, 3)], "solid": True})
+                           "size_m": [2 * POLE_BOX_M, 2 * POLE_BOX_M, config.pole_height_m], "solid": True})
     result.footprints.append(Point(x, y).buffer(config.clear_m))
     result.triangles += mesh.triangle_count
 

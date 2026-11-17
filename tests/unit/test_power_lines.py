@@ -113,6 +113,7 @@ def test_the_configuration_is_read_whole() -> None:
     (lambda d: d.pop("styles"), "^overhead_lines: 'styles' is a required property$"),
     (lambda d: d.update(back_m=1.0), "^overhead_lines: back_m: 1.0 is less than the minimum of 1.2$"),
     (lambda d: d.update(pole_colour=[1, 2]), "^overhead_lines: pole_colour: "),
+    (lambda d: d.update(pole_colour=[1, 2, 300]), "^overhead_lines: pole_colour/2: 300 is greater than the maximum of 255$"),
     (lambda d: d.update(extra=1), "^overhead_lines: Additional properties"),
 ])
 def test_a_bad_configuration_is_refused(change: Any, message: str) -> None:
@@ -154,11 +155,13 @@ def test_a_pole_is_a_tapered_capped_prism_with_a_crossarm() -> None:
     v = mesh.vertices
     assert np.allclose(v[0], [2.2, 3.0, 0.5]) and np.allclose(v[2], [2.0, 3.2, 0.5])  # the foot ring, a quarter turn every two
     assert np.allclose(v[8], [2.15, 3.0, 8.5]) and np.allclose(v[10], [2.0, 3.15, 8.5])  # the top ring, three quarters as wide
-    arm = v[16:]
-    assert np.allclose(arm.min(axis=0), [1.95, 2.3, 8.05]) and np.allclose(arm.max(axis=0), [2.05, 3.7, 8.15])
+    assert np.allclose(v[16:], [[2.05, 2.3, 8.05], [2.05, 3.7, 8.05], [1.95, 3.7, 8.05], [1.95, 2.3, 8.05],
+                                [2.05, 2.3, 8.15], [2.05, 3.7, 8.15], [1.95, 3.7, 8.15], [1.95, 2.3, 8.15]])
     assert mesh.triangles[:2].tolist() == [[0, 1, 9], [0, 9, 8]] and mesh.triangles[14:16].tolist() == [[7, 0, 8], [7, 8, 15]]
     assert mesh.triangles[16].tolist() == [8, 9, 10] and mesh.triangles[21].tolist() == [8, 14, 15]  # the cap's fan
-    assert mesh.triangles[22].tolist() == [16, 18, 17] and mesh.triangles[33].tolist() == [19, 20, 23]
+    assert mesh.triangles[22:].tolist() == [[16 + i for i in face] for face in (
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7])]
+    assert mesh.vertices.dtype == np.float64 and mesh.triangles.dtype == np.int64
     assert np.allclose(uvs, [0.5, 0.25]) and uvs.shape == (24, 2)
     normals = mesh.face_normals()
     assert normals[16][2] > 0 and normals[22][2] < 0 and normals[24][2] > 0  # the cap faces up; the arm's bottom down, its top up
@@ -182,13 +185,17 @@ def test_a_wire_is_two_crossed_ribbons_drawn_both_ways() -> None:
     assert np.allclose(v[0], [0, -0.02, 8]) and np.allclose(v[9], [0, 0.02, 8])  # the flat ribbon across the run
     assert np.allclose(v[18], [0, 0, 7.98]) and np.allclose(v[27], [0, 0, 8.02])  # the upright one
     assert np.allclose(v[17], [10, 0.02, 8]) and np.allclose(v[72 // 2:], v[:72 // 2])
-    assert mesh.triangles[:2].tolist() == [[0, 9, 10], [0, 10, 1]] and mesh.triangles[16:18].tolist() == [[18, 27, 28], [18, 28, 19]]
+    front = [tri for first, second in ((0, 9), (18, 27)) for k in range(8)
+             for tri in ([first + k, second + k, second + k + 1], [first + k, second + k + 1, first + k + 1])]
+    assert mesh.triangles.tolist() == front + [[c + 36 for c in reversed(tri)] for tri in front]
     assert np.allclose(uvs, [0.5, 0.75])
     assert np.allclose(np.linalg.norm(vertex_normals(mesh), axis=1), 1.0)  # each side keeps its normal
     upright = wire_mesh(np.array([1.0, 1.0, 5.0]), np.array([1.0, 1.0, 7.0]), 0.0, 0.04)[0]
     assert np.allclose(upright.vertices[0], [0.98, 1.0, 5.0])  # a wire with no run in plan still has a width
     diagonal = wire_mesh(np.array([0.0, 0.0, 5.0]), np.array([3.0, 4.0, 5.0]), 0.0, 0.1)[0]
     assert np.allclose(diagonal.vertices[0], [0.04, -0.03, 5.0])
+    short = wire_mesh(np.array([0.0, 0.0, 5.0]), np.array([0.3, 0.4, 5.0]), 0.0, 0.1)[0]
+    assert np.allclose(short.vertices[0], [0.04, -0.03, 5.0])  # half a metre in plan still runs across its own way
 
 
 # ------------------------------------------------------------------------------------------------ streets and buildings
@@ -208,6 +215,10 @@ def test_the_streets_a_line_follows() -> None:
         ("long", 4.0, 100.0), ("nowidth", 3.0, 20.0), ("nowidth#1", 3.0, 20.0), ("short", 3.0, 10.0)]
     zero = streets_for([{**_street("zero"), "attributes": {"width_m": {"value": 0}}}], cfg().highways)
     assert zero[0].half_width == 3.0
+    narrow = {"kind": "highway", "tags": {"highway": "service"}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [0.5, 0]]},
+              "attributes": {"width_m": {"value": 0.5}}}
+    assert [(s.feature_id, s.half_width, s.line.length) for s in streets_for([narrow], cfg().highways)] == [("", 0.25, 0.5)]
+    assert streets_for([{**_street("untagged"), "tags": {}}], cfg().highways) == []
 
 
 def test_each_footprint_takes_the_height_detail_gave_it() -> None:
@@ -454,11 +465,11 @@ def test_the_records_keep_millimetres_on_an_odd_street() -> None:
     x0, y0 = -50.1234, 0.4321
     street = {**_street("odd", x0, 50.5678), "geometry": {"type": "LineString", "coordinates": [[x0, y0], [50.5678, y0]]}}
     buildings = STRtree([shapely_box(-60, 6.4321, 60, 16), shapely_box(-60, -16, 60, -5.5679)])
-    result = place_lines(_manifest({}), [street], buildings, square_zone(200), 7, budget=100_000, ground_z=lambda x, y: x / 7 + 0.01234,
+    result = place_lines(_manifest({}), [street], buildings, square_zone(200), 7, budget=100_000, ground_z=lambda x, y: x / 71 + 0.01234,
                          near_spawn=_never, config=cfg(drops_per_pole=0))
     side = 1.0 if pl.stable_unit(7, "odd", "side") < 0.5 else -1.0
     xs = [x0 + 14 + 28 * k for k in range(4)]
-    feet = [np.array([x, y0 + 3.5 * side, x / 7 + 0.01234]) for x in xs]
+    feet = [np.array([x, y0 + 3.5 * side, x / 71 + 0.01234]) for x in xs]
     poles = [row for row in result.records if row["kind"] == "power_pole"]
     assert poles == [{"kind": "power_pole", "origin": "generated", "source_id": "odd", "role": "pole",
                       "position_m": [round(float(f[0]), 3), round(float(f[1]), 3), round(float(f[2]), 3)],
@@ -493,8 +504,10 @@ def test_a_spot_s_reasons_at_their_bounds() -> None:
     assert reason(spot, zone, _never, [Point(config.clear_m, 0.0)], [], [], config) is None  # exactly clear_m away
     assert reason(spot, zone, _never, [Point(config.clear_m - 0.001, 0.0)], [], [], config) == "occupied"
     edge = config.spacing_m * pl.NEAR_POLE
-    assert reason(spot, zone, _never, [], [], [_pole("s", 0, edge, 0.0)], config) is None  # exactly four tenths of the spacing
-    assert reason(spot, zone, _never, [], [], [_pole("s", 0, edge - 0.001, 0.0)], config) == "near_pole"
+    high = Pole("s", 0, np.array([edge, 0.0, 5.0]), np.array([0.0, 1.0]))  # the height plays no part
+    assert reason(spot, zone, _never, [], [], [high], config) is None  # exactly four tenths of the spacing
+    nearer = Pole("s", 0, np.array([edge - 0.001, 0.0, 5.0]), np.array([0.0, 1.0]))
+    assert reason(spot, zone, _never, [], [], [nearer], config) == "near_pole"
     door = config.clear_m + config.back_m
     assert reason(spot, zone, _never, [], [(door, 0.0)], [], config) is None
     assert reason(spot, zone, _never, [], [(door - 0.001, 0.0)], [], config) == "door"
@@ -519,3 +532,91 @@ def test_a_building_without_geometry_or_id_is_handled() -> None:
     manifest = {"objects": [{"type": "building", "source_ids": ["x", ""], "height": {"height_m": 6.0}}]}
     found = building_heights(features, manifest)
     assert [(p.bounds, h) for p, h in found] == [(NORTH.bounds, 6.0)]  # the footprint without an id reads as ""
+
+
+
+def test_drops_go_nearest_first_whatever_the_footprints_order_and_ties_by_order() -> None:
+    near, far = shapely_box(-5, 6, 5, 16), shapely_box(6, 0, 16, 10)
+    heights = [(far, 9.0), (near, 9.0)]  # listed far first
+    tree = STRtree([p for p, _ in heights])
+    pole = _pole("s", 0, 0.0, 3.5)
+    one = next(i for i in range(50) if round(pl.stable_unit(7, i, "drops") * 2) == 1)
+    assert [np.round(end[:2], 3).tolist() for _, end in drops(pole, one, 7, heights, tree, tree, cfg())] == [[0.0, 5.95]]
+    left, right = shapely_box(-5, 6, -1, 16), shapely_box(1, 6, 5, 16)  # both corners 2.693 m away
+    tie = [(right, 9.0), (left, 9.0)]
+    found = drops(pole, one, 7, tie, STRtree([p for p, _ in tie]), STRtree([left, right]), cfg())
+    assert [round(float(end[0]), 3) for _, end in found] == [0.981]  # the first footprint listed, 5 cm out of its corner
+    wanted = [round(pl.stable_unit(7, i, "drops") * 6) for i in range(6)]
+    many = [(shapely_box(-30 + 4 * k, 6, -27 + 4 * k, 9), 9.0) for k in range(15)]
+    many_tree = STRtree([p for p, _ in many])
+    assert [len(drops(pole, i, 7, many, many_tree, many_tree, cfg(drops_per_pole=6))) for i in range(6)] == wanted
+
+
+def test_poles_follow_a_corner_and_a_diagonal_and_stop_before_the_end() -> None:
+    far = [shapely_box(500, 500, 501, 501)]
+    corner = Street("corner", LineString([(-43, 0), (0, 0), (0, 50)]), 3.0)
+    poles, _ = _poles([corner], far)
+    assert [np.round(p.foot[:2], 3).tolist() for p in poles] == [[-29.0, 3.5], [-1.0, 3.5], [-3.5, 27.0]]
+    diagonal = Street("diag", LineString([(0, 0), (30, 40)]), 3.0)
+    poles, _ = _poles([diagonal], far)
+    assert [np.round(p.foot[:2], 3).tolist() for p in poles] == [[11.2, 9.1], [28.0, 31.5]]
+    assert np.allclose(poles[0].across, [-0.8, 0.6])
+    exact = Street("short42", LineString([(0, 0), (42, 0)]), 3.0)
+    assert len(_poles([exact], far)[0]) == 1  # a pole would stand on the very end
+
+
+def test_spans_skip_a_bad_pair_and_keep_looking() -> None:
+    clear = STRtree([shapely_box(500, 500, 501, 501)])
+    other, a, b = _pole("t", 0, -28), _pole("s", 0, 0), _pole("s", 1, 28)
+    assert spans([other, a, b], clear, cfg()) == [(a, b)]
+    c, d = _pole("s", 2, 56), _pole("s", 3, 84)
+    assert spans([a, c, d], clear, cfg()) == [(c, d)]
+    far, nxt = _pole("s", 1, 41), _pole("s", 2, 69)
+    assert spans([a, far, nxt], clear, cfg()) == [(far, nxt)]
+    assert spans([a, b, c], STRtree([shapely_box(10, 3, 12, 4)]), cfg()) == [(b, c)]
+
+
+def _four(budget: int, **changes: Any):  # type: ignore[no-untyped-def]
+    features = [_street(), _building("n", NORTH), _building("s", SOUTH)]
+    return _run(features, _manifest({"n": 9.0, "s": 9.0}), budget=budget, config=cfg(drops_per_pole=0, **changes))
+
+
+def test_the_budget_counts_a_span_only_with_the_pole_it_links() -> None:
+    three = _four(4 * 34 + 2 * 192 - 34 - 192 + 1)  # 295: the third pole and its span do not fit, the fourth alone does
+    assert (three.report("x", None)["poles"], three.spans, three.triangles, three.skipped) == (3, 1, 294, {"budget": 1})
+    two = _four(100)
+    assert (two.report("x", None)["poles"], two.spans, two.triangles, two.skipped) == (2, 0, 68, {"budget": 2})
+    one = _four(34)
+    assert (one.report("x", None)["poles"], one.spans, one.triangles) == (1, 0, 34)
+
+
+def test_the_drops_spend_the_budget_to_the_last_triangle() -> None:
+    features = [_street(), _building("n", NORTH), _building("s", SOUTH)]
+    manifest = _manifest({"n": 9.0, "s": 9.0})
+    full = _run(features, manifest, config=cfg(drops_per_pole=6))
+    assert full.drops >= 2
+    tight = _run(features, manifest, budget=full.triangles - 64, config=cfg(drops_per_pole=6))
+    assert tight.drops == full.drops - 1 and tight.triangles == full.triangles - 64 and tight.skipped == {"drop_budget": 1}
+
+
+def test_each_pole_takes_its_own_drops() -> None:
+    streets = [_street()]
+    many = [_building(f"b{k}", shapely_box(-56 + 4 * k, 6, -53 + 4 * k, 9)) for k in range(28)]
+    manifest = _manifest({f"b{k}": 9.0 for k in range(28)})
+    config = cfg(drops_per_pole=6)
+    buildings = STRtree([NORTH, SOUTH])
+    result = place_lines(manifest, streets + many, buildings, square_zone(200), 7, budget=100_000, ground_z=_flat, near_spawn=_never,
+                         config=config)
+    poles, _ = place_poles(streets_for(streets, config.highways), buildings, square_zone(200), 7, near_spawn=_never, blocked=[],
+                           doors=[], config=config, ground_z=_flat)
+    heights = building_heights(many, manifest)
+    tree = STRtree([p for p, _ in heights])
+    assert result.drops == sum(len(drops(pole, i, 7, heights, tree, buildings, config)) for i, pole in enumerate(poles)) > 4
+
+
+def test_unwired_poles_are_counted_and_a_later_wired_one_still_stands() -> None:
+    features = [_street(), _building("h", shapely_box(44, 4.5, 52, 9)), _building("n", NORTH), _building("s", SOUTH)]
+    lone = _run(features, _manifest({}), config=cfg(max_span_m=10.0))
+    assert lone.skipped == {"unwired": 4} and lone.nodes == []
+    last = _run(features, _manifest({"h": 9.0}), config=cfg(max_span_m=10.0, drops_per_pole=6))
+    assert last.report("x", None)["poles"] == 1 and last.skipped == {"unwired": 3} and last.drops >= 1
