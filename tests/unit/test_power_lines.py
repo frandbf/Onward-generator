@@ -269,6 +269,9 @@ def test_a_blocked_side_tries_the_other_and_names_why_neither_fits() -> None:
     wall = shapely_box(-60, 2.0, 60, 9) if side > 0 else shapely_box(-60, -9, 60, -2.0)
     poles, _ = _poles([street], [wall])
     assert {round(float(p.foot[1]), 3) for p in poles} == {-3.5 * side}  # the hashed side is too narrow
+    lefty = Street("lone", street.line, 3.0)  # its hash starts on the left, which a wall blocks
+    assert pl.stable_unit(7, "lone", "side") < 0.5
+    assert {round(float(p.foot[1]), 3) for p in _poles([lefty], [shapely_box(-60, 2.0, 60, 9)])[0]} == {-3.5}
     both = [shapely_box(-60, 2.0, 60, 9), shapely_box(-60, -9, 60, -2.0)]
     assert _poles([street], both) == ([], {"narrow": 4})
     _poles_, why = _poles([street], near_spawn=lambda x, y: x < 0)

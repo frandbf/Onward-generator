@@ -325,7 +325,7 @@ def place_poles(streets: Sequence[Street], buildings: STRtree, zone: Zone, seed:
     poles: list[Pole] = []
     skipped: dict[str, int] = {}
     for street in streets:
-        hashed_left = stable_unit(seed, street.feature_id, "side") < 0.5
+        hashed_left = stable_unit(seed, street.feature_id, "side") < 0.5  # pragma: no mutate: a 64-bit hash is never exactly one half
         along = config.spacing_m / 2
         order = 0
         while along < street.line.length and len(poles) < config.max_poles:
@@ -354,8 +354,10 @@ def place_poles(streets: Sequence[Street], buildings: STRtree, zone: Zone, seed:
 
 def crosses(segment: LineString, buildings: STRtree) -> bool:
     """Whether ``segment`` runs through a building for longer than ``CROSS_M``."""
-    return any(buildings.geometries[int(index)].intersection(segment).length > CROSS_M
-               for index in buildings.query(segment, predicate="intersects"))  # pragma: no mutate: a box-only candidate meets the segment in nothing, of length 0
+    for index in buildings.query(segment, predicate="intersects"):  # pragma: no mutate: a box-only candidate meets the segment in nothing, of length 0
+        if buildings.geometries[int(index)].intersection(segment).length > CROSS_M:
+            return True
+    return False
 
 
 def spans(poles: Sequence[Pole], buildings: STRtree, config: LineConfig) -> list[tuple[Pole, Pole]]:
