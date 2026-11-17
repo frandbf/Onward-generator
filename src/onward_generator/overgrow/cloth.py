@@ -47,7 +47,7 @@ def fabric_png() -> bytes:
             x0 = 2 * stripe * STRIPE_PX
             pixels[band * BAND_PX:(band + 1) * BAND_PX, x0:x0 + STRIPE_PX] = STRIPE_COLOURS[band]
     out = io.BytesIO()
-    Image.fromarray(pixels, "RGB").save(out, format="PNG")
+    Image.fromarray(pixels).save(out, format="PNG")  # three uint8 channels: RGB
     return out.getvalue()
 
 

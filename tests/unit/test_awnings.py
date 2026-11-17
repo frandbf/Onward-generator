@@ -171,6 +171,8 @@ def test_the_records_keep_millimetres_and_each_shop_its_colour() -> None:
     record = odd.records[0]
     assert record["size_m"] == [2.988, 0.9, 0.55] and all(v == round(v, 3) for v in record["position_m"])
     assert record["position_m"] == [0.123, -0.46, round(3.11111 - 0.18 - 0.02 - 0.35 - 0.2, 3)]
+    skirt = _run(_manifest(_fascia()), config=replace(ALL, valance_m=0.21234))
+    assert skirt.records[0]["size_m"][2] == round(0.35 + 0.21234, 3)
     deep = _run(_manifest(_fascia()), config=replace(ALL, depth_m=0.81234))
     assert deep.records[0]["size_m"][1] == 0.812 and deep.records[0]["position_m"][1] == round(-0.01 - 0.81234 / 2, 3)
     many = _run(_manifest(*(_fascia(x) for x in (-9.0, -6.0, -3.0, 0.0, 3.0, 6.0, 9.0))))
