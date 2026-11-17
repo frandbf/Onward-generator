@@ -82,7 +82,7 @@ def test_the_fascias_and_the_wall_things_are_read() -> None:
         {"type": "building", "facade": {"shops": ["odd", {"sign": _fascia(5.0)}]}},
         {"type": "interior", "facade": {"shops": [{"id": "x", "sign": _fascia()}]}},
         {"type": "street_sign", "position_m": [1.0, -0.1, 2.55]},
-        {"type": "wall_decal", "position_m": [2.0, -0.1, 3.0], "size_m": [1.2, 0.8]},
+        {"type": "wall_decal", "position_m": [2.0, -0.1, 3.0, 9.0], "size_m": [1.2, 0.8, 0.01]},
         {"type": "wall_decal", "position_m": [2.0, -0.1, 3.0]},
         {"type": "street_sign", "position_m": [1.0, -0.1]},
         {"type": "shop_sign", "position_m": [1.0, -0.1, 2.0]},
@@ -110,8 +110,9 @@ def test_an_awning_hangs_under_its_fascia() -> None:
                                "size_m": [3.0, 0.9, 0.55], "solid": False}]
     plan, bottom, top = result.footprints[0]
     assert (round(bottom, 3), round(top, 3)) == (2.33, 2.88) and plan.bounds == pytest.approx((-1.5, -0.91, 1.5, -0.01))
+    assert plan.area == pytest.approx(3.0 * 0.9)
     turned = _run({"objects": [{"type": "building", "source_ids": ["A"], "facade": {"shops": [{"id": "s", "sign": {
-        **_fascia(), "centre_m": [10.03, 2.0, 3.08], "normal": [1.0, 0.0]}}]}}]})
+        **_fascia(), "centre_m": [10.03, 2.0, 3.08], "normal": [1.0, 0.0, 0.0]}}]}}]})
     assert np.allclose(turned.nodes[0].primitives[0].mesh.vertices[2], [10.91, 3.5, 2.53])  # out along the wall's own normal
 
 
@@ -156,3 +157,25 @@ def test_the_share_and_the_budget() -> None:
     tight = _run(_manifest(_fascia(-5.0), _fascia(5.0)), budget=12)
     assert len(tight.nodes) == 1 and tight.skipped == {"budget": 1} and tight.triangles == 12
     assert _run(_manifest(_fascia()), budget=11).skipped == {"budget": 1}
+
+
+def test_a_plate_runs_along_the_awning_s_wall_and_heights_overlap() -> None:
+    from onward_generator.overgrow.awnings import overlaps, plate_line
+
+    assert list(plate_line(1.0, 2.0, 0.5, np.array([0.6, 0.8])).coords) == [pytest.approx((0.7, 1.6)), pytest.approx((1.3, 2.4))]
+    assert overlaps(2.0, 3.0, 2.5, 4.0) and overlaps(2.0, 3.0, 1.0, 2.5) and not overlaps(2.0, 3.0, 3.1, 4.0) and not overlaps(2.0, 3.0, 0.0, 1.9)
+
+
+def test_the_records_keep_millimetres_and_each_shop_its_colour() -> None:
+    odd = _run(_manifest(_fascia(x=0.12345, z=3.11111, width=2.98765)))
+    record = odd.records[0]
+    assert record["size_m"] == [2.988, 0.9, 0.55] and all(v == round(v, 3) for v in record["position_m"])
+    assert record["position_m"] == [0.123, -0.46, round(3.11111 - 0.18 - 0.02 - 0.35 - 0.2, 3)]
+    deep = _run(_manifest(_fascia()), config=replace(ALL, depth_m=0.81234))
+    assert deep.records[0]["size_m"][1] == 0.812 and deep.records[0]["position_m"][1] == round(-0.01 - 0.81234 / 2, 3)
+    many = _run(_manifest(*(_fascia(x) for x in (-9.0, -6.0, -3.0, 0.0, 3.0, 6.0, 9.0))))
+    assert len(many.nodes) == 7 and many.triangles == 7 * 12
+    bands = [int(stable_unit(7, f"shop/A/{n}", "colour") * 3) for n in range(7)]
+    assert len(set(bands)) > 1  # the shops do not all share one colour
+    for node, band in zip(many.nodes, bands, strict=True):
+        assert np.allclose(node.primitives[0].uvs[0], [0.0, band_v(band, 0.0)])

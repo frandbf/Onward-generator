@@ -25,7 +25,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
@@ -434,8 +434,9 @@ def _try_unit(
     pieces = unit_pieces(slot, models, wall, centre_s, cfg)
     footprint = wall.rect(low, high, cfg.wall_gap_m, cfg.wall_gap_m + depth)
     middle = wall.point(centre_s, cfg.wall_gap_m + depth / 2)
-    shade = _parasol(pieces[0], cfg.parasol, ground_z, front) if slot == "table" and cfg.parasol is not None else None
-    triangles = sum(piece.piece.prop.triangles for piece in pieces) + (shade.primitives[0].mesh.triangle_count if shade else 0)
+    unit = len(result.footprints)
+    shade = _parasol(pieces[0], cfg.parasol, ground_z, front, unit) if slot == "table" and cfg.parasol is not None else None
+    triangles = sum(piece.piece.prop.triangles for piece in pieces) + (shade[0].primitives[0].mesh.triangle_count if shade else 0)
     free = free_across(wall.point(centre_s, RAY_START_M), wall.n, buildings, cfg.reach_m) - RAY_START_M
     need = cfg.wall_gap_m + depth + cfg.passage_m
     reason = None
@@ -460,32 +461,30 @@ def _try_unit(
     if reason is not None:
         return reason
     cursors[side] = start + side * (width + cfg.set_gap_m)
-    unit = len(result.footprints)
     for index, piece in enumerate(pieces):
         _emit(piece, unit, index, result, ground_z, front)
     if shade is not None:
-        result.nodes.append(replace(shade, name=f"{NODE_PREFIX}{unit}/parasol"))
-        result.triangles += shade.primitives[0].mesh.triangle_count
+        result.nodes.append(shade[0])
+        result.records.append(shade[1])
+        result.triangles += shade[0].primitives[0].mesh.triangle_count
         result.parasols += 1
-        result.records.append({
-            "kind": "terrace", "origin": "generated", "source_id": front.building_id, "role": "parasol",
-            "position_m": [round(pieces[0].x, 3), round(pieces[0].y, 3), round(ground_z(pieces[0].x, pieces[0].y), 3)],
-            "size_m": [round(float(v), 3) for v in shade.extras["size_m"]], "solid": False,
-        })
     result.footprints.append(footprint)
     result.sets += slot == "table"
     return None
 
 
-def _parasol(table: Placed, parasol: Parasol, ground_z: Callable[[float, float], float], front: Front) -> Node:
-    """The parasol over ``table``, its pole through the table's middle, in one colour per bar."""
+def _parasol(table: Placed, parasol: Parasol, ground_z: Callable[[float, float], float], front: Front, unit: int) -> tuple[Node, dict[str, Any]]:
+    """The parasol over ``table``, its pole through the table's middle, in one colour per bar, and its record."""
     band = int(stable_unit(0, front.building_id, "parasol") * POLE_BAND)  # the colour bands come before the pole's
-    mesh, uvs = parasol_mesh(table.x, table.y, ground_z(table.x, table.y), parasol.radius_m, parasol.rim_m, parasol.apex_m,
-                             parasol.pole_m, band)
-    return Node("", (Primitive(mesh, FABRIC_MATERIAL, uvs),),
+    z = ground_z(table.x, table.y)
+    mesh, uvs = parasol_mesh(table.x, table.y, z, parasol.radius_m, parasol.rim_m, parasol.apex_m, parasol.pole_m, band)
+    across = round(2 * parasol.radius_m, 3)
+    node = Node(f"{NODE_PREFIX}{unit}/parasol", (Primitive(mesh, FABRIC_MATERIAL, uvs),),
                 {"type": "overgrowth", "origin": "generated", "attribute_origin": "generated", "kind": "terrace", "slot": "parasol",
-                 "building_id": front.building_id, "solid": False,
-                 "size_m": (2 * parasol.radius_m, 2 * parasol.radius_m, parasol.apex_m)})
+                 "building_id": front.building_id, "solid": False})
+    record = {"kind": "terrace", "origin": "generated", "source_id": front.building_id, "role": "parasol",
+              "position_m": [round(table.x, 3), round(table.y, 3), round(z, 3)], "size_m": [across, across, round(parasol.apex_m, 3)], "solid": False}
+    return node, record
 
 
 def _backed(strip: Polygon, buildings: STRtree) -> bool:

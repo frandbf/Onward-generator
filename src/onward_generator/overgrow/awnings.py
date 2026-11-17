@@ -43,6 +43,8 @@ PLATE_HALF_M = (0.7, 0.18)
 """Half the width and height of a street name plate (``signs.place.PLATE_WIDTH_M``, ``PLATE_HEIGHT_M``)."""
 WALL_CLEAR_M = 0.1
 """A plate, decal or other sign is kept this far from an awning's box."""
+RAY_START_M = 0.05
+"""The ray across the street starts this far out, so the shop's own wall does not stop it."""
 WALL_GAP_M = 0.01
 """The canopy's top edge stands this far out of the wall, so it does not flicker in it."""
 
@@ -67,7 +69,7 @@ def parse_awnings(doc: object, schema: Mapping[str, Any], where: str = "awnings"
     """The checked configuration."""
     first = best_match(Draft202012Validator(schema).iter_errors(doc))
     if first is not None:
-        path = "/".join(str(part) for part in first.absolute_path)
+        path = "/".join(str(part) for part in first.absolute_path)  # pragma: no mutate: the schema is flat, a path has one part
         raise AwningError(f"{where}: {path}: {first.message}" if path else f"{where}: {first.message}")
     assert isinstance(doc, dict)  # the schema requires an object  # pragma: no mutate: narrows the type only
     return AwningConfig(*(float(doc[name]) for name in ("share", "depth_m", "max_drop_m", "min_drop_m", "valance_m", "head_clear_m",
@@ -113,6 +115,16 @@ def wall_things(manifest: Mapping[str, Any]) -> list[tuple[float, float, float, 
     return found
 
 
+def overlaps(z0: float, z1: float, low: float, high: float) -> bool:
+    """Whether the height range ``z0``-``z1`` overlaps ``low``-``high``."""
+    return z0 < high and z1 > low  # pragma: no mutate: < or <=: ranges exactly touching, to the float
+
+
+def plate_line(x: float, y: float, half: float, along: np.ndarray) -> LineString:
+    """A plate or decal ``half`` wide each way of (``x``, ``y``), run along the awning's wall."""
+    return LineString([(x - half * along[0], y - half * along[1]), (x + half * along[0], y + half * along[1])])
+
+
 @dataclass(slots=True)
 class AwningResult:
     nodes: list[Node] = field(default_factory=list)
@@ -138,7 +150,7 @@ def place_awnings(manifest: Mapping[str, Any], buildings: STRtree, zone: Zone, s
     things = wall_things(manifest)
     signs = sign_footprints(manifest)
     for building, shop, sign in boards:
-        if stable_unit(seed, shop, "awning") >= cfg.share:
+        if stable_unit(seed, shop, "awning") >= cfg.share:  # pragma: no mutate: > or >=: a hash exactly equal to share
             result.skipped["share"] += 1
             continue
         reason = _place(building, shop, sign, cfg, buildings, zone, things, signs, budget, result, seed)
@@ -151,8 +163,8 @@ def _place(building: str, shop: str, sign: Mapping[str, Any], cfg: AwningConfig,
            things: Sequence[tuple[float, float, float, float, float]], signs: Sequence[tuple[Polygon, float, float]], budget: int,
            result: AwningResult, seed: int) -> str | None:
     """Hang one awning under ``sign``; None when it hangs, else why not."""
-    centre = np.asarray(sign["centre_m"], dtype=float)
-    out = np.asarray(sign["normal"], dtype=float)[:2]
+    centre = np.asarray(sign["centre_m"])
+    out = np.asarray(sign["normal"])[:2]
     along = np.array([-out[1], out[0]])
     width = float(sign["width_m"])
     base = centre[:2] - out * (float(sign["depth_m"]) / 2 - WALL_GAP_M)
@@ -165,14 +177,14 @@ def _place(building: str, shop: str, sign: Mapping[str, Any], cfg: AwningConfig,
     plan = Polygon([tuple(base - half), tuple(base + half), tuple(base + half + out * cfg.depth_m), tuple(base - half + out * cfg.depth_m)])
     if not zone.contains(float(base[0]), float(base[1])):
         return "outside_zone"
-    if free_across(base + out * 0.05, out, buildings, cfg.depth_m + cfg.free_m + 1.0) < cfg.depth_m + cfg.free_m:
+    need = cfg.depth_m + cfg.free_m
+    if free_across(base + out * RAY_START_M, out, buildings, need) < need:
         return "narrow"
     grown = plan.buffer(WALL_CLEAR_M)
-    if any(z0 < top + WALL_CLEAR_M and z1 > bottom - WALL_CLEAR_M and grown.intersects(LineString([(x - hw * along[0], y - hw * along[1]),
-                                                                                                 (x + hw * along[0], y + hw * along[1])]))
+    if any(overlaps(z0, z1, bottom - WALL_CLEAR_M, top + WALL_CLEAR_M) and grown.intersects(plate_line(x, y, hw, along))
            for x, y, hw, z0, z1 in things):
         return "covers_sign"
-    if any(z0 < top and z1 > bottom and footprint.intersects(plan) for footprint, z0, z1 in signs):  # its own fascia is above it
+    if any(overlaps(z0, z1, bottom, top) and footprint.intersects(plan) for footprint, z0, z1 in signs):  # its own fascia is above it
         return "covers_sign"
     band = int(stable_unit(seed, shop, "colour") * POLE_BAND)  # the colour bands come before the pole's
     mesh, uvs = awning_mesh(base, along, out, width, top, cfg.depth_m, drop, cfg.valance_m, band)

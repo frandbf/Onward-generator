@@ -447,7 +447,7 @@ def test_each_table_stands_under_a_parasol_in_its_bar_s_colour(monkeypatch: pyte
     shade = result.nodes[3]
     assert shade.name == NODE_PREFIX + "0/parasol" and shade.matrix is None and shade.mesh_key is None
     assert shade.extras == {"type": "overgrowth", "origin": "generated", "attribute_origin": "generated", "kind": "terrace", "slot": "parasol",
-                            "building_id": "A", "solid": False, "size_m": (2.2, 2.2, 2.5)}
+                            "building_id": "A", "solid": False}
     primitive = shade.primitives[0]
     assert primitive.material == FABRIC_MATERIAL and primitive.mesh.triangle_count == 32
     assert np.allclose(primitive.mesh.vertices[0], [1.8, -0.7, 2.75])  # its apex over the table, the table on the ground
@@ -461,3 +461,29 @@ def test_each_table_stands_under_a_parasol_in_its_bar_s_colour(monkeypatch: pyte
     assert tight.sets == 0 and tight.skipped == {"budget": 2}  # a table and its parasol fit together or not at all
     snug = _run(ROW, monkeypatch=monkeypatch, config=replace(CFG, sets_per_shop=1), budget=36 + 32)
     assert snug.sets == 1 and snug.parasols == 1
+
+
+def test_a_parasol_stands_on_its_table_s_ground_in_its_bar_s_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.detail.facades import stable_unit
+    from onward_generator.overgrow.cloth import band_v
+
+    odd = replace(CFG, parasol=terraces.Parasol(radius_m=1.23456, rim_m=2.15, apex_m=2.51234, pole_m=0.05), sets_per_shop=1)
+    shifted = [shapely_box(x0, 0.12345, x1, 10) for x0, x1 in ((-10, 10), (10, 20), (-20, -10))]
+    result = _run(shifted, manifest=_manifest([("A", "bar", (0.12345, 0.12345))]), monkeypatch=monkeypatch, config=odd,
+                  ground_z=lambda x, y: x / 7 - y)
+    table = result.records[0]
+    shade = next(row for row in result.records if row["role"] == "parasol")
+    assert shade["size_m"] == [2.469, 2.469, 2.512]
+    assert shade["position_m"][:2] == table["position_m"][:2] and all(v == round(v, 3) for v in shade["position_m"])
+    x, y = table["position_m"][:2]
+    assert shade["position_m"][2] == pytest.approx(x / 7 - y, abs=1e-3)
+    apex = next(node for node in result.nodes if node.name.endswith("/parasol")).primitives[0].mesh.vertices[0]
+    assert apex[2] == pytest.approx(x / 7 - y + 2.51234, abs=2e-3)
+    doors = [(f"B{n}", "bar", (float(-50 + 20 * n), 0.0)) for n in range(6)]
+    row = [shapely_box(-80, 0, 80, 10)]
+    many = _run(row, manifest=_manifest(doors), monkeypatch=monkeypatch, config=replace(CFG, sets_per_shop=1))
+    shades = [node for node in many.nodes if node.name.endswith("/parasol")]
+    bands = [int(stable_unit(0, f"B{n}", "parasol") * 3) for n in range(6)]
+    assert len(shades) == 6 and len(set(bands)) > 1
+    for node, band in zip(shades, bands, strict=True):
+        assert np.allclose(node.primitives[0].uvs[0], [0.5, band_v(band, 0.0)])

@@ -15,7 +15,7 @@ import io
 import math
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from onward_generator.generation.mesh import Mesh
 
@@ -29,6 +29,8 @@ POLE_GREY = (70, 72, 74)
 IMAGE_PX = 256
 STRIPES = 8
 """Stripe pairs across the image."""
+BAND_PX = IMAGE_PX // BANDS
+STRIPE_PX = IMAGE_PX // (2 * STRIPES)
 STRIPE_REPEAT_M = 1.0
 """One image width along the cloth: eight 12.5 cm stripe pairs a metre."""
 BAND_MARGIN = 0.3
@@ -37,17 +39,15 @@ BAND_MARGIN = 0.3
 
 def fabric_png() -> bytes:
     """The ``awning_fabric`` image."""
-    image = Image.new("RGB", (IMAGE_PX, IMAGE_PX), CREAM)
-    draw = ImageDraw.Draw(image)
-    band_px = IMAGE_PX // BANDS
-    stripe_px = IMAGE_PX // (2 * STRIPES)
-    for band, colour in enumerate(STRIPE_COLOURS):
+    pixels = np.full((IMAGE_PX, IMAGE_PX, 3), POLE_GREY, dtype=np.uint8)
+    pixels[:POLE_BAND * BAND_PX] = CREAM
+    # The last band first: a stripe that ran into the next band would show, not be painted over.
+    for band in reversed(range(len(STRIPE_COLOURS))):
         for stripe in range(STRIPES):
-            x0 = 2 * stripe * stripe_px
-            draw.rectangle([x0, band * band_px, x0 + stripe_px - 1, (band + 1) * band_px - 1], fill=colour)
-    draw.rectangle([0, POLE_BAND * band_px, IMAGE_PX - 1, IMAGE_PX - 1], fill=POLE_GREY)
+            x0 = 2 * stripe * STRIPE_PX
+            pixels[band * BAND_PX:(band + 1) * BAND_PX, x0:x0 + STRIPE_PX] = STRIPE_COLOURS[band]
     out = io.BytesIO()
-    image.save(out, format="PNG")
+    Image.fromarray(pixels, "RGB").save(out, format="PNG")
     return out.getvalue()
 
 
@@ -75,7 +75,7 @@ def awning_mesh(base: np.ndarray, along: np.ndarray, out: np.ndarray, width: flo
         [*front_l, low - valance], [*front_r, low - valance],  # valance bottom 4-5
     ])
     triangles = np.array([[0, 1, 2], [0, 2, 3], [3, 2, 5], [3, 5, 4], [0, 3, 4], [1, 5, 2]])
-    u_right = width / STRIPE_REPEAT_M
+    u_right = width / STRIPE_REPEAT_M  # pragma: no mutate: STRIPE_REPEAT_M is 1, so / and * give the same U
     uvs = np.array([
         [0.0, band_v(band, 0.0)], [u_right, band_v(band, 0.0)], [u_right, band_v(band, 0.7)], [0.0, band_v(band, 0.7)],
         [0.0, band_v(band, 1.0)], [u_right, band_v(band, 1.0)],

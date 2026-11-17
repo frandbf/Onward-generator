@@ -32,7 +32,9 @@ def test_the_fabric_image_has_three_striped_bands_and_a_grey_one() -> None:
         assert image.getpixel((0, top)) == colour and image.getpixel((15, bottom)) == colour
         assert image.getpixel((16, top)) == CREAM and image.getpixel((31, bottom)) == CREAM
         assert image.getpixel((32, top + 30)) == colour and image.getpixel((255, top + 30)) == CREAM  # eight stripe pairs across
-    assert image.getpixel((0, 192)) == POLE_GREY and image.getpixel((255, 255)) == POLE_GREY and image.getpixel((100, 220)) == POLE_GREY
+    assert image.getpixel((0, 64)) == STRIPE_COLOURS[1] and image.getpixel((0, 63)) == STRIPE_COLOURS[0]  # bands end where they should
+    assert image.getpixel((0, 191)) == STRIPE_COLOURS[2] and image.getpixel((16, 191)) == CREAM
+    assert image.getpixel((0, 192)) == POLE_GREY and image.getpixel((16, 192)) == POLE_GREY and image.getpixel((255, 255)) == POLE_GREY and image.getpixel((100, 220)) == POLE_GREY
 
 
 def test_a_band_s_v_keeps_off_its_edges() -> None:
@@ -41,8 +43,8 @@ def test_a_band_s_v_keeps_off_its_edges() -> None:
 
 
 def test_each_face_is_drawn_both_ways() -> None:
-    mesh, uvs = two_sided(np.zeros((3, 3)), np.array([[0, 1, 2]]), np.zeros((3, 2)))
-    assert mesh.triangles.tolist() == [[0, 1, 2], [2, 1, 0]] and mesh.vertices.dtype == np.float64 and uvs.shape == (3, 2)
+    mesh, uvs = two_sided(np.zeros((3, 3), dtype=int), np.array([[0, 1, 2]]), np.zeros((3, 2), dtype=int))
+    assert mesh.triangles.tolist() == [[0, 1, 2], [2, 1, 0]] and mesh.vertices.dtype == np.float64 and uvs.dtype == np.float64
     assert mesh.triangles.dtype == np.int64
 
 
@@ -63,6 +65,7 @@ def test_a_parasol_is_a_cone_of_cloth_on_a_pole() -> None:
     assert np.allclose(rim[0], [6.1, -2.0, 2.4]) and np.allclose(rim[2], [5.0, -0.9, 2.4])  # a quarter turn every two sides
     pole = mesh.vertices[9:]
     assert np.allclose(pole[0], [4.975, -2.025, 0.25]) and np.allclose(pole[1], [4.975, -2.025, 2.75])
+    assert np.allclose(pole[2], [5.025, -2.025, 0.25]) and np.allclose(pole[4], [5.025, -1.975, 0.25])
     assert np.allclose(pole[6], [4.975, -1.975, 0.25])
     assert np.allclose(np.ptp(pole[:, :2], axis=0), [0.05, 0.05]) and set(np.round(pole[:, 2], 6)) == {0.25, 2.75}
     assert mesh.triangles[:8].tolist() == [[0, 1 + (k + 1) % 8, 1 + k] for k in range(8)]

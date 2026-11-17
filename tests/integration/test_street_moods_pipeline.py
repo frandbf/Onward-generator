@@ -233,6 +233,7 @@ def test_the_awnings_join_the_scene(runs, monkeypatch: pytest.MonkeyPatch) -> No
     assert made.footprints[0] in dressed["signs"]  # a wall prop keeps off the awning as off a sign
     nodes, materials = nodes_from_glb((out / "scene_visual.glb").read_bytes())
     assert "overgrow/awning/0" in {node.name for node in nodes} and "awning_fabric" in materials
+    assert tuple(materials["awning_fabric"].color) == (1.0, 1.0, 1.0, 1.0) and materials["awning_fabric"].roughness == pytest.approx(0.9)
     objects = json.loads((out / "scene_detail.json").read_text(encoding="utf-8"))["objects"]
     row = next(o for o in objects if o.get("kind") == "awning")
     assert row["size_m"] == [2.0, 0.9, 0.5] and row["source_ids"] == ["B"] and row["role"] == "awning"
