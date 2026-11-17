@@ -118,7 +118,7 @@ def catalogue_licences(library: str | Path | None) -> dict[str, str]:
             document = json.loads((directory / "manifest.json").read_bytes())
         except (OSError, json.JSONDecodeError):
             continue
-        source = str(document.get("source") or "")
+        source = str(document.get("source"))  # "None" without one: it names no licence
         named = next((spdx for name, spdx in SOURCE_LICENCES.items() if name in source), None)
         for row in document.get("assets") or []:
             if not isinstance(row, dict) or not row.get("id"):
