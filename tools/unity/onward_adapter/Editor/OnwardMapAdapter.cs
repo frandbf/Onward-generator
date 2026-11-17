@@ -2832,6 +2832,9 @@ namespace OnwardGenerator
                     : "";
                 if (string.IsNullOrEmpty(clip)) continue;
                 source.AudioSourceName = clip;
+                // An SDK prefab instance keeps a field set after its creation frame only when the change is recorded.
+                PrefabUtility.RecordPrefabInstancePropertyModifications(source);
+                EditorUtility.SetDirty(source);
                 swapped++;
             }
             foreach (SoundSource local in sound.sources ?? new SoundSource[0])

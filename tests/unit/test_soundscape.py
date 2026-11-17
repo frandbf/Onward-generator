@@ -251,5 +251,5 @@ def test_the_adapter_swaps_the_layer_s_clips_and_places_the_sources() -> None:
     body = source[source.index("private static void ApplySoundscape"):source.index("private static void PlaceLocalAudio")]
     for line in ('string clip = name == "Ambience" ? sound.global', ': name == "Birds" ? sound.birds',
                  ': name == "TowerWind" || name.StartsWith("RoofWind_", StringComparison.Ordinal) ? sound.wind',
-                 "source.AudioSourceName = clip;", 'PlaceLocalAudio("Sound_" + local.name, local.clip, new[] { local.x, local.y }, local.z);'):
+                 "source.AudioSourceName = clip;", "PrefabUtility.RecordPrefabInstancePropertyModifications(source);", 'PlaceLocalAudio("Sound_" + local.name, local.clip, new[] { local.x, local.y }, local.z);'):
         assert line in body, line
