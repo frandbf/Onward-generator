@@ -226,6 +226,18 @@ def _street_mood(root: Path | None) -> tuple[str, ...]:
     return ("--street-mood", mood) if mood is not None else ()
 
 
+def cover_street_mood(root: Path | None) -> tuple[str, ...]:
+    """``--street-mood NAME`` for ``perf cover``: the ``map.json`` mood, or else the one the map's street profile applies
+    (plan 2026-11-16, increment 5). ``perf cover`` takes no profile flag for it, as ``signs`` takes none."""
+    if root is None or not (root / "map.json").is_file():
+        return ()
+    from onward_generator.ai.street_profile import applied_street_mood
+    from onward_generator.maps.workspace import street_mood
+
+    mood = street_mood(root) or applied_street_mood(root)
+    return ("--street-mood", mood) if mood is not None else ()
+
+
 def detail_command(scene: Path, heights: Path, base: Path, places: Path | None = None, tints: Path | None = None,
                    roof_spread: Path | None = None, lod2_landmarks: Path | None = None) -> StageCommand:
     """``detail``, with the map's playable core when ``map.json`` has one (fixed or budget), Overture places and colours when given,

@@ -27,7 +27,7 @@ Status: proposed · 16 November 2026. Plan [2026-11-16-ambientes-de-calle](../pl
 ## Consequences
 
 - A new mood is a table row, with no code.
-- The library still has little outdoor furniture. The street profile offering the mood is a later increment of the plan.
+- The library still has little outdoor furniture. The street profile offering the mood and cover by mood came in the third and fourth amendments.
 - A `lived` map spends less of its triangle budget on props until those increments land.
 - `street_mood` was not in the street profile schema at first: a map got a mood only from its own `map.json`. The third amendment adds it.
 
@@ -60,3 +60,11 @@ The street profile ([10-ai.md](../10-ai.md#street-profile-plan-d2), ADR-006 amen
 - The id is one row of the profile's fixed table: pointer `/overgrow/street_mood`, flag `overgrow place --street-mood <id>`. `signs place` takes no profile flag; without a `map.json` `street_mood` it reads the applied row of `config/street_profile.json`, so the wall decals and `overgrow` follow the same mood.
 - A `map.json` `street_mood` always wins: the id is recorded as skipped (`user_setting`). Without either, the mood is `abandoned`, the default, as before.
 - A stored 0.1.0 reply is carried forward, not asked again: when its hashes match the 0.1.0 schema and prompt (kept in the code) and the same inputs, it replays with `street_mood` `map_default` and the record says `AI_PROFILE_MIGRATED`. On Calle Sierpes the stored reply (`mediterranean`, `intact`) replays so, without a call.
+
+## Amendment of 17 November 2026: cover by mood (plan increment 5)
+
+A mood now also names its sightline cover (`"cover"`, required; schema 0.4.0): the library roles and conditions `perf cover` may stand on a long open sightline (ADR-032, plan C7), or `null` for the stage's own rule.
+
+- `lived`: intact `utility_box`, `dumpster`, `planter` and `trashcan`; no barrier, even when nothing civic fits, so a sightline may stay open (the maintainer's choice). `emptied`: those, `trash`, and the barriers, barrels and fences, intact or worn. `abandoned`: `null`, the barriers, barrels, wrecks, debris and fences of any condition, as before; its report is byte for byte the one without a mood.
+- `perf cover --street-mood NAME`; `run` passes the `map.json` `street_mood`, or else the mood the street profile applies (`next_step.cover_street_mood`). A prop of another role is refused as `not_a_cover_role`, one of another condition as `not_of_the_mood`, and a row without a condition is kept. `cover_report.json` gains a `street_mood` block (id, roles, conditions) for a mood other than the default.
+- The cover rule itself (solid, 0.5 m tall, 0.4 m deep, at most 3 m long, licence checked) is unchanged. With the committed CC0 catalogues one prop meets it in a `lived` street, Kenney's suburban planter (2.7 × 2.0 × 1.2 m): the Asset Store utility boxes, dumpsters and bins have no licence the legal record lists, and Kenney's dumpsters are tagged worn. More civic CC0 models would give it variety.

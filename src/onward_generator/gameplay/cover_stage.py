@@ -30,6 +30,7 @@ from shapely.geometry.base import BaseGeometry
 from onward_generator.bounds.envelope import WALL_ID
 from onward_generator.dress.geometry import compare_fingerprints, geometry_fingerprint
 from onward_generator.gameplay.cover import (
+    COVER_ROLES,
     MAX_COVER_PROPS,
     MAX_PROP_LENGTH_M,
     TARGET_SPACING_M,
@@ -64,6 +65,7 @@ from onward_generator.overgrow.ground import road_floor
 from onward_generator.overgrow.library import read_library
 from onward_generator.overgrow.library_catalog import library_directories
 from onward_generator.overgrow.manifest import PINNED_ONLY
+from onward_generator.overgrow.moods import load_moods, mood_for
 from onward_generator.overgrow.realize import fitted_props
 from onward_generator.overgrow.urban import detail_elements
 from onward_generator.overgrow.zone import Zone
@@ -322,12 +324,16 @@ def apply_cover(
     overwrite: bool = False,
     max_props: int | None = None,
     street_profile: Mapping[str, Any] | None = None,
+    street_mood: str | None = None,
 ) -> CoverResult:
     """Write ``out_dir``: the playable scene with cover props, or a verbatim copy with none. Inputs are not modified.
 
     ``max_props`` (``perf cover --max-props``, plan D2) lowers the props cap; None keeps ``MAX_COVER_PROPS``.
-    ``street_profile`` is the record's report block, added to the report only when given.
+    ``street_profile`` is the record's report block, added to the report only when given. ``street_mood``
+    (``perf cover --street-mood``, ADR-044) picks the props a street of that mood may stand; None is the default
+    mood, whose cover is the stage's own rule. An unknown mood raises ``MoodError`` before anything is read.
     """
+    mood = mood_for(street_mood)
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
     layout_file = Path(layout_path).expanduser().resolve()
@@ -345,7 +351,8 @@ def apply_cover(
     props, _library_rejects = read_library(library)
     props = [prop for prop in props if prop.spec.placement != PINNED_ONLY]  # a story prop is never cover by chance
     candidates, refused = cover_props(fitted_props(props), catalogue_licences(library),
-                                      _scene_assets(materials, read_glb(visual_bytes)[0].get("extras", {}).get(PROP_ATLAS_EXTRA)))
+                                      _scene_assets(materials, read_glb(visual_bytes)[0].get("extras", {}).get(PROP_ATLAS_EXTRA)),
+                                      mood.cover_roles, mood.cover_conditions)
     overgrown = _overgrow_triangles(nodes)
     caps = Caps(props=MAX_COVER_PROPS if max_props is None else max_props, triangles=triangle_cap(overgrown))
     site = build_site(base, manifest, layout, layout_file, scene_file, collision_path)
@@ -403,6 +410,9 @@ def apply_cover(
         }
         if street_profile is not None:
             report["street_profile"] = dict(street_profile)
+        if mood.id != load_moods().default:
+            report["street_mood"] = {"id": mood.id, "roles": sorted(mood.cover_roles or COVER_ROLES),
+                                     "conditions": sorted(mood.cover_conditions) if mood.cover_conditions is not None else None}
         atomic_write_bytes(work / COVER_REPORT, report_text(report).encode("utf-8"))
         _swap(work, out)
     except BaseException:

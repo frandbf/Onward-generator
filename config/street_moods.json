@@ -1,7 +1,7 @@
 {
   "schema": "onward_generator.street_moods",
-  "schema_version": "0.3.0",
-  "description": "Street moods (plan 2026-11-16, ADR-044): what overgrow and signs add on top of a map's real geometry, by the state of its streets. A map names one with map.json \"street_mood\"; absent is the default, which changes nothing. \"terraces\" sets café tables before the bars of pedestrian streets and plazas (config/terraces.json), and \"awnings\" hangs striped awnings under the shops' fascias (config/awnings.json). Factors multiply the year profile's; a category factor multiplies its placement rule caps.",
+  "schema_version": "0.4.0",
+  "description": "Street moods (plan 2026-11-16, ADR-044): what overgrow and signs add on top of a map's real geometry, by the state of its streets. A map names one with map.json \"street_mood\"; absent is the default, which changes nothing. \"terraces\" sets café tables before the bars of pedestrian streets and plazas (config/terraces.json), and \"awnings\" hangs striped awnings under the shops' fascias (config/awnings.json). \"cover\" names the library roles and conditions perf cover may stand on a long sightline; null keeps its own rule (barriers, barrels, wrecks, debris and fences of any condition). Factors multiply the year profile's; a category factor multiplies its placement rule caps.",
   "default": "abandoned",
   "moods": {
     "abandoned": {
@@ -13,7 +13,8 @@
       "categories": {},
       "wall_decals_excluded": [],
       "terraces": false,
-      "awnings": false
+      "awnings": false,
+      "cover": null
     },
     "emptied": {
       "note": "A town emptied days ago: nothing has grown and few cars were left behind; props intact or worn, fewer barriers and less rubbish, no soot or bullet holes on the walls unless the map asks for damage.",
@@ -24,7 +25,8 @@
       "categories": {"barriers": 0.5, "waste": 0.5},
       "wall_decals_excluded": ["soot", "bullets", "moss"],
       "terraces": false,
-      "awnings": false
+      "awnings": false,
+      "cover": {"roles": ["barrier", "barrel", "fence", "utility_box", "dumpster", "trash", "planter", "trashcan"], "conditions": ["intact", "worn"]}
     },
     "lived": {
       "note": "A street in daily use: no growth, no wrecks, only intact props; street furniture and plants go up, barriers, rubbish, parked vehicles and site structures go down; the walls keep posters, adverts and light wear.",
@@ -35,7 +37,8 @@
       "categories": {"barriers": 0.15, "waste": 0.25, "vehicles": 0.25, "structures": 0.5, "furniture": 2.0, "vegetation": 1.5},
       "wall_decals_excluded": ["soot", "bullets", "moss", "rust", "peeling", "crack", "chalk"],
       "terraces": true,
-      "awnings": true
+      "awnings": true,
+      "cover": {"roles": ["utility_box", "dumpster", "planter", "trashcan"], "conditions": ["intact"]}
     }
   }
 }
