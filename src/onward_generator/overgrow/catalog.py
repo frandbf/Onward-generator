@@ -75,6 +75,7 @@ _FURNITURE = ("curb", "sidewalk", "courtyard", "yard", "empty_lot", "plaza", "pa
 _BUILDING = ("block_edge", "curb", "yard", "empty_lot", "plaza", "park")
 _EDGE = ("block_edge", "carriageway")
 _BARRIER = ("curb", "carriageway", "sidewalk", "plaza")
+_CIVIC = ("block_edge", "curb", "yard", "plaza", "park")
 
 NAMED_ASSETS: tuple[AssetSpec, ...] = (
     _spec("covered_car", "vehicles", "wreck", _WRECK, "ground", "abandoned car at the curb, in the street, on a sidewalk, in a yard or lot, or in a plaza"),
@@ -98,6 +99,12 @@ NAMED_ASSETS: tuple[AssetSpec, ...] = (
     _spec("concrete_road_barrier", "barriers", "barrier", _BARRIER, "ground", "barrier at the curb, across the street, on a sidewalk or in a plaza"),
     _spec("concrete_road_barrier_02", "barriers", "barrier", _BARRIER, "ground", "barrier at the curb, across the street, on a sidewalk or in a plaza"),
     _spec("water_manhole_cover", "barriers", "manhole", ("carriageway", "sidewalk"), "flat", "manhole on the carriageway or a sidewalk", lane="allow"),
+    # Civic street props for a street in daily use (plan 2026-11-16, ADR-044): cover a lived street may stand.
+    _spec("utility_box_01", "structures", "utility_box", _CIVIC, "ground", "electrical cabinet against a wall, at the curb or in a plaza"),
+    _spec("utility_box_02", "structures", "utility_box", _CIVIC, "ground", "electrical cabinet against a wall, at the curb or in a plaza"),
+    _spec("planter_box_01", "furniture", "planter", _FURNITURE, "ground", "wooden planter box on a sidewalk, at the curb or in a plaza"),
+    _spec("planter_box_02", "furniture", "planter", _FURNITURE, "ground", "wooden planter box on a sidewalk, at the curb or in a plaza"),
+    _spec("planter_box_03", "furniture", "planter", _FURNITURE, "ground", "wooden planter box on legs on a sidewalk, at the curb or in a plaza"),
 )
 
 # Few plants and one bush. No ivy model exists on the Poly Haven model API.
