@@ -65,6 +65,8 @@ from onward_generator.export.smoke import TEXTURE_FILE as SMOKE_TEXTURE
 from onward_generator.export.smoke import TEXTURE_ROLE as SMOKE_ROLE
 from onward_generator.export.smoke import choose as choose_smoke
 from onward_generator.export.smoke import puff_png, smoke_options, wreck_sites
+from onward_generator.export.soundscape import DEFAULT as SOUND_DEFAULT
+from onward_generator.export.soundscape import SoundscapeError, load_soundscape, soundscape_block
 from onward_generator.export.sun import street_sun
 from onward_generator.export.thumbnail import render_listing_thumbnail
 from onward_generator.export.triangle_budget import UNITY_TRIANGLE_LIMIT, budget_warning, triangle_budget
@@ -463,12 +465,14 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
-                  atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0) -> PackageResult:
+                  atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0,
+                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto") -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
     changes nothing, the package id included. ``smoke`` asks for that many smoke columns (plan 2026-11-15,
-    increment C); 0 changes nothing."""
+    increment C); 0 changes nothing. ``soundscape`` is a mode of ``export.soundscape`` (plan 2026-11-17, increment D)
+    and ``facade_style`` the map's style as materials resolves it; ``default`` changes nothing."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -572,6 +576,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         if core_lightmap is not None:
             applied.append(LIGHTMAP_CORE)
     smoke_record: dict[str, Any] | None = None
+    columns: list[dict[str, float]] = []
     if smoke:
         # Plan 2026-11-15, increment C: only a map that asks for smoke writes it, so others keep their package_id.
         columns, refused = choose_smoke(wreck_sites(detail_manifest.get("objects") or []), smoke,
@@ -582,6 +587,17 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         if len(columns) < smoke:
             warnings.append(f"smoke: {len(columns)} of {smoke} columns found a wreck of the core clear of the spawns, "
                             f"the climbs and each other ({', '.join(f'{k} {v}' for k, v in refused.items() if v) or 'no wreck'})")
+    sound_record: dict[str, Any] | None = None
+    if soundscape != SOUND_DEFAULT:
+        # Plan 2026-11-17, increment D: the block only when the mode changes something, so others keep their package_id.
+        try:
+            block, sound_record = soundscape_block(soundscape, _style(detail_manifest, facade_style), load_soundscape(),
+                                                   detail_manifest.get("objects") or [], columns,
+                                                   (detail_manifest.get("core") or {}).get("half_side_m"), layout_doc)
+        except SoundscapeError as exc:
+            raise ExportError([f"soundscape: {exc}"]) from exc
+        if block is not None:
+            options["soundscape"] = block
     tiers = _tiers(visual_bytes, detail_manifest, float(options["combine_cell_m"]))
     # Plan Q2: the Unity total, estimated now so a map over the official limit is known before the bake.
     budget = triangle_budget(visual_bytes, layout_doc, tiers, (detail_manifest.get("core") or {}).get("half_side_m"), triangle_limit)
@@ -674,12 +690,25 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 manifest["atmosphere"]["lightmap_core"] = core_lightmap
         if smoke_record is not None:
             manifest["smoke"] = smoke_record
+        if sound_record is not None:
+            manifest["soundscape"] = sound_record
         atomic_write_json(out / MANIFEST_FILE, manifest)
         atomic_write_bytes(out / CHECKLIST_FILE, checklist(manifest).encode("utf-8"))
     except BaseException:
         shutil.rmtree(out, ignore_errors=True)
         raise
     return PackageResult(out, manifest, tuple(warnings))
+
+
+def _style(detail_manifest: Mapping[str, Any], request: str) -> str:
+    """The map's facade style, as materials resolves it: ``request``, else the box of the map's centre."""
+    from onward_generator.materials.trim_style import StyleError, load_style_table, resolve_style
+
+    origin = (detail_manifest.get("frame") or {}).get("origin_wgs84")
+    try:
+        return resolve_style(load_style_table(), request, origin or None)[0]
+    except StyleError as exc:
+        raise ExportError([f"soundscape: {exc}"]) from exc
 
 
 def _tiers(visual: bytes, detail_manifest: Mapping[str, Any], cell_m: float) -> dict[str, Any] | None:

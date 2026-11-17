@@ -160,6 +160,21 @@ namespace OnwardGenerator
             public Lighting lighting = new Lighting();
             // Plan 2026-11-15, increment C: smoke columns over wrecks. Absent (no columns) in every package without smoke.
             public SmokeOptions smoke = new SmokeOptions();
+            // Plan 2026-11-17, increment D (ADR-046): the SDK clips of the map's soundscape. Absent (empty mode) in every
+            // package whose soundscape changes nothing.
+            public SoundscapeOptions soundscape = new SoundscapeOptions();
+        }
+
+        [Serializable] private class SoundSource { public string name; public string clip; public float x; public float y; public float z; }
+
+        [Serializable]
+        private class SoundscapeOptions
+        {
+            public string mode = "";
+            public string global = "";
+            public string birds = "";
+            public string wind = "";
+            public SoundSource[] sources = new SoundSource[0];
         }
 
         [Serializable] private class SmokeColumn { public float x; public float y; public float z; public int seed; }
@@ -1027,6 +1042,7 @@ namespace OnwardGenerator
                 AddInteriorLights(visual, opt, probes);
                 AddStreetLights(pkg.Layout);
                 AddSmoke(pkg, root);
+                ApplySoundscape(pkg.Options.soundscape);
                 AddClimbProbes(pkg.Layout, probes);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
                 EditorSceneManager.SaveScene(scene, scenePath);
@@ -2798,6 +2814,33 @@ namespace OnwardGenerator
             go.transform.SetParent(parent, false);
             go.transform.position = Local(xy[0], xy[1], 0f);
             return go.transform;
+        }
+
+        // Plan 2026-11-17, increment D (ADR-046): after the playable layer, swap the clips of its ambience, birds and roof
+        // wind for the soundscape's, and place its local sources (fire, flies, a generator) at their heights. JsonUtility
+        // reads a JSON null as an empty string: an empty clip keeps the layer's.
+        private static void ApplySoundscape(SoundscapeOptions sound)
+        {
+            if (sound == null || string.IsNullOrEmpty(sound.mode)) return;
+            int swapped = 0;
+            foreach (OnwardAudioSource source in UnityEngine.Object.FindObjectsOfType<OnwardAudioSource>())
+            {
+                string name = source.gameObject.name;
+                string clip = name == "Ambience" ? sound.global
+                    : name == "Birds" ? sound.birds
+                    : name == "TowerWind" || name.StartsWith("RoofWind_", StringComparison.Ordinal) ? sound.wind
+                    : "";
+                if (string.IsNullOrEmpty(clip)) continue;
+                source.AudioSourceName = clip;
+                swapped++;
+            }
+            foreach (SoundSource local in sound.sources ?? new SoundSource[0])
+            {
+                if (local == null || string.IsNullOrEmpty(local.name) || string.IsNullOrEmpty(local.clip))
+                    throw new InvalidDataException("soundscape: every source needs a name and a clip");
+                PlaceLocalAudio("Sound_" + local.name, local.clip, new[] { local.x, local.y }, local.z);
+            }
+            Debug.Log($"{LogPrefix} Soundscape {sound.mode}: {swapped} clips swapped, {(sound.sources ?? new SoundSource[0]).Length} local sources.");
         }
 
         private static void PlaceLocalAudio(string objectName, string clip, float[] xy, float heightM = 2f)

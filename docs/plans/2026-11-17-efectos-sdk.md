@@ -2,6 +2,8 @@
 
 Fecha: 17 de noviembre de 2026. Pedido por el mantenedor tras probar Mogadiscio pkg_20 en el casco, después de revisar qué ofrece el SDK v1.15 además de lo que ya usamos (humo de ADR-043, tormenta de ADR-028, sobrevuelos, ambiente `Suburban Day/Night`, pájaros, viento en tejados, reverberación del monumento y niebla por preset).
 
+**Estado (17 de noviembre de 2026).** D (paisaje sonoro, ADR-046 propuesto) en su PR. Difiere del plan en dos puntos: se resuelve en `export package --soundscape` y no en `perf layout`, para no tocar el contrato del layout; y hay un modo `regional` (pájaros, viento y generador sin combate), que es lo que da `auto` sin daño `heavy`. G0 está construido y espera al casco.
+
 Todo es genérico: cada efecto se decide por el estilo de fachada, el nivel de daño (`signs/damage.py`), el preset de luz o una clave de `map.json`, nunca por el nombre de un lugar. Un mapa sin las claves nuevas y sin estilo, daño o preset que las active sale igual byte a byte (Murcia, Madrid y París no cambian).
 
 ## 0. Lo que ofrece el SDK y lo que no
@@ -17,7 +19,7 @@ Cada efecto es una opción del pipeline que cualquier mapa puede activar o desac
 
 | Efecto | Clave de `map.json` | Opción de la etapa | Se rehace desde | Sin la clave |
 | --- | --- | --- | --- | --- |
-| Paisaje sonoro | `"soundscape"`: `auto`, `default`, `war` o `battle` | `perf layout --soundscape` | `layout` | `auto`: lo decide el daño resuelto |
+| Paisaje sonoro | `"soundscape"`: `auto`, `default`, `regional`, `war` o `battle` | `export package --soundscape` | `export` | `auto`: lo decide el daño resuelto |
 | Fuego al pie del humo | `"fire"`: `true` o `false` | `export package --fire` | `export` | `false`: sin fuego |
 | Polvo en el aire | `"dust"`: `auto`, `off` o `light` | `export package --dust` | `export` | `auto`: con el preset `dusty` o los estilos `arid` y `east_african` |
 | Filtro de color | `"grade"`: `auto`, `off` u `on` | `export package --grade` | `export` | `auto`: el bloque `grade` del preset, si lo tiene |
@@ -49,7 +51,7 @@ Orden: **G0** (prueba del LUT, barata y puede descartar el punto 4), **D** (soni
   - `combat` por nivel de daño: `heavy` da `Distant Combat Sparse`, y `none` o `light` no tienen combate.
   - `regional` por estilo de fachada: el clip de pájaros (por ejemplo `Birds African Bush 1` para `east_african`) y el de viento (`Wind Desert` para `arid` y `east_african`). Un estilo sin fila conserva `Birds Park` y `Wind Rooftop`.
   - Límites de fuentes locales: moscas 4 como máximo, generador 1, y 35 m entre fuentes del mismo clip.
-- **Clave** `"soundscape"` en `map.json`: `auto` (por defecto), `default`, `war` o `battle`, y `perf layout --soundscape`. Cualquier mapa puede pedir `war` o `battle`.
+- **Clave** `"soundscape"` en `map.json`: `auto` (por defecto), `default`, `war` o `battle`, y `export package --soundscape`. Cualquier mapa puede pedir `war` o `battle`.
   - `auto` lee el daño resuelto: `heavy` da `war` y el resto `default`.
   - `war` cambia el ambiente global a `Distant Combat Sparse`.
   - `battle` usa `Dense`, que nunca se elige solo.

@@ -418,6 +418,11 @@ def _map_value(base: Path, key: str) -> str | None:
     return None
 
 
+def map_damage(base: Path) -> str:
+    """The war damage level the map at or above ``base`` is drawn with (plan 2026-11-17: the soundscape follows it)."""
+    return _damage(base)[0]
+
+
 def _damage(base: Path) -> tuple[str, str]:
     """The map's war damage level and its origin (``signs.damage.resolve_damage``): ``none`` outside a map folder or
     without the key; ``auto`` reads the map's street profile record."""

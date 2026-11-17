@@ -98,6 +98,7 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 | Abandoned look, props, lamp posts, library trees, power poles and wires (`--brief`, `--ai`, `triangle_limit`, `overhead_lines`) | `overgrow` |
 | Spawns, routes, game modes | `layout` |
 | Smoke columns (`smoke`) | `export` |
+| Soundscape (`soundscape`) | `export` |
 | Lightmap detail (`build.lightmap_texels_per_m` in `config/export.json`) | `export`, then a new Unity build |
 | Centre or radius | Don't. Make a new map with a new name: `map.json` keeps the area it was created with. |
 
