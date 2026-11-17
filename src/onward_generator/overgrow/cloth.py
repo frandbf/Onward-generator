@@ -62,8 +62,8 @@ def two_sided(vertices: np.ndarray, triangles: np.ndarray, uvs: np.ndarray) -> t
     its own normal."""
     back = triangles[:, ::-1] + len(vertices)
     both = np.vstack([triangles, back])
-    return (Mesh(np.vstack([vertices, vertices]).astype(np.float64), both.astype(np.int64)),
-            np.vstack([uvs, uvs]).astype(np.float64))
+    return (Mesh(np.vstack([vertices, vertices], dtype=np.float64), both.astype(np.int64)),
+            np.vstack([uvs, uvs], dtype=np.float64))
 
 
 def awning_mesh(base: np.ndarray, along: np.ndarray, out: np.ndarray, width: float, top_z: float, depth: float, drop: float,
