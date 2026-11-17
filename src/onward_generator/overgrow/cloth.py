@@ -5,8 +5,9 @@ vertical stripes in one colour on cream, and a last band of plain grey for a par
 its V range and repeats the stripes along U, one image width per ``STRIPE_REPEAT_M`` metres, so every awning and
 parasol of a map shares one draw per combine cell. No model is downloaded: the cloth is CC0 by construction.
 
-The cloth is two-sided (each face is drawn again turned the other way): a player sees an awning from the street and
-from under it. Neither collides.
+The cloth is two-sided (each face is drawn again turned the other way, on its own copy of the vertices): a player sees
+an awning from the street and from under it. A face and its turned copy sharing vertices would sum their normals to
+nothing, and Unity would draw the cloth black. Neither collides.
 """
 
 from __future__ import annotations
@@ -57,9 +58,12 @@ def band_v(band: int, share: float) -> float:
 
 
 def two_sided(vertices: np.ndarray, triangles: np.ndarray, uvs: np.ndarray) -> tuple[Mesh, np.ndarray]:
-    """The mesh with each triangle drawn again in the other winding, on the same vertices."""
-    both = np.vstack([triangles, triangles[:, ::-1]])
-    return Mesh(np.asarray(vertices, dtype=np.float64), both.astype(np.int64)), np.asarray(uvs, dtype=np.float64)
+    """The mesh with each triangle drawn again in the other winding, on a second copy of its vertices so each side keeps
+    its own normal."""
+    back = triangles[:, ::-1] + len(vertices)
+    both = np.vstack([triangles, back])
+    return (Mesh(np.vstack([vertices, vertices]).astype(np.float64), both.astype(np.int64)),
+            np.vstack([uvs, uvs]).astype(np.float64))
 
 
 def awning_mesh(base: np.ndarray, along: np.ndarray, out: np.ndarray, width: float, top_z: float, depth: float, drop: float,
