@@ -8,6 +8,8 @@ from collections.abc import Sequence
 
 from onward_generator.export.package import ExportError, build_package, verify_package
 from onward_generator.export.smoke import SMOKE_MAX
+from onward_generator.export.soundscape import DEFAULT as SOUND_DEFAULT
+from onward_generator.export.soundscape import MODES as SOUND_MODES
 from onward_generator.export.triangle_budget import UNITY_TRIANGLE_LIMIT
 from onward_generator.export.views import ViewError, write_views
 
@@ -23,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="new package directory; must not exist")
     p.add_argument("--triangle-limit", type=int, default=UNITY_TRIANGLE_LIMIT, help="the Unity triangle limit the package is checked against (map.json triangle_limit; default 300000)")  # pragma: no mutate: help text
     p.add_argument("--smoke", type=int, default=0, choices=range(0, SMOKE_MAX + 1), metavar="N", help="smoke columns over wrecks of the core, 0 to 5 (map.json smoke; plan 2026-11-15)")  # pragma: no mutate: help text
+    p.add_argument("--soundscape", default=SOUND_DEFAULT, choices=SOUND_MODES, help="the SDK ambience clips: default keeps today's, regional the facade style's birds and wind and a generator by a power pole, war and battle add distant combat, fire under the smoke and flies (map.json soundscape; ADR-046)")  # pragma: no mutate: help text
+    p.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it; the soundscape's regional clips follow it")  # pragma: no mutate: help text
     p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037)")  # pragma: no mutate: help text
     v = sub.add_parser("verify", help="re-hash every file of a package")
     v.add_argument("package")
@@ -53,7 +57,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if not problems else 1
     try:
         result = build_package(args.project, args.detail, args.layout, args.out, export_config=args.config,
-                               atmosphere=args.atmosphere, triangle_limit=args.triangle_limit, smoke=args.smoke)
+                               atmosphere=args.atmosphere, triangle_limit=args.triangle_limit, smoke=args.smoke,
+                               soundscape=args.soundscape, facade_style=args.facade_style)
     except ExportError as exc:
         print("export package rejected; nothing written:", file=sys.stderr)
         for p in exc.problems:

@@ -124,6 +124,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Spawns, routes, modes | `perf layout --playable` and a new package | the geometry |
 | Sightline cover (`"sightline_cover": true`) | `perf cover` after the layout, then a new package | `scene_playable` and the layout |
 | Smoke columns (`"smoke"`) | a new package (`export`) | the scene |
+| Soundscape (`"soundscape"`) | a new package (`export`) | the scene |
 | Street mood (`"street_mood"`) | `signs place` and everything after it | `materials` |
 | Overhead power lines (`"overhead_lines"`) | `overgrow place` and everything after it | `signs` |
 | Earth on unpaved streets (an older map) | `map create --textures` for the `unpaved_carriageway` slot, then `generate` and everything after it | `geo`, `heights` |

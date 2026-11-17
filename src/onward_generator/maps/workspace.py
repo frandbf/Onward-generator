@@ -381,6 +381,17 @@ def smoke_columns(directory: str | Path) -> int:
         raise MapError(str(exc)) from exc
 
 
+def soundscape(directory: str | Path) -> str:
+    """``map.json`` ``soundscape`` (plan 2026-11-17, increment D; ADR-046): ``auto`` without the key, else ``default``,
+    ``regional``, ``war`` or ``battle``. Anything else is refused with ``MapError``."""
+    from onward_generator.export.soundscape import SoundscapeError, check_choice
+
+    try:
+        return check_choice(load_map(directory).get("soundscape"))
+    except SoundscapeError as exc:
+        raise MapError(str(exc)) from exc
+
+
 def overhead_lines(directory: str | Path) -> bool | None:
     """``map.json`` ``overhead_lines`` (ADR-045): True or False to force the poles and wires on or off, None without the
     key, when the map's facade style decides. Anything else is refused with ``MapError``."""

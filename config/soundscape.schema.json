@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "onward-generator soundscape",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "modes",
+    "regional",
+    "local",
+    "flies_kinds"
+  ],
+  "properties": {
+    "schema": {
+      "const": "onward_generator.soundscape"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "description": {
+      "type": "string"
+    },
+    "modes": {
+      "description": "What each mode adds; default adds nothing and is not listed",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regional",
+        "war",
+        "battle"
+      ],
+      "properties": {
+        "regional": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "global",
+            "local"
+          ],
+          "properties": {
+            "global": {
+              "description": "Global ambience in place of Suburban Day or Night; null keeps the layout's",
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/clip"
+                }
+              ]
+            },
+            "local": {
+              "description": "Local sources this mode places",
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "fire",
+                  "flies",
+                  "generator"
+                ]
+              }
+            }
+          }
+        },
+        "war": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "global",
+            "local"
+          ],
+          "properties": {
+            "global": {
+              "description": "Global ambience in place of Suburban Day or Night; null keeps the layout's",
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/clip"
+                }
+              ]
+            },
+            "local": {
+              "description": "Local sources this mode places",
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "fire",
+                  "flies",
+                  "generator"
+                ]
+              }
+            }
+          }
+        },
+        "battle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "global",
+            "local"
+          ],
+          "properties": {
+            "global": {
+              "description": "Global ambience in place of Suburban Day or Night; null keeps the layout's",
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/clip"
+                }
+              ]
+            },
+            "local": {
+              "description": "Local sources this mode places",
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "fire",
+                  "flies",
+                  "generator"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "regional": {
+      "description": "Birds and wind clips by facade style (config/facade_styles.json); a style not listed keeps Birds Park and Wind Rooftop",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "birds",
+          "wind"
+        ],
+        "properties": {
+          "birds": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/clip"
+              }
+            ]
+          },
+          "wind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/clip"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "local": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fire",
+        "flies",
+        "generator"
+      ],
+      "properties": {
+        "fire": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "clip",
+            "max",
+            "apart_m",
+            "spawn_clear_m",
+            "height_m"
+          ],
+          "properties": {
+            "clip": {
+              "$ref": "#/$defs/clip"
+            },
+            "max": {
+              "description": "Sources of this kind on the map",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "apart_m": {
+              "description": "Least distance between two sources of this kind",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "spawn_clear_m": {
+              "description": "Least distance from a spawn point or an objective",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "height_m": {
+              "description": "Height of the source over its site",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          }
+        },
+        "flies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "clip",
+            "max",
+            "apart_m",
+            "spawn_clear_m",
+            "height_m"
+          ],
+          "properties": {
+            "clip": {
+              "$ref": "#/$defs/clip"
+            },
+            "max": {
+              "description": "Sources of this kind on the map",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "apart_m": {
+              "description": "Least distance between two sources of this kind",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "spawn_clear_m": {
+              "description": "Least distance from a spawn point or an objective",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "height_m": {
+              "description": "Height of the source over its site",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          }
+        },
+        "generator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "clip",
+            "max",
+            "apart_m",
+            "spawn_clear_m",
+            "height_m"
+          ],
+          "properties": {
+            "clip": {
+              "$ref": "#/$defs/clip"
+            },
+            "max": {
+              "description": "Sources of this kind on the map",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "apart_m": {
+              "description": "Least distance between two sources of this kind",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "spawn_clear_m": {
+              "description": "Least distance from a spawn point or an objective",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "height_m": {
+              "description": "Height of the source over its site",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          }
+        }
+      }
+    },
+    "flies_kinds": {
+      "description": "scene_detail overgrowth kinds where flies buzz, with the wrecks",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z_]*$"
+      }
+    }
+  },
+  "$defs": {
+    "clip": {
+      "description": "An ambience clip of the SDK (OnwardAudioDataStrings)",
+      "enum": [
+        "Arctic",
+        "Bootcamp",
+        "Desert Day",
+        "Desert Night",
+        "Distant Combat Dense",
+        "Distant Combat Sparse",
+        "Factory",
+        "Jungle Day",
+        "Jungle Night",
+        "Ocean",
+        "Room Tone",
+        "Suburban Day",
+        "Suburban Night",
+        "Subway Exterior",
+        "Subway Interior",
+        "Tanker Exterior",
+        "Tanker Interior",
+        "White Noise",
+        "Birds African Bush 1",
+        "Birds African Bush 2",
+        "Birds Country",
+        "Birds Park",
+        "Birds Seagulls",
+        "Birds Suburbs",
+        "Computer Room",
+        "Conference Room",
+        "Engine",
+        "Engine Generator",
+        "Engine Tank",
+        "Fire",
+        "Flies",
+        "Hanger Metal",
+        "Helicopter",
+        "Ice Lake Stress",
+        "Server",
+        "Static",
+        "Steam",
+        "Thunder",
+        "Vent Shaft",
+        "Water Drip",
+        "Water Flow",
+        "Water Lapping",
+        "Waterfall",
+        "Wind",
+        "Wind Big Entrance",
+        "Wind Chimes",
+        "Wind Desert",
+        "Wind Forest",
+        "Wind Mountain",
+        "Wind Rooftop",
+        "Wind Small Entrance",
+        "Wind Tunnel"
+      ]
+    }
+  }
+}

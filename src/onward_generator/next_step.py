@@ -476,6 +476,7 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     if config.is_file():
         parts.extend(["--config", show(config)])
     parts.extend(["--layout", show(layout), "--out", show(out)])
+    parts.extend(_soundscape(root, detail))
     atmosphere = _atmosphere(root)
     if atmosphere is not None:
         parts.extend(["--atmosphere", atmosphere])
@@ -490,6 +491,19 @@ def _smoke(root: Path) -> list[str]:
 
     count = smoke_columns(root) if (root / "map.json").is_file() else 0
     return ["--smoke", str(count)] if count else []
+
+
+def _soundscape(root: Path, detail: Path) -> list[str]:
+    """``--soundscape MODE`` (and the map's ``--facade-style``) for export (plan 2026-11-17, increment D): the
+    ``map.json`` mode, ``auto`` resolved by the map's war damage; nothing for ``default``."""
+    if not (root / "map.json").is_file():
+        return []
+    from onward_generator.export.soundscape import DEFAULT, resolve_mode
+    from onward_generator.maps.workspace import soundscape
+    from onward_generator.signs.place import map_damage
+
+    mode = resolve_mode(soundscape(root), map_damage(root))
+    return [] if mode == DEFAULT else ["--soundscape", mode, *_facade_style(detail)]
 
 
 def _triangle_limit(root: Path | None) -> list[str]:
