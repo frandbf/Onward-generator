@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--triangle-limit", type=int, default=UNITY_TRIANGLE_LIMIT, help="the Unity triangle limit the package is checked against (map.json triangle_limit; default 300000)")  # pragma: no mutate: help text
     p.add_argument("--smoke", type=int, default=0, choices=range(0, SMOKE_MAX + 1), metavar="N", help="smoke columns over wrecks of the core, 0 to 5 (map.json smoke; plan 2026-11-15)")  # pragma: no mutate: help text
     p.add_argument("--fire", action="store_true", help="flames and embers under every smoke column (map.json fire; plan 2026-11-17, increment E)")  # pragma: no mutate: help text
+    p.add_argument("--no-pack-particles", dest="pack_particles", action="store_false", help="keep the smoke and flame textures drawn by code even when asset-store particles imported a pack (map.json pack_particles: false; ADR-035 amendment of 18 November 2026)")  # pragma: no mutate: help text
     p.add_argument("--soundscape", default=SOUND_DEFAULT, choices=SOUND_MODES, help="the SDK ambience clips: default keeps today's, regional the facade style's birds and wind and a generator by a power pole, war and battle add distant combat, fire under the smoke and flies (map.json soundscape; ADR-046)")  # pragma: no mutate: help text
     p.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it; the soundscape's regional clips follow it")  # pragma: no mutate: help text
     p.add_argument("--atmosphere", default=None, help="day maps only: preset of config/atmosphere.default.json; neutral or absent changes nothing (ADR-037)")  # pragma: no mutate: help text
@@ -59,7 +60,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         result = build_package(args.project, args.detail, args.layout, args.out, export_config=args.config,
                                atmosphere=args.atmosphere, triangle_limit=args.triangle_limit, smoke=args.smoke,
-                               soundscape=args.soundscape, facade_style=args.facade_style, fire=args.fire)
+                               soundscape=args.soundscape, facade_style=args.facade_style, fire=args.fire,
+                               pack_particles=args.pack_particles)
     except ExportError as exc:
         print("export package rejected; nothing written:", file=sys.stderr)
         for p in exc.problems:

@@ -74,6 +74,9 @@ namespace OnwardGenerator
         // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit particle shader.
         private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit.shadergraph";
         private const string FireRole = "fire_texture";
+        // ADR-035 amendment of 18 November 2026: a local particle pack's flame flipbook, played by the flames only.
+        private const string FireSheetRole = "fire_sheet_texture";
+        private const int SheetTilesMax = 16;
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
         private const float LitNormalSpecular = 0.04f;
@@ -188,6 +191,17 @@ namespace OnwardGenerator
             public int max_particles;
         }
 
+        // A flipbook grid (columns, rows) a particle plays once over its life, and how far its billboard is lifted, in
+        // particle sizes. Empty tiles: no flipbook (JsonUtility fills a missing object with defaults).
+        [Serializable]
+        private class ParticleSheet
+        {
+            public string texture = "";
+            public int[] tiles = new int[0];
+            public float pivot_y;
+            public bool Present => tiles != null && tiles.Length > 0;
+        }
+
         [Serializable]
         private class FireOptions
         {
@@ -195,6 +209,7 @@ namespace OnwardGenerator
             public FireEmitter flames = new FireEmitter();
             public FireEmitter embers = new FireEmitter();
             public FireSite[] sites = new FireSite[0];
+            public ParticleSheet sheet = new ParticleSheet();
         }
 
         [Serializable] private class SoundSource { public string name; public string clip; public float x; public float y; public float z; }
@@ -225,6 +240,7 @@ namespace OnwardGenerator
             public float alpha;
             public int max_particles;
             public SmokeColumn[] columns = new SmokeColumn[0];
+            public ParticleSheet sheet = new ParticleSheet();
         }
 
         [Serializable]
@@ -381,6 +397,11 @@ namespace OnwardGenerator
             int fireSites = (pkg.Options.fire?.sites ?? new FireSite[0]).Length;
             if (fireFiles > 1 || (fireSites > 0) != (fireFiles == 1))
                 throw new InvalidDataException($"adapter_options.json fire has {fireSites} sites, the package lists {fireFiles} '{FireRole}' files");
+            // ADR-035 amendment of 18 November 2026: a flame flipbook comes with exactly one listed sheet texture.
+            int sheetFiles = m.files.Count(f => f.role == FireSheetRole);
+            bool fireSheet = fireSites > 0 && (pkg.Options.fire?.sheet?.Present ?? false);
+            if (sheetFiles > 1 || fireSheet != (sheetFiles == 1))
+                throw new InvalidDataException($"adapter_options.json fire {(fireSheet ? "has" : "has no")} flame flipbook, the package lists {sheetFiles} '{FireSheetRole}' files");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -3148,6 +3169,12 @@ namespace OnwardGenerator
             importer.SaveAndReimport();
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
                 ?? throw new InvalidOperationException($"{texturePath}: imported, but no Texture2D to load");
+            if (smoke.sheet.Present)
+            {
+                CheckSheet("smoke", smoke.sheet);
+                importer.maxTextureSize = 2048;
+                importer.SaveAndReimport();
+            }
             var material = new Material(shader) { name = "M_smoke" };
             material.SetTexture("_MainTex", texture);
             material.SetColor("_BaseColor", Color.white);
@@ -3205,9 +3232,11 @@ namespace OnwardGenerator
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
                 renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
+                ApplySheet(ps, renderer, smoke.sheet);
                 ps.Play();
             }
-            Debug.Log($"{LogPrefix} Smoke: {smoke.columns.Length} columns, {smoke.max_particles} particles each at most, {shader.name}.");
+            string flipbook = smoke.sheet.Present ? $", a {smoke.sheet.tiles[0]}x{smoke.sheet.tiles[1]} flipbook" : "";
+            Debug.Log($"{LogPrefix} Smoke: {smoke.columns.Length} columns, {smoke.max_particles} particles each at most{flipbook}, {shader.name}.");
         }
 
         // Plan 2026-11-17, increment E: small flames and rising embers at the foot of each smoke column, two ParticleSystems
@@ -3238,6 +3267,31 @@ namespace OnwardGenerator
             material.SetColor("_BaseColor", Color.white);
             material.SetFloat("_Cutoff", SmokeCutoff);
             AssetDatabase.CreateAsset(material, $"{root}/M_fire.mat");
+            Material flameMaterial = material;
+            if (fire.sheet.Present)
+            {
+                CheckSheet("fire", fire.sheet);
+                string sheetPath = $"{root}/Textures/T_fire_flame_sheet.png";
+                File.WriteAllBytes(sheetPath, File.ReadAllBytes(pkg.Path(FireSheetRole)));
+                AssetDatabase.ImportAsset(sheetPath, ImportAssetOptions.ForceSynchronousImport);
+                var sheetImporter = AssetImporter.GetAtPath(sheetPath) as TextureImporter
+                    ?? throw new InvalidOperationException($"{sheetPath}: no TextureImporter after the import");
+                sheetImporter.textureType = TextureImporterType.Default;
+                sheetImporter.sRGBTexture = true;
+                sheetImporter.alphaSource = TextureImporterAlphaSource.FromInput;
+                sheetImporter.alphaIsTransparency = true;
+                sheetImporter.wrapMode = TextureWrapMode.Clamp;
+                sheetImporter.mipmapEnabled = true;
+                sheetImporter.maxTextureSize = 2048;
+                sheetImporter.SaveAndReimport();
+                var sheetTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(sheetPath)
+                    ?? throw new InvalidOperationException($"{sheetPath}: imported, but no Texture2D to load");
+                flameMaterial = new Material(shader) { name = "M_fire_flames" };
+                flameMaterial.SetTexture("_MainTex", sheetTexture);
+                flameMaterial.SetColor("_BaseColor", Color.white);
+                flameMaterial.SetFloat("_Cutoff", SmokeCutoff);
+                AssetDatabase.CreateAsset(flameMaterial, $"{root}/M_fire_flames.mat");
+            }
 
             var parent = new GameObject("Fire");
             foreach (FireSite site in fire.sites)
@@ -3246,13 +3300,36 @@ namespace OnwardGenerator
                 go.transform.SetParent(parent.transform, false);
                 go.transform.position = Local(site.x, site.y, site.z);
                 go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);  // the cones' axis points up
-                FireEmitterSystem(go, "Flames", fire.flames, material, site.seed);
-                FireEmitterSystem(go, "Embers", fire.embers, material, site.seed + 1000);
+                FireEmitterSystem(go, "Flames", fire.flames, flameMaterial, site.seed, fire.sheet);
+                FireEmitterSystem(go, "Embers", fire.embers, material, site.seed + 1000, null);
             }
-            Debug.Log($"{LogPrefix} Fire: {fire.sites.Length} sites, {fire.flames.max_particles} flames and {fire.embers.max_particles} embers each at most, {shader.name}.");
+            string flipbook = fire.sheet.Present ? $", flames on a {fire.sheet.tiles[0]}x{fire.sheet.tiles[1]} flipbook" : "";
+            Debug.Log($"{LogPrefix} Fire: {fire.sites.Length} sites, {fire.flames.max_particles} flames and {fire.embers.max_particles} embers each at most{flipbook}, {shader.name}.");
         }
 
-        private static void FireEmitterSystem(GameObject site, string name, FireEmitter e, Material material, int seed)
+        private static void CheckSheet(string effect, ParticleSheet sheet)
+        {
+            if (sheet.tiles.Length != 2 || sheet.tiles.Any(n => n < 1 || n > SheetTilesMax) || sheet.pivot_y < 0f || sheet.pivot_y > 1f)
+                throw new InvalidDataException($"{effect} sheet: tiles must be two counts from 1 to {SheetTilesMax}, pivot_y from 0 to 1");
+        }
+
+        // ADR-035 amendment of 18 November 2026: each particle plays the whole flipbook once over its life; the frames carry
+        // the shape (and for flames the colour). A pivot lifts a billboard whose shape stands on the foot of its frame.
+        private static void ApplySheet(ParticleSystem ps, ParticleSystemRenderer renderer, ParticleSheet sheet)
+        {
+            if (sheet == null || !sheet.Present) return;
+            var frames = ps.textureSheetAnimation;
+            frames.enabled = true;
+            frames.mode = ParticleSystemAnimationMode.Grid;
+            frames.numTilesX = sheet.tiles[0];
+            frames.numTilesY = sheet.tiles[1];
+            frames.animation = ParticleSystemAnimationType.WholeSheet;
+            frames.frameOverTime = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
+            frames.cycleCount = 1;
+            renderer.pivot = new Vector3(0f, sheet.pivot_y, 0f);
+        }
+
+        private static void FireEmitterSystem(GameObject site, string name, FireEmitter e, Material material, int seed, ParticleSheet sheet)
         {
             if (!(e.rate_per_s > 0f && e.lifetime_s > 0f && e.max_particles > 0 && e.min_size_m > 0f && e.max_size_m >= e.min_size_m && e.end_scale > 0f))
                 throw new InvalidDataException($"fire {name}: rate_per_s, lifetime_s, max_particles, min_size_m and end_scale must be positive, max_size_m at least min_size_m");
@@ -3298,6 +3375,7 @@ namespace OnwardGenerator
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
             renderer.lightProbeUsage = LightProbeUsage.Off;
+            ApplySheet(ps, renderer, sheet);
             ps.Play();
         }
 

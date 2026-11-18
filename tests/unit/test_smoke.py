@@ -123,6 +123,12 @@ def test_the_options_block_carries_the_numbers_and_the_columns() -> None:
     assert block == {"texture": "smoke_puff.png", **COLUMN, "columns": [{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}]}
 
 
+def test_a_pack_s_smoke_flipbook_rides_in_the_block() -> None:
+    block = smoke_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}], (5, 4))
+    assert block == {"texture": "smoke_puff.png", **COLUMN, "columns": [{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}],
+                     "sheet": {"tiles": [5, 4]}}
+
+
 def test_the_map_key_reaches_the_export_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "map.json").write_text("{}", encoding="utf-8")
     document: dict = {}

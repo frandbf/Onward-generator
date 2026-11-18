@@ -392,6 +392,16 @@ def fire_enabled(directory: str | Path) -> bool:
         raise MapError(str(exc)) from exc
 
 
+def pack_particles(directory: str | Path) -> bool:
+    """``map.json`` ``pack_particles`` (ADR-035 amendment of 18 November 2026): True without the key, so the smoke and the
+    flames play a local particle pack's flipbooks when one is imported. True or false; anything else is refused with
+    ``MapError``."""
+    value = load_map(directory).get("pack_particles", True)
+    if not isinstance(value, bool):
+        raise MapError(f'map.json "pack_particles" must be true or false, got {value!r}')
+    return value
+
+
 def soundscape(directory: str | Path) -> str:
     """``map.json`` ``soundscape`` (plan 2026-11-17, increment D; ADR-046): ``auto`` without the key, else ``default``,
     ``regional``, ``war`` or ``battle``. Anything else is refused with ``MapError``."""

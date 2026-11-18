@@ -22,6 +22,7 @@ from jsonschema import Draft202012Validator
 from shapely import box
 
 from onward_generator import __version__
+from onward_generator.assetstore.particles import local_particles
 from onward_generator.config.loader import MAX_SCENE_BYTES, ConfigLoadError, read_json_document
 from onward_generator.config.validation import validate_config_file
 from onward_generator.contracts import is_schema
@@ -39,6 +40,8 @@ from onward_generator.export.atmosphere import (
     load_presets,
 )
 from onward_generator.export.cutouts import CutoutError, cutout_options, scene_cutouts
+from onward_generator.export.fire import SHEET_FILE as FIRE_SHEET
+from onward_generator.export.fire import SHEET_ROLE as FIRE_SHEET_ROLE
 from onward_generator.export.fire import TEXTURE_FILE as FIRE_TEXTURE
 from onward_generator.export.fire import TEXTURE_ROLE as FIRE_ROLE
 from onward_generator.export.fire import fire_options, flame_png
@@ -469,14 +472,18 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
                   atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0,
-                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto", fire: bool = False) -> PackageResult:
+                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto", fire: bool = False,
+                  pack_particles: bool = True) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
     changes nothing, the package id included. ``smoke`` asks for that many smoke columns (plan 2026-11-15,
     increment C); 0 changes nothing. ``soundscape`` is a mode of ``export.soundscape`` (plan 2026-11-17, increment D)
     and ``facade_style`` the map's style as materials resolves it; ``default`` changes nothing. ``fire`` lights flames
-    and embers under every smoke column (plan 2026-11-17, increment E); without a column it writes nothing."""
+    and embers under every smoke column (plan 2026-11-17, increment E); without a column it writes nothing.
+    ``pack_particles`` lets the smoke and the flames play the flipbooks of a local particle pack when
+    ``asset-store particles`` imported one (ADR-035 amendment of 18 November 2026); without one, or False, they keep the
+    textures drawn here."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -581,13 +588,18 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             applied.append(LIGHTMAP_CORE)
     smoke_record: dict[str, Any] | None = None
     columns: list[dict[str, float]] = []
+    pack: dict[str, dict[str, Any]] = {}
     if smoke:
         # Plan 2026-11-15, increment C: only a map that asks for smoke writes it, so others keep their package_id.
         columns, refused = choose_smoke(wreck_sites(detail_manifest.get("objects") or []), smoke,
                                         (detail_manifest.get("core") or {}).get("half_side_m"), layout_doc)
+        # ADR-035 amendment of 18 November 2026: a local particle pack's flipbooks, only where something burns.
+        pack = local_particles(REPO_ROOT / "assets") if pack_particles and columns else {}
         smoke_record = {"wanted": smoke, "columns": len(columns), "origin": "generated", "refused": refused}
+        if "smoke" in pack:
+            smoke_record["texture"] = _pack_record(pack["smoke"])
         if columns:
-            options["smoke"] = smoke_options(columns)
+            options["smoke"] = smoke_options(columns, pack["smoke"]["tiles"] if "smoke" in pack else None)
         if len(columns) < smoke:
             warnings.append(f"smoke: {len(columns)} of {smoke} columns found a wreck of the core clear of the spawns, "
                             f"the climbs and each other ({', '.join(f'{k} {v}' for k, v in refused.items() if v) or 'no wreck'})")
@@ -596,7 +608,9 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         # Plan 2026-11-17, increment E: only a map that asks for fire, and has smoke to burn under, writes it.
         fire_record = {"sites": len(columns), "origin": "generated"}
         if columns:
-            options["fire"] = fire_options(columns)
+            options["fire"] = fire_options(columns, pack["flame"]["tiles"] if "flame" in pack else None)
+            if "flame" in pack:
+                fire_record["texture"] = _pack_record(pack["flame"])
         else:
             warnings.append("fire: no smoke column to burn under; set map.json \"smoke\" to light the fire")
     sound_record: dict[str, Any] | None = None
@@ -645,13 +659,18 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 files.append({"role": NORMAL_MAP_ROLE, "path": path, "sha256": sha256_file(out / path),
                               "bytes": (out / path).stat().st_size, "source": "library"})
         if "smoke" in options:
-            atomic_write_bytes(out / SMOKE_TEXTURE, puff_png())
+            sheet = pack.get("smoke") if "sheet" in options["smoke"] else None
+            atomic_write_bytes(out / SMOKE_TEXTURE, sheet["file"].read_bytes() if sheet else puff_png())
             files.append({"role": SMOKE_ROLE, "path": SMOKE_TEXTURE, "sha256": sha256_file(out / SMOKE_TEXTURE),
-                          "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": "generated"})
+                          "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": sheet["path"] if sheet else "generated"})
         if "fire" in options:
             atomic_write_bytes(out / FIRE_TEXTURE, flame_png())
             files.append({"role": FIRE_ROLE, "path": FIRE_TEXTURE, "sha256": sha256_file(out / FIRE_TEXTURE),
                           "bytes": (out / FIRE_TEXTURE).stat().st_size, "source": "generated"})
+            if "sheet" in options["fire"]:
+                atomic_write_bytes(out / FIRE_SHEET, pack["flame"]["file"].read_bytes())
+                files.append({"role": FIRE_SHEET_ROLE, "path": FIRE_SHEET, "sha256": sha256_file(out / FIRE_SHEET),
+                              "bytes": (out / FIRE_SHEET).stat().st_size, "source": pack["flame"]["path"]})
         if lit_normal is not None:
             png, _block = lit_normal
             atomic_write_bytes(out / LIT_NORMAL_FILE, png)
@@ -716,6 +735,12 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
         shutil.rmtree(out, ignore_errors=True)
         raise
     return PackageResult(out, manifest, tuple(warnings))
+
+
+def _pack_record(row: Mapping[str, Any]) -> dict[str, Any]:
+    """What ``onward_export.json`` records of a pack's particle texture: where it came from and under what licence."""
+    return {"origin": "asset_store", "role": row["role"], "path": row["path"], "sha256": row["sha256"],
+            "tiles": list(row["tiles"]), "license": row["license"], "credit": row["credit"]}
 
 
 def _style(detail_manifest: Mapping[str, Any], request: str) -> str:

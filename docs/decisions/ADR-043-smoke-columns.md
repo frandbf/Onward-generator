@@ -35,3 +35,20 @@ Plan [2026-11-17-efectos-sdk](../plans/2026-11-17-efectos-sdk.md), increment E. 
 - **Adapter.** `AddFire` draws two `ParticleSystem` per site on the SDK's `PP_Particle_Unlit`: flames (20 a second living 0.6 s, 0.4 to 1 m, rising at 1.5 m/s in a 12° cone, at most 16) and embers (3 a second living 2.5 s, 4 to 7 cm, in a 25° cone, at most 8), coloured from yellow-orange to red and fading in and out. Unlit and without light probes, shadows or a real-time light: the fire is its own light, and a light that flickers cannot be baked. A package with fire sites and no flame texture, or the other way round, is refused. The first headset-free render tried `PP_Particle_Unlit_Additive`: over a daylight sky the additive flames washed out to white, so the fire uses the alpha-blended `PP_Particle_Unlit`, and its sprite carries the yellow-to-red colour.
 - **Cost.** At most 24 more billboards a column, 120 with five columns, alpha-blended like the smoke and small on screen. No triangle enters the scene budget. Like the smoke, the frame rate with a fire in view is still to be measured on the headset.
 
+
+## Amendment of 18 November 2026: a particle pack's flipbooks
+
+The smoke puff and the flame are drawn by code. After the dust motes drawn the same way were withdrawn (ADR-047), the maintainer brought Unity's *Particle Pack Starter Assets*. `asset-store particles` copies its textures to a local catalogue (ADR-035 amendment of the same day).
+
+- **When.** On by default whenever the local catalogue has the role and the map has a smoke column. `map.json` `"pack_particles": false` (`export package --no-pack-particles`) keeps the drawn textures. Without a catalogue, with `ONWARD_LOCAL_CATALOGUES=0`, or without a column, nothing changes and the pack is not even looked for.
+- **Smoke.** With the `smoke` role, `smoke_puff.png` is the pack's `SmokePuff04`, 25 white puffs on a 5 × 5 grid. The `smoke` block of `adapter_options.json` gains `sheet` (`tiles`), and each puff plays the grid once over its life. The colour, sizes and timings stay the column's own.
+- **Flames.** With the `flame` role, the package adds `fire_flame_sheet.png` (role `fire_sheet_texture`): the pack's `MediumFlame01`, 100 frames on a 10 × 10 grid. The `fire` block gains `sheet` (`texture`, `tiles`, `pivot_y` 0.5), and the flames take `SHEET_FLAMES`, after the pack's own `MediumFlames`:
+  - 3 a second living 3 s, 0.9 to 1.25 m, still (speed 0) in a 25° cone, at most 12;
+  - white, because the frames carry the colour;
+  - the billboard is lifted by half its size, because each frame's flame stands on its foot.
+
+  The embers keep the drawn sprite and their own material.
+- **Record.** `onward_export.json` `smoke.texture` and `fire.texture` record the origin (`asset_store`), the role, the catalogue path, the SHA-256, the grid, the licence and the credit. Each file's `source` is that catalogue path.
+- **Adapter.** `ApplySheet` turns on the particle system's texture sheet animation: a grid, the whole sheet, frame over time from 0 to 1, one cycle. It also sets the renderer's pivot. The shaders stay `PP_Particle_Simple_Lit` and `PP_Particle_Unlit`. A package with a flame flipbook and no `fire_sheet_texture`, or the other way round, is refused. A grid outside 1 to 16 tiles, or a pivot outside 0 to 1, is refused too.
+- **Cost.** Fewer flames than before (about 9 alive, 12 at most, against 16), each larger. The 2048 px flipbook adds one texture of about 2.7 MB in ASTC 6×6 with mips. The look and the frame rate are still to be checked on the headset.
+- **Licence.** Unity Asset Store EULA: the textures go into a built map, never into the repository.

@@ -483,6 +483,7 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     parts.extend(_triangle_limit(root))
     parts.extend(_smoke(root))
     parts.extend(_fire(root))
+    parts.extend(_pack_particles(root))
     return invoke(*parts)
 
 
@@ -499,6 +500,14 @@ def _fire(root: Path) -> list[str]:
     from onward_generator.maps.workspace import fire_enabled
 
     return ["--fire"] if (root / "map.json").is_file() and fire_enabled(root) else []
+
+
+def _pack_particles(root: Path) -> list[str]:
+    """``--no-pack-particles`` when ``map.json`` keeps the drawn smoke and flames (ADR-035 amendment of 18 November 2026),
+    else nothing."""
+    from onward_generator.maps.workspace import pack_particles
+
+    return ["--no-pack-particles"] if (root / "map.json").is_file() and not pack_particles(root) else []
 
 
 def _soundscape(root: Path, detail: Path) -> list[str]:
