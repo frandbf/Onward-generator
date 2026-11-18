@@ -119,13 +119,14 @@ Nine CC0 Poly Haven sets join the wide library of every map (`config/dress/wide_
 The maintainer downloaded Unity's *Particle Pack Starter Assets* to replace the effects this project draws in code: dust (ADR-047, withdrawn), and later the flames and smoke of ADR-043. Its prefabs and materials use Unity's built-in particle shaders (`Particles/Standard Unlit`, `Particles/Standard Surface`, `Legacy Shaders/Particles/*`). A custom Onward map cannot ship them, because only the SDK's `PP_*` shaders are allowed. So the prefabs are not used.
 
 - **What is read.** `asset-store particles [--only ID…] [--cache PATH]` reads, without the editor, the image of each role that `config/dress/asset_store_particles.json` names.
-  - The roles are `flame`, `large_flame`, `smoke`, `dust_mote`, `sand_puff`, `ground_fog` and `spark`.
+  - The roles are `flame`, `large_flame`, `smoke`, `dust_mote`, `sand_puff` and `spark`. The pack's ground fog (`SmokeLoop02.tif`) is left out: Pillow does not read its TIFF alpha, so the copy would be an opaque grey square.
   - Each image is named by its exact path in the package and checked against `config/dress/asset_store_particles.schema.json`.
   - The table also records the flipbook grid that the pack's own prefab plays (10 × 10 for `MediumFlames`, 5 × 5 for `SmokeEffect`), the source prefab, and a size cap of 256 to 2048 px.
-- **What is written.** Each image keeps its alpha and is written as a PNG to the gitignored `assets/asset_store_<package>/`. The manifest is `onward_generator.particle_textures`, with one row per role: file, SHA-256, size, grid, frames, licence and credit.
+- **Alpha.** The flames and the spark are drawn on opaque black, for the additive blending of the pack's materials. With the SDK's alpha-blended `PP_Particle_Unlit` the black showed as a square around each flame (a render of Mogadishu, 18 November 2026). Their rows say `"alpha": "luminance"`: the alpha is the brightest channel and the colour is divided by it, so the flame drawn over the scene looks as it did added to black. The smoke, the mote and the sand keep their own alpha (`keep`).
+- **What is written.** Each image is written as a PNG to the gitignored `assets/asset_store_<package>/`. The manifest is `onward_generator.particle_textures`, with one row per role: file, SHA-256, size, grid, frames, licence and credit.
   - No code, scene or material from the package is unpacked.
   - Models, textures and decals ignore this manifest, because it has no `assets`, `textures` or `decals` rows.
 - **How it is read.** `assetstore.particles.local_particles` returns `{role: row}`. The first catalogue in name order wins a role. A row whose file is missing, outside `assets/`, or no longer matches its SHA-256 is left out. With `ONWARD_LOCAL_CATALOGUES=0` the result is empty, so the test suite and other machines get the same package.
 - **Not yet used.** No stage reads these rows yet. Fire, smoke and dust take them in their own increments, with the adapter drawing each effect on `PP_Particle_*` and playing the flipbook through the particle system's texture sheet animation. When the textures are absent, the code-drawn sprites remain.
-- **Result.** All 7 roles were imported from the maintainer's copy: 3.7 MB on disk, the two flame flipbooks at 2048 px.
+- **Result.** All 6 roles were imported from the maintainer's copy, with the two flame flipbooks at 2048 px.
 - **Licence.** The textures are under the Unity Asset Store EULA: local copies for this user's maps, never committed, used inside built maps only.

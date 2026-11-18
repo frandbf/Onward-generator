@@ -14,6 +14,7 @@ from PIL import Image
 
 from onward_generator.assetstore.packages import MAX_MEMBER_BYTES, find_packages
 from onward_generator.assetstore.particles import (
+    ALPHA_MODES,
     PARTICLES_SCHEMA,
     ROLES,
     SCHEMA_PATH,
@@ -21,6 +22,7 @@ from onward_generator.assetstore.particles import (
     ParticleSpec,
     ParticleTableError,
     local_particles,
+    luminance_alpha,
     parse_table,
     particle_rows,
     read_table,
@@ -49,9 +51,9 @@ def _package(tmp_path: Path, members: dict[str, bytes], prefix: str = "") -> Pat
 
 
 SPECS = {
-    "dust_mote": ParticleSpec("Assets/Pack/Missing.png", (5, 5), 1024, "DustMotesEffect", "Not in the package."),
-    "flame": ParticleSpec(FLAME, (8, 4), 64, "MediumFlames", "Flames."),
-    "spark": ParticleSpec(MOTE, (1, 1), 256, "ElectricalSparks", "A spark."),
+    "dust_mote": ParticleSpec("Assets/Pack/Missing.png", (5, 5), 1024, "keep", "DustMotesEffect", "Not in the package."),
+    "flame": ParticleSpec(FLAME, (8, 4), 64, "keep", "MediumFlames", "Flames."),
+    "spark": ParticleSpec(MOTE, (1, 1), 256, "keep", "ElectricalSparks", "A spark."),
 }
 """In role order the missing image comes first, so a role left out does not end the loop."""
 
@@ -63,7 +65,9 @@ def test_the_table_names_the_starter_pack_s_textures() -> None:
     assert sorted(pack) == sorted(ROLES)
     assert pack["flame"].tiles == (10, 10) and pack["flame"].max_px == 2048 and pack["flame"].prefab == "MediumFlames"
     assert pack["flame"].path.endswith("/Fire & Explosion Effects/Textures/MediumFlame01.tif")
-    assert pack["smoke"].tiles == (5, 5) and pack["dust_mote"].tiles == (1, 1) and pack["ground_fog"].tiles == (6, 6)
+    assert pack["smoke"].tiles == (5, 5) and pack["dust_mote"].tiles == (1, 1)
+    assert {role for role, spec in pack.items() if spec.alpha == "luminance"} == {"flame", "large_flame", "spark"}  # drawn on black
+    assert "ground_fog" not in ROLES  # its TIFF alpha does not survive the copy
 
 
 def test_a_broken_table_names_the_first_problem() -> None:
@@ -83,7 +87,11 @@ def test_a_broken_table_names_the_first_problem() -> None:
     assert parse_table(wide, schema, "here")["particle_pack_starter_assets"]["flame"].tiles == (8, 4)
     assert parsed["particle_pack_starter_assets"]["spark"] == ParticleSpec(
         "Assets/UnityTechnologies/ParticlePack/EffectExamples/Misc Effects/Textures/SparkParticle.tif", (1, 1), 256,
-        "ElectricalSparks", "One bright spark.")
+        "luminance", "ElectricalSparks", "One bright spark.")
+    bad = copy.deepcopy(doc)
+    bad["packages"]["particle_pack_starter_assets"]["flame"]["alpha"] = "premultiplied"
+    with pytest.raises(ParticleTableError, match="/packages/particle_pack_starter_assets/flame/alpha"):
+        parse_table(bad, schema, "here")
 
 
 def test_the_rows_keep_alpha_cap_the_size_and_record_the_flipbook(tmp_path: Path) -> None:
@@ -96,6 +104,7 @@ def test_the_rows_keep_alpha_cap_the_size_and_record_the_flipbook(tmp_path: Path
     flame = rows[0]
     assert flame["path"] == "assets/asset_store_particle_pack/particle_flame.png"
     assert flame["px"] == 64 and flame["tiles"] == [8, 4] and flame["frames"] == 32 and flame["prefab"] == "MediumFlames"
+    assert flame["alpha"] == "keep"
     assert flame["license"] == "LicenseRef-Unity-Asset-Store-EULA" and flame["license_url"] == "https://unity.com/legal/as-terms"
     assert flame["credit"] == ("Flame.tif from Particle Pack by Unity Technologies, Unity Asset Store EULA; local copy, never "
                                "committed.") and flame["note"] == "Flames."
@@ -225,3 +234,27 @@ def test_the_particles_help_documents_its_options(monkeypatch: pytest.MonkeyPatc
     text = capsys.readouterr().out
     assert text.startswith("usage: onward-generator asset-store particles ")
     assert "the Unity Asset Store cache (default: the host profile's asset_store_cache)" in text and "package ids of the table" in text
+
+
+def test_an_image_drawn_on_black_takes_its_alpha_from_its_brightness() -> None:
+    assert ALPHA_MODES == ("keep", "luminance")
+    source = Image.new("RGB", (3, 1))
+    source.putpixel((0, 0), (0, 0, 0))
+    source.putpixel((1, 0), (200, 100, 50))
+    source.putpixel((2, 0), (255, 255, 255))
+    image = luminance_alpha(source)
+    assert image.mode == "RGBA"
+    assert [image.getpixel((x, 0)) for x in range(3)] == [(0, 0, 0, 0), (255, 128, 64, 200), (255, 255, 255, 255)]
+
+
+def test_a_luminance_role_is_written_without_its_black(tmp_path: Path) -> None:
+    out = io.BytesIO()
+    picture = Image.new("RGB", (4, 4))
+    picture.putpixel((1, 1), (255, 128, 0))
+    picture.save(out, format="TIFF")
+    _package(tmp_path, {FLAME: out.getvalue()})
+    specs = {"flame": ParticleSpec(FLAME, (2, 2), 64, "luminance", "MediumFlames", "Flames.")}
+    rows = particle_rows(find_packages(tmp_path / "cache")[0], tmp_path / "assets", specs)
+    assert rows[0]["alpha"] == "luminance"
+    with Image.open(tmp_path / rows[0]["path"]) as image:
+        assert image.getpixel((0, 0)) == (0, 0, 0, 0) and image.getpixel((1, 1)) == (255, 128, 0, 255)

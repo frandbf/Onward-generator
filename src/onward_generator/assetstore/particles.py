@@ -4,7 +4,8 @@ A particle package (Unity's *Particle Pack Starter Assets*) ships prefabs whose 
 shaders, which a custom Onward map cannot carry: the adapter draws its effects with the SDK's ``PP_Particle_*``
 shaders. So only the textures are taken. ``config/dress/asset_store_particles.json`` names, per package, the image of
 each role (``flame``, ``smoke``, ``dust_mote``...) by its exact path in the package, the flipbook grid the pack's own
-prefab plays and the largest side of the copy. Each image is read straight from the ``.unitypackage`` (no editor, no
+prefab plays, the largest side of the copy and whether its alpha is kept or made from its brightness (an image drawn on
+black for additive blending). Each image is read straight from the ``.unitypackage`` (no editor, no
 code from the package), kept with its alpha, and written as a PNG with a manifest to the gitignored
 ``assets/asset_store_<package>/``. The images stay on this machine (Unity Asset Store EULA).
 """
@@ -21,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 from PIL import Image
@@ -33,7 +35,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TABLE_PATH = REPO_ROOT / "config" / "dress" / "asset_store_particles.json"
 SCHEMA_PATH = REPO_ROOT / "config" / "dress" / "asset_store_particles.schema.json"
 PARTICLES_SCHEMA = "onward_generator.particle_textures"
-ROLES = ("flame", "large_flame", "smoke", "dust_mote", "sand_puff", "ground_fog", "spark")
+ROLES = ("flame", "large_flame", "smoke", "dust_mote", "sand_puff", "spark")
+ALPHA_MODES = ("keep", "luminance")
 
 
 class ParticleTableError(ValueError):
@@ -45,6 +48,7 @@ class ParticleSpec:
     path: str
     tiles: tuple[int, int]
     max_px: int
+    alpha: str
     prefab: str
     note: str
 
@@ -56,7 +60,7 @@ def parse_table(doc: Any, schema: Mapping[str, Any], where: str) -> dict[str, di
         path = "/".join(str(part) for part in first.absolute_path)
         raise ParticleTableError(f"{where}: /{path}: {first.message}")
     return {package: {role: ParticleSpec(spec["path"], (spec["tiles"][0], spec["tiles"][1]), spec["max_px"],
-                                         spec["prefab"], spec["note"])
+                                         spec["alpha"], spec["prefab"], spec["note"])
                       for role, spec in roles.items()}
             for package, roles in doc["packages"].items()}
 
@@ -81,12 +85,22 @@ def _members_by_path(archive: tarfile.TarFile) -> dict[str, tarfile.TarInfo]:
     return found
 
 
-def _png(archive: tarfile.TarFile, member: tarfile.TarInfo, max_px: int) -> tuple[bytes, int]:
+def luminance_alpha(image: Image.Image) -> Image.Image:
+    """An image drawn on black for additive blending, made fit for alpha blending: its alpha is its brightest channel
+    and its colour is divided by that alpha, so a pixel drawn over a background looks as it did added to black."""
+    rgb = np.asarray(image.convert("RGB")).astype(np.float64)
+    alpha = rgb.max(axis=2)
+    colour = np.where(alpha[..., None] > 0, rgb * 255.0 / np.maximum(alpha, 1.0)[..., None], 0.0)
+    pixels = np.dstack([np.round(colour), alpha]).astype(np.uint8)  # colour <= 255: no channel exceeds the maximum
+    return Image.fromarray(pixels)
+
+
+def _png(archive: tarfile.TarFile, member: tarfile.TarInfo, max_px: int, alpha: str) -> tuple[bytes, int]:
     handle = archive.extractfile(member)
     if handle is None:  # pragma: no mutate: a regular member always has a handle
         raise ValueError(f"{member.name}: no data")  # pragma: no mutate: a regular member always has a handle
     with Image.open(io.BytesIO(handle.read())) as picture:
-        image = picture.convert("RGBA")
+        image = luminance_alpha(picture) if alpha == "luminance" else picture.convert("RGBA")
     image.thumbnail((max_px, max_px))
     out = io.BytesIO()
     image.save(out, format="PNG")
@@ -105,7 +119,7 @@ def particle_rows(package: Package, assets: Path, chosen: Mapping[str, ParticleS
             if member is None:
                 continue
             try:
-                data, px = _png(archive, member, spec.max_px)
+                data, px = _png(archive, member, spec.max_px, spec.alpha)
             except (OSError, ValueError):
                 continue
             target.mkdir(parents=True, exist_ok=True)
@@ -114,7 +128,7 @@ def particle_rows(package: Package, assets: Path, chosen: Mapping[str, ParticleS
             rows.append({
                 "role": role, "path": (target / file).relative_to(assets.parent).as_posix(),
                 "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "px": px,
-                "tiles": list(spec.tiles), "frames": spec.tiles[0] * spec.tiles[1], "prefab": spec.prefab,
+                "tiles": list(spec.tiles), "frames": spec.tiles[0] * spec.tiles[1], "alpha": spec.alpha, "prefab": spec.prefab,
                 "license": LICENCE_SPDX, "license_url": "https://unity.com/legal/as-terms",
                 "credit": f"{posixpath.basename(spec.path)} from {package.name} by {package.publisher}, Unity Asset Store EULA; "
                           "local copy, never committed.",
@@ -152,5 +166,5 @@ def local_particles(assets: Path, env: Mapping[str, str] | None = None) -> dict[
     return found
 
 
-__all__ = ["PARTICLES_SCHEMA", "ROLES", "TABLE_PATH", "ParticleSpec", "ParticleTableError", "local_particles",
+__all__ = ["ALPHA_MODES", "PARTICLES_SCHEMA", "ROLES", "luminance_alpha", "TABLE_PATH", "ParticleSpec", "ParticleTableError", "local_particles",
            "parse_table", "particle_rows", "read_table"]

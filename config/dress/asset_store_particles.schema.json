@@ -15,15 +15,16 @@
       "additionalProperties": {
         "type": "object",
         "minProperties": 1,
-        "propertyNames": {"enum": ["flame", "large_flame", "smoke", "dust_mote", "sand_puff", "ground_fog", "spark"]},
+        "propertyNames": {"enum": ["flame", "large_flame", "smoke", "dust_mote", "sand_puff", "spark"]},
         "additionalProperties": {
           "type": "object",
-          "required": ["path", "tiles", "max_px", "prefab", "note"],
+          "required": ["path", "tiles", "max_px", "alpha", "prefab", "note"],
           "additionalProperties": false,
           "properties": {
             "path": {"type": "string", "pattern": "^Assets/[^\\\\]+\\.(png|tga|tif|tiff|jpg|jpeg)$"},
             "tiles": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 16}, "minItems": 2, "maxItems": 2},
             "max_px": {"type": "integer", "minimum": 64, "maximum": 2048},
+            "alpha": {"enum": ["keep", "luminance"]},
             "prefab": {"type": "string", "minLength": 1},
             "note": {"type": "string", "minLength": 1}
           }
