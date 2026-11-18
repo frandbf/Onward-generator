@@ -588,7 +588,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             applied.append(LIGHTMAP_CORE)
     smoke_record: dict[str, Any] | None = None
     columns: list[dict[str, float]] = []
-    pack: dict[str, dict[str, Any]] = {}
+    pack: dict[str, dict[str, Any]] = {}  # pragma: no mutate: read only under a smoke column, which only the smoke branch below sets, and it sets the pack too
     if smoke:
         # Plan 2026-11-15, increment C: only a map that asks for smoke writes it, so others keep their package_id.
         columns, refused = choose_smoke(wreck_sites(detail_manifest.get("objects") or []), smoke,
@@ -659,7 +659,7 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
                 files.append({"role": NORMAL_MAP_ROLE, "path": path, "sha256": sha256_file(out / path),
                               "bytes": (out / path).stat().st_size, "source": "library"})
         if "smoke" in options:
-            sheet = pack.get("smoke") if "sheet" in options["smoke"] else None
+            sheet = pack.get("smoke")  # the block has a sheet exactly when the pack has a smoke role
             atomic_write_bytes(out / SMOKE_TEXTURE, sheet["file"].read_bytes() if sheet else puff_png())
             files.append({"role": SMOKE_ROLE, "path": SMOKE_TEXTURE, "sha256": sha256_file(out / SMOKE_TEXTURE),
                           "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": sheet["path"] if sheet else "generated"})
