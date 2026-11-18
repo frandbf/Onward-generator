@@ -46,6 +46,7 @@ def test_no_smoke_keeps_the_package_byte_for_byte(inputs: tuple[Path, Path], tmp
     assert result.manifest["package_id"] == GOLDEN_PACKAGE_ID
     assert hashlib.sha256((result.directory / "adapter_options.json").read_bytes()).hexdigest() == GOLDEN_OPTIONS_SHA256
     assert "smoke" not in result.manifest and not (result.directory / "smoke_puff.png").exists()
+    assert "fire" not in result.manifest and not (result.directory / "fire_flame.png").exists()  # no fire unless asked
 
 
 def test_smoke_columns_stand_on_the_wrecks_with_their_texture(inputs: tuple[Path, Path], tmp_path: Path) -> None:

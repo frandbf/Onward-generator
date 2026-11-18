@@ -79,14 +79,14 @@ def flame_png() -> bytes:
     yy, xx = np.mgrid[0:n, 0:n] / (n - 1) * 2.0 - 1.0  # y grows downwards: the tip is at the top
     rise = (1.0 - yy) / 2.0  # 0 at the foot, 1 at the tip
     width = 0.75 * (1.0 - rise) ** 0.8 + 0.05
-    across = np.clip(1.0 - (xx / width) ** 2, 0.0, 1.0)
-    along = np.clip(1.0 - rise, 0.0, 1.0) ** 0.6 * np.clip(rise * 6.0, 0.0, 1.0)
+    across = np.maximum(1.0 - (xx / width) ** 2, 0.0)  # at most 1: (xx / width) ** 2 is not negative
+    along = (1.0 - rise) ** 0.6 * np.minimum(rise * 6.0, 1.0)  # rise lies in [0, 1]
     alpha = across * along * ALPHA_PEAK
-    heat = np.clip(across * (1.0 - rise), 0.0, 1.0)[..., None]  # 1 in the low core, 0 at the edges and the tip
+    heat = (across * (1.0 - rise))[..., None]  # in [0, 1]: 1 in the low core, 0 at the edges and the tip
     colour = EDGE_RGB + (CORE_RGB - EDGE_RGB) * heat
     pixels = np.empty((n, n, 4), dtype=np.uint8)
-    pixels[..., :3] = np.round(colour).astype(np.uint8)
-    pixels[..., 3] = np.round(alpha * 255).astype(np.uint8)
+    pixels[..., :3] = np.round(colour)  # the uint8 page casts it
+    pixels[..., 3] = np.round(alpha * 255)
     out = io.BytesIO()
     Image.fromarray(pixels).save(out, format="PNG")
     return out.getvalue()
