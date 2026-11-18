@@ -74,10 +74,11 @@ namespace OnwardGenerator
         // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit particle shader.
         private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit.shadergraph";
         private const string FireRole = "fire_texture";
-        // Plan 2026-11-17, increment F: dust motes on the SDK's dithered unlit particle shader (opaque, a dithered cut-out).
-        private const string DustShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_UnLit_Dither.shadergraph";
+        // Plan 2026-11-17, increment F: dust motes on the smoke's lit particle shader, soft-edged and lit by the probes. The
+        // dithered unlit shader drew hard white squares on the headset: it ignores the particle colour and its cut-out
+        // turns a few-pixel dot into a square.
+        private const string DustShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Simple_Lit.shadergraph";
         private const string DustRole = "dust_texture";
-        private const float DustAlphaClip = 0.3f;
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
         private const float LitNormalSpecular = 0.04f;
@@ -3332,8 +3333,9 @@ namespace OnwardGenerator
             ps.Play();
         }
 
-        // Plan 2026-11-17, increment F: a box of drifting motes per volume over the AI routes, on the SDK's dithered unlit
-        // shader: opaque with a dithered cut-out, so no transparency is blended. One wind for the whole map. Not static.
+        // Plan 2026-11-17, increment F: a box of drifting motes per volume over the AI routes, on the SDK's lit particle
+        // shader with the dust colour on the material, lit by the probes so a mote in shade is not bright. One wind for the
+        // whole map. Not static.
         private static void AddDust(Package pkg, string root)
         {
             DustOptions dust = pkg.Options.dust;
@@ -3361,9 +3363,10 @@ namespace OnwardGenerator
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
                 ?? throw new InvalidOperationException($"{texturePath}: imported, but no Texture2D to load");
             var material = new Material(shader) { name = "M_dust" };
-            material.SetTexture("_BaseMap", texture);
-            material.SetColor("_BaseColor", Color.white);
-            material.SetFloat("_AlphaClipping", DustAlphaClip);
+            // The colour goes on the material: the headset showed white motes when only the particles carried it.
+            material.SetTexture("_MainTex", texture);
+            material.SetColor("_BaseColor", colour);
+            material.SetFloat("_Cutoff", SmokeCutoff);
             AssetDatabase.CreateAsset(material, $"{root}/M_dust.mat");
 
             // Heading clockwise from north in the map's frame; Unity's x is east and z north.
@@ -3387,7 +3390,7 @@ namespace OnwardGenerator
                 main.startLifetime = dust.lifetime_s;
                 main.startSpeed = 0f;
                 main.startSize = new ParticleSystem.MinMaxCurve(dust.min_size_m, dust.max_size_m);
-                main.startColor = colour;
+                main.startColor = Color.white;
                 main.maxParticles = dust.max_particles;
                 main.simulationSpace = ParticleSystemSimulationSpace.World;
                 var emission = ps.emission;
@@ -3409,11 +3412,11 @@ namespace OnwardGenerator
                 life.color = fade;
                 var renderer = go.GetComponent<ParticleSystemRenderer>();
                 renderer.renderMode = ParticleSystemRenderMode.Billboard;
-                renderer.sortMode = ParticleSystemSortMode.None;
+                renderer.sortMode = ParticleSystemSortMode.Distance;
                 renderer.sharedMaterial = material;
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
-                renderer.lightProbeUsage = LightProbeUsage.Off;
+                renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
                 ps.Play();
             }
             Debug.Log($"{LogPrefix} Dust: {dust.volumes.Length} volumes, {dust.max_particles} motes each at most, wind {dust.heading_deg:0} deg at {dust.drift_m_s} m/s, {shader.name}.");

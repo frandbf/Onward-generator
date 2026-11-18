@@ -4,9 +4,9 @@
 or facade style ``config/dust.json`` lists (``dusty``; ``arid``, ``east_african``), else ``off``; the key always wins.
 With dust, a few emission volumes stand over the map's AI routes inside the playable core, apart from each other, and the
 Unity adapter fills each with fine motes that drift with one wind across the map: ``ParticleSystem`` boxes on the SDK's
-dithered ``PP_Particle_UnLit_Dither``, opaque with a dithered cut-out, so no transparency is blended. Their sprite,
-``dust_mote.png``, is a soft dot drawn here (CC0 by construction). The motes are a few centimetres across and hide no
-one: bots see through particles, and gusts of sand at eye level, which would hide a player from a player only, are left
+``PP_Particle_Simple_Lit``, the smoke's shader, soft-edged, lit by the probes and coloured on the material (the dithered
+``PP_Particle_UnLit_Dither`` drew hard white squares on the headset). Their sprite, ``dust_mote.png``, is a soft dot
+drawn here (CC0 by construction). The motes are three to ten centimetres across and hide no one: bots see through particles, and gusts of sand at eye level, which would hide a player from a player only, are left
 out.
 """
 

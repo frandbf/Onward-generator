@@ -177,14 +177,15 @@ def test_the_map_key_reaches_the_export_command(tmp_path: Path, monkeypatch: pyt
     assert _dust(tmp_path / "elsewhere") == []  # no map.json there
 
 
-def test_the_adapter_fills_a_box_per_volume_on_the_sdk_dithered_shader() -> None:
+def test_the_adapter_fills_a_box_per_volume_on_the_sdk_lit_particle_shader() -> None:
     source = ADAPTER.read_text(encoding="utf-8")
-    assert 'private const string DustShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_UnLit_Dither.shadergraph";' in source
+    assert 'private const string DustShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Simple_Lit.shadergraph";' in source
     assert 'private const string DustRole = "dust_texture";' in source
     assert "public DustOptions dust = new DustOptions();" in source and "AddDust(pkg, root);" in source
     assert "adapter_options.json dust has {dustVolumes} volumes, the package lists {dustFiles} '{DustRole}' files" in source
     body = source[source.index("private static void AddDust"):source.index("// One baked point light per furnished room")]
-    for line in ('material.SetTexture("_BaseMap", texture);', "shape.shapeType = ParticleSystemShapeType.Box;",
+    for line in ('material.SetTexture("_MainTex", texture);', 'material.SetColor("_BaseColor", colour);',
+                 "renderer.lightProbeUsage = LightProbeUsage.BlendProbes;", "shape.shapeType = ParticleSystemShapeType.Box;",
                  "shape.scale = new Vector3(dust.box_m[0], dust.box_m[2], dust.box_m[1]);",
                  "var wind = new Vector3(Mathf.Sin(heading), 0f, Mathf.Cos(heading)) * dust.drift_m_s;",
                  "go.transform.position = Local(volume.x, volume.y, volume.z);", "main.maxParticles = dust.max_particles;",
