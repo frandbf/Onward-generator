@@ -9,7 +9,8 @@
     "modes",
     "regional",
     "local",
-    "flies_kinds"
+    "flies_kinds",
+    "flies_first"
   ],
   "properties": {
     "schema": {
@@ -186,7 +187,8 @@
             "max",
             "apart_m",
             "spawn_clear_m",
-            "height_m"
+            "height_m",
+            "copies"
           ],
           "properties": {
             "clip": {
@@ -215,6 +217,12 @@
               "type": "number",
               "minimum": 0,
               "maximum": 10
+            },
+            "copies": {
+              "description": "Sources stacked on each site: the SDK sets no volume, so two copies of a clip play it louder",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
             }
           }
         },
@@ -226,7 +234,8 @@
             "max",
             "apart_m",
             "spawn_clear_m",
-            "height_m"
+            "height_m",
+            "copies"
           ],
           "properties": {
             "clip": {
@@ -255,6 +264,12 @@
               "type": "number",
               "minimum": 0,
               "maximum": 10
+            },
+            "copies": {
+              "description": "Sources stacked on each site: the SDK sets no volume, so two copies of a clip play it louder",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
             }
           }
         },
@@ -266,7 +281,8 @@
             "max",
             "apart_m",
             "spawn_clear_m",
-            "height_m"
+            "height_m",
+            "copies"
           ],
           "properties": {
             "clip": {
@@ -295,6 +311,12 @@
               "type": "number",
               "minimum": 0,
               "maximum": 10
+            },
+            "copies": {
+              "description": "Sources stacked on each site: the SDK sets no volume, so two copies of a clip play it louder",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
             }
           }
         }
@@ -302,6 +324,15 @@
     },
     "flies_kinds": {
       "description": "scene_detail overgrowth kinds where flies buzz, with the wrecks",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z_]*$"
+      }
+    },
+    "flies_first": {
+      "description": "Roles of the flies kinds placed before the other sites (a bin, a can, a barrel before a wreck)",
       "type": "array",
       "uniqueItems": true,
       "items": {

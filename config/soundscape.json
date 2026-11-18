@@ -1,7 +1,7 @@
 {
   "schema": "onward_generator.soundscape",
   "schema_version": "0.1.0",
-  "description": "Soundscape by mood (plan 2026-11-17-efectos-sdk, increment D; ADR-046): the Onward SDK's own ambience clips, chosen by the map's mode (map.json \"soundscape\", auto by its war damage) and its facade style. Every clip is one the game ships, so nothing is added to the package. Lengths in metres.",
+  "description": "Soundscape by mood (plan 2026-11-17-efectos-sdk, increment D; ADR-046): the Onward SDK's own ambience clips, chosen by the map's mode (map.json \"soundscape\", auto by its war damage) and its facade style. Every clip is one the game ships, so nothing is added to the package. Lengths in metres. The SDK sets no volume on a source (the client plays each clip at its own level and range, 10 m for Flies), so copies stacks a kind's clip on each site to play it louder. flies_first puts the flies on a bin, a can or a barrel before a wreck or other rubbish.",
   "modes": {
     "regional": { "global": null, "local": ["generator"] },
     "war": { "global": "Distant Combat Sparse", "local": ["generator", "fire", "flies"] },
@@ -12,9 +12,10 @@
     "arid": { "birds": null, "wind": "Wind Desert" }
   },
   "local": {
-    "fire": { "clip": "Fire", "max": 5, "apart_m": 0, "spawn_clear_m": 0, "height_m": 0.5 },
-    "flies": { "clip": "Flies", "max": 4, "apart_m": 20, "spawn_clear_m": 10, "height_m": 0.8 },
-    "generator": { "clip": "Engine Generator", "max": 1, "apart_m": 0, "spawn_clear_m": 15, "height_m": 1.0 }
+    "fire": { "clip": "Fire", "max": 5, "apart_m": 0, "spawn_clear_m": 0, "height_m": 0.5, "copies": 1 },
+    "flies": { "clip": "Flies", "max": 8, "apart_m": 12, "spawn_clear_m": 10, "height_m": 0.8, "copies": 2 },
+    "generator": { "clip": "Engine Generator", "max": 1, "apart_m": 0, "spawn_clear_m": 15, "height_m": 1.0, "copies": 1 }
   },
-  "flies_kinds": ["wreck", "waste"]
+  "flies_kinds": ["wreck", "waste"],
+  "flies_first": ["trash", "can", "barrel"]
 }

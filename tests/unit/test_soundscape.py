@@ -16,6 +16,7 @@ from onward_generator.export.soundscape import (
     SoundscapeError,
     Source,
     check_choice,
+    first_ids,
     flies_sites,
     load_soundscape,
     parse_soundscape,
@@ -53,10 +54,11 @@ def test_the_configuration_names_sdk_clips_by_mode_and_style() -> None:
     assert config.globals_ == {"regional": None, "war": "Distant Combat Sparse", "battle": "Distant Combat Dense"}
     assert config.locals_ == {"regional": ("generator",), "war": ("generator", "fire", "flies"), "battle": ("generator", "fire", "flies")}
     assert config.regional == {"east_african": ("Birds African Bush 1", "Wind Desert"), "arid": (None, "Wind Desert")}
-    assert config.sources["fire"] == Source("Fire", 5, 0.0, 0.0, 0.5)
-    assert config.sources["flies"] == Source("Flies", 4, 20.0, 10.0, 0.8)
-    assert config.sources["generator"] == Source("Engine Generator", 1, 0.0, 15.0, 1.0)
+    assert config.sources["fire"] == Source("Fire", 5, 0.0, 0.0, 0.5, 1)
+    assert config.sources["flies"] == Source("Flies", 8, 12.0, 10.0, 0.8, 2)
+    assert config.sources["generator"] == Source("Engine Generator", 1, 0.0, 15.0, 1.0, 1)
     assert config.flies_kinds == frozenset({"wreck", "waste"})
+    assert config.flies_first == frozenset({"trash", "can", "barrel"})
 
 
 def test_every_clip_of_the_schema_is_one_the_sdk_ships() -> None:
@@ -119,7 +121,7 @@ def test_auto_follows_the_war_damage_and_a_named_mode_wins(choice: str, damage: 
 
 
 def test_a_site_stands_inside_the_core_clear_of_spawns_and_apart_each_bound_included() -> None:
-    source = Source("Flies", 8, 20.0, 10.0, 0.8)
+    source = Source("Flies", 8, 20.0, 10.0, 0.8, 1)
     spawns = [(0.0, 0.0)]
     assert pick([("edge", 50.0, 30.0, 0.0), ("out", 50.001, 0.0, 0.0)], source, 50.0, spawns) == [(50.0, 30.0, 0.0)]
     assert pick([("clear", 0.0, 10.0, 0.0), ("near", 0.0, -9.999, 0.0)], source, 50.0, spawns) == [(0.0, 10.0, 0.0)]
@@ -134,8 +136,8 @@ def test_a_site_stands_inside_the_core_clear_of_spawns_and_apart_each_bound_incl
 
 def test_the_order_is_fixed_by_the_ids_and_the_count_caps_it() -> None:
     sites = [(f"s{i}", float(10 * i), 40.0, 0.0) for i in range(6)]
-    one = pick(sites, Source("Fire", 2, 0.0, 0.0, 0.5), None, [])
-    assert one == pick(list(reversed(sites)), Source("Fire", 2, 0.0, 0.0, 0.5), None, [])
+    one = pick(sites, Source("Fire", 2, 0.0, 0.0, 0.5, 1), None, [])
+    assert one == pick(list(reversed(sites)), Source("Fire", 2, 0.0, 0.0, 0.5, 1), None, [])
     by_hash = sorted(sites, key=lambda s: hashlib.sha256(s[0].encode()).hexdigest())
     assert by_hash != sorted(sites)  # these ids hash in another order than they sort
     assert len(one) == 2 and one == [(x, y, z) for _i, x, y, z in by_hash[:2]]
@@ -156,6 +158,39 @@ def test_flies_buzz_over_wrecks_and_the_listed_kinds_only() -> None:
         ("overgrow/waste/1", 5.0, 6.0, 0.25), ("overgrow/waste/2", 7.0, 8.0, 0.0),
     ]
     assert flies_sites(objects, frozenset({"wreck"})) == [("overgrow/wreck/1", 1.0, 2.0, 0.5), ("overgrow/vehicles/3", 3.0, 4.0, 0.0)]
+
+
+def test_the_first_ids_are_the_listed_roles_of_the_listed_kinds() -> None:
+    objects = [
+        {"id": "overgrow/waste/1", "type": "overgrowth", "kind": "waste", "role": "trash"},
+        {"id": "overgrow/waste/2", "type": "overgrowth", "kind": "waste", "role": "crate"},
+        {"id": "overgrow/barriers/1", "type": "overgrowth", "kind": "barriers", "role": "barrel"},
+        {"id": "waste_basket/1", "type": "urban_element", "kind": "waste", "role": "trash"},
+        {"id": "overgrow/waste/3", "type": "overgrowth", "kind": "waste", "role": "barrel"},
+    ]
+    assert first_ids(objects, frozenset({"wreck", "waste"}), frozenset({"trash", "barrel"})) == frozenset(
+        {"overgrow/waste/1", "overgrow/waste/3"})
+
+
+def test_the_first_ids_come_before_the_others_in_their_own_fixed_order() -> None:
+    sites = [(f"s{i}", float(10 * i), 40.0, 0.0) for i in range(6)]
+    by_hash = sorted(sites, key=lambda s: hashlib.sha256(s[0].encode()).hexdigest())
+    last_two = frozenset(s[0] for s in by_hash[-2:])
+    chosen = pick(sites, Source("Flies", 3, 0.0, 0.0, 0.0, 1), None, [], last_two)
+    assert chosen == [(x, y, z) for _i, x, y, z in by_hash[-2:] + by_hash[:1]]
+    assert pick(sites, Source("Flies", 3, 0.0, 0.0, 0.0, 1), None, []) == [(x, y, z) for _i, x, y, z in by_hash[:3]]
+
+
+def test_war_puts_the_flies_on_a_barrel_before_a_wreck() -> None:
+    doc = _doc()
+    doc["local"]["flies"]["max"] = 1
+    config = parse_soundscape(copy.deepcopy(doc), _schema(), "here")
+    barrel = {"id": "overgrow/waste/9", "type": "overgrowth", "kind": "waste", "role": "barrel", "position_m": [-40.0, 50.0, 0.0]}
+    objects = [_wreck(i, 30.0 * i - 60.0, 60.0) for i in range(5)] + [barrel]
+    block, record = soundscape_block("war", "arid", config, objects, [], 100.0, LAYOUT)
+    assert block is not None and record["sources"]["flies"] == 1
+    assert [(s["name"], s["x"], s["y"]) for s in block["sources"] if s["clip"] == "Flies"] == [
+        ("Flies_1", -40.0, 50.0), ("Flies_1_2", -40.0, 50.0)]
 
 
 def test_the_generator_stands_by_a_power_pole() -> None:
@@ -200,7 +235,7 @@ def test_war_adds_distant_combat_fire_under_the_smoke_and_flies() -> None:
     fires = sorted((s["x"], s["y"], s["z"]) for s in block["sources"] if s["clip"] == "Fire")
     assert fires == [(-60.0, 60.0, 1.5), (60.0, 60.0, 2.0)]  # 0.5 m over each column's foot
     flies = sorted((s["x"], s["y"], s["z"]) for s in block["sources"] if s["clip"] == "Flies")
-    assert flies == [(-60.0, 60.0, 0.8), (60.0, 60.0, 1.3)]
+    assert flies == [(-60.0, 60.0, 0.8), (-60.0, 60.0, 0.8), (60.0, 60.0, 1.3), (60.0, 60.0, 1.3)]  # two copies a site
     assert [s["name"] for s in block["sources"] if s["clip"] == "Fire"] == ["Fire_1", "Fire_2"]
     assert record == {"mode": "war", "style": "arid", "global": "Distant Combat Sparse", "birds": None, "wind": "Wind Desert",
                       "sources": {"generator": 0, "fire": 2, "flies": 2}}
@@ -229,11 +264,13 @@ def test_an_unknown_mode_is_refused() -> None:
 
 def test_the_configured_counts_and_heights_are_used(monkeypatch: pytest.MonkeyPatch) -> None:
     doc = _doc()
-    doc["local"]["flies"] = {"clip": "Water Drip", "max": 1, "apart_m": 0, "spawn_clear_m": 0, "height_m": 2.5}
+    doc["local"]["flies"] = {"clip": "Water Drip", "max": 1, "apart_m": 0, "spawn_clear_m": 0, "height_m": 2.5,
+                            "copies": 3}
     config = parse_soundscape(copy.deepcopy(doc), _schema(), "here")
     block, _ = soundscape_block("war", "arid", config, [_wreck(1, 30.0, 30.0), _wreck(2, -30.0, 30.0)], [], 100.0, LAYOUT)
     assert block is not None
-    assert [(s["clip"], s["z"]) for s in block["sources"] if s["name"].startswith("Flies")] == [("Water Drip", 2.5)]
+    assert [(s["name"], s["clip"], s["z"]) for s in block["sources"] if s["name"].startswith("Flies")] == [
+        ("Flies_1", "Water Drip", 2.5), ("Flies_1_2", "Water Drip", 2.5), ("Flies_1_3", "Water Drip", 2.5)]
 
 
 def test_the_map_key_reaches_the_export_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

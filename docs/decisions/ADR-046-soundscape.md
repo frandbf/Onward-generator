@@ -28,3 +28,11 @@ Every map so far sounds alike: `Suburban Day` or `Suburban Night` as the global 
 - No triangle, texture or memory is added. A war map gains up to ten local sources.
 - Murcia, Madrid or Paris without damage, poles or a regional row are unchanged. Mogadishu (heavy damage, `east_african`, wired) hears distant combat, African birds, desert wind, fire under its three smoke columns, flies by four wrecks and a generator.
 - Whether the combat clip is too loud, and how far each local clip carries, is known only on the headset. The numbers (counts, distances, heights) are configuration and can be tuned without code.
+
+## Amendment of 18 November 2026: louder flies, on the rubbish first
+
+On Mogadishu's pkg_24 the maintainer found the flies too quiet and asked for them by the bins. `OnwardAudioSource` has only a type and a clip name: the client plays each clip at its own level and range (10 m for `Flies`), so no volume can be set.
+
+- **Copies.** Each `local` row of `config/soundscape.json` gains `copies` (1 to 3): the clip is placed that many times on the same site. The extra sources are named `<Kind>_<n>_2`, `<Kind>_<n>_3`. `Flies` takes 2, so it should play louder; the fire and the generator keep 1. How much louder is known only on the headset.
+- **Rubbish first.** `flies_first` (`trash`, `can`, `barrel`) lists the roles of the `flies_kinds` records placed before the others. The order inside each group is still fixed by the ids. A wreck carries flies only when there are not enough bins, cans and barrels.
+- **More of them.** `Flies` goes from 4 sites 20 m apart to 8 sites 12 m apart. A war map gains up to 22 local sources instead of 10.
