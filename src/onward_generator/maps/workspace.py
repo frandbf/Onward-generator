@@ -381,6 +381,17 @@ def smoke_columns(directory: str | Path) -> int:
         raise MapError(str(exc)) from exc
 
 
+def fire_enabled(directory: str | Path) -> bool:
+    """``map.json`` ``fire`` (plan 2026-11-17, increment E): flames and embers under the smoke columns, False without the
+    key. True or false; anything else is refused with ``MapError``."""
+    from onward_generator.export.fire import FireError, check_fire
+
+    try:
+        return check_fire(load_map(directory).get("fire"))
+    except FireError as exc:
+        raise MapError(str(exc)) from exc
+
+
 def soundscape(directory: str | Path) -> str:
     """``map.json`` ``soundscape`` (plan 2026-11-17, increment D; ADR-046): ``auto`` without the key, else ``default``,
     ``regional``, ``war`` or ``battle``. Anything else is refused with ``MapError``."""

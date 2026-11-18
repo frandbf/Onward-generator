@@ -2,7 +2,7 @@
 
 Fecha: 17 de noviembre de 2026. Pedido por el mantenedor tras probar Mogadiscio pkg_20 en el casco, después de revisar qué ofrece el SDK v1.15 además de lo que ya usamos (humo de ADR-043, tormenta de ADR-028, sobrevuelos, ambiente `Suburban Day/Night`, pájaros, viento en tejados, reverberación del monumento y niebla por preset).
 
-**Estado (17 de noviembre de 2026).** D (paisaje sonoro, ADR-046 propuesto) en su PR. Difiere del plan en dos puntos: se resuelve en `export package --soundscape` y no en `perf layout`, para no tocar el contrato del layout; y hay un modo `regional` (pájaros, viento y generador sin combate), que es lo que da `auto` sin daño `heavy`. G0 está construido y espera al casco.
+**Estado (17 de noviembre de 2026).** D (paisaje sonoro, ADR-046 propuesto) fusionado (#132). E (fuego, enmienda de ADR-043) en su PR. Difiere del plan en dos puntos: se resuelve en `export package --soundscape` y no en `perf layout`, para no tocar el contrato del layout; y hay un modo `regional` (pájaros, viento y generador sin combate), que es lo que da `auto` sin daño `heavy`. G0 está construido y espera al casco.
 
 Todo es genérico: cada efecto se decide por el estilo de fachada, el nivel de daño (`signs/damage.py`), el preset de luz o una clave de `map.json`, nunca por el nombre de un lugar. Un mapa sin las claves nuevas y sin estilo, daño o preset que las active sale igual byte a byte (Murcia, Madrid y París no cambian).
 
@@ -79,7 +79,7 @@ Orden: **G0** (prueba del LUT, barata y puede descartar el punto 4), **D** (soni
 - **Bloque** `fire` en `adapter_options.json`:
   - Llamas: unas 12 partículas por columna, que viven 0,6 s, miden de 0,4 a 1,2 m y suben a 1,5 m/s.
   - Brasas: 6 partículas por columna, de 4 cm, que viven 2 s, suben con algo de dispersión y se apagan.
-- **Adaptador:** un segundo y un tercer `ParticleSystem`, hijos de cada columna, con `PP_Particle_Unlit_Additive`.
+- **Adaptador:** un segundo y un tercer `ParticleSystem`, hijos de cada columna, con `PP_Particle_Unlit` (la variante aditiva se descartó: de día la llama salía blanca).
   - No se iluminan: el fuego da su propia luz y no necesita sondas.
   - Van sin sombras y sin luz en tiempo real, porque una luz dinámica es cara en el Quest y un parpadeo no se puede hornear.
   - Se rechaza un paquete con bloque `fire` y sin textura, o con textura y sin bloque.
