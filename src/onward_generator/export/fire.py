@@ -69,10 +69,11 @@ SHEET_FLAMES = {
 the colour, so the particles stay white; about nine burn at once, fewer than the sixteen small flames of the sprite."""
 SHEET_PIVOT_Y = 0.5
 """The flipbook's flames stand on the foot of each frame: the billboard is lifted by half its size to stand on the site."""
-SHEET_RISE_M = -0.2
-"""The flipbook's flames stand this far above the smoke column's foot: 0.8 m over the wreck's base, on the top of a
-1.55 m wreck's body (0.95 m, sunk 0.15 m), so they rise out of it and over its cabin. At ``BASE_RISE_M`` their foot
-floated 0.2 m over the cabin and 0.8 m over the body (pkg_24 on the headset, 18 November 2026)."""
+SHEET_RISE_M = 0.2
+"""The flipbook's flames stand this far above the smoke column's foot: 1.2 m over the wreck's base, between the top of a
+1.55 m wreck's body (0.8 m, sunk 0.15 m) and its cabin roof (1.4 m), so they rise out of it and over its cabin. On the
+headset (18 November 2026) their foot floated over the wreck at ``BASE_RISE_M`` (1.6 m, pkg_24) and sank too deep into
+it at 0.8 m (pkg_25)."""
 CORE_RGB = np.array([255.0, 224.0, 128.0])
 """The flame's colour in its low core."""
 EDGE_RGB = np.array([255.0, 84.0, 16.0])
