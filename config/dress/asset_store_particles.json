@@ -1,0 +1,15 @@
+{
+  "schema": "onward_generator.asset_store_particles",
+  "schema_version": "0.1.0",
+  "description": "Particle textures read from the maintainer's Asset Store particle packages (ADR-035 amendment of 18 November 2026). Names only: the images stay local under assets/asset_store_<package>/ and are never committed. Only textures are taken: the packs' prefabs and materials use Unity's built-in particle shaders, which a custom Onward map cannot ship, so the adapter draws each effect with the SDK's PP_Particle_* shaders. tiles is the flipbook grid (columns, rows) the pack's own prefab plays; max_px caps the longer side of the copy. alpha is keep for an image with its own alpha, or luminance for one drawn on black for additive blending (the flames, the spark): its alpha is then its brightness and its colour is divided by it, so the SDK's alpha-blended PP_Particle_Unlit draws it without a black square. SmokeLoop02 (the pack's ground fog) is left out: its TIFF alpha does not survive the copy.",
+  "packages": {
+    "particle_pack_starter_assets": {
+      "flame": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Fire & Explosion Effects/Textures/MediumFlame01.tif", "tiles": [10, 10], "max_px": 2048, "alpha": "luminance", "prefab": "MediumFlames", "note": "A flame rising and falling in 100 frames."},
+      "large_flame": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Fire & Explosion Effects/Textures/LargeFlame01.tif", "tiles": [8, 8], "max_px": 2048, "alpha": "luminance", "prefab": "LargeFlames", "note": "A taller flame in 64 frames."},
+      "smoke": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Smoke & Steam Effects/Textures/SmokePuff04.png", "tiles": [5, 5], "max_px": 1024, "alpha": "keep", "prefab": "SmokeEffect", "note": "25 white smoke puffs, tinted by the particle colour."},
+      "dust_mote": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Misc Effects/Textures/DustMote.png", "tiles": [1, 1], "max_px": 256, "alpha": "keep", "prefab": "DustMotesEffect", "note": "One soft mote."},
+      "sand_puff": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Misc Effects/Textures/DustPuffSmall.png", "tiles": [2, 2], "max_px": 256, "alpha": "keep", "prefab": "SandSwirlsEffect", "note": "Four small puffs of sand."},
+      "spark": {"path": "Assets/UnityTechnologies/ParticlePack/EffectExamples/Misc Effects/Textures/SparkParticle.tif", "tiles": [1, 1], "max_px": 256, "alpha": "luminance", "prefab": "ElectricalSparks", "note": "One bright spark."}
+    }
+  }
+}

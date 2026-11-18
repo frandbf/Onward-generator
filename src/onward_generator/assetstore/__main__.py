@@ -1,9 +1,10 @@
-"""``onward-generator asset-store scan | import | textures`` (ADR-035).
+"""``onward-generator asset-store scan | import | textures | particles`` (ADR-035).
 
 ``scan`` lists the ``.unitypackage`` files in this user's Unity Asset Store cache and whether each one already has a
 local catalogue. ``import`` exports the chosen packages with the host's Unity editor and writes
 ``assets/asset_store_<id>/``, which git ignores. Run it on the host, not in Docker: it needs the editor and the cache. ``textures`` reads the texture sets that
-``config/dress/asset_store_textures.json`` names straight from their packages (no editor) into ``assets/asset_store_<id>/``.
+``config/dress/asset_store_textures.json`` names straight from their packages (no editor) into ``assets/asset_store_<id>/``. ``particles`` does the same for the particle
+textures ``config/dress/asset_store_particles.json`` names.
 """
 
 from __future__ import annotations
@@ -111,6 +112,32 @@ def _textures(args: argparse.Namespace) -> int:
     return 0
 
 
+def _particles(args: argparse.Namespace) -> int:
+    from onward_generator.assetstore.particles import ParticleTableError, particle_rows, read_table
+
+    try:
+        table = read_table()
+    except ParticleTableError as exc:
+        print(f"asset-store: {exc}", file=sys.stderr)
+        return 2
+    packages = {p.id: p for p in find_packages(_cache(args))}
+    wanted = args.only or sorted(table)
+    missing = sorted(set(wanted) - set(table))
+    if missing:
+        raise SystemExit(f"asset-store: {', '.join(missing)} has no particle textures in config/dress/asset_store_particles.json")
+    total = 0
+    for package_id in wanted:
+        if package_id not in packages:
+            print(f"{package_id}: not downloaded")
+            continue
+        rows = particle_rows(packages[package_id], ASSETS, table[package_id])
+        roles = ", ".join(row["role"] for row in rows)
+        print(f"{package_id}: {len(rows)} particle textures of {len(table[package_id])} named ({roles})", flush=True)  # pragma: no mutate: flushing changes when a line shows, not what it says
+        total += len(rows)
+    print(f"{total} particle textures under {ASSETS}/asset_store_*")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="onward-generator asset-store", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -135,9 +162,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--only", nargs="+",
         help="package ids of the table",  # pragma: no mutate: help text only
     )
+    par = sub.add_parser(
+        "particles",
+        help="particle textures named in config/dress/asset_store_particles.json, without the editor",  # pragma: no mutate: help text only
+    )
+    par.add_argument(
+        "--cache",
+        help="the Unity Asset Store cache (default: the host profile's asset_store_cache)",  # pragma: no mutate: help text only
+    )
+    par.add_argument(
+        "--only", nargs="+",
+        help="package ids of the table",  # pragma: no mutate: help text only
+    )
     args = parser.parse_args(argv)
     if args.command == "textures":
         return _textures(args)
+    if args.command == "particles":
+        return _particles(args)
     return _scan(args) if args.command == "scan" else _import(args)
 
 
