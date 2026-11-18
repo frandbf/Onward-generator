@@ -15,6 +15,11 @@ from onward_generator.export.fire import (
     BASE_RISE_M,
     EMBERS,
     FLAMES,
+    SHEET_FILE,
+    SHEET_FLAMES,
+    SHEET_PIVOT_Y,
+    SHEET_RISE_M,
+    SHEET_ROLE,
     TEXTURE_FILE,
     TEXTURE_PX,
     TEXTURE_ROLE,
@@ -23,8 +28,8 @@ from onward_generator.export.fire import (
     fire_options,
     flame_png,
 )
-from onward_generator.maps.workspace import MapError, fire_enabled
-from onward_generator.next_step import _fire
+from onward_generator.maps.workspace import MapError, fire_enabled, pack_particles
+from onward_generator.next_step import _fire, _pack_particles
 
 ADAPTER = Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs"
 
@@ -96,8 +101,8 @@ def test_the_adapter_draws_flames_and_embers_on_the_sdk_unlit_shader() -> None:
     assert "public FireOptions fire = new FireOptions();" in source and "AddFire(pkg, root);" in source
     assert "adapter_options.json fire has {fireSites} sites, the package lists {fireFiles} '{FireRole}' files" in source
     body = source[source.index("private static void AddFire"):source.index("// One baked point light per furnished room")]
-    for line in ('material.SetTexture("_MainTex", texture);', 'FireEmitterSystem(go, "Flames", fire.flames, material, site.seed);',
-                 'FireEmitterSystem(go, "Embers", fire.embers, material, site.seed + 1000);', "go.transform.position = Local(site.x, site.y, site.z);",
+    for line in ('material.SetTexture("_MainTex", texture);', 'FireEmitterSystem(go, "Flames", fire.flames, flameMaterial, site.seed, fire.sheet);',
+                 'FireEmitterSystem(go, "Embers", fire.embers, material, site.seed + 1000, null);', "go.transform.position = Local(site.x, site.y, site.z);",
                  "main.maxParticles = e.max_particles;", "emission.rateOverTime = e.rate_per_s;", "main.startSpeed = e.speed_m_s;",
                  "renderer.shadowCastingMode = ShadowCastingMode.Off;", "renderer.lightProbeUsage = LightProbeUsage.Off;"):
         assert line in body, line
@@ -109,3 +114,48 @@ def test_the_views_run_the_particles_before_they_render() -> None:
     simulate = body.index("system.Simulate(system.main.duration * 2f, false, true);")
     assert simulate < body.index('new GameObject("OnwardCaptureCamera")')
 
+
+
+def test_a_pack_s_flipbook_draws_the_flames_and_the_embers_keep_the_sprite() -> None:
+    assert (SHEET_FILE, SHEET_ROLE, SHEET_PIVOT_Y, SHEET_RISE_M) == ("fire_flame_sheet.png", "fire_sheet_texture", 0.5, -0.2)
+    assert SHEET_FLAMES == {"rate_per_s": 3.0, "lifetime_s": 3.0, "min_size_m": 0.9, "max_size_m": 1.25, "end_scale": 1.0,
+                            "speed_m_s": 0.0, "cone_deg": 25.0, "radius_m": 0.4, "start_color": "#FFFFFF",
+                            "end_color": "#FFFFFF", "max_particles": 12}
+    block = fire_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}, {"x": 0.5, "y": 0.0, "z": 2.12345, "seed": 2}], (10, 8))
+    assert block == {"texture": "fire_flame.png", "flames": SHEET_FLAMES, "embers": EMBERS,
+                     "sites": [{"x": 1.0, "y": 2.0, "z": 0.8, "seed": 1}, {"x": 0.5, "y": 0.0, "z": 1.923, "seed": 2}],
+                     "sheet": {"texture": "fire_flame_sheet.png", "tiles": [10, 8], "pivot_y": 0.5}}
+    block["flames"]["rate_per_s"] = 0.0
+    assert SHEET_FLAMES["rate_per_s"] == 3.0  # the block is a copy
+    assert "sheet" not in fire_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}])
+
+
+def test_the_pack_particles_key_reaches_the_export_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "map.json").write_text("{}", encoding="utf-8")
+    document: dict[str, Any] = {}
+    monkeypatch.setattr("onward_generator.maps.workspace.load_map", lambda directory: document)
+    assert pack_particles(tmp_path) is True and _pack_particles(tmp_path) == []
+    document["pack_particles"] = False
+    assert pack_particles(tmp_path) is False and _pack_particles(tmp_path) == ["--no-pack-particles"]
+    assert _pack_particles(tmp_path / "elsewhere") == []  # no map.json there
+    document["pack_particles"] = True
+    assert _pack_particles(tmp_path) == []
+    document["pack_particles"] = "no"
+    with pytest.raises(MapError, match=r'^map.json "pack_particles" must be true or false, got \'no\'$'):
+        pack_particles(tmp_path)
+
+
+def test_the_adapter_plays_a_flipbook_once_over_each_particle_s_life() -> None:
+    source = ADAPTER.read_text(encoding="utf-8")
+    assert 'private const string FireSheetRole = "fire_sheet_texture";' in source and "private const int SheetTilesMax = 16;" in source
+    assert "public ParticleSheet sheet = new ParticleSheet();" in source
+    assert "the package lists {sheetFiles} '{FireSheetRole}' files" in source
+    body = source[source.index("private static void ApplySheet"):source.index("private static void FireEmitterSystem")]
+    for line in ("frames.numTilesX = sheet.tiles[0];", "frames.numTilesY = sheet.tiles[1];",
+                 "frames.animation = ParticleSystemAnimationType.WholeSheet;",
+                 "frames.frameOverTime = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0f, 1f, 1f));",
+                 "frames.cycleCount = 1;", "renderer.pivot = new Vector3(0f, sheet.pivot_y, 0f);"):
+        assert line in body, line
+    fire = source[source.index("private static void AddFire"):source.index("private static void CheckSheet")]
+    assert 'File.ReadAllBytes(pkg.Path(FireSheetRole))' in fire and 'flameMaterial.SetTexture("_MainTex", sheetTexture);' in fire
+    assert "ApplySheet(ps, renderer, smoke.sheet);" in source and "ApplySheet(ps, renderer, sheet);" in source

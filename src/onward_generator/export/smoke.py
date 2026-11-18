@@ -127,9 +127,13 @@ def puff_png(seed: int = 0) -> bytes:
     return out.getvalue()
 
 
-def smoke_options(columns: Sequence[Mapping[str, float]]) -> dict[str, Any]:
-    """The ``smoke`` block of ``adapter_options.json``."""
-    return {"texture": TEXTURE_FILE, **COLUMN, "columns": [dict(c) for c in columns]}
+def smoke_options(columns: Sequence[Mapping[str, float]], sheet_tiles: Sequence[int] | None = None) -> dict[str, Any]:
+    """The ``smoke`` block of ``adapter_options.json``. ``sheet_tiles`` (columns, rows) is the flipbook grid of a pack's
+    smoke texture (ADR-035 amendment of 18 November 2026): each puff then plays it once over its life."""
+    block: dict[str, Any] = {"texture": TEXTURE_FILE, **COLUMN, "columns": [dict(c) for c in columns]}
+    if sheet_tiles is not None:
+        block["sheet"] = {"tiles": [int(n) for n in sheet_tiles]}
+    return block
 
 
 __all__ = ["APART_M", "COLUMN", "FOOT_CLEAR_M", "SMOKE_MAX", "SPAWN_CLEAR_M", "TEXTURE_FILE", "TEXTURE_ROLE", "SmokeError",

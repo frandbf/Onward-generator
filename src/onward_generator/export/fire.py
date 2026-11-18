@@ -5,7 +5,8 @@ the smoke has a source. Absent or ``false`` writes nothing, and without a smoke 
 the package is the one of before and a warning says why. The Unity adapter draws two ``ParticleSystem`` per column on
 the SDK's ``PP_Particle_Unlit``, unlit (the fire is its own light) and with no real-time light, a flicker
 cannot be baked. Their sprite, ``fire_flame.png``, is a soft upright flame drawn here: CC0 by construction. The flames
-are small and low: they do not hide a player from a player, as bots see through particles.
+are small and low: they do not hide a player from a player, as bots see through particles. With a local particle
+pack (ADR-035 amendment of 18 November 2026) the flames play its flame flipbook instead, and the embers keep the sprite.
 """
 
 from __future__ import annotations
@@ -48,6 +49,30 @@ EMBERS = {
     "max_particles": 8,
 }
 """Every column's embers: sparks that rise past the flames and go out."""
+SHEET_FILE = "fire_flame_sheet.png"
+SHEET_ROLE = "fire_sheet_texture"
+SHEET_FLAMES = {
+    "rate_per_s": 3.0,
+    "lifetime_s": 3.0,
+    "min_size_m": 0.9,
+    "max_size_m": 1.25,
+    "end_scale": 1.0,
+    "speed_m_s": 0.0,
+    "cone_deg": 25.0,
+    "radius_m": 0.4,
+    "start_color": "#FFFFFF",
+    "end_color": "#FFFFFF",
+    "max_particles": 12,
+}
+"""The flames when a pack's flipbook draws them (ADR-035 amendment of 18 November 2026), after the pack's own
+``MediumFlames``: a few still flames of about a metre, each playing the whole flipbook once over 3 s. The frames carry
+the colour, so the particles stay white; about nine burn at once, fewer than the sixteen small flames of the sprite."""
+SHEET_PIVOT_Y = 0.5
+"""The flipbook's flames stand on the foot of each frame: the billboard is lifted by half its size to stand on the site."""
+SHEET_RISE_M = -0.2
+"""The flipbook's flames stand this far above the smoke column's foot: 0.8 m over the wreck's base, on the top of a
+1.55 m wreck's body (0.95 m, sunk 0.15 m), so they rise out of it and over its cabin. At ``BASE_RISE_M`` their foot
+floated 0.2 m over the cabin and 0.8 m over the body (pkg_24 on the headset, 18 November 2026)."""
 CORE_RGB = np.array([255.0, 224.0, 128.0])
 """The flame's colour in its low core."""
 EDGE_RGB = np.array([255.0, 84.0, 16.0])
@@ -92,16 +117,24 @@ def flame_png() -> bytes:
     return out.getvalue()
 
 
-def fire_options(columns: Sequence[Mapping[str, float]]) -> dict[str, Any]:
-    """The ``fire`` block of ``adapter_options.json``: the look in numbers and a site under each smoke column."""
-    return {
+def fire_options(columns: Sequence[Mapping[str, float]], sheet_tiles: Sequence[int] | None = None) -> dict[str, Any]:
+    """The ``fire`` block of ``adapter_options.json``: the look in numbers and a site under each smoke column.
+    ``sheet_tiles`` (columns, rows) is the grid of a pack's flame flipbook: the flames then take ``SHEET_FLAMES`` and
+    ``SHEET_FILE`` and stand ``SHEET_RISE_M`` over the column's foot, and the embers keep the drawn sprite."""
+    rise = BASE_RISE_M if sheet_tiles is None else SHEET_RISE_M
+    block: dict[str, Any] = {
         "texture": TEXTURE_FILE,
         "flames": dict(FLAMES),
         "embers": dict(EMBERS),
-        "sites": [{"x": float(c["x"]), "y": float(c["y"]), "z": round(float(c["z"]) + BASE_RISE_M, 3), "seed": int(c["seed"])}
+        "sites": [{"x": float(c["x"]), "y": float(c["y"]), "z": round(float(c["z"]) + rise, 3), "seed": int(c["seed"])}
                   for c in columns],
     }
+    if sheet_tiles is not None:
+        block["flames"] = dict(SHEET_FLAMES)
+        block["sheet"] = {"texture": SHEET_FILE, "tiles": [int(n) for n in sheet_tiles], "pivot_y": SHEET_PIVOT_Y}
+    return block
 
 
-__all__ = ["ALPHA_PEAK", "BASE_RISE_M", "CORE_RGB", "EDGE_RGB", "EMBERS", "FLAMES", "TEXTURE_FILE", "TEXTURE_PX", "TEXTURE_ROLE", "FireError", "check_fire",
+__all__ = ["ALPHA_PEAK", "BASE_RISE_M", "CORE_RGB", "EDGE_RGB", "EMBERS", "FLAMES", "SHEET_FILE", "SHEET_FLAMES",
+           "SHEET_PIVOT_Y", "SHEET_RISE_M", "SHEET_ROLE", "TEXTURE_FILE", "TEXTURE_PX", "TEXTURE_ROLE", "FireError", "check_fire",
            "fire_options", "flame_png"]

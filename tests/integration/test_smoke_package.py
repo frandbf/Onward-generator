@@ -151,3 +151,99 @@ def test_fire_without_smoke_warns_and_writes_nothing(inputs: tuple[Path, Path], 
     assert main(["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout),
                  "--out", str(tmp_path / "cli"), "--fire"]) == 0
     assert "fire" in json.loads((tmp_path / "cli" / "onward_export.json").read_bytes())
+
+
+def _far(layout: Path) -> list[tuple[float, float]]:
+    spawns = json.loads(layout.read_bytes())
+    return [(x, y) for x, y in ((-70.0, -70.0), (70.0, -70.0), (-70.0, 70.0), (70.0, 70.0))
+            if all(((x - p["x"]) ** 2 + (y - p["y"]) ** 2) ** 0.5 >= 15.0
+                   for key in ("attackers", "defenders") for p in (spawns.get(key) or {}).get("points_m") or [])]
+
+
+def _pack(tmp_path: Path) -> dict[str, dict[str, object]]:
+    """Rows as ``local_particles`` returns them, with their files under ``tmp_path``."""
+    rows: dict[str, dict[str, object]] = {}
+    for role, tiles, data in (("smoke", [5, 5], b"smoke-sheet"), ("flame", [10, 10], b"flame-sheet")):
+        file = tmp_path / "assets" / "asset_store_pack" / f"particle_{role}.png"
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes(data)
+        rows[role] = {"role": role, "path": f"assets/asset_store_pack/particle_{role}.png", "file": file,
+                      "sha256": hashlib.sha256(data).hexdigest(), "tiles": tiles, "license": "LicenseRef-Unity-Asset-Store-EULA",
+                      "credit": f"{role} from Pack by Pub, Unity Asset Store EULA; local copy, never committed.", "frames": 1}
+    return rows
+
+
+def test_a_local_pack_s_flipbooks_draw_the_smoke_and_the_flames(inputs: tuple[Path, Path], tmp_path: Path,
+                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator.export.fire import EMBERS, SHEET_FLAMES, flame_png
+
+    detail, layout = inputs
+    far = _far(layout)
+    pack = _pack(tmp_path)
+    asked: list[Path] = []
+    monkeypatch.setattr("onward_generator.export.package.local_particles", lambda assets: asked.append(assets) or pack)
+    wrecked = _wrecked(detail, tmp_path, far)
+    result = build_package(EXPORT_PROJECT, wrecked, layout, tmp_path / "pkg", now=FIXED_NOW, smoke=len(far), fire=True)
+    assert asked == [Path(__file__).resolve().parents[2] / "assets"]
+    options = json.loads((result.directory / "adapter_options.json").read_bytes())
+    assert options["smoke"]["sheet"] == {"tiles": [5, 5]} and options["smoke"]["texture"] == "smoke_puff.png"
+    assert options["fire"]["sheet"] == {"texture": "fire_flame_sheet.png", "tiles": [10, 10], "pivot_y": 0.5}
+    assert options["fire"]["flames"] == SHEET_FLAMES and options["fire"]["embers"] == EMBERS
+    assert (result.directory / "smoke_puff.png").read_bytes() == b"smoke-sheet"
+    assert (result.directory / "fire_flame_sheet.png").read_bytes() == b"flame-sheet"
+    assert (result.directory / "fire_flame.png").read_bytes() == flame_png()  # the embers keep the sprite
+    files = {f["role"]: f for f in result.manifest["files"]}
+    assert files["smoke_texture"]["source"] == "assets/asset_store_pack/particle_smoke.png"
+    assert files["fire_sheet_texture"]["source"] == "assets/asset_store_pack/particle_flame.png"
+    assert files["fire_sheet_texture"]["path"] == "fire_flame_sheet.png" and files["fire_sheet_texture"]["bytes"] == len(b"flame-sheet")
+    assert files["fire_texture"]["source"] == "generated"
+    assert result.manifest["smoke"]["texture"] == {
+        "origin": "asset_store", "role": "smoke", "path": "assets/asset_store_pack/particle_smoke.png",
+        "sha256": hashlib.sha256(b"smoke-sheet").hexdigest(), "tiles": [5, 5], "license": "LicenseRef-Unity-Asset-Store-EULA",
+        "credit": "smoke from Pack by Pub, Unity Asset Store EULA; local copy, never committed."}
+    assert result.manifest["fire"]["texture"]["role"] == "flame" and result.manifest["fire"]["texture"]["tiles"] == [10, 10]
+    assert result.manifest["fire"]["origin"] == "generated" and result.manifest["fire"]["sites"] == len(far)
+    assert verify_package(result.directory) == []
+    plain = build_package(EXPORT_PROJECT, wrecked, layout, tmp_path / "plain", now=FIXED_NOW, smoke=len(far), fire=True,
+                          pack_particles=False)
+    assert len(asked) == 1  # not even looked for
+    assert plain.manifest["package_id"] != result.manifest["package_id"]
+    assert (plain.directory / "smoke_puff.png").read_bytes() == puff_png() and not (plain.directory / "fire_flame_sheet.png").exists()
+    assert "texture" not in plain.manifest["smoke"] and "texture" not in plain.manifest["fire"]
+
+
+def test_a_pack_with_only_a_flame_keeps_the_drawn_smoke(inputs: tuple[Path, Path], tmp_path: Path,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    detail, layout = inputs
+    far = _far(layout)
+    pack = {"flame": _pack(tmp_path)["flame"]}
+    monkeypatch.setattr("onward_generator.export.package.local_particles", lambda assets: pack)
+    result = build_package(EXPORT_PROJECT, _wrecked(detail, tmp_path, far), layout, tmp_path / "pkg", now=FIXED_NOW, smoke=len(far))
+    options = json.loads((result.directory / "adapter_options.json").read_bytes())
+    assert "sheet" not in options["smoke"] and "fire" not in options and "texture" not in result.manifest["smoke"]
+    assert (result.directory / "smoke_puff.png").read_bytes() == puff_png() and not (result.directory / "fire_flame_sheet.png").exists()
+    assert {f["role"]: f["source"] for f in result.manifest["files"]}["smoke_texture"] == "generated"
+
+
+def test_no_column_looks_for_no_pack(inputs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    detail, layout = inputs
+    monkeypatch.setattr("onward_generator.export.package.local_particles", lambda assets: pytest.fail("looked for a pack"))
+    result = build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW, smoke=2, fire=True)
+    assert result.manifest["smoke"]["columns"] == 0 and "texture" not in result.manifest["smoke"]
+
+
+def test_the_export_command_passes_no_pack_particles(inputs: tuple[Path, Path], tmp_path: Path,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    detail, layout = inputs
+    seen: list[bool] = []
+    real = build_package
+
+    def spy(*args: object, **kwargs: object) -> object:
+        seen.append(bool(kwargs["pack_particles"]))
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("onward_generator.export.__main__.build_package", spy)
+    base = ["export", "package", "--project", str(EXPORT_PROJECT), "--detail", str(detail), "--layout", str(layout)]
+    assert main([*base, "--out", str(tmp_path / "a")]) == 0
+    assert main([*base, "--out", str(tmp_path / "b"), "--no-pack-particles"]) == 0
+    assert seen == [True, False]
