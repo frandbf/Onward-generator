@@ -9,11 +9,11 @@
   "spawn_clear_m": 0.0,
   "box_m": [30.0, 30.0, 5.5],
   "base_m": 0.5,
-  "rate_per_s": 7.5,
+  "rate_per_s": 18.75,
   "lifetime_s": 8.0,
   "min_size_m": 0.03,
   "max_size_m": 0.1,
   "drift_m_s": 0.5,
   "color": "#C9B48E",
-  "max_particles": 60
+  "max_particles": 150
 }

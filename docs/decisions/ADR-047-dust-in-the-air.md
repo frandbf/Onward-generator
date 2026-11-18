@@ -16,7 +16,7 @@ A dry, dusty city (Mogadishu, Fallujah, a map under the `dusty` light) has a haz
    - They stay inside the playable core, `apart_m` (30 m) from each other, in an order fixed by a hash of the points.
    - Each box is `box_m` (30 × 30 × 5.5 m) with its floor `base_m` (0.5 m) over the layout's ground.
    - A layout without routes gets no dust, and a warning.
-3. **Look.** Each box holds at most `max_particles` (60) motes of 3 to 10 cm, born at `rate_per_s` (7.5) and living `lifetime_s` (8 s), fading in and out.
+3. **Look.** Each box holds at most `max_particles` (150) motes of 3 to 10 cm, born at `rate_per_s` (18.75) and living `lifetime_s` (8 s), fading in and out.
    - They drift at `drift_m_s` (0.5 m/s) on one wind per map: a heading fixed by a hash of the map's id.
    - Their colour is the light preset's fog colour, else `color` (`#C9B48E`, sand).
    - The sprite, `dust_mote.png`, is a 32 px soft dot drawn by code (CC0, role `dust_texture`).
@@ -30,6 +30,6 @@ A dry, dusty city (Mogadishu, Fallujah, a map under the `dusty` light) has a haz
 
 ## Consequences
 
-- At most 360 motes on a map, a few centimetres each, opaque. No triangle enters the scene budget, and colliders and navigation do not change.
+- At most 900 motes on a map, a few centimetres each, opaque. A first render with 60 a box showed a handful of specks in a street; 150 reads as dust in the air without hiding anything. No triangle enters the scene budget, and colliders and navigation do not change.
 - Murcia, Madrid and Paris without the `dusty` light are unchanged. Mogadishu (`east_african`) gets six volumes.
 - How visible the motes are, and whether the dither shimmers, is known only on the headset. The numbers are configuration and can be tuned without code.

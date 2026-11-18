@@ -33,8 +33,8 @@ from onward_generator.maps.workspace import MapError, dust
 from onward_generator.next_step import _dust
 
 ADAPTER = Path(__file__).resolve().parents[2] / "tools" / "unity" / "onward_adapter" / "Editor" / "OnwardMapAdapter.cs"
-LOOK = {"box_m": [30.0, 30.0, 5.5], "base_m": 0.5, "rate_per_s": 7.5, "lifetime_s": 8.0, "min_size_m": 0.03, "max_size_m": 0.1,
-        "drift_m_s": 0.5, "color": "#C9B48E", "max_particles": 60}
+LOOK = {"box_m": [30.0, 30.0, 5.5], "base_m": 0.5, "rate_per_s": 18.75, "lifetime_s": 8.0, "min_size_m": 0.03, "max_size_m": 0.1,
+        "drift_m_s": 0.5, "color": "#C9B48E", "max_particles": 150}
 
 
 def _doc() -> dict[str, Any]:
