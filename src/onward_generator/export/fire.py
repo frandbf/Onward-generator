@@ -69,6 +69,10 @@ SHEET_FLAMES = {
 the colour, so the particles stay white; about nine burn at once, fewer than the sixteen small flames of the sprite."""
 SHEET_PIVOT_Y = 0.5
 """The flipbook's flames stand on the foot of each frame: the billboard is lifted by half its size to stand on the site."""
+SHEET_RISE_M = -0.2
+"""The flipbook's flames stand this far above the smoke column's foot: 0.8 m over the wreck's base, on the top of a
+1.55 m wreck's body (0.95 m, sunk 0.15 m), so they rise out of it and over its cabin. At ``BASE_RISE_M`` their foot
+floated 0.2 m over the cabin and 0.8 m over the body (pkg_24 on the headset, 18 November 2026)."""
 CORE_RGB = np.array([255.0, 224.0, 128.0])
 """The flame's colour in its low core."""
 EDGE_RGB = np.array([255.0, 84.0, 16.0])
@@ -116,12 +120,13 @@ def flame_png() -> bytes:
 def fire_options(columns: Sequence[Mapping[str, float]], sheet_tiles: Sequence[int] | None = None) -> dict[str, Any]:
     """The ``fire`` block of ``adapter_options.json``: the look in numbers and a site under each smoke column.
     ``sheet_tiles`` (columns, rows) is the grid of a pack's flame flipbook: the flames then take ``SHEET_FLAMES`` and
-    ``SHEET_FILE``, and the embers keep the drawn sprite."""
+    ``SHEET_FILE`` and stand ``SHEET_RISE_M`` over the column's foot, and the embers keep the drawn sprite."""
+    rise = BASE_RISE_M if sheet_tiles is None else SHEET_RISE_M
     block: dict[str, Any] = {
         "texture": TEXTURE_FILE,
         "flames": dict(FLAMES),
         "embers": dict(EMBERS),
-        "sites": [{"x": float(c["x"]), "y": float(c["y"]), "z": round(float(c["z"]) + BASE_RISE_M, 3), "seed": int(c["seed"])}
+        "sites": [{"x": float(c["x"]), "y": float(c["y"]), "z": round(float(c["z"]) + rise, 3), "seed": int(c["seed"])}
                   for c in columns],
     }
     if sheet_tiles is not None:
@@ -131,5 +136,5 @@ def fire_options(columns: Sequence[Mapping[str, float]], sheet_tiles: Sequence[i
 
 
 __all__ = ["ALPHA_PEAK", "BASE_RISE_M", "CORE_RGB", "EDGE_RGB", "EMBERS", "FLAMES", "SHEET_FILE", "SHEET_FLAMES",
-           "SHEET_PIVOT_Y", "SHEET_ROLE", "TEXTURE_FILE", "TEXTURE_PX", "TEXTURE_ROLE", "FireError", "check_fire",
+           "SHEET_PIVOT_Y", "SHEET_RISE_M", "SHEET_ROLE", "TEXTURE_FILE", "TEXTURE_PX", "TEXTURE_ROLE", "FireError", "check_fire",
            "fire_options", "flame_png"]

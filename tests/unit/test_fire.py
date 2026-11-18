@@ -18,6 +18,7 @@ from onward_generator.export.fire import (
     SHEET_FILE,
     SHEET_FLAMES,
     SHEET_PIVOT_Y,
+    SHEET_RISE_M,
     SHEET_ROLE,
     TEXTURE_FILE,
     TEXTURE_PX,
@@ -116,13 +117,13 @@ def test_the_views_run_the_particles_before_they_render() -> None:
 
 
 def test_a_pack_s_flipbook_draws_the_flames_and_the_embers_keep_the_sprite() -> None:
-    assert (SHEET_FILE, SHEET_ROLE, SHEET_PIVOT_Y) == ("fire_flame_sheet.png", "fire_sheet_texture", 0.5)
+    assert (SHEET_FILE, SHEET_ROLE, SHEET_PIVOT_Y, SHEET_RISE_M) == ("fire_flame_sheet.png", "fire_sheet_texture", 0.5, -0.2)
     assert SHEET_FLAMES == {"rate_per_s": 3.0, "lifetime_s": 3.0, "min_size_m": 0.9, "max_size_m": 1.25, "end_scale": 1.0,
                             "speed_m_s": 0.0, "cone_deg": 25.0, "radius_m": 0.4, "start_color": "#FFFFFF",
                             "end_color": "#FFFFFF", "max_particles": 12}
-    block = fire_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}], (10, 8))
+    block = fire_options([{"x": 1.0, "y": 2.0, "z": 1.0, "seed": 1}, {"x": 0.5, "y": 0.0, "z": 2.12345, "seed": 2}], (10, 8))
     assert block == {"texture": "fire_flame.png", "flames": SHEET_FLAMES, "embers": EMBERS,
-                     "sites": [{"x": 1.0, "y": 2.0, "z": 1.6, "seed": 1}],
+                     "sites": [{"x": 1.0, "y": 2.0, "z": 0.8, "seed": 1}, {"x": 0.5, "y": 0.0, "z": 1.923, "seed": 2}],
                      "sheet": {"texture": "fire_flame_sheet.png", "tiles": [10, 8], "pivot_y": 0.5}}
     block["flames"]["rate_per_s"] = 0.0
     assert SHEET_FLAMES["rate_per_s"] == 3.0  # the block is a copy

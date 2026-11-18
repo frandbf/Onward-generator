@@ -45,7 +45,8 @@ The smoke puff and the flame are drawn by code. After the dust motes drawn the s
 - **Flames.** With the `flame` role, the package adds `fire_flame_sheet.png` (role `fire_sheet_texture`): the pack's `MediumFlame01`, 100 frames on a 10 × 10 grid. The `fire` block gains `sheet` (`texture`, `tiles`, `pivot_y` 0.5), and the flames take `SHEET_FLAMES`, after the pack's own `MediumFlames`:
   - 3 a second living 3 s, 0.9 to 1.25 m, still (speed 0) in a 25° cone, at most 12;
   - white, because the frames carry the colour;
-  - the billboard is lifted by half its size, because each frame's flame stands on its foot.
+  - the billboard is lifted by half its size, because each frame's flame stands on its foot;
+  - the site stands 0.2 m under the column's foot, 0.8 m over the wreck's base, on the top of the wreck's body. At the sprite's 0.6 m over the foot, pkg_24 showed on the headset a gap between the wreck and the flames: their foot floated 0.2 m over the cabin and 0.8 m over the body. The drawn sprite keeps 0.6 m: it is centred on its site and rises, and lower it burns inside the wreck.
 
   The embers keep the drawn sprite and their own material.
 - **Record.** `onward_export.json` `smoke.texture` and `fire.texture` record the origin (`asset_store`), the role, the catalogue path, the SHA-256, the grid, the licence and the credit. Each file's `source` is that catalogue path.
