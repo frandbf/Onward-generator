@@ -190,3 +190,25 @@ def test_the_adapter_fills_a_box_per_volume_on_the_sdk_dithered_shader() -> None
                  "go.transform.position = Local(volume.x, volume.y, volume.z);", "main.maxParticles = dust.max_particles;",
                  "emission.rateOverTime = dust.rate_per_s;", "renderer.shadowCastingMode = ShadowCastingMode.Off;"):
         assert line in body, line
+
+
+def test_the_export_command_names_the_facade_style_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from onward_generator import next_step
+
+    sound: list[str] = []
+    dusty: list[str] = []
+    monkeypatch.setattr(next_step, "_soundscape", lambda root, detail: list(sound))
+    monkeypatch.setattr(next_step, "_dust", lambda root: list(dusty))
+    monkeypatch.setattr(next_step, "_facade_style", lambda scene: ("--facade-style", "arid"))
+
+    def argv() -> list[str]:
+        return list(next_step.export_invocation(tmp_path, tmp_path / "d", tmp_path / "l.json", tmp_path / "out").argv)
+
+    assert "--facade-style" not in argv()  # neither needs it
+    dusty[:] = ["--dust", "auto"]
+    assert argv().count("--facade-style") == 1 and argv()[-4:] == ["--dust", "auto", "--facade-style", "arid"]
+    sound[:] = ["--soundscape", "war", "--facade-style", "arid"]
+    assert argv().count("--facade-style") == 1  # the soundscape already named it
+    dusty[:] = []
+    assert argv().count("--facade-style") == 1
+

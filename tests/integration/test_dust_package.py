@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from onward_generator.cli import main
-from onward_generator.export.dust import mote_png
+from onward_generator.export.dust import mote_png, wind_heading
 from onward_generator.export.package import ExportError, build_package, verify_package
 from tests.conftest import FIXED_NOW
 from tests.integration.test_export_package import EXPORT_PROJECT
@@ -45,7 +45,8 @@ def test_light_dust_stands_volumes_on_the_routes_with_the_preset_s_colour(inputs
     result = build_package(EXPORT_PROJECT, detail, _routed(layout, tmp_path), tmp_path / "pkg", now=FIXED_NOW, dust="light",
                            atmosphere="dusty")
     block = json.loads((result.directory / "adapter_options.json").read_bytes())["dust"]
-    assert block["texture"] == "dust_mote.png" and block["color"] == "#C9B48E" and 0.0 <= block["heading_deg"] < 360.0
+    assert block["texture"] == "dust_mote.png" and block["color"] == "#C9B48E"
+    assert block["heading_deg"] == wind_heading(result.manifest["map"]["id"]) != wind_heading("None")  # the map's own wind
     assert sorted((v["x"], v["y"]) for v in block["volumes"]) == [(-60.0, -60.0), (0.0, -60.0), (60.0, 60.0)]
     assert result.manifest["dust"] == {"choice": "light", "wanted": True, "style": "mediterranean", "preset": "dusty", "volumes": 3,
                                        "origin": "generated"}
