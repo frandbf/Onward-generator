@@ -13,7 +13,7 @@ import numpy as np
 
 from onward_generator.contracts import is_schema
 from onward_generator.detail.budget import detail_scene_budget
-from onward_generator.detail.config import DetailConfigError, load_detail_config
+from onward_generator.detail.config import DetailConfigError, load_detail_config, with_parapet
 from onward_generator.detail.lidar_roofs import RoofSpread, SpreadReport
 from onward_generator.detail.lod2 import Lod2Error, Lod2Index, load_index
 from onward_generator.detail.scene import DetailError, detail_scene, load_base
@@ -66,6 +66,9 @@ def build_parser() -> argparse.ArgumentParser:
              "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
     )
     parser.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it (map.json facades.style or the street profile); auto takes the box of the map's centre; decides the style's geometry")  # pragma: no mutate: help text
+    parser.add_argument("--parapet-m", type=float,
+                        metavar="M",  # pragma: no mutate: help text
+                        help="height of every roof parapet, 0.5 to 1.5 m, in place of the templates' (map.json parapet_m)")  # pragma: no mutate: help text
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -218,6 +221,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise DetailError("--mid-ring-m needs --core-radius-m")
             check_mid_ring(args.mid_ring_m)
         cfg = load_detail_config(args.config)
+        if args.parapet_m is not None:
+            cfg = with_parapet(cfg, args.parapet_m)
         typology = load_typology_config(args.typology_config)
         gen_cfg = load_generation_config(args.generation_config)
         clash = sorted(set(cfg.materials) & set(gen_cfg.materials))

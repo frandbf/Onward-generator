@@ -413,6 +413,7 @@ def test_detail_gets_the_map_s_named_facade_style(tmp_path: Path, monkeypatch: p
     facades: list[str] = []
     profile: dict[str, list[str]] = {}
     monkeypatch.setattr("onward_generator.maps.workspace.facade_options", lambda r: list(facades))
+    monkeypatch.setattr("onward_generator.maps.workspace.parapet_height", lambda r: None)  # the bare map.json is no map document
     def flags(r: object) -> dict[str, list[str]]:
         assert r == root  # the profile of this map
         return dict(profile)
@@ -429,3 +430,19 @@ def test_detail_gets_the_map_s_named_facade_style(tmp_path: Path, monkeypatch: p
     assert next_step._facade_style(scene) == ()
     monkeypatch.setattr(next_step, "map_root", lambda path: None)
     assert next_step._facade_style(scene) == ()
+
+
+def test_detail_command_carries_the_map_s_parapet_height(tmp_path: Path) -> None:
+    root = tmp_path / "low"
+    create_map(root, map_id="low", name="Low", latitude=40.40657, longitude=-3.719187, radius_m=120, core_radius_m=0)
+    scene = root / "data" / "processed" / "geo" / "geo_scene.json"
+    assert "--parapet-m" not in detail_command(scene, scene, root).argv
+    document = json.loads((root / "map.json").read_text(encoding="utf-8"))
+    document["parapet_m"] = 0.5
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    argv = list(detail_command(scene, scene, root).argv)
+    assert argv[argv.index("--parapet-m"):argv.index("--out")] == ["--parapet-m", "0.5"]
+    document["parapet_m"] = 1
+    (root / "map.json").write_text(json.dumps(document), encoding="utf-8")
+    assert "1.0" in detail_command(scene, scene, root).argv
+    assert "--parapet-m" not in detail_command(tmp_path / "elsewhere" / "geo_scene.json", scene, root).argv

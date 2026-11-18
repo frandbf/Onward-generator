@@ -200,6 +200,17 @@ def _own_config(scene: Path, name: str, flag: str) -> tuple[str, ...]:
     return (flag, show(own)) if own is not None and own.is_file() else ()
 
 
+def _parapet(scene: Path) -> tuple[str, ...]:
+    """``--parapet-m M`` for detail when ``map.json`` sets ``parapet_m``, else nothing."""
+    root = map_root(scene)
+    if root is None or not (root / "map.json").is_file():
+        return ()
+    from onward_generator.maps.workspace import parapet_height
+
+    height = parapet_height(root)
+    return () if height is None else ("--parapet-m", str(height))
+
+
 def _facade_style(scene: Path) -> tuple[str, ...]:
     """``--facade-style NAME`` for detail when the map names a style the way materials gets it: ``map.json``
     ``facades.style``, else the street profile's applied ``dominant_typology``; nothing for ``auto`` (the box)."""
@@ -265,6 +276,7 @@ def detail_command(scene: Path, heights: Path, base: Path, places: Path | None =
         *_own_config(scene, "detail.json", "--config"),
         *_own_config(scene, "typology.json", "--typology-config"),
         *_facade_style(scene),
+        *_parapet(scene),
         "--out", show(stage_path(scene, STAGE_DIRS["detail"])),
         *_core_flags(scene),
     )

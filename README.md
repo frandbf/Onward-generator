@@ -150,6 +150,7 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `--core-target-triangles N` | Budget core: the core half-side is solved for N core triangles instead of a fixed radius ([ADR-017](docs/decisions/ADR-017-playable-core.md) amendment) |
 | `map.json` `"mid_ring_m": W` | 10 to 1000 m of intermediate HLOD ring around the core (plan D3) |
 | `map.json` `"facades": {"mode": "trim" \| "legacy", "style": "<name>" \| "auto", "weathering": "clean" \| "worn" \| "heavy"}` | Force a facade style, the old per-material facades, or aged walls |
+| `map.json` `"parapet_m": H` | 0.5 to 1.5 m: every roof parapet at this height instead of the templates' 0.7 m, to see more of the street from a roof (0.5 for that); its ladders follow. Rerun from `detail` |
 | `map.json` `"triangle_limit": N` | 100 000 to 300 000 (default 300 000): what props and library trees fill up to and what the package is checked against; 250 000 for the Onward Workshop ([ADR-005](docs/decisions/ADR-005-quest-performance.md) amendment) |
 | `map.json` `"user_decals": false` | Leaves your own wall decals (*Your own wall decals* above) off this map, as a Workshop map must |
 | `map.json` `"project_decals": false` | Leaves the project's wall decals (`assets/decals/`) off this map |
