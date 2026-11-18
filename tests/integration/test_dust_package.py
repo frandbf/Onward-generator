@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ from onward_generator.cli import main
 from onward_generator.export.dust import mote_png
 from onward_generator.export.package import ExportError, build_package, verify_package
 from tests.conftest import FIXED_NOW
-from tests.integration.test_export_package import EXPORT_PROJECT, GOLDEN_OPTIONS_SHA256, GOLDEN_PACKAGE_ID
+from tests.integration.test_export_package import EXPORT_PROJECT
 from tests.integration.test_smoke_package import inputs  # noqa: F401 - the module fixture is shared
 
 ROUTES = [{"points": [{"x": -60.0, "y": -60.0}, {"x": 0.0, "y": -60.0}]}, {"points": [{"x": 60.0, "y": 60.0}]}]
@@ -29,9 +29,9 @@ def _routed(layout: Path, tmp_path: Path) -> Path:
 @pytest.mark.parametrize("choice", ["off", "auto"])
 def test_a_map_that_does_not_get_dust_keeps_its_package(inputs: tuple[Path, Path], tmp_path: Path, choice: str) -> None:  # noqa: F811 - the shared fixture
     detail, layout = inputs
-    result = build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW, dust=choice)
-    assert result.manifest["package_id"] == GOLDEN_PACKAGE_ID
-    assert hashlib.sha256((result.directory / "adapter_options.json").read_bytes()).hexdigest() == GOLDEN_OPTIONS_SHA256
+    routed = _routed(layout, tmp_path)  # routes to stand on, yet a mediterranean map without a preset gets no dust
+    result = build_package(EXPORT_PROJECT, detail, routed, tmp_path / "pkg", now=FIXED_NOW, dust=choice)
+    assert "dust" not in json.loads((result.directory / "adapter_options.json").read_bytes())
     assert not (result.directory / "dust_mote.png").exists()
     if choice == "off":
         assert "dust" not in result.manifest
@@ -81,3 +81,43 @@ def test_an_unknown_style_stops_the_export(inputs: tuple[Path, Path], tmp_path: 
         build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW, dust="auto", facade_style="martian")
     assert caught.value.problems[0].startswith("facade_style: unknown facade style 'martian'")
     assert not (tmp_path / "pkg").exists()
+
+
+def test_auto_takes_the_dusty_light_on_any_style(inputs: tuple[Path, Path], tmp_path: Path) -> None:  # noqa: F811 - the shared fixture
+    detail, layout = inputs
+    result = build_package(EXPORT_PROJECT, detail, _routed(layout, tmp_path), tmp_path / "pkg", now=FIXED_NOW, dust="auto", atmosphere="dusty")
+    assert result.manifest["dust"]["wanted"] is True and result.manifest["dust"]["volumes"] == 3
+
+
+def test_the_colour_is_the_preset_s_fog(inputs: tuple[Path, Path], tmp_path: Path) -> None:  # noqa: F811 - the shared fixture
+    detail, layout = inputs
+    result = build_package(EXPORT_PROJECT, detail, _routed(layout, tmp_path), tmp_path / "pkg", now=FIXED_NOW, dust="light",
+                           atmosphere="golden_hour")
+    assert json.loads((result.directory / "adapter_options.json").read_bytes())["dust"]["color"] == "#E8D2B4"
+
+
+def test_a_route_past_the_core_s_edge_stands_no_volume(inputs: tuple[Path, Path], tmp_path: Path) -> None:  # noqa: F811 - the shared fixture
+    detail, layout = inputs
+    copy = tmp_path / "detail"
+    shutil.copytree(detail, copy)
+    document = json.loads((copy / "scene_detail.json").read_bytes())
+    assert document.get("core") is None  # the fixture plays the whole map: give the copy a 50 m core
+    document["core"] = {"half_side_m": 50.0}
+    (copy / "scene_detail.json").write_text(json.dumps(document), encoding="utf-8")
+    result = build_package(EXPORT_PROJECT, copy, _routed(layout, tmp_path), tmp_path / "pkg", now=FIXED_NOW, dust="light")
+    assert result.manifest["dust"]["volumes"] == 0  # every route point lies 60 m out
+
+
+def test_a_bad_dust_configuration_stops_the_export(inputs: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: F811 - the shared fixture
+    from onward_generator.export import package
+    from onward_generator.export.dust import DustError
+
+    def broken() -> None:
+        raise DustError("dust.json: broken")
+
+    detail, layout = inputs
+    monkeypatch.setattr(package, "load_dust", broken)
+    with pytest.raises(ExportError) as caught:
+        build_package(EXPORT_PROJECT, detail, layout, tmp_path / "pkg", now=FIXED_NOW, dust="light")
+    assert caught.value.problems == ["dust: dust.json: broken"]
+

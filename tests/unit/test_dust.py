@@ -64,6 +64,7 @@ def test_the_configuration() -> None:
     ("volumes", 0, "volumes: 0 is less than the minimum of 1"),
     ("color", "sand", "color: 'sand' does not match '^#[0-9A-Fa-f]{6}$'"),
     ("box_m", [30, 30], "box_m: [30, 30] is too short"),
+    ("box_m", [30, 30, 0], "box_m/2: 0 is less than the minimum of 1"),
 ])
 def test_a_bad_configuration_is_refused_with_its_path(key: str, value: object, message: str) -> None:
     with pytest.raises(DustError) as caught:
@@ -121,9 +122,10 @@ def test_volumes_stand_inside_the_core_clear_of_spawns_and_apart_each_bound_incl
     assert choose_volumes([(50.0, 0.0), (50.001, 10.0)], config, 50.0, layout) == [{"x": 50.0, "y": 0.0, "z": 5.25, "seed": 1}]
     assert [(v["x"], v["y"]) for v in choose_volumes([(-10.0, 30.0), (-29.999, 30.0)], config, 50.0, layout)] == [(-10.0, 30.0)]
     assert [(v["x"], v["y"]) for v in choose_volumes([(-20.0, 40.0), (-20.0, 20.001)], config, 50.0, layout)] == [(-20.0, 40.0)]
-    both = choose_volumes([(0.0, 0.0), (30.0, 0.0)], config, 50.0, layout)  # exactly 30 m apart
-    assert sorted((v["x"], v["y"]) for v in both) == [(0.0, 0.0), (30.0, 0.0)]
-    assert len(choose_volumes([(0.0, 0.0), (29.999, 0.0)], config, 50.0, layout)) == 1
+    for a, b, near in (((10.0, 5.0), (40.0, 5.0), (39.999, 5.0)), ((5.0, -10.0), (5.0, -40.0), (5.0, -39.999))):  # off the origin
+        both = choose_volumes([a, b], config, 50.0, layout)  # exactly 30 m apart
+        assert sorted((v["x"], v["y"]) for v in both) == sorted([a, b])
+        assert len(choose_volumes([a, near], config, 50.0, layout)) == 1
     assert len(choose_volumes([(50.001, 10.0)], config, None, layout)) == 1  # no core: anywhere counts
 
 
