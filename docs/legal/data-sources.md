@@ -265,6 +265,8 @@ GitHub publishes no digest for that release. The archive's SHA-512 matches the o
 
 Since 10 November 2026 each user can convert **their own** downloaded Asset Store packs into local catalogues (`asset-store import`, [ADR-035](../decisions/ADR-035-local-asset-store-catalogues.md)). The Standard Unity Asset Store EULA forbids redistributing the files. The converted GLBs therefore stay in `assets/asset_store_*/` on that machine. Git ignores those folders, and a test checks that no tracked file names the EULA. A built map may embed them, as the EULA allows for a Licensed Product. The export package and those GLBs must not be shared or published.
 
+Since 18 November 2026 `asset-store particles` also copies the particle textures (flames, smoke, motes) of the user's own *Particle Pack Starter Assets* into `assets/asset_store_particle_pack_starter_assets/`, under the same EULA and the same rule: local only, never committed, used only inside a built map. The pack's prefabs, materials and scripts are not taken.
+
 Approved to import, and still not instantiated: **327313**, **71042** (furniture only), and **251403**. A pack whose licence or shader does not fit `PP_Opaque_Simple_Lit` stays out. Store shaders do not replace that shader.
 
 ## Quest measurement and export

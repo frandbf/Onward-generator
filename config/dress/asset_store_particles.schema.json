@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Particle textures from Asset Store packages (ADR-035 amendment of 18 November 2026)",
+  "type": "object",
+  "required": ["schema", "schema_version", "packages"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "onward_generator.asset_store_particles"},
+    "schema_version": {"const": "0.1.0"},
+    "description": {"type": "string"},
+    "packages": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z0-9_]{1,48}$"},
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "propertyNames": {"enum": ["flame", "large_flame", "smoke", "dust_mote", "sand_puff", "ground_fog", "spark"]},
+        "additionalProperties": {
+          "type": "object",
+          "required": ["path", "tiles", "max_px", "prefab", "note"],
+          "additionalProperties": false,
+          "properties": {
+            "path": {"type": "string", "pattern": "^Assets/[^\\\\]+\\.(png|tga|tif|tiff|jpg|jpeg)$"},
+            "tiles": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 16}, "minItems": 2, "maxItems": 2},
+            "max_px": {"type": "integer", "minimum": 64, "maximum": 2048},
+            "prefab": {"type": "string", "minLength": 1},
+            "note": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}
