@@ -66,9 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
              "core landmark footprints instead of the placeholder shell and tower (plan D6, opt-in)",  # pragma: no mutate: help text
     )
     parser.add_argument("--facade-style", default="auto", help="the map's facade style as materials resolves it (map.json facades.style or the street profile); auto takes the box of the map's centre; decides the style's geometry")  # pragma: no mutate: help text
-    parser.add_argument("--parapet-m", type=float,
-                        metavar="M",  # pragma: no mutate: help text
-                        help="height of every roof parapet, 0.5 to 1.5 m, in place of the templates' (map.json parapet_m)")  # pragma: no mutate: help text
+    parser.add_argument("--parapet-m", type=float, metavar="M",
+                        help="height of every roof parapet, 0.5 to 1.5 m, in place of the templates' (map.json parapet_m)")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 

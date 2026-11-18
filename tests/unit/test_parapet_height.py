@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from onward_generator.detail.__main__ import build_parser
 from onward_generator.detail.config import PARAPET_MAX_M, PARAPET_MIN_M, load_detail_config, with_parapet
 from onward_generator.maps.workspace import MapError, create_map, parapet_height
 
@@ -57,3 +58,8 @@ def test_every_template_with_a_parapet_takes_the_height_and_the_others_keep_none
 def test_a_height_out_of_bounds_is_refused(height: float) -> None:
     with pytest.raises(ValueError, match=rf"^parapet height must be from 0.5 to 1.5 m, got {height}$"):
         with_parapet(load_detail_config(), height)
+
+
+def test_the_detail_help_names_the_flag_and_its_bounds() -> None:
+    text = " ".join(build_parser().format_help().split())
+    assert "--parapet-m M height of every roof parapet, 0.5 to 1.5 m, in place of the templates' (map.json parapet_m)" in text
