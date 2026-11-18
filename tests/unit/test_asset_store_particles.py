@@ -30,9 +30,9 @@ FLAME = "Assets/Pack/Fire/Flame.tif"
 MOTE = "Assets/Pack/Misc/Mote.png"
 
 
-def _image(size: tuple[int, int], fmt: str = "PNG") -> bytes:
+def _image(size: tuple[int, int], fmt: str = "PNG", mode: str = "RGBA") -> bytes:
     out = io.BytesIO()
-    Image.new("RGBA", size, (250, 140, 20, 90)).save(out, format=fmt)
+    Image.new(mode, size, (250, 140, 20, 90)[:len(mode)]).save(out, format=fmt)
     return out.getvalue()
 
 
@@ -49,10 +49,11 @@ def _package(tmp_path: Path, members: dict[str, bytes], prefix: str = "") -> Pat
 
 
 SPECS = {
-    "flame": ParticleSpec(FLAME, (10, 10), 64, "MediumFlames", "Flames."),
-    "dust_mote": ParticleSpec(MOTE, (1, 1), 256, "DustMotesEffect", "A mote."),
-    "smoke": ParticleSpec("Assets/Pack/Missing.png", (5, 5), 1024, "SmokeEffect", "Not in the package."),
+    "dust_mote": ParticleSpec("Assets/Pack/Missing.png", (5, 5), 1024, "DustMotesEffect", "Not in the package."),
+    "flame": ParticleSpec(FLAME, (8, 4), 64, "MediumFlames", "Flames."),
+    "spark": ParticleSpec(MOTE, (1, 1), 256, "ElectricalSparks", "A spark."),
 }
+"""In role order the missing image comes first, so a role left out does not end the loop."""
 
 
 def test_the_table_names_the_starter_pack_s_textures() -> None:
@@ -77,21 +78,24 @@ def test_a_broken_table_names_the_first_problem() -> None:
     with pytest.raises(ParticleTableError, match="rain"):
         parse_table(bad, schema, "here")
     parsed = parse_table(doc, schema, "here")
+    wide = copy.deepcopy(doc)
+    wide["packages"]["particle_pack_starter_assets"]["flame"]["tiles"] = [8, 4]
+    assert parse_table(wide, schema, "here")["particle_pack_starter_assets"]["flame"].tiles == (8, 4)
     assert parsed["particle_pack_starter_assets"]["spark"] == ParticleSpec(
         "Assets/UnityTechnologies/ParticlePack/EffectExamples/Misc Effects/Textures/SparkParticle.tif", (1, 1), 256,
         "ElectricalSparks", "One bright spark.")
 
 
 def test_the_rows_keep_alpha_cap_the_size_and_record_the_flipbook(tmp_path: Path) -> None:
-    _package(tmp_path, {FLAME: _image((256, 128), "TIFF"), MOTE: _image((32, 32)), "Assets/Pack/Readme.txt": b"hello"},
+    _package(tmp_path, {FLAME: _image((256, 128), "TIFF"), MOTE: _image((32, 32), mode="RGB"), "Assets/Pack/Readme.txt": b"hello"},
              prefix="./")
     package = find_packages(tmp_path / "cache")[0]
     assets = tmp_path / "assets"
     rows = particle_rows(package, assets, SPECS)
-    assert [row["role"] for row in rows] == ["dust_mote", "flame"]  # sorted, the missing smoke left out
-    flame = rows[1]
+    assert [row["role"] for row in rows] == ["flame", "spark"]  # sorted, the missing mote left out
+    flame = rows[0]
     assert flame["path"] == "assets/asset_store_particle_pack/particle_flame.png"
-    assert flame["px"] == 64 and flame["tiles"] == [10, 10] and flame["frames"] == 100 and flame["prefab"] == "MediumFlames"
+    assert flame["px"] == 64 and flame["tiles"] == [8, 4] and flame["frames"] == 32 and flame["prefab"] == "MediumFlames"
     assert flame["license"] == "LicenseRef-Unity-Asset-Store-EULA" and flame["license_url"] == "https://unity.com/legal/as-terms"
     assert flame["credit"] == ("Flame.tif from Particle Pack by Unity Technologies, Unity Asset Store EULA; local copy, never "
                                "committed.") and flame["note"] == "Flames."
@@ -101,13 +105,17 @@ def test_the_rows_keep_alpha_cap_the_size_and_record_the_flipbook(tmp_path: Path
         assert image.format == "PNG" and image.mode == "RGBA" and image.size == (64, 32)
         red, green, blue, alpha = image.getpixel((5, 5))
         assert alpha == 90 and abs(red - 250) <= 2 and abs(green - 140) <= 3 and abs(blue - 20) <= 2  # resampled
-    assert rows[0]["px"] == 32 and rows[0]["frames"] == 1
+    assert rows[1]["px"] == 32 and rows[1]["frames"] == 1 and rows[1]["path"].endswith("/particle_spark.png")
+    with Image.open(assets.parent / rows[1]["path"]) as image:
+        assert image.mode == "RGBA" and image.getpixel((0, 0)) == (250, 140, 20, 255)  # an image without alpha gains an opaque one
     manifest = json.loads((assets / "asset_store_particle_pack" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema"] == PARTICLES_SCHEMA and manifest["schema_version"] == "0.1.0" and manifest["particles"] == rows
-    assert manifest["source"].startswith("Unity Asset Store EULA (Extension Asset), local only: Unity Technologies / Particle Pack.")
+    assert manifest["source"] == ("Unity Asset Store EULA (Extension Asset), local only: Unity Technologies / Particle Pack. "
+                                  "Converted on this machine; never committed or redistributed outside a built map.")
     assert manifest["package"] == {"publisher": "Unity Technologies", "category": "Particle Systems", "name": "Particle Pack"}
     licence = (assets / "asset_store_particle_pack" / "License.txt").read_text(encoding="utf-8")
-    assert licence.startswith("Particle Pack by Unity Technologies, from the Unity Asset Store") and "Do not commit" in licence
+    assert licence == ("Particle Pack by Unity Technologies, from the Unity Asset Store, under the Standard Unity Asset Store EULA.\n"
+                       "Local copy for this user's maps only. Do not commit, share or publish these files.\n")
 
 
 def test_an_unreadable_or_absent_image_writes_nothing(tmp_path: Path) -> None:
@@ -115,6 +123,12 @@ def test_an_unreadable_or_absent_image_writes_nothing(tmp_path: Path) -> None:
     assets = tmp_path / "assets"
     assert particle_rows(find_packages(tmp_path / "cache")[0], assets, SPECS) == []
     assert not (assets / "asset_store_particle_pack").exists()
+
+
+def test_an_unreadable_image_does_not_stop_the_next_role(tmp_path: Path) -> None:
+    _package(tmp_path, {FLAME: b"not an image", MOTE: _image((16, 16))})
+    rows = particle_rows(find_packages(tmp_path / "cache")[0], tmp_path / "assets", SPECS)
+    assert [row["role"] for row in rows] == ["spark"]
 
 
 def test_a_member_over_the_size_cap_is_not_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,7 +162,10 @@ def test_the_local_particles_check_each_file_and_honour_the_switch(tmp_path: Pat
     _file(assets, "assets/asset_store_a/smoke.png", b"changed")
     unknown = {"role": "rain", **_file(assets, "assets/asset_store_a/rain.png", b"rain")}
     outside = {"role": "spark", **_file(assets, "elsewhere/spark.png", b"spark")}
-    _catalogue(assets, "asset_store_a", [flame, stale, unknown, outside, "x", {"path": "no role"}])
+    _catalogue(assets, "asset_store_0", [{"role": "sand_puff", **_file(assets, "assets/asset_store_0/p.png", b"p")}],
+               schema="onward_generator.imported_library")  # first in name order: a skipped catalogue does not end the search
+    _catalogue(assets, "asset_store_a", [flame, stale, unknown, outside, "x", {"path": "no role"}, {"role": "large_flame"},
+                                         {"role": "ground_fog", "path": 3}])
     later = {"role": "flame", **_file(assets, "assets/asset_store_b/flame.png", b"flame-b")}
     mote = {"role": "dust_mote", **_file(assets, "assets/asset_store_b/mote.png", b"mote")}
     _catalogue(assets, "asset_store_b", [later, mote])
@@ -169,14 +186,17 @@ def test_the_particles_command_imports_the_table_s_packages(tmp_path: Path, monk
     import onward_generator.assetstore.__main__ as cli
 
     _package(tmp_path, {FLAME: _image((32, 32)), MOTE: _image((16, 16))})
+    second = tmp_path / "cache" / "Pub" / "Particle Systems" / "Sparks.unitypackage"
+    second.parent.mkdir(parents=True)
+    second.write_bytes(_package(tmp_path / "s", {MOTE: _image((16, 16))}).read_bytes())
     monkeypatch.setattr("onward_generator.assetstore.particles.read_table",
-                        lambda: {"particle_pack": SPECS, "absent_pack": {"spark": SPECS["dust_mote"]}})
+                        lambda: {"particle_pack": SPECS, "absent_pack": {"spark": SPECS["spark"]}, "sparks": {"spark": SPECS["spark"]}})
     monkeypatch.setattr(cli, "ASSETS", tmp_path / "assets")
     assert cli.main(["particles", "--cache", str(tmp_path / "cache")]) == 0
     out = capsys.readouterr().out
     assert "absent_pack: not downloaded\n" in out
-    assert "particle_pack: 2 particle textures of 3 named (dust_mote, flame)\n" in out
-    assert out.endswith(f"\n2 particle textures under {tmp_path / 'assets'}/asset_store_*\n")
+    assert "particle_pack: 2 particle textures of 3 named (flame, spark)\n" in out and "sparks: 1 particle textures of 1 named (spark)\n" in out
+    assert out.endswith(f"\n3 particle textures under {tmp_path / 'assets'}/asset_store_*\n")  # both packages counted
     assert cli.main(["particles", "--cache", str(tmp_path / "cache"), "--only", "absent_pack"]) == 0
     assert capsys.readouterr().out == f"absent_pack: not downloaded\n0 particle textures under {tmp_path / 'assets'}/asset_store_*\n"
     with pytest.raises(SystemExit, match="asset-store: other, zzz has no particle textures in config/dress/asset_store_particles.json"):

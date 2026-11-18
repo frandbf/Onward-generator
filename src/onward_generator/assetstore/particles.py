@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import re
+import posixpath
 import tarfile
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -68,7 +68,7 @@ def read_table(path: Path = TABLE_PATH, schema_path: Path = SCHEMA_PATH) -> dict
 
 def _members_by_path(archive: tarfile.TarFile) -> dict[str, tarfile.TarInfo]:
     """``{path in the package: its asset member}`` for every asset no larger than ``MAX_MEMBER_BYTES``."""
-    members = {m.name.removeprefix("./"): m for m in archive.getmembers() if m.isfile()}
+    members = {m.name: m for m in archive.getmembers() if m.isfile()}
     found: dict[str, tarfile.TarInfo] = {}
     for name, member in sorted(members.items()):
         if not name.endswith("/pathname"):
@@ -87,9 +87,9 @@ def _png(archive: tarfile.TarFile, member: tarfile.TarInfo, max_px: int) -> tupl
         raise ValueError(f"{member.name}: no data")  # pragma: no mutate: a regular member always has a handle
     with Image.open(io.BytesIO(handle.read())) as picture:
         image = picture.convert("RGBA")
-    image.thumbnail((max_px, max_px), Image.Resampling.LANCZOS)
+    image.thumbnail((max_px, max_px))
     out = io.BytesIO()
-    image.save(out, format="PNG", optimize=True)
+    image.save(out, format="PNG")
     return out.getvalue(), max(image.size)
 
 
@@ -109,14 +109,14 @@ def particle_rows(package: Package, assets: Path, chosen: Mapping[str, ParticleS
             except (OSError, ValueError):
                 continue
             target.mkdir(parents=True, exist_ok=True)
-            file = f"particle_{re.sub(r'[^a-z0-9_]+', '_', role)}.png"
+            file = f"particle_{role}.png"  # a role is one of ROLES: lower case and underscores
             atomic_write_bytes(target / file, data)
             rows.append({
                 "role": role, "path": (target / file).relative_to(assets.parent).as_posix(),
                 "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "px": px,
                 "tiles": list(spec.tiles), "frames": spec.tiles[0] * spec.tiles[1], "prefab": spec.prefab,
                 "license": LICENCE_SPDX, "license_url": "https://unity.com/legal/as-terms",
-                "credit": f"{spec.path.rsplit('/', 1)[-1]} from {package.name} by {package.publisher}, Unity Asset Store EULA; "
+                "credit": f"{posixpath.basename(spec.path)} from {package.name} by {package.publisher}, Unity Asset Store EULA; "
                           "local copy, never committed.",
                 "note": spec.note,
             })
@@ -143,9 +143,10 @@ def local_particles(assets: Path, env: Mapping[str, str] | None = None) -> dict[
         if document.get("schema") != PARTICLES_SCHEMA:
             continue
         for row in document.get("particles") or []:
-            if not isinstance(row, dict) or row.get("role") not in ROLES or row["role"] in found:
+            if (not isinstance(row, dict) or row.get("role") not in ROLES or row["role"] in found
+                    or not isinstance(row.get("path"), str)):
                 continue
-            file = (assets.parent / str(row.get("path", ""))).resolve()
+            file = (assets.parent / row["path"]).resolve()
             if file.is_relative_to(assets.resolve()) and file.is_file() and hashlib.sha256(file.read_bytes()).hexdigest() == row.get("sha256"):
                 found[row["role"]] = {**row, "file": file}
     return found
