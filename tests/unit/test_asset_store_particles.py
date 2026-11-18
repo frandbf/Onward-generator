@@ -238,13 +238,16 @@ def test_the_particles_help_documents_its_options(monkeypatch: pytest.MonkeyPatc
 
 def test_an_image_drawn_on_black_takes_its_alpha_from_its_brightness() -> None:
     assert ALPHA_MODES == ("keep", "luminance")
-    source = Image.new("RGB", (3, 1))
+    source = Image.new("RGB", (4, 1))
     source.putpixel((0, 0), (0, 0, 0))
     source.putpixel((1, 0), (200, 100, 50))
     source.putpixel((2, 0), (255, 255, 255))
+    source.putpixel((3, 0), (1, 0, 0))
     image = luminance_alpha(source)
     assert image.mode == "RGBA"
-    assert [image.getpixel((x, 0)) for x in range(3)] == [(0, 0, 0, 0), (255, 128, 64, 200), (255, 255, 255, 255)]
+    assert [image.getpixel((x, 0)) for x in range(4)] == [(0, 0, 0, 0), (255, 128, 64, 200), (255, 255, 255, 255), (255, 0, 0, 1)]
+    grey = luminance_alpha(Image.new("L", (1, 1), 100))  # a single-channel image is read as RGB
+    assert grey.getpixel((0, 0)) == (255, 255, 255, 100)
 
 
 def test_a_luminance_role_is_written_without_its_black(tmp_path: Path) -> None:

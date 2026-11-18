@@ -88,9 +88,9 @@ def _members_by_path(archive: tarfile.TarFile) -> dict[str, tarfile.TarInfo]:
 def luminance_alpha(image: Image.Image) -> Image.Image:
     """An image drawn on black for additive blending, made fit for alpha blending: its alpha is its brightest channel
     and its colour is divided by that alpha, so a pixel drawn over a background looks as it did added to black."""
-    rgb = np.asarray(image.convert("RGB")).astype(np.float64)
+    rgb = np.asarray(image.convert("RGB"))
     alpha = rgb.max(axis=2)
-    colour = np.where(alpha[..., None] > 0, rgb * 255.0 / np.maximum(alpha, 1.0)[..., None], 0.0)
+    colour = rgb * 255.0 / np.maximum(alpha, 1)[..., None]  # a black pixel stays black: 0 / 1
     pixels = np.dstack([np.round(colour), alpha]).astype(np.uint8)  # colour <= 255: no channel exceeds the maximum
     return Image.fromarray(pixels)
 
