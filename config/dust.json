@@ -1,0 +1,19 @@
+{
+  "schema": "onward_generator.dust",
+  "schema_version": "0.1.0",
+  "description": "Dust in the air (plan 2026-11-17-efectos-sdk, increment F; ADR-047): fine motes that drift with the wind over the streets of the playable core, drawn by the Unity adapter as particles on the SDK's dithered unlit shader. A map whose light preset or facade style is listed gets them by default (map.json \"dust\": \"light\" or \"off\" overrides). Lengths in metres, times in seconds.",
+  "presets": ["dusty"],
+  "styles": ["arid", "east_african"],
+  "volumes": 6,
+  "apart_m": 30.0,
+  "spawn_clear_m": 0.0,
+  "box_m": [30.0, 30.0, 5.5],
+  "base_m": 0.5,
+  "rate_per_s": 7.5,
+  "lifetime_s": 8.0,
+  "min_size_m": 0.03,
+  "max_size_m": 0.1,
+  "drift_m_s": 0.5,
+  "color": "#C9B48E",
+  "max_particles": 60
+}

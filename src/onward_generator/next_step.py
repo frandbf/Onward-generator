@@ -476,7 +476,11 @@ def export_invocation(root: Path, detail: Path, layout: Path, out: Path) -> Stag
     if config.is_file():
         parts.extend(["--config", show(config)])
     parts.extend(["--layout", show(layout), "--out", show(out)])
-    parts.extend(_soundscape(root, detail))
+    sound = _soundscape(root, detail)
+    dust = _dust(root)
+    parts.extend(sound + dust)
+    if dust and "--facade-style" not in sound:
+        parts.extend(_facade_style(detail))
     atmosphere = _atmosphere(root)
     if atmosphere is not None:
         parts.extend(["--atmosphere", atmosphere])
@@ -499,6 +503,16 @@ def _fire(root: Path) -> list[str]:
     from onward_generator.maps.workspace import fire_enabled
 
     return ["--fire"] if (root / "map.json").is_file() and fire_enabled(root) else []
+
+
+def _dust(root: Path) -> list[str]:
+    """``--dust CHOICE`` for export (plan 2026-11-17, increment F): the ``map.json`` value, ``auto`` without the key, so
+    export decides by the light preset and the facade style; nothing outside a map folder."""
+    if not (root / "map.json").is_file():
+        return []
+    from onward_generator.maps.workspace import dust
+
+    return ["--dust", dust(root)]
 
 
 def _soundscape(root: Path, detail: Path) -> list[str]:

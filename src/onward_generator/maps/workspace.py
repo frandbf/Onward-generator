@@ -381,6 +381,17 @@ def smoke_columns(directory: str | Path) -> int:
         raise MapError(str(exc)) from exc
 
 
+def dust(directory: str | Path) -> str:
+    """``map.json`` ``dust`` (plan 2026-11-17, increment F): ``auto`` without the key, else ``light`` or ``off``.
+    Anything else is refused with ``MapError``."""
+    from onward_generator.export.dust import DustError, check_choice
+
+    try:
+        return check_choice(load_map(directory).get("dust"))
+    except DustError as exc:
+        raise MapError(str(exc)) from exc
+
+
 def fire_enabled(directory: str | Path) -> bool:
     """``map.json`` ``fire`` (plan 2026-11-17, increment E): flames and embers under the smoke columns, False without the
     key. True or false; anything else is refused with ``MapError``."""

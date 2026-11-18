@@ -2,7 +2,7 @@
 
 Fecha: 17 de noviembre de 2026. Pedido por el mantenedor tras probar Mogadiscio pkg_20 en el casco, después de revisar qué ofrece el SDK v1.15 además de lo que ya usamos (humo de ADR-043, tormenta de ADR-028, sobrevuelos, ambiente `Suburban Day/Night`, pájaros, viento en tejados, reverberación del monumento y niebla por preset).
 
-**Estado (17 de noviembre de 2026).** D (paisaje sonoro, ADR-046 propuesto) fusionado (#132). E (fuego, enmienda de ADR-043) en su PR. Difiere del plan en dos puntos: se resuelve en `export package --soundscape` y no en `perf layout`, para no tocar el contrato del layout; y hay un modo `regional` (pájaros, viento y generador sin combate), que es lo que da `auto` sin daño `heavy`. G0 está construido y espera al casco.
+**Estado (17 de noviembre de 2026).** D (paisaje sonoro, ADR-046 propuesto) fusionado (#132). E (fuego, enmienda de ADR-043) fusionado (#133). F (polvo, ADR-047 propuesto) en su PR: los volúmenes se apoyan en las rutas de la IA, que siguen las calles transitables. Difiere del plan en dos puntos: se resuelve en `export package --soundscape` y no en `perf layout`, para no tocar el contrato del layout; y hay un modo `regional` (pájaros, viento y generador sin combate), que es lo que da `auto` sin daño `heavy`. G0 está construido y espera al casco.
 
 Todo es genérico: cada efecto se decide por el estilo de fachada, el nivel de daño (`signs/damage.py`), el preset de luz o una clave de `map.json`, nunca por el nombre de un lugar. Un mapa sin las claves nuevas y sin estilo, daño o preset que las active sale igual byte a byte (Murcia, Madrid y París no cambian).
 

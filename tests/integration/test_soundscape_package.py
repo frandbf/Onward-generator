@@ -81,7 +81,7 @@ def test_an_unknown_style_or_mode_stops_the_export(inputs: tuple[Path, Path], tm
     detail, layout = inputs
     with pytest.raises(ExportError) as caught:
         build_package(EXPORT_PROJECT, detail, layout, tmp_path / "style", now=FIXED_NOW, soundscape="war", facade_style="martian")
-    assert caught.value.problems[0].startswith("soundscape: unknown facade style 'martian'")
+    assert caught.value.problems[0].startswith("facade_style: unknown facade style 'martian'")
     with pytest.raises(ExportError, match="soundscape"):
         build_package(EXPORT_PROJECT, detail, layout, tmp_path / "mode", now=FIXED_NOW, soundscape="auto")
     assert not (tmp_path / "style").exists() and not (tmp_path / "mode").exists()
