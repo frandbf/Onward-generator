@@ -100,6 +100,7 @@ Use the same `--name`, `--lat` and `--lon` with the new flag, and `--from` the s
 | Smoke columns (`smoke`) | `export` |
 | Soundscape (`soundscape`) | `export` |
 | Fire under the smoke (`fire`) | `export` |
+| Dust in the air (`dust`) | `export` |
 | Lightmap detail (`build.lightmap_texels_per_m` in `config/export.json`) | `export`, then a new Unity build |
 | Centre or radius | Don't. Make a new map with a new name: `map.json` keeps the area it was created with. |
 

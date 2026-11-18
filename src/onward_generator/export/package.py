@@ -39,6 +39,19 @@ from onward_generator.export.atmosphere import (
     load_presets,
 )
 from onward_generator.export.cutouts import CutoutError, cutout_options, scene_cutouts
+from onward_generator.export.dust import OFF as DUST_OFF
+from onward_generator.export.dust import TEXTURE_FILE as DUST_TEXTURE
+from onward_generator.export.dust import TEXTURE_ROLE as DUST_ROLE
+from onward_generator.export.dust import (
+    DustError,
+    choose_volumes,
+    dust_options,
+    dust_wanted,
+    load_dust,
+    mote_png,
+    route_points,
+    wind_heading,
+)
 from onward_generator.export.fire import TEXTURE_FILE as FIRE_TEXTURE
 from onward_generator.export.fire import TEXTURE_ROLE as FIRE_ROLE
 from onward_generator.export.fire import fire_options, flame_png
@@ -469,14 +482,16 @@ def _description(config: Mapping[str, Any], attribution: list[Mapping[str, Any]]
 def build_package(project: str | Path, detail_dir: str | Path, layout: str | Path, out_dir: str | Path, *,
                   export_config: str | Path | None = None, now: datetime | None = None,
                   atmosphere: str | None = None, triangle_limit: int = UNITY_TRIANGLE_LIMIT, smoke: int = 0,
-                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto", fire: bool = False) -> PackageResult:
+                  soundscape: str = SOUND_DEFAULT, facade_style: str = "auto", fire: bool = False,
+                  dust: str = DUST_OFF) -> PackageResult:
     """Validate every input, then write the package into ``out_dir``, which must not exist yet.
 
     ``atmosphere`` names a preset of ``config/atmosphere.default.json`` (ADR-037). None or ``neutral``
     changes nothing, the package id included. ``smoke`` asks for that many smoke columns (plan 2026-11-15,
     increment C); 0 changes nothing. ``soundscape`` is a mode of ``export.soundscape`` (plan 2026-11-17, increment D)
     and ``facade_style`` the map's style as materials resolves it; ``default`` changes nothing. ``fire`` lights flames
-    and embers under every smoke column (plan 2026-11-17, increment E); without a column it writes nothing."""
+    and embers under every smoke column (plan 2026-11-17, increment E); without a column it writes nothing. ``dust``
+    (``auto``, ``light`` or ``off``) fills a few volumes over the AI routes with drifting motes (increment F)."""
     preset = None if atmosphere in (None, NEUTRAL) else atmosphere
     detail = Path(detail_dir).expanduser().resolve()
     out = Path(out_dir).expanduser().resolve()
@@ -599,6 +614,23 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             options["fire"] = fire_options(columns)
         else:
             warnings.append("fire: no smoke column to burn under; set map.json \"smoke\" to light the fire")
+    dust_record: dict[str, Any] | None = None
+    if dust != DUST_OFF:
+        # Plan 2026-11-17, increment F: the block only when the map gets dust and has routes, so others keep their package_id.
+        try:
+            dust_config = load_dust()
+            style = _style(detail_manifest, facade_style)
+            wanted = dust_wanted(dust, preset, style, dust_config)
+        except DustError as exc:
+            raise ExportError([f"dust: {exc}"]) from exc
+        volumes = (choose_volumes(route_points(layout_doc), dust_config, (detail_manifest.get("core") or {}).get("half_side_m"), layout_doc)
+                   if wanted else [])
+        dust_record = {"choice": dust, "wanted": wanted, "style": style, "preset": preset, "volumes": len(volumes), "origin": "generated"}
+        if volumes:
+            fog = (load_presets()[preset].get("fog") or {}).get("color") if preset is not None else None
+            options["dust"] = dust_options(volumes, dust_config, fog, wind_heading(str(cfg["map"]["id"])))
+        elif wanted:
+            warnings.append("dust: the layout has no AI route inside the core to stand a dust volume on")
     sound_record: dict[str, Any] | None = None
     if soundscape != SOUND_DEFAULT:
         # Plan 2026-11-17, increment D: the block only when the mode changes something, so others keep their package_id.
@@ -648,6 +680,10 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             atomic_write_bytes(out / SMOKE_TEXTURE, puff_png())
             files.append({"role": SMOKE_ROLE, "path": SMOKE_TEXTURE, "sha256": sha256_file(out / SMOKE_TEXTURE),
                           "bytes": (out / SMOKE_TEXTURE).stat().st_size, "source": "generated"})
+        if "dust" in options:
+            atomic_write_bytes(out / DUST_TEXTURE, mote_png())
+            files.append({"role": DUST_ROLE, "path": DUST_TEXTURE, "sha256": sha256_file(out / DUST_TEXTURE),
+                          "bytes": (out / DUST_TEXTURE).stat().st_size, "source": "generated"})
         if "fire" in options:
             atomic_write_bytes(out / FIRE_TEXTURE, flame_png())
             files.append({"role": FIRE_ROLE, "path": FIRE_TEXTURE, "sha256": sha256_file(out / FIRE_TEXTURE),
@@ -708,6 +744,8 @@ def build_package(project: str | Path, detail_dir: str | Path, layout: str | Pat
             manifest["smoke"] = smoke_record
         if fire_record is not None:
             manifest["fire"] = fire_record
+        if dust_record is not None:
+            manifest["dust"] = dust_record
         if sound_record is not None:
             manifest["soundscape"] = sound_record
         atomic_write_json(out / MANIFEST_FILE, manifest)
@@ -726,7 +764,7 @@ def _style(detail_manifest: Mapping[str, Any], request: str) -> str:
     try:
         return resolve_style(load_style_table(), request, origin or None)[0]
     except StyleError as exc:
-        raise ExportError([f"soundscape: {exc}"]) from exc
+        raise ExportError([f"facade_style: {exc}"]) from exc
 
 
 def _tiers(visual: bytes, detail_manifest: Mapping[str, Any], cell_m: float) -> dict[str, Any] | None:

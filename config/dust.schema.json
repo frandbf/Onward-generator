@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "onward-generator dust in the air",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "presets", "styles", "volumes", "apart_m", "spawn_clear_m", "box_m", "base_m", "rate_per_s", "lifetime_s",
+               "min_size_m", "max_size_m", "drift_m_s", "color", "max_particles"],
+  "properties": {
+    "schema": { "const": "onward_generator.dust" },
+    "schema_version": { "const": "0.1.0" },
+    "description": { "type": "string" },
+    "presets": { "description": "Light presets (config/atmosphere.default.json) whose maps get dust unless map.json says otherwise", "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" } },
+    "styles": { "description": "Facade styles (config/facade_styles.json) whose maps get dust unless map.json says otherwise", "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" } },
+    "volumes": { "description": "Emission volumes on the map, over its AI routes", "type": "integer", "minimum": 1, "maximum": 12 },
+    "apart_m": { "description": "Least distance between two volumes' centres", "type": "number", "minimum": 5, "maximum": 200 },
+    "spawn_clear_m": { "description": "Least distance from a volume's centre to a spawn point or an objective", "type": "number", "minimum": 0, "maximum": 60 },
+    "box_m": { "description": "A volume's width, depth and height", "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "minimum": 1, "maximum": 100 } },
+    "base_m": { "description": "Height of a volume's floor over the ground", "type": "number", "minimum": 0, "maximum": 5 },
+    "rate_per_s": { "type": "number", "exclusiveMinimum": 0, "maximum": 50 },
+    "lifetime_s": { "type": "number", "exclusiveMinimum": 0, "maximum": 30 },
+    "min_size_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 },
+    "max_size_m": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 },
+    "drift_m_s": { "description": "Wind speed the motes drift at, in one heading per map", "type": "number", "minimum": 0, "maximum": 3 },
+    "color": { "description": "Colour of the motes when the map's light preset has no fog colour", "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "max_particles": { "description": "Motes in one volume at most", "type": "integer", "minimum": 1, "maximum": 200 }
+  }
+}

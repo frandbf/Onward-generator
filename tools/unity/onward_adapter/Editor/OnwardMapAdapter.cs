@@ -74,6 +74,11 @@ namespace OnwardGenerator
         // Plan 2026-11-17, increment E: flames and embers under the smoke, on the SDK's unlit particle shader.
         private const string FireShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Unlit.shadergraph";
         private const string FireRole = "fire_texture";
+        // Plan 2026-11-17, increment F: dust motes on the smoke's lit particle shader, soft-edged and lit by the probes. The
+        // dithered unlit shader drew hard white squares on the headset: it ignores the particle colour and its cut-out
+        // turns a few-pixel dot into a square.
+        private const string DustShaderPath = SdkRoot + "/Internal/Shaders/PP_Particle_Simple_Lit.shadergraph";
+        private const string DustRole = "dust_texture";
         // A matte plaster: low smoothness and the dielectric 4 % specular colour, so the relief reads without a sheen.
         private const float LitNormalSmoothness = 0.1f;
         private const float LitNormalSpecular = 0.04f;
@@ -168,6 +173,27 @@ namespace OnwardGenerator
             public SoundscapeOptions soundscape = new SoundscapeOptions();
             // Plan 2026-11-17, increment E: flames and embers under the smoke columns. Absent (no sites) in every package without fire.
             public FireOptions fire = new FireOptions();
+            // Plan 2026-11-17, increment F: dust motes over the AI routes. Absent (no volumes) in every package without dust.
+            public DustOptions dust = new DustOptions();
+        }
+
+        [Serializable] private class DustVolume { public float x; public float y; public float z; public int seed; }
+
+        [Serializable]
+        private class DustOptions
+        {
+            public string texture = "";
+            public float[] box_m = new float[0];
+            public float base_m;
+            public float rate_per_s;
+            public float lifetime_s;
+            public float min_size_m;
+            public float max_size_m;
+            public float drift_m_s;
+            public string color = "";
+            public int max_particles;
+            public float heading_deg;
+            public DustVolume[] volumes = new DustVolume[0];
         }
 
         [Serializable] private class FireSite { public float x; public float y; public float z; public int seed; }
@@ -381,6 +407,11 @@ namespace OnwardGenerator
             int fireSites = (pkg.Options.fire?.sites ?? new FireSite[0]).Length;
             if (fireFiles > 1 || (fireSites > 0) != (fireFiles == 1))
                 throw new InvalidDataException($"adapter_options.json fire has {fireSites} sites, the package lists {fireFiles} '{FireRole}' files");
+            // Plan 2026-11-17, increment F: dust volumes come with exactly one listed (and so verified) mote texture.
+            int dustFiles = m.files.Count(f => f.role == DustRole);
+            int dustVolumes = (pkg.Options.dust?.volumes ?? new DustVolume[0]).Length;
+            if (dustFiles > 1 || (dustVolumes > 0) != (dustFiles == 1))
+                throw new InvalidDataException($"adapter_options.json dust has {dustVolumes} volumes, the package lists {dustFiles} '{DustRole}' files");
             if (!IsSchema(pkg.Layout.schema, "perf_layout") && !IsSchema(pkg.Layout.schema, "gameplay_layout"))
                 throw new InvalidDataException("layout is not a onward_generator.perf_layout or onward_generator.gameplay_layout document");
             Debug.Log($"{LogPrefix} Package {m.package_id}: {m.files.Length} files verified (manifest sha256 {pkg.ManifestSha256})");
@@ -1080,6 +1111,7 @@ namespace OnwardGenerator
                 AddStreetLights(pkg.Layout);
                 AddSmoke(pkg, root);
                 AddFire(pkg, root);
+                AddDust(pkg, root);
                 ApplySoundscape(pkg.Options.soundscape);
                 AddClimbProbes(pkg.Layout, probes);
                 AddLightProbes(probes, IsSchema(pkg.Layout.schema, "gameplay_layout"));
@@ -3299,6 +3331,95 @@ namespace OnwardGenerator
             renderer.receiveShadows = false;
             renderer.lightProbeUsage = LightProbeUsage.Off;
             ps.Play();
+        }
+
+        // Plan 2026-11-17, increment F: a box of drifting motes per volume over the AI routes, on the SDK's lit particle
+        // shader with the dust colour on the material, lit by the probes so a mote in shade is not bright. One wind for the
+        // whole map. Not static.
+        private static void AddDust(Package pkg, string root)
+        {
+            DustOptions dust = pkg.Options.dust;
+            if (dust == null || dust.volumes == null || dust.volumes.Length == 0) return;
+            if (dust.box_m == null || dust.box_m.Length != 3 || !(dust.box_m[0] > 0f && dust.box_m[1] > 0f && dust.box_m[2] > 0f))
+                throw new InvalidDataException("dust: box_m must be three positive lengths");
+            if (!(dust.rate_per_s > 0f && dust.lifetime_s > 0f && dust.max_particles > 0 && dust.min_size_m > 0f && dust.max_size_m >= dust.min_size_m))
+                throw new InvalidDataException("dust: rate_per_s, lifetime_s, max_particles and min_size_m must be positive, max_size_m at least min_size_m");
+            if (!ColorUtility.TryParseHtmlString(dust.color, out Color colour))
+                throw new InvalidDataException($"dust color {dust.color} is not #RRGGBB");
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(DustShaderPath)
+                ?? throw new InvalidOperationException($"Missing SDK shader at {DustShaderPath}.");
+            string texturePath = $"{root}/Textures/T_dust_mote.png";
+            File.WriteAllBytes(texturePath, File.ReadAllBytes(pkg.Path(DustRole)));
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter
+                ?? throw new InvalidOperationException($"{texturePath}: no TextureImporter after the import");
+            importer.textureType = TextureImporterType.Default;
+            importer.sRGBTexture = true;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.alphaIsTransparency = true;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.mipmapEnabled = true;
+            importer.SaveAndReimport();
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath)
+                ?? throw new InvalidOperationException($"{texturePath}: imported, but no Texture2D to load");
+            var material = new Material(shader) { name = "M_dust" };
+            // The colour goes on the material: the headset showed white motes when only the particles carried it.
+            material.SetTexture("_MainTex", texture);
+            material.SetColor("_BaseColor", colour);
+            material.SetFloat("_Cutoff", SmokeCutoff);
+            AssetDatabase.CreateAsset(material, $"{root}/M_dust.mat");
+
+            // Heading clockwise from north in the map's frame; Unity's x is east and z north.
+            float heading = dust.heading_deg * Mathf.Deg2Rad;
+            var wind = new Vector3(Mathf.Sin(heading), 0f, Mathf.Cos(heading)) * dust.drift_m_s;
+            var parent = new GameObject("Dust");
+            foreach (DustVolume volume in dust.volumes)
+            {
+                var go = new GameObject("Dust_" + volume.seed.ToString(CultureInfo.InvariantCulture));
+                go.transform.SetParent(parent.transform, false);
+                go.transform.position = Local(volume.x, volume.y, volume.z);
+                var ps = go.AddComponent<ParticleSystem>();
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                ps.useAutoRandomSeed = false;
+                ps.randomSeed = (uint)Math.Max(1, volume.seed);
+                var main = ps.main;
+                main.loop = true;
+                main.prewarm = true;
+                main.playOnAwake = true;
+                main.duration = dust.lifetime_s;
+                main.startLifetime = dust.lifetime_s;
+                main.startSpeed = 0f;
+                main.startSize = new ParticleSystem.MinMaxCurve(dust.min_size_m, dust.max_size_m);
+                main.startColor = Color.white;
+                main.maxParticles = dust.max_particles;
+                main.simulationSpace = ParticleSystemSimulationSpace.World;
+                var emission = ps.emission;
+                emission.rateOverTime = dust.rate_per_s;
+                var shape = ps.shape;
+                shape.shapeType = ParticleSystemShapeType.Box;
+                shape.scale = new Vector3(dust.box_m[0], dust.box_m[2], dust.box_m[1]);
+                var velocity = ps.velocityOverLifetime;
+                velocity.enabled = true;
+                velocity.space = ParticleSystemSimulationSpace.World;
+                velocity.x = new ParticleSystem.MinMaxCurve(wind.x);
+                velocity.y = new ParticleSystem.MinMaxCurve(-0.05f, 0.05f);
+                velocity.z = new ParticleSystem.MinMaxCurve(wind.z);
+                var fade = new Gradient();
+                fade.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                             new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.8f), new GradientAlphaKey(0f, 1f) });
+                var life = ps.colorOverLifetime;
+                life.enabled = true;
+                life.color = fade;
+                var renderer = go.GetComponent<ParticleSystemRenderer>();
+                renderer.renderMode = ParticleSystemRenderMode.Billboard;
+                renderer.sortMode = ParticleSystemSortMode.Distance;
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
+                ps.Play();
+            }
+            Debug.Log($"{LogPrefix} Dust: {dust.volumes.Length} volumes, {dust.max_particles} motes each at most, wind {dust.heading_deg:0} deg at {dust.drift_m_s} m/s, {shader.name}.");
         }
 
         // One baked point light per furnished room, in node order, up to interior_lights_max.
