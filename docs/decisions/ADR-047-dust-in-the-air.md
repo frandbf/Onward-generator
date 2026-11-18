@@ -1,6 +1,6 @@
 # ADR-047: Dust in the air
 
-Status: proposed · 17 November 2026. Plan [2026-11-17-efectos-sdk](../plans/2026-11-17-efectos-sdk.md), increment F. Pending a headset check of the soft motes and the frame rate. The first headset session (17 November 2026, Mogadishu `pkg_21`) showed the dithered motes as hard white squares; this record now describes their replacement.
+Status: withdrawn · 18 November 2026. Plan [2026-11-17-efectos-sdk](../plans/2026-11-17-efectos-sdk.md), increment F. Merged in #134 and removed the next day: on the headset the motes drawn by code did not reach the expected quality (first hard white squares on `PP_Particle_UnLit_Dither`, then soft motes on `PP_Particle_Simple_Lit` that still did not read as dust). The `dust` key, `export package --dust`, `config/dust.json` and the adapter's `AddDust` are gone; a `map.json` that still has `"dust"` is ignored. Dust may return from ready-made particle packs the maintainer imports. The record below describes what was built.
 
 ## Context
 
