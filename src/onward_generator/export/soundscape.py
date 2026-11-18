@@ -4,7 +4,8 @@
 reads the map's war damage (``signs.damage``): ``heavy`` is ``war``, anything else ``regional``. ``default`` keeps the
 sound of before. ``regional`` swaps the birds and the roof wind for the clips of the map's facade style
 (``config/soundscape.json`` ``regional``) and sets an engine generator by a power pole. ``war`` and ``battle`` add
-distant combat as the global ambience, fire under each smoke column and flies over wrecks and rubbish.
+distant combat as the global ambience, fire under each smoke column and flies over rubbish and wrecks: a bin, a can or a
+barrel first (``flies_first``), each with its clip stacked twice, as the SDK sets no volume on a source.
 
 Every clip is one the Onward client ships (``OnwardAudioDataStrings`` of the SDK), named by the configuration and
 checked by its schema: nothing is added to the package, no licence to record. ``adapter_options.json`` gains a
@@ -45,13 +46,15 @@ class SoundscapeError(ValueError):
 
 @dataclass(frozen=True)
 class Source:
-    """One kind of local source: its clip, how many, how far apart, how far from the spawns, how high."""
+    """One kind of local source: its clip, how many, how far apart, how far from the spawns, how high, and how many
+    copies of the clip stand on each site (the SDK has no volume: two copies play it louder)."""
 
     clip: str
     max: int
     apart_m: float
     spawn_clear_m: float
     height_m: float
+    copies: int
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,7 @@ class SoundConfig:
     regional: Mapping[str, tuple[str | None, str | None]]
     sources: Mapping[str, Source]
     flies_kinds: frozenset[str]
+    flies_first: frozenset[str]
 
 
 def parse_soundscape(doc: object, schema: Mapping[str, Any], where: str) -> SoundConfig:
@@ -77,8 +81,9 @@ def parse_soundscape(doc: object, schema: Mapping[str, Any], where: str) -> Soun
         locals_={name: tuple(mode["local"]) for name, mode in doc["modes"].items()},
         regional={style: (row["birds"], row["wind"]) for style, row in doc["regional"].items()},
         sources={name: Source(str(row["clip"]), int(row["max"]), float(row["apart_m"]), float(row["spawn_clear_m"]),
-                              float(row["height_m"])) for name, row in doc["local"].items()},
+                              float(row["height_m"]), int(row["copies"])) for name, row in doc["local"].items()},
         flies_kinds=frozenset(doc["flies_kinds"]),
+        flies_first=frozenset(doc["flies_first"]),
     )
 
 
@@ -108,15 +113,16 @@ def resolve_mode(choice: str, damage: str) -> str:
     return choice
 
 
-def _ordered(sites: Iterable[tuple[str, float, float, float]]) -> list[tuple[str, float, float, float]]:
-    return sorted(sites, key=lambda s: hashlib.sha256(s[0].encode()).hexdigest())
+def _ordered(sites: Iterable[tuple[str, float, float, float]], first: frozenset[str]) -> list[tuple[str, float, float, float]]:
+    return sorted(sites, key=lambda s: (s[0] not in first, hashlib.sha256(s[0].encode()).hexdigest()))
 
 
 def pick(sites: Iterable[tuple[str, float, float, float]], source: Source, half_side_m: float | None,
-         spawns: Sequence[tuple[float, float]]) -> list[tuple[float, float, float]]:
-    """Up to ``source.max`` sites inside the core, clear of the spawns and of each other, in an order fixed by ids."""
+         spawns: Sequence[tuple[float, float]], first: frozenset[str] = frozenset()) -> list[tuple[float, float, float]]:
+    """Up to ``source.max`` sites inside the core, clear of the spawns and of each other, in an order fixed by ids; the
+    ids in ``first`` come before the others."""
     chosen: list[tuple[float, float, float]] = []
-    for _site_id, x, y, z in _ordered(sites):
+    for _site_id, x, y, z in _ordered(sites, first):
         if len(chosen) == source.max:
             break
         inside = half_side_m is None or max(abs(x), abs(y)) <= half_side_m
@@ -137,6 +143,12 @@ def flies_sites(objects: Iterable[Mapping[str, Any]], kinds: frozenset[str]) -> 
             x, y, *rest = position
             sites.append((str(record.get("id")), float(x), float(y), float(rest[0]) if rest else 0.0))
     return sites
+
+
+def first_ids(objects: Iterable[Mapping[str, Any]], kinds: frozenset[str], roles: frozenset[str]) -> frozenset[str]:
+    """The ids of the overgrowth records of a listed kind whose role is listed: the flies' first sites."""
+    return frozenset(str(r.get("id")) for r in objects
+                     if r.get("type") == "overgrowth" and r.get("kind") in kinds and r.get("role") in roles)
 
 
 def pole_sites(objects: Iterable[Mapping[str, Any]]) -> list[tuple[str, float, float, float]]:
@@ -166,14 +178,16 @@ def soundscape_block(mode: str, style: str, config: SoundConfig, objects: Sequen
         "flies": flies_sites(objects, config.flies_kinds),
         "generator": pole_sites(objects),
     }
+    first = {"flies": first_ids(objects, config.flies_kinds, config.flies_first)}
     sources = []
     counts: dict[str, int] = {}
     for kind in config.locals_[mode]:
         source = config.sources[kind]
-        chosen = pick(sites[kind], source, half_side_m, spawns)
+        chosen = pick(sites[kind], source, half_side_m, spawns, first.get(kind, frozenset()))
         counts[kind] = len(chosen)
-        sources += [{"name": f"{kind.capitalize()}_{i + 1}", "clip": source.clip, "x": round(x, 3), "y": round(y, 3),
-                     "z": round(z + source.height_m, 3)} for i, (x, y, z) in enumerate(chosen)]
+        sources += [{"name": f"{kind.capitalize()}_{i + 1}" + (f"_{copy + 1}" if copy else ""), "clip": source.clip,
+                     "x": round(x, 3), "y": round(y, 3), "z": round(z + source.height_m, 3)}
+                    for i, (x, y, z) in enumerate(chosen) for copy in range(source.copies)]
     combat = config.globals_[mode]
     record.update({"global": combat, "birds": birds, "wind": wind, "sources": counts})
     if combat is None and birds is None and wind is None and not sources:
@@ -182,5 +196,5 @@ def soundscape_block(mode: str, style: str, config: SoundConfig, objects: Sequen
 
 
 __all__ = ["AUTO", "CHOICES", "DEFAULT", "LOCAL_KINDS", "MODES", "SoundConfig", "SoundscapeError", "Source",
-           "check_choice", "flies_sites", "load_soundscape", "parse_soundscape", "pick", "pole_sites", "resolve_mode",
+           "check_choice", "first_ids", "flies_sites", "load_soundscape", "parse_soundscape", "pick", "pole_sites", "resolve_mode",
            "soundscape_block"]

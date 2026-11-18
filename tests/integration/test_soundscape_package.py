@@ -45,8 +45,9 @@ def test_war_sounds_combat_fire_under_the_smoke_and_flies(inputs: tuple[Path, Pa
     assert (block["mode"], block["global"], block["birds"], block["wind"]) == ("war", "Distant Combat Sparse", "Birds African Bush 1", "Wind Desert")
     fires = sorted((s["x"], s["y"], s["z"]) for s in block["sources"] if s["clip"] == "Fire")
     assert fires == sorted((x, y, 1.5) for x, y in far)  # each column stands 1 m over its wreck, the fire 0.5 m more
-    assert sorted((s["x"], s["y"]) for s in block["sources"] if s["clip"] == "Flies") == sorted(far)[:4]
-    assert result.manifest["soundscape"]["sources"] == {"generator": 0, "fire": len(far), "flies": min(len(far), 4)}
+    assert len(far) <= 8  # every wreck carries flies, its clip twice
+    assert sorted((s["x"], s["y"]) for s in block["sources"] if s["clip"] == "Flies") == sorted(far + far)
+    assert result.manifest["soundscape"]["sources"] == {"generator": 0, "fire": len(far), "flies": len(far)}
     assert result.manifest["package_id"] != GOLDEN_PACKAGE_ID and verify_package(result.directory) == []
 
 
