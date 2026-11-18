@@ -692,6 +692,21 @@ def _with_party(materials: dict[str, Material]) -> dict[str, Material]:
     return materials | {PARTY_PREFIX + name: material for name, material in materials.items()}
 
 
+PARAPET_MIN_M = 0.5
+"""The lowest roof parapet ``map.json`` ``parapet_m`` sets (18 November 2026): lower, a player could step over it and
+fall off the roof."""
+PARAPET_MAX_M = 1.5
+
+
+def with_parapet(cfg: DetailConfig, height_m: float) -> DetailConfig:
+    """``cfg`` with every template's roof parapet ``height_m`` tall (``map.json`` ``parapet_m``): lower than the
+    templates' 0.7 m, a player on the roof sees more of the street below. A template without a parapet keeps none."""
+    if not PARAPET_MIN_M <= height_m <= PARAPET_MAX_M:
+        raise ValueError(f"parapet height must be from {PARAPET_MIN_M} to {PARAPET_MAX_M} m, got {height_m!r}")
+    return replace(cfg, templates={name: replace(t, parapet_m=height_m) if t.parapet_m > 0 else t
+                                   for name, t in cfg.templates.items()})
+
+
 def load_detail_config(path: str | Path | None = None) -> DetailConfig:
     """The detail configuration of a run, with the furnishing rows of this machine's local Asset Store catalogues (ADR-035)."""
     try:

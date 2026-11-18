@@ -116,6 +116,8 @@ A mismatch raises `DetailError` and writes nothing.
 | `generic_minor` | `minor` | door and windows | `hip` in `roof_tile` when convex and ≤ 200 m²; otherwise `flat` |
 | `landmark_placeholder` | `religious` and any `landmark` | door only (2.4 × 4 m) | `flat` |
 
+`map.json` `"parapet_m"` (`detail --parapet-m`, 18 November 2026) sets every parapet the templates draw to that height, from 0.5 to 1.5 m; a template without a parapet keeps none. The ladders, the lift landings and the trim's cornice read the building's own `parapet_m`, so they follow. At 0.5 m a player on a roof sees more of the street below: the maintainer asked for it after playing Mogadishu's pkg_24. Lower is refused, as a player could step over it and fall off the roof.
+
 ### Typology
 
 [ADR-024](decisions/ADR-024-building-typology.md). Each building records `facade.typology`, and its facade style follows from it (below). The rules are in `config/typology.default.json` (schema beside it; `detail --typology-config`), and every threshold is a modelling assumption.

@@ -370,6 +370,20 @@ def triangle_limit(directory: str | Path) -> int | None:
     return value
 
 
+def parapet_height(directory: str | Path) -> float | None:
+    """``map.json`` ``parapet_m``: the height of every roof parapet in metres (18 November 2026), or None without the
+    key, when the detail templates' height stands. A number from ``detail.config.PARAPET_MIN_M`` to ``PARAPET_MAX_M``;
+    anything else is refused."""
+    from onward_generator.detail.config import PARAPET_MAX_M, PARAPET_MIN_M
+
+    value = load_map(directory).get("parapet_m")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float) or not PARAPET_MIN_M <= value <= PARAPET_MAX_M:
+        raise MapError(f'map.json "parapet_m" must be a number from {PARAPET_MIN_M} to {PARAPET_MAX_M}, got {value!r}')
+    return float(value)
+
+
 def smoke_columns(directory: str | Path) -> int:
     """``map.json`` ``smoke``: how many smoke columns the package asks for (plan 2026-11-15, increment C), 0 without
     the key. An integer from 0 to ``export.smoke.SMOKE_MAX``; anything else is refused."""

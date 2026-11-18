@@ -516,3 +516,23 @@ def test_the_detail_command_passes_the_facade_style_on_both_paths(ring_inputs: t
     assert seen == ["haussmann", "haussmann"]
     assert detail_cli.main([*common[:-2], "--out", str(tmp_path / "auto"), "--core-radius-m", "50"]) == 0
     assert seen[-1] == "auto"
+
+
+def test_the_detail_command_sets_every_roof_parapet_to_the_map_s_height(ring_inputs: tuple[Path, Path, Path], tmp_path: Path,
+                                                                        capsys: pytest.CaptureFixture[str]) -> None:
+    """18 November 2026: ``detail --parapet-m`` (``map.json`` ``parapet_m``) lowers every parapet, and its ladders with it."""
+    from onward_generator.detail import __main__ as detail_cli
+
+    scene, heights, base = ring_inputs
+    common = ["--scene", str(scene), "--heights", str(heights), "--base", str(base), "--no-preview", "--core-radius-m", "50"]
+
+    def parapets(out: Path) -> set[float]:
+        document = json.loads((out / "scene_detail.json").read_text(encoding="utf-8"))
+        return {o["roof"]["parapet_m"] for o in document["objects"] if o.get("type") == "building" and "parapet_m" in o.get("roof", {})}
+
+    assert detail_cli.main([*common, "--out", str(tmp_path / "templates")]) == 0
+    assert parapets(tmp_path / "templates") == {0.7}
+    assert detail_cli.main([*common, "--out", str(tmp_path / "low"), "--parapet-m", "0.5"]) == 0
+    assert parapets(tmp_path / "low") == {0.5}
+    assert detail_cli.main([*common, "--out", str(tmp_path / "bad"), "--parapet-m", "0.4"]) == 1
+    assert capsys.readouterr().err.endswith("detail: parapet height must be from 0.5 to 1.5 m, got 0.4\n")

@@ -113,6 +113,7 @@ The macOS values are the ones used before the option existed. The Linux values a
 | Heights, Catastro or another source plugin | the plugin's stages and `overrides` when it runs, then `heights`, `generate` and everything after it | `geo` |
 | Volumes | `generate` and everything after it | `geo`, `heights` |
 | Facades, or the facade style (`facades.style`) | `detail` and everything after it | `generate` |
+| Roof parapet height (`parapet_m`) | `detail` and everything after it | `generate` |
 | Generated trees and benches | `dress style` and everything after it | `detail` |
 | Asset Store instances | `props place` | the `detail` geometry |
 | Textures | `materials apply` | geometry and OSM footprints |
