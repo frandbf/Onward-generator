@@ -172,7 +172,7 @@ A new map gets the base pipeline: OSM, the height sources that cover its centre,
 | `lightmap_pages_max: N` | Lowers the texel density until the lightmap fits N pages, never below 4 texels/m (plan C5) |
 | `lit_normal_material: "facade_trim_…"`, `lit_normal_strength` | Spike: one facade material lit with a derived normal map ([ADR-033](docs/decisions/ADR-033-lit-normal-spike.md)) |
 
-**Build and headset:** `ONWARD_BAKE=final task unity` bakes the final lighting (default `draft`). `ONWARD_QUEST_LISTING=local-thumb`, `named` or `named-thumb` try experimental card listings ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)). `task unity` asks before every upload. To share a map on the Onward Workshop, check it against the guide first and publish it from a Windows PC: [docs/12-export.md](docs/12-export.md#onward-workshop).
+**Build and headset:** `ONWARD_BAKE=final task unity` bakes the final lighting (default `draft`). `ONWARD_QUEST_LISTING=local-thumb`, `named` or `named-thumb` try experimental card listings ([docs/12-export.md](docs/12-export.md#quest-listing-modes-experimental)). `task unity` asks before every upload. To share a map on the Onward Workshop, check it against the guide, write its kit with `task workshop -- <package>` (to `~/Unity/WorkshopExports/<map id>/`) and publish it from a Windows PC: [docs/12-export.md](docs/12-export.md#onward-workshop).
 
 **On by default, can be turned off:** shop furnishing (`interiors.shops.furnish.enabled`), flat furnishing (`interiors.furnish.enabled`), semantic furniture sets (`ONWARD_SEMANTIC_SETS=0` off) and your local Asset Store catalogues (`ONWARD_LOCAL_CATALOGUES=0` hides them).
 

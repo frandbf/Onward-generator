@@ -108,6 +108,11 @@ tasks:
     cmds:
       - "tools/unity/onward_adapter/build_map.sh {{.CLI_ARGS}}"
 
+  workshop:
+    desc: On the host, write the Onward Workshop kit of each package (built with the final bake) to ~/Unity/WorkshopExports, one folder per map
+    cmds:
+      - "python3 -I tools/unity/workshop_kit.py {{.CLI_ARGS}}"
+
   shell:
     desc: Open a shell in the image
     interactive: true
