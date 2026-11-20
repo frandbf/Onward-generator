@@ -18,6 +18,7 @@ Every Python stage runs inside the project's Docker image (`Taskfile.yml` → `t
 | `task map -- <flags>` | Make a map, resume it, or rerun it from a stage (`--from <stage>`). The only way you run the pipeline. It stops after the export package; Unity is a separate step. |
 | `task unity` / `task unity -- "<map name, id or package>"` | Build the newest package, or a named one, in Unity on the host. Without a terminal it builds and **skips the Quest upload by itself**. |
 | `ONWARD_BAKE=final task unity -- "<map>"` | The same with the release-quality light bake (step 6). |
+| `task workshop -- maps/<id>/data/processed/export/pkg_NN` | Write that package's Workshop kit to `~/Unity/WorkshopExports/<map id>/` (step 8). Only after a final-bake build. |
 | `task image` | Rebuild the Docker image, only when the user agrees (it takes minutes). |
 | `task --list` | Show the available tasks. |
 | `tools/docker/run.sh onward-generator doctor` | Read-only setup check, inside Docker. |
@@ -153,11 +154,13 @@ When the user wants to share the map publicly, check it against the Onward *Cust
 | Title 6–18 characters (24 at most), description about 250 characters (500 at most), thumbnail 512×256 | Write a short, inviting description in English, with the required data credits: `Map data © OpenStreetMap contributors (ODbL)`, plus Catastro and IGN `(CC BY 4.0)` for a map in Spain. Put the title and description in `config/export.json` (`map.title`, `map.description`) and rerun from `export`. The thumbnail is written by the generator. |
 | Built with the final bake | Step 6. |
 
+**The Workshop kit.** After the final-bake build, run `task workshop -- maps/<id>/data/processed/export/pkg_NN`. It writes `~/Unity/WorkshopExports/<map id>/` and `<map id>.zip`: a reduced Unity project with only this map's scene, its Dashboard fields already filled in, the 512×256 cover, `workshop/PUBLICAR.md` and `LEEME.txt`. A newer kit replaces the map's older one, so that folder is the one place where the maps ready to publish are. Read its warnings (long title or description, missing OpenStreetMap credit) to the user, and the Asset Store packages that `PUBLICAR.md` lists for them to check.
+
 **Publishing itself is not done from here.** Tell the user:
 
 1. It needs a **Windows PC** with the Meta Quest (Oculus) PC app open, logged into an account that owns Onward. The app does not exist for macOS.
-2. Copy the Unity project the build used to that PC, open it with Unity 2021.3.23f1 (Android and Windows build support), double-click `Assets/OnwardCustomContent/RegistryKey/OnwardUGCRegConfig.reg` once in Windows Explorer, and restart the PC.
-3. In Unity, open **Onward Custom Map Dashboard**, accept the terms, fill in title, description, environment, map size, time of day, thumbnail and display version `1.0`, and press **Publish**.
+2. Copy the map's kit folder (or its zip) from `~/Unity/WorkshopExports/` to that PC, open its `OnwardProject` with Unity 2021.3.23f1 (Android and Windows build support), double-click `Assets/OnwardCustomContent/RegistryKey/OnwardUGCRegConfig.reg` once in Windows Explorer, and restart the PC.
+3. In Unity, open the map's scene and **Onward Custom Map Dashboard**, accept the terms, check the fields against `workshop/PUBLICAR.md` (they come filled in), and press **Publish**.
 4. Approval can take up to two weeks; updates are reviewed too.
 
 There is no file to upload by hand: the `.content3` the build writes is only for local testing on the headset.

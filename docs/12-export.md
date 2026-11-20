@@ -270,6 +270,15 @@ This pipeline does not publish. What a map needs before the maintainer publishes
 | No "full name, likeness or representation of any person (alive or dead)" | `map.json` `"user_decals": false` leaves the maintainer's own decals off (ADR-038 amendment). |
 | Title 6–18 characters (24 at most), description about 250 (500 at most), thumbnail 512 × 256, environment and time of day matching the map | The export card's `map.title` and `map.description`; the thumbnail is written at 512 × 256. |
 
+`task workshop -- maps/<id>/data/processed/export/pkg_NN [...]` (`tools/unity/workshop_kit.py`, on the host) writes each package's publication kit to `~/Unity/WorkshopExports/<map id>/`, the one place to look for maps ready to publish. The package must be built in Unity with the `final` bake, and its title and description must fit the limits above; a description past 300 characters, a title past 18 or a description without the OpenStreetMap credit is a warning. The kit holds:
+
+- `OnwardProject/`: `Assets` with only this map's scene under `Assets/OnwardAdapter`, `Packages` and `ProjectSettings`, but not `Library`. Its `SharedLevelSettings.asset`, which the Dashboard reads, carries the title and description of the map's `config/export.json` (not the package's description, which appends every credit and can pass 500 characters), display version 1.0, and the scene for both PC and Quest.
+- `workshop/`: `cover_512x256.png`, `publish.json`, and `PUBLICAR.md` with every Dashboard field, the package's data credits and the Unity Asset Store packages found in the scene, to be checked.
+- `LEEME.txt`: what to install on Windows and how to publish.
+- `<map id>.zip`, beside the folder.
+
+A newer kit replaces the map's older one, so the folder keeps only the latest kit of each map.
+
 Publishing itself needs a Windows PC with the Meta Quest (Oculus) PC app open, logged into an account that owns Onward; the Unity project the build used, opened there with Unity 2021.3.23f1; the SDK's registry key (double-click `Assets/OnwardCustomContent/RegistryKey/OnwardUGCRegConfig.reg` in Windows Explorer, then restart); and the SDK's **Onward Custom Map Dashboard**, which uploads the scene. No file is uploaded by hand: the `.content3` the launcher step writes is only for local testing. Approval takes up to two weeks; updates are reviewed too.
 
 ## Known limits
